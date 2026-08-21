@@ -69,7 +69,9 @@ const KIND_LABEL: Record<string, string> = {
  *  an instant rather than a stay. */
 function lasted(event: EventView): string | null {
     if (!event.endedAt) return null;
-    const seconds = Math.round((new Date(event.endedAt).getTime() - new Date(event.at).getTime()) / 1000);
+    const seconds = Math.round(
+        (new Date(event.endedAt).getTime() - new Date(event.at).getTime()) / 1000
+    );
     return seconds >= 1 ? `${seconds}s` : null;
 }
 
@@ -87,7 +89,11 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const [zones, setZones] = useState<string[]>([]);
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
-    const [moment, setMoment] = useState<{ event: EventView; clipId: string; offsetSeconds: number } | null>(null);
+    const [moment, setMoment] = useState<{
+        event: EventView;
+        clipId: string;
+        offsetSeconds: number;
+    } | null>(null);
     const [noFootage, setNoFootage] = useState<string | null>(null);
     /** Each still's own shape, by event, learned as the pictures arrive. */
     const [shapes, setShapes] = useState<Record<string, number>>({});
@@ -129,7 +135,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 cameraId: cameraId || null,
                 kind: kind || null,
                 label: label || null,
-                    zone: zone || null,
+                zone: zone || null,
                 from: from || null,
                 to: to || null
             });
@@ -172,7 +178,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         const result = await runAction(() => actions.deleteEventAction(event.id), setError);
         if (result?.error) {
             setError(result.error);
-            setEvents((current) => [event, ...(current ?? [])].sort((a, b) => b.at.localeCompare(a.at)));
+            setEvents((current) =>
+                [event, ...(current ?? [])].sort((a, b) => b.at.localeCompare(a.at))
+            );
         }
     };
 
@@ -207,7 +215,9 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         if (result?.error) {
             setError(result.error);
             setEvents((current) =>
-                (current ?? []).map((item) => (item.id === event.id ? { ...item, acked: false } : item))
+                (current ?? []).map((item) =>
+                    item.id === event.id ? { ...item, acked: false } : item
+                )
             );
         }
     };
@@ -255,7 +265,13 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         ...cameras.map((camera) => ({ value: camera.id, label: camera.name }))
                     ]}
                 />
-                <Select value={kind} onValueChange={setKind} className="w-44" aria-label="What happened" options={KINDS} />
+                <Select
+                    value={kind}
+                    onValueChange={setKind}
+                    className="w-44"
+                    aria-label="What happened"
+                    options={KINDS}
+                />
                 {people.length > 0 ? (
                     <Select
                         value={label}
@@ -268,7 +284,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             // the event, shown under whatever they are called
                             // now: a name corrected here still finds everything
                             // recorded before the correction.
-                            ...people.map((person) => ({ value: person.subjectId, label: person.name }))
+                            ...people.map((person) => ({
+                                value: person.subjectId,
+                                label: person.name
+                            }))
                         ]}
                     />
                 ) : null}
@@ -365,12 +384,17 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
                                             className="object-contain"
                                             onLoad={(loaded) => {
-                                                const { naturalWidth, naturalHeight } = loaded.currentTarget;
+                                                const { naturalWidth, naturalHeight } =
+                                                    loaded.currentTarget;
                                                 if (naturalWidth <= 0 || naturalHeight <= 0) return;
                                                 setShapes((current) =>
                                                     current[event.id]
                                                         ? current
-                                                        : { ...current, [event.id]: naturalWidth / naturalHeight }
+                                                        : {
+                                                              ...current,
+                                                              [event.id]:
+                                                                  naturalWidth / naturalHeight
+                                                          }
                                                 );
                                             }}
                                             unoptimized
@@ -383,7 +407,11 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     {event.stillKey ? (
                                         <DetectionBox
                                             box={event.box}
-                                            label={nameFor(event.label) ?? KIND_LABEL[event.kind] ?? null}
+                                            label={
+                                                nameFor(event.label) ??
+                                                KIND_LABEL[event.kind] ??
+                                                null
+                                            }
                                             picture={shapes[event.id] ?? null}
                                             tile={TILE_SHAPE}
                                         />
@@ -397,13 +425,17 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
                                         <p className="truncate text-[13px] text-foreground">
-                                            {nameFor(event.label) ?? KIND_LABEL[event.kind] ?? event.kind}
+                                            {nameFor(event.label) ??
+                                                KIND_LABEL[event.kind] ??
+                                                event.kind}
                                         </p>
                                         <p className="truncate text-[11px] text-foreground-subtle">
                                             {[
                                                 event.cameraName,
                                                 format.dateTime(event.at),
-                                                event.zones.length > 0 ? event.zones.join(", ") : null,
+                                                event.zones.length > 0
+                                                    ? event.zones.join(", ")
+                                                    : null,
                                                 lasted(event)
                                             ]
                                                 .filter(Boolean)
@@ -412,7 +444,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1">
                                         {event.score !== null ? (
-                                            <Badge variant="neutral" title="How sure the detector was">
+                                            <Badge
+                                                variant="neutral"
+                                                title="How sure the detector was"
+                                            >
                                                 {event.score}
                                             </Badge>
                                         ) : null}
@@ -445,8 +480,15 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     </ul>
                     {!done ? (
                         <div className="flex justify-center">
-                            <Button variant="secondary" size="sm" onClick={loadMore} disabled={loadingMore}>
-                                {loadingMore ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 Show older
                             </Button>
                         </div>
@@ -523,7 +565,10 @@ function FeedSkeleton() {
     return (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
-                <div key={index} className="overflow-hidden rounded-lg border border-border bg-card">
+                <div
+                    key={index}
+                    className="overflow-hidden rounded-lg border border-border bg-card"
+                >
                     <Skeleton className="aspect-video w-full rounded-none" />
                     <div className="border-t border-border px-3 py-2">
                         <Skeleton className="h-3.5 w-32" />

@@ -103,12 +103,19 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
     };
 
     const toggle = async (rule: AlertRuleView, enabled: boolean) => {
-        setRules((current) => (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled } : item)));
-        const result = await runAction(() => actions.saveAlertAction(rule.id, { ...rule, enabled }), setError);
+        setRules((current) =>
+            (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled } : item))
+        );
+        const result = await runAction(
+            () => actions.saveAlertAction(rule.id, { ...rule, enabled }),
+            setError
+        );
         if (result?.error) {
             setError(result.error);
             setRules((current) =>
-                (current ?? []).map((item) => (item.id === rule.id ? { ...item, enabled: !enabled } : item))
+                (current ?? []).map((item) =>
+                    item.id === rule.id ? { ...item, enabled: !enabled } : item
+                )
             );
         }
     };
@@ -191,14 +198,27 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                 >
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="truncate text-[13px] text-foreground" title={rule.name}>{rule.name}</span>
-                                            {rule.channelId ? null : <Badge variant="neutral">Never fired</Badge>}
+                                            <span
+                                                className="truncate text-[13px] text-foreground"
+                                                title={rule.name}
+                                            >
+                                                {rule.name}
+                                            </span>
+                                            {rule.channelId ? null : (
+                                                <Badge variant="neutral">Never fired</Badge>
+                                            )}
                                         </div>
-                                        <p className="truncate text-[11px] text-foreground-subtle">{describe(rule)}</p>
+                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                            {describe(rule)}
+                                        </p>
                                         <p className="truncate text-[11px] text-foreground-subtle">
                                             Tells{" "}
                                             {rule.recipients
-                                                .map((id) => people.find((person) => person.id === id)?.name ?? "somebody")
+                                                .map(
+                                                    (id) =>
+                                                        people.find((person) => person.id === id)
+                                                            ?.name ?? "somebody"
+                                                )
                                                 .join(", ")}
                                         </p>
                                     </div>
@@ -241,18 +261,25 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                             <Pencil className="size-4 shrink-0" />
                                             Rename and change
                                         </ContextMenuItem>
-                                        <ContextMenuItem onSelect={() => void toggle(rule, !rule.enabled)}>
+                                        <ContextMenuItem
+                                            onSelect={() => void toggle(rule, !rule.enabled)}
+                                        >
                                             <Bell className="size-4 shrink-0" />
                                             {rule.enabled ? "Turn off" : "Turn on"}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
-                                        <ContextMenuItem variant="danger" onSelect={() => setRemoving(rule)}>
+                                        <ContextMenuItem
+                                            variant="danger"
+                                            onSelect={() => setRemoving(rule)}
+                                        >
                                             <Trash2 className="size-4 shrink-0" />
                                             Remove
                                         </ContextMenuItem>
                                     </>
                                 ) : (
-                                    <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                    <ContextMenuItem disabled>
+                                        Nothing to change here
+                                    </ContextMenuItem>
                                 )}
                             </ContextMenuContent>
                         </ContextMenu>

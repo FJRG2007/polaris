@@ -32,7 +32,10 @@ import type { CSSProperties } from "react";
  * so one axis fills and the other is the ratio of the two shapes - and centred,
  * which is what `m-auto` against a full inset does with the size below.
  */
-function pictureFrame(picture: number | null | undefined, tile: number | null | undefined): CSSProperties {
+function pictureFrame(
+    picture: number | null | undefined,
+    tile: number | null | undefined
+): CSSProperties {
     const usable = (value: number | null | undefined): value is number =>
         typeof value === "number" && Number.isFinite(value) && value > 0;
     if (!usable(picture) || !usable(tile)) return {};
@@ -64,9 +67,16 @@ export function DetectionBox({
     if (width <= 0 || height <= 0) return null;
 
     return (
-        <span aria-hidden className="pointer-events-none absolute inset-0 m-auto" style={pictureFrame(picture, tile)}>
+        <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 m-auto"
+            style={pictureFrame(picture, tile)}
+        >
             <span
-                className={cn("absolute rounded-[3px] border-2 border-primary shadow-[0_0_0_1px_rgba(0,0,0,0.5)]", className)}
+                className={cn(
+                    "absolute rounded-[3px] border-2 border-primary shadow-[0_0_0_1px_rgba(0,0,0,0.5)]",
+                    className
+                )}
                 style={{
                     left: `${box.x1 * 100}%`,
                     top: `${box.y1 * 100}%`,

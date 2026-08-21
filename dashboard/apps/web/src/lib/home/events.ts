@@ -21,7 +21,15 @@ import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
 export interface Detection {
     readonly cameraId: string;
-    readonly kind: "motion" | "person" | "vehicle" | "animal" | "package" | "face" | "offline" | "tamper";
+    readonly kind:
+        | "motion"
+        | "person"
+        | "vehicle"
+        | "animal"
+        | "package"
+        | "face"
+        | "offline"
+        | "tamper";
     /** A name, when the stage that fired can put one to it. */
     readonly label?: string | null;
     /** 0-100, as the detector reported it. */
@@ -134,7 +142,14 @@ export async function recordDetection(detection: Detection): Promise<EventView |
                     score: detection.score ?? null,
                     ...(detection.stillKey ? { stillKey: detection.stillKey } : {}),
                     ...(detection.box
-                        ? { box: JSON.stringify([detection.box.x1, detection.box.y1, detection.box.x2, detection.box.y2]) }
+                        ? {
+                              box: JSON.stringify([
+                                  detection.box.x1,
+                                  detection.box.y1,
+                                  detection.box.x2,
+                                  detection.box.y2
+                              ])
+                          }
                         : {}),
                     ...(detection.zones ? { zones: JSON.stringify(detection.zones) } : {})
                 }
@@ -166,7 +181,11 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     if (!detection.trackId) {
         const gapMs = settings.minGapSeconds * 1000;
         const recent = await prisma.cameraEvent.findFirst({
-            where: { cameraId: camera.id, kind: detection.kind, at: { gt: new Date(at.getTime() - gapMs) } },
+            where: {
+                cameraId: camera.id,
+                kind: detection.kind,
+                at: { gt: new Date(at.getTime() - gapMs) }
+            },
             select: { id: true }
         });
         if (recent) return null;
@@ -180,7 +199,14 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             label: detection.label ?? null,
             score: detection.score ?? null,
             stillKey: detection.stillKey ?? null,
-            box: detection.box ? JSON.stringify([detection.box.x1, detection.box.y1, detection.box.x2, detection.box.y2]) : null,
+            box: detection.box
+                ? JSON.stringify([
+                      detection.box.x1,
+                      detection.box.y1,
+                      detection.box.x2,
+                      detection.box.y2
+                  ])
+                : null,
             zones: JSON.stringify(detection.zones ?? []),
             trackId: detection.trackId ?? null
         }
@@ -211,7 +237,11 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     if (camera.recording === "motion") {
         void recordClip(camera.installedAppId, camera.id, "motion", MOTION_SECONDS)
             .then(async (clip) => {
-                if (clip) await prisma.cameraEvent.update({ where: { id: row.id }, data: { clipId: clip.id } });
+                if (clip)
+                    await prisma.cameraEvent.update({
+                        where: { id: row.id },
+                        data: { clipId: clip.id }
+                    });
             })
             .catch((error) => console.error("polaris: could not keep footage of an event:", error));
     }
@@ -236,7 +266,9 @@ export async function recordDetection(detection: Detection): Promise<EventView |
 /** A stored box, or null for anything that is not four numbers. Read
  *  defensively: this is drawn over a picture, and a malformed row must be an
  *  event with no box rather than a screen that will not render. */
-export function parseEventBox(raw: string | null): { x1: number; y1: number; x2: number; y2: number } | null {
+export function parseEventBox(
+    raw: string | null
+): { x1: number; y1: number; x2: number; y2: number } | null {
     if (!raw) return null;
     try {
         const parsed: unknown = JSON.parse(raw);
@@ -253,7 +285,9 @@ export function parseEventBox(raw: string | null): { x1: number; y1: number; x2:
 export function parseEventZones(raw: string): string[] {
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -282,7 +316,11 @@ export async function closeDetection(cameraId: string, trackId: string, at: Date
  * failure leaves the row exactly as it was - with no picture, which is what it
  * had anyway.
  */
-async function attachStill(installedAppId: string, cameraId: string, eventId: string): Promise<void> {
+async function attachStill(
+    installedAppId: string,
+    cameraId: string,
+    eventId: string
+): Promise<void> {
     try {
         const { cameraStill } = await import("@/lib/home/live");
         const image = await cameraStill(installedAppId, cameraId);
@@ -382,7 +420,10 @@ export interface EventQuery {
 }
 
 /** What happened, newest first. Always bounded. */
-export async function listEvents(installedAppId: string, query: EventQuery = {}): Promise<EventView[]> {
+export async function listEvents(
+    installedAppId: string,
+    query: EventQuery = {}
+): Promise<EventView[]> {
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
     // Scoped through the cameras of this house rather than trusting the id in the
     // request: an event id from anywhere else must not resolve.
@@ -453,13 +494,20 @@ export async function listEvents(installedAppId: string, query: EventQuery = {})
 }
 
 /** Mark an event as seen, so it stops being one of the things waiting. */
-export async function acknowledgeEvent(installedAppId: string, id: string, userId: string): Promise<void> {
+export async function acknowledgeEvent(
+    installedAppId: string,
+    id: string,
+    userId: string
+): Promise<void> {
     const event = await prisma.cameraEvent.findFirst({
         where: { id, camera: { installedAppId } },
         select: { id: true }
     });
     if (!event) throw new Error("Event not found");
-    await prisma.cameraEvent.update({ where: { id }, data: { ackedAt: new Date(), ackedById: userId } });
+    await prisma.cameraEvent.update({
+        where: { id },
+        data: { ackedAt: new Date(), ackedById: userId }
+    });
 }
 
 /**

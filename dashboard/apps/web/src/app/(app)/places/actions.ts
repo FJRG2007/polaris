@@ -38,8 +38,19 @@ import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
-import { cameraInputSchema, cameraZoneInputSchema, discoveryInputSchema, normalizeCameraInput, normalizeZoneInput } from "@/lib/home/schemas";
-import { faceEndpoint, faceRecognitionSettings, installRecognizer, setFaceRecognition } from "@/lib/home/recognizer";
+import {
+    cameraInputSchema,
+    cameraZoneInputSchema,
+    discoveryInputSchema,
+    normalizeCameraInput,
+    normalizeZoneInput
+} from "@/lib/home/schemas";
+import {
+    faceEndpoint,
+    faceRecognitionSettings,
+    installRecognizer,
+    setFaceRecognition
+} from "@/lib/home/recognizer";
 
 const PATH = "/places";
 
@@ -53,7 +64,10 @@ async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: str
     }
 }
 
-export async function listCamerasAction(): Promise<{ cameras?: cameras.CameraView[]; error?: string }> {
+export async function listCamerasAction(): Promise<{
+    cameras?: cameras.CameraView[];
+    error?: string;
+}> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
@@ -99,7 +113,8 @@ export async function savePlaceAction(
     const result = await guard(() =>
         id ? places.updatePlace(install.id, id, shape) : places.createPlace(install.id, shape)
     );
-    if (result.error || !result.value) return { error: result.error ?? "That place could not be saved." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "That place could not be saved." };
     revalidatePath(PATH);
     return { place: result.value };
 }
@@ -121,12 +136,19 @@ export async function listRecipientsAction(): Promise<{
     await requireHome("home.manage");
     const result = await guard(async () => {
         const { prisma } = await import("@polaris/db");
-        return prisma.user.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true }, take: 200 });
+        return prisma.user.findMany({
+            orderBy: { name: "asc" },
+            select: { id: true, name: true },
+            take: 200
+        });
     });
     return result.error ? { error: result.error } : { people: result.value };
 }
 
-export async function listAlertsAction(): Promise<{ rules?: alerts.AlertRuleView[]; error?: string }> {
+export async function listAlertsAction(): Promise<{
+    rules?: alerts.AlertRuleView[];
+    error?: string;
+}> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () =>
         alerts.listAlertRules(install.id, (await currentPlace(install.id)).current.id)
@@ -152,7 +174,8 @@ export async function saveAlertAction(
         const placeId = input.placeId ?? (await currentPlace(install.id)).current.id;
         return alerts.saveAlertRule(install.id, id, user.id, { ...input, placeId });
     });
-    if (result.error || !result.value) return { error: result.error ?? "That alert could not be saved." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "That alert could not be saved." };
     revalidatePath(`${PATH}/alerts`);
     return { rule: result.value };
 }
@@ -193,7 +216,10 @@ export async function listStorageOptionsAction(): Promise<{
 }> {
     await requireHome("home.read");
     const result = await guard(async () => {
-        const [fallback, connections] = await Promise.all([footageTarget(null), storageTargetOptions()]);
+        const [fallback, connections] = await Promise.all([
+            footageTarget(null),
+            storageTargetOptions()
+        ]);
         return [
             { id: "", label: `Wherever this Polaris keeps footage (${fallback.name})` },
             { id: LOCAL_TARGET, label: "This server" },
@@ -227,7 +253,13 @@ export async function listServersAction(): Promise<{
  * credentials - a camera refuses this call first when they are wrong.
  */
 export async function probeCameraAction(input: unknown): Promise<{
-    probe?: { model: string; manufacturer: string; mainPath: string; subPath: string; ptz: boolean };
+    probe?: {
+        model: string;
+        manufacturer: string;
+        mainPath: string;
+        subPath: string;
+        ptz: boolean;
+    };
     error?: string;
 }> {
     await requireHome("home.manage");
@@ -246,7 +278,8 @@ export async function probeCameraAction(input: unknown): Promise<{
             password: parsed.data.password ?? ""
         })
     );
-    if (result.error || !result.value) return { error: result.error ?? "The camera did not answer." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "The camera did not answer." };
 
     // Only the path is kept from what the camera answered. Its URL carries the
     // host it thinks it is on, which on a camera behind a repeater is an address
@@ -287,7 +320,9 @@ export async function discoverCamerasAction(input: unknown): Promise<{
     const result = await guard(() =>
         discoverCameras(
             parsed.data.subnet,
-            parsed.data.fromServerId ? { hostId: parsed.data.fromServerId, ownerId: install.ownerId } : null
+            parsed.data.fromServerId
+                ? { hostId: parsed.data.fromServerId, ownerId: install.ownerId }
+                : null
         )
     );
     return result.error ? { error: result.error } : { found: result.value };
@@ -298,24 +333,32 @@ export async function saveCameraAction(
     input: unknown
 ): Promise<{ camera?: cameras.CameraView; error?: string }> {
     const { install } = await requireHome("home.manage");
-    const parsed = cameraInputSchema.safeParse(normalizeCameraInput((input ?? {}) as Record<string, unknown>));
+    const parsed = cameraInputSchema.safeParse(
+        normalizeCameraInput((input ?? {}) as Record<string, unknown>)
+    );
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     }
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
         const placeId = parsed.data.placeId || current.id;
-        if (!(await places.getPlace(install.id, placeId))) throw new Error("That place is not one of yours");
+        if (!(await places.getPlace(install.id, placeId)))
+            throw new Error("That place is not one of yours");
         parsed.data.placeId = placeId;
         if (parsed.data.storageTarget) {
-            const allowed = new Set([LOCAL_TARGET, ...(await storageTargetOptions()).map((option) => option.id)]);
-            if (!allowed.has(parsed.data.storageTarget)) throw new Error("That storage is not one of yours");
+            const allowed = new Set([
+                LOCAL_TARGET,
+                ...(await storageTargetOptions()).map((option) => option.id)
+            ]);
+            if (!allowed.has(parsed.data.storageTarget))
+                throw new Error("That storage is not one of yours");
         }
         return id
             ? cameras.updateCamera(install.id, id, parsed.data)
             : cameras.createCamera(install.id, parsed.data);
     });
-    if (result.error || !result.value) return { error: result.error ?? "That camera could not be saved." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "That camera could not be saved." };
     revalidatePath(PATH);
     return { camera: result.value };
 }
@@ -337,7 +380,11 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
         if (!camera.enabled) return;
         const target = await cameras.cameraTarget(install.id, id);
         if (!target) throw new Error("Camera not found");
-        const endpoint = await relay.ensureRelay(install.ownerId, user.id, relay.relayServerFor(camera.reachVia));
+        const endpoint = await relay.ensureRelay(
+            install.ownerId,
+            user.id,
+            relay.relayServerFor(camera.reachVia)
+        );
         await relay.publishCamera(endpoint, target, camera.vendor);
         // A rung Polaris runs itself needs something to run it on, and that
         // machine is the one the owner chose on the form. Installed here rather
@@ -382,7 +429,8 @@ export async function listCameraZonesAction(cameraId: string): Promise<{
 }> {
     const { install } = await requireHome("home.read");
     const result = await guard(() => cameraZones.listCameraZones(install.id, cameraId));
-    if (result.error || !result.value) return { error: result.error ?? "Those areas could not be read." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "Those areas could not be read." };
     return { zones: result.value };
 }
 
@@ -393,18 +441,23 @@ export async function saveCameraZoneAction(
 ): Promise<{ zone?: cameraZones.CameraZoneView; error?: string }> {
     const { install } = await requireHome("home.manage");
     const parsed = cameraZoneInputSchema.safeParse(normalizeZoneInput(input));
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     const result = await guard(() =>
         id
             ? cameraZones.updateCameraZone(install.id, cameraId, id, parsed.data)
             : cameraZones.createCameraZone(install.id, cameraId, parsed.data)
     );
-    if (result.error || !result.value) return { error: result.error ?? "That area could not be saved." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "That area could not be saved." };
     revalidatePath(PATH);
     return { zone: result.value };
 }
 
-export async function deleteCameraZoneAction(cameraId: string, id: string): Promise<{ error?: string }> {
+export async function deleteCameraZoneAction(
+    cameraId: string,
+    id: string
+): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
     const result = await guard(() => cameraZones.deleteCameraZone(install.id, cameraId, id));
     if (result.error) return { error: result.error };
@@ -419,7 +472,9 @@ export async function listPlaceZoneNamesAction(): Promise<{ zones?: string[]; er
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
-        const here = new Set((await cameras.listCameras(install.id, current.id)).map((camera) => camera.id));
+        const here = new Set(
+            (await cameras.listCameras(install.id, current.id)).map((camera) => camera.id)
+        );
         const names = new Set<string>();
         for (const [cameraId, drawn] of await cameraZones.zonesByCamera(install.id)) {
             if (!here.has(cameraId)) continue;
@@ -429,7 +484,8 @@ export async function listPlaceZoneNamesAction(): Promise<{ zones?: string[]; er
         }
         return [...names].sort((first, second) => first.localeCompare(second));
     });
-    if (result.error || !result.value) return { error: result.error ?? "Those areas could not be read." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "Those areas could not be read." };
     return { zones: result.value };
 }
 
@@ -551,7 +607,9 @@ export async function listPeopleAction(): Promise<{
     return result.error ? { error: result.error } : { ...result.value };
 }
 
-export async function addPersonAction(name: string): Promise<{ person?: people.PersonView; error?: string }> {
+export async function addPersonAction(
+    name: string
+): Promise<{ person?: people.PersonView; error?: string }> {
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.addPerson(install.id, String(name)));
     if (result.error || !result.value) return { error: result.error ?? "They could not be added." };
@@ -576,7 +634,9 @@ export async function addFaceAction(
 ): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
     if (image.byteLength > 8_000_000) return { error: "That photograph is too large." };
-    const result = await guard(() => people.addFace(install.id, id, image, faceImageType(contentType)));
+    const result = await guard(() =>
+        people.addFace(install.id, id, image, faceImageType(contentType))
+    );
     return result.error ? { error: result.error } : {};
 }
 
@@ -588,12 +648,16 @@ export async function renamePersonAction(
 ): Promise<{ person?: people.PersonView; error?: string }> {
     const { install } = await requireHome("home.manage");
     const result = await guard(() => people.renamePerson(install.id, id, String(name)));
-    if (result.error || !result.value) return { error: result.error ?? "That name could not be saved." };
+    if (result.error || !result.value)
+        return { error: result.error ?? "That name could not be saved." };
     revalidatePath(`${PATH}/people`);
     return { person: result.value };
 }
 
-export async function setPersonNotifyAction(id: string, notify: boolean): Promise<{ error?: string }> {
+export async function setPersonNotifyAction(
+    id: string,
+    notify: boolean
+): Promise<{ error?: string }> {
     const { install } = await requireHome("home.control");
     const result = await guard(() => people.setNotify(install.id, id, Boolean(notify)));
     return result.error ? { error: result.error } : {};
@@ -658,9 +722,14 @@ export async function installRecognizerAction(serverId: string): Promise<{ error
  * one should not have to install a second, and this speaks the same dialect.
  * Clearing the address switches that pairing off.
  */
-export async function setFaceRecognitionAction(baseUrl: string, apiKey: string): Promise<{ error?: string }> {
+export async function setFaceRecognitionAction(
+    baseUrl: string,
+    apiKey: string
+): Promise<{ error?: string }> {
     const { install } = await requireHome("home.manage");
-    const result = await guard(() => setFaceRecognition(install.id, String(baseUrl), String(apiKey)));
+    const result = await guard(() =>
+        setFaceRecognition(install.id, String(baseUrl), String(apiKey))
+    );
     return result.error ? { error: result.error } : {};
 }
 
@@ -672,7 +741,10 @@ export async function setFaceRecognitionAction(baseUrl: string, apiKey: string):
  * The stop is its own call because movement is continuous - the camera keeps
  * going until told otherwise.
  */
-export async function ptzMoveAction(cameraId: string, direction: ptz.PtzDirection): Promise<{ error?: string }> {
+export async function ptzMoveAction(
+    cameraId: string,
+    direction: ptz.PtzDirection
+): Promise<{ error?: string }> {
     const { install } = await requireHome("home.control");
     const result = await guard(() => ptz.move(install.id, cameraId, direction));
     return result.error ? { error: result.error } : {};
@@ -744,7 +816,9 @@ export async function liveCamerasAction(): Promise<{ live?: string[]; error?: st
             })
         );
         const published = new Set(names.flat());
-        return all.filter((camera) => published.has(relay.streamName(camera.id, "main"))).map((camera) => camera.id);
+        return all
+            .filter((camera) => published.has(relay.streamName(camera.id, "main")))
+            .map((camera) => camera.id);
     });
     return result.error ? { error: result.error } : { live: result.value };
 }

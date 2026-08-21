@@ -99,8 +99,13 @@ async function reconcile(model: LoadedModel | null): Promise<void> {
     for (const [id, assignment] of wanted) {
         if (watches.has(id)) continue;
         const areas = assignment.zones?.length ?? 0;
-        log(`watching ${assignment.cameraName} (${assignment.detector}${areas > 0 ? `, ${areas} areas` : ""})`);
-        watches.set(id, watchCamera({ ...assignment, zones: assignment.zones ?? [] }, { report, model, log }));
+        log(
+            `watching ${assignment.cameraName} (${assignment.detector}${areas > 0 ? `, ${areas} areas` : ""})`
+        );
+        watches.set(
+            id,
+            watchCamera({ ...assignment, zones: assignment.zones ?? [] }, { report, model, log })
+        );
     }
 }
 

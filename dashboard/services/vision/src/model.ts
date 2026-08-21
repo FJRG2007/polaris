@@ -82,21 +82,32 @@ export async function loadModel(path: string): Promise<LoadedModel | null> {
     const size = MODEL_SIZE;
     let rows = 0;
     try {
-        const probe = new ort.Tensor("float32", new Float32Array(3 * size * size), [1, 3, size, size]);
+        const probe = new ort.Tensor("float32", new Float32Array(3 * size * size), [
+            1,
+            3,
+            size,
+            size
+        ]);
         const result = await session.run({ [inputName]: probe });
         const output = result[outputName];
         const dims = output ? fixedDims(output.dims) : null;
         if (!dims || dims.length !== 3) {
-            console.error(`[vision] the model answers in a shape this worker cannot read: ${String(output?.dims)}`);
+            console.error(
+                `[vision] the model answers in a shape this worker cannot read: ${String(output?.dims)}`
+            );
             return null;
         }
         rows = dims[1]!;
         if (dims[2] !== ROW_LENGTH) {
-            console.error(`[vision] the model reports ${dims[2]} values a row, and this worker reads ${ROW_LENGTH}`);
+            console.error(
+                `[vision] the model reports ${dims[2]} values a row, and this worker reads ${ROW_LENGTH}`
+            );
             return null;
         }
         if (rows !== candidateCount(size)) {
-            console.error(`[vision] the model produced ${rows} rows for a ${size}px square, and ${candidateCount(size)} were expected`);
+            console.error(
+                `[vision] the model produced ${rows} rows for a ${size}px square, and ${candidateCount(size)} were expected`
+            );
             return null;
         }
     } catch (error) {
@@ -110,7 +121,8 @@ export async function loadModel(path: string): Promise<LoadedModel | null> {
     return {
         size,
         async run(frame: Uint8Array): Promise<Float32Array> {
-            if (frame.length !== bytes) throw new Error(`frame is ${frame.length} bytes, model takes ${bytes}`);
+            if (frame.length !== bytes)
+                throw new Error(`frame is ${frame.length} bytes, model takes ${bytes}`);
             // Interleaved blue-green-red to one plane per channel, as floats
             // from 0 to 255. Not divided by anything: this model was trained on
             // raw byte values, and normalizing it here would make every score

@@ -57,7 +57,11 @@ export interface VisionAssignment {
      *  event has already been written. */
     readonly zones: readonly Zone[];
     /** Where to ask who somebody is, when the camera reaches that rung. */
-    readonly faces: { readonly baseUrl: string; readonly apiKey: string; readonly threshold: number } | null;
+    readonly faces: {
+        readonly baseUrl: string;
+        readonly apiKey: string;
+        readonly threshold: number;
+    } | null;
 }
 
 /** The vision worker running on one server, or null when there is not one. */
@@ -72,7 +76,11 @@ async function findWorker(serverId: string) {
  * rather than on a render path. It is idempotent: a server that already has one
  * keeps it.
  */
-export async function ensureVisionWorker(ownerId: string, actorId: string, serverId: string): Promise<void> {
+export async function ensureVisionWorker(
+    ownerId: string,
+    actorId: string,
+    serverId: string
+): Promise<void> {
     if (await findWorker(serverId)) return;
     await assertServer(ownerId, serverId);
     await installApp(ownerId, actorId, {
@@ -104,8 +112,13 @@ export async function authorizeWorker(request: Request): Promise<{ ownerId: stri
     });
     const digest = (value: string) => createHash("sha256").update(value).digest();
     for (const worker of workers) {
-        const key = await installEnvSecret(worker.applicationId as string, worker.ownerId, "WORKER_KEY");
-        if (key && timingSafeEqual(digest(presented), digest(key))) return { ownerId: worker.ownerId };
+        const key = await installEnvSecret(
+            worker.applicationId as string,
+            worker.ownerId,
+            "WORKER_KEY"
+        );
+        if (key && timingSafeEqual(digest(presented), digest(key)))
+            return { ownerId: worker.ownerId };
     }
     return null;
 }
@@ -166,7 +179,11 @@ export async function assignmentsFor(installedAppId: string): Promise<VisionAssi
                       // it gets the address that machine can dial rather than the
                       // one Polaris uses - which may be a tunnel that exists only
                       // inside this process.
-                      { baseUrl: faces.directUrl, apiKey: faces.apiKey, threshold: detection.faceThreshold }
+                      {
+                          baseUrl: faces.directUrl,
+                          apiKey: faces.apiKey,
+                          threshold: detection.faceThreshold
+                      }
                     : null
         });
     }

@@ -61,7 +61,12 @@ describe("point in polygon", () => {
     });
 
     it("is not an area below three points", () => {
-        expect(zoning.pointInPolygon({ x: 0.5, y: 0.5 }, [{ x: 0, y: 0 }, { x: 1, y: 1 }])).toBe(false);
+        expect(
+            zoning.pointInPolygon({ x: 0.5, y: 0.5 }, [
+                { x: 0, y: 0 },
+                { x: 1, y: 1 }
+            ])
+        ).toBe(false);
     });
 });
 
@@ -122,7 +127,8 @@ describe("inertia and loitering", () => {
     it("does not lose a settled object to one frame of wobble", () => {
         const drawn = [zone({ inertia: 3 })];
         let state = zoning.NO_PRESENCE;
-        for (let frame = 0; frame < 4; frame += 1) state = zoning.advancePresence(state, drawn, INSIDE, "person", 5);
+        for (let frame = 0; frame < 4; frame += 1)
+            state = zoning.advancePresence(state, drawn, INSIDE, "person", 5);
         expect(state.current).toEqual(["Drive"]);
         // One frame where the box slipped over the line.
         state = zoning.advancePresence(state, drawn, OUTSIDE, "person", 5);
@@ -161,7 +167,13 @@ describe("inertia and loitering", () => {
         ];
         let state = zoning.NO_PRESENCE;
         state = zoning.advancePresence(state, drawn, INSIDE, "person", 5);
-        state = zoning.advancePresence(state, drawn, { x1: 0.7, y1: 0.4, x2: 0.8, y2: 0.7 }, "person", 5);
+        state = zoning.advancePresence(
+            state,
+            drawn,
+            { x1: 0.7, y1: 0.4, x2: 0.8, y2: 0.7 },
+            "person",
+            5
+        );
         expect(state.current).toEqual(["Door"]);
         expect(state.entered).toEqual(["Drive", "Door"]);
     });
@@ -174,7 +186,9 @@ describe("box arithmetic", () => {
         expect(zoning.intersectionOverUnion(a, { x1: 0.5, y1: 0.5, x2: 0.7, y2: 0.7 })).toBe(0);
         // Half of each box overlaps, so a third of the space they cover between
         // them.
-        expect(zoning.intersectionOverUnion(a, { x1: 0.1, y1: 0, x2: 0.3, y2: 0.2 })).toBeCloseTo(1 / 3);
+        expect(zoning.intersectionOverUnion(a, { x1: 0.1, y1: 0, x2: 0.3, y2: 0.2 })).toBeCloseTo(
+            1 / 3
+        );
     });
 
     it("tells a tall thing from a wide one", () => {

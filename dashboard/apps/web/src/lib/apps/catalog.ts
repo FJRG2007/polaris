@@ -12,7 +12,15 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP } from "@/lib/apps/ark/maps";
-import { Bot, Gamepad2, House, MessagesSquare, ScanFace, Video, type LucideIcon } from "lucide-react";
+import {
+    Bot,
+    Gamepad2,
+    House,
+    MessagesSquare,
+    ScanFace,
+    Video,
+    type LucideIcon
+} from "lucide-react";
 
 export type AppCategory = "Messaging" | "AI" | "Game servers" | "Home" | "Tools";
 
@@ -192,9 +200,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             // from dashboard/services/messaging-bridge; the marketplace installs it as
             // a managed Deploy app rather than building from source on the host.
             image: "ghcr.io/fjrg2007/polaris-messaging-bridge:latest",
-            volumes: [
-                { name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }
-            ],
+            volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }],
             ports: [{ container: 8787, protocol: "http", label: "Bridge API" }]
         }
     },
@@ -712,7 +718,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: DEFAULT_ARK_MAP,
                     options: ARK_MAPS.map((map) => ({
                         value: map.value,
-                        label: map.requires === "base" ? map.label : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
+                        label:
+                            map.requires === "base"
+                                ? map.label
+                                : `${map.label} (${map.requires === "paid" ? "needs the DLC" : "a separate free download"})`
                     })),
                     tunable: true,
                     group: "World"
@@ -1027,7 +1036,9 @@ export function isInstallable(app: AppManifest): boolean {
 /** The env vars an operator fills in: everything the manifest declares except the
  *  ones the install mints itself and the ones installing already answers. */
 export function promptedEnvVars(app: AppManifest): readonly TemplateEnvVar[] {
-    return (app.template?.env ?? []).filter((field) => !field.generated && !isConsentField(app, field));
+    return (app.template?.env ?? []).filter(
+        (field) => !field.generated && !isConsentField(app, field)
+    );
 }
 
 /** The env vars an installed app exposes as settings, in manifest order. */

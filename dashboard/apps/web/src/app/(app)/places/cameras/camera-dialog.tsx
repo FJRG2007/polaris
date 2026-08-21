@@ -155,7 +155,9 @@ export function CameraDialog({
 
     const vendor = cameraVendor(form.vendor);
     /** The server this camera is reached through, when it is not Polaris itself. */
-    const reachedVia = form.reachVia.startsWith("server:") ? form.reachVia.slice("server:".length) : null;
+    const reachedVia = form.reachVia.startsWith("server:")
+        ? form.reachVia.slice("server:".length)
+        : null;
     // A make with its own protocol has no paths and no account to fill in: the
     // password is the whole credential. Showing the fields anyway is how somebody
     // ends up typing a camera account into a form that ignores it.
@@ -190,7 +192,9 @@ export function CameraDialog({
                 : DEFAULT_DETECTION.settleSeconds,
             classes: form.classes,
             faceThreshold: Number(form.faceThreshold) || DEFAULT_DETECTION.faceThreshold,
-            hours: form.hoursOn ? { from: Number(form.hoursFrom) || 0, to: Number(form.hoursTo) || 0 } : null
+            hours: form.hoursOn
+                ? { from: Number(form.hoursFrom) || 0, to: Number(form.hoursTo) || 0 }
+                : null
         },
         recording: form.recording,
         storageTarget: form.storageTarget,
@@ -217,14 +221,18 @@ export function CameraDialog({
             name: current.name || result.probe?.model || ""
         }));
         setTested(
-            [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") || "The camera answered"
+            [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
+                "The camera answered"
         );
     };
 
     const save = async () => {
         setBusy(true);
         setError(null);
-        const result = await runAction(() => actions.saveCameraAction(camera?.id ?? null, payload()), setError);
+        const result = await runAction(
+            () => actions.saveCameraAction(camera?.id ?? null, payload()),
+            setError
+        );
         if (!result || result.error || !result.camera) {
             setBusy(false);
             if (result?.error) setError(result.error);
@@ -259,7 +267,10 @@ export function CameraDialog({
                                 placeholder="Front door"
                             />
                         </Field>
-                        <Field label="Where it points" hint="Groups the wall. Leave it blank if you only have a few.">
+                        <Field
+                            label="Where it points"
+                            hint="Groups the wall. Leave it blank if you only have a few."
+                        >
                             <Input
                                 value={form.zone}
                                 onChange={(event) => set("zone", event.target.value)}
@@ -270,11 +281,16 @@ export function CameraDialog({
                             <Select
                                 value={form.vendor}
                                 onValueChange={(value) => set("vendor", value)}
-                                options={CAMERA_VENDORS.map((item) => ({ value: item.id, label: item.label }))}
+                                options={CAMERA_VENDORS.map((item) => ({
+                                    value: item.id,
+                                    label: item.label
+                                }))}
                             />
                         </Field>
                         {vendor.note ? (
-                            <p className="text-[12px] leading-relaxed text-muted-foreground">{vendor.note}</p>
+                            <p className="text-[12px] leading-relaxed text-muted-foreground">
+                                {vendor.note}
+                            </p>
                         ) : null}
                         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                             <Field label="Address" required>
@@ -307,7 +323,9 @@ export function CameraDialog({
                             ) : null}
                             <Field
                                 label="Password"
-                                hint={camera?.hasPassword ? "Stored. Type to replace it." : undefined}
+                                hint={
+                                    camera?.hasPassword ? "Stored. Type to replace it." : undefined
+                                }
                             >
                                 {/* enigma:allow-no-breach-check - nothing is being
                                     chosen here. This is the password the camera
@@ -328,7 +346,13 @@ export function CameraDialog({
                             </Field>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button type="button" variant="secondary" size="sm" onClick={test} disabled={testing || incomplete}>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={test}
+                                disabled={testing || incomplete}
+                            >
                                 {testing ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
                                 ) : (
@@ -345,14 +369,20 @@ export function CameraDialog({
                         </div>
                         {usesRtsp ? (
                             <div className="grid gap-3 sm:grid-cols-2">
-                                <Field label="Stream path" hint="Left blank, the make's usual one is used.">
+                                <Field
+                                    label="Stream path"
+                                    hint="Left blank, the make's usual one is used."
+                                >
                                     <Input
                                         value={form.mainPath}
                                         onChange={(event) => set("mainPath", event.target.value)}
                                         placeholder={vendor.mainPath || "/stream1"}
                                     />
                                 </Field>
-                                <Field label="Small stream" hint="What detection reads. Cheaper by a lot.">
+                                <Field
+                                    label="Small stream"
+                                    hint="What detection reads. Cheaper by a lot."
+                                >
                                     <Input
                                         value={form.subPath}
                                         onChange={(event) => set("subPath", event.target.value)}
@@ -374,7 +404,10 @@ export function CameraDialog({
                                 { value: "direct", label: "Polaris itself" },
                                 ...servers
                                     .filter((server) => server.id !== "local")
-                                    .map((server) => ({ value: `server:${server.id}`, label: server.label }))
+                                    .map((server) => ({
+                                        value: `server:${server.id}`,
+                                        label: server.label
+                                    }))
                             ]}
                         />
                     </Section>
@@ -383,11 +416,16 @@ export function CameraDialog({
                         <Select
                             value={form.detector}
                             onValueChange={(value) => set("detector", value as Detector)}
-                            options={DETECTORS.map((id) => ({ value: id, label: DETECTOR_META[id].label }))}
+                            options={DETECTORS.map((id) => ({
+                                value: id,
+                                label: DETECTOR_META[id].label
+                            }))}
                         />
                         <p className="text-[12px] leading-relaxed text-muted-foreground">
                             {DETECTOR_META[form.detector].summary}{" "}
-                            <span className="text-foreground-subtle">{DETECTOR_META[form.detector].cost}</span>
+                            <span className="text-foreground-subtle">
+                                {DETECTOR_META[form.detector].cost}
+                            </span>
                         </p>
                         {DETECTOR_META[form.detector].requires ? (
                             <p className="text-[12px] leading-relaxed text-warning">
@@ -406,7 +444,10 @@ export function CameraDialog({
                                     hint="The machine that reaches this camera also analyzes it - the stream is already there."
                                 >
                                     <Input
-                                        value={servers.find((server) => server.id === reachedVia)?.label ?? reachedVia}
+                                        value={
+                                            servers.find((server) => server.id === reachedVia)
+                                                ?.label ?? reachedVia
+                                        }
                                         readOnly
                                         className="w-64"
                                     />
@@ -416,7 +457,10 @@ export function CameraDialog({
                                     <Select
                                         value={form.detectorTargetId}
                                         onValueChange={(value) => set("detectorTargetId", value)}
-                                        options={servers.map((server) => ({ value: server.id, label: server.label }))}
+                                        options={servers.map((server) => ({
+                                            value: server.id,
+                                            label: server.label
+                                        }))}
                                     />
                                 </Field>
                             )
@@ -437,7 +481,9 @@ export function CameraDialog({
                                             min={1}
                                             max={100}
                                             value={form.sensitivity}
-                                            onChange={(event) => set("sensitivity", Number(event.target.value))}
+                                            onChange={(event) =>
+                                                set("sensitivity", Number(event.target.value))
+                                            }
                                             className="w-64 accent-primary"
                                             aria-label="Sensitivity"
                                         />
@@ -449,7 +495,9 @@ export function CameraDialog({
                                 >
                                     <Input
                                         value={form.settleSeconds}
-                                        onChange={(event) => set("settleSeconds", event.target.value)}
+                                        onChange={(event) =>
+                                            set("settleSeconds", event.target.value)
+                                        }
                                         className="w-24"
                                         inputMode="numeric"
                                     />
@@ -460,25 +508,36 @@ export function CameraDialog({
                                 >
                                     <Input
                                         value={form.minGapSeconds}
-                                        onChange={(event) => set("minGapSeconds", event.target.value)}
+                                        onChange={(event) =>
+                                            set("minGapSeconds", event.target.value)
+                                        }
                                         className="w-24"
                                         inputMode="numeric"
                                     />
                                 </Field>
                                 <label className="flex items-center justify-between gap-3">
-                                    <span className="text-[13px] text-foreground">Only at certain hours</span>
-                                    <Switch checked={form.hoursOn} onChange={(value) => set("hoursOn", value)} />
+                                    <span className="text-[13px] text-foreground">
+                                        Only at certain hours
+                                    </span>
+                                    <Switch
+                                        checked={form.hoursOn}
+                                        onChange={(value) => set("hoursOn", value)}
+                                    />
                                 </label>
                                 {form.hoursOn ? (
                                     <div className="flex items-center gap-2">
                                         <Input
                                             value={form.hoursFrom}
-                                            onChange={(event) => set("hoursFrom", event.target.value)}
+                                            onChange={(event) =>
+                                                set("hoursFrom", event.target.value)
+                                            }
                                             className="w-20"
                                             inputMode="numeric"
                                             aria-label="From hour"
                                         />
-                                        <span className="text-[12px] text-muted-foreground">to</span>
+                                        <span className="text-[12px] text-muted-foreground">
+                                            to
+                                        </span>
                                         <Input
                                             value={form.hoursTo}
                                             onChange={(event) => set("hoursTo", event.target.value)}
@@ -498,7 +557,10 @@ export function CameraDialog({
                             <Field label="Worth reporting">
                                 <div className="flex flex-wrap gap-3">
                                     {OBJECT_CLASSES.map((item) => (
-                                        <label key={item} className="flex items-center gap-2 text-[13px]">
+                                        <label
+                                            key={item}
+                                            className="flex items-center gap-2 text-[13px]"
+                                        >
                                             <Checkbox
                                                 checked={form.classes.includes(item)}
                                                 onChange={(event) =>
@@ -506,7 +568,9 @@ export function CameraDialog({
                                                         "classes",
                                                         event.target.checked
                                                             ? [...form.classes, item]
-                                                            : form.classes.filter((value) => value !== item)
+                                                            : form.classes.filter(
+                                                                  (value) => value !== item
+                                                              )
                                                     )
                                                 }
                                             />
@@ -515,7 +579,9 @@ export function CameraDialog({
                                     ))}
                                 </div>
                                 {form.classes.includes("package") ? (
-                                    <p className="text-[12px] text-foreground-subtle">{OBJECT_CLASS_HINTS.package}</p>
+                                    <p className="text-[12px] text-foreground-subtle">
+                                        {OBJECT_CLASS_HINTS.package}
+                                    </p>
                                 ) : null}
                             </Field>
                         ) : null}
@@ -538,7 +604,9 @@ export function CameraDialog({
                     <Section title="What to keep">
                         <SegmentedControl
                             value={form.recording}
-                            onValueChange={(value) => set("recording", value as FormState["recording"])}
+                            onValueChange={(value) =>
+                                set("recording", value as FormState["recording"])
+                            }
                             options={[
                                 { value: "off", label: "Nothing" },
                                 { value: "motion", label: "When something happens" },
@@ -553,7 +621,10 @@ export function CameraDialog({
                                 <Select
                                     value={form.storageTarget}
                                     onValueChange={(value) => set("storageTarget", value)}
-                                    options={storage.map((option) => ({ value: option.id, label: option.label }))}
+                                    options={storage.map((option) => ({
+                                        value: option.id,
+                                        label: option.label
+                                    }))}
                                 />
                             </Field>
                         ) : null}
@@ -574,7 +645,10 @@ export function CameraDialog({
                                     Off means Polaris does not connect to it at all.
                                 </span>
                             </span>
-                            <Switch checked={form.enabled} onChange={(value) => set("enabled", value)} />
+                            <Switch
+                                checked={form.enabled}
+                                onChange={(value) => set("enabled", value)}
+                            />
                         </label>
                     </Section>
                 </div>
@@ -595,12 +669,24 @@ export function CameraDialog({
     );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Section({
+    title,
+    hint,
+    children
+}: {
+    title: string;
+    hint?: string;
+    children: React.ReactNode;
+}) {
     return (
         <section className="flex flex-col gap-3">
             <div>
                 <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
-                {hint ? <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{hint}</p> : null}
+                {hint ? (
+                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        {hint}
+                    </p>
+                ) : null}
             </div>
             {children}
         </section>

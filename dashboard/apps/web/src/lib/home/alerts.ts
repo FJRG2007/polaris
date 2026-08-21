@@ -78,7 +78,10 @@ function toView(row: NonNullable<Row>): AlertRuleView {
     };
 }
 
-export async function listAlertRules(installedAppId: string, placeId?: string | null): Promise<AlertRuleView[]> {
+export async function listAlertRules(
+    installedAppId: string,
+    placeId?: string | null
+): Promise<AlertRuleView[]> {
     const rows = await prisma.alertRule.findMany({
         where: { installedAppId, ...(placeId ? { OR: [{ placeId }, { placeId: null }] } : {}) },
         orderBy: { createdAt: "asc" }
@@ -121,11 +124,16 @@ export async function saveAlertRule(
         if (existing.channelId) await syncMembers(existing.channelId, input.recipients);
         return toView(await prisma.alertRule.update({ where: { id }, data }));
     }
-    return toView(await prisma.alertRule.create({ data: { ...data, installedAppId, createdById: actorId } }));
+    return toView(
+        await prisma.alertRule.create({ data: { ...data, installedAppId, createdById: actorId } })
+    );
 }
 
 export async function deleteAlertRule(installedAppId: string, id: string): Promise<void> {
-    const existing = await prisma.alertRule.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    const existing = await prisma.alertRule.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!existing) throw new Error("Alert not found");
     // The conversation stays. What it holds is a record of things that actually
     // happened, and deleting the rule that reported them is not a reason to take
@@ -151,7 +159,9 @@ async function syncMembers(channelId: string, recipients: readonly string[]): Pr
     }
     const removed = [...present].filter((id) => !wanted.has(id));
     if (removed.length > 0) {
-        await prisma.chatChannelMember.deleteMany({ where: { channelId, userId: { in: removed } } });
+        await prisma.chatChannelMember.deleteMany({
+            where: { channelId, userId: { in: removed } }
+        });
     }
 }
 
@@ -169,7 +179,12 @@ async function conversationFor(rule: AlertRuleView, actorId: string | null): Pro
         select: { id: true }
     });
     await prisma.alertRule.update({ where: { id: rule.id }, data: { channelId: channel.id } });
-    publishChatChange({ channelId: channel.id, kind: "channels", actorId: "", audience: [...rule.recipients] });
+    publishChatChange({
+        channelId: channel.id,
+        kind: "channels",
+        actorId: "",
+        audience: [...rule.recipients]
+    });
     return channel.id;
 }
 
@@ -203,13 +218,19 @@ function matches(
         const seen = detection.zones ?? [];
         if (!rule.zones.some((zone) => seen.includes(zone))) return false;
     }
-    if (rule.hours && !withinHours({ hours: rule.hours } as never, new Date().getHours())) return false;
+    if (rule.hours && !withinHours({ hours: rule.hours } as never, new Date().getHours()))
+        return false;
     return true;
 }
 
 /** What the message says. One line, in the words somebody would use, and a link
  *  to the moment - an alert nobody can act on is a notification. */
-function body(detection: Detection, cameraName: string, placeName: string, eventId: string): string {
+function body(
+    detection: Detection,
+    cameraName: string,
+    placeName: string,
+    eventId: string
+): string {
     const who =
         detection.kind === "face" && detection.label
             ? detection.label
@@ -221,9 +242,9 @@ function body(detection: Detection, cameraName: string, placeName: string, event
                   ? "An animal"
                   : detection.kind === "package"
                     ? "Something was left"
-                  : detection.kind === "tamper"
-                    ? "Somebody may have tampered with a camera"
-                    : "Movement";
+                    : detection.kind === "tamper"
+                      ? "Somebody may have tampered with a camera"
+                      : "Movement";
     // The area is the useful half of "where" once somebody has drawn one: "at
     // the front door" is a sentence, "at Front camera" is a device name.
     const area = detection.zones?.[0];
@@ -255,13 +276,18 @@ export async function raiseAlerts(
         if (rules.length === 0) return;
 
         const place = camera.placeId
-            ? await prisma.place.findFirst({ where: { id: camera.placeId }, select: { name: true } })
+            ? await prisma.place.findFirst({
+                  where: { id: camera.placeId },
+                  select: { name: true }
+              })
             : null;
         // Named after where it has just walked into rather than where it came
         // in: "somebody at the driveway" is only a useful sentence if the
         // driveway is what set it off.
         const text = body(
-            onlyZones ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] } : detection,
+            onlyZones
+                ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] }
+                : detection,
             camera.name,
             place?.name ?? "",
             eventId
@@ -275,10 +301,18 @@ export async function raiseAlerts(
             // Unlike a join notice, this one moves the conversation and lights
             // it: being told is the whole purpose, and a room that stays quiet
             // is a room somebody finds two days later.
-            await prisma.chatChannel.update({ where: { id: channelId }, data: { lastMessageAt: new Date() } });
+            await prisma.chatChannel.update({
+                where: { id: channelId },
+                data: { lastMessageAt: new Date() }
+            });
             // No actor: a camera saw it, not a person, so every recipient's tab
             // wakes rather than one of them skipping its own write.
-            publishChatChange({ channelId, kind: "posted", actorId: "", audience: [...rule.recipients] });
+            publishChatChange({
+                channelId,
+                kind: "posted",
+                actorId: "",
+                audience: [...rule.recipients]
+            });
         }
     } catch (error) {
         console.error("polaris: an alert could not be delivered:", error);

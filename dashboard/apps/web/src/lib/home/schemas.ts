@@ -52,7 +52,10 @@ const addressSchema = z
     .trim()
     .min(1, "Where is the camera?")
     .max(255)
-    .refine((value) => !/[\s@/\\]/.test(value), "Just the address: no slashes, spaces or credentials");
+    .refine(
+        (value) => !/[\s@/\\]/.test(value),
+        "Just the address: no slashes, spaces or credentials"
+    );
 
 const portSchema = z.coerce.number().int().min(1).max(65535);
 
@@ -69,7 +72,10 @@ export const detectionSettingsSchema = z.object({
     classes: z.array(z.enum(OBJECT_CLASSES)).max(OBJECT_CLASSES.length),
     faceThreshold: z.coerce.number().int().min(1).max(100),
     hours: z
-        .object({ from: z.coerce.number().int().min(0).max(23), to: z.coerce.number().int().min(0).max(23) })
+        .object({
+            from: z.coerce.number().int().min(0).max(23),
+            to: z.coerce.number().int().min(0).max(23)
+        })
         .nullable()
 });
 
@@ -131,7 +137,10 @@ export function parseCameraInput(input: unknown): CameraInput {
  * than rejected: a polygon dragged a few pixels past the edge of the picture is
  * somebody drawing to the corner, not somebody sending a bad request.
  */
-const zonePointSchema = z.tuple([z.coerce.number().min(-1).max(2), z.coerce.number().min(-1).max(2)]);
+const zonePointSchema = z.tuple([
+    z.coerce.number().min(-1).max(2),
+    z.coerce.number().min(-1).max(2)
+]);
 
 export const cameraZoneInputSchema = z.object({
     name: z.string().trim().min(1, "Give the area a name").max(64),

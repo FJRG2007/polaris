@@ -50,7 +50,8 @@ export const ZONE_KIND_META: Readonly<Record<ZoneKind, ZoneKindMeta>> = {
     ignore: {
         id: "ignore",
         label: "Ignore this area",
-        summary: "Nothing here is ever reported. The road, the pavement, the tree that moves all afternoon."
+        summary:
+            "Nothing here is ever reported. The road, the pavement, the tree that moves all afternoon."
     }
 };
 
@@ -109,7 +110,11 @@ export const MAX_ZONE_POINTS = 32;
 export function pointInPolygon(point: ZonePoint, polygon: readonly ZonePoint[]): boolean {
     if (polygon.length < MIN_ZONE_POINTS) return false;
     let inside = false;
-    for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    for (
+        let index = 0, previous = polygon.length - 1;
+        index < polygon.length;
+        previous = index, index += 1
+    ) {
         const a = polygon[index]!;
         const b = polygon[previous]!;
         // Only edges that straddle the point's row can be crossed by the ray.
@@ -187,7 +192,9 @@ export function isIgnored(zones: readonly Zone[], box: RelativeBox, label: strin
 
 /** The watch zones a box is standing in, by name. */
 export function zonesContaining(zones: readonly Zone[], box: RelativeBox, label: string): string[] {
-    return zones.filter((zone) => zone.kind === "watch" && zoneContains(zone, box, label)).map((zone) => zone.name);
+    return zones
+        .filter((zone) => zone.kind === "watch" && zoneContains(zone, box, label))
+        .map((zone) => zone.name);
 }
 
 /**
@@ -200,7 +207,9 @@ export function zonesContaining(zones: readonly Zone[], box: RelativeBox, label:
  */
 export function zonesAllow(zones: readonly Zone[], box: RelativeBox, label: string): boolean {
     if (isIgnored(zones, box, label)) return false;
-    const watching = zones.filter((zone) => zone.kind === "watch" && zone.enabled && zoneAdmits(zone, label));
+    const watching = zones.filter(
+        (zone) => zone.kind === "watch" && zone.enabled && zoneAdmits(zone, label)
+    );
     if (watching.length === 0) return true;
     return watching.some((zone) => pointInPolygon(groundPoint(box), zone.points));
 }
@@ -280,7 +289,9 @@ export function advancePresence(
 /** A polygon as an SVG `points` attribute at a given size, which is how both the
  *  editor and the picture drawn over an event render one. */
 export function polygonPoints(points: readonly ZonePoint[], width: number, height: number): string {
-    return points.map((point) => `${(point.x * width).toFixed(1)},${(point.y * height).toFixed(1)}`).join(" ");
+    return points
+        .map((point) => `${(point.x * width).toFixed(1)},${(point.y * height).toFixed(1)}`)
+        .join(" ");
 }
 
 /** Read points off a stored row, dropping anything that is not a pair of numbers
@@ -311,7 +322,9 @@ export function serializeZonePoints(points: readonly ZonePoint[]): string {
 export function parseZoneObjects(value: unknown, allowed: readonly string[]): string[] {
     const raw = typeof value === "string" ? safeJson(value) : value;
     if (!Array.isArray(raw)) return [];
-    return raw.filter((entry): entry is string => typeof entry === "string" && allowed.includes(entry));
+    return raw.filter(
+        (entry): entry is string => typeof entry === "string" && allowed.includes(entry)
+    );
 }
 
 function safeJson(value: string): unknown {

@@ -37,7 +37,8 @@ function row(input: {
 /** A whole output tensor of the right length, with one row filled in. */
 function tensorWith(modelSize: number, rowIndex: number, filled: number[]): number[] {
     const output = new Array<number>(detect.candidateCount(modelSize) * detect.ROW_LENGTH).fill(0);
-    for (let index = 0; index < filled.length; index += 1) output[rowIndex * detect.ROW_LENGTH + index] = filled[index]!;
+    for (let index = 0; index < filled.length; index += 1)
+        output[rowIndex * detect.ROW_LENGTH + index] = filled[index]!;
     return output;
 }
 
@@ -146,7 +147,12 @@ describe("fitting a frame into the model's square", () => {
 
     it("keeps a box inside the frame even when the model ran off the edge", () => {
         const letterbox = detect.letterboxFor(640, 640, 416);
-        const frame = detect.modelBoxToFrame({ x1: -40, y1: -40, x2: 900, y2: 900 }, letterbox, 640, 640);
+        const frame = detect.modelBoxToFrame(
+            { x1: -40, y1: -40, x2: 900, y2: 900 },
+            letterbox,
+            640,
+            640
+        );
         expect(frame).toEqual({ x1: 0, y1: 0, x2: 1, y2: 1 });
     });
 });
@@ -203,11 +209,15 @@ describe("the camera's own filters", () => {
     });
 
     it("rejects a stripe of wet road that the model called a person", () => {
-        expect(detect.passesFilter({ x1: 0.1, y1: 0.7, x2: 0.9, y2: 0.75 }, 0.8, person)).toBe(false);
+        expect(detect.passesFilter({ x1: 0.1, y1: 0.7, x2: 0.9, y2: 0.75 }, 0.8, person)).toBe(
+            false
+        );
     });
 
     it("rejects something too far away to be worth a line", () => {
-        expect(detect.passesFilter({ x1: 0.5, y1: 0.5, x2: 0.51, y2: 0.52 }, 0.8, person)).toBe(false);
+        expect(detect.passesFilter({ x1: 0.5, y1: 0.5, x2: 0.51, y2: 0.52 }, 0.8, person)).toBe(
+            false
+        );
     });
 
     it("rejects a box that covers the whole lens", () => {
@@ -350,7 +360,9 @@ describe("against the model itself", () => {
      * than a megabyte.
      */
     const tensor = (() => {
-        const output = new Float32Array(detect.candidateCount(fixture.modelSize) * detect.ROW_LENGTH);
+        const output = new Float32Array(
+            detect.candidateCount(fixture.modelSize) * detect.ROW_LENGTH
+        );
         for (const row of fixture.rows) {
             output.set(row.values, row.index * detect.ROW_LENGTH);
         }

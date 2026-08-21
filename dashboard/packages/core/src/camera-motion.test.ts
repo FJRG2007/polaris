@@ -22,7 +22,14 @@ function scene(value = 100): Uint8Array {
 }
 
 /** Paint a rectangle onto a frame, in pixels. */
-function paint(frame: Uint8Array, x1: number, y1: number, x2: number, y2: number, value: number): Uint8Array {
+function paint(
+    frame: Uint8Array,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    value: number
+): Uint8Array {
     const painted = new Uint8Array(frame);
     for (let y = y1; y < y2; y += 1) {
         for (let x = x1; x < x2; x += 1) painted[y * WIDTH + x] = value;
@@ -165,7 +172,8 @@ describe("the parts of the picture nobody asked about", () => {
         const mask = motion.buildMotionMask([road], WIDTH, HEIGHT);
         const masked = { ...OPTIONS, mask };
         let state = motion.newMotionState(WIDTH, HEIGHT);
-        for (let frame = 0; frame < 40; frame += 1) state = motion.detectMotion(state, scene(), masked).state;
+        for (let frame = 0; frame < 40; frame += 1)
+            state = motion.detectMotion(state, scene(), masked).state;
 
         const car = paint(scene(), 4, 24, 30, 29, 240);
         expect(motion.detectMotion(state, car, masked).boxes).toEqual([]);
@@ -180,7 +188,8 @@ describe("a dark garden", () => {
     const night = (() => {
         const frame = new Uint8Array(WIDTH * HEIGHT);
         for (let y = 0; y < HEIGHT; y += 1) {
-            for (let x = 0; x < WIDTH; x += 1) frame[y * WIDTH + x] = 30 + Math.floor((x / WIDTH) * 40);
+            for (let x = 0; x < WIDTH; x += 1)
+                frame[y * WIDTH + x] = 30 + Math.floor((x / WIDTH) * 40);
         }
         return frame;
     })();
@@ -198,7 +207,8 @@ describe("a dark garden", () => {
     it("finds somebody the raw threshold cannot see at all", () => {
         const stretching = { width: WIDTH, height: HEIGHT, improveContrast: true, minArea: 4 };
         let state = motion.newMotionState(WIDTH, HEIGHT);
-        for (let frame = 0; frame < 600; frame += 1) state = motion.detectMotion(state, night, stretching).state;
+        for (let frame = 0; frame < 600; frame += 1)
+            state = motion.detectMotion(state, night, stretching).state;
         expect(state.calibrating).toBe(false);
         expect(motion.detectMotion(state, person, stretching).boxes).toHaveLength(1);
     });

@@ -47,16 +47,24 @@ function ffmpegInput(source: StreamSource): string[] {
  * it for movement and do not try to detect anything in it" - a wrong guess here
  * would put every box in the wrong place, and no boxes beats wrong ones.
  */
-export function probeSize(source: StreamSource, timeoutMs = 15_000): Promise<{ width: number; height: number } | null> {
+export function probeSize(
+    source: StreamSource,
+    timeoutMs = 15_000
+): Promise<{ width: number; height: number } | null> {
     return new Promise((resolve) => {
         const child = spawn(
             "ffprobe",
             [
-                "-v", "error",
-                "-headers", `Authorization: ${source.authorization}\r\n`,
-                "-select_streams", "v:0",
-                "-show_entries", "stream=width,height",
-                "-of", "csv=p=0:s=x",
+                "-v",
+                "error",
+                "-headers",
+                `Authorization: ${source.authorization}\r\n`,
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=width,height",
+                "-of",
+                "csv=p=0:s=x",
                 source.url
             ],
             { windowsHide: true }
@@ -78,9 +86,11 @@ export function probeSize(source: StreamSource, timeoutMs = 15_000): Promise<{ w
         child.on("error", () => done(null));
         child.on("close", () => {
             const [width, height] = text.trim().split("\n")[0]?.split("x").map(Number) ?? [];
-            done(Number.isInteger(width) && Number.isInteger(height) && width! > 0 && height! > 0
-                ? { width: width!, height: height! }
-                : null);
+            done(
+                Number.isInteger(width) && Number.isInteger(height) && width! > 0 && height! > 0
+                    ? { width: width!, height: height! }
+                    : null
+            );
         });
     });
 }
@@ -145,14 +155,21 @@ function framed(child: ChildProcessWithoutNullStreams, frameBytes: number): Fram
  * The aspect ratio is kept rather than squared off, so an area drawn on the
  * picture lines up with the pixels it was drawn over.
  */
-export function openMotionFrames(source: StreamSource, width: number, height: number, fps: number): FrameStream {
+export function openMotionFrames(
+    source: StreamSource,
+    width: number,
+    height: number,
+    fps: number
+): FrameStream {
     const child = spawn(
         "ffmpeg",
         [
             ...ffmpegInput(source),
             "-an",
-            "-vf", `fps=${fps},scale=${width}:${height},format=gray`,
-            "-f", "rawvideo",
+            "-vf",
+            `fps=${fps},scale=${width}:${height},format=gray`,
+            "-f",
+            "rawvideo",
             "-"
         ],
         { windowsHide: true }
@@ -190,9 +207,12 @@ export function openDetectFrames(
         [
             ...ffmpegInput(source),
             "-an",
-            "-vf", `fps=${fps},${letterboxFilter(sourceWidth, sourceHeight, size)}`,
-            "-pix_fmt", "bgr24",
-            "-f", "rawvideo",
+            "-vf",
+            `fps=${fps},${letterboxFilter(sourceWidth, sourceHeight, size)}`,
+            "-pix_fmt",
+            "bgr24",
+            "-f",
+            "rawvideo",
             "-"
         ],
         { windowsHide: true }
@@ -224,13 +244,20 @@ export function encodeJpeg(
         const child = spawn(
             "ffmpeg",
             [
-                "-f", "rawvideo",
-                "-pix_fmt", "bgr24",
-                "-s", `${size}x${size}`,
-                "-i", "-",
-                "-vf", `crop=${width}:${height}:${Math.max(0, Math.round(crop.x))}:${Math.max(0, Math.round(crop.y))}`,
-                "-frames:v", "1",
-                "-f", "mjpeg",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "bgr24",
+                "-s",
+                `${size}x${size}`,
+                "-i",
+                "-",
+                "-vf",
+                `crop=${width}:${height}:${Math.max(0, Math.round(crop.x))}:${Math.max(0, Math.round(crop.y))}`,
+                "-frames:v",
+                "1",
+                "-f",
+                "mjpeg",
                 "-"
             ],
             { windowsHide: true }

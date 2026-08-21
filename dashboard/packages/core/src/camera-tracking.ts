@@ -118,7 +118,9 @@ export function confidenceOf(object: TrackedObject): number {
     if (object.scores.length === 0) return 0;
     const sorted = [...object.scores].sort((a, b) => a - b);
     const middle = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2 : (sorted[middle] ?? 0);
+    return sorted.length % 2 === 0
+        ? ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2
+        : (sorted[middle] ?? 0);
 }
 
 /**
@@ -131,7 +133,10 @@ export function confidenceOf(object: TrackedObject): number {
  * face in. The margins are there so the held picture is not replaced every frame
  * by noise.
  */
-export function isBetterSnapshot(current: Snapshot | null, candidate: { score: number; box: RelativeBox }): boolean {
+export function isBetterSnapshot(
+    current: Snapshot | null,
+    candidate: { score: number; box: RelativeBox }
+): boolean {
     if (!current) return true;
     const candidateOnEdge = onEdge(candidate.box);
     const currentOnEdge = onEdge(current.box);
@@ -189,7 +194,8 @@ export function trackFrame(
     const takenDetections = new Set<number>();
     const matched = new Map<number, number>();
     for (const pair of pairs) {
-        if (takenObjects.has(pair.objectIndex) || takenDetections.has(pair.detectionIndex)) continue;
+        if (takenObjects.has(pair.objectIndex) || takenDetections.has(pair.detectionIndex))
+            continue;
         takenObjects.add(pair.objectIndex);
         takenDetections.add(pair.detectionIndex);
         matched.set(pair.objectIndex, pair.detectionIndex);
@@ -264,6 +270,8 @@ export function markReported(state: TrackingState, ids: readonly string[]): Trac
     const reported = new Set(ids);
     return {
         ...state,
-        objects: state.objects.map((object) => (reported.has(object.id) ? { ...object, reported: true } : object))
+        objects: state.objects.map((object) =>
+            reported.has(object.id) ? { ...object, reported: true } : object
+        )
     };
 }

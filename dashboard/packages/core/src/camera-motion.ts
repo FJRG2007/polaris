@@ -102,8 +102,14 @@ export function newMotionState(width: number, height: number): MotionState {
  * Each pixel is tested at its own centre, which is what stops a boundary drawn
  * along a wall from either leaking a row of pixels or eating one.
  */
-export function buildMotionMask(zones: readonly Zone[], width: number, height: number): Uint8Array | null {
-    const ignored = zones.filter((zone) => zone.kind === "ignore" && zone.enabled && zone.points.length >= 3);
+export function buildMotionMask(
+    zones: readonly Zone[],
+    width: number,
+    height: number
+): Uint8Array | null {
+    const ignored = zones.filter(
+        (zone) => zone.kind === "ignore" && zone.enabled && zone.points.length >= 3
+    );
     if (ignored.length === 0) return null;
     const mask = new Uint8Array(width * height);
     for (let y = 0; y < height; y += 1) {
@@ -258,7 +264,11 @@ function grow(changed: Uint8Array, width: number, height: number): Uint8Array {
  * deliberate - an ignored area full of moving headlights would otherwise drag
  * the stretch around and change what counts as movement everywhere else.
  */
-export function detectMotion(state: MotionState, frame: Uint8Array, options: MotionOptions): MotionResult {
+export function detectMotion(
+    state: MotionState,
+    frame: Uint8Array,
+    options: MotionOptions
+): MotionResult {
     const { width, height } = options;
     const threshold = options.threshold ?? 30;
     const minArea = options.minArea ?? 10;

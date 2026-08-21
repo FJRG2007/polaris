@@ -59,7 +59,8 @@ describe("one visit is one event", () => {
 
     it("does not lose somebody who was missed for a frame", () => {
         let state = tracking.NO_TRACKING;
-        for (let frame = 0; frame < 4; frame += 1) state = walk(state, [personAt(0.2 + frame * 0.02)], frame).state;
+        for (let frame = 0; frame < 4; frame += 1)
+            state = walk(state, [personAt(0.2 + frame * 0.02)], frame).state;
         const id = state.objects[0]!.id;
         // Two frames where the detector saw nothing.
         state = walk(state, [], 4).state;
@@ -103,7 +104,11 @@ describe("telling two people apart", () => {
     it("keeps their identities as they cross", () => {
         let state = tracking.NO_TRACKING;
         for (let frame = 0; frame < 3; frame += 1) {
-            state = walk(state, [personAt(0.1 + frame * 0.05), personAt(0.8 - frame * 0.05)], frame).state;
+            state = walk(
+                state,
+                [personAt(0.1 + frame * 0.05), personAt(0.8 - frame * 0.05)],
+                frame
+            ).state;
         }
         expect(state.objects).toHaveLength(2);
         const ids = state.objects.map((object) => object.id);
@@ -120,7 +125,9 @@ describe("telling two people apart", () => {
         ).state;
         // A person is detected in exactly the same place the next frame. Same
         // box, different class: two things, not one that changed species.
-        const update = tracking.trackFrame(state, [{ label: "person", score: 0.9, box }], { now: 200 });
+        const update = tracking.trackFrame(state, [{ label: "person", score: 0.9, box }], {
+            now: 200
+        });
         expect(update.state.objects).toHaveLength(2);
     });
 });
@@ -141,10 +148,12 @@ describe("which frame is kept as the picture", () => {
 
     it("prefers a clearly bigger box, because bigger is closer", () => {
         const held = { score: 0.8, box: personAt(0.4, 0.08), frame: 1 };
-        expect(tracking.isBetterSnapshot(held, { score: 0.8, box: personAt(0.4, 0.12) })).toBe(true);
+        expect(tracking.isBetterSnapshot(held, { score: 0.8, box: personAt(0.4, 0.12) })).toBe(
+            true
+        );
     });
 
-it("leaves the hit count and the best frame in step when it is not seen", () => {
+    it("leaves the hit count and the best frame in step when it is not seen", () => {
         // The one that catches a caller out. `best.frame` is a hit number, so a
         // thing that goes unseen keeps both unchanged and the two stay equal -
         // "the best frame is this frame" reads true forever. Anything holding a

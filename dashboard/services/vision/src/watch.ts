@@ -22,7 +22,14 @@
  */
 
 import type { LoadedModel } from "./model.js";
-import { encodeJpeg, openDetectFrames, openMotionFrames, probeSize, type FrameStream, type StreamSource } from "./frames.js";
+import {
+    encodeJpeg,
+    openDetectFrames,
+    openMotionFrames,
+    probeSize,
+    type FrameStream,
+    type StreamSource
+} from "./frames.js";
 import {
     buildMotionMask,
     confidenceOf,
@@ -150,7 +157,9 @@ function withinHours(assignment: Assignment, hour: number): boolean {
 function movementIn(zones: readonly Zone[], box: RelativeBox): string[] {
     const point = groundPoint(box);
     return zones
-        .filter((zone) => zone.kind === "watch" && zone.enabled && pointInPolygon(point, zone.points))
+        .filter(
+            (zone) => zone.kind === "watch" && zone.enabled && pointInPolygon(point, zone.points)
+        )
         .map((zone) => zone.name);
 }
 
@@ -174,7 +183,10 @@ function union(boxes: readonly RelativeBox[]): RelativeBox | null {
 }
 
 export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
-    const source: StreamSource = { url: assignment.streamUrl, authorization: assignment.authorization };
+    const source: StreamSource = {
+        url: assignment.streamUrl,
+        authorization: assignment.authorization
+    };
     let stopped = false;
     let motionStream: FrameStream | null = null;
     let burst: FrameStream | null = null;
@@ -276,7 +288,9 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                             sourceWidth: shot.width,
                             sourceHeight: shot.height,
                             classes: assignment.classes
-                        }).filter((detection) => zonesAllow(assignment.zones, detection.box, detection.houseClass));
+                        }).filter((detection) =>
+                            zonesAllow(assignment.zones, detection.box, detection.houseClass)
+                        );
 
                         const update = trackFrame(
                             tracking,
@@ -295,7 +309,8 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                         // forever, and every frame after it left would be stored
                         // as the best picture of it.
                         for (const object of tracking.objects) {
-                            if (object.missing !== 0 || object.best?.frame !== object.hits) continue;
+                            if (object.missing !== 0 || object.best?.frame !== object.hits)
+                                continue;
                             if (!held.has(object.id) && held.size >= MAX_HELD_FRAMES) continue;
                             held.set(object.id, { frame, at: Date.now() });
                         }
@@ -358,7 +373,10 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
 
             /** Turn one tracked thing into a report, with the best picture of it
              *  there has been. */
-            async function announce(object: TrackedObject, reason: "start" | "improve"): Promise<boolean> {
+            async function announce(
+                object: TrackedObject,
+                reason: "start" | "improve"
+            ): Promise<boolean> {
                 const kept = held.get(object.id);
                 const box = object.best?.box ?? object.box;
                 let still: Buffer | null = null;
@@ -407,7 +425,10 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
              *  rather than sent whole: the recognizer is being asked about a
              *  face, and sending it the whole garden costs it every other face
              *  in the picture. */
-            async function recognize(frame: Uint8Array, box: RelativeBox): Promise<{ name: string; score: number } | null> {
+            async function recognize(
+                frame: Uint8Array,
+                box: RelativeBox
+            ): Promise<{ name: string; score: number } | null> {
                 if (!assignment.faces) return null;
                 const scale = letterbox.scale;
                 const crop = {
@@ -419,10 +440,18 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                 const jpeg = await encodeJpeg(frame, model.size, crop);
                 if (!jpeg) return null;
                 const form = new FormData();
-                form.append("file", new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }), "face.jpg");
+                form.append(
+                    "file",
+                    new Blob([new Uint8Array(jpeg)], { type: "image/jpeg" }),
+                    "face.jpg"
+                );
                 const response = await fetch(
                     `${assignment.faces.baseUrl}/api/v1/recognition/recognize?limit=1&prediction_count=1`,
-                    { method: "POST", headers: { "x-api-key": assignment.faces.apiKey }, body: form }
+                    {
+                        method: "POST",
+                        headers: { "x-api-key": assignment.faces.apiKey },
+                        body: form
+                    }
                 ).catch(() => null);
                 if (!response?.ok) return null;
                 const body = (await response.json().catch(() => null)) as {
@@ -431,7 +460,9 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                 const best = body?.result?.[0]?.subjects?.[0];
                 if (!best) return null;
                 const percent = Math.round(best.similarity * 100);
-                return percent >= assignment.faces.threshold ? { name: best.subject, score: percent } : null;
+                return percent >= assignment.faces.threshold
+                    ? { name: best.subject, score: percent }
+                    : null;
             }
         });
 
@@ -519,7 +550,9 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         if (stopped) return;
         picture = size;
         if (!size && assignment.detector !== "motion") {
-            deps.log(`${assignment.cameraName}: could not read the picture's size, so movement only`);
+            deps.log(
+                `${assignment.cameraName}: could not read the picture's size, so movement only`
+            );
         }
         start();
     });

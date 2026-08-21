@@ -177,7 +177,11 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                 {canManage ? <th className="px-3 py-2" /> : null}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border" tabIndex={0} onKeyDown={onKeyDown}>
+                        <tbody
+                            className="divide-y divide-border"
+                            tabIndex={0}
+                            onKeyDown={onKeyDown}
+                        >
                             {cameras.map((camera) => (
                                 <ContextMenu key={camera.id}>
                                     <ContextMenuTrigger asChild>
@@ -189,22 +193,38 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                         >
                                             <td className="w-full max-w-0 px-3 py-2">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="truncate text-foreground" title={camera.name}>{camera.name}</span>
-                                                    {!camera.enabled ? <Badge variant="neutral">Off</Badge> : null}
+                                                    <span
+                                                        className="truncate text-foreground"
+                                                        title={camera.name}
+                                                    >
+                                                        {camera.name}
+                                                    </span>
+                                                    {!camera.enabled ? (
+                                                        <Badge variant="neutral">Off</Badge>
+                                                    ) : null}
                                                 </div>
                                                 <p className="truncate text-[11px] text-foreground-subtle">
-                                                    {[camera.zone, cameraVendor(camera.vendor).label, camera.address]
+                                                    {[
+                                                        camera.zone,
+                                                        cameraVendor(camera.vendor).label,
+                                                        camera.address
+                                                    ]
                                                         .filter(Boolean)
                                                         .join(" - ")}
                                                 </p>
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                                {DETECTOR_META[camera.detector as Detector]?.label ?? camera.detector}
+                                                {DETECTOR_META[camera.detector as Detector]
+                                                    ?.label ?? camera.detector}
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                                {RECORDING_LABEL[camera.recording] ?? camera.recording}
+                                                {RECORDING_LABEL[camera.recording] ??
+                                                    camera.recording}
                                                 {camera.recording !== "off" ? (
-                                                    <span className="text-foreground-subtle"> - {camera.retentionDays}d</span>
+                                                    <span className="text-foreground-subtle">
+                                                        {" "}
+                                                        - {camera.retentionDays}d
+                                                    </span>
                                                 ) : null}
                                             </td>
                                             {canManage ? (
@@ -246,11 +266,15 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                         <ContextMenuLabel>{camera.name}</ContextMenuLabel>
                                         {canManage ? (
                                             <>
-                                                <ContextMenuItem onSelect={() => setEditing(camera)}>
+                                                <ContextMenuItem
+                                                    onSelect={() => setEditing(camera)}
+                                                >
                                                     <Pencil className="size-4 shrink-0" />
                                                     Rename and change
                                                 </ContextMenuItem>
-                                                <ContextMenuItem onSelect={() => setDrawing(camera)}>
+                                                <ContextMenuItem
+                                                    onSelect={() => setDrawing(camera)}
+                                                >
                                                     <Shapes className="size-4 shrink-0" />
                                                     Draw areas
                                                 </ContextMenuItem>
@@ -264,7 +288,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                 </ContextMenuItem>
                                             </>
                                         ) : (
-                                            <ContextMenuItem disabled>Nothing to change here</ContextMenuItem>
+                                            <ContextMenuItem disabled>
+                                                Nothing to change here
+                                            </ContextMenuItem>
                                         )}
                                     </ContextMenuContent>
                                 </ContextMenu>

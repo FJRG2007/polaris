@@ -36,7 +36,10 @@ const bodySchema = z.object({
     label: z.string().trim().max(64).nullish(),
     score: z.coerce.number().int().min(0).max(100).nullish(),
     /** JPEG bytes, base64. Optional: the movement rung keeps no picture. */
-    still: z.string().max(Math.ceil(MAX_STILL_BYTES * 1.4)).nullish(),
+    still: z
+        .string()
+        .max(Math.ceil(MAX_STILL_BYTES * 1.4))
+        .nullish(),
     /** Where in the picture it was: [x1, y1, x2, y2]. */
     box: z.tuple([fractionSchema, fractionSchema, fractionSchema, fractionSchema]).nullish(),
     /** The areas it was standing in, by the name the camera gave them. */
@@ -85,7 +88,12 @@ export async function POST(request: Request): Promise<Response> {
         score: parsed.data.score ?? null,
         stillKey,
         box: parsed.data.box
-            ? { x1: parsed.data.box[0], y1: parsed.data.box[1], x2: parsed.data.box[2], y2: parsed.data.box[3] }
+            ? {
+                  x1: parsed.data.box[0],
+                  y1: parsed.data.box[1],
+                  x2: parsed.data.box[2],
+                  y2: parsed.data.box[3]
+              }
             : null,
         zones: parsed.data.zones,
         trackId: parsed.data.trackId ?? null

@@ -15,7 +15,9 @@ describe("DetectionBox", () => {
     });
 
     it("fills the whole tile when the picture's shape is not yet known", () => {
-        const html = renderToStaticMarkup(<DetectionBox box={{ x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5 }} />);
+        const html = renderToStaticMarkup(
+            <DetectionBox box={{ x1: 0.1, y1: 0.1, x2: 0.5, y2: 0.5 }} />
+        );
         const outer = /<span aria-hidden="true"[^>]*style="([^"]*)"/.exec(html);
         // No picture/tile supplied: pictureFrame() returns {}, so the style
         // attribute carries neither a width nor a height override and the
@@ -37,7 +39,12 @@ describe("DetectionBox", () => {
 
     it("places the box as a percentage of the picture frame, not the tile", () => {
         const html = renderToStaticMarkup(
-            <DetectionBox box={{ x1: 0.25, y1: 0.1, x2: 0.75, y2: 0.9 }} label="Somebody" picture={4 / 3} tile={16 / 9} />
+            <DetectionBox
+                box={{ x1: 0.25, y1: 0.1, x2: 0.75, y2: 0.9 }}
+                label="Somebody"
+                picture={4 / 3}
+                tile={16 / 9}
+            />
         );
         const inner = /<span class="[^"]*rounded-\[3px\][^"]*"[^>]*style="([^"]*)"/.exec(html);
         const style = inner?.[1] ?? "";

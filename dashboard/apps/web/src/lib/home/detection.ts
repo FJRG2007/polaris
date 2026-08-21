@@ -50,31 +50,36 @@ export const DETECTOR_META: Readonly<Record<Detector, DetectorMeta>> = {
     camera: {
         id: "camera",
         label: "The camera's own alerts",
-        summary: "Let the camera decide something moved and tell Polaris. Most cameras made in the last ten years can.",
+        summary:
+            "Let the camera decide something moved and tell Polaris. Most cameras made in the last ten years can.",
         cost: "None. The camera does the work and Polaris only listens.",
         onCamera: true
     },
     motion: {
         id: "motion",
         label: "Movement",
-        summary: "Polaris watches the small stream for movement, against what the view normally looks like - so a tree that sways all afternoon stops counting and somebody walking in does not. Use it when the camera cannot report its own movement, or reports far too much.",
+        summary:
+            "Polaris watches the small stream for movement, against what the view normally looks like - so a tree that sways all afternoon stops counting and somebody walking in does not. Use it when the camera cannot report its own movement, or reports far too much.",
         cost: "Small. A couple of low-resolution frames a second, and none of the good stream.",
         onCamera: false
     },
     objects: {
         id: "objects",
         label: "People, vehicles and animals",
-        summary: "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the picture. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house.",
+        summary:
+            "When something moves, Polaris looks properly for as long as it is there, and says what it was and whereabouts in the picture. One arrival is one entry, with the clearest frame of it. This is what stops a swaying branch waking the house.",
         cost: "Moderate, and only while something is actually happening. Idle the rest of the time.",
         onCamera: false
     },
     faces: {
         id: "faces",
         label: "Who it is",
-        summary: "When somebody is seen, compare their face against the people you have taught it. Everybody else is reported as a stranger.",
+        summary:
+            "When somebody is seen, compare their face against the people you have taught it. Everybody else is reported as a stranger.",
         cost: "Highest, and rarest: it runs on the people already found rather than on the whole picture.",
         onCamera: false,
-        requires: "A recognizer connected under Settings. Without one, these cameras still report that somebody is there - just not who."
+        requires:
+            "A recognizer connected under Settings. Without one, these cameras still report that somebody is there - just not who."
     }
 };
 
@@ -108,7 +113,8 @@ export const OBJECT_CLASS_LABELS: Readonly<Record<ObjectClass, string>> = {
  *  parcel, so what gets reported is a box or a bag left in view. Promising
  *  parcel detection and delivering that is how a setting stops being trusted. */
 export const OBJECT_CLASS_HINTS: Readonly<Partial<Record<ObjectClass, string>>> = {
-    package: "A box or a bag left in view, which is the closest anything gets without being taught your own doorstep."
+    package:
+        "A box or a bag left in view, which is the closest anything gets without being taught your own doorstep."
 };
 
 /**

@@ -70,7 +70,9 @@ const IGNORE_COLOR = "#f43f5e";
 const DEFAULT_SHAPE = 16 / 9;
 
 function colorFor(zone: { kind: zoning.ZoneKind }, index: number): string {
-    return zone.kind === "ignore" ? IGNORE_COLOR : (WATCH_COLORS[index % WATCH_COLORS.length] ?? WATCH_COLORS[0]!);
+    return zone.kind === "ignore"
+        ? IGNORE_COLOR
+        : (WATCH_COLORS[index % WATCH_COLORS.length] ?? WATCH_COLORS[0]!);
 }
 
 function emptyDraft(): Draft {
@@ -198,7 +200,10 @@ export function ZonesDialog({
 
     const remove = async (zone: zoning.Zone) => {
         setBusy(true);
-        const result = await runAction(() => actions.deleteCameraZoneAction(camera.id, zone.id), setError);
+        const result = await runAction(
+            () => actions.deleteCameraZoneAction(camera.id, zone.id),
+            setError
+        );
         setBusy(false);
         if (result?.error) return;
         setZones((current) => current.filter((entry) => entry.id !== zone.id));
@@ -215,8 +220,8 @@ export function ZonesDialog({
                 <DialogHeader>
                     <DialogTitle>Areas on {camera.name}</DialogTitle>
                     <DialogDescription>
-                        Draw the parts of the picture that matter. Click the frame to place each corner. Until
-                        you draw one, the whole picture counts.
+                        Draw the parts of the picture that matter. Click the frame to place each
+                        corner. Until you draw one, the whole picture counts.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -245,8 +250,9 @@ export function ZonesDialog({
                                 mean the same thing. */}
                             {noPicture ? (
                                 <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[12px] text-foreground-subtle">
-                                    No picture from this camera right now. You can still draw on the frame - an area
-                                    is a fraction of the picture, not a set of pixels.
+                                    No picture from this camera right now. You can still draw on the
+                                    frame - an area is a fraction of the picture, not a set of
+                                    pixels.
                                 </span>
                             ) : (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -283,9 +289,13 @@ export function ZonesDialog({
                                 {draft.points.length > 1 ? (
                                     <polygon
                                         points={zoning.polygonPoints(draft.points, 100, 100)}
-                                        fill={draft.kind === "ignore" ? IGNORE_COLOR : WATCH_COLORS[0]}
+                                        fill={
+                                            draft.kind === "ignore" ? IGNORE_COLOR : WATCH_COLORS[0]
+                                        }
                                         fillOpacity={0.25}
-                                        stroke={draft.kind === "ignore" ? IGNORE_COLOR : WATCH_COLORS[0]}
+                                        stroke={
+                                            draft.kind === "ignore" ? IGNORE_COLOR : WATCH_COLORS[0]
+                                        }
                                         strokeWidth={0.5}
                                     />
                                 ) : null}
@@ -339,7 +349,9 @@ export function ZonesDialog({
                         <div className="flex flex-col gap-1">
                             <p className="text-[12px] font-medium text-muted-foreground">Areas</p>
                             {loading ? (
-                                <p className="text-[13px] text-foreground-subtle">Reading them...</p>
+                                <p className="text-[13px] text-foreground-subtle">
+                                    Reading them...
+                                </p>
                             ) : zones.length === 0 ? (
                                 <p className="text-[13px] text-foreground-subtle">
                                     None yet, so everything this camera sees counts.
@@ -358,13 +370,18 @@ export function ZonesDialog({
                                                 onClick={() => setDraft(draftOf(zone))}
                                                 className={cn(
                                                     "min-w-0 flex-1 truncate text-left text-[13px]",
-                                                    draft.id === zone.id && "font-medium text-primary"
+                                                    draft.id === zone.id &&
+                                                        "font-medium text-primary"
                                                 )}
                                             >
                                                 {zone.name}
                                             </button>
-                                            {zone.kind === "ignore" ? <Badge variant="neutral">Ignored</Badge> : null}
-                                            {!zone.enabled ? <Badge variant="neutral">Off</Badge> : null}
+                                            {zone.kind === "ignore" ? (
+                                                <Badge variant="neutral">Ignored</Badge>
+                                            ) : null}
+                                            {!zone.enabled ? (
+                                                <Badge variant="neutral">Off</Badge>
+                                            ) : null}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -406,10 +423,15 @@ export function ZonesDialog({
                             </p>
 
                             <div className="flex flex-col gap-1">
-                                <span className="text-[12px] font-medium text-muted-foreground">What counts here</span>
+                                <span className="text-[12px] font-medium text-muted-foreground">
+                                    What counts here
+                                </span>
                                 <div className="flex flex-wrap gap-3">
                                     {OBJECT_CLASSES.map((item) => (
-                                        <label key={item} className="flex items-center gap-2 text-[13px]">
+                                        <label
+                                            key={item}
+                                            className="flex items-center gap-2 text-[13px]"
+                                        >
                                             <Checkbox
                                                 checked={draft.objects.includes(item)}
                                                 onChange={(event) =>
@@ -417,7 +439,9 @@ export function ZonesDialog({
                                                         "objects",
                                                         event.target.checked
                                                             ? [...draft.objects, item]
-                                                            : draft.objects.filter((value) => value !== item)
+                                                            : draft.objects.filter(
+                                                                  (value) => value !== item
+                                                              )
                                                     )
                                                 }
                                             />
@@ -449,7 +473,9 @@ export function ZonesDialog({
                                     </span>
                                     <Input
                                         value={draft.loiterSeconds}
-                                        onChange={(event) => set("loiterSeconds", event.target.value)}
+                                        onChange={(event) =>
+                                            set("loiterSeconds", event.target.value)
+                                        }
                                         inputMode="numeric"
                                     />
                                 </label>
@@ -457,7 +483,10 @@ export function ZonesDialog({
 
                             <label className="flex items-center justify-between gap-3">
                                 <span className="text-[13px]">In use</span>
-                                <Switch checked={draft.enabled} onChange={(checked) => set("enabled", checked)} />
+                                <Switch
+                                    checked={draft.enabled}
+                                    onChange={(checked) => set("enabled", checked)}
+                                />
                             </label>
                         </div>
                     </div>
@@ -467,15 +496,27 @@ export function ZonesDialog({
 
                 <DialogFooter>
                     {draft.id ? (
-                        <Button variant="ghost" onClick={() => setDraft(emptyDraft())} disabled={busy}>
+                        <Button
+                            variant="ghost"
+                            onClick={() => setDraft(emptyDraft())}
+                            disabled={busy}
+                        >
                             New area
                         </Button>
                     ) : null}
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
                         Done
                     </Button>
-                    <Button onClick={() => void save()} disabled={busy || incomplete} aria-disabled={incomplete}>
-                        {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <Plus className="size-4 shrink-0" />}
+                    <Button
+                        onClick={() => void save()}
+                        disabled={busy || incomplete}
+                        aria-disabled={incomplete}
+                    >
+                        {busy ? (
+                            <Loader2 className="size-4 shrink-0 animate-spin" />
+                        ) : (
+                            <Plus className="size-4 shrink-0" />
+                        )}
                         {draft.id ? "Save area" : "Add area"}
                     </Button>
                 </DialogFooter>
