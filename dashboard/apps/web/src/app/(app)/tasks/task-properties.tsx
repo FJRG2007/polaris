@@ -24,7 +24,7 @@ import {
     ChevronDown,
     ChevronRight,
     CircleDot,
-    Flag,
+    Signal,
     Hourglass,
     Tag,
     Target,
@@ -142,7 +142,7 @@ export function PropertyRows({
                 </label>
             </Property>
 
-            <Property icon={<Flag className="size-3.5" />} label="Priority">
+            <Property icon={<Signal className="size-3.5" />} label="Priority">
                 {/* The flag and the word are one control: pointing at "Normal"
                     and having nothing happen is the kind of small lie that makes
                     a panel feel unfinished. */}
@@ -156,7 +156,7 @@ export function PropertyRows({
                             aria-label="Priority"
                             className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-muted"
                         >
-                            <pickers.PriorityFlag priority={task.priority} />
+                            <pickers.PriorityMark priority={task.priority} />
                             {core.TASK_PRIORITY_LABELS[task.priority]}
                         </button>
                     }

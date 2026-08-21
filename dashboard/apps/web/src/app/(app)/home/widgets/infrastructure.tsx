@@ -15,7 +15,7 @@ import { cn } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import { GameLogo } from "@/components/game-picker";
 import { findGame } from "@/lib/apps/games-catalog";
-import { PriorityFlag } from "@/components/priority-flag";
+import { PriorityMark } from "@/components/priority-mark";
 import { RelativeTime } from "@/components/relative-time";
 import { StateDot, WidgetEmpty, WidgetList, WidgetRow, WidgetRowsSkeleton, WidgetUnavailable } from "../widget-card";
 import type {
@@ -337,7 +337,7 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                     <WidgetRow
                         key={task.id}
                         href={task.href}
-                        icon={<PriorityFlag priority={task.priority} className="mt-0.5" />}
+                        icon={<PriorityMark priority={task.priority} className="mt-0.5" />}
                         label={task.name}
                         detail={`${task.reference} - ${task.list}`}
                         trailing={

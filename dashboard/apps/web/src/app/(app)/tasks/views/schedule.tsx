@@ -15,7 +15,7 @@ import { cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { Diamond } from "lucide-react";
 import type { ViewProps } from "./shared";
-import { PriorityFlag, StatusIcon } from "../pickers";
+import { PriorityMark, StatusIcon } from "../pickers";
 import { commandsFor, TaskMenu } from "./task-actions";
 import { toFacts, type TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
@@ -97,7 +97,7 @@ export function GanttView(props: ViewProps) {
                                     >
                                         <StatusIcon color={task.statusColor} type={task.statusType} size={14} />
                                         <span className="truncate text-xs">{task.name}</span>
-                                        <PriorityFlag priority={task.priority} />
+                                        <PriorityMark priority={task.priority} />
                                     </button>
                                     <div className="relative h-9 flex-1">
                                         <button

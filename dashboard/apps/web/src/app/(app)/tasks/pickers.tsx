@@ -17,8 +17,8 @@ import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
-import { PriorityFlag } from "@/components/priority-flag";
-import { Ban, CalendarPlus, Check, ChevronDown, Flag, Plus, Settings2, UserPlus, X } from "lucide-react";
+import { PriorityMark } from "@/components/priority-mark";
+import { Ban, CalendarPlus, Check, ChevronDown, Plus, Settings2, UserPlus, X } from "lucide-react";
 import {
     Badge,
     cn,
@@ -184,7 +184,14 @@ export function StatusDot({ color, className }: { color: string; className?: str
  *   - not started: a broken ring, open and clearly empty
  *   - under way: a ring with the middle filled in
  *   - held up: a ring with the middle barred, the way a hold reads everywhere
- *   - finished: a solid disc with a tick
+ *   - done: a solid disc with a tick
+ *   - closed: a solid disc with a cross
+ *
+ * Those last two were one shape until now, and it was the wrong one. Both kinds
+ * stop the clock, so both drew the tick - which meant a task somebody cancelled,
+ * filed as a duplicate, or decided not to do was shown as a task that had been
+ * completed. On a board that is the difference between work that got done and
+ * work that got dropped, and the colour was the only thing saying which.
  *
  * Drawn rather than composed out of borders because a dashed CSS border on a
  * 20px circle renders as an uneven smudge, and the tick has to sit dead centre
@@ -201,7 +208,10 @@ export function StatusIcon({
     size?: number;
     className?: string;
 }) {
-    const finished = core.isFinishedStatus(type);
+    // Not `isFinishedStatus`: that answers "has the clock stopped", which is
+    // true of both, and it is the question this shape must not be asking.
+    const done = type === "done";
+    const closed = type === "closed";
     return (
         <svg
             aria-hidden
@@ -211,11 +221,11 @@ export function StatusIcon({
             className={cn("shrink-0", className)}
             style={{ color }}
         >
-            {finished ? (
+            {done || closed ? (
                 <>
                     <circle cx="10" cy="10" r="9" fill="currentColor" />
                     <path
-                        d="M5.8 10.3l2.7 2.7 5.7-5.7"
+                        d={done ? "M5.8 10.3l2.7 2.7 5.7-5.7" : "M6.9 6.9l6.2 6.2M13.1 6.9l-6.2 6.2"}
                         fill="none"
                         stroke="#fff"
                         strokeWidth="2"
@@ -391,7 +401,7 @@ export function StatusMarker({
 
 /** Re-exported from where it lives, so the board's own callers are unchanged and
  *  the Overview does not have to import this module to draw one flag. */
-export { PriorityFlag };
+export { PriorityMark };
 
 export function PriorityPicker({
     value,
@@ -414,30 +424,24 @@ export function PriorityPicker({
                         title={core.TASK_PRIORITY_LABELS[value]}
                         className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
-                        {value === "none" ? <Flag className="size-3.5 opacity-50" /> : <PriorityFlag priority={value} />}
+                        <PriorityMark priority={value} />
                     </button>
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
                 <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Priority</p>
-                {core.TASK_PRIORITIES.filter((priority) => priority !== "none").map((priority) => (
+                {/* Every priority, "none" included and in its own place at the
+                    bottom of the scale. It used to be a "Clear" row with a
+                    crossed-out circle on it, which reads as an action rather
+                    than as the answer it is - and left the menu unable to show
+                    that no priority is what this task currently has. */}
+                {core.TASK_PRIORITIES.map((priority) => (
                     <DropdownMenuItem key={priority} onSelect={() => onChange(priority)} className="gap-2">
-                        <Flag
-                            className="size-3.5"
-                            fill={core.TASK_PRIORITY_COLORS[priority]}
-                            style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
-                        />
+                        <PriorityMark priority={priority} />
                         <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
                         {value === priority && <Check className="size-3.5 text-primary" />}
                     </DropdownMenuItem>
                 ))}
-                {/* "No priority" is the absence of the others, so it reads as the
-                    way out of the menu rather than a fifth thing to pick. */}
-                <DropdownMenuItem onSelect={() => onChange("none")} className="gap-2 text-muted-foreground">
-                    <Ban className="size-3.5" />
-                    <span className="flex-1">Clear</span>
-                    {value === "none" && <Check className="size-3.5 text-primary" />}
-                </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );

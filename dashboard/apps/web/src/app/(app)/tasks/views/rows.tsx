@@ -15,7 +15,7 @@ import { toFacts } from "@/lib/tasks/facts";
 import { useRowCursor } from "./row-cursor";
 import { cn, EmptyState } from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
-import { PriorityFlag } from "@/components/priority-flag";
+import { PriorityMark } from "@/components/priority-mark";
 import { useDisplayFormat } from "@/components/display-format";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
@@ -133,7 +133,7 @@ function TaskLine({
                         the box and a list ordered by something it never shows is
                         a list nobody can check. Nothing is drawn for a task with
                         none, so it costs no width in the common case. */}
-                        <PriorityFlag priority={task.priority} />
+                        <PriorityMark priority={task.priority} />
                         <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
                             {task.reference}
                         </span>

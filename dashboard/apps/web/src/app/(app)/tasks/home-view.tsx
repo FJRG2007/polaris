@@ -24,7 +24,7 @@ import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import type { TaskBulkEdit, TaskEdit, TaskListRef } from "./views/shared";
 import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
-import { AvatarStack, DueBadge, PriorityFlag, StatusDot, StatusMarker, TaskLocation } from "./pickers";
+import { AvatarStack, DueBadge, PriorityMark, StatusDot, StatusMarker, TaskLocation } from "./pickers";
 
 export interface HomeCounts {
     readonly assigned: number;
@@ -275,7 +275,7 @@ export function HomeView({
                                                 {task.reference}
                                             </span>
                                             <span className="truncate text-sm">{task.name}</span>
-                                            <PriorityFlag priority={task.priority} />
+                                            <PriorityMark priority={task.priority} />
                                         </button>
                                         <TaskLocation task={task} />
                                     </div>
