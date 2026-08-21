@@ -8,12 +8,18 @@ const NOW = Date.parse("2026-08-02T12:00:00.000Z");
 function hits(
     ip: string,
     count: number,
-    { status = 404, path = "/missing", agoSec = 10 }: { status?: number; path?: string; agoSec?: number } = {}
+    {
+        status = 404,
+        path = "/missing",
+        agoSec = 10,
+        method = "GET"
+    }: { status?: number; path?: string; agoSec?: number; method?: string } = {}
 ): HttpLogLike[] {
     return Array.from({ length: count }, (_, index) => ({
         ip,
         status,
         path,
+        method,
         time: new Date(NOW - agoSec * 1000 - index * 1000).toISOString()
     }));
 }
@@ -84,6 +90,38 @@ describe("detectWafBans", () => {
             ...hits("203.0.113.7", 4, { path: "/_next/image?url=%2Flogo.png&w=64&q=75", agoSec: 20 })
         ];
         expect(detectWafBans({ entries: stale, jails: [NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    /**
+     * The one that took the dashboard away from somebody who was using it.
+     *
+     * The screens submit back to the page they are on, naming a handler the build
+     * minted, so a deploy landing under an open tab makes every submission a 404 -
+     * and a tab that submits on a timer does it until somebody closes it. Ninety
+     * seconds after a deploy, a signed-in account on a call was banned by her own
+     * keepalive and lost the whole instance for half an hour.
+     */
+    it("does not count a page still submitting to the build it was loaded from", () => {
+        const keepalive = hits("203.0.113.7", 12, {
+            method: "POST",
+            path: "/chat/c/01a006cb-ea4d-7eb1-b686-fe34e19b9a9a",
+            agoSec: 10
+        });
+        expect(detectWafBans({ entries: keepalive, jails: [NOT_FOUND], now: NOW })).toEqual([]);
+    });
+
+    it("still counts a login script posting at a named endpoint", () => {
+        // Which is what a hostile POST looks like: it names a file, because it is
+        // going somewhere specific rather than back to a page.
+        const scripted = hits("203.0.113.7", 8, { method: "POST", path: "/wp-login.php" });
+        expect(detectWafBans({ entries: scripted, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
+    });
+
+    it("still counts somebody asking for the same pages rather than posting to them", () => {
+        // The exclusion is about the verb. Asking is how URLs are enumerated, and
+        // a path with no file extension on it is still a URL.
+        const asked = hits("203.0.113.7", 8, { path: "/chat/c/01a006cb-ea4d-7eb1-b686" });
+        expect(detectWafBans({ entries: asked, jails: [NOT_FOUND], now: NOW })).toHaveLength(1);
     });
 
     // A hashed chunk name is not a URL anybody enumerates; a path that only starts the

@@ -23,6 +23,9 @@ export interface HttpLogLike {
     readonly ip: string;
     readonly path: string;
     readonly status: number;
+    /** The verb, where the log carries one. Optional for the same reason as the
+     *  hostname: the auth log feeds this engine too, and an SSH login has none. */
+    readonly method?: string | null;
     /** The hostname asked for, where the log carries one. Optional because the auth
      *  log feeds this same engine and an SSH login has no hostname. */
     readonly host?: string | null;
@@ -172,16 +175,30 @@ const BUILD_ASSET_PREFIXES = ["/_next/static/", "/_next/image", "/_next/webpack-
  * already holds, and every one of those names dies the moment a deploy replaces
  * the build that minted it.
  *
- * They are excluded because leaving them in bans the operator. Opening the
+ * A form the page posted back is the same thing again, and it is the one that
+ * caused real harm. The dashboard's own screens submit to the page they are on,
+ * naming a handler the build minted - so the moment a deploy replaces that build,
+ * every open tab's submissions answer 404, and a tab that submits on a timer does
+ * it until somebody closes it. Somebody on a call had theirs post every ten
+ * seconds; ninety seconds after a deploy landed under her, the flood rule banned
+ * her address and took the whole dashboard away from her, mid-call, while she was
+ * signed in with a second factor.
+ *
+ * Refusing to count it gives nothing away, because a post is not how anybody
+ * finds out which URLs exist - that is asked for, not submitted to. Posts that
+ * really are hostile go to a named endpoint (`/wp-login.php`, `/xmlrpc.php`), so
+ * a path with a file extension on it still counts, and the paths that give a scan
+ * away outright are the `probes` jail's business rather than this one's.
+ *
+ * They are all excluded because leaving them in bans the operator. Opening the
  * dashboard prefetches every route in the nav at once, so three dead ones land in
  * the same second and eight in five minutes is a normal morning - which is exactly
  * what happened on the instance this was written for. The build assets are here
  * for the same reason and a worse case: deploying Polaris while your own tab is
  * open has that tab ask for four or five chunks that no longer exist, inside one
  * second, and the operator bans themselves out of the instance they just shipped.
- * Nothing is given away by refusing to count them either - a hashed chunk name is
- * not a URL anybody enumerates, and the paths that do give a scan away are the
- * `probes` jail's business rather than this one's.
+ * Nothing is given away by refusing to count those either - a hashed chunk name is
+ * not a URL anybody enumerates.
  */
 function selfInflicted(entry: HttpLogLike): boolean {
     const path = entry.path ?? "";
@@ -189,7 +206,22 @@ function selfInflicted(entry: HttpLogLike): boolean {
     if (path.includes("?") && (query === "_rsc" || query.includes("_rsc="))) return true;
     const withoutQuery = path.split("?")[0] ?? "";
     if (withoutQuery === "/favicon.ico") return true;
-    return BUILD_ASSET_PREFIXES.some((prefix) => withoutQuery.startsWith(prefix));
+    if (BUILD_ASSET_PREFIXES.some((prefix) => withoutQuery.startsWith(prefix))) return true;
+    return submittedToAPage(entry.method, withoutQuery);
+}
+
+/**
+ * Whether this was a form posted back to a page rather than a URL being tried.
+ *
+ * The last segment is what decides it. Something posted to a page is posted to
+ * the address the reader is already on, which is a path; something posted to a
+ * named endpoint - the shape every scripted login attempt and exploit has - names
+ * a file, and those keep counting.
+ */
+function submittedToAPage(method: string | null | undefined, path: string): boolean {
+    if ((method ?? "").toUpperCase() !== "POST") return false;
+    const last = path.slice(path.lastIndexOf("/") + 1);
+    return !last.includes(".");
 }
 
 /** Whether a log entry counts as a failure for a jail. */

@@ -56,6 +56,24 @@ import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mi
 const KEEPALIVE_MS = 10_000;
 
 /**
+ * How many times in a row the seat may fail to be kept before this stops asking.
+ *
+ * A beat that never gives up sounds harmless and is not. It is submitted to the
+ * page this tab was loaded from, naming a handler that build minted, so a deploy
+ * landing under an open call makes every beat a 404 - forever, ten seconds apart,
+ * until somebody closes the tab. On this instance the firewall did the closing:
+ * it read the flood as somebody trying URLs and banned the address, which took
+ * the entire dashboard away from a signed-in person in the middle of a call.
+ *
+ * Three, so half a minute of failure ends it. A blip shorter than that recovers
+ * on the next beat; anything longer is a tab that has lost its server, and the
+ * honest thing is to stop rather than to keep insisting on a seat nobody is
+ * recording. Polaris is already offering that tab the reload, and taking it walks
+ * back into the call.
+ */
+const KEEPALIVE_GIVE_UP = 3;
+
+/**
  * The client for the media server, fetched at the moment a call needs it.
  *
  * Types at the top of the file, code only here. The provider that holds a call
@@ -854,7 +872,22 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (frame.data.kind === "ended") setEnded(true);
             };
 
-            beat = setInterval(() => void actions.keepSeatAction(inCall), KEEPALIVE_MS);
+            let missed = 0;
+            beat = setInterval(() => {
+                void actions
+                    .keepSeatAction(inCall)
+                    .then(() => {
+                        missed = 0;
+                    })
+                    .catch(() => {
+                        // Not shown to anybody. The call itself is still up - it
+                        // is held by the media server, not by this - and the
+                        // person on it does not need a dialog about a heartbeat.
+                        if (++missed < KEEPALIVE_GIVE_UP || !beat) return;
+                        clearInterval(beat);
+                        beat = null;
+                    });
+            }, KEEPALIVE_MS);
             refresh();
             await connect();
         }
