@@ -276,297 +276,302 @@ export function AccountMenu({
 
     return (
         <>
-        {/* Not modal, which is what makes the double press below possible: a
+            {/* Not modal, which is what makes the double press below possible: a
             modal menu takes the pointer away from everything behind it, its own
             trigger included, so the second press of a double never reaches the
             face it was aimed at. */}
-        <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
-            <DropdownMenuTrigger
-                aria-label="Your account"
-                title="Your account. Press twice to open it."
-                // Straight there. Your own face is the way to your own account
-                // in every application that has one, and going through a menu to
-                // press the item named after the thing you just pressed is a step
-                // that exists for no reason. The menu opens and closes under the
-                // two presses, which is what every double-click on a menu does.
-                onDoubleClick={() => {
-                    setOpen(false);
-                    router.push("/account");
-                }}
-                className="rounded-full "
-            >
-                <Avatar person={{ id, name }} size={32} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuLabel>
-                    <span className="block text-sm font-medium text-foreground">{name}</span>
-                    <span className="block truncate">{email}</span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {/* Where the status lives in every application that has one: on
+            <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+                <DropdownMenuTrigger
+                    aria-label="Your account"
+                    title="Your account. Press twice to open it."
+                    // Straight there. Your own face is the way to your own account
+                    // in every application that has one, and going through a menu to
+                    // press the item named after the thing you just pressed is a step
+                    // that exists for no reason. The menu opens and closes under the
+                    // two presses, which is what every double-click on a menu does.
+                    onDoubleClick={() => {
+                        setOpen(false);
+                        router.push("/account");
+                    }}
+                    className="rounded-full "
+                >
+                    <Avatar person={{ id, name }} size={32} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>
+                        <span className="block text-sm font-medium text-foreground">{name}</span>
+                        <span className="block truncate">{email}</span>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {/* Where the status lives in every application that has one: on
                     your own face, one press from anywhere. A settings page would
                     be the right place for a preference and the wrong one for
                     something people change three times a day. */}
-                {PRESENCE_CHOICES.map((choice) => {
-                    const face = (
-                        <>
-                            <span
-                                aria-hidden="true"
-                                className={cn(
-                                    "size-2 shrink-0 rounded-full",
-                                    PRESENCE_CHOICE_DOTS[choice]
+                    {PRESENCE_CHOICES.map((choice) => {
+                        const face = (
+                            <>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        "size-2 shrink-0 rounded-full",
+                                        PRESENCE_CHOICE_DOTS[choice]
+                                    )}
+                                />
+                                <span className="flex-1">{PRESENCE_LABELS[choice]}</span>
+                                {shownChoice === choice && shownUntil && (
+                                    <span className="text-[11px] text-muted-foreground">
+                                        {shownByRule ? "scheduled, until " : "until "}
+                                        {endLabel(shownUntil, format)}
+                                    </span>
                                 )}
-                            />
-                            <span className="flex-1">{PRESENCE_LABELS[choice]}</span>
-                            {shownChoice === choice && shownUntil && (
-                                <span className="text-[11px] text-muted-foreground">
-                                    {shownByRule ? "scheduled, until " : "until "}
-                                    {endLabel(shownUntil, format)}
-                                </span>
-                            )}
-                            {shownChoice === choice && <Check className="size-3.5 text-primary" />}
-                        </>
-                    );
-
-                    // Online is the reset, so it has no window: "back to working
-                    // it out, for an hour" is not a thing anybody means.
-                    if (choice === "auto") {
-                        return (
-                            <DropdownMenuItem key={choice} onSelect={() => void choose(choice)}>
-                                {face}
-                            </DropdownMenuItem>
+                                {shownChoice === choice && (
+                                    <Check className="size-3.5 text-primary" />
+                                )}
+                            </>
                         );
-                    }
 
-                    // Pressing the row sets it until you change it; resting on it
-                    // offers the lengths. Both, because both are habits - and the
-                    // one that matters is the status somebody forgets they set.
-                    //
-                    // Only a mouse commits on the press. A tap and the Enter key
-                    // are the only ways a finger or a keyboard has of reaching
-                    // the submenu at all, so for them the press opens it - and
-                    // "Until I change it" is in there, which is the same answer
-                    // one press further on rather than an answer they cannot
-                    // give.
-                    return (
-                        <DropdownMenuSub key={choice}>
-                            <DropdownMenuSubTrigger
-                                onKeyDown={() => {
-                                    reached.current = "key";
-                                }}
-                                onPointerDown={(event) => {
-                                    reached.current = event.pointerType;
-                                }}
-                                onClick={() => {
-                                    const via = reached.current;
-                                    reached.current = "";
-                                    if (via === "mouse" || via === "pen") {
-                                        void choose(choice);
-                                    }
-                                }}
-                            >
-                                {face}
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                                {PRESENCE_DURATIONS.map((duration) => (
-                                    <DropdownMenuItem
-                                        key={duration.label}
-                                        onSelect={() => void choose(choice, { minutes: duration.minutes })}
-                                    >
-                                        {duration.label}
-                                    </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuSeparator />
-                                {/* The two answers a ladder of lengths cannot
-                                    give: a moment somebody has in mind, and a
-                                    part of the week they already know about. */}
-                                <DropdownMenuItem
-                                    onSelect={() => {
-                                        setOpen(false);
-                                        setMoment(localInput(new Date(Date.now() + 60 * 60_000)));
-                                        setTiming(choice);
+                        // Online is the reset, so it has no window: "back to working
+                        // it out, for an hour" is not a thing anybody means.
+                        if (choice === "auto") {
+                            return (
+                                <DropdownMenuItem key={choice} onSelect={() => void choose(choice)}>
+                                    {face}
+                                </DropdownMenuItem>
+                            );
+                        }
+
+                        // Pressing the row sets it until you change it; resting on it
+                        // offers the lengths. Both, because both are habits - and the
+                        // one that matters is the status somebody forgets they set.
+                        //
+                        // Only a mouse commits on the press. A tap and the Enter key
+                        // are the only ways a finger or a keyboard has of reaching
+                        // the submenu at all, so for them the press opens it - and
+                        // "Until I change it" is in there, which is the same answer
+                        // one press further on rather than an answer they cannot
+                        // give.
+                        return (
+                            <DropdownMenuSub key={choice}>
+                                <DropdownMenuSubTrigger
+                                    onKeyDown={() => {
+                                        reached.current = "key";
+                                    }}
+                                    onPointerDown={(event) => {
+                                        reached.current = event.pointerType;
+                                    }}
+                                    onClick={() => {
+                                        const via = reached.current;
+                                        reached.current = "";
+                                        if (via === "mouse" || via === "pen") {
+                                            void choose(choice);
+                                        }
                                     }}
                                 >
-                                    Until a date and time...
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/account/privacy/schedule">
-                                        <CalendarClock className="size-4" />
-                                        Every week...
-                                    </Link>
-                                </DropdownMenuItem>
-                            </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                {/* Under the four dots and above everything else, because it is
+                                    {face}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    {PRESENCE_DURATIONS.map((duration) => (
+                                        <DropdownMenuItem
+                                            key={duration.label}
+                                            onSelect={() =>
+                                                void choose(choice, { minutes: duration.minutes })
+                                            }
+                                        >
+                                            {duration.label}
+                                        </DropdownMenuItem>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                    {/* The two answers a ladder of lengths cannot
+                                    give: a moment somebody has in mind, and a
+                                    part of the week they already know about. */}
+                                    <DropdownMenuItem
+                                        onSelect={() => {
+                                            setOpen(false);
+                                            setMoment(
+                                                localInput(new Date(Date.now() + 60 * 60_000))
+                                            );
+                                            setTiming(choice);
+                                        }}
+                                    >
+                                        Until a date and time...
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/account/privacy/schedule">
+                                            <CalendarClock className="size-4" />
+                                            Every week...
+                                        </Link>
+                                    </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                        );
+                    })}
+                    <DropdownMenuSeparator />
+                    {/* Under the four dots and above everything else, because it is
                     the same question one answer further on: the dot says whether
                     to expect a reply and this says why. */}
-                <DropdownMenuItem
-                    onSelect={() => {
-                        setLine(shownStatus);
-                        // Reopened on what is already set: a status standing
-                        // until it is cleared should not offer to start
-                        // expiring because the dialog was opened again, and one
-                        // that does expire says the moment it was actually set
-                        // to rather than the offered length nearest to it.
-                        setClears(null);
-                        setClearsAt(
-                            shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null
-                        );
-                        setWriting(true);
-                    }}
-                >
-                    <MessageSquareText className="size-4" />
-                    <span className="min-w-0 truncate">{shownStatus || "Set a status"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                    <Link href="/account">
-                        <UserCog className="size-4" />
-                        My account
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link href="/account/notifications">
-                        <Bell className="size-4" />
-                        Notifications
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link href="/drive/shared-links">
-                        <Link2 className="size-4" />
-                        Shared links
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={onSignOut}>
-                    <LogOut className="size-4" />
-                    Sign out
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    <DropdownMenuItem
+                        onSelect={() => {
+                            setLine(shownStatus);
+                            // Reopened on what is already set: a status standing
+                            // until it is cleared should not offer to start
+                            // expiring because the dialog was opened again, and one
+                            // that does expire says the moment it was actually set
+                            // to rather than the offered length nearest to it.
+                            setClears(null);
+                            setClearsAt(
+                                shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null
+                            );
+                            setWriting(true);
+                        }}
+                    >
+                        <MessageSquareText className="size-4" />
+                        <span className="min-w-0 truncate">{shownStatus || "Set a status"}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                        <Link href="/account">
+                            <UserCog className="size-4" />
+                            My account
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/account/notifications">
+                            <Bell className="size-4" />
+                            Notifications
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                        <Link href="/drive/shared-links">
+                            <Link2 className="size-4" />
+                            Shared links
+                        </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={onSignOut}>
+                        <LogOut className="size-4" />
+                        Sign out
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
 
-        {/* The exact end of a chosen state. Its own dialog rather than a field
+            {/* The exact end of a chosen state. Its own dialog rather than a field
             in the menu, because a menu that has to stay open while somebody
             picks a date is a menu that shuts on the first press outside it. */}
-        <Dialog open={timing !== null} onOpenChange={(next) => !next && setTiming(null)}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>
-                        {timing ? PRESENCE_LABELS[timing] : ""} until a date and time
-                    </DialogTitle>
-                    <DialogDescription>
-                        You go back to being shown as online after this.
-                    </DialogDescription>
-                </DialogHeader>
-                <Input
-                    autoFocus
-                    type="datetime-local"
-                    value={moment}
-                    min={localInput(new Date())}
-                    aria-label="When it goes back to normal"
-                    onChange={(event) => setMoment(event.target.value)}
-                />
-                {badTiming ? <p className="text-xs text-danger">{badTiming}</p> : null}
-                <DialogFooter>
-                    <Button variant="ghost" onClick={() => setTiming(null)}>
-                        Cancel
-                    </Button>
-                    <Button
-                        aria-disabled={Boolean(badTiming)}
-                        onClick={() => {
-                            if (!timing || badTiming) return;
-                            void choose(timing, { until: new Date(moment).toISOString() });
-                        }}
-                    >
-                        Save
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-
-        {/* Outside the menu, which closes on the item that opens this: a dialog
-            mounted inside one is unmounted the moment it is asked for. */}
-        <Dialog open={writing} onOpenChange={setWriting}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>Set a status</DialogTitle>
-                    <DialogDescription>
-                        Shown beside your name while you are online.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
+            <Dialog open={timing !== null} onOpenChange={(next) => !next && setTiming(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {timing ? PRESENCE_LABELS[timing] : ""} until a date and time
+                        </DialogTitle>
+                        <DialogDescription>
+                            You go back to being shown as online after this.
+                        </DialogDescription>
+                    </DialogHeader>
                     <Input
                         autoFocus
-                        value={line}
-                        maxLength={MAX_STATUS}
-                        placeholder="What are you up to?"
-                        onChange={(event) => setLine(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter" && !badMoment) {
-                                void saveStatus(line, statusWindow);
-                            }
-                        }}
+                        type="datetime-local"
+                        value={moment}
+                        min={localInput(new Date())}
+                        aria-label="When it goes back to normal"
+                        onChange={(event) => setMoment(event.target.value)}
                     />
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Clear</span>
-                        <Select
-                            value={clearsAt === null ? String(clears) : AT_A_TIME}
-                            aria-label="When the status clears"
-                            options={[
-                                ...STATUS_DURATIONS.map((duration) => ({
-                                    value: String(duration.minutes),
-                                    label: duration.label
-                                })),
-                                { value: AT_A_TIME, label: "At a date and time..." }
-                            ]}
-                            onValueChange={(value) => {
-                                if (value === AT_A_TIME) {
-                                    return setClearsAt(
-                                        clearsAt || localInput(new Date(Date.now() + 60 * 60_000))
-                                    );
+                    {badTiming ? <p className="text-xs text-danger">{badTiming}</p> : null}
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setTiming(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            aria-disabled={Boolean(badTiming)}
+                            onClick={() => {
+                                if (!timing || badTiming) return;
+                                void choose(timing, { until: new Date(moment).toISOString() });
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Outside the menu, which closes on the item that opens this: a dialog
+            mounted inside one is unmounted the moment it is asked for. */}
+            <Dialog open={writing} onOpenChange={setWriting}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Set a status</DialogTitle>
+                        <DialogDescription>
+                            Shown beside your name while you are online.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-3">
+                        <Input
+                            autoFocus
+                            value={line}
+                            maxLength={MAX_STATUS}
+                            placeholder="What are you up to?"
+                            onChange={(event) => setLine(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" && !badMoment) {
+                                    void saveStatus(line, statusWindow);
                                 }
-                                setClearsAt(null);
-                                setClears(value === "null" ? null : Number(value));
                             }}
                         />
-                    </label>
-                    {clearsAt !== null ? (
-                        <Input
-                            type="datetime-local"
-                            value={clearsAt}
-                            min={localInput(new Date())}
-                            aria-label="The date and time the status clears"
-                            onChange={(event) => setClearsAt(event.target.value)}
-                        />
-                    ) : null}
-                    {badMoment ? (
-                        <p className="text-xs text-danger">{badMoment}</p>
-                    ) : null}
-                </div>
-                <DialogFooter>
-                    {/* Only where there is one to take off. A Clear that clears
+                        <label className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">Clear</span>
+                            <Select
+                                value={clearsAt === null ? String(clears) : AT_A_TIME}
+                                aria-label="When the status clears"
+                                options={[
+                                    ...STATUS_DURATIONS.map((duration) => ({
+                                        value: String(duration.minutes),
+                                        label: duration.label
+                                    })),
+                                    { value: AT_A_TIME, label: "At a date and time..." }
+                                ]}
+                                onValueChange={(value) => {
+                                    if (value === AT_A_TIME) {
+                                        return setClearsAt(
+                                            clearsAt ||
+                                                localInput(new Date(Date.now() + 60 * 60_000))
+                                        );
+                                    }
+                                    setClearsAt(null);
+                                    setClears(value === "null" ? null : Number(value));
+                                }}
+                            />
+                        </label>
+                        {clearsAt !== null ? (
+                            <Input
+                                type="datetime-local"
+                                value={clearsAt}
+                                min={localInput(new Date())}
+                                aria-label="The date and time the status clears"
+                                onChange={(event) => setClearsAt(event.target.value)}
+                            />
+                        ) : null}
+                        {badMoment ? <p className="text-xs text-danger">{badMoment}</p> : null}
+                    </div>
+                    <DialogFooter>
+                        {/* Only where there is one to take off. A Clear that clears
                         nothing is a button that does nothing. */}
-                    {shownStatus && (
+                        {shownStatus && (
+                            <Button
+                                variant="ghost"
+                                disabled={saving}
+                                onClick={() => void saveStatus("", {})}
+                            >
+                                Clear it
+                            </Button>
+                        )}
                         <Button
-                            variant="ghost"
                             disabled={saving}
-                            onClick={() => void saveStatus("", {})}
+                            aria-disabled={Boolean(badMoment)}
+                            onClick={() => !badMoment && void saveStatus(line, statusWindow)}
                         >
-                            Clear it
+                            Save
                         </Button>
-                    )}
-                    <Button
-                        disabled={saving}
-                        aria-disabled={Boolean(badMoment)}
-                        onClick={() => !badMoment && void saveStatus(line, statusWindow)}
-                    >
-                        Save
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

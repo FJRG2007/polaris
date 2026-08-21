@@ -186,8 +186,16 @@ export const presenceScheduleSchema = z
             .int()
             .min(1, "Pick at least one day")
             .max(EVERY_DAY, "That is not a set of days"),
-        startMinute: z.number().int().min(0).max(MINUTES_IN_DAY - 1),
-        endMinute: z.number().int().min(0).max(MINUTES_IN_DAY - 1),
+        startMinute: z
+            .number()
+            .int()
+            .min(0)
+            .max(MINUTES_IN_DAY - 1),
+        endMinute: z
+            .number()
+            .int()
+            .min(0)
+            .max(MINUTES_IN_DAY - 1),
         enabled: z.boolean()
     })
     // On the object rather than on either field, because it is a fact about the
