@@ -41,6 +41,32 @@ describe("what a status looks like", () => {
         expect(paths(html).join(" ")).toMatch(/M6\.9 6\.9/);
     });
 
+    it("fills work in progress like a clock face, by how far through it is", () => {
+        // A space with three stages of work in progress drew three identical
+        // filled circles, so the only thing telling them apart was a colour
+        // somebody had to have learned.
+        const drawn = [0.25, 0.5, 0.75].map((progress) =>
+            renderToStaticMarkup(<StatusIcon color="#000000" type="active" progress={progress} />)
+        );
+        expect(new Set(drawn).size).toBe(3);
+        // A quarter turn ends to the right of centre and three quarters to the
+        // left, so the wedge is going the way a clock goes. Read off the path
+        // rather than matched against literals, so the mark can be resized
+        // without this becoming a test about a radius.
+        const endsAt = (html: string) =>
+            Number(/ (\d+(?:\.\d+)?) \d+(?:\.\d+)?Z/.exec(html)?.[1] ?? NaN);
+        expect(endsAt(drawn[0]!)).toBeGreaterThan(10);
+        expect(endsAt(drawn[2]!)).toBeLessThan(10);
+    });
+
+    it("falls back to a half turn when the space's stages are not known", () => {
+        // Which is what a single-stage space draws anyway, and what this mark
+        // has always meant.
+        const guessed = renderToStaticMarkup(<StatusIcon color="#000000" type="active" />);
+        const half = renderToStaticMarkup(<StatusIcon color="#000000" type="active" progress={0.5} />);
+        expect(guessed).toBe(half);
+    });
+
     it("draws every kind as its own shape", () => {
         // Colour is not allowed to be the only difference between any two of
         // them, so the markup has to differ too.

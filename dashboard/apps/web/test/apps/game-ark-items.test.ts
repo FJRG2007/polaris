@@ -13,6 +13,7 @@ import {
     arkGiveCommand,
     arkItemIconUrl,
     arkStackCount,
+    describeArkStacks,
     MAX_ARK_GIVE,
     readArkItemCatalog,
     searchArkItems
@@ -100,6 +101,52 @@ describe("arkItemIconUrl", () => {
     it("refuses to build a URL out of anything else", () => {
         expect(arkItemIconUrl("../../secret")).toBeNull();
         expect(arkItemIconUrl("")).toBeNull();
+    });
+});
+
+/**
+ * The sentence under the quantity box, which was contradicting the box.
+ *
+ * Ask for 125 of something that stacks to 100 and it read "2 stacks of 100" -
+ * a sentence that says two hundred. The count was right about how many stacks
+ * arrive and wrong about what is in them, and the one an admin acts on is the
+ * sentence.
+ */
+describe("describeArkStacks", () => {
+    it("names what is left over rather than rounding it up to a full stack", () => {
+        expect(describeArkStacks(100, 125)).toBe("Arrives as a stack of 100 and 25.");
+        expect(describeArkStacks(100, 350)).toBe("Arrives as 3 stacks of 100 and 50.");
+    });
+
+    it("says nothing about a remainder there is not", () => {
+        expect(describeArkStacks(100, 200)).toBe("Arrives as 2 stacks of 100.");
+    });
+
+    it("stays quiet when it all fits in one stack", () => {
+        // Nothing to describe, and a line saying so is a line in the way.
+        expect(describeArkStacks(100, 100)).toBeNull();
+        expect(describeArkStacks(100, 1)).toBeNull();
+    });
+
+    it("counts gear as pieces, because gear does not stack", () => {
+        // "5 stacks of 1" is arithmetic rather than English.
+        expect(describeArkStacks(1, 5)).toBe("Arrives as 5 separate pieces.");
+    });
+
+    it("never adds up to more than was asked for", () => {
+        // The property the original broke. Whatever the sentence names has to
+        // come to the number in the box.
+        for (const stack of [3, 20, 100, 300]) {
+            for (const quantity of [1, 2, 7, 99, 100, 101, 125, 250, 999, 1000]) {
+                const said = describeArkStacks(stack, quantity);
+                if (!said) continue;
+                const numbers = [...said.matchAll(/(\d+)/g)].map((match) => Number(match[1]));
+                const [count, size, rest = 0] = said.startsWith("Arrives as a stack")
+                    ? [1, numbers[0]!, numbers[1] ?? 0]
+                    : [numbers[0]!, numbers[1]!, numbers[2] ?? 0];
+                expect(count * size + rest).toBe(quantity);
+            }
+        }
     });
 });
 

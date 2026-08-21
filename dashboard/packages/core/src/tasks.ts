@@ -764,6 +764,38 @@ export interface GroupContext {
     readonly lists?: readonly { id: string; name: string }[];
 }
 
+/**
+ * How far through the work a status sits, for the mark that draws it.
+ *
+ * Only the ones in progress have an answer. Not started is empty, finished is
+ * full, held up is its own shape - none of those is a position on a scale. What
+ * needed one is the band in between, because a space that has drawn three stages
+ * of work in progress had them rendered as three identical filled circles, and
+ * the only thing telling "In progress" from "In review" from "Ready to ship" was
+ * a colour somebody had to have learned.
+ *
+ * The fraction is the status's own place among the in-progress stages of its
+ * space, in the order that space put them in. Nothing here is invented: a space
+ * with one such stage gets a half-filled mark, and a space with three gets a
+ * quarter, a half and three quarters.
+ *
+ * Never zero and never one, deliberately. A quarter-turn short of empty still
+ * reads as started, and a quarter-turn short of full still reads as unfinished -
+ * which is the honest thing for work that is neither.
+ *
+ * Null for every other kind, which is what tells the mark to keep its own shape.
+ */
+export function statusProgress(
+    statuses: readonly { id: string; type: work.TaskStatusType }[],
+    statusId: string | null
+): number | null {
+    if (!statusId) return null;
+    const started = statuses.filter((status) => status.type === "active");
+    const index = started.findIndex((status) => status.id === statusId);
+    if (index < 0) return null;
+    return (index + 1) / (started.length + 1);
+}
+
 /** One column of a board grouped by status, and every status row it stands for. */
 export interface StatusColumn {
     /** The status the column is keyed by: the first one that carries this name. */

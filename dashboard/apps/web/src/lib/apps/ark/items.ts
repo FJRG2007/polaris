@@ -118,11 +118,41 @@ export const MAX_ARK_GIVE = 1000;
  *  anything the game hands out on its own. */
 export const MAX_ARK_QUALITY = 100;
 
-/** How many stacks a quantity actually arrives as, for the sentence under the
- *  field. The game splits them itself - this only says so. */
+/** How many stacks a quantity actually arrives as. The game splits them itself -
+ *  this only counts them. */
 export function arkStackCount(stack: number, quantity: number): number {
     const size = Math.max(1, Math.trunc(stack));
     return Math.ceil(Math.max(0, Math.trunc(quantity)) / size);
+}
+
+/**
+ * How a quantity lands, for the sentence under the field.
+ *
+ * The count on its own was being read out as "2 stacks of 100", which is a
+ * sentence that says two hundred. Ask for a hundred and twenty-five and that is
+ * what it said - so the line under the box contradicted the number in the box,
+ * and the one that was right was the box. Somebody trusting the sentence hands
+ * out an amount nobody asked for.
+ *
+ * So the remainder is named. A quantity that fills its stacks exactly still
+ * reads as before, because there is nothing left over to say.
+ *
+ * Null when it all fits in one stack: there is no split to describe, and a line
+ * saying so is a line in the way.
+ */
+export function describeArkStacks(stack: number, quantity: number): string | null {
+    const size = Math.max(1, Math.trunc(stack));
+    const total = Math.max(0, Math.trunc(quantity));
+    if (total <= size) return null;
+    // Gear does not stack at all, so counting it in stacks of one is arithmetic
+    // rather than English. Five swords are five swords.
+    if (size === 1) return `Arrives as ${total} separate pieces.`;
+    const full = Math.trunc(total / size);
+    const rest = total - full * size;
+    const stacks = full === 1 ? `a stack of ${size}` : `${full} stacks of ${size}`;
+    return rest === 0
+        ? `Arrives as ${stacks}.`
+        : `Arrives as ${stacks} and ${rest}.`;
 }
 
 export interface ArkGive {

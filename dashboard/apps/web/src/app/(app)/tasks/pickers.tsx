@@ -175,6 +175,31 @@ export function StatusDot({ color, className }: { color: string; className?: str
     );
 }
 
+/** The radius of the filled part of an in-progress mark, inside the ring. */
+const PIE_RADIUS = 5.2;
+
+/**
+ * A wedge of the inner circle, clockwise from twelve.
+ *
+ * A full turn cannot be drawn as an arc - start and end land on the same point
+ * and every renderer draws nothing - so anything at or past a whole turn is the
+ * disc itself.
+ */
+function pieOf(progress: number | null | undefined): string {
+    const fraction =
+        typeof progress === "number" && Number.isFinite(progress)
+            ? Math.min(1, Math.max(0, progress))
+            : 0.5;
+    if (fraction >= 1) {
+        return `M10 ${10 - PIE_RADIUS}A${PIE_RADIUS} ${PIE_RADIUS} 0 1 1 9.99 ${10 - PIE_RADIUS}Z`;
+    }
+    const angle = fraction * 2 * Math.PI;
+    const x = 10 + PIE_RADIUS * Math.sin(angle);
+    const y = 10 - PIE_RADIUS * Math.cos(angle);
+    const largeArc = fraction > 0.5 ? 1 : 0;
+    return `M10 10L10 ${10 - PIE_RADIUS}A${PIE_RADIUS} ${PIE_RADIUS} 0 ${largeArc} 1 ${x.toFixed(3)} ${y.toFixed(3)}Z`;
+}
+
 /**
  * What a state looks like, as a shape rather than only a colour.
  *
@@ -182,7 +207,8 @@ export function StatusDot({ color, className }: { color: string; className?: str
  * readable to somebody who cannot tell the colours apart:
  *
  *   - not started: a broken ring, open and clearly empty
- *   - under way: a ring with the middle filled in
+ *   - under way: a ring filling up like a clock face, and how far round it has
+ *     got is how far through the space's own stages that status sits
  *   - held up: a ring with the middle barred, the way a hold reads everywhere
  *   - done: a solid disc with a tick
  *   - closed: a solid disc with a cross
@@ -193,6 +219,14 @@ export function StatusDot({ color, className }: { color: string; className?: str
  * completed. On a board that is the difference between work that got done and
  * work that got dropped, and the colour was the only thing saying which.
  *
+ * The clock face is the one worth explaining. A space that has drawn three
+ * stages of work in progress had all three rendered as the same filled circle,
+ * so "In progress", "In review" and "Ready to ship" were told apart only by a
+ * colour somebody had to have learned. Now the mark says which, and it says it
+ * in the direction the work is going. Where the caller does not know the space's
+ * stages it falls back to a half-filled one, which is what a single-stage space
+ * draws anyway and is what this mark has always meant.
+ *
  * Drawn rather than composed out of borders because a dashed CSS border on a
  * 20px circle renders as an uneven smudge, and the tick has to sit dead centre
  * at every size a row, a card and a menu use.
@@ -200,11 +234,18 @@ export function StatusDot({ color, className }: { color: string; className?: str
 export function StatusIcon({
     color,
     type,
+    progress,
     size = 20,
     className
 }: {
     color: string;
     type: core.TaskStatusType;
+    /**
+     * How far through the space's stages of work in progress this status sits,
+     * from `core.statusProgress`. Ignored by every other kind, and a half turn
+     * when the caller does not know.
+     */
+    progress?: number | null;
     size?: number;
     className?: string;
 }) {
@@ -258,7 +299,7 @@ export function StatusIcon({
                             strokeLinecap="round"
                         />
                     ) : (
-                        type !== "open" && <circle cx="10" cy="10" r="4" fill="currentColor" />
+                        type !== "open" && <path d={pieOf(progress)} fill="currentColor" />
                     )}
                 </>
             )}
@@ -306,7 +347,12 @@ export function StatusPicker({
                         )}
                         style={current ? { color: current.color } : undefined}
                     >
-                        <StatusIcon color={current?.color ?? "#64748b"} type={current?.type ?? "open"} size={14} />
+                        <StatusIcon
+                            color={current?.color ?? "#64748b"}
+                            type={current?.type ?? "open"}
+                            progress={core.statusProgress(statuses, value)}
+                            size={14}
+                        />
                         <span className="truncate">{current?.name ?? "No status"}</span>
                         {!compact && <ChevronDown className="size-3 opacity-60" />}
                     </button>
@@ -320,7 +366,12 @@ export function StatusPicker({
                     )}
                     {matches.map((status) => (
                         <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
-                            <StatusIcon color={status.color} type={status.type} size={16} />
+                            <StatusIcon
+                                color={status.color}
+                                type={status.type}
+                                progress={core.statusProgress(statuses, status.id)}
+                                size={16}
+                            />
                             <span className="flex-1 truncate">{status.name}</span>
                             {status.id === value ? (
                                 <Check className="size-3.5 text-primary" />
@@ -388,7 +439,11 @@ export function StatusMarker({
                     aria-label={`Status: ${statusName}`}
                     className="inline-flex size-5 shrink-0 items-center justify-center transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    <StatusIcon color={statusColor} type={statusType} />
+                    <StatusIcon
+                        color={statusColor}
+                        type={statusType}
+                        progress={core.statusProgress(statuses, statusId)}
+                    />
                 </button>
             }
         />

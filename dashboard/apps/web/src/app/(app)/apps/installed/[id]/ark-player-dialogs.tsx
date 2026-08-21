@@ -24,7 +24,7 @@ import { PlayerRecordPanel } from "@/components/player-history";
 import { ArkItemPicker, loadArkCatalog } from "./ark-item-picker";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
-import { arkStackCount, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkItem } from "@/lib/apps/ark/items";
+import { describeArkStacks, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkItem } from "@/lib/apps/ark/items";
 import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import {
     Button,
@@ -279,7 +279,7 @@ export function ArkGiveDialog({
     // neither, and the game ignores both arguments for it - so the two fields are
     // only drawn where they mean something.
     const gear = item !== undefined && item.stack === 1;
-    const stacks = item ? arkStackCount(item.stack, quantity) : 1;
+    const split = item ? describeArkStacks(item.stack, quantity) : null;
 
     return (
         <PlayerFormDialog
@@ -306,9 +306,8 @@ export function ArkGiveDialog({
             <PlayerFormField
                 label="How many"
                 hint={
-                    item && !blueprint && stacks > 1
-                        ? `${stacks} stacks of ${item.stack}.`
-                        : "Straight into their inventory, wherever they are standing."
+                    (!blueprint && split) ||
+                    "Straight into their inventory, wherever they are standing."
                 }
             >
                 <Input
