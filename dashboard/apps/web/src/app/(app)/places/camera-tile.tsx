@@ -24,6 +24,11 @@
  * Two other things are still bounded. The tiles watch the SMALL stream, and a
  * tile scrolled out of view stops asking for anything at all.
  *
+ * Over all of it, whatever the detector is following right now. A tile fills its
+ * frame rather than letterboxing it, so the boxes are told that - placed against
+ * the whole tile they would sit off to one side of a camera whose shape is not
+ * the tile's.
+ *
  * Nothing here nests a button inside a button. It used to - the whole tile was
  * one, with the movement arrows inside it - which is invalid HTML, and the
  * browser resolves it by dropping the inner button's events. The arrows silently
@@ -35,6 +40,9 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Camera, Maximize2, VideoOff } from "lucide-react";
+import type { LiveBox } from "@polaris/core";
+import { DetectionBox } from "./detection-box";
+import { boxLabel } from "./detection-label";
 import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
 /**
@@ -84,9 +92,14 @@ const VIDEO_SILENCE_MS = 9_000;
  *  a postcard is most of a megabyte, over and over, on somebody's phone. */
 const FRAME_WIDTH = 640;
 
+/** The shape every tile is drawn at, from the `aspect-video` below. The picture
+ *  inside it is rarely the same shape, and the boxes need both to be placed. */
+const TILE_SHAPE = 16 / 9;
+
 export function CameraTile({
     camera,
     live,
+    boxes,
     canControl,
     idle,
     onOpen
@@ -94,6 +107,9 @@ export function CameraTile({
     camera: CameraView;
     /** Whether the relay is serving this camera at all. */
     live: boolean;
+    /** What the detector is following on this camera, if anything. Handed down
+     *  rather than asked for here: the wall asks once for all of them. */
+    boxes?: readonly LiveBox[];
     canControl: boolean;
     /**
      * Whether to stop and hold the last picture.
@@ -126,6 +142,9 @@ export function CameraTile({
     /** Whether the stream is actually playing. Until it is, the frames are what
      *  is on screen. */
     const [playing, setPlaying] = useState(false);
+    /** The camera's own shape, width over height, learned from whichever of the
+     *  two is on screen. Null until one has arrived. */
+    const [shape, setShape] = useState<number | null>(null);
 
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
@@ -270,8 +289,12 @@ export function CameraTile({
                                 // that appears to be working and is not moving.
                                 idle && "opacity-60 blur-[3px] saturate-50"
                             )}
-                            onLoad={() => {
+                            onLoad={(loaded) => {
                                 setDrawn(true);
+                                const { naturalWidth, naturalHeight } = loaded.currentTarget;
+                                if (naturalWidth > 0 && naturalHeight > 0) {
+                                    setShape(naturalWidth / naturalHeight);
+                                }
                                 if (wantFrames) after(attempt ? FRAME_GAP_MS : COLD_GAP_MS);
                             }}
                             onError={() => {
@@ -299,13 +322,31 @@ export function CameraTile({
                                 // still coming. Without them the clock below runs
                                 // against a camera that is merely loading.
                                 onLoadStart={stirred}
-                                onLoadedMetadata={stirred}
+                                onLoadedMetadata={(loaded) => {
+                                    stirred();
+                                    const { videoWidth, videoHeight } = loaded.currentTarget;
+                                    if (videoWidth > 0 && videoHeight > 0) {
+                                        setShape(videoWidth / videoHeight);
+                                    }
+                                }}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
                                 onPlaying={() => setPlaying(true)}
                                 onError={failed}
                             />
                         ) : null}
+                        {showing && visible && !idle
+                            ? (boxes ?? []).map((found) => (
+                                  <DetectionBox
+                                      key={found.id}
+                                      box={found.box}
+                                      label={boxLabel(found.label, found.score)}
+                                      picture={shape}
+                                      tile={TILE_SHAPE}
+                                      fit="cover"
+                                  />
+                              ))
+                            : null}
                         {drawn === false && !playing ? (
                             <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />
                         ) : null}

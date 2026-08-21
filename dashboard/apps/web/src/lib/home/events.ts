@@ -415,6 +415,9 @@ export interface EventQuery {
     /** Only what was standing in this area, by the name it had when the event
      *  was written. */
     readonly zone?: string | null;
+    /** Only what was written against one recording, which is what a player
+     *  draws over the footage while it is being watched. */
+    readonly clipId?: string | null;
     /** Newest first, from this point back. Keyset rather than an offset: this
      *  table is the one that grows without limit. */
     readonly before?: Date | null;
@@ -453,6 +456,7 @@ export async function listEvents(
             cameraId: { in: [...names.keys()] },
             ...(query.kind ? { kind: query.kind } : {}),
             ...(query.label ? { label: query.label } : {}),
+            ...(query.clipId ? { clipId: query.clipId } : {}),
             // The area names are a JSON array in one column, so this is a
             // substring match on the quoted name rather than an index lookup.
             // A table per event per area would be indexable and would be a

@@ -25,6 +25,9 @@
 import { cn } from "@polaris/ui";
 import type { CSSProperties } from "react";
 
+/** How the picture was fitted into the element it was drawn in. */
+export type Fit = "contain" | "cover";
+
 /**
  * Where the picture sits inside the box it was drawn in.
  *
@@ -34,14 +37,21 @@ import type { CSSProperties } from "react";
  */
 function pictureFrame(
     picture: number | null | undefined,
-    tile: number | null | undefined
+    tile: number | null | undefined,
+    fit: Fit
 ): CSSProperties {
     const usable = (value: number | null | undefined): value is number =>
         typeof value === "number" && Number.isFinite(value) && value > 0;
     if (!usable(picture) || !usable(tile)) return {};
+    // Contained, the picture is scaled until it just fits and one axis is short
+    // of the tile. Covered, it is scaled until nothing is left over and one axis
+    // overflows - the same two ratios, taken the other way. The overflow is what
+    // the tile's own clipping removes, which is exactly what the browser did to
+    // the picture underneath.
+    const pick = fit === "cover" ? Math.max : Math.min;
     return {
-        width: `${Math.min(1, picture / tile) * 100}%`,
-        height: `${Math.min(1, tile / picture) * 100}%`
+        width: `${pick(1, picture / tile) * 100}%`,
+        height: `${pick(1, tile / picture) * 100}%`
     };
 }
 
@@ -50,7 +60,8 @@ export function DetectionBox({
     label,
     className,
     picture,
-    tile
+    tile,
+    fit = "contain"
 }: {
     box: { x1: number; y1: number; x2: number; y2: number } | null;
     /** Drawn against the top edge of the box when there is room for it. */
@@ -60,6 +71,17 @@ export function DetectionBox({
     picture?: number | null;
     /** The shape of the element the still was drawn in. */
     tile?: number | null;
+    /**
+     * How the picture underneath was fitted to that element.
+     *
+     * It has to be told, because the two do opposite things to the same
+     * mismatch and getting it wrong puts the box in the wrong place by exactly
+     * the amount that is hardest to notice - close enough to look deliberate.
+     * `contain` letterboxes, which is what a viewer showing a whole frame does;
+     * `cover` crops, which is what a tile on a wall does so that a grid of
+     * cameras has no grey bars in it.
+     */
+    fit?: Fit;
 }) {
     if (!box) return null;
     const width = box.x2 - box.x1;
@@ -70,7 +92,7 @@ export function DetectionBox({
         <span
             aria-hidden
             className="pointer-events-none absolute inset-0 m-auto"
-            style={pictureFrame(picture, tile)}
+            style={pictureFrame(picture, tile, fit)}
         >
             <span
                 className={cn(

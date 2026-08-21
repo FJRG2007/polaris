@@ -15,6 +15,7 @@
  * Polaris minted for it.
  */
 
+import type { LiveBox } from "@polaris/core";
 import { loadModel, type LoadedModel } from "./model.js";
 import { signatureOf, watchCamera, type Assignment, type Report, type Watch } from "./watch.js";
 
@@ -77,6 +78,38 @@ async function report(input: Report): Promise<boolean> {
     return Boolean(body?.recorded);
 }
 
+/**
+ * Say where everything a camera is following is, right now.
+ *
+ * Nothing is awaited and a failure is swallowed on purpose. This is what a
+ * screen draws over the live picture, so it is only ever worth what the next
+ * frame is about to replace: retrying one would put a rectangle on screen a
+ * second after the person it was drawn around had walked out of it, and holding
+ * up the pipeline for it would cost the frame that IS current.
+ *
+ * The one thing that is not swallowed is a run of them, because a worker that
+ * has silently stopped being able to reach Polaris is worth a line in the log -
+ * once, not five times a second.
+ */
+let liveFailures = 0;
+function sendLive(cameraId: string, boxes: readonly LiveBox[]): void {
+    void fetch(`${POLARIS_URL}/api/home/vision/live`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${WORKER_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify({ cameraId, boxes })
+    })
+        .then((response) => {
+            if (response.ok) {
+                liveFailures = 0;
+                return;
+            }
+            if (++liveFailures === 50) log(`live positions refused (${response.status})`);
+        })
+        .catch(() => {
+            if (++liveFailures === 50) log("live positions are not reaching Polaris");
+        });
+}
+
 /** Bring the running pipelines in line with what Polaris says they should be. */
 async function reconcile(model: LoadedModel | null): Promise<void> {
     let assignments: Assignment[];
@@ -104,7 +137,10 @@ async function reconcile(model: LoadedModel | null): Promise<void> {
         );
         watches.set(
             id,
-            watchCamera({ ...assignment, zones: assignment.zones ?? [] }, { report, model, log })
+            watchCamera(
+                { ...assignment, zones: assignment.zones ?? [] },
+                { report, live: sendLive, model, log }
+            )
         );
     }
 }

@@ -21,6 +21,11 @@
  * - **It offers the file.** A player with no way to save what it is playing
  *   sends people to a context menu that Polaris has replaced. Where the caller
  *   passes an address to save from, the control is there.
+ * - **It lets a caller draw on the picture.** A recording from a camera has
+ *   boxes around what the camera found, and they belong over the frame they
+ *   describe rather than beside it. The caller is handed where the playhead is
+ *   and both shapes needed to place something against the picture, and draws
+ *   whatever it likes; nothing here knows what a detection is.
  * - **It repairs a duration nobody wrote down.** Anything a browser recorded -
  *   a voice message, a screen clip - comes out of MediaRecorder with no duration
  *   in its container, so the counter reads `00:-2` and the bar refuses to seek:
@@ -40,7 +45,7 @@
 
 import "plyr/dist/plyr.css";
 import { cn } from "@polaris/ui";
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /** The controls every player in Polaris carries. Download is added by the caller
  *  passing somewhere to download from - what may be saved is the screen's
@@ -104,10 +109,21 @@ function repairDuration(media: HTMLMediaElement): () => void {
     return () => media.removeEventListener("loadedmetadata", settle);
 }
 
+/** What a caller drawing over the picture is told about it. */
+export interface PlayerSurface {
+    /** Where the playhead is, in milliseconds from the start of the file. */
+    readonly atMs: number;
+    /** The picture's own shape, width over height, once the file has said. */
+    readonly picture: number | null;
+    /** The shape of the box it is being drawn in. */
+    readonly surface: number | null;
+}
+
 export function MediaPlayer({
     src,
     kind,
     name,
+    overlay,
     autoPlay = false,
     download,
     poster,
@@ -166,8 +182,61 @@ export function MediaPlayer({
     /** For a player drawn inside something that is itself pressable - a clip in a
      *  list that opens on click - so pressing play does not also open it. */
     onClick?: (event: React.MouseEvent<HTMLDivElement>) => void;
+    /**
+     * Drawn over the picture, and told where the playhead is.
+     *
+     * Only attached when a caller passes one: following the playhead means
+     * listening to an event that fires several times a second, and no screen
+     * should pay for that to draw nothing.
+     */
+    overlay?: (surface: PlayerSurface) => ReactNode;
 }): ReactNode {
     const element = useRef<HTMLMediaElement | null>(null);
+    const frame = useRef<HTMLDivElement | null>(null);
+    const [atMs, setAtMs] = useState(0);
+    const [picture, setPicture] = useState<number | null>(null);
+    const [surface, setSurface] = useState<number | null>(null);
+    /** Whether anything is being drawn over this player, as something the
+     *  effects below can depend on - the function itself is usually written
+     *  inline and is a different one on every render. */
+    const drawnOn = Boolean(overlay);
+
+    useEffect(() => {
+        const media = element.current;
+        if (!drawnOn || !media) return;
+        const follow = () => setAtMs(Math.round(media.currentTime * 1000));
+        const measure = () => {
+            const video = media as HTMLVideoElement;
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+                setPicture(video.videoWidth / video.videoHeight);
+            }
+            follow();
+        };
+        // `seeked` as well as `timeupdate`: scrubbing is exactly when somebody
+        // is looking for the moment something happened, and `timeupdate` does
+        // not fire while a paused player is dragged.
+        media.addEventListener("timeupdate", follow);
+        media.addEventListener("seeked", follow);
+        media.addEventListener("loadedmetadata", measure);
+        if (media.readyState >= 1) measure();
+        return () => {
+            media.removeEventListener("timeupdate", follow);
+            media.removeEventListener("seeked", follow);
+            media.removeEventListener("loadedmetadata", measure);
+        };
+    }, [drawnOn, src]);
+
+    useEffect(() => {
+        const box = frame.current;
+        if (!drawnOn || !box) return;
+        const observer = new ResizeObserver(([entry]) => {
+            if (!entry) return;
+            const { width, height } = entry.contentRect;
+            if (width > 0 && height > 0) setSurface(width / height);
+        });
+        observer.observe(box);
+        return () => observer.disconnect();
+    }, [drawnOn]);
 
     useEffect(() => {
         let player: { destroy(): void } | null = null;
@@ -216,7 +285,12 @@ export function MediaPlayer({
     const style = { "--plyr-color-main": "hsl(var(--primary))" } as CSSProperties;
 
     return (
-        <div className={cn("w-full", className)} style={style} onClick={onClick}>
+        <div
+            ref={frame}
+            className={cn("relative w-full", className)}
+            style={style}
+            onClick={onClick}
+        >
             {kind === "video" ? (
                 <video
                     ref={(node) => {
@@ -249,6 +323,7 @@ export function MediaPlayer({
                     className="w-full"
                 />
             )}
+            {overlay ? overlay({ atMs, picture, surface }) : null}
         </div>
     );
 }

@@ -157,6 +157,16 @@ function toView(row: ClipRow, cameraName: string): ClipView {
     };
 }
 
+/** One clip of this house, or null. Scoped through its camera rather than
+ *  trusting the id: a clip id from anywhere else must not resolve. */
+export async function getClip(installedAppId: string, id: string): Promise<ClipView | null> {
+    const row = await prisma.cameraClip.findFirst({
+        where: { id, camera: { installedAppId } },
+        include: { camera: { select: { name: true } } }
+    });
+    return row ? toView(row, row.camera.name) : null;
+}
+
 /** The house's footage, newest first, bounded and keyset-paged like the events. */
 export async function listClips(
     installedAppId: string,

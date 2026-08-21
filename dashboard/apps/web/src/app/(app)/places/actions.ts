@@ -17,6 +17,7 @@
 
 import * as ptz from "@/lib/home/ptz";
 import { HomeError } from "@/lib/home/home-error";
+import { marksForClip, type ClipMark } from "@polaris/core";
 import { cookies } from "next/headers";
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
@@ -536,6 +537,32 @@ export async function listEventsAction(input: {
         })
     );
     return result.error ? { error: result.error } : { events: result.value };
+}
+
+/**
+ * What the camera found during one recording, ready to draw over it.
+ *
+ * Timed from the start of the clip rather than by wall clock, because that is
+ * the only thing a player can answer with: `currentTime` is an offset into a
+ * file. Done here rather than in the browser so the arithmetic - and the rule
+ * that an event outside the recording is not drawn on its first frame - is the
+ * one that is tested.
+ */
+export async function clipDetectionsAction(
+    clipId: string
+): Promise<{ marks?: ClipMark[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const clip = await recording.getClip(install.id, clipId);
+        if (!clip) return [];
+        const found = await events.listEvents(install.id, {
+            cameraId: clip.cameraId,
+            clipId: clip.id,
+            limit: 200
+        });
+        return marksForClip(found, clip.startedAt, clip.durationMs);
+    });
+    return result.error ? { error: result.error } : { marks: result.value };
 }
 
 /**

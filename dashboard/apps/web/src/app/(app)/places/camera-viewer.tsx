@@ -15,13 +15,22 @@
  * the stream that connects and then sends nothing raises no error at all - so
  * silence is timed rather than waited on.
  *
+ * Over the picture, whatever the detector is following. This surface shows the
+ * whole frame rather than filling itself with it, so the boxes are placed inside
+ * the picture rather than against the dialog - a doorbell camera in a wide
+ * dialog is drawn with a bar down each side, and a box measured against the
+ * dialog lands on the bar.
+ *
  * Fullscreen is the browser's own, on the frame rather than the video element,
  * so the controls stay on screen with it - a fullscreen `<video>` hides
  * everything drawn over it.
  */
 
 import { PtzPad } from "./ptz-pad";
-import { useEffect, useRef, useState } from "react";
+import { DetectionBox } from "./detection-box";
+import { boxLabel } from "./detection-label";
+import { useDetections } from "./use-detections";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CameraView } from "@/lib/home/cameras";
 import { Camera, Maximize2, Minimize2 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
@@ -95,8 +104,33 @@ export function CameraViewer({
     const [trying, setTrying] = useState(true);
     const [transport, setTransport] = useState<Transport>("mp4");
     const [swapped, setSwapped] = useState(false);
+    /** The camera's own shape, width over height, learned from whichever of the
+     *  two is on screen. */
+    const [shape, setShape] = useState<number | null>(null);
+    /** The shape of the surface they are drawn in, measured rather than assumed:
+     *  it is `aspect-video` in the dialog and the whole screen in fullscreen, and
+     *  a box placed against the wrong one of those is a box in the wrong place. */
+    const [surfaceShape, setSurfaceShape] = useState<number | null>(null);
+
+    // Only this one: the wall behind the dialog has stopped asking for its own.
+    const watching = useMemo(() => [camera.id], [camera.id]);
+    const boxes = useDetections(watching, true)[camera.id] ?? [];
 
     useEffect(() => setTransport(preferredTransport()), []);
+
+    // The frame's own shape, and every time it changes: entering fullscreen, a
+    // dialog that resized, a phone turned on its side.
+    useEffect(() => {
+        const element = frame.current;
+        if (!element) return;
+        const observer = new ResizeObserver(([entry]) => {
+            if (!entry) return;
+            const { width, height } = entry.contentRect;
+            if (width > 0 && height > 0) setSurfaceShape(width / height);
+        });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
 
     // The browser is the authority on whether it is fullscreen: it leaves on
     // Escape without telling anybody who asked for it.
@@ -187,8 +221,12 @@ export function CameraViewer({
                         )}
                         alt={camera.name}
                         className={cn("w-full bg-black", surface, playing && "invisible")}
-                        onLoad={() => {
+                        onLoad={(loaded) => {
                             setDrawn(true);
+                            const { naturalWidth, naturalHeight } = loaded.currentTarget;
+                            if (naturalWidth > 0 && naturalHeight > 0) {
+                                setShape(naturalWidth / naturalHeight);
+                            }
                             if (!playing) after(trying ? FRAME_GAP_MS : COLD_GAP_MS);
                         }}
                         onError={() => {
@@ -212,13 +250,29 @@ export function CameraViewer({
                             // Each of these is the stream saying it is still
                             // coming, which is what the clock above is against.
                             onLoadStart={stirred}
-                            onLoadedMetadata={stirred}
+                            onLoadedMetadata={(loaded) => {
+                                stirred();
+                                const { videoWidth, videoHeight } = loaded.currentTarget;
+                                if (videoWidth > 0 && videoHeight > 0) {
+                                    setShape(videoWidth / videoHeight);
+                                }
+                            }}
                             onProgress={stirred}
                             onCanPlay={stirred}
                             onPlaying={() => setPlaying(true)}
                             onError={failed}
                         />
                     ) : null}
+
+                    {boxes.map((found) => (
+                        <DetectionBox
+                            key={found.id}
+                            box={found.box}
+                            label={boxLabel(found.label, found.score)}
+                            picture={shape}
+                            tile={surfaceShape}
+                        />
+                    ))}
 
                     {drawn === false && !playing ? (
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">

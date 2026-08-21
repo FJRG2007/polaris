@@ -37,6 +37,20 @@ describe("DetectionBox", () => {
         expect(style).toContain("height:100%");
     });
 
+    it("crops rather than letterboxes when the picture was fitted to fill", () => {
+        const html = renderToStaticMarkup(
+            <DetectionBox box={{ x1: 0, y1: 0, x2: 1, y2: 1 }} picture={4 / 3} tile={16 / 9} fit="cover" />
+        );
+        const outer = /<span aria-hidden="true"[^>]*style="([^"]*)"/.exec(html);
+        const style = outer?.[1] ?? "";
+        // A wall tile fills: the 4:3 picture is scaled until it covers a 16:9
+        // tile, so it is the full width and overflows the height by (16/9)/(4/3)
+        // - and that overflow is what the tile clips, off both ends, exactly as
+        // the browser clipped the picture underneath.
+        expect(style).toContain("width:100%");
+        expect(style).toContain("height:133.33");
+    });
+
     it("places the box as a percentage of the picture frame, not the tile", () => {
         const html = renderToStaticMarkup(
             <DetectionBox

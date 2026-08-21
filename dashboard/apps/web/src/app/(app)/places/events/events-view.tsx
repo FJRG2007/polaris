@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
 import { DetectionBox } from "../detection-box";
+import { KIND_LABEL } from "../detection-label";
 import type { CameraView } from "@/lib/home/cameras";
 import { Bell, Check, Loader2, Trash2 } from "lucide-react";
 import { MediaPlayer } from "@/components/media-player";
@@ -52,17 +53,6 @@ const KINDS = [
  *  one has to be told, or it is placed against the tile instead of against the
  *  picture inside it. */
 const TILE_SHAPE = 16 / 9;
-
-const KIND_LABEL: Record<string, string> = {
-    motion: "Movement",
-    person: "Somebody",
-    vehicle: "A vehicle",
-    animal: "An animal",
-    package: "A box or bag",
-    face: "Recognized",
-    tamper: "Camera tampered with",
-    offline: "Camera went quiet"
-};
 
 /** How long the thing was there, for a detector that followed it. Rounded to
  *  seconds: nobody reads a duration in milliseconds, and anything under one is

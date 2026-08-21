@@ -7,6 +7,10 @@
  * arrive after - so the page never waits on a relay or a camera that is asleep.
  * Which of them the relay is actually serving is a second, slower question, and
  * it lands on its own without holding the tiles back.
+ *
+ * What the detectors are following is asked for here rather than in each tile.
+ * One ask covers the whole wall, so a house with twelve cameras costs what a
+ * house with one does; the tiles are handed their own boxes and draw them.
  */
 
 import Link from "next/link";
@@ -14,7 +18,8 @@ import * as actions from "./actions";
 import { Cctv, Plus } from "lucide-react";
 import { CameraTile } from "./camera-tile";
 import { CameraViewer } from "./camera-viewer";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useDetections } from "./use-detections";
 import type { CameraView } from "@/lib/home/cameras";
 import { Button, EmptyState, Skeleton } from "@polaris/ui";
 
@@ -40,6 +45,11 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
             cancelled = true;
         };
     }, []);
+
+    // Every camera on the wall, in one ask. Stopped while one is open: the wall
+    // behind a dialog is standing still, and the viewer asks for its own.
+    const watching = useMemo(() => (cameras ?? []).map((camera) => camera.id), [cameras]);
+    const boxes = useDetections(watching, opened === null);
 
     if (cameras === null) return <WallSkeleton />;
 
@@ -92,6 +102,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
                                     key={camera.id}
                                     camera={camera}
                                     live={live.has(camera.id)}
+                                    boxes={boxes[camera.id]}
                                     canControl={canControl}
                                     // Everything on the wall stands still while
                                     // one camera is open, the one being watched

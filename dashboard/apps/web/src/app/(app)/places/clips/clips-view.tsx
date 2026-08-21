@@ -16,6 +16,12 @@
  *
  * A clip has no name, so there is no rename and no F2: it is a camera and a
  * moment, and both are already written on the row.
+ *
+ * What the camera found is drawn over the footage as it plays, which is what a
+ * recording is watched for: a two minute segment of a garden with somebody in it
+ * for six seconds is a segment nobody finds the six seconds in. Fetched once
+ * when a clip is opened rather than followed live - it is a recording, so
+ * everything about it was written down before anybody pressed play.
  */
 
 import * as actions from "../actions";
@@ -25,6 +31,9 @@ import type { ClipView } from "@/lib/home/recording";
 import type { CameraView } from "@/lib/home/cameras";
 import { afterClick, afterMove } from "@/lib/list-selection";
 import { MediaPlayer } from "@/components/media-player";
+import { DetectionBox } from "../detection-box";
+import { boxLabel } from "../detection-label";
+import { marksAt, type ClipMark } from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
 import { Download, Loader2, Pin, PinOff, Play, Square, Trash2, Video, X } from "lucide-react";
 import {
@@ -80,6 +89,8 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
     const [cameras, setCameras] = useState<CameraView[]>([]);
     const [cameraId, setCameraId] = useState("");
     const [playing, setPlaying] = useState<string | null>(null);
+    /** What the camera found during the clip being played, timed from its start. */
+    const [marks, setMarks] = useState<ClipMark[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [removing, setRemoving] = useState<ClipView[] | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -100,6 +111,21 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
             cancelled = true;
         };
     }, []);
+
+    // What to draw over the clip being played. Cleared first, so the boxes of the
+    // clip before it are never briefly on top of this one.
+    useEffect(() => {
+        setMarks([]);
+        if (!playing) return;
+        let cancelled = false;
+        void (async () => {
+            const result = await actions.clipDetectionsAction(playing);
+            if (!cancelled) setMarks(result.marks ?? []);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [playing]);
 
     useEffect(() => {
         let cancelled = false;
@@ -398,6 +424,20 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                     download={`/api/home/clips/${clip.id}/video`}
                                                     className="overflow-hidden rounded-md border border-border bg-background"
                                                     onClick={(event) => event.stopPropagation()}
+                                                    overlay={({ atMs, picture, surface }) =>
+                                                        marksAt(marks, atMs).map((mark) => (
+                                                            <DetectionBox
+                                                                key={mark.id}
+                                                                box={mark.box}
+                                                                label={boxLabel(
+                                                                    mark.label,
+                                                                    mark.score
+                                                                )}
+                                                                picture={picture}
+                                                                tile={surface}
+                                                            />
+                                                        ))
+                                                    }
                                                 />
                                             ) : null}
                                         </li>

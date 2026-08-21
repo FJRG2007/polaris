@@ -43,6 +43,7 @@ import {
     readDetections,
     trackFrame,
     zonesAllow,
+    type LiveBox,
     type MotionState,
     type RelativeBox,
     type TrackedObject,
@@ -81,6 +82,16 @@ export interface Report {
 
 export interface WatchDeps {
     report(report: Report): Promise<boolean>;
+    /**
+     * Where everything being followed is, right now.
+     *
+     * Separate from `report`, and deliberately not awaited: this is what a
+     * screen draws over the live picture, and a box is worth nothing a moment
+     * after it was true. A publish that is slow, refused or lost must never
+     * hold up the frame after it - the next one is along in two hundred
+     * milliseconds and is a better answer than this one.
+     */
+    live?(cameraId: string, boxes: readonly LiveBox[]): void;
     model: LoadedModel | null;
     log(message: string): void;
 }
@@ -123,6 +134,16 @@ const MAX_HELD_FRAMES = 6;
 
 /** How often an event already reported may be improved with a better picture. */
 const IMPROVE_GAP_MS = 3000;
+
+/**
+ * The shortest gap between two publishes of where things are.
+ *
+ * Every detector frame, in practice, which is what makes a box follow somebody
+ * rather than jump between two places they were. The ceiling exists for a
+ * machine fast enough to run the model quicker than the stream delivers: a box
+ * published more often than the picture moves is requests nobody can see.
+ */
+const LIVE_GAP_MS = 180;
 
 /** How long after the movement stream dies before it is opened again, and the
  *  ceiling the wait climbs to. A camera rebooting is back within seconds; one
@@ -240,7 +261,28 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         /** How many areas each thing had been into the last time Polaris was
          *  told about it, so walking into one more is news. */
         const told = new Map<string, number>();
+        /** Who each thing turned out to be, once the recognizer has said. Kept
+         *  for the boxes a screen draws: a rectangle that says "Ana" is the
+         *  whole reason the recognizer is running, and re-asking it five times
+         *  a second to put that word on it would cost more than the detector. */
+        const named = new Map<string, string>();
+        let publishedAt = 0;
         let running = false;
+
+        /** Draw what is there. Nothing is awaited and nothing is retried - see
+         *  `WatchDeps.live`. */
+        function publish(objects: readonly TrackedObject[]): void {
+            if (!deps.live) return;
+            deps.live(
+                assignment.cameraId,
+                objects.map((object) => ({
+                    id: object.id,
+                    label: named.get(object.id) ?? object.label,
+                    score: Math.round(confidenceOf(object) * 100),
+                    box: object.box
+                }))
+            );
+        }
 
         await new Promise<void>((resolve) => {
             let finished = false;
@@ -256,6 +298,10 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                 // and showing no duration in the list.
                 const open = tracking.objects.filter((object) => object.reported);
                 tracking = NO_TRACKING;
+                // And nothing is there any more. Said rather than left to
+                // expire, so the rectangle goes when the burst does instead of
+                // hanging over an empty garden for another two seconds.
+                publish([]);
                 for (const object of open) {
                     void deps
                         .report({
@@ -302,6 +348,15 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                             { now: Date.now(), zones: assignment.zones, fps: DETECT_FPS }
                         );
                         tracking = update.state;
+
+                        // Where everything is, as often as the detector knows.
+                        // Before the reports below, because those wait on
+                        // storage and on the recognizer, and a box that arrives
+                        // after them is a box a second behind the picture.
+                        if (Date.now() - publishedAt >= LIVE_GAP_MS) {
+                            publishedAt = Date.now();
+                            publish(tracking.objects.filter((object) => object.missing === 0));
+                        }
 
                         // `missing` is what says this thing was actually seen in
                         // this frame. Without it, something that has gone quiet
@@ -402,6 +457,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                     if (who) {
                         label = who.name;
                         score = who.score;
+                        named.set(object.id, who.name);
                     } else if (reason === "start") {
                         // Somebody, and not one of yours - which is the answer
                         // that matters at three in the morning.
