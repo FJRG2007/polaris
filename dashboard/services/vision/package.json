@@ -3,12 +3,15 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "The Polaris vision worker: watches camera streams for movement and asks the recognizer who is there.",
+    "description": "The Polaris vision worker: watches camera streams for movement, looks properly when something is there, and follows it.",
     "main": "dist/index.js",
     "scripts": {
         "build": "tsup",
         "typecheck": "tsc --noEmit",
         "start": "node dist/index.js",
         "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "onnxruntime-node": "1.27.0"
     }
 }

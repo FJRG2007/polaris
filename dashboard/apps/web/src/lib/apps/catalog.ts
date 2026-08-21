@@ -946,9 +946,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         internal: true,
         category: "Home",
         icon: ScanFace,
-        summary: "Watches the small stream for movement, so nothing else has to.",
+        summary: "Watches for movement, then looks properly at what it was.",
         description:
-            "The part of Home that looks at pixels. It reads the small stream from the relay - never the camera - decides that something moved, and only then does anything more expensive. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
+            "The part of Places that looks at pixels. It reads the small stream from the relay - never the camera - and while nothing is happening that is all it does. When something moves in a part of the picture you care about, it looks properly: full frames through a detection model, following whatever it found for as long as it is there, so one arrival is one event with one good picture of it. It sits idle the rest of the time, and it runs on the machine you chose rather than on the one Polaris is on.",
         installMethod: "compose-template",
         capabilities: ["tool"],
         dashboard: "generic",
