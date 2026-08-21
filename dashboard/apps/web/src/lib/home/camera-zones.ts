@@ -96,12 +96,38 @@ async function assertCamera(installedAppId: string, cameraId: string): Promise<v
     if (!camera) throw new Error("Camera not found");
 }
 
+/**
+ * Two areas on one camera cannot share a name.
+ *
+ * The database says so, and left alone its refusal is what somebody drawing a
+ * second "Driveway" reads on the screen - a Prisma invocation with the column
+ * names in it. The name is what an event is stamped with and what an alert rule
+ * names, so the rule is real; it just has to be said in words.
+ */
+async function assertNameFree(cameraId: string, name: string, exceptId: string | null): Promise<void> {
+    const clash = await prisma.cameraZone.findFirst({
+        where: { cameraId, name, ...(exceptId ? { id: { not: exceptId } } : {}) },
+        select: { id: true }
+    });
+    if (clash) throw new Error("An area on this camera is already called that.");
+}
+
+/** The same rule again, for the gap between the check above and the write: two
+ *  browsers saving the same name at once get the sentence rather than the
+ *  constraint. */
+function asNameClash(caught: unknown): Error {
+    const duplicate =
+        typeof caught === "object" && caught !== null && (caught as { code?: string }).code === "P2002";
+    return duplicate ? new Error("An area on this camera is already called that.") : (caught as Error);
+}
+
 export async function createCameraZone(
     installedAppId: string,
     cameraId: string,
     input: CameraZoneInput
 ): Promise<CameraZoneView> {
     await assertCamera(installedAppId, cameraId);
+    await assertNameFree(cameraId, input.name, null);
     const row = await prisma.cameraZone.create({
         data: {
             cameraId,
@@ -114,6 +140,8 @@ export async function createCameraZone(
             enabled: input.enabled
         },
         select: SELECT
+    }).catch((caught: unknown) => {
+        throw asNameClash(caught);
     });
     return toView(row);
 }
@@ -129,6 +157,7 @@ export async function updateCameraZone(
         select: { id: true }
     });
     if (!existing) throw new Error("Area not found");
+    await assertNameFree(cameraId, input.name, id);
     const row = await prisma.cameraZone.update({
         where: { id },
         data: {
@@ -141,6 +170,8 @@ export async function updateCameraZone(
             enabled: input.enabled
         },
         select: SELECT
+    }).catch((caught: unknown) => {
+        throw asNameClash(caught);
     });
     return toView(row);
 }

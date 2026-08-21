@@ -32,6 +32,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 RUN curl -fsSL -o /detector.onnx "$MODEL_URL" && \
     echo "$MODEL_SHA256  /detector.onnx" | sha256sum -c -
 
+# The one dependency the worker cannot bundle: a native addon, installed from
+# the workspace's own lockfile so two builds of this commit ship the same code
+# down to the last transitive package. Scripts are off for the install and run
+# only for this package, which is what fetches its .node binaries.
+FROM node:22-bookworm-slim AS deps
+WORKDIR /deps
+COPY package.json package-lock.json ./
+COPY services/vision/package.json ./services/vision/
+RUN npm ci --omit=dev --workspace @polaris/vision --include-workspace-root=false --ignore-scripts && \
+    npm rebuild onnxruntime-node && \
+    rm -rf node_modules/@polaris && \
+    npm cache clean --force
+
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -42,11 +55,10 @@ ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# The detection runtime is a native addon, so it is installed rather than
-# bundled. Everything else the worker uses, including the pure Polaris logic it
-# shares with the dashboard, is in the one built file.
+# Everything the worker uses beyond that addon, including the pure Polaris logic
+# it shares with the dashboard, is in the one built file.
 COPY services/vision/package.json ./package.json
-RUN npm install --omit=dev --no-package-lock && npm cache clean --force
+COPY --from=deps /deps/node_modules ./node_modules
 
 COPY --from=builder /build/services/vision/dist/index.js ./index.js
 COPY --from=model /detector.onnx ./model/detector.onnx

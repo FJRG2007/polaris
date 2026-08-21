@@ -13,6 +13,14 @@
  * 1920-wide frame against. The conversion happens once, here, against the
  * element's own box - never against a remembered size, because the dialog is
  * resizable and the picture is not always the shape the camera claims.
+ *
+ * Which is why the box the pointer is measured against is given the camera's own
+ * shape the moment its frame loads. A 4:3 doorbell drawn on a 16:9 box sits in
+ * the middle of it with a bar down each side, and a corner traced on the left
+ * edge of what is visible would be stored as an eighth of the way in - an
+ * outline that looks right here and covers the wrong part of the frame on the
+ * machine watching. Sixteen by nine is only the shape used until the picture
+ * says otherwise.
  */
 
 import * as actions from "../actions";
@@ -56,6 +64,10 @@ interface Draft {
  *  colour on each camera. */
 const WATCH_COLORS = ["#8b5cf6", "#22d3ee", "#f59e0b", "#34d399", "#f472b6", "#60a5fa"];
 const IGNORE_COLOR = "#f43f5e";
+
+/** The shape of the drawing box before the camera's frame has said what shape it
+ *  is, and the shape it keeps for a camera that never sends one. */
+const DEFAULT_SHAPE = 16 / 9;
 
 function colorFor(zone: { kind: zoning.ZoneKind }, index: number): string {
     return zone.kind === "ignore" ? IGNORE_COLOR : (WATCH_COLORS[index % WATCH_COLORS.length] ?? WATCH_COLORS[0]!);
@@ -107,6 +119,8 @@ export function ZonesDialog({
      *  to show. Drawing still works and still means the same thing, so this says
      *  so rather than leaving a broken picture. */
     const [noPicture, setNoPicture] = useState(false);
+    /** The camera's own shape, read off the frame once it has loaded. */
+    const [shape, setShape] = useState<number | null>(null);
     const frameRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -214,7 +228,16 @@ export function ZonesDialog({
                             onPointerMove={movePoint}
                             onPointerUp={() => setDragging(null)}
                             onPointerLeave={() => setDragging(null)}
-                            className="relative aspect-video w-full cursor-crosshair overflow-hidden rounded-md bg-surface-sunken"
+                            style={{
+                                aspectRatio: shape ?? DEFAULT_SHAPE,
+                                // A tall camera - a doorbell on its side - must
+                                // not push the rest of the dialog off the
+                                // screen. Bounded by width so the box keeps the
+                                // picture's shape exactly, which is the whole
+                                // point of taking it.
+                                maxWidth: `calc(70vh * ${shape ?? DEFAULT_SHAPE})`
+                            }}
+                            className="relative mx-auto w-full cursor-crosshair overflow-hidden rounded-md bg-surface-sunken"
                         >
                             {/* The camera's own frame. A camera that is asleep answers 503 and
                                 the picture simply does not arrive, which is the right outcome:
@@ -232,6 +255,12 @@ export function ZonesDialog({
                                     alt=""
                                     draggable={false}
                                     onError={() => setNoPicture(true)}
+                                    onLoad={(event) => {
+                                        const { naturalWidth, naturalHeight } = event.currentTarget;
+                                        if (naturalWidth > 0 && naturalHeight > 0) {
+                                            setShape(naturalWidth / naturalHeight);
+                                        }
+                                    }}
                                     className="pointer-events-none size-full select-none object-contain"
                                 />
                             )}

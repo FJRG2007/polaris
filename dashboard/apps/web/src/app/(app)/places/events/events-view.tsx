@@ -47,6 +47,12 @@ const KINDS = [
     { value: "motion", label: "Movement" }
 ];
 
+/** The shape every tile is drawn at. The stills are not all this shape - a
+ *  still keeps whatever the camera sends - so it is also what the box drawn over
+ *  one has to be told, or it is placed against the tile instead of against the
+ *  picture inside it. */
+const TILE_SHAPE = 16 / 9;
+
 const KIND_LABEL: Record<string, string> = {
     motion: "Movement",
     person: "Somebody",
@@ -83,6 +89,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
     const [to, setTo] = useState("");
     const [moment, setMoment] = useState<{ event: EventView; clipId: string; offsetSeconds: number } | null>(null);
     const [noFootage, setNoFootage] = useState<string | null>(null);
+    /** Each still's own shape, by event, learned as the pictures arrive. */
+    const [shapes, setShapes] = useState<Record<string, number>>({});
     const [clearing, setClearing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [done, setDone] = useState(false);
@@ -337,7 +345,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                             >
                                 <button
                                     type="button"
-                                    className="relative block aspect-video w-full cursor-zoom-in bg-background"
+                                    style={{ aspectRatio: TILE_SHAPE }}
+                                    className="relative block w-full cursor-zoom-in bg-background"
                                     onClick={() => void openMoment(event)}
                                     aria-label={`See ${event.cameraName} at ${format.dateTime(event.at)}`}
                                 >
@@ -346,12 +355,24 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                         // fill: the box below is in fractions of
                                         // the frame, and a box over a cropped
                                         // picture points at the wrong part of it.
+                                        // Its own shape is read off it as it
+                                        // loads, because that is what says where
+                                        // in the tile the picture ended up.
                                         <Image
                                             src={`/api/home/events/${event.id}/still`}
                                             alt=""
                                             fill
                                             sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw"
                                             className="object-contain"
+                                            onLoad={(loaded) => {
+                                                const { naturalWidth, naturalHeight } = loaded.currentTarget;
+                                                if (naturalWidth <= 0 || naturalHeight <= 0) return;
+                                                setShapes((current) =>
+                                                    current[event.id]
+                                                        ? current
+                                                        : { ...current, [event.id]: naturalWidth / naturalHeight }
+                                                );
+                                            }}
                                             unoptimized
                                         />
                                     ) : (
@@ -363,6 +384,8 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                         <DetectionBox
                                             box={event.box}
                                             label={nameFor(event.label) ?? KIND_LABEL[event.kind] ?? null}
+                                            picture={shapes[event.id] ?? null}
+                                            tile={TILE_SHAPE}
                                         />
                                     ) : null}
                                     {noFootage === event.id ? (

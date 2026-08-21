@@ -265,6 +265,59 @@ describe("the whole way through", () => {
         ).toEqual([]);
     });
 
+    it("still reports the person when the view is full of furniture", () => {
+        // The decoder is given the lowest threshold of the classes this camera
+        // was asked about, so everything the model saw is in the list - and
+        // suppression keeps a fixed number of boxes. Twenty-five confident
+        // chairs outscore one person, and if they are still in the list when
+        // the count is applied the person is the box that gets dropped.
+        const chair = detect.COCO_LABELS.indexOf("chair");
+        const output = new Array<number>(detect.candidateCount(SIZE) * detect.ROW_LENGTH).fill(0);
+        const put = (rowIndex: number, filled: number[]) => {
+            for (let index = 0; index < filled.length; index += 1) {
+                output[rowIndex * detect.ROW_LENGTH + index] = filled[index]!;
+            }
+        };
+        for (let cell = 0; cell < 25; cell += 1) {
+            // Small boxes, one per cell, so they are twenty-five separate
+            // things rather than one cluster suppressed down to a single box.
+            put(
+                cell,
+                row({
+                    offsetX: 0,
+                    offsetY: 0,
+                    logWidth: Math.log(0.5),
+                    logHeight: Math.log(0.5),
+                    objectness: 0.99,
+                    classIndex: chair,
+                    classScore: 0.99
+                })
+            );
+        }
+        put(
+            36,
+            row({
+                offsetX: 0,
+                offsetY: 0,
+                logWidth: Math.log(1),
+                logHeight: Math.log(3),
+                objectness: 0.95,
+                classIndex: 0,
+                classScore: 0.9
+            })
+        );
+
+        const found = detect.readDetections({
+            output,
+            modelSize: SIZE,
+            sourceWidth: 640,
+            sourceHeight: 640,
+            classes: ["person"]
+        });
+        expect(found).toHaveLength(1);
+        expect(found[0]!.houseClass).toBe("person");
+    });
+
     it("says nothing at all when the camera cares about nothing", () => {
         expect(
             detect.readDetections({

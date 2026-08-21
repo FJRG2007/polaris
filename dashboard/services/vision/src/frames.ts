@@ -19,12 +19,14 @@
  * and costs no second look at the camera.
  */
 
+import { LETTERBOX_FILL } from "@polaris/core";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
-/** The grey ffmpeg fills the empty part of the model's square with. The model
- *  was trained against this exact value, so it is part of the input format
- *  rather than a background colour. 114 in each channel is 0x727272. */
-const LETTERBOX_COLOR = "0x727272";
+/** The grey ffmpeg fills the empty part of the model's square with, written the
+ *  way ffmpeg wants it. Taken from the decoder's own constant rather than
+ *  repeated as a hex string: the model was trained against that exact value, so
+ *  it is part of the input format, and the two must never drift apart. */
+const LETTERBOX_COLOR = `0x${LETTERBOX_FILL.toString(16).repeat(3)}`;
 
 export interface StreamSource {
     readonly url: string;

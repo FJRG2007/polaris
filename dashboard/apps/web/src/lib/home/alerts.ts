@@ -174,8 +174,19 @@ async function conversationFor(rule: AlertRuleView, actorId: string | null): Pro
 }
 
 /** Whether one detection is what a rule was written for. */
-function matches(rule: AlertRuleView, detection: Detection, cameraId: string, placeId: string | null): boolean {
+function matches(
+    rule: AlertRuleView,
+    detection: Detection,
+    cameraId: string,
+    placeId: string | null,
+    onlyZones?: readonly string[]
+): boolean {
     if (!rule.enabled) return false;
+    // A second look at an event that has since walked into somewhere. Only the
+    // rules that named one of the areas it has just entered are in play: every
+    // other rule already had its chance when the event was opened, and firing
+    // them again would tell somebody twice about one arrival.
+    if (onlyZones && !rule.zones.some((zone) => onlyZones.includes(zone))) return false;
     if (rule.cameraId && rule.cameraId !== cameraId) return false;
     if (rule.placeId && rule.placeId !== placeId) return false;
     if (!rule.kinds.includes(detection.kind)) return false;
@@ -231,18 +242,30 @@ export async function raiseAlerts(
     installedAppId: string,
     detection: Detection,
     eventId: string,
-    camera: { id: string; name: string; placeId: string | null }
+    camera: { id: string; name: string; placeId: string | null },
+    /** The areas this event has entered since it was opened. Set only on the
+     *  second and later looks, and it narrows the rules considered to the ones
+     *  that named one of them. */
+    onlyZones?: readonly string[]
 ): Promise<void> {
     try {
         const rules = (await listAlertRules(installedAppId)).filter((rule) =>
-            matches(rule, detection, camera.id, camera.placeId)
+            matches(rule, detection, camera.id, camera.placeId, onlyZones)
         );
         if (rules.length === 0) return;
 
         const place = camera.placeId
             ? await prisma.place.findFirst({ where: { id: camera.placeId }, select: { name: true } })
             : null;
-        const text = body(detection, camera.name, place?.name ?? "", eventId);
+        // Named after where it has just walked into rather than where it came
+        // in: "somebody at the driveway" is only a useful sentence if the
+        // driveway is what set it off.
+        const text = body(
+            onlyZones ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] } : detection,
+            camera.name,
+            place?.name ?? "",
+            eventId
+        );
 
         for (const rule of rules) {
             const channelId = await conversationFor(rule, rule.recipients[0] ?? null);

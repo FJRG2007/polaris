@@ -25,6 +25,7 @@ import type { LoadedModel } from "./model.js";
 import { encodeJpeg, openDetectFrames, openMotionFrames, probeSize, type FrameStream, type StreamSource } from "./frames.js";
 import {
     buildMotionMask,
+    confidenceOf,
     detectMotion,
     groundPoint,
     letterboxFor,
@@ -116,6 +117,12 @@ const MAX_HELD_FRAMES = 6;
 /** How often an event already reported may be improved with a better picture. */
 const IMPROVE_GAP_MS = 3000;
 
+/** How long after the movement stream dies before it is opened again, and the
+ *  ceiling the wait climbs to. A camera rebooting is back within seconds; one
+ *  taken off the wall never is, and must not be retried in a tight loop. */
+const RESTART_MS = 2000;
+const RESTART_MAX_MS = 60_000;
+
 export interface Watch {
     readonly signature: string;
     stop(): void;
@@ -174,6 +181,8 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
     let busy = false;
     let lastFired = 0;
     let movingFrames = 0;
+    let restartIn = RESTART_MS;
+    let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
     /** The size of the camera's own picture, which every box is divided by.
      *  Null until it has been asked for, and null forever if it would not
@@ -216,15 +225,38 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
          *  camera is showing by the time anybody asks. */
         const held = new Map<string, { frame: Uint8Array; at: number }>();
         const improved = new Map<string, number>();
+        /** How many areas each thing had been into the last time Polaris was
+         *  told about it, so walking into one more is news. */
+        const told = new Map<string, number>();
         let running = false;
 
         await new Promise<void>((resolve) => {
+            let finished = false;
             const finish = () => {
+                if (finished) return;
+                finished = true;
                 frames.stop();
                 if (burst === frames) burst = null;
+                // Anything still being followed when the burst ends - the
+                // thirty second ceiling, or ffmpeg going away - was never seen
+                // to leave, and nothing here will see it leave now. Closing it
+                // is what stops an event that was opened staying open forever
+                // and showing no duration in the list.
+                const open = tracking.objects.filter((object) => object.reported);
+                tracking = NO_TRACKING;
+                for (const object of open) {
+                    void deps
+                        .report({
+                            cameraId: assignment.cameraId,
+                            kind: object.label,
+                            trackId: object.id,
+                            ended: true
+                        })
+                        .catch(() => false);
+                }
                 resolve();
             };
-            frames.onClosed(() => resolve());
+            frames.onClosed(() => finish());
 
             frames.onFrame((frame) => {
                 // Frames keep arriving while the model is busy with the last
@@ -269,24 +301,42 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                         }
 
                         for (const object of update.appeared) {
-                            const told = await announce(object, "start");
-                            if (told) tracking = markReported(tracking, [object.id]);
+                            const sent = await announce(object, "start");
+                            if (!sent) continue;
+                            tracking = markReported(tracking, [object.id]);
+                            // The frame it was just announced on is a picture
+                            // of it. Without this the improve loop below runs
+                            // on that same frame - its clock reading zero - and
+                            // everything is announced twice.
+                            improved.set(object.id, Date.now());
+                            told.set(object.id, object.zones.entered.length);
                         }
 
                         // A better picture of something already reported is
                         // worth sending: the frame it was first recognized in is
-                        // rarely the frame somebody can recognize it in.
+                        // rarely the frame somebody can recognize it in. So is
+                        // somewhere new, whatever the picture looks like -
+                        // somebody who walked up the drive is now at the door,
+                        // and an area with a waiting time cannot have been in
+                        // the first report at all. Both are the same event
+                        // getting better; neither opens a second one.
                         for (const object of tracking.objects) {
-                            if (object.missing !== 0 || !object.reported || object.best?.frame !== object.hits) continue;
-                            const last = improved.get(object.id) ?? 0;
-                            if (Date.now() - last < IMPROVE_GAP_MS) continue;
+                            if (object.missing !== 0 || !object.reported) continue;
+                            const areas = object.zones.entered.length;
+                            const somewhereNew = areas > (told.get(object.id) ?? 0);
+                            const betterPicture =
+                                object.best?.frame === object.hits &&
+                                Date.now() - (improved.get(object.id) ?? 0) >= IMPROVE_GAP_MS;
+                            if (!somewhereNew && !betterPicture) continue;
                             improved.set(object.id, Date.now());
+                            told.set(object.id, areas);
                             await announce(object, "improve");
                         }
 
                         for (const object of update.ended) {
                             held.delete(object.id);
                             improved.delete(object.id);
+                            told.delete(object.id);
                             await deps.report({
                                 cameraId: assignment.cameraId,
                                 kind: object.label,
@@ -325,7 +375,10 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                 }
 
                 let label: string | null = null;
-                let score = Math.round(object.score * 100);
+                // The middle of what it was scored rather than this frame's
+                // number: a detector that was sure once and unsure nine times
+                // was wrong once.
+                let score = Math.round(confidenceOf(object) * 100);
                 if (assignment.faces && object.label === "person" && kept) {
                     const who = await recognize(kept.frame, box);
                     if (who) {
@@ -428,6 +481,9 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         const stream = openMotionFrames(source, MOTION_WIDTH, MOTION_HEIGHT, MOTION_FPS);
         motionStream = stream;
         stream.onFrame((frame) => {
+            // A frame is proof the camera is answering, so the next outage
+            // starts its wait from the bottom again.
+            restartIn = RESTART_MS;
             if (busy || stopped) return;
             const result = detectMotion(motionState, frame, {
                 width: MOTION_WIDTH,
@@ -440,7 +496,21 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
             motionState = result.state;
             onMotion(result.boxes);
         });
-        stream.onClosed((code) => deps.log(`${assignment.cameraName}: stream ended (${code ?? "error"})`));
+        // A stream that ends is a camera reboot, a relay restart or a network
+        // fault, and none of them are permanent. Left alone this camera would
+        // be blind until something changed in Polaris or the worker was
+        // restarted, which is the worst way this service can fail: silently.
+        stream.onClosed((code) => {
+            if (stopped || motionStream !== stream) return;
+            motionStream = null;
+            const wait = restartIn;
+            restartIn = Math.min(restartIn * 2, RESTART_MAX_MS);
+            deps.log(
+                `${assignment.cameraName}: stream ended (${code ?? "error"}), looking again in ${Math.round(wait / 1000)}s`
+            );
+            restartTimer = setTimeout(start, wait);
+            restartTimer.unref();
+        });
     }
 
     // The picture's size is asked for once, and watching starts either way: a
@@ -458,6 +528,8 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
         signature: signatureOf(assignment),
         stop() {
             stopped = true;
+            if (restartTimer) clearTimeout(restartTimer);
+            restartTimer = null;
             motionStream?.stop();
             burst?.stop();
         }
@@ -476,6 +548,18 @@ export function signatureOf(assignment: Assignment): string {
         assignment.classes,
         assignment.hours,
         assignment.faces?.baseUrl ?? "",
-        assignment.zones.map((zone) => [zone.id, zone.kind, zone.enabled, zone.objects, zone.inertia, zone.loiterSeconds, zone.points])
+        // The name is in here because it is what every event is stamped with:
+        // a typo corrected in Polaris has to reach the running worker, or the
+        // "Where" filter and every area-scoped alert quietly stop matching.
+        assignment.zones.map((zone) => [
+            zone.id,
+            zone.name,
+            zone.kind,
+            zone.enabled,
+            zone.objects,
+            zone.inertia,
+            zone.loiterSeconds,
+            zone.points
+        ])
     ]);
 }

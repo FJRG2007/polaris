@@ -26,7 +26,7 @@
  * it is refused rather than half-read.
  */
 
-import type { RelativeBox } from "./camera-zones.js";
+import { boxArea, boxRatio, intersectionOverUnion, type RelativeBox } from "./camera-zones.js";
 
 /**
  * The eighty classes the model was trained on, in the order it reports them.
@@ -245,15 +245,6 @@ export function decodeDetections(
     return detections;
 }
 
-function overlap(a: ModelDetection, b: ModelDetection): number {
-    const width = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1);
-    const height = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1);
-    if (width <= 0 || height <= 0) return 0;
-    const intersection = width * height;
-    const union = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1) - intersection;
-    return union > 0 ? intersection / union : 0;
-}
-
 /**
  * Keep the best box of each cluster and drop the rest.
  *
@@ -271,8 +262,13 @@ export function suppressOverlaps(
     const kept: ModelDetection[] = [];
     for (const candidate of sorted) {
         if (kept.length >= limit) break;
+        // The corners are model pixels rather than fractions of the frame here,
+        // which changes nothing: overlap over union is a ratio, and a ratio has
+        // no units.
         const duplicate = kept.some(
-            (existing) => existing.classIndex === candidate.classIndex && overlap(existing, candidate) > threshold
+            (existing) =>
+                existing.classIndex === candidate.classIndex &&
+                intersectionOverUnion(existing, candidate) > threshold
         );
         if (!duplicate) kept.push(candidate);
     }
@@ -309,21 +305,26 @@ export const DEFAULT_FILTERS: Readonly<Record<string, DetectionFilter>> = {
 
 export function passesFilter(box: RelativeBox, score: number, filter: DetectionFilter): boolean {
     if (score < filter.minScore) return false;
-    const width = box.x2 - box.x1;
-    const height = box.y2 - box.y1;
-    if (width <= 0 || height <= 0) return false;
-    const area = width * height;
+    if (box.x2 <= box.x1 || box.y2 <= box.y1) return false;
+    const area = boxArea(box);
     if (area < filter.minArea || area > filter.maxArea) return false;
-    const ratio = width / height;
+    const ratio = boxRatio(box);
     return ratio >= filter.minRatio && ratio <= filter.maxRatio;
 }
 
 /**
  * Everything above, in the order it has to happen.
  *
- * Decoding first because it is the cheap filter, suppression next because it
- * shrinks what the rest has to look at, and the camera's own rules last, so a
- * box rejected for being too small was at least the best box of its cluster.
+ * Decoding first because it is the cheap filter, then the classes this camera
+ * was asked about, then suppression, and the camera's own rules last - so a box
+ * rejected for being too small was at least the best box of its cluster.
+ *
+ * The class filter has to come before suppression rather than after it.
+ * Suppression keeps a fixed number of boxes, and the decoder was given the
+ * lowest threshold of the wanted classes, so everything the model saw is still
+ * in the list: on a busy view a row of chairs and a television can fill every
+ * slot by score and crowd out the person the camera was actually watching for,
+ * which reads downstream as the detector simply not seeing them.
  */
 export function readDetections(input: {
     output: ArrayLike<number>;
@@ -341,13 +342,16 @@ export function readDetections(input: {
     const floor = Math.min(...[...wanted].map((name) => filters[name]?.minScore ?? 0.5));
 
     const letterbox = letterboxFor(input.sourceWidth, input.sourceHeight, input.modelSize);
-    const decoded = decodeDetections(input.output, input.modelSize, floor);
+    const decoded = decodeDetections(input.output, input.modelSize, floor).filter((candidate) => {
+        const houseClass = houseClassOf(COCO_LABELS[candidate.classIndex] ?? "");
+        return houseClass !== null && wanted.has(houseClass);
+    });
     const detections: Detection[] = [];
     for (const candidate of suppressOverlaps(decoded)) {
         const label = COCO_LABELS[candidate.classIndex];
         if (!label) continue;
         const houseClass = houseClassOf(label);
-        if (!houseClass || !wanted.has(houseClass)) continue;
+        if (!houseClass) continue;
         const box = modelBoxToFrame(candidate, letterbox, input.sourceWidth, input.sourceHeight);
         const filter = filters[houseClass] ?? DEFAULT_FILTERS.person!;
         if (!passesFilter(box, candidate.score, filter)) continue;

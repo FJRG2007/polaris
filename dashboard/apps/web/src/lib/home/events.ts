@@ -123,7 +123,7 @@ export async function recordDetection(detection: Detection): Promise<EventView |
     if (detection.trackId) {
         const open = await prisma.cameraEvent.findFirst({
             where: { cameraId: camera.id, trackId: detection.trackId },
-            select: { id: true, stillKey: true }
+            select: { id: true, stillKey: true, zones: true }
         });
         if (open) {
             await prisma.cameraEvent.update({
@@ -141,6 +141,23 @@ export async function recordDetection(detection: Detection): Promise<EventView |
             });
             if (detection.stillKey && open.stillKey && open.stillKey !== detection.stillKey) {
                 await deleteStill(open.stillKey).catch(() => undefined);
+            }
+            // Somebody who walked up the drive and is now at the door entered
+            // the second area minutes after this event was opened, and an area
+            // with a waiting time cannot be in the first report at all. The
+            // rules that named those areas have never been offered this event,
+            // so they are offered it now - and only they, so nobody is told
+            // twice about one arrival.
+            const already = parseEventZones(open.zones);
+            const gained = (detection.zones ?? []).filter((name) => !already.includes(name));
+            if (gained.length > 0) {
+                void raiseAlerts(
+                    camera.installedAppId,
+                    detection,
+                    open.id,
+                    { id: camera.id, name: camera.name, placeId: camera.placeId },
+                    gained
+                );
             }
             return null;
         }

@@ -28,7 +28,7 @@
  */
 
 import type { RelativeBox, Zone, ZonePresence } from "./camera-zones.js";
-import { advancePresence, NO_PRESENCE, onEdge } from "./camera-zones.js";
+import { advancePresence, boxArea, NO_PRESENCE, onEdge } from "./camera-zones.js";
 
 /** The best frame of a thing so far, which is what a still gets grabbed for. */
 export interface Snapshot {
@@ -138,11 +138,7 @@ export function isBetterSnapshot(current: Snapshot | null, candidate: { score: n
     if (candidateOnEdge && !currentOnEdge) return false;
     if (!candidateOnEdge && currentOnEdge) return true;
     if (candidate.score > current.score + 0.05) return true;
-    return area(candidate.box) > area(current.box) * 1.1;
-}
-
-function area(box: RelativeBox): number {
-    return Math.max(0, box.x2 - box.x1) * Math.max(0, box.y2 - box.y1);
+    return boxArea(candidate.box) > boxArea(current.box) * 1.1;
 }
 
 /** The middle of a box, which is what one frame's things are matched to the
