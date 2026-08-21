@@ -47,10 +47,20 @@ const FRAME_GAP_MS = 260;
 const COLD_GAP_MS = 2_000;
 const FRAME_RETRY_MS = 5_000;
 
-/** How long the stream gets to produce a picture before the other one is tried.
- *  Usually the camera's keyframe interval rather than a fault, so it is
- *  generous - and it costs nothing to wait, since there is already a picture. */
-const VIDEO_START_MS = 9_000;
+/**
+ * How long the stream may say nothing at all before it is written off.
+ *
+ * Silence is the failure this catches: a request that connects and never sends
+ * a playable frame raises no error, and the element waits forever.
+ *
+ * It is silence that is timed, not the wait for a picture. A camera here takes
+ * about fourteen seconds between the request and the first frame the browser
+ * will show, because the browser fills a buffer before it starts - which is not
+ * a fault. Timed as "how long until it plays", such a camera is written off a
+ * few seconds before it would have played, every time, and the viewer keeps the
+ * still pictures for good.
+ */
+const VIDEO_SILENCE_MS = 9_000;
 
 /** Opened deliberately, so the good size. */
 const FRAME_WIDTH = 1280;
@@ -124,13 +134,19 @@ export function CameraViewer({
         setTransport(otherTransport(transport));
     };
 
+    /** Anything the element does that proves the stream is alive, so the clock
+     *  below runs against silence rather than against the picture. */
+    const [alive, setAlive] = useState(0);
+    const stirred = () => setAlive((value) => value + 1);
+
     useEffect(() => {
         if (!trying || playing) return;
-        const watchdog = setTimeout(failed, VIDEO_START_MS);
+        const watchdog = setTimeout(failed, VIDEO_SILENCE_MS);
         return () => clearTimeout(watchdog);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- restarting the
-        // clock is the point whenever what is being tried changes.
-    }, [transport, trying, playing]);
+        // clock is the point whenever what is being tried changes, and whenever
+        // the stream shows a sign of life.
+    }, [transport, trying, playing, alive]);
 
     // Closing has to end the request rather than hide it: a stream left running
     // holds a slot on the relay for a camera nobody is watching. Read at teardown
@@ -193,6 +209,12 @@ export function CameraViewer({
                             muted
                             playsInline
                             controls={false}
+                            // Each of these is the stream saying it is still
+                            // coming, which is what the clock above is against.
+                            onLoadStart={stirred}
+                            onLoadedMetadata={stirred}
+                            onProgress={stirred}
+                            onCanPlay={stirred}
                             onPlaying={() => setPlaying(true)}
                             onError={failed}
                         />

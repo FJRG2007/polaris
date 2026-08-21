@@ -62,14 +62,22 @@ const COLD_GAP_MS = 2_500;
 const FRAME_RETRY_MS = 5_000;
 
 /**
- * How long the stream gets to produce a picture before it is written off.
+ * How long the stream may say nothing at all before it is written off.
  *
- * There has to be a number, because the failure this catches is silence: a
- * request that connects and never sends a playable frame raises no error and the
- * element waits forever. Generous, because the wait is usually the camera's
- * keyframe interval and not a fault.
+ * Silence is the failure this catches: a request that connects and never sends
+ * a playable frame raises no error, and the element waits forever.
+ *
+ * It is silence that is timed, not the wait for a picture, and the difference is
+ * the whole bug it replaces. A camera here takes about fourteen seconds between
+ * the request and the first frame the browser will show - the browser fills a
+ * buffer before it starts, and that is not a fault, it is what a progressive
+ * stream costs. Timed as "how long until it plays", every such camera was
+ * declared dead a few seconds before it would have played, every time, and the
+ * viewer sat on still pictures for good. Timed as "how long since anything
+ * happened", a stream that is loading is left alone and a stream that is not
+ * still fails quickly.
  */
-const VIDEO_START_MS = 9_000;
+const VIDEO_SILENCE_MS = 9_000;
 
 /** The frame is drawn a few hundred pixels wide, so that is what is asked for.
  *  A camera's own frame is several thousand pixels across - sending that to fill
@@ -186,15 +194,23 @@ export function CameraTile({
         setAttempt(null);
     };
 
-    // A stream that connects and then says nothing raises no error, so silence is
-    // timed rather than waited on.
+    /**
+     * Anything the element does that proves the stream is alive.
+     *
+     * Bumped by the events a loading stream fires, and read by the watchdog
+     * below - so the clock is against silence rather than against the picture.
+     */
+    const [alive, setAlive] = useState(0);
+    const stirred = () => setAlive((value) => value + 1);
+
     useEffect(() => {
         if (!attempt || playing || !wantFrames) return;
-        const watchdog = setTimeout(failed, VIDEO_START_MS);
+        const watchdog = setTimeout(failed, VIDEO_SILENCE_MS);
         return () => clearTimeout(watchdog);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- restarting the
-        // clock is the point whenever what is being tried changes.
-    }, [attempt, transport, playing, wantFrames]);
+        // clock is the point whenever what is being tried changes, and whenever
+        // the stream shows a sign of life.
+    }, [attempt, transport, playing, wantFrames, alive]);
 
     // Give up for a minute, not forever: a camera that was rebooting when the
     // page loaded should not need a reload.
@@ -279,6 +295,13 @@ export function CameraTile({
                                 autoPlay
                                 muted
                                 playsInline
+                                // Every one of these is the stream saying it is
+                                // still coming. Without them the clock below runs
+                                // against a camera that is merely loading.
+                                onLoadStart={stirred}
+                                onLoadedMetadata={stirred}
+                                onProgress={stirred}
+                                onCanPlay={stirred}
                                 onPlaying={() => setPlaying(true)}
                                 onError={failed}
                             />
