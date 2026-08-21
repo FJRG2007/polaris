@@ -164,6 +164,32 @@ describe("what the account actually appears as", () => {
     });
 });
 
+describe("a choice with no schedule anywhere near it", () => {
+    // The call the picker on your own face makes, every half minute, against a
+    // clock of its own. It has to go on being the same rule the server applies,
+    // because the failure it exists to prevent is silent and one-sided: a window
+    // lapses everywhere - `/api/presence` resolves it on every poll - except on
+    // the screen of the one person relying on it, whose layout was rendered
+    // hours ago and is never rendered again while the tab stays open.
+    it("stops being a choice the moment its window passes", () => {
+        const account = {
+            presence: "invisible",
+            presenceUntil: new Date("2026-08-20T07:00:00Z"),
+            presenceSetAt: new Date("2026-08-19T23:00:00Z")
+        };
+        expect(core.presenceInForce(account, [], "UTC", new Date("2026-08-20T06:59:00Z"))).toEqual({
+            choice: "invisible",
+            until: account.presenceUntil,
+            scheduled: false
+        });
+        expect(core.presenceInForce(account, [], "UTC", new Date("2026-08-20T07:00:01Z"))).toEqual({
+            choice: "auto",
+            until: null,
+            scheduled: false
+        });
+    });
+});
+
 describe("what a window is refused for", () => {
     it("no days, because it would never open", () => {
         const written = core.presenceScheduleSchema.safeParse({

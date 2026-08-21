@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { Avatar } from "@/components/avatar";
+import { useNow } from "@/components/presence";
 import { useDisplayFormat } from "@/components/display-format";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
@@ -28,6 +29,8 @@ import {
     STATUS_DURATIONS,
     MAX_WINDOW_MS,
     windowEndsAt,
+    presenceInForce,
+    AUTOMATIC_TIME_ZONE,
     type DisplayFormat,
     type PresenceChoice,
     type WindowChoice
@@ -127,6 +130,62 @@ export function AccountMenu({
         setUntil(presenceUntil);
         setByRule(presenceScheduled);
     }, [presence, presenceUntil, presenceScheduled]);
+
+    /**
+     * A clock of this menu's own, because the props above are not enough.
+     *
+     * The layout that resolves them renders once per page load, and a tab is not
+     * reloaded for hours: nothing re-renders a layout on a soft navigation, so a
+     * window that lapses at seven in the morning lapses everywhere except on the
+     * screen of the person who set it. Everybody else was already reading the
+     * truth - `/api/presence` works a lapsed choice out on every poll - which is
+     * the worst shape this can take, because the one person being told the
+     * setting is still on is the one relying on it.
+     *
+     * So the moment is compared against a clock that ticks. Half a minute is
+     * finer than anybody notices and coarser than anything this costs.
+     */
+    const now = useNow(30_000);
+    // Through the rule itself rather than a comparison written out again here.
+    // It is a pure function for exactly this reason: the dot beside a face, the
+    // screen that writes a schedule and this picker have to agree about when a
+    // choice stops being one, and only one of the three can reach a database.
+    // No schedules are passed - the layout has already resolved those, and what
+    // arrives here is the answer, not the inputs.
+    const held = presenceInForce(
+        {
+            presence: chosen,
+            presenceUntil: until ? new Date(until) : null,
+            presenceSetAt: null
+        },
+        [],
+        AUTOMATIC_TIME_ZONE,
+        new Date(now)
+    );
+    const shownChoice = held.choice;
+    const shownUntil = held.until?.toISOString() ?? null;
+    const shownByRule = held.choice === "auto" ? false : byRule;
+    const lapsed = shownChoice !== chosen;
+
+    // And once it has, ask the server what took over. It knows two things this
+    // does not: the choice that was standing before a schedule borrowed the
+    // account, and the next window that may have opened in the same breath.
+    //
+    // Once per lapse, held by a flag rather than by the dependency list. The
+    // refresh is handed out by a context that does not promise the same function
+    // twice, and an effect that asked again on every render would be a page
+    // reloading itself in a loop for as long as the moment stayed passed.
+    const asked = useRef(false);
+    useEffect(() => {
+        if (!lapsed) {
+            asked.current = false;
+            return;
+        }
+        if (asked.current) return;
+        asked.current = true;
+        refreshPresence();
+        router.refresh();
+    }, [lapsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** What is wrong with the moment being typed, empty when nothing is - and
      *  the one answer the two fields add up to, which is only ever built from a
@@ -229,13 +288,13 @@ export function AccountMenu({
                                 )}
                             />
                             <span className="flex-1">{PRESENCE_LABELS[choice]}</span>
-                            {chosen === choice && until && (
+                            {shownChoice === choice && shownUntil && (
                                 <span className="text-[11px] text-muted-foreground">
-                                    {byRule ? "scheduled, until " : "until "}
-                                    {endLabel(until, format)}
+                                    {shownByRule ? "scheduled, until " : "until "}
+                                    {endLabel(shownUntil, format)}
                                 </span>
                             )}
-                            {chosen === choice && <Check className="size-3.5 text-primary" />}
+                            {shownChoice === choice && <Check className="size-3.5 text-primary" />}
                         </>
                     );
 
