@@ -45,7 +45,9 @@ describe("a window on the account's own clock", () => {
         expect(open?.rule.id).toBe("night");
 
         // The same instant is 22:30 in London, still half an hour short.
-        expect(core.openWindow(overnight, "Europe/London", new Date("2026-08-20T21:30:00Z"))).toBeNull();
+        expect(
+            core.openWindow(overnight, "Europe/London", new Date("2026-08-20T21:30:00Z"))
+        ).toBeNull();
     });
 
     it("closes at the hour it names rather than a length after it opened", () => {
@@ -73,8 +75,18 @@ describe("a window that crosses midnight", () => {
 
 describe("two windows over the same hour", () => {
     it("hands it to the one that opened most recently", () => {
-        const allDay = rule({ id: "day", presence: "away", startMinute: 9 * 60, endMinute: 18 * 60 });
-        const afternoon = rule({ id: "focus", presence: "busy", startMinute: 14 * 60, endMinute: 16 * 60 });
+        const allDay = rule({
+            id: "day",
+            presence: "away",
+            startMinute: 9 * 60,
+            endMinute: 18 * 60
+        });
+        const afternoon = rule({
+            id: "focus",
+            presence: "busy",
+            startMinute: 14 * 60,
+            endMinute: 16 * 60
+        });
         const open = core.openWindow([allDay, afternoon], "UTC", new Date("2026-08-20T15:00:00Z"));
         expect(open?.rule.id).toBe("focus");
     });
@@ -312,7 +324,9 @@ describe("a window picked as an exact moment", () => {
     });
 
     it("is refused when it has passed or reaches past a year", () => {
-        expect(core.isWindowMoment(new Date(THURSDAY.getTime() - 1000).toISOString(), THURSDAY)).toBe(false);
+        expect(
+            core.isWindowMoment(new Date(THURSDAY.getTime() - 1000).toISOString(), THURSDAY)
+        ).toBe(false);
         expect(core.isWindowMoment("not a date", THURSDAY)).toBe(false);
         expect(
             core.isWindowMoment(
@@ -320,7 +334,9 @@ describe("a window picked as an exact moment", () => {
                 THURSDAY
             )
         ).toBe(false);
-        expect(core.isWindowMoment(new Date(THURSDAY.getTime() + 60_000).toISOString(), THURSDAY)).toBe(true);
+        expect(
+            core.isWindowMoment(new Date(THURSDAY.getTime() + 60_000).toISOString(), THURSDAY)
+        ).toBe(true);
     });
 
     it("is nothing at all when neither half was given", () => {
