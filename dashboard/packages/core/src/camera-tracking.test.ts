@@ -144,6 +144,28 @@ describe("which frame is kept as the picture", () => {
         expect(tracking.isBetterSnapshot(held, { score: 0.8, box: personAt(0.4, 0.12) })).toBe(true);
     });
 
+it("leaves the hit count and the best frame in step when it is not seen", () => {
+        // The one that catches a caller out. `best.frame` is a hit number, so a
+        // thing that goes unseen keeps both unchanged and the two stay equal -
+        // "the best frame is this frame" reads true forever. Anything holding a
+        // picture per object has to ask whether it was seen at all, which is
+        // what `missing` is for.
+        // They come closer each frame, so the last hit is also the best frame.
+        let state = tracking.NO_TRACKING;
+        state = walk(state, [personAt(0.3, 0.06)], 0).state;
+        state = walk(state, [personAt(0.3, 0.09)], 1).state;
+        state = walk(state, [personAt(0.3, 0.14)], 2).state;
+        const before = state.objects[0]!;
+        expect(before.best?.frame).toBe(before.hits);
+        expect(before.missing).toBe(0);
+
+        state = walk(state, [], 3).state;
+        const after = state.objects[0]!;
+        expect(after.hits).toBe(before.hits);
+        expect(after.best?.frame).toBe(after.hits);
+        expect(after.missing).toBe(1);
+    });
+
     it("holds the best frame of a whole walk-past, not the first or the last", () => {
         let state = tracking.NO_TRACKING;
         // They come closer as they walk, so the box grows and the detector gets

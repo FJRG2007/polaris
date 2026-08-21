@@ -257,8 +257,13 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                         );
                         tracking = update.state;
 
+                        // `missing` is what says this thing was actually seen in
+                        // this frame. Without it, something that has gone quiet
+                        // keeps its hit count and its best-frame number in step
+                        // forever, and every frame after it left would be stored
+                        // as the best picture of it.
                         for (const object of tracking.objects) {
-                            if (object.best?.frame !== object.hits) continue;
+                            if (object.missing !== 0 || object.best?.frame !== object.hits) continue;
                             if (!held.has(object.id) && held.size >= MAX_HELD_FRAMES) continue;
                             held.set(object.id, { frame, at: Date.now() });
                         }
@@ -272,7 +277,7 @@ export function watchCamera(assignment: Assignment, deps: WatchDeps): Watch {
                         // worth sending: the frame it was first recognized in is
                         // rarely the frame somebody can recognize it in.
                         for (const object of tracking.objects) {
-                            if (!object.reported || object.best?.frame !== object.hits) continue;
+                            if (object.missing !== 0 || !object.reported || object.best?.frame !== object.hits) continue;
                             const last = improved.get(object.id) ?? 0;
                             if (Date.now() - last < IMPROVE_GAP_MS) continue;
                             improved.set(object.id, Date.now());
