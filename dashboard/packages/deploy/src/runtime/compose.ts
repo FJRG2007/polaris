@@ -35,6 +35,30 @@ function timer(ctx: RuntimeContext): (label: string) => (note?: string) => void 
     };
 }
 
+/**
+ * Give up, and say why in the log.
+ *
+ * Every way this pipeline can fail used to end the same way: the reason was
+ * returned, the deployment was marked failed, and the log simply stopped -
+ * usually mid-step, because a step that throws never writes its closing line.
+ * What the operator was left with was a build that looked like it worked and a
+ * red badge with nothing to read, which sends them to the wrong place entirely.
+ *
+ * The reason belongs in the log because the log is what they already have open.
+ * It is still returned as well: that is what the deployment record stores.
+ */
+function fail(ctx: RuntimeContext, error: string): DeployResult {
+    ctx.log(Buffer.from(`==> Failed: ${error}
+`));
+    return { ok: false, error };
+}
+
+/** The sentence inside an unknown thrown value, or a stated fallback. */
+function reasonOf(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
+}
+
+
 export class ComposeRuntime implements RuntimeDriver {
     public readonly engine = "compose" as const;
 
@@ -54,7 +78,7 @@ export class ComposeRuntime implements RuntimeDriver {
         const step = timer(ctx);
         let imageTag: string;
         if (plan.build.method === "image") {
-            if (!plan.build.imageRef) return { ok: false, error: "an image source needs an image reference" };
+            if (!plan.build.imageRef) return fail(ctx, "an image source needs an image reference");
             imageTag = plan.build.imageRef;
             const done = step(`Pulling ${plan.build.imageRef}`);
             await ctx.ports.pull(imageTag, sink);
@@ -86,7 +110,7 @@ export class ComposeRuntime implements RuntimeDriver {
             built();
         } else {
             // buildpacks/static need a builder toolchain on the target; not yet wired.
-            return { ok: false, error: `build method "${plan.build.method}" is not yet supported on the compose runtime` };
+            return fail(ctx, `build method "${plan.build.method}" is not yet supported on the compose runtime`);
         }
 
         const effectivePlan = await this.refineContainerPort(plan, imageTag, ctx);
@@ -100,13 +124,16 @@ export class ComposeRuntime implements RuntimeDriver {
                 done(created ? "mounted" : "already mounted");
             }
         } catch (error) {
-            return { ok: false, error: `could not mount a NAS volume: ${error instanceof Error ? error.message : "mount failed"}` };
+            // The share is what the app's data lives on, so a container brought
+            // up without it would write into an empty directory on the host and
+            // look fine until somebody went looking for the files.
+            return fail(ctx, `could not mount a NAS volume: ${reasonOf(error, "mount failed")}`);
         }
         const started = step("Starting the containers");
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
-            return { ok: false, error: error instanceof Error ? error.message : "compose up failed" };
+            return fail(ctx, reasonOf(error, "compose up failed"));
         }
         started();
         return { ok: true, imageTag };
@@ -154,7 +181,7 @@ export class ComposeRuntime implements RuntimeDriver {
         try {
             await ctx.ports.composeUp(spec, sink);
         } catch (error) {
-            return { ok: false, error: error instanceof Error ? error.message : "database deploy failed" };
+            return fail(ctx, reasonOf(error, "database deploy failed"));
         }
         return { ok: true };
     }
