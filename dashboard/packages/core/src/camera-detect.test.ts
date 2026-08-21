@@ -11,6 +11,7 @@
  */
 
 import * as detect from "./camera-detect.js";
+import fixture from "./camera-detect.fixture.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 
 /** Build one candidate row in the model's own convention. */
@@ -274,5 +275,52 @@ describe("the whole way through", () => {
                 classes: []
             })
         ).toEqual([]);
+    });
+});
+
+describe("against the model itself", () => {
+    /**
+     * Six candidate rows lifted out of a real run of the model this worker
+     * ships, together with what the model's own reference implementation makes
+     * of them.
+     *
+     * This is the one thing in the module that could not be reasoned about. The
+     * output layout - which grid a row belongs to, whether the coordinates are
+     * offsets or pixels, whether the sizes are logarithms - is a convention, and
+     * a convention got wrong produces boxes in the wrong place rather than an
+     * error. So the numbers here came out of the model, the answers came out of
+     * the implementation that ships with it, and this asserts the two agree.
+     *
+     * Only the rows that carried a candidate are kept: the rest of the tensor is
+     * zeroes, and a zero row cannot pass the score floor, so reconstructing it
+     * that way changes nothing and keeps the fixture at a few kilobytes rather
+     * than a megabyte.
+     */
+    const tensor = (() => {
+        const output = new Float32Array(detect.candidateCount(fixture.modelSize) * detect.ROW_LENGTH);
+        for (const row of fixture.rows) {
+            output.set(row.values, row.index * detect.ROW_LENGTH);
+        }
+        return output;
+    })();
+
+    it("decodes a real tensor exactly as the model's own implementation does", () => {
+        const mine = detect
+            .decodeDetections(tensor, fixture.modelSize, fixture.minScore)
+            .sort((a, b) => b.score - a.score);
+        expect(mine).toHaveLength(fixture.expected.length);
+        mine.forEach((found, index) => {
+            const expected = fixture.expected[index]!;
+            expect(found.classIndex).toBe(expected.classIndex);
+            expect(found.score).toBeCloseTo(expected.score, 4);
+            expect(found.x1).toBeCloseTo(expected.box[0]!, 2);
+            expect(found.y1).toBeCloseTo(expected.box[1]!, 2);
+            expect(found.x2).toBeCloseTo(expected.box[2]!, 2);
+            expect(found.y2).toBeCloseTo(expected.box[3]!, 2);
+        });
+    });
+
+    it("counts the rows the model actually produces", () => {
+        expect(detect.candidateCount(416) * detect.ROW_LENGTH).toBe(3549 * 85);
     });
 });
