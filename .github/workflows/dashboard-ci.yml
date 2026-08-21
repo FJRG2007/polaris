@@ -64,6 +64,17 @@ env:
   # to markup. So the download is skipped, and CI stops depending on a third
   # party being in a good mood.
   PUPPETEER_SKIP_DOWNLOAD: "true"
+  # The same story, one dependency along. `onnxruntime-node` ships the CPU
+  # runtime for every platform inside the package, and then - on linux/x64 only -
+  # downloads the CUDA execution provider from nuget.org in a postinstall. A
+  # connect timeout to nuget took `npm ci` down with it, on a commit that touched
+  # nothing near it.
+  #
+  # Nothing here, or anywhere in Polaris, would ever load that binary: the vision
+  # worker runs on the processor, which is what its own screen promises. So the
+  # download buys nothing and is skipped. The images were never affected - their
+  # `npm ci` already runs with --ignore-scripts.
+  ONNXRUNTIME_NODE_INSTALL: "skip"
 
 jobs:
   checks:

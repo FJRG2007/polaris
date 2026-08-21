@@ -19,6 +19,13 @@ permissions:
   contents: read
   issues: write
 
+env:
+  # Install-time downloads from third parties, skipped for the reason
+  # dashboard-ci.yml spells out: neither is ever loaded by anything here, and
+  # each one has taken `npm ci` down on a commit that touched nothing near it.
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+  ONNXRUNTIME_NODE_INSTALL: "skip"
+
 defaults:
   run:
     working-directory: dashboard
