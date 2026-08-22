@@ -26,9 +26,9 @@ import { findGameIdentity } from "@/lib/apps/game-identity";
 import { recentlyGivenItems } from "@/lib/apps/recent-items";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "@/lib/apps/ark/access";
-import { giveArkItem, requireArkPlayerId } from "@/lib/apps/ark/item-service";
+import { giveArkItems, requireArkPlayerId } from "@/lib/apps/ark/item-service";
 import { liftArkTimeout, timeoutArkPlayer } from "@/lib/apps/ark/timeout-service";
-import { ARK_ITEM_KEY, MAX_ARK_GIVE, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
+import { ARK_ITEM_KEY, MAX_ARK_GIVE, MAX_ARK_GIVE_ITEMS, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
 import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { readPlayerRecord, type PlayerRecord } from "@/lib/apps/games-activity-service";
@@ -385,12 +385,23 @@ export async function giveArkExperienceAction(
 const giveSchema = z.object({
     installedAppId: z.string().trim().min(1),
     steamId: z.string().trim().refine(isSteamId, "That is not a Steam id"),
-    /** An item's class, which is the only thing a browser is allowed to name: the
-     *  blueprint path the command carries is looked up from it on this side. */
-    key: z.string().trim().regex(ARK_ITEM_KEY, "That is not an item"),
-    quantity: z.number().int().min(1).max(MAX_ARK_GIVE),
-    quality: z.number().int().min(0).max(MAX_ARK_QUALITY).default(0),
-    blueprint: z.boolean().default(false)
+    /** Everything to hand over in this one errand. A list rather than an item,
+     *  because a set of gear is four or five things and reopening the form
+     *  between each was the whole complaint. */
+    items: z
+        .array(
+            z.object({
+                /** An item's class, which is the only thing a browser is allowed to
+                 *  name: the blueprint path the command carries is looked up from
+                 *  it on this side. */
+                key: z.string().trim().regex(ARK_ITEM_KEY, "That is not an item"),
+                quantity: z.number().int().min(1).max(MAX_ARK_GIVE),
+                quality: z.number().int().min(0).max(MAX_ARK_QUALITY).default(0),
+                blueprint: z.boolean().default(false)
+            })
+        )
+        .min(1, "Pick something to give them")
+        .max(MAX_ARK_GIVE_ITEMS)
 });
 
 export type ArkGiveInput = z.infer<typeof giveSchema>;
@@ -398,32 +409,34 @@ export type ArkGiveInput = z.infer<typeof giveSchema>;
 /**
  * Put items in a player's inventory.
  *
- * Nothing here can confirm it landed: ARK answers a give with silence whether it
+ * Nothing here can confirm they landed: ARK answers a give with silence whether it
  * worked or not, so the result says what was sent rather than what happened, and
  * the screen words it that way.
+ *
+ * One audit row per item rather than one per errand, because that record is also
+ * what the picker opens on - "what has been handed out on this server lately" is
+ * a question about items, not about visits to the form.
  */
-export async function giveArkItemAction(
+export async function giveArkItemsAction(
     input: ArkGiveInput
-): Promise<{ item?: string; stacks?: number; output?: string; error?: string }> {
+): Promise<{ items?: string[]; error?: string }> {
     const parsed = giveSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
-    const { installedAppId, steamId, key, quantity, quality, blueprint } = parsed.data;
+    const { installedAppId, steamId, items } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        const given = await giveArkItem(access.ownerId, installedAppId, steamId, {
-            key,
-            quantity,
-            quality,
-            blueprint
-        });
-        await recordAudit({
-            actorId: user.id,
-            action: "games.ark.give",
-            targetType: "installedApp",
-            targetId: installedAppId,
-            metadata: { steamId, item: key, count: quantity, blueprint }
-        });
-        return { item: given.item.name, stacks: given.stacks, output: given.output };
+        const given = await giveArkItems(access.ownerId, installedAppId, steamId, items);
+        for (const [index, line] of items.entries()) {
+            if (index >= given.length) break;
+            await recordAudit({
+                actorId: user.id,
+                action: "games.ark.give",
+                targetType: "installedApp",
+                targetId: installedAppId,
+                metadata: { steamId, item: line.key, count: line.quantity, blueprint: line.blueprint }
+            });
+        }
+        return { items: given.map((result) => result.item.name) };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that" };
     }

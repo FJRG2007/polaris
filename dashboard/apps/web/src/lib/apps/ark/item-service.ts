@@ -16,7 +16,7 @@
 
 import { readArkPlayerId, runArkCommand } from "@/lib/apps/ark/service";
 import { findArkItem, type ArkCatalogItem } from "@/lib/apps/ark/item-catalog";
-import { arkGiveCommand, MAX_ARK_GIVE, MAX_ARK_QUALITY } from "@/lib/apps/ark/items";
+import { arkGiveCommand, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkGiveLine } from "@/lib/apps/ark/items";
 
 /** Why a give did not happen, in the words a screen uses. */
 export class ArkGiveError extends Error {}
@@ -41,17 +41,6 @@ export async function requireArkPlayerId(
     );
 }
 
-export interface ArkGiveRequest {
-    /** The item's class, as the catalogue keys it. */
-    readonly key: string;
-    readonly quantity: number;
-    /** How good it arrives. Ignored by the game for anything that does not have a
-     *  quality, which is most things. */
-    readonly quality: number;
-    /** The blueprint for the thing rather than the thing itself. */
-    readonly blueprint: boolean;
-}
-
 export interface ArkGiveResult {
     readonly item: ArkCatalogItem;
     /** How many stacks that quantity arrives as, so the screen can say. */
@@ -60,34 +49,65 @@ export interface ArkGiveResult {
     readonly output: string;
 }
 
-/** Put items in somebody's inventory. */
-export async function giveArkItem(
+/**
+ * Put items in somebody's inventory, in the order they were asked for.
+ *
+ * Several at a time, because handing somebody a set of gear is one errand and not
+ * four - and the expensive half of it is the same either way: the in-game id is
+ * read out of the survivor's own file, once here rather than once per item.
+ *
+ * Everything that can be refused is refused before anything is sent, so the two
+ * ordinary failures - an item the catalogue does not know, a player with no file
+ * to read - leave nobody half-given. A command that dies part way through cannot
+ * be taken back, so the refusal says how far it got instead of pretending it did
+ * nothing.
+ */
+export async function giveArkItems(
     ownerId: string,
     installedAppId: string,
     steamId: string,
-    request: ArkGiveRequest
-): Promise<ArkGiveResult> {
-    const item = findArkItem(request.key);
-    if (!item) throw new ArkGiveError("That is not an item this server's catalog knows");
-    const quantity = Math.max(1, Math.min(MAX_ARK_GIVE, Math.trunc(request.quantity)));
-    const quality = Math.max(0, Math.min(MAX_ARK_QUALITY, Math.trunc(request.quality)));
+    requests: readonly ArkGiveLine[]
+): Promise<ArkGiveResult[]> {
+    if (requests.length === 0) return [];
+    const items = requests.map((request) => {
+        const item = findArkItem(request.key);
+        if (!item) throw new ArkGiveError("That is not an item this server's catalog knows");
+        return item;
+    });
     const playerId = await requireArkPlayerId(ownerId, installedAppId, steamId);
-    const output = await runArkCommand(
-        ownerId,
-        installedAppId,
-        arkGiveCommand({
-            playerId,
-            blueprintPath: item.bp,
-            quantity,
-            quality,
-            blueprint: request.blueprint
-        })
-    );
-    return {
-        item,
-        // A blueprint is one piece of paper however many were asked for, so the
-        // sentence about stacks would be wrong for it.
-        stacks: request.blueprint ? quantity : Math.ceil(quantity / Math.max(1, item.stack)),
-        output: output.trim()
-    };
+
+    const given: ArkGiveResult[] = [];
+    for (const [index, request] of requests.entries()) {
+        const item = items[index]!;
+        const quantity = Math.max(1, Math.min(MAX_ARK_GIVE, Math.trunc(request.quantity)));
+        const quality = Math.max(0, Math.min(MAX_ARK_QUALITY, Math.trunc(request.quality)));
+        try {
+            const output = await runArkCommand(
+                ownerId,
+                installedAppId,
+                arkGiveCommand({
+                    playerId,
+                    blueprintPath: item.bp,
+                    quantity,
+                    quality,
+                    blueprint: request.blueprint
+                })
+            );
+            given.push({
+                item,
+                // A blueprint is one piece of paper however many were asked for, so
+                // the sentence about stacks would be wrong for it.
+                stacks: request.blueprint ? quantity : Math.ceil(quantity / Math.max(1, item.stack)),
+                output: output.trim()
+            });
+        } catch (caught) {
+            const reason = caught instanceof Error ? caught.message : "the server stopped answering";
+            throw new ArkGiveError(
+                given.length === 0
+                    ? reason
+                    : `The first ${given.length} of ${requests.length} were sent. The rest were not: ${reason}`
+            );
+        }
+    }
+    return given;
 }

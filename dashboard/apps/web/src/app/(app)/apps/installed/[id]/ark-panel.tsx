@@ -1376,24 +1376,31 @@ function PlayersTab({
                     error={dialogError}
                     recent={recentItems}
                     onClose={() => setActing(null)}
-                    onGive={(input) => {
+                    onGive={(lines) => {
                         // In front of the list before the server has been asked,
                         // so the next give opens on what was just handed out.
+                        const keys = lines.map((line) => line.key);
                         setRecentItems((was) =>
-                            [input.key, ...was.filter((id) => id !== input.key)].slice(0, 12)
+                            [...new Set([...keys, ...was])].slice(0, 12)
                         );
                         runOptimistic(
                             () =>
-                                actions.giveArkItemAction({
+                                actions.giveArkItemsAction({
                                     installedAppId,
                                     steamId: target.steamId,
-                                    ...input
+                                    items: [...lines]
                                 }),
                             // Said rather than claimed: the server takes the
                             // command and answers nothing either way, so the note
                             // is about what was sent.
-                            `Sent ${input.quantity} to ${target.name}. ARK does not confirm a give - ask them to look.`,
-                            (reason) => `${target.name} was not given anything: ${reason}`
+                            `Sent ${lines.length === 1 ? `${lines[0]?.quantity ?? 1}` : `${lines.length} things`} to ${target.name}. ARK does not confirm a give - ask them to look.`,
+                            // Part of a list can land before something stops the
+                            // rest, and the refusal says how far it got - so this
+                            // may not claim they were given nothing.
+                            (reason) =>
+                                lines.length === 1
+                                    ? `${target.name} was not given anything: ${reason}`
+                                    : `${target.name} was not given everything: ${reason}`
                         );
                     }}
                 />

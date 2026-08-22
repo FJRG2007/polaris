@@ -16,7 +16,7 @@
 
 import * as actions from "./ark-actions";
 import { isSteamId } from "@/lib/apps/ark/access";
-import { Loader2, UserSearch } from "lucide-react";
+import { Loader2, Plus, UserSearch, X } from "lucide-react";
 import { AccountInput } from "@/components/account-input";
 import { useEffect, useState, useTransition } from "react";
 import type { ArkAllowedPlayer } from "@/lib/apps/ark/access";
@@ -24,7 +24,15 @@ import { PlayerRecordPanel } from "@/components/player-history";
 import { ArkItemPicker, loadArkCatalog } from "./ark-item-picker";
 import type { PlayerRecord } from "@/lib/apps/games-activity-service";
 import { PlayerFormDialog, PlayerFormField } from "@/components/player-form-dialog";
-import { describeArkStacks, MAX_ARK_GIVE, MAX_ARK_QUALITY, type ArkItem } from "@/lib/apps/ark/items";
+import {
+    describeArkGive,
+    describeArkStacks,
+    MAX_ARK_GIVE,
+    MAX_ARK_GIVE_ITEMS,
+    MAX_ARK_QUALITY,
+    type ArkGiveLine,
+    type ArkItem
+} from "@/lib/apps/ark/items";
 import { MAX_ARK_EXPERIENCE } from "@/lib/apps/ark/experience";
 import {
     Button,
@@ -228,13 +236,19 @@ export function ArkMessageDialog({
 }
 
 /**
- * Hand a player something.
+ * Hand a player something, or several somethings.
  *
  * ARK gives an operator no way to do this from outside the game: the two commands
  * everybody knows put the item in the inventory of whoever typed them, and over
  * RCON that is nobody. The third names its player - by a number out of their own
  * survivor file, which is what Polaris reads - so this is a give that works with
  * nobody logged in, which is the whole reason the screen has it.
+ *
+ * Several, because handing somebody a set of gear is one errand: a weapon, the
+ * ammunition for it, and something to wear. Giving one thing closed the form, so
+ * the second and the third meant finding the row again and opening it again, and
+ * the fields were back to their defaults each time. Now the form keeps a list and
+ * the confirm sends the lot.
  *
  * What it cannot do is confirm. ARK answers a give with silence whether it landed
  * or not, so the dialog says what was sent and to whom, and never that it arrived.
@@ -253,7 +267,7 @@ export function ArkGiveDialog({
     /** What was handed out on this server lately, for the grid to open on. */
     recent?: readonly string[];
     onClose: () => void;
-    onGive: (input: { key: string; quantity: number; quality: number; blueprint: boolean }) => void;
+    onGive: (lines: readonly ArkGiveLine[]) => void;
 }) {
     const [picked, setPicked] = useState<string | null>(null);
     const [query, setQuery] = useState("");
@@ -261,6 +275,9 @@ export function ArkGiveDialog({
     const [quality, setQuality] = useState(0);
     const [blueprint, setBlueprint] = useState(false);
     const [items, setItems] = useState<readonly ArkItem[]>([]);
+    /** What has been put on the list so far. The fields above are the line being
+     *  written; this is the ones already written down. */
+    const [queued, setQueued] = useState<readonly ArkGiveLine[]>([]);
 
     useEffect(() => {
         let live = true;
@@ -280,20 +297,46 @@ export function ArkGiveDialog({
     // only drawn where they mean something.
     const gear = item !== undefined && item.stack === 1;
     const split = item ? describeArkStacks(item.stack, quantity) : null;
+    /** The line the fields are describing right now, if they describe one. */
+    const writing: ArkGiveLine | null =
+        picked === null
+            ? null
+            : { key: picked, quantity, quality: gear ? quality : 0, blueprint: gear && blueprint };
+    // What confirming would send: the list, plus the line still in the fields.
+    // Somebody who picks one thing and presses the button never touches the list
+    // at all, which is the case this must not make longer.
+    const sending = writing ? [...queued, writing] : queued;
+    // Measured on what confirming would send rather than on the list, so the line
+    // still in the fields cannot be the one that takes the errand over the cap.
+    const full = sending.length >= MAX_ARK_GIVE_ITEMS;
+
+    /** Put the line in the fields on the list and clear them for the next one. */
+    function addAnother(): void {
+        if (!writing || full) return;
+        setQueued((was) => [...was, writing]);
+        setPicked(null);
+        setQuantity(1);
+        setQuality(0);
+        setBlueprint(false);
+    }
+
+    /** What one queued line is called, for its row and for the label that removes
+     *  it. Falls back to the class the catalogue keys it by, which is at least
+     *  recognisable, for a line whose item the catalogue has since dropped. */
+    function describe(line: ArkGiveLine): string {
+        return describeArkGive(items.find((entry) => entry.id === line.key)?.label ?? line.key, line);
+    }
 
     return (
         <PlayerFormDialog
             title={`Give ${name} something`}
             description="Goes straight into their inventory. They have to have played on this server before."
-            confirmLabel="Give it to them"
-            ready={picked !== null}
+            confirmLabel={sending.length > 1 ? `Give them ${sending.length} things` : "Give it to them"}
+            ready={sending.length > 0}
             pending={pending}
             error={error}
             onClose={onClose}
-            onConfirm={() =>
-                picked &&
-                onGive({ key: picked, quantity, quality: gear ? quality : 0, blueprint: gear && blueprint })
-            }
+            onConfirm={() => sending.length > 0 && onGive(sending)}
         >
             <ArkItemPicker
                 value={picked}
@@ -354,6 +397,51 @@ export function ArkGiveDialog({
                     </label>
                 </>
             )}
+
+            {/* The second half of the form: what is already on the list. A give
+                that is one thing never touches any of this - the button is what
+                somebody presses when the errand turns out to be four things. */}
+            <div className="flex flex-col gap-2">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={writing === null || full || pending}
+                    onClick={addAnother}
+                >
+                    <Plus className="size-4" />
+                    Add another
+                </Button>
+                {full && (
+                    <p className="text-xs text-muted-foreground">
+                        {MAX_ARK_GIVE_ITEMS} things is as much as one give carries. Send these and open it again.
+                    </p>
+                )}
+                {queued.length > 0 && (
+                    <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+                        {queued.map((line, index) => (
+                            <li
+                                key={`${line.key}-${index}`}
+                                className="flex items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-2 py-1 text-xs"
+                            >
+                                <span className="truncate" title={describe(line)}>
+                                    {describe(line)}
+                                </span>
+                                <button
+                                    type="button"
+                                    disabled={pending}
+                                    title={`Take ${describe(line)} off the list`}
+                                    aria-label={`Take ${describe(line)} off the list`}
+                                    className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
+                                    onClick={() => setQueued((was) => was.filter((_, at) => at !== index))}
+                                >
+                                    <X className="size-3.5" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </PlayerFormDialog>
     );
 }

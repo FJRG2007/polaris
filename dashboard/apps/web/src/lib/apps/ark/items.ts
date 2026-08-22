@@ -118,6 +118,44 @@ export const MAX_ARK_GIVE = 1000;
  *  anything the game hands out on its own. */
 export const MAX_ARK_QUALITY = 100;
 
+/**
+ * How many different things one give may hand over.
+ *
+ * Handing somebody a set of gear is four or five lines, not one, and making them
+ * reopen the form between each was the whole reason this exists. The cap is on a
+ * form that has got away from somebody rather than on the errand: past this many
+ * the list is taller than the dialog and each line is still a command the server
+ * has to run.
+ */
+export const MAX_ARK_GIVE_ITEMS = 20;
+
+/** One thing to hand over: what, how many, and how it arrives. */
+export interface ArkGiveLine {
+    /** The item's class, as the catalogue keys it. */
+    readonly key: string;
+    readonly quantity: number;
+    /** How good it arrives. Ignored by the game for anything that does not have a
+     *  quality, which is most things. */
+    readonly quality: number;
+    /** The blueprint for the thing rather than the thing itself. */
+    readonly blueprint: boolean;
+}
+
+/**
+ * One line of a give, as the list in the form says it.
+ *
+ * The name is passed in rather than looked up: this runs in a browser that has
+ * the catalogue open in front of it, and on a server that has just handed the
+ * thing over and knows what it was called.
+ */
+export function describeArkGive(name: string, line: ArkGiveLine): string {
+    const what = line.blueprint ? `${name} blueprint` : name;
+    // Quality is the one field that is worth saying twice: it is the difference
+    // between a pistol and the best pistol on the server, and it is off by
+    // default, so a line that carries one has had it typed in deliberately.
+    return `${line.quantity} x ${what}${line.quality > 0 ? `, quality ${line.quality}` : ""}`;
+}
+
 /** How many stacks a quantity actually arrives as. The game splits them itself -
  *  this only counts them. */
 export function arkStackCount(stack: number, quantity: number): number {

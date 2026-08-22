@@ -13,6 +13,7 @@ import {
     arkGiveCommand,
     arkItemIconUrl,
     arkStackCount,
+    describeArkGive,
     describeArkStacks,
     MAX_ARK_GIVE,
     readArkItemCatalog,
@@ -224,5 +225,33 @@ describe("the vendored catalogue", () => {
 
     it("ends every path at the object rather than at the generated class", () => {
         expect(arkItems().filter((item) => item.bp.endsWith("_C"))).toEqual([]);
+    });
+});
+
+/**
+ * One line of a give, as the form's list says it.
+ *
+ * The list exists so that handing somebody a weapon, its ammunition and something
+ * to wear is one errand rather than three trips through the form, and a line
+ * nobody can read back is a list nobody can check before pressing send.
+ */
+describe("describeArkGive", () => {
+    const line = { key: "PrimalItemResource_Wood", quantity: 100, quality: 0, blueprint: false };
+
+    it("says how many of what", () => {
+        expect(describeArkGive("Wood", line)).toBe("100 x Wood");
+    });
+
+    it("says when it is the blueprint rather than the thing", () => {
+        expect(describeArkGive("Assault Rifle", { ...line, quantity: 1, blueprint: true })).toBe(
+            "1 x Assault Rifle blueprint"
+        );
+    });
+
+    // Quality is off by default and is the difference between a pistol and the
+    // best pistol on the server, so a line carrying one has had it typed in.
+    it("says the quality when there is one, and stays quiet when there is not", () => {
+        expect(describeArkGive("Pistol", { ...line, quantity: 1, quality: 40 })).toBe("1 x Pistol, quality 40");
+        expect(describeArkGive("Pistol", { ...line, quantity: 1 })).toBe("1 x Pistol");
     });
 });
