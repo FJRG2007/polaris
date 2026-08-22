@@ -16,7 +16,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 
 /** A stored window, as the screens read it. */
 export interface PresenceScheduleView extends core.PresenceScheduleRule {}
@@ -24,9 +24,13 @@ export interface PresenceScheduleView extends core.PresenceScheduleRule {}
 /** What the schedule screen shows, and the clock it is all read against. */
 export interface PresenceScheduleSettings {
     readonly schedules: readonly PresenceScheduleView[];
-    /** The zone these run on. "auto" means nobody picked one, and the server
-     *  has no device clock to borrow - which the screen says out loud. */
+    /** The zone these run on. "auto" only for an account no browser has ever
+     *  reported for, which the screen says out loud. */
     readonly timeZone: string;
+    /** Whether that zone was chosen in Preferences rather than taken from the
+     *  browser. The difference is worth a sentence: a zone that follows the
+     *  browser follows it abroad, and these hours move with it. */
+    readonly pinned: boolean;
 }
 
 /** A row, or null for one whose stored mode is not a mode any more. Nothing can
@@ -104,8 +108,14 @@ export async function scheduleZoneOf(userId: string): Promise<string> {
 }
 
 export async function scheduleSettingsOf(userId: string): Promise<PresenceScheduleSettings> {
-    const [schedules, timeZone] = await Promise.all([schedulesOf(userId), scheduleZoneOf(userId)]);
-    return { schedules, timeZone };
+    const [schedules, timeZone, reported] = await Promise.all([
+        schedulesOf(userId),
+        scheduleZoneOf(userId),
+        getReportedTimeZone(userId)
+    ]);
+    // Both reads are the same memoized row, so this costs nothing over the zone
+    // on its own.
+    return { schedules, timeZone, pinned: timeZone !== reported };
 }
 
 /**

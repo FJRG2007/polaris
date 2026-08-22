@@ -29,7 +29,11 @@ export default async function StatusSchedulePage() {
                     until it ends.
                 </p>
             </div>
-            <ScheduleView schedules={settings.schedules} timeZone={settings.timeZone} />
+            <ScheduleView
+                schedules={settings.schedules}
+                timeZone={settings.timeZone}
+                pinned={settings.pinned}
+            />
         </div>
     );
 }

@@ -10,7 +10,10 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import {
+    AUTOMATIC_TIME_ZONE,
+    effectiveTimeZone,
     isThemeId,
+    isTimeZone,
     parseDisplayPreferences,
     resolveDisplayPreferences,
     stringifyDisplayPreferences,
@@ -35,19 +38,80 @@ export const getPlatformDisplayPreferences = cache(async (): Promise<UserDisplay
     return parseDisplayPreferences(await getSetting(PLATFORM_KEY));
 });
 
-/** One user's own choices, which may be partial or empty. */
-export const getUserDisplayPreferences = cache(async (userId: string): Promise<UserDisplayPreferences> => {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { displayPrefs: true } });
-    return parseDisplayPreferences(row?.displayPrefs);
+/** What one account holds: the choices it made, and what its browser reported. */
+interface AccountDisplay {
+    readonly preferences: UserDisplayPreferences;
+    /** The zone this account's browser last said it was in, or null before one
+     *  ever has. Not a choice - see `effectiveTimeZone`. */
+    readonly deviceTimeZone: string | null;
+}
+
+const NOTHING_HELD: AccountDisplay = { preferences: {}, deviceTimeZone: null };
+
+/** Both halves in one read, memoized per request: everything below wants the
+ *  reported zone the moment it wants the choices. */
+const readAccountDisplay = cache(async (userId: string): Promise<AccountDisplay> => {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayPrefs: true, deviceTimeZone: true }
+    });
+    return {
+        preferences: parseDisplayPreferences(row?.displayPrefs),
+        deviceTimeZone: row?.deviceTimeZone ?? null
+    };
 });
 
-/** The effective set for a user: built-in defaults, then platform, then their own. */
+/** One user's own choices, which may be partial or empty. */
+export async function getUserDisplayPreferences(userId: string): Promise<UserDisplayPreferences> {
+    return (await readAccountDisplay(userId)).preferences;
+}
+
+/** The zone this account's browser reported, for the screens that have to say
+ *  which of the two is deciding. */
+export async function getReportedTimeZone(userId: string): Promise<string | null> {
+    return (await readAccountDisplay(userId)).deviceTimeZone;
+}
+
+/**
+ * The effective set for a user: built-in defaults, then platform, then their own.
+ *
+ * With one substitution the layering cannot express: a zone left on "automatic"
+ * is resolved to what this account's browser reported. Automatic means the
+ * device's, and every one of these callers is on the server, where there is no
+ * device - so without it a date rendered into a page and a status schedule
+ * deciding whether somebody is hidden both quietly used the deployment's clock.
+ */
 export async function resolveDisplayPreferencesFor(userId: string | null): Promise<DisplayPreferences> {
-    const [platform, user] = await Promise.all([
+    const [platform, account] = await Promise.all([
         getPlatformDisplayPreferences(),
-        userId ? getUserDisplayPreferences(userId) : Promise.resolve({})
+        userId ? readAccountDisplay(userId) : Promise.resolve(NOTHING_HELD)
     ]);
-    return resolveDisplayPreferences(platform, user);
+    const resolved = resolveDisplayPreferences(platform, account.preferences);
+    return {
+        ...resolved,
+        timeZone: effectiveTimeZone(resolved.timeZone, account.deviceTimeZone)
+    };
+}
+
+/**
+ * Write down the zone a browser says it is in.
+ *
+ * Reported rather than asked for: the alternative is a screen telling somebody
+ * to go and pick a timezone before their own schedule works, which is a setup
+ * step for something the browser already knows. Refused unless it is a zone this
+ * runtime recognises, because it arrives from one.
+ *
+ * Returns whether anything changed, so the caller can leave the page alone when
+ * nothing did - which is every load after the first.
+ */
+export async function recordDeviceTimeZone(userId: string, zone: string): Promise<boolean> {
+    const wanted = zone.trim();
+    if (wanted === AUTOMATIC_TIME_ZONE || !isTimeZone(wanted)) return false;
+    const changed = await prisma.user.updateMany({
+        where: { id: userId, NOT: { deviceTimeZone: wanted } },
+        data: { deviceTimeZone: wanted }
+    });
+    return changed.count > 0;
 }
 
 /**

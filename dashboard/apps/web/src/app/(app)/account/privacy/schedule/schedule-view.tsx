@@ -60,12 +60,15 @@ const BLANK: core.PresenceScheduleInput = {
 
 export function ScheduleView({
     schedules,
-    timeZone
+    timeZone,
+    pinned
 }: {
     schedules: readonly PresenceScheduleView[];
-    /** The clock these are read against, "auto" for an account that never
-     *  picked one. */
+    /** The clock these are read against - the one chosen in Preferences, or the
+     *  one this account's browser reported. "auto" only before either exists. */
     timeZone: string;
+    /** Whether that zone was chosen rather than taken from the browser. */
+    pinned: boolean;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -144,8 +147,16 @@ export function ScheduleView({
                                     These run on the clock of whichever machine Polaris is on. Pick
                                     a timezone in Preferences to be sure they run on yours.
                                 </>
-                            ) : (
+                            ) : pinned ? (
                                 <>Times are read on your own clock ({timeZone}).</>
+                            ) : (
+                                // Worth saying, because it is the one thing that moves these
+                                // hours without anybody editing them: a zone taken from the
+                                // browser follows the browser abroad.
+                                <>
+                                    Times are read on this browser&apos;s clock ({timeZone}). Pick a
+                                    timezone in Preferences to keep them on one.
+                                </>
                             )}
                         </p>
                         <Button

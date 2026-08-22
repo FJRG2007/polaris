@@ -93,7 +93,12 @@ export async function presenceFor(
                 // Only ever read for the timezone, and only for somebody who has
                 // a schedule: a window written as 00:00 is midnight on their
                 // clock, and the server has none to fall back on.
-                displayPrefs: true
+                displayPrefs: true,
+                // Which is what this is: the zone their browser reported, for
+                // the accounts - almost all of them - whose choice is
+                // "automatic". Without it their windows are read on the clock of
+                // whichever machine Polaris runs on.
+                deviceTimeZone: true
             }
         }),
         // The freshest session per account, from one query rather than one each:
@@ -142,10 +147,13 @@ export async function presenceFor(
             // Worked out only for the few accounts that have a window, because
             // it means parsing a blob of preferences per person.
             rules.length > 0
-                ? core.resolveDisplayPreferences(
-                      platformPrefs,
-                      core.parseDisplayPreferences(person.displayPrefs)
-                  ).timeZone
+                ? core.effectiveTimeZone(
+                      core.resolveDisplayPreferences(
+                          platformPrefs,
+                          core.parseDisplayPreferences(person.displayPrefs)
+                      ).timeZone,
+                      person.deviceTimeZone
+                  )
                 : core.AUTOMATIC_TIME_ZONE,
             at
         );

@@ -23,8 +23,15 @@ vi.mock("@/app/(app)/account/privacy/schedule/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
-function draw(schedules: core.PresenceScheduleRule[], timeZone = "Europe/Madrid"): string {
-    return renderToStaticMarkup(<ScheduleView schedules={schedules} timeZone={timeZone} />);
+function draw(
+    schedules: core.PresenceScheduleRule[],
+    timeZone = "Europe/Madrid",
+    /** Chosen in Preferences, rather than taken from the browser. */
+    pinned = true
+): string {
+    return renderToStaticMarkup(
+        <ScheduleView schedules={schedules} timeZone={timeZone} pinned={pinned} />
+    );
 }
 
 const OVERNIGHT: core.PresenceScheduleRule = {
@@ -54,6 +61,14 @@ describe("the list", () => {
 
     it("names the clock the hours are read on", () => {
         expect(draw([OVERNIGHT])).toContain("Europe/Madrid");
+    });
+
+    it("says when that clock is the browser's rather than one that was chosen", () => {
+        // The difference is the one thing that moves these hours without anybody
+        // editing them: a zone taken from the browser follows it abroad.
+        const markup = draw([OVERNIGHT], "Europe/Madrid", false);
+        expect(markup).toContain("Europe/Madrid");
+        expect(markup).toContain("browser");
     });
 
     it("says so when there is no clock of the account's own to read them on", () => {

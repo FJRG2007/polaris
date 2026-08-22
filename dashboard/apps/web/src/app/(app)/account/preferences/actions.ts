@@ -11,7 +11,7 @@ import { requireUser } from "@/lib/session";
 import * as core from "@polaris/core";
 import { setPresenceChoice, setStatus } from "@/lib/presence-service";
 import { userDisplayPreferencesSchema } from "@polaris/core";
-import { saveUserDisplayPreferences } from "@/lib/display-prefs-service";
+import { recordDeviceTimeZone, saveUserDisplayPreferences } from "@/lib/display-prefs-service";
 import { PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
 
 export async function saveDisplayPreferencesAction(input: unknown): Promise<{ error?: string }> {
@@ -22,6 +22,30 @@ export async function saveDisplayPreferencesAction(input: unknown): Promise<{ er
     // Formatting is resolved in the app layout, so every screen re-renders.
     revalidatePath("/", "layout");
     return {};
+}
+
+/**
+ * The zone this browser says it is in.
+ *
+ * Not a preference and not a question anybody is asked: "automatic" is what
+ * almost every account keeps, and it means the device's clock - which the
+ * dashboard knows and the server does not. Written down here so that the half of
+ * this account that is worked out on the server - whether a status schedule is
+ * open right now, a date rendered into a page - is read on the same clock as the
+ * half that is worked out in front of them.
+ *
+ * Sent only when it disagrees with what is already stored, so this is one write
+ * the first time an account signs in and nothing at all afterwards.
+ */
+export async function reportTimeZoneAction(zone: unknown): Promise<{ changed: boolean }> {
+    const user = await requireUser();
+    const parsed = core.timeZoneField.safeParse(zone);
+    if (!parsed.success) return { changed: false };
+    const changed = await recordDeviceTimeZone(user.id, parsed.data);
+    // Everything the zone decides is resolved in the layout, so the screen that
+    // is up - a schedule saying whether it is running - re-reads with it.
+    if (changed) revalidatePath("/", "layout");
+    return { changed };
 }
 
 /**

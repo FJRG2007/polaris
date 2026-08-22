@@ -57,6 +57,49 @@ describe("a window on the account's own clock", () => {
     });
 });
 
+/**
+ * Which clock "automatic" means where nobody is standing.
+ *
+ * Almost every account leaves its timezone automatic, and automatic means the
+ * device's - an answer a browser has and a server does not. Left to its own
+ * fallback the server read these windows on the clock of the machine Polaris
+ * runs on, so somebody two hours east wrote 00:00 to 09:00, watched the screen
+ * say "running now" at one in the morning, and stayed visible until two: the
+ * badge was drawn on their clock and the effect was decided on the datacentre's.
+ */
+describe("the clock a schedule is read on", () => {
+    const night = [rule({ id: "small-hours", startMinute: 0, endMinute: 9 * 60 })];
+    /** 01:09 in Madrid, which is 23:09 the day before in UTC. */
+    const gone_one = new Date("2026-08-22T23:09:00Z");
+
+    it("is the account's, so a midnight window is open at one in the morning", () => {
+        expect(core.openWindow(night, "Europe/Madrid", gone_one)?.rule.id).toBe("small-hours");
+        // And the same instant on the deployment's clock, which is the answer
+        // that used to be given: the window has not started yet.
+        expect(core.openWindow(night, "UTC", gone_one)).toBeNull();
+    });
+
+    it("stands in the reported zone for an account that chose automatic", () => {
+        expect(core.effectiveTimeZone("auto", "Europe/Madrid")).toBe("Europe/Madrid");
+        expect(core.openWindow(night, core.effectiveTimeZone("auto", "Europe/Madrid"), gone_one)).not.toBeNull();
+    });
+
+    it("leaves a chosen zone alone, whatever the browser says", () => {
+        // Somebody who picked one in Preferences meant it, including the case
+        // where they are reading this from somewhere else.
+        expect(core.effectiveTimeZone("UTC", "Europe/Madrid")).toBe("UTC");
+    });
+
+    it("stays automatic when there is nothing to stand in", () => {
+        // Nothing has reported one, or what was reported is not a zone this
+        // runtime knows. Inventing one would be worse than the screen saying
+        // plainly that these are read on the server's clock.
+        expect(core.effectiveTimeZone("auto", null)).toBe("auto");
+        expect(core.effectiveTimeZone("auto", "auto")).toBe("auto");
+        expect(core.effectiveTimeZone("auto", "Mars/Olympus_Mons")).toBe("auto");
+    });
+});
+
 describe("a window that crosses midnight", () => {
     const fridayNights = [rule({ days: core.dayBit(5) })];
 

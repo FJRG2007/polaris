@@ -59,6 +59,18 @@ model User {
     // stringified JSON holding only the fields it actually chose. Absent fields
     // (and a null column) follow the platform default.
     displayPrefs  String?
+    // What the "automatic" timezone actually resolves to for this account: the
+    // zone its browser reports, written by the dashboard rather than chosen.
+    //
+    // Automatic means "this device's", which is an answer a browser has and a
+    // server does not - so anything worked out where there is no browser (a
+    // status schedule deciding whether somebody is hidden right now, a date
+    // rendered into a page) silently used the deployment's zone instead, and a
+    // window written as midnight opened at midnight somewhere else.
+    //
+    // Not a preference: the choice stays in `displayPrefs` and stays "auto".
+    // Null until a browser has said, which is until the account signs in once.
+    deviceTimeZone String?
     // Which events this account wants told about and how, as stringified JSON
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.

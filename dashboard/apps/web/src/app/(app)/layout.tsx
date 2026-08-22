@@ -27,7 +27,8 @@ import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
 import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
-import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
+import { TimeZoneReporter } from "@/components/time-zone-reporter";
+import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { unreadTotal } from "@/lib/chat/chat-service";
 import { ChatUnreadProvider } from "@/components/chat-unread";
@@ -54,10 +55,14 @@ const NO_CHAT_UNREAD = { messages: 0, conversations: 0 };
 export default async function AppLayout({ children }: { children: ReactNode }) {
     const user = await requireUser();
     const capabilities = getCapabilities();
-    const [notifications, display, baseUrl, apps, scope, organizations, presence, status] =
+    const [notifications, display, reportedZone, baseUrl, apps, scope, organizations, presence, status] =
         await Promise.all([
             listNotifications(user.id),
             resolveDisplayPreferencesFor(user.id),
+            // What this account's browser last said. Read beside the preferences
+            // it resolves - the same memoized row - so the reporter below stays
+            // quiet on every load after the first.
+            getReportedTimeZone(user.id),
             appBaseUrl(),
             reachableAppNav(accessFor(user)),
             resolveScope(user.id),
@@ -100,6 +105,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                         >
                                             <NotificationFavicon />
                                             <PresenceReporter />
+                                            <TimeZoneReporter reported={reportedZone} />
                                             <VisitRecorder />
                                             {/* The bottom corner, laid out once. Each of these
                                     used to pin itself there, so an update landing

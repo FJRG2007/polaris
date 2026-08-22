@@ -61,6 +61,25 @@ export function isTimeZone(value: string): boolean {
     }
 }
 
+/**
+ * The zone to read an account's hours against.
+ *
+ * `auto` means "whatever device is reading this", which is an answer a browser
+ * has and a server does not. Left to fall back on its own, the server used the
+ * clock of the machine Polaris runs on - so a status schedule written as
+ * midnight opened at midnight somewhere else, while the screen that drew it said
+ * "running now" because the browser doing the drawing did have an answer.
+ *
+ * So the zone the account's own browser reported stands in. Still `auto` when
+ * nothing has ever reported one, because inventing a zone would be worse than
+ * saying plainly that these are being read on the server's.
+ */
+export function effectiveTimeZone(chosen: string, reported: string | null | undefined): string {
+    if (chosen !== AUTOMATIC_TIME_ZONE) return chosen;
+    if (!reported || reported === AUTOMATIC_TIME_ZONE) return AUTOMATIC_TIME_ZONE;
+    return isTimeZone(reported) ? reported : AUTOMATIC_TIME_ZONE;
+}
+
 export const timeZoneField = z
     .string()
     .trim()
