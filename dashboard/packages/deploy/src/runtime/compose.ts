@@ -6,11 +6,13 @@
  * refinement tracked on top of this straight up/down flow.
  */
 
+import type { OutputSink } from "../ports.js";
 import { parseContainerState } from "./status.js";
 import { imageTag as toImageTag } from "../naming.js";
-import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
-import { deployFailureReason } from "../deploy-failure.js";
+import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
+import { deployFailureReason, isStaleImageLease } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -60,6 +62,42 @@ function reasonOf(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
 }
 
+/**
+ * Bring the containers up, and do it twice when the image store lost the image.
+ *
+ * Seen in the wild: the pull finishes ("Downloaded newer image for ...:latest"),
+ * the very next step asks for the same image, and the daemon answers "unable to
+ * lease content: lease does not exist". The content was fetched and the claim on
+ * it is gone - typically because something reclaimed disk while the pull was in
+ * flight - so the deploy stops on a sentence about leases with an image that had
+ * just arrived.
+ *
+ * Nothing about the app, the registry or the target is wrong, and the operator's
+ * only move would be to press deploy again. So it is pressed here: the image is
+ * fetched once more and the same spec goes up. Only for this one failure, only
+ * once, and only when there is an image to re-fetch - a locally built one has
+ * nowhere to be fetched from, and repeating anything else would just fail twice.
+ */
+async function composeUpRetryingLease(
+    ctx: RuntimeContext,
+    spec: ComposeSpec,
+    sink: OutputSink,
+    pullable: string | null
+): Promise<void> {
+    try {
+        await ctx.ports.composeUp(spec, sink);
+    } catch (error) {
+        const said = reasonOf(error, "");
+        if (!pullable || !isStaleImageLease(said)) throw error;
+        ctx.log(
+            Buffer.from(
+                `The image store lost the image it had just fetched; fetching ${pullable} again and starting once more.\n`
+            )
+        );
+        await ctx.ports.pull(pullable, sink);
+        await ctx.ports.composeUp(spec, sink);
+    }
+}
 
 export class ComposeRuntime implements RuntimeDriver {
     public readonly engine = "compose" as const;
@@ -164,7 +202,7 @@ export class ComposeRuntime implements RuntimeDriver {
         }
         const started = step("Starting the containers");
         try {
-            await ctx.ports.composeUp(spec, sink);
+            await composeUpRetryingLease(ctx, spec, sink, plan.build.method === "image" ? imageTag : null);
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
@@ -212,7 +250,7 @@ export class ComposeRuntime implements RuntimeDriver {
         await ctx.ports.pull(plan.image, sink);
         const spec = dbComposeSpec(plan, ctx.target.proxyNetwork);
         try {
-            await ctx.ports.composeUp(spec, sink);
+            await composeUpRetryingLease(ctx, spec, sink, plan.image);
         } catch (error) {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "database deploy failed"));
         }

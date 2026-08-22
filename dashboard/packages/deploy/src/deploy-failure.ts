@@ -53,6 +53,14 @@ const MEANINGS: readonly Meaning[] = [
         says: "the machine ran out of disk space while fetching the image. Nothing was deployed. Free some room on it and try again."
     },
     {
+        // The image store fetched the image and then lost its own claim on the
+        // content: the pull reports "Downloaded newer image" and the very next
+        // step cannot use it. Nothing about the deploy, the registry or the disk
+        // is wrong, and every word of it points at one of those.
+        signs: ["unable to lease content", "lease does not exist"],
+        says: "that machine's image store lost track of the image it had just fetched. Fetching it again clears it."
+    },
+    {
         signs: ["manifest unknown", "manifest for", "not found: manifest", "no such manifest"],
         says: "that image does not exist at the address it was asked for - check the name and the tag."
     },
@@ -107,4 +115,17 @@ export function deployFailureReason(raw: string, fallback: string): string {
 export function isOutOfSpace(raw: string): boolean {
     const lowered = raw.toLowerCase();
     return MEANINGS[0]!.signs.some((sign) => lowered.includes(sign));
+}
+
+/**
+ * Whether the image store lost its claim on content it holds - the failure a
+ * deploy can simply do again.
+ *
+ * Worth telling apart from everything else here because it is the only one where
+ * the runtime has something better to do than report it: the image was fetched
+ * seconds ago, so fetching it once more is both cheap and usually the end of it.
+ */
+export function isStaleImageLease(raw: string): boolean {
+    const lowered = raw.toLowerCase();
+    return lowered.includes("unable to lease content") || lowered.includes("lease does not exist");
 }

@@ -111,4 +111,67 @@ describe("a deploy that gives up", () => {
         await new ComposeRuntime().deployApplication(planWithMount(), ctx);
         expect(lines.join("")).toContain("Failed: compose up failed");
     });
+    it("starts again, with the image fetched again, when the image store lost its lease", async () => {
+        // The pull said "Downloaded newer image" and the next step was told the
+        // content is not there. Nothing is wrong with the app, the registry or
+        // the machine, and the only move anybody has is to press deploy again.
+        const composeUp = vi
+            .fn()
+            .mockRejectedValueOnce(new Error("unable to lease content: lease does not exist: not found"))
+            .mockResolvedValueOnce(undefined);
+        const { ctx, lines, ports } = contextWith({ composeUp } as Partial<RuntimeContext["ports"]>);
+
+        const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
+
+        expect(result.ok).toBe(true);
+        expect(composeUp).toHaveBeenCalledTimes(2);
+        // Fetched once for the deploy, and once more for the retry.
+        expect(ports.pull).toHaveBeenCalledTimes(2);
+        expect(lines.join("")).toContain("lost the image it had just fetched");
+    });
+
+    it("gives up when starting again fails the same way, and says what it means", async () => {
+        const composeUp = vi.fn(async () => {
+            throw new Error("unable to lease content: lease does not exist: not found");
+        });
+        const { ctx, lines } = contextWith({ composeUp } as Partial<RuntimeContext["ports"]>);
+
+        const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
+
+        expect(result.ok).toBe(false);
+        expect(composeUp).toHaveBeenCalledTimes(2);
+        const log = lines.join("");
+        expect(log).toContain("lost track of the image it had just fetched");
+        // The daemon's own sentence survives, for whoever has to search for it.
+        expect(log).toContain("unable to lease content");
+    });
+
+    it("does not fetch an image that was built here", async () => {
+        // A locally built tag has nowhere to be fetched from; a retry would fail
+        // on the pull instead of on the thing that actually went wrong.
+        const composeUp = vi.fn(async () => {
+            throw new Error("unable to lease content: lease does not exist: not found");
+        });
+        const { ctx, ports } = contextWith({
+            composeUp,
+            build: vi.fn(async () => undefined)
+        } as Partial<RuntimeContext["ports"]>);
+        const plan = {
+            ...planWithMount(),
+            build: {
+                method: "dockerfile",
+                name: "orphion",
+                contextPath: "/ctx",
+                commitSha: "abcdef1",
+                dockerfilePath: "Dockerfile"
+            }
+        } as unknown as AppDeployPlan;
+        const ctxWithSource = { ...ctx, buildContext: async () => ({ tar: Buffer.from("") }) } as RuntimeContext;
+
+        const result = await new ComposeRuntime().deployApplication(plan, ctxWithSource);
+
+        expect(result.ok).toBe(false);
+        expect(composeUp).toHaveBeenCalledTimes(1);
+        expect(ports.pull).not.toHaveBeenCalled();
+    });
 });
