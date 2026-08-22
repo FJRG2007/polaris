@@ -7,19 +7,19 @@
  *   npm run dev:up
  */
 
-import { spawn, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
+import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const webDir = join(root, "apps", "web");
-const prismaDir = join(root, "packages", "db", "prisma");
+const dbDir = join(root, "packages", "db");
+const prismaDir = join(dbDir, "prisma");
 const sqliteSchema = join(prismaDir, "schema.sqlite.prisma");
 const envFile = join(webDir, ".env.local");
-const isWindows = process.platform === "win32";
-const npx = isWindows ? "npx.cmd" : "npx";
 
 const toUrlPath = (p) => p.replace(/\\/g, "/");
 
@@ -64,8 +64,36 @@ function ensureEnv() {
     return values;
 }
 
+/**
+ * The script a workspace command runs, resolved from the package that depends on
+ * it and started with THIS node.
+ *
+ * Not `npx`: npx looks in the current directory's node_modules and, finding
+ * nothing, tries to FETCH the package from the registry - which asks a question
+ * nobody is there to answer and exits 1, reporting only "npx.cmd prisma generate
+ * ... exited with 1". That is what happens whenever the install left the binary
+ * somewhere other than the workspace root: an installer other than npm, a partial
+ * install, or no install at all. Resolving it here works for any of those layouts
+ * and says what to do when the package genuinely is not installed.
+ */
+function commandScript(pkg, fromDir) {
+    const resolve = createRequire(join(fromDir, "package.json")).resolve;
+    let manifestPath;
+    try {
+        manifestPath = resolve(`${pkg}/package.json`);
+    } catch {
+        throw new Error(
+            `${pkg} is not installed. Run "npm install" in ${root} first (this is an npm-workspaces monorepo).`
+        );
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[pkg];
+    if (!bin) throw new Error(`${pkg} exposes no "${pkg}" command`);
+    return join(dirname(manifestPath), bin);
+}
+
 function run(command, args, env) {
-    const result = spawnSync(command, args, { cwd: root, env, stdio: "inherit", shell: isWindows });
+    const result = spawnSync(command, args, { cwd: root, env, stdio: "inherit" });
     if (result.status !== 0) {
         throw new Error(`${command} ${args.join(" ")} exited with ${result.status}`);
     }
@@ -77,10 +105,11 @@ log("Generating SQLite schema");
 run(process.execPath, [join(root, "scripts", "gen-sqlite-schema.mjs")], env);
 
 log("Generating Prisma client and pushing the schema");
-run(npx, ["prisma", "generate", `--schema=${sqliteSchema}`], env);
-run(npx, ["prisma", "db", "push", `--schema=${sqliteSchema}`, "--skip-generate", "--accept-data-loss"], env);
+const prisma = commandScript("prisma", dbDir);
+run(process.execPath, [prisma, "generate", `--schema=${sqliteSchema}`], env);
+run(process.execPath, [prisma, "db", "push", `--schema=${sqliteSchema}`, "--skip-generate", "--accept-data-loss"], env);
 
 log(`First run? Open http://localhost:3000/oauth/setup?token=${env.POLARIS_SETUP_TOKEN}`);
 log("Starting the dashboard at http://localhost:3000 (Ctrl+C to stop)");
-const dev = spawn(npx, ["next", "dev"], { cwd: webDir, env, stdio: "inherit", shell: isWindows });
+const dev = spawn(process.execPath, [commandScript("next", webDir), "dev"], { cwd: webDir, env, stdio: "inherit" });
 dev.on("exit", (code) => process.exit(code ?? 0));

@@ -37,6 +37,9 @@ polaris/
 
 Everything runs from the `dashboard/` workspace root.
 
+npm, not pnpm or yarn: the lockfile and the workspace layout are npm's, and the
+scripts resolve their tools out of it.
+
 ```sh
 cd dashboard
 npm install
