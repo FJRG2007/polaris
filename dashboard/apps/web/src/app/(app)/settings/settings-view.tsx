@@ -369,7 +369,7 @@ export function SettingsView({
         }
         setUpdating(false);
         if (result === "unavailable") {
-            setUpdateMsg("The host agent has no update command set (POLARIS_HOSTD_UPDATE_CMD). Use the manual command for now.");
+            setUpdateMsg("This deployment does not install its own updates; it is updated from the machine it runs on.");
             setShowManual(true);
         } else if (result === "disabled") {
             setUpdateMsg("Auto-update is disabled on this host.");

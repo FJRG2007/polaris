@@ -114,8 +114,8 @@ export function SetupForm({
                     </CardHeader>
                     <CardBody>
                         <p className="text-sm text-muted-foreground">
-                            To create the administrator, run this on the server and open the link it
-                            prints:
+                            The installer printed the link that creates the administrator. To see it
+                            again, run this where Polaris is installed:
                         </p>
                         <pre className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-sm">
                             polaris setup

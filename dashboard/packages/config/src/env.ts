@@ -151,7 +151,7 @@ const envSchema = z.object({
     POLARIS_IMAGE_TAG: z.string().default("latest"),
 
     /**
-     * Docker-over-SSH access provisioned by `install.sh --ssh`. When enabled, the
+     * Docker-over-SSH access the installer provisions. When enabled, the
      * Containers app can reach the host Engine over a dedicated, forced-command
      * key without mounting the docker socket into the container.
      */

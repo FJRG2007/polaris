@@ -160,7 +160,7 @@ export function DockerConnectionDialog({ sshEnabled }: { sshEnabled: boolean }) 
                                     onChange={(event) => setUseInstallKey(event.target.checked)}
                                 />
                                 Use the installed access key
-                                {sshEnabled ? null : " (run the installer with --ssh first)"}
+                                {sshEnabled ? null : " (this deployment has none)"}
                             </label>
                             {useInstallKey ? null : (
                                 <>

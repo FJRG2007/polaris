@@ -98,7 +98,7 @@ export async function lastUpdateOutcome(): Promise<UpdateOutcome | null> {
 
 /** Why an update did not start, in words an operator can act on. */
 export function updateTriggerReason(trigger: Exclude<UpdateTrigger, "started">): string {
-    if (trigger === "unavailable") return "The host agent has no update command set.";
+    if (trigger === "unavailable") return "This deployment does not install its own updates.";
     if (trigger === "disabled") return "Updates are switched off on this host.";
     return "The host agent could not be reached.";
 }

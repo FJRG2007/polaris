@@ -335,9 +335,9 @@ export function LoginForm({
                     </p>
                     {awaitingSetup ? (
                         <p className="mt-2 text-center text-xs text-muted-foreground">
-                            New accounts are by invitation. Setting up a new instance? Run{" "}
-                            <code className="rounded bg-muted px-1">polaris setup</code> on the server for a
-                            setup link.
+                            New accounts are by invitation. Setting up a new instance? The installer
+                            printed the link that creates the administrator;{" "}
+                            <code className="rounded bg-muted px-1">polaris setup</code> prints it again.
                         </p>
                     ) : null}
                     </div>
