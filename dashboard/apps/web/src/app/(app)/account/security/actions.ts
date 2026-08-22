@@ -40,6 +40,7 @@ import {
     changeUserPassword,
     setNewDeviceGrace,
     setConnectionSignInChallenge,
+    setEmailLinkSignIn,
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
@@ -96,6 +97,33 @@ export async function setConnectionSignInChallengeAction(challenge: boolean): Pr
         actorId: user.id,
         action: "account.connection-sign-in.challenge",
         metadata: { challenge: challenge === true }
+    });
+    revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Let a link emailed to this account sign it in, or stop letting it.
+ *
+ * A way in, so it is gated like the rest of this page: a browser the account has
+ * only just met waits it out first, because the hours after a password is taken
+ * are exactly when somebody would reach for this.
+ *
+ * Turning it on adds a way in that the mailbox holds; turning it off takes it
+ * away from the next request rather than from a link already sent, which stops
+ * working on its own within ten minutes. Both directions are recorded: this is
+ * the kind of change an account's owner should be able to find afterwards.
+ */
+export async function setEmailLinkSignInAction(enabled: boolean): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    await setEmailLinkSignIn(user.id, enabled === true);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.email-link-sign-in",
+        metadata: { enabled: enabled === true }
     });
     revalidatePath("/account/security");
     return {};

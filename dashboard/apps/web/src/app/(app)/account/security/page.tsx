@@ -16,6 +16,7 @@ import { auth } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
 import { listPasskeys } from "./passkey-actions";
+import { getAuthMailStatus } from "@/lib/auth-mail";
 import { getSuccessor } from "@/lib/successor-service";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
@@ -79,7 +80,8 @@ export default async function SecurityPage() {
         standing,
         connections,
         instancePolicy,
-        successor
+        successor,
+        mail
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -100,7 +102,10 @@ export default async function SecurityPage() {
         // the instance can have settled it already, and a switch that says
         // otherwise would be lying about what happens at the next sign-in.
         getInstanceSecurity(),
-        getSuccessor(user.id)
+        getSuccessor(user.id),
+        // Only for the emailed-link switch: with no channel to send from there is
+        // nowhere for the link to go, and the switch says so instead of turning on.
+        getAuthMailStatus()
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
@@ -120,6 +125,8 @@ export default async function SecurityPage() {
                 idleLockMinutes={settings.idleLockMinutes}
                 sessionMaxMinutes={settings.sessionMaxMinutes}
                 requireLoginApproval={settings.requireLoginApproval}
+                emailLinkSignIn={settings.emailLinkSignIn}
+                canSendMail={mail.channelId !== null}
                 twoFactorEnabled={hasTwoFactor}
                 backupCodesRemaining={backupCodes}
                 questions={questions.map((entry) => entry.question)}

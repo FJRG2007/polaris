@@ -16,6 +16,7 @@ import { loadEnv } from "@polaris/config";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { passkeyRelyingPartyId } from "@polaris/core";
+import { emailLinkSignInAllowed } from "@polaris/auth";
 import {
     openSignInCode,
     redeemSignInCode,
@@ -23,8 +24,9 @@ import {
     type QrSignInStatus
 } from "@/lib/qr-sign-in-service";
 
-/** Caps how fast one address can be probed for a passkey. Generous enough for a
- *  person retyping their email, useless for enumerating a list. */
+/** Caps how fast one address can be probed for a way in it may or may not have.
+ *  Generous enough for a person retyping their email, useless for enumerating a
+ *  list. Shared by both hints, which are asked together as somebody types. */
 const PASSKEY_HINT_LIMIT = 10;
 const PASSKEY_HINT_WINDOW_MS = 10 * 60 * 1000;
 
@@ -36,12 +38,26 @@ export async function resolveIdentifier(identifier: string): Promise<string | nu
 }
 
 /**
- * Whether this deployment can email a sign-in link. Says nothing about any
- * account - it is the instance's mail configuration, which the sign-in page needs
- * in order to decide whether offering the option would be a dead end.
+ * Whether an emailed link can sign this identifier's account in: the deployment
+ * can send mail, and the account has asked for that way in. Off is the default,
+ * so most accounts answer false and the option is not drawn for them.
+ *
+ * Like the passkey hint below, this answers a question about one account, and it
+ * is offered for the same reason: a button that is always there and usually does
+ * nothing teaches people to ignore the one time it matters, and here it would be
+ * worse than useless - the screen would say a link is on its way when none is.
+ * Throttled per address so it cannot be swept, and an address with no account
+ * answers exactly as one that never turned this on.
  */
-export async function magicLinkAvailable(): Promise<boolean> {
-    return (await getAuthMailStatus()).channelId !== null;
+export async function emailLinkOffered(identifier: string): Promise<boolean> {
+    const value = identifier.trim().toLowerCase();
+    if (!value) return false;
+    if ((await getAuthMailStatus()).channelId === null) return false;
+    const throttle = await rateLimit(`email-link-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    if (!throttle.ok) return false;
+    const email = await resolveIdentifier(value);
+    if (!email) return false;
+    return emailLinkSignInAllowed(email);
 }
 
 /**

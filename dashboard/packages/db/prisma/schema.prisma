@@ -720,6 +720,14 @@ model UserSecurity {
     // both steps. Off by default; the instance policy can demand it of everyone,
     // and this is how one account asks for it when the instance does not.
     challengeConnectionSignIn Boolean @default(false)
+    // A link emailed to this account's address signs it in, no password.
+    //
+    // Off by default and per account, because it moves what guards the account
+    // to whoever can read that mailbox: a mailbox left open on a shared machine
+    // becomes the account. Somebody who would rather have that than a password
+    // they retype on a phone turns it on for themselves; nothing turns it on for
+    // them.
+    emailLinkSignIn      Boolean   @default(false)
     // Second-factor delivery methods the account accepts, beyond the
     // authenticator, which is always accepted while the factor is on. JSON
     // string array for SQLite portability; empty means authenticator only.

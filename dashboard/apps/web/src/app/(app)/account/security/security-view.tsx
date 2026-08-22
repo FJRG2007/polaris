@@ -17,6 +17,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "./passkeys-card";
+import { EmailLinkCard } from "./email-link-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { BackupCodesCard } from "./backup-codes-card";
 import type { PasskeyView } from "@/lib/passkey-directory";
@@ -65,6 +66,8 @@ export function SecurityView({
     idleLockMinutes,
     sessionMaxMinutes,
     requireLoginApproval,
+    emailLinkSignIn,
+    canSendMail,
     twoFactorEnabled,
     backupCodesRemaining,
     questions,
@@ -89,6 +92,11 @@ export function SecurityView({
     idleLockMinutes: number;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
+    /** Whether a link emailed to this account signs it in. Off unless asked for. */
+    emailLinkSignIn: boolean;
+    /** Whether this Polaris has a way to send mail at all, which is what decides
+     *  whether the switch above it can do anything. */
+    canSendMail: boolean;
     twoFactorEnabled: boolean;
     /** Backup codes still unspent, or null when there is no readable set. */
     backupCodesRemaining: number | null;
@@ -204,8 +212,10 @@ export function SecurityView({
                         approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
                     />
 
-                    {/* Another way the account is proved, so it sits in the left
-                        column with the rest of them. */}
+                    {/* Ways in, next to the ones they stand beside: a link to the
+                        address, and the outside accounts that were connected. */}
+                    <EmailLinkCard enabled={emailLinkSignIn} canSend={canSendMail} lock={lock} />
+
                     <ConnectedSignInCard
                         accounts={connections}
                         challenge={connectionChallenge}

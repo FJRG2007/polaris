@@ -18,11 +18,11 @@ import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { passkey } from "@better-auth/passkey";
-import { passwordConfirmed } from "./security.js";
 import { setSessionCookie } from "better-auth/cookies";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { emailLinkSignInAllowed, passwordConfirmed } from "./security.js";
 import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
@@ -555,6 +555,13 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
                 // an address with no account must not conjure one.
                 disableSignUp: true,
                 sendMagicLink: async ({ email, url }) => {
+                    // Off unless the account asked for it. This is the gate, not
+                    // the screen: the endpoint stays open and answers the same
+                    // for every address, so what an account decided about its own
+                    // way in is never readable from the outside. A link that is
+                    // never sent is a link nobody has - the token the plugin has
+                    // already minted expires unused.
+                    if (!(await emailLinkSignInAllowed(email))) return;
                     const result = await send({
                         to: email,
                         subject: "Your Polaris sign-in link",

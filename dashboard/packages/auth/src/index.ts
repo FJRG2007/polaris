@@ -67,6 +67,8 @@ export {
     updateSessionLimits,
     setLoginApprovalRequired,
     setConnectionSignInChallenge,
+    setEmailLinkSignIn,
+    emailLinkSignInAllowed,
     setTwoFactorPreferences,
     setTotpUnclaimed,
     hashSecret,

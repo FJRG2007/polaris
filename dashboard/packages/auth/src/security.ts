@@ -32,6 +32,9 @@ export interface UserSecuritySettings {
     /** Answer the challenge after a sign-in with a connected account as well.
      *  What this account asks of itself; the instance can ask for it regardless. */
     challengeConnectionSignIn: boolean;
+    /** A link emailed to this account signs it in, with no password. Off unless
+     *  the account asked for it. */
+    emailLinkSignIn: boolean;
     /** Second-factor methods that send a code, beyond the authenticator. */
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
@@ -55,6 +58,7 @@ const DEFAULTS: UserSecuritySettings = {
     sessionMaxMinutes: 0,
     requireLoginApproval: false,
     challengeConnectionSignIn: false,
+    emailLinkSignIn: false,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
     // An account with no row of its own armed its factor through better-auth
@@ -117,6 +121,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         sessionMaxMinutes: row.sessionMaxMinutes,
         requireLoginApproval: row.requireLoginApproval,
         challengeConnectionSignIn: row.challengeConnectionSignIn,
+        emailLinkSignIn: row.emailLinkSignIn,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         totpUnclaimed: row.totpUnclaimed,
@@ -167,6 +172,34 @@ export async function setLoginApprovalRequired(userId: string, required: boolean
  */
 export async function setConnectionSignInChallenge(userId: string, challenge: boolean): Promise<void> {
     await upsertSecurity(userId, { challengeConnectionSignIn: challenge });
+}
+
+/**
+ * Let a link emailed to this account sign it in, or stop letting it.
+ *
+ * The account's own decision, and it is a real one: with it on, whoever can read
+ * that mailbox can open the account without knowing the password. Off is the
+ * default and stays the default for an account that never says otherwise.
+ */
+export async function setEmailLinkSignIn(userId: string, enabled: boolean): Promise<void> {
+    await upsertSecurity(userId, { emailLinkSignIn: enabled });
+}
+
+/**
+ * Whether an emailed link may sign this address in.
+ *
+ * Answered from the address rather than from a user id because that is all the
+ * sign-in screen and the send path ever have. An address with no account answers
+ * the same as one that has not asked for this - false - so neither the screen nor
+ * the mail says which addresses are registered here.
+ */
+export async function emailLinkSignInAllowed(email: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+        where: { email: email.trim().toLowerCase() },
+        select: { id: true, bannedAt: true }
+    });
+    if (!user || user.bannedAt) return false;
+    return (await getUserSecurity(user.id)).emailLinkSignIn;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ import { postLoginTarget } from "./post-login-target";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
-import { accountHasPasskey, magicLinkAvailable, resolveIdentifier } from "./actions";
+import { accountHasPasskey, emailLinkOffered, resolveIdentifier } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 
@@ -91,24 +91,27 @@ export function LoginForm({
         const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
         if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
         setNotice(sessionNotice());
-        // Whether the instance can send at all. Nothing account-specific, so it
-        // is safe to ask for before anyone has identified themselves.
-        void magicLinkAvailable().then(setCanEmailLink);
     }, []);
 
-    // Look up whether the typed account has a passkey, so it is offered without
-    // the user having to remember they set one up. Debounced because it runs as
-    // they type, and re-checked from scratch whenever the identifier changes.
+    // Look up the ways in the typed account has beyond its password - a passkey,
+    // a link it can be sent - so each is offered without the user having to
+    // remember they set it up, and neither is offered to an account that would
+    // get nothing out of pressing it. Debounced because it runs as they type, and
+    // re-asked from scratch whenever the identifier changes.
     useEffect(() => {
         const identifier = values.identifier.trim();
         if (!identifier) {
             setHasPasskey(false);
+            setCanEmailLink(false);
             return;
         }
         let current = true;
         const timer = setTimeout(() => {
             void accountHasPasskey(identifier).then((found) => {
                 if (current) setHasPasskey(found);
+            });
+            void emailLinkOffered(identifier).then((offered) => {
+                if (current) setCanEmailLink(offered);
             });
         }, 400);
         return () => {
