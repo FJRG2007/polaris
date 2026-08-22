@@ -10,17 +10,17 @@ This pillar is a self-contained npm-workspaces monorepo living beside the Rust
 plugins. The privileged host daemon that unlocks host access lives in the root
 Cargo workspace as [`crates/polaris-hostd`](../crates/polaris-hostd).
 
-## Editions
+## Host access
 
-One image, two editions determined at runtime:
+Every install runs `polaris-hostd` beside the container: a privileged daemon that
+grants native SMB/NFS mounts, host filesystem access, Docker/Kubernetes/systemd
+control and in-band updates. Host access is reported as available only once that
+daemon actually answers with a valid token; an env var alone never unlocks it.
 
-- **Limited** - the container alone. Cloud/API and userspace storage providers
-  work (SFTP, WebDAV, S3, Synology/QNAP/TrueNAS APIs). Kernel mounts (NFS) and
-  arbitrary host access are disabled and shown as "unlock host access".
-- **Full** - additionally runs `polaris-hostd`, a privileged daemon that grants
-  native SMB/NFS mounts, host filesystem access, Docker/Kubernetes/systemd
-  control and auto-update. The edition flips to `full` only when the daemon
-  actually answers with a valid token; an env var alone never unlocks it.
+Without it - a container run by hand, or a host where the daemon cannot start -
+the deployment still works: cloud/API and userspace storage providers (SFTP,
+WebDAV, S3, Synology/QNAP/TrueNAS APIs) are unaffected, while kernel mounts and
+arbitrary host access are disabled and shown as "unlock host access".
 
 ## Layout
 

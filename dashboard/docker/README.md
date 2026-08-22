@@ -1,44 +1,35 @@
 # Polaris Docker
 
-Run the dashboard with Docker Compose. One image, two editions.
-
-## Editions
-
-- **Limited** (default) - `postgres` + `web` + `caddy`. Cloud/API and userspace
-  storage providers work. Kernel mounts and host access are disabled.
-- **Full** - adds the privileged `hostd` daemon, which unlocks SMB/NFS mounts,
-  host filesystem access, container/systemd control and daemon-driven updates.
-  The edition flips to `full` only when the daemon answers over the shared
-  socket; the profile alone does not unlock it.
+Run the dashboard with Docker Compose.
 
 ## Run
 
 ```sh
 cp .env.example .env      # then generate the secrets it flags
-docker compose up -d                 # limited
-docker compose --profile full up -d  # full (starts hostd)
+docker compose --profile full up -d
 ```
 
-Or use the one-command installer, which generates `.env` for you:
+Or use the one-command installer, which generates `.env` for you, provisions the
+host access and installs the `polaris` command:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
-curl -fsSL .../install.sh | sh -s -- --full   # full edition
 ```
 
 Windows: `irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex`.
 
+The `full` profile is what starts the privileged `hostd` daemon, which unlocks
+SMB/NFS mounts, host filesystem access, container control and in-band updates.
+It reports itself as available only once the daemon answers over the shared
+socket; the profile alone does not unlock it.
+
 ## Docker over SSH (Containers app)
 
 So the container can view and manage the host's containers without mounting the
-docker socket, the installer can provision a dedicated SSH access to the host
-Engine:
+docker socket, every install provisions a dedicated SSH access to the host
+Engine.
 
-```sh
-curl -fsSL .../install.sh | sh -s -- --ssh
-```
-
-This runs [`scripts/setup-ssh-access.sh`](../scripts/setup-ssh-access.sh), which:
+The installer runs [`scripts/setup-ssh-access.sh`](../scripts/setup-ssh-access.sh), which:
 
 - generates a unique ed25519 key under `secrets/ssh/` (0600, never committed),
 - authorizes it with a **forced command** `docker system dial-stdio` plus

@@ -3,8 +3,8 @@
 # settings to .env automatically, rebuilds, and restarts (applying migrations).
 #
 #   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
-#   # full edition: set the flag first, then run the same line
-#   $env:POLARIS_FULL = "1"; irm .../install.ps1 | iex
+#
+# One command, no options: an install is an install, the same one every time.
 #
 # Idempotent and non-destructive: never overwrites an existing .env. All logic
 # lives in a function that returns (never `exit`) so piping into `iex` cannot
@@ -12,9 +12,7 @@
 
 function Invoke-PolarisInstall {
     [CmdletBinding()]
-    param(
-        [switch]$Full
-    )
+    param()
 
     $ErrorActionPreference = "Stop"
     $repoUrl = if ($env:POLARIS_REPO_URL) { $env:POLARIS_REPO_URL } else { "https://github.com/FJRG2007/polaris.git" }
@@ -22,11 +20,6 @@ function Invoke-PolarisInstall {
     # same place regardless of which user runs it; a running deployment is found via
     # Docker regardless (see below).
     $installDir = if ($env:POLARIS_INSTALL_DIR) { $env:POLARIS_INSTALL_DIR } else { Join-Path $env:ProgramData "Polaris" }
-
-    # Env flag lets `irm | iex` opt into the full edition without arguments.
-    if ($env:POLARIS_FULL -and $env:POLARIS_FULL -notin @("0", "false", "no", "")) {
-        $Full = $true
-    }
 
     function Write-Log { param($Message) Write-Host "polaris: $Message" }
 
@@ -186,19 +179,84 @@ function Invoke-PolarisInstall {
         if ($added.Count -gt 0) { Write-Log ("added new settings to .env: " + ($added -join ", ")) }
     }
 
+    # Replace a setting in .env in place (appending it when it is not there yet),
+    # leaving every other line untouched.
+    function Set-EnvValue {
+        param([string]$Path, [string]$Key, [string]$Value)
+        $pattern = "^$([regex]::Escape($Key))="
+        $kept = @(Get-Content $Path | Where-Object { $_ -notmatch $pattern })
+        $kept += "$Key=$Value"
+        [System.IO.File]::WriteAllText($Path, (($kept -join "`n") + "`n"))
+    }
+
+    # Write the compose profile into .env, so every `docker compose` after this
+    # one - the CLI, the next update - runs the same set of services.
+    #
+    # The in-band update command install.sh writes alongside it stays empty here.
+    # It exists to be run BY hostd, which is a Linux container: it bind-mounts the
+    # checkout into a throwaway updater by a path the Docker daemon resolves on
+    # its own side, and a Windows path is not one of those. Rather than write a
+    # command that would fail at the moment an operator needs it most, the update
+    # path on this machine is `polaris update`, which the installer says.
+    function Set-Edition {
+        param([string]$EnvPath)
+        Set-EnvValue -Path $EnvPath -Key "POLARIS_HOSTD_UPDATE_CMD" -Value ""
+        Set-EnvValue -Path $EnvPath -Key "COMPOSE_PROFILES" -Value "full"
+        Write-Log "update this deployment with 'polaris update'"
+    }
+
     # Map polaris / polaris.local to loopback on this machine so they resolve even
     # without mDNS. Best effort and idempotent; editing hosts needs Administrator.
+    # Returns whether those names resolve here, because everything this installer
+    # prints afterwards has to be a link that opens: without the entry (the usual
+    # case, since `irm | iex` is rarely elevated) polaris.local resolves nowhere and
+    # a setup link naming it is a dead end.
     function Set-PolarisHostnames {
         $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
         $marker = "# polaris-dashboard"
         try {
-            if (Select-String -Path $hostsPath -SimpleMatch $marker -ErrorAction SilentlyContinue) { return }
+            if (Select-String -Path $hostsPath -SimpleMatch $marker -ErrorAction SilentlyContinue) { return $true }
             Add-Content -Path $hostsPath -Value "127.0.0.1 polaris polaris.local $marker" -ErrorAction Stop
             Write-Log "mapped polaris and polaris.local to 127.0.0.1 in hosts"
+            return $true
         }
         catch {
-            Write-Host "polaris: could not edit hosts (run as Administrator to enable 'polaris'/'polaris.local'); add manually: 127.0.0.1 polaris polaris.local" -ForegroundColor Yellow
+            Write-Host "polaris: could not edit hosts (run as Administrator to enable 'polaris'/'polaris.local'); the dashboard is reachable at https://127.0.0.1 either way" -ForegroundColor Yellow
+            return $false
         }
+    }
+
+    # Install the `polaris` (and `plr`) command, the way install.sh does on
+    # Linux and macOS: every screen and message that names it has to be true here
+    # too. The deployment path is baked in, so the command works from any
+    # directory. Installed for this user - a machine-wide location would need
+    # Administrator, which `irm | iex` almost never has - and the shim is a .cmd
+    # so it runs from cmd.exe and PowerShell alike.
+    function Install-PolarisCli {
+        param([string]$RepoRoot)
+        $source = Join-Path $RepoRoot "dashboard\cli\polaris.ps1"
+        if (-not (Test-Path $source)) { return }
+        $binDir = Join-Path $env:LOCALAPPDATA "Polaris\bin"
+        if (-not (Test-Path $binDir)) { New-Item -ItemType Directory -Force -Path $binDir | Out-Null }
+
+        $script = (Get-Content $source -Raw).Replace("__POLARIS_INSTALL_DIR__", $RepoRoot)
+        [System.IO.File]::WriteAllText((Join-Path $binDir "polaris.ps1"), $script)
+        [System.IO.File]::WriteAllText((Join-Path $binDir "plr.ps1"), $script)
+        # -File, not -Command: it passes the arguments through untouched and does
+        # not need the user's execution policy to allow a policy-scoped script.
+        $shim = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0polaris.ps1`" %*`r`n"
+        [System.IO.File]::WriteAllText((Join-Path $binDir "polaris.cmd"), $shim)
+        [System.IO.File]::WriteAllText((Join-Path $binDir "plr.cmd"), $shim)
+
+        # On PATH for future sessions, and for this one, so the link printed below
+        # is not the only way in.
+        $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+        if (($userPath -split ";") -notcontains $binDir) {
+            $updated = if ($userPath) { "$userPath;$binDir" } else { $binDir }
+            [Environment]::SetEnvironmentVariable("Path", $updated, "User")
+            Write-Log "installed the 'polaris' (and 'plr') command; open a new terminal to use it"
+        }
+        if (($env:Path -split ";") -notcontains $binDir) { $env:Path = "$env:Path;$binDir" }
     }
 
     # Locate the compose directory: run in place inside a checkout, otherwise
@@ -232,6 +290,10 @@ function Invoke-PolarisInstall {
         }
         $workdir = Join-Path $installDir "dashboard/docker"
     }
+
+    # The checkout the deployment runs from, resolved before anything changes the
+    # current directory: the CLI has this path baked into it.
+    $repoRoot = (Resolve-Path (Join-Path $workdir "..\..")).Path
 
     Push-Location $workdir
     try {
@@ -280,12 +342,28 @@ function Invoke-PolarisInstall {
             }
         }
 
-        Set-PolarisHostnames
+        $hostsMapped = Set-PolarisHostnames
+        Install-PolarisCli -RepoRoot $repoRoot
 
-        if ($Full) {
-            Write-Log "enabling the full edition (privileged host daemon)"
-            $env:COMPOSE_PROFILES = "full"
-        }
+        # Select the edition and WRITE it, the way install.sh does. Held only in
+        # this process it would last exactly one run: the next one - the update
+        # the operator runs later - would come up with no profile, and its
+        # `--remove-orphans` would then delete the host daemon as a leftover,
+        # quietly demoting a full deployment to limited.
+        Set-Edition -EnvPath (Join-Path (Get-Location) ".env")
+        # Exported as well as written: COMPOSE_PROFILES from .env is not honoured
+        # reliably across Compose versions, and when it is ignored the host daemon
+        # never starts - and `--remove-orphans` below then deletes it as a leftover.
+        $env:COMPOSE_PROFILES = "full"
+
+        # The two networks the compose file declares as `external`. Compose resolves
+        # every network of every service it starts BEFORE starting one, so a missing
+        # external network fails the whole `up` ("network polaris-proxy declared as
+        # external, but could not be found"), not just the service that named it.
+        # hostd creates polaris-proxy too, but it is started by the very `up` that
+        # fails - and the limited edition has no hostd at all. Idempotent.
+        docker network create polaris-proxy *> $null
+        docker network create polaris-hub *> $null
 
         # Install and update are the same: prefer the published image, falling
         # back to a source build; the web entrypoint applies pending migrations.
@@ -311,6 +389,17 @@ function Invoke-PolarisInstall {
 
         # Now bring up the rest against the already-aligned database.
         docker compose up -d @buildFlag --remove-orphans
+
+        # A deployment whose host daemon never started looks identical from the
+        # dashboard except that this machine's own containers are simply not there.
+        # The daemon needs a privileged container with shared mount propagation,
+        # which Docker Desktop does not always allow, so this is a real outcome
+        # here and not a theoretical one. Reported, never fatal - the rest of the
+        # deployment is up and serving.
+        if (-not (docker compose ps -q hostd 2>$null)) {
+            Write-Host "polaris: the host daemon did not start; this machine's own containers will not appear" -ForegroundColor Red
+            docker compose logs --tail 20 hostd
+        }
 
         # The Caddyfile is bind-mounted, so `up -d` does not restart Caddy when it
         # changes. Reload its config live so proxy/TLS changes from an update take
@@ -341,7 +430,13 @@ function Invoke-PolarisInstall {
             return
         }
 
-        Write-Log "done. Polaris is running at: $appUrl"
+        # The address to hand over. The configured one only opens once its name
+        # resolves here, which needs the hosts entry an unelevated run cannot write;
+        # the loopback address is matched by the dashboard's own router and always
+        # does. https, because :80 redirects there anyway.
+        $openUrl = if ($hostsMapped) { $appUrl } else { "https://127.0.0.1" }
+        Write-Log "done. Polaris is running at: $openUrl"
+        Write-Host "polaris: the certificate is self-signed until you point a domain here, so the browser will warn once" -ForegroundColor Yellow
 
         # Only advertise the first-run setup link while setup is still pending.
         $userCount = (docker compose exec -T postgres psql -U polaris -d polaris -tAc 'SELECT count(*) FROM "User";' 2>$null)
@@ -349,7 +444,7 @@ function Invoke-PolarisInstall {
         if ($userCount -notmatch '^\d+$' -or [int]$userCount -eq 0) {
             $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""
             Write-Host "polaris: First run - open this link to create the administrator:" -ForegroundColor Yellow
-            Write-Host "polaris:   http://polaris.local/oauth/setup?token=$token" -ForegroundColor Yellow
+            Write-Host "polaris:   $openUrl/oauth/setup?token=$token" -ForegroundColor Yellow
             Write-Host "polaris: (registration is otherwise invite-only)" -ForegroundColor Yellow
         }
         Write-Log "check status with: polaris status"
@@ -359,4 +454,4 @@ function Invoke-PolarisInstall {
     }
 }
 
-Invoke-PolarisInstall @args
+Invoke-PolarisInstall

@@ -71,14 +71,24 @@ curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scr
 irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.ps1 | iex
 ```
 
+Linux is the recommended host - Ubuntu Server is what Polaris is run against.
+Windows works, but Docker there runs inside WSL and the host Polaris manages is
+that virtual machine, not the PC; see [Requirements](#requirements).
+
 Prefer to do it by hand? Clone the repo and run Compose directly:
 
 ```bash
 git clone https://github.com/FJRG2007/polaris.git
 cd polaris/dashboard/docker
-cp .env.example .env                  # then set the two secrets it flags
+cp .env.example .env                  # then replace every REPLACE_ME value in it
+docker network create polaris-proxy   # compose expects both to exist already
+docker network create polaris-hub
 docker compose --profile full up -d
 ```
+
+Then open `https://127.0.0.1/oauth/setup?token=` followed by the
+`POLARIS_SETUP_TOKEN` you put in `.env`, and create the administrator. The
+certificate is self-signed until a domain points here, so the browser warns once.
 
 Updating is a button in Settings. There is a script behind it for anybody who
 would rather drive it themselves.
@@ -159,16 +169,26 @@ becomes the administrator**.
 so any device on your network can open **`http://polaris.local`**, and the machine
 running Polaris also resolves bare **`http://polaris`**.
 
-Two editions come out of one image. The **full** edition includes the privileged
-host daemon and can manage the machine it runs on - mounts, the Docker engine,
-updates. The **limited** edition is everything that does not need that, for a
-host you would rather not hand over.
+An install is one thing, with nothing to choose: the privileged host daemon that
+lets Polaris manage the machine it runs on - mounts, the Docker engine, its own
+updates - is part of it, along with the dedicated key it uses to reach that
+machine's Docker engine and the `polaris` command for the host.
 
 ## Requirements
 
 [Docker Engine](https://docs.docker.com/engine/install/) with the Compose v2
 plugin. That's it. For local development without containers, see the
 [developer guide](docs/developers/README.md).
+
+**Run it on Linux** - Ubuntu Server is what it is developed and run against.
+Polaris manages the machine it lives on, and that means privileged mounts, the
+host's Docker engine and host networking, all of which are native there.
+
+On Windows, Docker runs inside WSL, so the host Polaris would be managing is the
+virtual machine rather than your PC: privileged mounts and host networking behave
+differently or not at all. It is not recommended as the host. A Windows machine
+is a perfectly good **server to add** to a Polaris running elsewhere, managed
+from it like any other.
 
 ## Contributing
 

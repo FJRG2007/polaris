@@ -450,6 +450,12 @@ main() {
 
     cd "$dash_dir/docker"
 
+    # A release can add a service on one of the external networks, and an install
+    # from before they were created here has neither. Missing, compose refuses the
+    # whole `up` rather than the one service, so the update would fail with nothing
+    # deployed. Idempotent, so it costs nothing on a deployment that has them.
+    ensure_networks
+
     # New settings introduced by this release are added to .env automatically, with
     # their secrets generated, so an update never asks the operator to edit a file.
     if [ -f ".env" ]; then

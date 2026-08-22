@@ -1,18 +1,13 @@
 # Polaris dashboard stack.
 #
-# Two editions share this one file, selected by the `full` compose profile:
-#   - Full (installer default): additionally starts the privileged `hostd`
-#     daemon, which unlocks kernel mounts (SMB/NFS), host filesystem access, the
-#     allowlisted Docker proxy, and daemon-driven updates. The installer sets
-#     COMPOSE_PROFILES=full in .env so every `docker compose` picks it up.
-#   - Limited (`install.sh --limited`, or a bare `docker compose up` with no
-#     profile): postgres + web + caddy only. Cloud/API and userspace storage
-#     providers work; host access is disabled.
-#
-# The privileged daemon stays behind the profile so a bare `up` without the
-# profile never grants host access by accident. Even with it enabled, the
-# dashboard only reports the `full` edition once the daemon answers over the
-# shared socket with a valid token.
+# The privileged `hostd` daemon sits behind the `full` compose profile, so a bare
+# `docker compose up` with no profile never grants host access by accident. Every
+# install turns it on - the installer writes COMPOSE_PROFILES=full into .env, so
+# every `docker compose` after it picks the same set of services - and the daemon
+# is what unlocks kernel mounts (SMB/NFS), host filesystem access, the allowlisted
+# Docker proxy and in-band updates. Enabling the profile is not the same as having
+# it: the dashboard reports host access as available only once the daemon answers
+# over the shared socket with a valid token.
 name: polaris
 
 services:
@@ -158,7 +153,8 @@ services:
       # left to Docker it would belong to root and this container could not write.
       - polaris-call-keys:/call-keys
       # Dedicated SSH key + pinned known_hosts for the Docker connector, mounted
-      # read-only. Populated by `install.sh --ssh`; empty (and ignored) otherwise.
+      # read-only. Written by the installer; empty (and ignored) when a host had
+      # nothing to provision it against.
       # Absolute host path so the mount is correct even when compose runs inside the
       # self-update container (POLARIS_HOST_REPO is the true host repo root); the
       # `../..` default resolves to the repo root for a direct host run.
@@ -344,13 +340,13 @@ services:
       # parses unsolicited multicast from the whole network.
       - polaris-hostip:/run/polaris-host
 
-  # --- Full edition ---------------------------------------------------------
+  # --- Host daemon ----------------------------------------------------------
   # Privileged host daemon. Runs the static musl `polaris-hostd` binary and
   # brokers host access for the web container over the shared unix socket:
   # native mounts, host filesystem, the allowlisted Docker proxy, and in-band
-  # updates. Kept in the `full` profile; the installer enables that profile by
-  # default (opt out with `install.sh --limited`), so a bare `docker compose up`
-  # without the profile still starts only the sandboxed services.
+  # updates. Kept in the `full` profile, which every install enables, so a bare
+  # `docker compose up` without the profile still starts only the sandboxed
+  # services.
   hostd:
     profiles: ["full"]
     image: ghcr.io/fjrg2007/polaris-hostd:${POLARIS_IMAGE_TAG:-latest}

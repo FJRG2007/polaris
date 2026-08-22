@@ -5,15 +5,12 @@
 # to manage.
 #
 #   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/install.sh | sh
-#   # sandboxed edition (no privileged host daemon; no in-band updates or local
-#   # Docker host):
-#   curl -fsSL .../install.sh | sh -s -- --limited
-#   # also grant SSH access to a REMOTE host's Docker Engine (the local host
-#   # works without this in the full edition):
-#   curl -fsSL .../install.sh | sh -s -- --ssh
 #
-# The full edition (privileged host daemon) is the default: it unlocks in-band
-# self-update and the local Docker host with no extra flags.
+# One command, no flags, one kind of deployment: the privileged host daemon, the
+# in-band self-update, the local Docker host, and the dedicated SSH access the
+# dashboard uses to drive the host's Docker Engine are all part of an install.
+# There is nothing to opt into, so there is nothing an operator can end up
+# without by not knowing the flag for it.
 #
 # Idempotent: re-running reconciles the stack and never overwrites an existing
 # .env. Everything is wrapped in main() so a truncated download cannot execute a
@@ -214,6 +211,24 @@ install_cli() {
         err "could not install the polaris CLI to $dest (need root); copy $src there by hand"
     fi
     rm -f "$tmp"
+}
+
+# The two networks the compose file declares as `external`, created before any
+# `up` because compose resolves every network of every service it starts BEFORE
+# it starts one: a missing external network is a hard error ("network
+# polaris-proxy declared as external, but could not be found") that stops the
+# whole stack, not just the service that referenced it.
+#
+# polaris-proxy is also created by hostd at startup, and that is not enough on
+# its own: hostd is started BY the same `up` that fails, so on a first install
+# nothing has ever created it - and the limited edition has no hostd at all.
+# Idempotent; a second create only reports that it already exists.
+ensure_networks() {
+    # Shared with deployed apps and the edge, for name-based routing.
+    docker network create polaris-proxy >/dev/null 2>&1 || true
+    # Dedicated web<->hub network a locally-installed messaging bridge joins to
+    # reach the web by service DNS.
+    docker network create polaris-hub >/dev/null 2>&1 || true
 }
 
 # Fill the secrets in a freshly copied .env, in place, using # as the sed
@@ -555,16 +570,15 @@ head_sha() {
 }
 
 main() {
-    # Full edition (privileged host daemon) is the default: it is what unlocks
-    # in-band updates and the local Docker host with no extra flags. `--limited`
-    # opts out to the sandboxed edition; `--full` is accepted for compatibility.
-    full="yes"
-    ssh="no"
+    # No options. An install is an install: everything below is provisioned every
+    # time. Arguments are still rejected rather than ignored, so a line copied
+    # from an older set of instructions says so instead of quietly installing
+    # something other than what it asks for.
     for arg in "$@"; do
         case "$arg" in
-            --full) full="yes" ;;
-            --limited) full="no" ;;
-            --ssh) ssh="yes" ;;
+            --full | --limited | --ssh)
+                err "$arg no longer exists: an install now provisions all of it"
+                exit 1 ;;
             *) err "unknown argument: $arg"; exit 1 ;;
         esac
     done
@@ -652,15 +666,25 @@ main() {
     # present (empty is fine) so `up` never fails when SSH access is not set up.
     mkdir -p secrets/ssh
 
-    if [ "$ssh" = "yes" ]; then
-        log "provisioning secure SSH access to the host Docker Engine"
-        need ssh-keygen "install openssh-client so the installer can generate the access key"
-        POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh
+    # The dashboard's own key for the host's Docker Engine, provisioned on every
+    # install: a dedicated ed25519 key locked to `docker system dial-stdio`, so
+    # the deployment can drive this machine's containers without the docker socket
+    # being mounted into the web container.
+    #
+    # Best-effort, deliberately. It needs OpenSSH and a host that answers on 22,
+    # and neither is Polaris' to guarantee; a machine without them still gets a
+    # working deployment, which is why this must not be the step that fails an
+    # install. What it costs is said out loud rather than discovered later.
+    log "provisioning the dashboard's SSH access to the host Docker Engine"
+    if ! POLARIS_ENV_FILE="$(pwd)/.env" sh ../scripts/setup-ssh-access.sh; then
+        err "could not provision SSH access to this host's Docker Engine."
+        err "the deployment is fine; the host's own containers are reached through the host daemon instead."
     fi
 
-    # Select the edition (full by default) and, for full, provision the in-band
-    # update command. Writes COMPOSE_PROFILES into .env.
-    configure_edition "$full" ".env"
+    # Write the compose profile and the in-band update command into .env, so every
+    # `docker compose` after this one - the CLI, the next update - runs the same
+    # set of services.
+    configure_edition "yes" ".env"
 
     # Honour the profile deterministically: export it for every compose call below.
     # Relying on COMPOSE_PROFILES from .env alone is not reliable across Docker
@@ -684,10 +708,7 @@ main() {
         POLARIS_WEB_PULL_POLICY="never"; export POLARIS_WEB_PULL_POLICY
     fi
 
-    # The dedicated web<->hub network a locally-installed messaging bridge joins to
-    # reach the web by service DNS. The web references it as an external network
-    # (like polaris-proxy), so it must exist before `up`; create it idempotently.
-    docker network create polaris-hub >/dev/null 2>&1 || true
+    ensure_networks
 
     # Bring up the database first and align its password with .env BEFORE anything
     # connects. Postgres only reads POSTGRES_PASSWORD at first init, so a drifted
@@ -704,11 +725,11 @@ main() {
     # Now bring up the rest against the already-aligned database.
     $compose up -d $build_flag --remove-orphans
 
-    # In the full edition, confirm the privileged daemon actually started - a
-    # silently-missing hostd is exactly what leaves the dashboard on "limited" and
-    # hides the local Docker host. Warn loudly (do not fail the whole deploy).
-    if [ "$full" = "yes" ] && [ -z "$($compose ps -q hostd 2>/dev/null)" ]; then
-        err "full edition selected but the polaris-hostd service is not running."
+    # Confirm the privileged daemon actually started - a silently-missing hostd is
+    # exactly what leaves the dashboard without in-band updates and without the
+    # local Docker host. Warn loudly (do not fail the whole deploy).
+    if [ -z "$($compose ps -q hostd 2>/dev/null)" ]; then
+        err "the polaris-hostd service is not running."
         err "recent hostd logs:"
         $compose logs --tail 20 hostd >&2 2>/dev/null || true
         err "the local Docker host needs hostd; inspect with 'polaris status' / 'docker compose ps'."
