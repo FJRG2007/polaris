@@ -104,13 +104,20 @@ else
 fi
 scanned=$(ssh-keyscan -T 5 -p "$SSH_PORT" "$SCAN_HOST" 2>/dev/null || true)
 if [ -z "$scanned" ]; then
+    # Nothing answered, so there is no host key to verify against - and the
+    # connector will not connect without one. Say so and stop, rather than
+    # publishing an access that cannot work: POLARIS_SSH_ENABLED is what the
+    # dashboard reads as "this host can be reached this way", and with it set but
+    # no known_hosts file the Containers app offers the key and then fails on a
+    # missing path nobody chose. Nothing written so far does anything without the
+    # values below, and the caller reports what was lost.
     err "could not scan the host key at $SCAN_HOST:$SSH_PORT"
-    err "is the host running sshd and reachable? known_hosts was not written"
-else
-    printf '%s\n' "$scanned" | sed "s#^[^ ]*#${host_alias}#" > "$SSH_DIR/known_hosts"
-    chmod 644 "$SSH_DIR/known_hosts"
-    log "pinned the host key for '$host_alias'"
+    err "is the host running sshd and reachable? SSH access to its Docker Engine was not enabled"
+    exit 1
 fi
+printf '%s\n' "$scanned" | sed "s#^[^ ]*#${host_alias}#" > "$SSH_DIR/known_hosts"
+chmod 644 "$SSH_DIR/known_hosts"
+log "pinned the host key for '$host_alias'"
 
 # 4. Publish the connection details to the env the compose stack reads. The paths
 #    are where compose mounts the secrets read-only inside the container.

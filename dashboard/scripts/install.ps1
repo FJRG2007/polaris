@@ -28,14 +28,44 @@ function Invoke-PolarisInstall {
         return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
     }
 
+    # Run a native command with its output discarded, and hand back its exit code.
+    #
+    # Windows PowerShell 5.1 turns a native command's stderr into ErrorRecords the
+    # moment that stream is redirected, and this script runs under
+    # $ErrorActionPreference = "Stop", which makes them TERMINATING. So a docker
+    # command that writes one ordinary line to stderr - "network with name
+    # polaris-proxy already exists" on the second run, a pull's progress, a
+    # compose warning about orphans - would abort the install with a PowerShell
+    # exception rather than being the non-event it is. The preference is lowered
+    # only for the moment the process runs.
+    function Invoke-Quiet {
+        param([scriptblock]$Command)
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & $Command *> $null
+            return $LASTEXITCODE
+        }
+        finally { $ErrorActionPreference = $previous }
+    }
+
+    # The same, for a command whose stdout is the answer: stderr discarded, output
+    # returned.
+    function Get-Quiet {
+        param([scriptblock]$Command)
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try { & $Command 2>$null }
+        finally { $ErrorActionPreference = $previous }
+    }
+
     if (-not (Test-Command "docker")) {
         Write-Error "docker not found. Install Docker Desktop: https://docs.docker.com/desktop/install/windows-install/"
         return
     }
 
     # Require the Compose v2 plugin (legacy docker-compose is unsupported).
-    docker compose version *> $null
-    if ($LASTEXITCODE -ne 0) {
+    if ((Invoke-Quiet { docker compose version }) -ne 0) {
         Write-Error "'docker compose' (v2) is required but not available. Update Docker Desktop."
         return
     }
@@ -97,9 +127,9 @@ function Invoke-PolarisInstall {
     function Get-RunningSecret {
         param([string]$Key)
         if (-not (Test-Command "docker")) { return "" }
-        $cid = (docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" 2>$null | Select-Object -First 1)
+        $cid = (Get-Quiet { docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" } | Select-Object -First 1)
         if (-not $cid) { return "" }
-        $envLines = docker inspect $cid --format '{{range .Config.Env}}{{println .}}{{end}}' 2>$null
+        $envLines = Get-Quiet { docker inspect $cid --format '{{range .Config.Env}}{{println .}}{{end}}' }
         foreach ($line in $envLines) {
             if ($line -match "^$([regex]::Escape($Key))=(.*)$") { return $Matches[1] }
         }
@@ -110,9 +140,9 @@ function Invoke-PolarisInstall {
     # a bare install updates that one in place instead of a divergent checkout.
     function Get-RunningDeploymentDir {
         if (-not (Test-Command "docker")) { return "" }
-        $cid = (docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" 2>$null | Select-Object -First 1)
+        $cid = (Get-Quiet { docker ps -q --filter "label=com.docker.compose.project=polaris" --filter "label=com.docker.compose.service=web" } | Select-Object -First 1)
         if (-not $cid) { return "" }
-        return (docker inspect $cid --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' 2>$null | Select-Object -First 1)
+        return (Get-Quiet { docker inspect $cid --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' } | Select-Object -First 1)
     }
 
     # Reuse a remembered secret for Key, else adopt the value from a Polaris
@@ -250,12 +280,29 @@ function Invoke-PolarisInstall {
 
         # On PATH for future sessions, and for this one, so the link printed below
         # is not the only way in.
-        $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-        if (($userPath -split ";") -notcontains $binDir) {
-            $updated = if ($userPath) { "$userPath;$binDir" } else { $binDir }
-            [Environment]::SetEnvironmentVariable("Path", $updated, "User")
-            Write-Log "installed the 'polaris' (and 'plr') command; open a new terminal to use it"
+        #
+        # Read and written through the registry rather than through
+        # [Environment], which hands back an EXPANDED value and stores what it is
+        # given as a plain string. A user PATH that contains %USERPROFILE%\... -
+        # the Windows default does - would come back expanded, go back flattened,
+        # and stop following that account around. The value kind is preserved, so
+        # an expandable PATH stays expandable.
+        $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Environment", $true)
+        try {
+            $userPath = ""
+            $kind = [Microsoft.Win32.RegistryValueKind]::ExpandString
+            if ($key) {
+                $userPath = [string]$key.GetValue("Path", "", [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+                if ($key.GetValueNames() -contains "Path") { $kind = $key.GetValueKind("Path") }
+            }
+            if (($userPath -split ";") -notcontains $binDir) {
+                $updated = if ($userPath) { "$userPath;$binDir" } else { $binDir }
+                if ($key) { $key.SetValue("Path", $updated, $kind) }
+                else { [Environment]::SetEnvironmentVariable("Path", $updated, "User") }
+                Write-Log "installed the 'polaris' (and 'plr') command; open a new terminal to use it"
+            }
         }
+        finally { if ($key) { $key.Close() } }
         if (($env:Path -split ";") -notcontains $binDir) { $env:Path = "$env:Path;$binDir" }
     }
 
@@ -362,15 +409,14 @@ function Invoke-PolarisInstall {
         # external, but could not be found"), not just the service that named it.
         # hostd creates polaris-proxy too, but it is started by the very `up` that
         # fails - and the limited edition has no hostd at all. Idempotent.
-        docker network create polaris-proxy *> $null
-        docker network create polaris-hub *> $null
+        Invoke-Quiet { docker network create polaris-proxy } | Out-Null
+        Invoke-Quiet { docker network create polaris-hub } | Out-Null
 
         # Install and update are the same: prefer the published image, falling
         # back to a source build; the web entrypoint applies pending migrations.
         Write-Log "starting the stack (also applies database migrations)"
-        docker compose pull 2>$null
         $buildFlag = @()
-        if ($LASTEXITCODE -ne 0) { $buildFlag = @("--build") }
+        if ((Invoke-Quiet { docker compose pull }) -ne 0) { $buildFlag = @("--build") }
 
         # Bring the database up first and align its password with .env BEFORE the
         # web connects, so it authenticates cleanly the first time (no P1000 race).
@@ -378,10 +424,9 @@ function Invoke-PolarisInstall {
         if ($pgPass -and $dbUrl -match "@postgres:5432/") {
             $esc = $pgPass -replace "'", "''"
             for ($i = 0; $i -lt 15; $i++) {
-                docker compose exec -T postgres pg_isready -U $pgUser -d $pgDb *> $null
-                if ($LASTEXITCODE -eq 0) {
-                    docker compose exec -T postgres psql -U $pgUser -d $pgDb -c "ALTER USER `"$pgUser`" WITH PASSWORD '$esc';" *> $null
-                    if ($LASTEXITCODE -eq 0) { Write-Log "aligned the database password with .env"; break }
+                if ((Invoke-Quiet { docker compose exec -T postgres pg_isready -U $pgUser -d $pgDb }) -eq 0) {
+                    $altered = Invoke-Quiet { docker compose exec -T postgres psql -U $pgUser -d $pgDb -c "ALTER USER `"$pgUser`" WITH PASSWORD '$esc';" }
+                    if ($altered -eq 0) { Write-Log "aligned the database password with .env"; break }
                 }
                 Start-Sleep -Seconds 2
             }
@@ -396,7 +441,7 @@ function Invoke-PolarisInstall {
         # which Docker Desktop does not always allow, so this is a real outcome
         # here and not a theoretical one. Reported, never fatal - the rest of the
         # deployment is up and serving.
-        if (-not (docker compose ps -q hostd 2>$null)) {
+        if (-not (Get-Quiet { docker compose ps -q hostd })) {
             Write-Host "polaris: the host daemon did not start; this machine's own containers will not appear" -ForegroundColor Red
             docker compose logs --tail 20 hostd
         }
@@ -404,8 +449,9 @@ function Invoke-PolarisInstall {
         # The Caddyfile is bind-mounted, so `up -d` does not restart Caddy when it
         # changes. Reload its config live so proxy/TLS changes from an update take
         # effect; fall back to recreating the container if a reload is not possible.
-        docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile *> $null
-        if ($LASTEXITCODE -ne 0) { docker compose up -d --force-recreate caddy *> $null }
+        if ((Invoke-Quiet { docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile }) -ne 0) {
+            Invoke-Quiet { docker compose up -d --force-recreate caddy } | Out-Null
+        }
 
         $appUrl = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_APP_URL=" } | Select-Object -First 1) -replace "^POLARIS_APP_URL=", ""
         if (-not $appUrl) { $appUrl = "your configured POLARIS_APP_URL" }
@@ -414,10 +460,10 @@ function Invoke-PolarisInstall {
         # "running") instead of reporting success blindly.
         $ready = $false
         for ($i = 0; $i -lt 45; $i++) {
-            $wid = (docker compose ps -q web 2>$null)
+            $wid = (Get-Quiet { docker compose ps -q web })
             if ($wid) {
-                $state = (docker inspect --format '{{.State.Status}}' $wid 2>$null)
-                $health = (docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $wid 2>$null)
+                $state = (Get-Quiet { docker inspect --format '{{.State.Status}}' $wid })
+                $health = (Get-Quiet { docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' $wid })
                 if (($health -and $health -eq "healthy") -or (-not $health -and $state -eq "running")) { $ready = $true; break }
                 if ($state -eq "exited") { break }
             }
@@ -439,7 +485,7 @@ function Invoke-PolarisInstall {
         Write-Host "polaris: the certificate is self-signed until you point a domain here, so the browser will warn once" -ForegroundColor Yellow
 
         # Only advertise the first-run setup link while setup is still pending.
-        $userCount = (docker compose exec -T postgres psql -U polaris -d polaris -tAc 'SELECT count(*) FROM "User";' 2>$null)
+        $userCount = (Get-Quiet { docker compose exec -T postgres psql -U polaris -d polaris -tAc 'SELECT count(*) FROM "User";' })
         if ($userCount) { $userCount = $userCount.Trim() }
         if ($userCount -notmatch '^\d+$' -or [int]$userCount -eq 0) {
             $token = (Get-Content ".env" | Where-Object { $_ -match "^POLARIS_SETUP_TOKEN=" } | Select-Object -First 1) -replace "^POLARIS_SETUP_TOKEN=", ""

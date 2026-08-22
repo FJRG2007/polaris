@@ -35,6 +35,22 @@ function Get-Setting {
     return ""
 }
 
+# Run a native command with stderr discarded and its stdout returned.
+#
+# Windows PowerShell 5.1 turns a native command's stderr into ErrorRecords as soon
+# as that stream is redirected, and this script runs under
+# $ErrorActionPreference = "Stop", which makes them terminating. `docker logs`
+# relays the container's own stderr, so reading a log to diagnose a fault would
+# end in a PowerShell exception instead of the diagnosis - exactly when it is
+# needed. The preference is lowered only for the moment the process runs.
+function Get-Quiet {
+    param([scriptblock]$Command)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try { & $Command 2>&1 }
+    finally { $ErrorActionPreference = $previous }
+}
+
 function Assert-Docker {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         Write-Host "polaris: docker is required for this command" -ForegroundColor Red
@@ -183,7 +199,7 @@ function Invoke-Doctor {
     if (Get-Command docker -ErrorAction SilentlyContinue) {
         $web = docker ps -a --filter "label=com.docker.compose.project=polaris" --filter "name=polaris-web-1" --format "{{.ID}}"
         if ($web) {
-            $logs = docker logs --tail 40 polaris-web-1 2>&1 | Out-String
+            $logs = Get-Quiet { docker logs --tail 40 polaris-web-1 } | Out-String
             if ($logs -match "P1000") {
                 Write-Host "  [fail] the web container is hitting P1000 (database auth failed)." -ForegroundColor Red
                 Write-Host "         The password in the postgres volume no longer matches .env."
@@ -246,6 +262,11 @@ switch ($Command) {
             Write-Host "polaris: the installer is not at $installer" -ForegroundColor Red
             exit 1
         }
+        # Name the deployment this command belongs to. Left unset, the installer
+        # looks for one that is RUNNING, and a stopped deployment therefore reads
+        # as none at all: it would clone a second checkout elsewhere and bring it
+        # up against these same volumes.
+        $env:POLARIS_INSTALL_DIR = $installDir
         & $installer @Rest
     }
     { $_ -in @("help", "--help", "-h") } {

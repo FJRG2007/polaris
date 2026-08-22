@@ -656,11 +656,20 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
     // Trust the public origin plus the local-network names (homeassistant.local
     // style) so the dashboard works whether reached by domain, polaris.local, or
     // bare polaris. Deduplicated in case the app URL is already one of them.
+    //
+    // The loopback address is one of them. The edge routes it - the dashboard's
+    // router matches any bare IPv4 host - and it is what somebody is given when
+    // the local names do not resolve for them, which on Windows is the usual case
+    // because writing them needs Administrator. Without it here the first sign-in
+    // works (no cookie yet, so the origin is never checked) and every request
+    // after it is refused as coming from somewhere else: signing out, signing in
+    // again, arming a second factor, changing a password.
     const fixedOrigins = Array.from(
         new Set([
             env.POLARIS_APP_URL,
             ...origins(`${localName}.local`),
-            `http://${localName}`
+            `http://${localName}`,
+            ...origins("127.0.0.1")
         ])
     );
     return betterAuth({
