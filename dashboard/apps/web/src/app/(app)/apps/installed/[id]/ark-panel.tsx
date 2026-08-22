@@ -33,12 +33,12 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { ArkProfile } from "@/lib/apps/ark/profile";
-import { presenceLine } from "@/lib/apps/games-activity";
+import { presenceLine, seenFor } from "@/lib/apps/games-activity";
 import { RelativeTime } from "@/components/relative-time";
 import { ToolbarSwitch } from "@/components/toolbar-switch";
 import type { ServerPresence } from "@/lib/apps/games-service";
 import { useGamePresence } from "@/components/use-game-presence";
-import type { PlayerSeen } from "@/lib/apps/games-activity-service";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import { findArkMap, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
@@ -1164,11 +1164,10 @@ function PlayersTab({
                         answering={answering}
                         pending={pending}
                         profile={profiles[entry.steamId] ?? null}
-                        seen={
-                            seen[entry.name.toLowerCase()] ??
-                            seen[(profiles[entry.steamId]?.characterName ?? "").toLowerCase()] ??
-                            null
-                        }
+                        seen={seenFor(seen, {
+                            id: entry.steamId,
+                            names: [entry.name, profiles[entry.steamId]?.characterName ?? ""]
+                        })}
                         admin={admins.includes(entry.steamId)}
                         onAdmin={(next) =>
                             run(
@@ -1326,6 +1325,7 @@ function PlayersTab({
                 <ArkHistoryDialog
                     installedAppId={installedAppId}
                     player={target.name}
+                    steamId={target.steamId}
                     onClose={() => setActing(null)}
                 />
             )}

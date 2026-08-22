@@ -83,15 +83,29 @@ export async function addArkPlayerAction(
  */
 export async function readArkPlayerRecordAction(
     installedAppId: string,
-    player: string
+    player: string,
+    /** Their Steam id, which is what a visit here belongs to: the survivor name a
+     *  visit was recorded under can be changed at will and shared with somebody
+     *  else. The name is still asked about, for the visits recorded before the id
+     *  was kept. */
+    steamId: string | null = null
 ): Promise<{ record?: PlayerRecord; error?: string }> {
     const parsed = z
-        .object({ installedAppId: z.string().uuid(), player: z.string().trim().min(1).max(64) })
-        .safeParse({ installedAppId, player });
+        .object({
+            installedAppId: z.string().uuid(),
+            player: z.string().trim().min(1).max(64),
+            steamId: z.string().trim().regex(/^\d{17}$/).nullable()
+        })
+        .safeParse({ installedAppId, player, steamId });
     if (!parsed.success) return { error: "Check the details and try again" };
     try {
         await requireGameServer("games.read", parsed.data.installedAppId);
-        return { record: await readPlayerRecord(parsed.data.installedAppId, parsed.data.player) };
+        return {
+            record: await readPlayerRecord(parsed.data.installedAppId, {
+                name: parsed.data.player,
+                id: parsed.data.steamId
+            })
+        };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not read this player's history" };
     }

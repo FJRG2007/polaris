@@ -18,51 +18,139 @@
  * the asking and the writing is `games-activity-service.ts`.
  */
 
+/** Somebody on a roster: the name the server printed, and the id it printed
+ *  beside it for the games that have one. */
+export interface RosterPlayer {
+    readonly name: string;
+    /** ARK's SteamID64. Null on Minecraft, where the name is the identity. */
+    readonly id: string | null;
+}
+
 /** A visit that has not ended: who, since when, and the row it belongs to. */
 export interface OpenSession {
     readonly id: string;
     readonly name: string;
+    /** The player it belongs to, for a visit recorded since the game's own id was
+     *  kept. Null on Minecraft and on every row written before it was. */
+    readonly playerId: string | null;
 }
 
 /** What changed between the roster last seen and the roster now. */
 export interface RosterChange {
-    /** Names to start a session for. */
-    readonly arrived: readonly string[];
+    /** Players to start a session for. */
+    readonly arrived: readonly RosterPlayer[];
     /** Sessions to close, by id. */
     readonly left: readonly string[];
+    /** Visits still open that the game has now said whose they are: recorded
+     *  under a name alone, before the id was kept, and matched by that name this
+     *  pass. Writing the id on them is what stops the visit somebody is on right
+     *  now from being lost to their row the moment it ends. */
+    readonly adopted: readonly { readonly id: string; readonly playerId: string }[];
 }
 
 /**
  * Fold a fresh roster against the sessions still open into arrivals and departures.
  *
- * Names are matched without case, because how a name is capitalised is the server's
- * business and not always the same answer twice - a roster that comes back
+ * Matched on the game's own id wherever there is one. On ARK the name is the
+ * survivor's, which can be changed at will and which two people can both pick, so
+ * a name is neither stable enough to follow somebody through a visit nor unique
+ * enough to tell two of them apart - and the id is printed on the same line.
+ *
+ * Where there is no id - Minecraft, and every visit recorded before the id was
+ * kept - names are matched without case, because how a name is capitalised is the
+ * server's business and not always the same answer twice: a roster that comes back
  * differently cased would otherwise read as everybody leaving and immediately
  * rejoining. The name as it arrives is what gets stored, so the newest spelling is
  * the one shown.
  *
  * Duplicates on either side are tolerated rather than trusted: two open sessions for
- * one name means an earlier sweep was interrupted, and closing all but one is how
+ * one player means an earlier sweep was interrupted, and closing all but one is how
  * that heals rather than something to refuse.
  */
-export function rosterChange(open: readonly OpenSession[], roster: readonly string[]): RosterChange {
-    const here = new Map<string, string>();
-    for (const name of roster) {
-        const key = name.trim().toLowerCase();
-        if (key.length > 0 && !here.has(key)) here.set(key, name.trim());
+export function rosterChange(open: readonly OpenSession[], roster: readonly RosterPlayer[]): RosterChange {
+    const here = new Map<string, RosterPlayer>();
+    /** Lowercased name to whoever holds it, for the sessions with no id to match on. */
+    const byName = new Map<string, string>();
+    for (const player of roster) {
+        const name = player.name.trim();
+        if (name.length === 0) continue;
+        const id = player.id?.trim() || null;
+        const key = id ?? name.toLowerCase();
+        if (here.has(key)) continue;
+        here.set(key, { name, id });
+        if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), key);
     }
 
     const kept = new Set<string>();
     const left: string[] = [];
+    const adopted: { id: string; playerId: string }[] = [];
     for (const session of open) {
-        const key = session.name.trim().toLowerCase();
+        // A session that knows whose it is is matched on that alone: falling back to
+        // the name would hand it to whoever is playing under that name now, which on
+        // ARK need not be the same person.
+        const key = session.playerId
+            ? here.has(session.playerId)
+                ? session.playerId
+                : null
+            : (byName.get(session.name.trim().toLowerCase()) ?? null);
         // Still on, and this is the first session claiming so. A second one is a
         // duplicate from an interrupted sweep and is closed.
-        if (here.has(key) && !kept.has(key)) kept.add(key);
-        else left.push(session.id);
+        if (key !== null && !kept.has(key)) {
+            kept.add(key);
+            const id = here.get(key)?.id ?? null;
+            if (id && !session.playerId) adopted.push({ id: session.id, playerId: id });
+        } else left.push(session.id);
     }
 
-    return { arrived: [...here.entries()].filter(([key]) => !kept.has(key)).map(([, name]) => name), left };
+    return {
+        arrived: [...here.entries()].filter(([key]) => !kept.has(key)).map(([, player]) => player),
+        left,
+        adopted
+    };
+}
+
+/** When one player was last on, for the line under their row. */
+export interface PlayerSeen {
+    /** When their latest visit started - which is when they arrived, for
+     *  somebody who is still playing. */
+    readonly since: string | null;
+    /** When they were last seen leaving. Null for somebody whose only visit is
+     *  the one they are on. */
+    readonly lastSeen: string | null;
+}
+
+/**
+ * How a visit is filed and looked up in one pass of `readLastSeen`.
+ *
+ * The id where the game has one, and the lowercased name where it does not.
+ * Prefixed, so that a survivor named after a Steam id cannot be handed somebody
+ * else's history.
+ */
+export function seenKey(player: RosterPlayer): string {
+    return player.id ? `#${player.id}` : `@${player.name.trim().toLowerCase()}`;
+}
+
+/**
+ * What is known about when this row's player was last on.
+ *
+ * A row is drawn under whichever name the list it came from holds, and the visit
+ * was recorded under whatever the server called them at the time, so more than one
+ * name can lead to the same person. The id is tried first because it is the only
+ * one of them that is the person.
+ */
+export function seenFor(
+    seen: Readonly<Record<string, PlayerSeen>>,
+    player: { readonly id: string | null; readonly names: readonly string[] }
+): PlayerSeen | null {
+    const keys = [
+        ...(player.id ? [seenKey({ name: "", id: player.id })] : []),
+        ...player.names.filter((name) => name.trim().length > 0).map((name) => seenKey({ name, id: null }))
+    ];
+    for (const key of keys) {
+        const found = seen[key];
+        if (found) return found;
+    }
+    return null;
 }
 
 /** One visit, as the history reads it back. */

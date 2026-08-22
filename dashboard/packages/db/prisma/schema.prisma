@@ -2971,6 +2971,12 @@ model GamePlayerSession {
     // As the server spells it. Compared case-insensitively by the reader, because
     // only the server decides how it capitalises a name.
     name           String
+    // The identity the game itself keys on, where it has one: an ARK survivor can
+    // be renamed at will and two of them can share a name, so a visit there is the
+    // Steam id's and the name is decoration. Minecraft reports no second id - the
+    // account name is the identity - so it stays null there, and a row with no id
+    // is the only kind still matched by name.
+    playerId       String?
     joinedAt       DateTime
     // Open while they are still on. An open session is also how the sweep knows
     // who was there a minute ago.
@@ -2979,6 +2985,7 @@ model GamePlayerSession {
     @@index([installedAppId, joinedAt])
     @@index([installedAppId, leftAt])
     @@index([installedAppId, name])
+    @@index([installedAppId, playerId])
 }
 
 // How many were playing, once a minute.

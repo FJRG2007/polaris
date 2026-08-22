@@ -25,6 +25,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { MinecraftModeration } from "./minecraft-actions";
 import { ACCESS_REACH_NOTE } from "@/lib/apps/minecraft/access";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import { PlayerTimeoutDialog } from "@/components/player-timeout-dialog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
@@ -102,6 +103,7 @@ export function MinecraftPlayers({
     roster,
     access,
     sessions,
+    seen,
     now,
     timeouts,
     levels,
@@ -115,6 +117,9 @@ export function MinecraftPlayers({
     access: PlayerAccessView | null;
     /** Who arrived and who left, out of the server's log. */
     sessions: readonly PlayerSessionEvent[];
+    /** When Polaris last watched each of them, for the rows the log no longer
+     *  reaches back to. */
+    seen: Readonly<Record<string, PlayerSeen>>;
     /** The server's clock when it read them. */
     now: number;
     /** Bans with an end, and when each one lifts. */
@@ -148,8 +153,8 @@ export function MinecraftPlayers({
     const bedrock = status?.edition === "bedrock";
     const edition = access?.edition ?? status?.edition ?? "java";
     const known = useMemo(
-        () => foldPlayers(status, roster, access, sessions, now),
-        [status, roster, access, sessions, now]
+        () => foldPlayers(status, roster, access, sessions, now, seen),
+        [status, roster, access, sessions, now, seen]
     );
     const players = useMemo(
         () => known.map((player) => ({ ...player, ...(applied.get(player.name.toLowerCase()) ?? {}) })),
@@ -840,14 +845,14 @@ function StatusCell({ player, onOpen }: { player: PlayerEntry; onOpen: (dialog: 
     return (
         <div className="flex flex-col items-start gap-0.5">
             {badge}
-            {player.sessions.length > 0 && (
+            {(player.sessions.length > 0 || player.lastSeen !== null) && (
                 <button
                     type="button"
                     onClick={() => onOpen("history")}
                     className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                     title={`When ${player.name} joined and left`}
                 >
-                    {player.presence === "playing" ? "since " : ""}
+                    {player.presence === "playing" ? "since " : "Last on "}
                     {relativeTime(player.lastSeen, format, "time not logged")}
                 </button>
             )}

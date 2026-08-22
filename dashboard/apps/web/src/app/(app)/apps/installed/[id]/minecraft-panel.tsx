@@ -41,6 +41,7 @@ import { useGamePresence } from "@/components/use-game-presence";
 import { MinecraftSchedule, NO_SCHEDULE } from "./minecraft-schedule";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { FirewallSection, MinecraftPlayers } from "./minecraft-players";
+import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -98,6 +99,9 @@ interface ServerReading {
     access: PlayerAccessView | null;
     /** Who arrived and who left, as far back as the log reaches. */
     sessions: readonly PlayerSessionEvent[];
+    /** When Polaris last watched each of them, for the rows the log has scrolled
+     *  past. Keyed as `seenFor` looks them up. */
+    seen: Readonly<Record<string, PlayerSeen>>;
     /** The server's clock when it read them, so the browser's own being out does
      *  not change what a player is reported as doing. */
     now: number;
@@ -168,6 +172,7 @@ export function MinecraftPanel({
         firewall: null,
         access: game?.playerAccess ?? null,
         sessions: [],
+        seen: {},
         now: Date.now(),
         timeouts: [],
         levels: {},
@@ -195,6 +200,7 @@ export function MinecraftPanel({
                 firewall?: MinecraftFirewall;
                 access?: PlayerAccessView;
                 sessions?: PlayerSessionEvent[];
+                seen?: Record<string, PlayerSeen>;
                 timeouts?: PlayerTimeout[];
                 levels?: Record<string, number>;
                 pending?: QueuedAction[];
@@ -224,6 +230,10 @@ export function MinecraftPanel({
                     : wantsRoster
                       ? current.sessions
                       : [],
+                // Kept between polls of the same screen, like the levels beside
+                // it: a read the server was too busy to answer would otherwise
+                // blank the line under every row.
+                seen: data.seen ?? (wantsRoster ? current.seen : {}),
                 timeouts: Array.isArray(data.timeouts)
                     ? data.timeouts
                     : wantsRoster
@@ -369,6 +379,7 @@ export function MinecraftPanel({
                     roster={reading.roster}
                     access={reading.access}
                     sessions={reading.sessions}
+                    seen={reading.seen}
                     now={reading.now}
                     timeouts={reading.timeouts}
                     levels={reading.levels}

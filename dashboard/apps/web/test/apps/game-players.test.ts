@@ -14,9 +14,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { seenKey } from "@/lib/apps/games-activity";
 import { foldPlayers } from "@/lib/apps/minecraft/players";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
+
+/** The server's clock when the lists were read, which is what the log's stamps
+ *  are compared against. */
+const NOW = Date.parse("2026-08-13T21:00:00.000Z");
 
 function status(players: string[]): MinecraftStatus {
     return {
@@ -127,5 +132,33 @@ describe("foldPlayers", () => {
 
     it("has nothing to show for a server nothing has answered for yet", () => {
         expect(foldPlayers(null, null, null)).toEqual([]);
+    });
+
+    // The log holds only the tail that was asked for, and starts again empty every
+    // time the container is replaced. Without the record behind it, a regular who
+    // was on last week is badged as never having played here at all.
+    it("says when Polaris last watched somebody the log no longer reaches", () => {
+        const seen = {
+            [seenKey({ name: "Alex", id: null })]: {
+                since: "2026-08-10T18:00:00.000Z",
+                lastSeen: "2026-08-10T20:00:00.000Z"
+            }
+        };
+        const folded = foldPlayers(status([]), roster({ whitelist: ["Alex"] }), access([]), [], NOW, seen);
+        expect(folded[0]).toMatchObject({ presence: "offline", lastSeen: "2026-08-10T20:00:00.000Z" });
+    });
+
+    it("leaves the log's own answer alone where it has one", () => {
+        // The server wrote the moment down itself; the record is a sweep that
+        // noticed within the minute of it.
+        const events = [{ name: "Alex", kind: "leave" as const, at: "2026-08-13T20:30:00.000Z", address: null }];
+        const seen = {
+            [seenKey({ name: "Alex", id: null })]: {
+                since: "2026-08-13T19:00:00.000Z",
+                lastSeen: "2026-08-13T20:31:00.000Z"
+            }
+        };
+        const folded = foldPlayers(status([]), roster({ whitelist: ["Alex"] }), access([]), events, NOW, seen);
+        expect(folded[0]).toMatchObject({ presence: "offline", lastSeen: "2026-08-13T20:30:00.000Z" });
     });
 });

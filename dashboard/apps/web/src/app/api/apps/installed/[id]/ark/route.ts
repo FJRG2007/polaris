@@ -97,15 +97,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         // game's: ARK reports who is connected this second and nothing about a
         // minute ago, so without this a row for somebody offline could only say
         // when they were added to the list - which is a fact about the list.
-        // Every name a row might be drawn under is asked about, since the one a
-        // visit was recorded under is whatever the server called them.
+        // Asked by Steam id, which is the half of a row that is the person: the
+        // list holds the label somebody typed and a visit was recorded under the
+        // survivor name the server printed, and those are two different names.
+        // The names go too, for the visits recorded before the id was kept.
         const seen = wantsPlayers
             ? await readLastSeen(id, [
-                  ...status.players.map((player) => player.name),
-                  ...(access?.players ?? []).map((player) => player.label),
-                  ...Object.values(profiles as Record<string, ArkProfile>).map(
-                      (profile) => profile.characterName ?? ""
-                  )
+                  ...status.players.map((player) => ({ name: player.name, id: player.steamId })),
+                  ...(access?.players ?? []).map((player) => ({ name: player.label, id: player.steamId })),
+                  ...Object.entries(profiles as Record<string, ArkProfile>).map(([steamId, profile]) => ({
+                      name: profile.characterName ?? "",
+                      id: steamId
+                  }))
               ]).catch(() => ({}))
             : {};
         return NextResponse.json({

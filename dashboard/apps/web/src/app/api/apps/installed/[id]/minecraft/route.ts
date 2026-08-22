@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reachAdviceFor } from "@/lib/apps/minecraft/reach";
 import { requireGameServer } from "@/lib/apps/install-access";
+import { readLastSeen } from "@/lib/apps/games-activity-service";
 import { sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "@/lib/apps/minecraft/queue-service";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
@@ -76,6 +77,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const [roster, firewall] = gathered;
         const sessions = gathered[3];
         const timeouts = wantsRoster ? await readPlayerTimeouts(id).catch(() => []) : [];
+        // When Polaris last watched each of them, for the rows the log no longer
+        // reaches back to: it holds only the tail that was asked for and starts
+        // again empty every time the container is replaced, so a regular who has
+        // not been on since this morning can have nothing in it. One indexed
+        // query, and only for the screen with a column for it.
+        const seen = wantsRoster
+            ? await readLastSeen(
+                  id,
+                  [
+                      ...status.players.players,
+                      ...(roster?.ops ?? []),
+                      ...(roster?.whitelist ?? []),
+                      ...(roster?.bans ?? []).map((ban) => ban.name),
+                      ...(access?.rules ?? []).map((rule) => rule.username),
+                      ...sessions.map((event) => event.name)
+                      // Minecraft reports no second id on its roster, so a visit
+                      // here is recorded under the account name alone.
+                  ].map((name) => ({ name, id: null }))
+              ).catch(() => ({}))
+            : {};
 
         // Two passes that only cost anything when there is something to do, so
         // they can ride on a five-second poll: one indexed query each says no.
@@ -121,6 +142,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             firewall,
             access,
             sessions,
+            seen,
             timeouts,
             levels,
             pending,

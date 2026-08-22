@@ -16,7 +16,7 @@
  * nothing worth reading, exactly as well as it does for Minecraft.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import { patchInstallConfig } from "@/lib/apps/install-config";
 import { listGameServerPresence } from "@/lib/apps/games-service";
 import {
@@ -30,9 +30,12 @@ import {
     fillGaps,
     historyOf,
     rosterChange,
+    seenKey,
     type OpenSession,
     type PlayerCount,
-    type PlayerHistory
+    type PlayerHistory,
+    type PlayerSeen,
+    type RosterPlayer
 } from "@/lib/apps/games-activity";
 
 /** How often the sweep asks, which is what a gap in the readings is measured
@@ -119,14 +122,22 @@ export async function sweepGameActivity(
         const open: OpenSession[] = await prisma.gamePlayerSession
             .findMany({
                 where: { installedAppId: presence.id, leftAt: null },
-                select: { id: true, name: true }
+                select: { id: true, name: true, playerId: true }
             })
             .catch(() => []);
 
-        const change = rosterChange(
-            open,
-            presence.players.map((player) => player.name)
-        );
+        // The roster as the game answered it, id and all: on ARK that id is the
+        // only half of it that is the person.
+        const change = rosterChange(open, presence.players);
+
+        // A visit that was open when the id started being kept: the game has just
+        // said whose it is, so the row is told before it closes and stops being
+        // findable by anything but a name the list may not hold.
+        for (const row of change.adopted) {
+            await prisma.gamePlayerSession
+                .updateMany({ where: { id: row.id, playerId: null }, data: { playerId: row.playerId } })
+                .catch(() => undefined);
+        }
 
         if (change.left.length > 0) {
             await prisma.gamePlayerSession
@@ -137,9 +148,10 @@ export async function sweepGameActivity(
         if (change.arrived.length > 0) {
             await prisma.gamePlayerSession
                 .createMany({
-                    data: change.arrived.map((name) => ({
+                    data: change.arrived.map((player) => ({
                         installedAppId: presence.id,
-                        name,
+                        name: player.name,
+                        playerId: player.id,
                         joinedAt: now
                     }))
                 })
@@ -173,14 +185,31 @@ export interface PlayerRecord {
 /** As many visits as a dialog can usefully show. */
 const VISIT_LIMIT = 50;
 
-/** When one player was last on, for the line under their row. */
-export interface PlayerSeen {
-    /** When their latest visit started - which is when they arrived, for
-     *  somebody who is still playing. */
-    readonly since: string | null;
-    /** When they were last seen leaving. Null for somebody whose only visit is
-     *  the one they are on. */
-    readonly lastSeen: string | null;
+/**
+ * The rows a visit of this player's could have been written under.
+ *
+ * The id where the game reports one, and the name for the rows written before it
+ * did - on ARK that is every visit recorded under a survivor name, which is the
+ * only thing there ever was to match on. Once a row carries an id, that id is who
+ * it belongs to and the name no longer decides anything: two survivors can share
+ * a name, and handing one of them the other's history would be worse than saying
+ * nothing.
+ *
+ * Names are compared as they are spelled, which is what the index on them can
+ * answer: this runs for a whole table of players on a poll, and matching a few
+ * hundred names without case would mean reading every visit the server has ever
+ * had. `readPlayerRecord` below, which is about one person and runs when a dialog
+ * opens, can afford the other comparison and does.
+ */
+function visitsOf(players: readonly RosterPlayer[]): Prisma.GamePlayerSessionWhereInput[] {
+    const ids = [...new Set(players.map((player) => player.id?.trim()).filter((id): id is string => !!id))];
+    const names = [
+        ...new Set(players.map((player) => player.name.trim()).filter((name) => name.length > 0))
+    ];
+    const or: Prisma.GamePlayerSessionWhereInput[] = [];
+    if (ids.length > 0) or.push({ playerId: { in: ids } });
+    if (names.length > 0) or.push({ playerId: null, name: { in: names } });
+    return or;
 }
 
 /**
@@ -193,45 +222,72 @@ export interface PlayerSeen {
  * who is connected this second and nothing about a minute ago, so Polaris's own
  * record of who it has watched is the whole of what can be said.
  *
- * One grouped query for the whole table rather than one per row, and by name
- * because that is what a visit is recorded under.
+ * One grouped query for the whole table rather than one per row. Filed under the
+ * id where there is one and under the name where there is not, because a row is
+ * drawn under whichever name the list it came from holds - on ARK the label
+ * somebody typed - and the visit was recorded under whatever the server called
+ * them, which is a different name entirely.
  */
 export async function readLastSeen(
     installedAppId: string,
-    names: readonly string[]
+    players: readonly RosterPlayer[]
 ): Promise<Record<string, PlayerSeen>> {
-    const wanted = [...new Set(names.map((name) => name.trim()).filter((name) => name.length > 0))];
-    if (wanted.length === 0) return {};
+    const or = visitsOf(players);
+    if (or.length === 0) return {};
     const rows = await prisma.gamePlayerSession
         .groupBy({
-            by: ["name"],
-            where: { installedAppId, name: { in: wanted } },
+            by: ["name", "playerId"],
+            where: { installedAppId, OR: or },
             _max: { joinedAt: true, leftAt: true }
         })
         .catch(() => []);
 
     const found: Record<string, PlayerSeen> = {};
-    for (const row of rows) {
-        // Keyed lowercased: the name on a row can be the one somebody typed into
-        // the allow list, and the one a visit was recorded under is whatever the
-        // server said - the same name in a different case, often enough.
-        found[row.name.toLowerCase()] = {
-            since: row._max.joinedAt?.toISOString() ?? null,
-            lastSeen: row._max.leftAt?.toISOString() ?? null
+    const file = (key: string, since: Date | null, lastSeen: Date | null): void => {
+        // A player has one row per name they have played under, so the newest of
+        // them is the answer rather than whichever the database returned last.
+        const held = found[key];
+        found[key] = {
+            since: newest(held?.since ?? null, since?.toISOString() ?? null),
+            lastSeen: newest(held?.lastSeen ?? null, lastSeen?.toISOString() ?? null)
         };
+    };
+    for (const row of rows) {
+        const since = row._max.joinedAt ?? null;
+        const left = row._max.leftAt ?? null;
+        if (row.playerId) file(seenKey({ name: row.name, id: row.playerId }), since, left);
+        // Filed under the name as well, so a row still finds it under the name it
+        // is drawn with when the game has no id to look it up by.
+        file(seenKey({ name: row.name, id: null }), since, left);
     }
     return found;
+}
+
+/** The later of two stamps, either of which may be missing. */
+function newest(left: string | null, right: string | null): string | null {
+    if (!left) return right;
+    if (!right) return left;
+    return left > right ? left : right;
 }
 
 /** What Polaris has watched this player do on this server. */
 export async function readPlayerRecord(
     installedAppId: string,
-    name: string,
+    player: RosterPlayer,
     now: Date = new Date()
 ): Promise<PlayerRecord> {
     const rows = await prisma.gamePlayerSession
         .findMany({
-            where: { installedAppId, name: { equals: name, mode: "insensitive" } },
+            where: {
+                installedAppId,
+                OR: [
+                    ...(player.id ? [{ playerId: player.id }] : []),
+                    // Without case, because the lists disagree on it: a visit is
+                    // recorded as the server spelled the name and a row is opened
+                    // from the list, which holds whatever was typed into it.
+                    { playerId: null, name: { equals: player.name, mode: "insensitive" as const } }
+                ]
+            },
             select: { joinedAt: true, leftAt: true },
             orderBy: { joinedAt: "desc" }
         })

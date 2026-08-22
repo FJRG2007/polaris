@@ -10,21 +10,39 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fillGaps, historyOf, presenceLine, readPlayerStats, rosterChange } from "@/lib/apps/games-activity";
+import {
+    fillGaps,
+    historyOf,
+    presenceLine,
+    readPlayerStats,
+    rosterChange,
+    seenFor,
+    seenKey
+} from "@/lib/apps/games-activity";
 
 const NOW = new Date("2026-08-13T21:00:00.000Z");
 
-function open(entries: [string, string][]) {
-    return entries.map(([id, name]) => ({ id, name }));
+function open(entries: [string, string][], playerId: string | null = null) {
+    return entries.map(([id, name]) => ({ id, name, playerId }));
+}
+
+/** A roster as Minecraft answers it: names, and no second id. */
+function named(...names: string[]) {
+    return names.map((name) => ({ name, id: null }));
+}
+
+/** And as ARK answers it: a survivor name with the Steam id beside it. */
+function survivor(name: string, id: string) {
+    return { name, id };
 }
 
 describe("what changed since the last look", () => {
     it("sees an arrival and a departure in one pass", () => {
-        const change = rosterChange(open([["s1", "Alice"]]), ["Alice", "Bob"]);
-        expect(change.arrived).toEqual(["Bob"]);
+        const change = rosterChange(open([["s1", "Alice"]]), named("Alice", "Bob"));
+        expect(change.arrived).toEqual([{ name: "Bob", id: null }]);
         expect(change.left).toEqual([]);
 
-        const after = rosterChange(open([["s1", "Alice"], ["s2", "Bob"]]), ["Bob"]);
+        const after = rosterChange(open([["s1", "Alice"], ["s2", "Bob"]]), named("Bob"));
         expect(after.arrived).toEqual([]);
         expect(after.left).toEqual(["s1"]);
     });
@@ -33,17 +51,21 @@ describe("what changed since the last look", () => {
         // Only the server decides how it spells a name, and it does not always
         // give the same answer twice. Taken literally, that is a player who
         // disconnects and reconnects every minute, forever.
-        expect(rosterChange(open([["s1", "Alice"]]), ["alice"])).toEqual({ arrived: [], left: [] });
+        expect(rosterChange(open([["s1", "Alice"]]), named("alice"))).toEqual({
+            arrived: [],
+            left: [],
+            adopted: []
+        });
     });
 
     it("keeps the newest spelling for somebody arriving", () => {
-        expect(rosterChange([], ["  Alice  "]).arrived).toEqual(["Alice"]);
+        expect(rosterChange([], named("  Alice  ")).arrived).toEqual([{ name: "Alice", id: null }]);
     });
 
     it("heals a duplicate left behind by an interrupted sweep", () => {
         // Two open sessions for one player means a pass died between writing and
         // committing. One is the visit; the rest are closed rather than kept.
-        const change = rosterChange(open([["s1", "Alice"], ["s2", "Alice"]]), ["Alice"]);
+        const change = rosterChange(open([["s1", "Alice"], ["s2", "Alice"]]), named("Alice"));
         expect(change.arrived).toEqual([]);
         expect(change.left).toEqual(["s2"]);
     });
@@ -53,7 +75,36 @@ describe("what changed since the last look", () => {
     });
 
     it("ignores a blank name rather than opening a session for nobody", () => {
-        expect(rosterChange([], ["", "   "]).arrived).toEqual([]);
+        expect(rosterChange([], named("", "   ")).arrived).toEqual([]);
+    });
+
+    it("keeps one visit for a survivor renamed mid-session", () => {
+        // ARK lets somebody rename their survivor whenever they like, and the
+        // roster prints the new name from the next second on. Matched by name that
+        // is one player leaving and a stranger arriving, every time.
+        const change = rosterChange(open([["s1", "Rex"]], "765"), [survivor("Rexy", "765")]);
+        expect(change).toEqual({ arrived: [], left: [], adopted: [] });
+    });
+
+    it("tells two survivors who picked the same name apart", () => {
+        // The name is decoration on ARK: two people can both call themselves
+        // Survivor, and the one who left has to be the one whose visit closes.
+        const change = rosterChange(open([["s1", "Survivor"]], "111"), [survivor("Survivor", "222")]);
+        expect(change.left).toEqual(["s1"]);
+        expect(change.arrived).toEqual([survivor("Survivor", "222")]);
+    });
+
+    it("still matches a visit recorded before the id was kept, and writes the id on it", () => {
+        // Every row already written has no id. Matched by name, as it always was,
+        // rather than read as everybody on the server leaving at once - and told
+        // whose it is now that the game has said, so the visit somebody is on
+        // right now is not lost to their row the moment it ends.
+        const change = rosterChange(open([["s1", "Rex"]]), [survivor("Rex", "765")]);
+        expect(change).toEqual({ arrived: [], left: [], adopted: [{ id: "s1", playerId: "765" }] });
+    });
+
+    it("adopts nothing on a game that reports no id of its own", () => {
+        expect(rosterChange(open([["s1", "Alice"]]), named("Alice")).adopted).toEqual([]);
     });
 });
 
@@ -226,5 +277,32 @@ describe("presenceLine", () => {
 
     it("says nothing at all when there is nothing to say", () => {
         expect(presenceLine({ online: false, seen: null, addedAt: null })).toBeNull();
+    });
+});
+
+/**
+ * Finding a row's own history.
+ *
+ * The row and the visit need not be drawn under the same name: an ARK row for
+ * somebody offline carries the label whoever added them typed, and the visit was
+ * recorded under whatever the server called their survivor.
+ */
+describe("seenFor", () => {
+    const visit = { since: "2026-08-13T19:00:00.000Z", lastSeen: "2026-08-13T20:00:00.000Z" };
+
+    it("finds the visit by id when the row and the visit disagree on the name", () => {
+        const seen = { [seenKey({ name: "Rex", id: "765" })]: visit };
+        expect(seenFor(seen, { id: "765", names: ["Er Migue"] })).toEqual(visit);
+    });
+
+    it("falls back to the name for a game with no id, and for the older rows", () => {
+        const seen = { [seenKey({ name: "Alice", id: null })]: visit };
+        expect(seenFor(seen, { id: null, names: ["alice"] })).toEqual(visit);
+        expect(seenFor(seen, { id: "765", names: ["Alice"] })).toEqual(visit);
+    });
+
+    it("does not hand somebody a stranger's history", () => {
+        const seen = { [seenKey({ name: "Rex", id: "765" })]: visit };
+        expect(seenFor(seen, { id: "111", names: ["Survivor", ""] })).toBeNull();
     });
 });

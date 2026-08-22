@@ -13,8 +13,15 @@
  */
 
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
+import { seenFor, type PlayerSeen } from "@/lib/apps/games-activity";
 import type { MinecraftRoster, MinecraftStatus } from "@/lib/apps/minecraft/service";
-import { playerActivity, sessionsByPlayer, type PlayerPresence, type PlayerSessionEvent } from "./sessions";
+import {
+    playerActivity,
+    sessionsByPlayer,
+    type PlayerActivity,
+    type PlayerPresence,
+    type PlayerSessionEvent
+} from "./sessions";
 
 /** One person, with every list this server holds them in. */
 export interface PlayerEntry {
@@ -32,7 +39,9 @@ export interface PlayerEntry {
     readonly banned: boolean;
     /** What they are doing, from the server's answer and its log. */
     readonly presence: PlayerPresence;
-    /** When they last arrived or left, ISO 8601, as far back as the log reaches. */
+    /** When they last arrived or left, ISO 8601. Out of the log while it still
+     *  reaches back that far, and out of Polaris's own record of who it has
+     *  watched once it does not. */
     readonly lastSeen: string | null;
     /** Their own arrivals and departures, oldest first. */
     readonly sessions: readonly PlayerSessionEvent[];
@@ -57,7 +66,10 @@ export function foldPlayers(
     /** The clock the log's timestamps are compared against. The server's, passed
      *  in with the reading, because a browser whose clock is minutes out would
      *  otherwise decide somebody is still arriving an hour after they left. */
-    now: number = Date.now()
+    now: number = Date.now(),
+    /** When Polaris last watched each of them on this server, for the players the
+     *  log no longer reaches back to. */
+    seen: Readonly<Record<string, PlayerSeen>> = {}
 ): PlayerEntry[] {
     const byKey = new Map<string, PlayerEntry>();
     const upsert = (name: string, patch: Partial<PlayerEntry>): void => {
@@ -98,7 +110,12 @@ export function foldPlayers(
     const history = sessionsByPlayer(sessions);
     for (const [key, entry] of byKey) {
         const own = history.get(key) ?? [];
-        byKey.set(key, { ...entry, ...playerActivity(own, entry.online, now), sessions: own });
+        const activity = playerActivity(own, entry.online, now);
+        byKey.set(key, {
+            ...entry,
+            ...watched(activity, seenFor(seen, { id: null, names: [entry.name] })),
+            sessions: own
+        });
     }
 
     // Online first - they are the ones something can be done about right now -
@@ -118,3 +135,20 @@ export function foldPlayers(
  * "map is not a function" and took the page down with it.
  */
 export const GAME_MODES = ["survival", "creative", "adventure", "spectator"] as const;
+
+/**
+ * What the log said about somebody, filled in from what Polaris watched.
+ *
+ * The log is the better answer while it has one - it is the server writing down
+ * the moment itself, where the record is a sweep that noticed within the minute -
+ * but it reaches back only as far as the tail that was asked for and starts empty
+ * again every time the container is replaced. So a player whose joins have scrolled
+ * off had nothing under their row at all, and was badged as never having played
+ * here, which is a different claim entirely from "the log no longer says".
+ */
+function watched(activity: PlayerActivity, seen: PlayerSeen | null): PlayerActivity {
+    if (activity.lastSeen) return activity;
+    const last = seen?.lastSeen ?? seen?.since ?? null;
+    if (!last) return activity;
+    return { presence: activity.presence === "never" ? "offline" : activity.presence, lastSeen: last };
+}

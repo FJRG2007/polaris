@@ -426,10 +426,14 @@ export function ArkExperienceDialog({
 export function ArkHistoryDialog({
     installedAppId,
     player,
+    steamId,
     onClose
 }: {
     installedAppId: string;
     player: string;
+    /** Who the visits belong to. The name is only what they were called at the
+     *  time: a survivor can be renamed, and the list holds a different name again. */
+    steamId: string;
     onClose: () => void;
 }) {
     const [record, setRecord] = useState<PlayerRecord | null>(null);
@@ -437,7 +441,7 @@ export function ArkHistoryDialog({
 
     useEffect(() => {
         let live = true;
-        void actions.readArkPlayerRecordAction(installedAppId, player).then((answer) => {
+        void actions.readArkPlayerRecordAction(installedAppId, player, steamId).then((answer) => {
             if (!live) return;
             setRecord(answer.record ?? null);
             setLoading(false);
@@ -445,7 +449,7 @@ export function ArkHistoryDialog({
         return () => {
             live = false;
         };
-    }, [installedAppId, player]);
+    }, [installedAppId, player, steamId]);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>

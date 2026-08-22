@@ -546,7 +546,9 @@ export async function readPlayerRecordAction(
     try {
         const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const [record, stats] = await Promise.all([
-            readPlayerRecord(parsed.data.installedAppId, parsed.data.player),
+            // The account name is the identity here: Minecraft reports no second
+            // id on its roster, so a visit is recorded under the name alone.
+            readPlayerRecord(parsed.data.installedAppId, { name: parsed.data.player, id: null }),
             readMinecraftStats(access.ownerId, parsed.data.installedAppId, parsed.data.player)
         ]);
         return { record, stats };
