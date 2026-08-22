@@ -73,7 +73,8 @@ irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/scripts/in
 
 Linux is the recommended host - Ubuntu Server is what Polaris is run against.
 Windows works, but Docker there runs inside WSL and the host Polaris manages is
-that virtual machine, not the PC; see [Requirements](#requirements).
+that virtual machine rather than the machine itself; see
+[Requirements](#requirements).
 
 Prefer to do it by hand? Clone the repo and run Compose directly:
 
@@ -184,11 +185,11 @@ plugin. That's it. For local development without containers, see the
 Polaris manages the machine it lives on, and that means privileged mounts, the
 host's Docker engine and host networking, all of which are native there.
 
-On Windows, Docker runs inside WSL, so the host Polaris would be managing is the
-virtual machine rather than your PC: privileged mounts and host networking behave
-differently or not at all. It is not recommended as the host. A Windows machine
-is a perfectly good **server to add** to a Polaris running elsewhere, managed
-from it like any other.
+On Windows, Docker runs inside WSL, so the host Polaris would be managing is that
+virtual machine rather than the machine you installed it on: privileged mounts
+and host networking behave differently or not at all. It is not recommended as
+the host. A Windows machine is a perfectly good **server to add** to a Polaris
+running elsewhere, managed from it like any other.
 
 ## Contributing
 
