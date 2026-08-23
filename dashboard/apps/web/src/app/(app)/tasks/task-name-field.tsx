@@ -59,11 +59,15 @@ export const TaskNameField = forwardRef<HTMLTextAreaElement, Props>(function Tas
                 }
                 onKeyDown?.(event);
             }}
-            // `shrink-0` is load-bearing: hiding the overflow drops a flex item's
-            // automatic minimum size to zero, so inside the panel's scrolling
-            // column the box was crushed to nothing and the name vanished.
+            // Bounded at both ends. `rows` is the floor; `max-h-32` is the ceiling,
+            // because a name pasted from somewhere else is sometimes a paragraph and
+            // a heading that grows without limit pushes the whole panel apart. Past
+            // the ceiling it scrolls; under it the height always matches the content,
+            // so no bar is ever drawn. `shrink-0` is load-bearing too: a scrolling
+            // box drops a flex item's automatic minimum size to zero, and inside the
+            // panel's own scrolling column this was crushed to nothing.
             className={cn(
-                "w-full shrink-0 resize-none overflow-hidden bg-transparent text-xl font-semibold leading-tight outline-none",
+                "w-full max-h-32 shrink-0 resize-none overflow-y-auto bg-transparent text-xl font-semibold leading-tight outline-none",
                 className
             )}
         />
