@@ -11,6 +11,13 @@
  * The conversation is made the first time a rule fires, not when it is written.
  * A rule nobody ever triggers should not leave a room in everybody's sidebar.
  *
+ * A rule can ask for the bell as well, and that is asked for rather than
+ * assumed. Everything a camera sees is written down in Events either way, so the
+ * bell is for the handful of things somebody wants pushed at them - it goes
+ * through the dispatcher, which is what makes it obey each recipient's own
+ * notification settings and reach their mail or a webhook without this knowing
+ * anything about either.
+ *
  * Server-only.
  */
 
@@ -20,6 +27,8 @@ import { HomeError } from "@/lib/home/home-error";
 import { withinHours } from "@/lib/home/detection";
 import type { Detection } from "@/lib/home/events";
 import { publishChatChange } from "@/lib/chat/live";
+import type { AlertRuleInput } from "@/lib/home/schemas";
+import { notify } from "@/lib/notifications/dispatch";
 
 export interface AlertRuleView {
     readonly id: string;
@@ -34,21 +43,12 @@ export interface AlertRuleView {
     readonly zones: readonly string[];
     readonly hours: { from: number; to: number } | null;
     readonly recipients: readonly string[];
+    /** Whether it also reaches their notifications, and from there mail or
+     *  wherever else the account sends an alert. */
+    readonly notify: boolean;
     readonly enabled: boolean;
     /** The conversation it posts into, once it has fired at least once. */
     readonly channelId: string | null;
-}
-
-export interface AlertRuleInput {
-    readonly name: string;
-    readonly placeId: string | null;
-    readonly cameraId: string | null;
-    readonly kinds: readonly string[];
-    readonly label: string | null;
-    readonly zones: readonly string[];
-    readonly hours: { from: number; to: number } | null;
-    readonly recipients: readonly string[];
-    readonly enabled: boolean;
 }
 
 /** A stored JSON column, or the fallback. A malformed one means the rule falls
@@ -75,6 +75,7 @@ function toView(row: NonNullable<Row>): AlertRuleView {
         zones: parseJson<string[]>(row.zones, []),
         hours: parseJson<{ from: number; to: number } | null>(row.hours, null),
         recipients: parseJson<string[]>(row.recipients, []),
+        notify: row.notify,
         enabled: row.enabled,
         channelId: row.channelId
     };
@@ -111,6 +112,7 @@ export async function saveAlertRule(
         zones: JSON.stringify([...input.zones]),
         hours: input.hours ? JSON.stringify(input.hours) : null,
         recipients: JSON.stringify([...input.recipients]),
+        notify: input.notify,
         enabled: input.enabled
     };
 
@@ -225,14 +227,14 @@ function matches(
     return true;
 }
 
-/** What the message says. One line, in the words somebody would use, and a link
- *  to the moment - an alert nobody can act on is a notification. */
-function body(
+/** What happened, in the words somebody would use, and where. Written once and
+ *  read twice: the message says it with a link on the end, and a notification
+ *  says the same sentence without the markup. */
+function headline(
     detection: Detection,
     cameraName: string,
-    placeName: string,
-    eventId: string
-): string {
+    placeName: string
+): { who: string; where: string } {
     const who =
         detection.kind === "face" && detection.label
             ? detection.label
@@ -250,8 +252,12 @@ function body(
     // The area is the useful half of "where" once somebody has drawn one: "at
     // the front door" is a sentence, "at Front camera" is a device name.
     const area = detection.zones?.[0];
-    const where = [area, cameraName, placeName].filter(Boolean).join(", ");
-    return `${who} at **${where}** - [see it](/places/events?event=${eventId})`;
+    return { who, where: [area, cameraName, placeName].filter(Boolean).join(", ") };
+}
+
+/** Where the moment itself is, for anything that hands somebody a link. */
+function eventHref(eventId: string): string {
+    return `/places/events?event=${eventId}`;
 }
 
 /**
@@ -286,14 +292,16 @@ export async function raiseAlerts(
         // Named after where it has just walked into rather than where it came
         // in: "somebody at the driveway" is only a useful sentence if the
         // driveway is what set it off.
-        const text = body(
+        const { who, where } = headline(
             onlyZones
                 ? { ...detection, zones: [...onlyZones, ...(detection.zones ?? [])] }
                 : detection,
             camera.name,
-            place?.name ?? "",
-            eventId
+            place?.name ?? ""
         );
+        // With the way back to the moment on the end of it: an alert somebody
+        // cannot act on is a line of text.
+        const text = `${who} at **${where}** - [see it](${eventHref(eventId)})`;
 
         for (const rule of rules) {
             const channelId = await conversationFor(rule, rule.recipients[0] ?? null);
@@ -315,6 +323,26 @@ export async function raiseAlerts(
                 actorId: "",
                 audience: [...rule.recipients]
             });
+
+            // And the bell, for a rule that was asked for it. Through the
+            // dispatcher rather than straight into the table, so it obeys the
+            // routing each recipient set for Places - which is also how it
+            // reaches their mail or a webhook without this knowing anything
+            // about either.
+            if (rule.notify) {
+                await Promise.all(
+                    rule.recipients.map((userId) =>
+                        notify({
+                            userId,
+                            event: "places.alert",
+                            title: `${who} at ${where}`,
+                            body: rule.name,
+                            href: eventHref(eventId),
+                            metadata: { eventId, ruleId: rule.id }
+                        })
+                    )
+                );
+            }
         }
     } catch (error) {
         console.error("polaris: an alert could not be delivered:", error);

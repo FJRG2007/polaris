@@ -69,6 +69,7 @@ export function AlertDialog({
     const [from, setFrom] = useState(String(rule?.hours?.from ?? 22));
     const [to, setTo] = useState(String(rule?.hours?.to ?? 7));
     const [recipients, setRecipients] = useState<string[]>([...(rule?.recipients ?? [])]);
+    const [notify, setNotify] = useState(rule?.notify ?? false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +89,7 @@ export function AlertDialog({
                     zones,
                     hours: hoursOn ? { from: Number(from) || 0, to: Number(to) || 0 } : null,
                     recipients,
+                    notify,
                     enabled: rule?.enabled ?? true
                 }),
             setError
@@ -109,8 +111,9 @@ export function AlertDialog({
                 <DialogHeader>
                     <DialogTitle>{rule ? rule.name : "Add an alert"}</DialogTitle>
                     <DialogDescription>
-                        It arrives as a message in a conversation with the people you pick, so it
-                        turns up wherever they are rather than waiting on a badge.
+                        Everything the cameras see is in Events either way. An alert is what you
+                        want telling about: it arrives as a message in a conversation with the
+                        people you pick.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -270,6 +273,20 @@ export function AlertDialog({
                                 </label>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex items-center justify-between gap-3">
+                            <span className="text-[13px] text-foreground">
+                                Also send it to their notifications
+                            </span>
+                            <Switch checked={notify} onChange={setNotify} />
+                        </label>
+                        <p className="text-[12px] text-foreground-subtle">
+                            {notify
+                                ? "It reaches the bell as well, and wherever each person sends their alerts. Everyone chooses that in their own notification settings."
+                                : "Only the conversation. Nothing lands on the bell."}
+                        </p>
                     </div>
                 </div>
 

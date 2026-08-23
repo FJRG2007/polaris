@@ -13,11 +13,13 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
 
+import { isMuted } from "@polaris/core";
 import { raiseAlerts } from "@/lib/home/alerts";
 import { parseDetection } from "@/lib/home/cameras";
+import { notify } from "@/lib/notifications/dispatch";
+import { ruleFor } from "@/lib/notifications/preferences";
 import type { ObjectClass } from "@/lib/home/detection";
 import { deleteStill, storeStill } from "@/lib/home/stills";
-import { createNotification } from "@/lib/notification-service";
 import { MOTION_SECONDS, recordClip } from "@/lib/home/recording";
 
 /** What a detector reports. The kinds are the ladder's own vocabulary. */
@@ -348,6 +350,13 @@ async function attachStill(
  * taught to the recognizer so it STOPS raising alerts, not so every arrival home
  * becomes one.
  *
+ * Even so, this is not the bell any more by default. It goes through the
+ * dispatcher as a catalogue event, so "a camera saw something" is a line in
+ * Settings > Notifications that starts off - a camera watching a room somebody
+ * works in reports them all day, and every one of those is already written down
+ * here. What is left on is a camera reporting that it was interfered with, which
+ * is about the camera rather than about what walked past it.
+ *
  * Sent to whoever the house belongs to. Never throws - it is the last thing that
  * happens to an event, and an event that was recorded must not be reported as a
  * failure because a notification could not be written.
@@ -379,6 +388,14 @@ async function announce(
     });
     if (!install) return;
 
+    const event = detection.kind === "tamper" ? "places.tamper" : "places.sighting";
+    // Asked here rather than left to the dispatcher to drop, because the
+    // dispatcher writes a line in the delivery history for everything it decides
+    // not to send. A camera reports what it sees all day and a sighting is off
+    // by default, so that history would become one row per person walking past a
+    // camera, which is not a history.
+    if (isMuted(await ruleFor(install.ownerId, event))) return;
+
     const what =
         detection.kind === "face" && detection.label
             ? `${known?.name ?? detection.label} is at the ${cameraName}`
@@ -388,12 +405,14 @@ async function announce(
                 ? `Somebody is at the ${cameraName}`
                 : `A ${detection.kind} at the ${cameraName}`;
 
-    await createNotification({
+    await notify({
         userId: install.ownerId,
-        type: "home.event",
+        event,
         title: what,
-        href: "/places/events",
-        level: detection.kind === "tamper" ? "warning" : "info",
+        // At the moment itself rather than at the top of the log: a line that
+        // says something happened and then makes somebody go and find it is
+        // half an alert.
+        href: `/places/events?event=${eventId}`,
         metadata: { eventId }
     });
 }
@@ -422,6 +441,57 @@ export interface EventQuery {
      *  table is the one that grows without limit. */
     readonly before?: Date | null;
     readonly limit?: number;
+}
+
+/** What an event is read into a view from. One list, so the two readers below
+ *  cannot drift into selecting different columns. */
+const EVENT_FIELDS = {
+    id: true,
+    cameraId: true,
+    at: true,
+    kind: true,
+    label: true,
+    score: true,
+    stillKey: true,
+    box: true,
+    zones: true,
+    endedAt: true,
+    clipId: true,
+    ackedAt: true
+} as const;
+
+function toEventView(
+    row: {
+        id: string;
+        cameraId: string;
+        at: Date;
+        kind: string;
+        label: string | null;
+        score: number | null;
+        stillKey: string | null;
+        box: string | null;
+        zones: string;
+        endedAt: Date | null;
+        clipId: string | null;
+        ackedAt: Date | null;
+    },
+    cameraName: string
+): EventView {
+    return {
+        id: row.id,
+        cameraId: row.cameraId,
+        cameraName,
+        at: row.at.toISOString(),
+        kind: row.kind,
+        label: row.label,
+        score: row.score,
+        stillKey: row.stillKey,
+        box: parseEventBox(row.box),
+        zones: parseEventZones(row.zones),
+        endedAt: row.endedAt?.toISOString() ?? null,
+        clipId: row.clipId,
+        acked: row.ackedAt !== null
+    };
 }
 
 /** What happened, newest first. Always bounded. */
@@ -467,36 +537,25 @@ export async function listEvents(
         },
         orderBy: { at: "desc" },
         take: limit,
-        select: {
-            id: true,
-            cameraId: true,
-            at: true,
-            kind: true,
-            label: true,
-            score: true,
-            stillKey: true,
-            box: true,
-            zones: true,
-            endedAt: true,
-            clipId: true,
-            ackedAt: true
-        }
+        select: EVENT_FIELDS
     });
-    return rows.map((row) => ({
-        id: row.id,
-        cameraId: row.cameraId,
-        cameraName: names.get(row.cameraId) ?? "",
-        at: row.at.toISOString(),
-        kind: row.kind,
-        label: row.label,
-        score: row.score,
-        stillKey: row.stillKey,
-        box: parseEventBox(row.box),
-        zones: parseEventZones(row.zones),
-        endedAt: row.endedAt?.toISOString() ?? null,
-        clipId: row.clipId,
-        acked: row.ackedAt !== null
-    }));
+    return rows.map((row) => toEventView(row, names.get(row.cameraId) ?? ""));
+}
+
+/**
+ * One event, whatever the screen is currently filtered to.
+ *
+ * The log is newest first and paged, so a link to a moment - the one in an
+ * alert, the one in a notification - points at something the list would not
+ * have loaded once a day has passed. Scoped through the cameras of this house
+ * for the same reason listing is: an id from anywhere else must not resolve.
+ */
+export async function getEvent(installedAppId: string, id: string): Promise<EventView | null> {
+    const row = await prisma.cameraEvent.findFirst({
+        where: { id, camera: { installedAppId } },
+        select: { ...EVENT_FIELDS, camera: { select: { name: true } } }
+    });
+    return row ? toEventView(row, row.camera.name) : null;
 }
 
 /** Mark an event as seen, so it stops being one of the things waiting. */

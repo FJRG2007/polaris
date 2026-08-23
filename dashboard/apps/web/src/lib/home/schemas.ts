@@ -191,6 +191,51 @@ export function normalizeZoneInput(input: unknown): Record<string, unknown> {
     return value;
 }
 
+/** What an alert can be written about. The detection ladder's vocabulary, and
+ *  nothing else: a rule names a thing a camera saw. */
+export const ALERT_KINDS = [
+    "motion",
+    "person",
+    "face",
+    "vehicle",
+    "animal",
+    "package",
+    "tamper"
+] as const;
+
+/**
+ * An alert, as the form fills it in and as the server stores it.
+ *
+ * Every field is a request rather than a fact: the recipients decide who is
+ * added to a private conversation and the areas are matched against what an
+ * event recorded, so both are shaped here before anything is written.
+ */
+export const alertRuleInputSchema = z.object({
+    name: z.string().trim().min(1, "Give it a name").max(80),
+    /** Filled in from the switcher when the form left it out. */
+    placeId: z.string().regex(UUID, "Unknown place").nullable().default(null),
+    cameraId: z.string().regex(UUID, "Unknown camera").nullable().default(null),
+    kinds: z
+        .array(z.enum(ALERT_KINDS))
+        .min(1, "Choose what it should tell you about")
+        .max(ALERT_KINDS.length),
+    /** One person by the name the recognizer put to them, or anybody. */
+    label: z.string().trim().max(120).nullable().default(null),
+    zones: z.array(z.string().trim().min(1).max(64)).max(64).default([]),
+    hours: z
+        .object({
+            from: z.coerce.number().int().min(0).max(23),
+            to: z.coerce.number().int().min(0).max(23)
+        })
+        .nullable()
+        .default(null),
+    recipients: z.array(z.string().regex(UUID, "Unknown person")).min(1, "Choose who to tell"),
+    notify: z.boolean().default(false),
+    enabled: z.boolean().default(true)
+});
+
+export type AlertRuleInput = z.infer<typeof alertRuleInputSchema>;
+
 /** What a discovery sweep is asked for: one subnet, or the one Polaris is on. */
 export const discoveryInputSchema = z.object({
     /** CIDR to sweep, e.g. "192.168.1.0/24". Empty means the network Polaris

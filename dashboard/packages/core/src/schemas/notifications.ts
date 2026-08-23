@@ -42,6 +42,7 @@ export const NOTIFICATION_GROUPS = [
     "tasks",
     "security",
     "drive",
+    "places",
     "network",
     "people",
     "system"
@@ -55,6 +56,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     tasks: "Tasks",
     security: "Security",
     drive: "Drive",
+    places: "Places",
     network: "Network",
     people: "People",
     system: "Polaris"
@@ -299,6 +301,34 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Upload could not be scanned",
         description: "The scanner did not finish. The file was kept.",
         level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "places.sighting",
+        group: "places",
+        label: "A camera saw something",
+        description: "Somebody, a vehicle, an animal or a parcel came into view of a camera.",
+        level: "info",
+        // Off, and deliberately. A camera pointed at a room somebody works in
+        // sees them all day, and every one of those is already written down in
+        // Places. An alert is how you ask to be told about the few that matter,
+        // so the bell is not the place to repeat the whole log.
+        defaults: { inapp: false, email: false }
+    },
+    {
+        id: "places.alert",
+        group: "places",
+        label: "An alert you wrote went off",
+        description: "Something one of your alerts asked about happened.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "places.tamper",
+        group: "places",
+        label: "A camera was interfered with",
+        description: "A camera reported being covered, moved or unplugged.",
+        level: "warning",
         defaults: { inapp: true, email: false }
     },
     {

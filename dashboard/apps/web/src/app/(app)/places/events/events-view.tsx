@@ -11,11 +11,16 @@
  *
  * Paged by keyset rather than by page number. This is the table that grows
  * without limit, and asking for page forty of it is a query nobody should write.
+ *
+ * `?event=<id>` is what an alert and a notification link to. It is read by id
+ * and put at the top of whatever is on screen, because a link followed two days
+ * later names a moment that is pages down a list ordered newest first.
  */
 
 import Image from "next/image";
 import * as actions from "../actions";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { EventView } from "@/lib/home/events";
 import { DetectionBox } from "../detection-box";
@@ -67,6 +72,8 @@ function lasted(event: EventView): string | null {
 
 export function EventsView({ canControl }: { canControl: boolean }) {
     const format = useDisplayFormat();
+    /** The moment a link asked for, if any. */
+    const asked = useSearchParams().get("event");
     const [events, setEvents] = useState<EventView[] | null>(null);
     const [cameras, setCameras] = useState<CameraView[]>([]);
     const [people, setPeople] = useState<{ id: string; name: string; subjectId: string }[]>([]);
@@ -131,12 +138,21 @@ export function EventsView({ canControl }: { canControl: boolean }) {
             });
             if (cancelled) return;
             if (result.error) setError(result.error);
-            setEvents(result.events ?? []);
+            let list = result.events ?? [];
+            // Followed from a message or a notification, and the tile it names
+            // is only on this page while it is recent. Read on its own and put
+            // first, so a link always lands on the thing it promised.
+            if (asked && !list.some((item) => item.id === asked)) {
+                const one = await actions.getEventAction(asked);
+                if (cancelled) return;
+                if (one.event) list = [one.event, ...list];
+            }
+            setEvents(list);
         })();
         return () => {
             cancelled = true;
         };
-    }, [cameraId, kind, label, zone, from, to]);
+    }, [asked, cameraId, kind, label, zone, from, to]);
 
     const loadMore = async () => {
         if (!events?.length) return;
@@ -224,6 +240,11 @@ export function EventsView({ canControl }: { canControl: boolean }) {
         if (!subject) return null;
         return people.find((person) => person.subjectId === subject)?.name ?? subject;
     };
+
+    /** Puts the moment a link named where somebody can see it, once. */
+    const showAsked = useCallback((node: HTMLLIElement | null) => {
+        node?.scrollIntoView({ block: "center" });
+    }, []);
 
     const openMoment = async (event: EventView) => {
         setNoFootage(null);
@@ -347,8 +368,10 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                         {events.map((event) => (
                             <li
                                 key={event.id}
+                                ref={event.id === asked ? showAsked : undefined}
                                 className={cn(
-                                    "overflow-hidden rounded-lg border border-border bg-card",
+                                    "overflow-hidden rounded-lg border bg-card",
+                                    event.id === asked ? "border-primary" : "border-border",
                                     event.acked && "opacity-60"
                                 )}
                             >

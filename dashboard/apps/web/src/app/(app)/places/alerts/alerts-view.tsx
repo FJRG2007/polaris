@@ -6,7 +6,9 @@
  * An alert arrives as a message in a conversation rather than as a badge on the
  * bell, and the list says so plainly, because it changes what people expect: it
  * appears the way a message appears, it can be muted the way a conversation is
- * muted, and it leaves a thread rather than a counter.
+ * muted, and it leaves a thread rather than a counter. A rule can ask for the
+ * bell as well, and that is a per-rule choice rather than the default, because
+ * everything a camera sees is already written down in Events.
  *
  * Deliberately few knobs. What was seen, optionally who, optionally which
  * camera, optionally between which hours - anything more expressive is a rules
@@ -175,7 +177,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                 <EmptyState
                     icon={<Bell />}
                     title="No alerts yet"
-                    description="An alert arrives as a message in a conversation with the people you choose, so it appears wherever they are rather than waiting on a badge."
+                    description="Everything the cameras see is kept in Events. An alert is for the few things worth being told about: it arrives as a message in a conversation with the people you choose."
                 />
             ) : (
                 <ul
@@ -220,6 +222,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                                             ?.name ?? "somebody"
                                                 )
                                                 .join(", ")}
+                                            {rule.notify
+                                                ? ", in a message and on the bell"
+                                                : ", in a message"}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">

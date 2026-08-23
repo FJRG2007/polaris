@@ -7218,6 +7218,10 @@ model AlertRule {
     /// The conversation it posts into, made the first time it fires so a rule
     /// nobody triggers never creates a room.
     channelId      String? @db.Uuid
+    /// Whether it also reaches everybody's notifications, and through them mail
+    /// or whatever else the account routes an alert to. Off: an alert is a
+    /// message, and the bell is a record you come back to and clear.
+    notify         Boolean @default(false)
     enabled        Boolean @default(true)
     createdById    String? @db.Uuid
 

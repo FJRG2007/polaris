@@ -42,6 +42,7 @@ import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import {
+    alertRuleInputSchema,
     cameraInputSchema,
     cameraZoneInputSchema,
     discoveryInputSchema,
@@ -181,14 +182,18 @@ export async function listAlertsAction(): Promise<{
  */
 export async function saveAlertAction(
     id: string | null,
-    input: alerts.AlertRuleInput
+    input: unknown
 ): Promise<{ rule?: alerts.AlertRuleView; error?: string }> {
     const { user, install } = await requireHome("home.manage");
+    const parsed = alertRuleInputSchema.safeParse(input ?? {});
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
+    }
     const result = await guard(async () => {
         // A rule with no place is one that watches everywhere, which is a
         // deliberate choice rather than a side effect of the switcher.
-        const placeId = input.placeId ?? (await currentPlace(install.id)).current.id;
-        return alerts.saveAlertRule(install.id, id, user.id, { ...input, placeId });
+        const placeId = parsed.data.placeId ?? (await currentPlace(install.id)).current.id;
+        return alerts.saveAlertRule(install.id, id, user.id, { ...parsed.data, placeId });
     });
     if (result.error || !result.value)
         return { error: result.error ?? "That alert could not be saved." };
@@ -539,6 +544,21 @@ export async function listEventsAction(input: {
         })
     );
     return result.error ? { error: result.error } : { events: result.value };
+}
+
+/**
+ * One event by id, for a link that points at a moment rather than at the log.
+ *
+ * Not filtered by the place in the switcher: a link is followed from a message
+ * or a notification, and refusing it because somebody last looked at a
+ * different house would be a dead end with nothing on screen to explain it.
+ */
+export async function getEventAction(
+    id: string
+): Promise<{ event?: events.EventView | null; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => events.getEvent(install.id, id));
+    return result.error ? { error: result.error } : { event: result.value ?? null };
 }
 
 /**
