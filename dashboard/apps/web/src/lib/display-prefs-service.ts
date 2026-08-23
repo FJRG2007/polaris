@@ -107,11 +107,18 @@ export async function resolveDisplayPreferencesFor(userId: string | null): Promi
 export async function recordDeviceTimeZone(userId: string, zone: string): Promise<boolean> {
     const wanted = zone.trim();
     if (wanted === AUTOMATIC_TIME_ZONE || !isTimeZone(wanted)) return false;
-    const changed = await prisma.user.updateMany({
-        where: { id: userId, NOT: { deviceTimeZone: wanted } },
-        data: { deviceTimeZone: wanted }
+    // Read, compare, write. The obvious version of this - one update with "where
+    // the column is not already this" - writes nothing at all on the row that
+    // matters: the column is null until a browser has ever said, and in SQL a
+    // null is not "not equal to Madrid", it is unknown, so the account this
+    // exists for was the one account it skipped.
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { deviceTimeZone: true }
     });
-    return changed.count > 0;
+    if (!row || row.deviceTimeZone === wanted) return false;
+    await prisma.user.update({ where: { id: userId }, data: { deviceTimeZone: wanted } });
+    return true;
 }
 
 /**
