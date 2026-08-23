@@ -77,7 +77,18 @@ describe("what a streamed command said before it gave up", () => {
         expect(lastMeaningfulLine("  \n\r\n [polaris:exit:1] \n")).toBeNull();
     });
 
-    it("keeps a runaway line short enough to be a message", () => {
-        expect(lastMeaningfulLine("x".repeat(5000))?.length).toBe(400);
+    it("keeps the whole of the store's own error, digests and all", () => {
+        // The real one is a little over four hundred characters. Cutting it
+        // loses "no such file or directory", which is the half that says what
+        // happened.
+        expect(lastMeaningfulLine(PULL)).toContain("no such file or directory");
+    });
+
+    it("cuts a runaway line at a word, and says it cut it", () => {
+        const long = `${"word ".repeat(400)}end`;
+        const cut = lastMeaningfulLine(long);
+        expect(cut?.endsWith("...")).toBe(true);
+        expect(cut?.length).toBeLessThanOrEqual(503);
+        expect(cut).not.toContain("wor...");
     });
 });

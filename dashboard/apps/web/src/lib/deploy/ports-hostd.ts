@@ -160,6 +160,12 @@ export class HostdPorts implements RuntimePorts {
  *  them, which is where the reason lives. */
 const RECENT_OUTPUT = 2000;
 
+/** How long the line put on an error may be. The image store's own errors run to
+ *  four hundred characters - two absolute paths, each with a digest in it - and
+ *  cutting one of those in half loses the end, which is where "no such file or
+ *  directory" is. */
+const LONGEST_LINE = 500;
+
 /**
  * The line a failed command ended on, for an error whose own message is a number.
  *
@@ -179,7 +185,15 @@ export function lastMeaningfulLine(output: string): string | null {
         (line) => !/^[0-9a-f]{8,}: |^[a-z0-9._-]+: (Pulling|Waiting|Already)/i.test(line)
     );
     const line = (said.length > 0 ? said : lines).pop();
-    return line ? line.slice(0, 400) : null;
+    if (!line) return null;
+    if (line.length <= LONGEST_LINE) return line;
+    // Cut where a word ends, and say that it was cut. The store's own errors
+    // name two absolute paths with a digest in each, so this is a real length
+    // rather than a defensive one - and stopping mid-word reads as a bug in the
+    // message rather than as a message that was too long.
+    const cut = line.slice(0, LONGEST_LINE);
+    const space = cut.lastIndexOf(" ");
+    return `${(space > LONGEST_LINE / 2 ? cut.slice(0, space) : cut).trimEnd()}...`;
 }
 
 /** Pipe a streamed daemon response into a sink and resolve when it ends. */
