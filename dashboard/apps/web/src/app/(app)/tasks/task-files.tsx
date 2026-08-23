@@ -161,7 +161,7 @@ export function AttachmentSection({
                                         );
                                         onChanged();
                                     }}
-                                    className="absolute right-1 top-1 rounded bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    className="absolute right-1 top-1 rounded bg-background/80 p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -199,7 +199,7 @@ export function AttachmentSection({
                                         );
                                         onChanged();
                                     }}
-                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    className="rounded p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
                                 >
                                     <Trash2 className="size-3.5" />
                                 </button>
@@ -279,7 +279,7 @@ export function CommitSection({
                                     <RelativeTime iso={commit.committedAt} />
                                 </span>
                             )}
-                            <CopyButton value={commit.url} label="the commit link" className="opacity-0 group-hover:opacity-100" />
+                            <CopyButton value={commit.url} label="the commit link" className="md:opacity-0 md:group-hover:opacity-100" />
                             {canEdit && (
                                 <button
                                     type="button"
@@ -289,7 +289,7 @@ export function CommitSection({
                                         await runAction(() => actions.unlinkCommitAction(taskId, commit.id), onError);
                                         onChanged();
                                     }}
-                                    className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                                    className="rounded p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
                                 >
                                     <X className="size-3.5" />
                                 </button>

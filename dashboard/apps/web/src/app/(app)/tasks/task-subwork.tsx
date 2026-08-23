@@ -520,7 +520,7 @@ export function ChecklistSection({
                                             {item.name}
                                         </span>
                                         {canEdit && (
-                                            <span className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                            <span className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                                                 <button
                                                     type="button"
                                                     aria-label={`Turn ${item.name} into a task`}

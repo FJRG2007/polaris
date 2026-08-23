@@ -23,14 +23,15 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { tagColorFor } from "./pickers";
-import { taskOverlay, useLatest } from "./optimistic";
 import { runAction } from "@/lib/run-action";
-import { isProvisionalTagId, settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { PropertyRows } from "./task-properties";
+import { TaskNameField } from "./task-name-field";
 import { useEffect, useMemo, useState } from "react";
+import { taskOverlay, useLatest } from "./optimistic";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
+import { isProvisionalTagId, settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import {
     Button,
     Dialog,
@@ -236,21 +237,16 @@ export function TaskCreateDialog({
 
                 <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
                     <div className="flex flex-col gap-1">
-                        <input
+                        <TaskNameField
                             autoFocus
                             value={draft.name}
                             aria-label="Task name"
                             placeholder="What needs doing?"
                             onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                            onKeyDown={(event) => {
-                                // Enter finishes from the name box, which is where
-                                // most of these are done.
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    void submit();
-                                }
-                            }}
-                            className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground"
+                            // Enter finishes from the name box, which is where most
+                            // of these are done.
+                            onEnter={() => void submit()}
+                            className="placeholder:text-muted-foreground"
                         />
                         {nameIssue && <p className="text-xs text-danger">{nameIssue}</p>}
                     </div>

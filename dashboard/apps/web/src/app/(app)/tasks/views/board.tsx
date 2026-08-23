@@ -224,7 +224,7 @@ function CornerControl({
     // control being used and leave the menu floating beside a card with nothing
     // on it. It stays while its menu is open.
     return (
-        <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+        <span className="transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
             {children}
         </span>
     );
@@ -609,7 +609,7 @@ export function BoardView(props: ViewProps) {
                                         // headers does not shuffle sideways on hover.
                                         <GripVertical
                                             aria-hidden
-                                            className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/column:opacity-100"
+                                            className="size-3.5 shrink-0 text-muted-foreground transition-opacity md:opacity-0 md:group-hover/column:opacity-100"
                                         />
                                     )}
                                     {group.color && <StatusDot color={group.color} />}

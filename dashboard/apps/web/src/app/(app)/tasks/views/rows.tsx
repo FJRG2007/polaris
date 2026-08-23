@@ -174,8 +174,8 @@ function TaskLine({
                 until somebody is actually pointing at this task. */}
                 <span
                     className={cn(
-                        "flex shrink-0 items-center transition-opacity focus-within:opacity-100 group-hover:opacity-100",
-                        canEdit ? "opacity-0" : "hidden"
+                        "flex shrink-0 items-center transition-opacity focus-within:opacity-100 md:group-hover:opacity-100",
+                        canEdit ? "md:opacity-0" : "hidden"
                     )}
                 >
                     <TaskControls commands={commands} />
@@ -456,7 +456,7 @@ export function TableView(props: ViewProps) {
                                     <td className="px-2 py-1.5">
                                         <span className="flex items-center gap-1">
                                             <AvatarStack people={task.assignees} size={20} />
-                                            <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                            <span className="transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100">
                                                 <AssigneePicker
                                                     people={context.people}
                                                     selected={task.assignees.map(
@@ -490,7 +490,7 @@ export function TableView(props: ViewProps) {
                                                 timed={task.timed}
                                                 format={format.date}
                                             />
-                                            <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                            <span className="transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100">
                                                 <DuePicker
                                                     dueDate={task.dueDate}
                                                     timed={task.timed}

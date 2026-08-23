@@ -32,8 +32,15 @@ import {
     UserRound
 } from "lucide-react";
 
-/** A labelled row. The icon column is what makes eight rows scannable rather
- *  than a wall of grey labels. */
+/**
+ * A labelled row. The icon column is what makes eight rows scannable rather
+ * than a wall of grey labels.
+ *
+ * On a phone the label goes above the value instead of beside it: a fixed
+ * eight-rem column takes a third of the width there, and what is left cannot
+ * hold two date boxes - the due date used to sit off the edge of the panel with
+ * nothing to scroll it back. The value wraps at every width for the same reason.
+ */
 export function Property({
     icon,
     label,
@@ -44,12 +51,12 @@ export function Property({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex items-start gap-3 py-1">
-            <span className="flex w-32 shrink-0 items-center gap-2 pt-1.5 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-1 py-1 sm:flex-row sm:items-start sm:gap-3">
+            <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:w-32 sm:pt-1.5">
                 <span className="shrink-0 opacity-70">{icon}</span>
                 {label}
             </span>
-            <div className="flex min-w-0 flex-1 items-center gap-2">{children}</div>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</div>
         </div>
     );
 }
@@ -121,7 +128,9 @@ export function PropertyRows({
                     disabled={disabled}
                     onChange={(startDate) => patch({ startDate })}
                 />
-                <span aria-hidden className="text-xs text-muted-foreground">
+                {/* It reads as a range only while both boxes are on one line; once
+                    they stack it is a dash hanging off the end of the first. */}
+                <span aria-hidden className="hidden text-xs text-muted-foreground sm:inline">
                     -
                 </span>
                 <pickers.DateField
@@ -186,7 +195,9 @@ export function PropertyRows({
                         placeholder="Why, if it is not a task or a date"
                         onChange={(event) => hold?.({ blockedNote: event.target.value.trim() })}
                         onBlur={(event) => patch({ blockedNote: event.target.value.trim() })}
-                        className="min-w-0 flex-1 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
+                        // A floor under it, so a narrow row wraps the box onto its
+                        // own line rather than squeezing it down to two letters.
+                        className="min-w-[12rem] flex-1 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
                     />
                     {waitingOn > 0 && (
                         <span className="text-[11px] text-amber-600">

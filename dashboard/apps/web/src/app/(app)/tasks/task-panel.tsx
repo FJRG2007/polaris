@@ -24,7 +24,7 @@ import { tagColorFor } from "./pickers";
 import { useAutosave } from "./autosave";
 import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
-import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
+import { TaskNameField } from "./task-name-field";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
@@ -33,10 +33,11 @@ import { AttachmentSection, CommitSection } from "./task-files";
 import { FieldsSection, PropertyRows } from "./task-properties";
 import { ActivityStream, TimeSection } from "./task-conversation";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
 import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -376,116 +377,132 @@ export function TaskPanel({
                                 <button
                                     type="button"
                                     onClick={() => void openTask(detail.parent!.id)}
-                                    className="truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                                    className="min-w-0 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
                                 >
                                     in {detail.parent.name}
                                 </button>
                             )}
-                            <span className="flex-1" />
-                            {/* Somebody who typed something and reached for the close
-                                button is owed an answer about where it went, and this
-                                is also what the panel is waiting on before it goes. */}
-                            {auto.busy && !error && (
-                                <span
-                                    role="status"
-                                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-                                >
-                                    <Loader2
-                                        className="size-3.5 shrink-0 animate-spin"
-                                        aria-hidden="true"
-                                    />
-                                    Saving
-                                </span>
-                            )}
-                            <span className="hidden text-[11px] text-muted-foreground sm:inline">
-                                Created {format.date(task.createdAt)}
-                            </span>
-                            {task.recurring && (
-                                <span
-                                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-                                    title="This task repeats"
-                                >
-                                    <Repeat className="size-3.5" /> Repeats
-                                </span>
-                            )}
-                            <Button size="sm" variant="ghost" onClick={() => setSharing(true)}>
-                                <Share2 className="size-4" />
-                                Share
-                            </Button>
-                            <button
-                                type="button"
-                                aria-label={watching ? "Stop watching" : "Watch this task"}
-                                title={watching ? "Stop watching" : "Watch this task"}
-                                onClick={async () => {
-                                    await runAction(
-                                        () => actions.setWatchingAction(task.id, !watching),
-                                        setError
-                                    );
-                                    load(task.id);
-                                }}
-                                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                {watching ? (
-                                    <Bell className="size-4" />
-                                ) : (
-                                    <BellOff className="size-4" />
-                                )}
-                            </button>
-                            {context.canEdit && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <button
-                                            type="button"
-                                            aria-label="More actions"
-                                            title="More actions"
-                                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        >
-                                            <MoreHorizontal className="size-4" />
-                                        </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                        align="end"
-                                        className="w-52"
-                                        onCloseAutoFocus={keepFocusOnClose}
+                            {/* The actions are a group of their own rather than a
+                                spacer and a run of siblings: on a phone the row
+                                wraps, and a spacer that wrapped with them left them
+                                floating in the middle of the second line. */}
+                            <div className="ml-auto flex items-center gap-2">
+                                {/* Somebody who typed something and reached for the close
+                                    button is owed an answer about where it went, and this
+                                    is also what the panel is waiting on before it goes. */}
+                                {auto.busy && !error && (
+                                    <span
+                                        role="status"
+                                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
                                     >
-                                        <DropdownMenuItem
-                                            onSelect={async () => {
-                                                const result = await runAction(
-                                                    () => actions.duplicateTaskAction(task.id),
-                                                    setError
-                                                );
-                                                onChanged();
-                                                if (result?.id) void openTask(result.id);
-                                            }}
+                                        <Loader2
+                                            className="size-3.5 shrink-0 animate-spin"
+                                            aria-hidden="true"
+                                        />
+                                        Saving
+                                    </span>
+                                )}
+                                <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                                    Created {format.date(task.createdAt)}
+                                </span>
+                                {task.recurring && (
+                                    <span
+                                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                        title="This task repeats"
+                                        aria-label="This task repeats"
+                                    >
+                                        <Repeat className="size-3.5" />
+                                        <span className="hidden sm:inline">Repeats</span>
+                                    </span>
+                                )}
+                                {/* Icon-only on a phone, the way every other toolbar
+                                    here narrows: the row already carries four controls
+                                    and the reference beside them. */}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    title="Share"
+                                    aria-label="Share"
+                                    onClick={() => setSharing(true)}
+                                >
+                                    <Share2 className="size-4" />
+                                    <span className="hidden sm:inline">Share</span>
+                                </Button>
+                                <button
+                                    type="button"
+                                    aria-label={watching ? "Stop watching" : "Watch this task"}
+                                    title={watching ? "Stop watching" : "Watch this task"}
+                                    onClick={async () => {
+                                        await runAction(
+                                            () => actions.setWatchingAction(task.id, !watching),
+                                            setError
+                                        );
+                                        load(task.id);
+                                    }}
+                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    {watching ? (
+                                        <Bell className="size-4" />
+                                    ) : (
+                                        <BellOff className="size-4" />
+                                    )}
+                                </button>
+                                {context.canEdit && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                aria-label="More actions"
+                                                title="More actions"
+                                                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                            >
+                                                <MoreHorizontal className="size-4" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="end"
+                                            className="w-52"
+                                            onCloseAutoFocus={keepFocusOnClose}
                                         >
-                                            Duplicate
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={() =>
-                                                void patch({ milestone: !task.milestone })
-                                            }
-                                        >
-                                            {task.milestone
-                                                ? "Not a milestone"
-                                                : "Mark as a milestone"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onSelect={() =>
-                                                void patch({ archived: !task.archived })
-                                            }
-                                        >
-                                            {task.archived ? "Unarchive" : "Archive"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            variant="danger"
-                                            onSelect={() => setConfirmDelete(true)}
-                                        >
-                                            Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
+                                            <DropdownMenuItem
+                                                onSelect={async () => {
+                                                    const result = await runAction(
+                                                        () => actions.duplicateTaskAction(task.id),
+                                                        setError
+                                                    );
+                                                    onChanged();
+                                                    if (result?.id) void openTask(result.id);
+                                                }}
+                                            >
+                                                Duplicate
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    void patch({ milestone: !task.milestone })
+                                                }
+                                            >
+                                                {task.milestone
+                                                    ? "Not a milestone"
+                                                    : "Mark as a milestone"}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() =>
+                                                    void patch({ archived: !task.archived })
+                                                }
+                                            >
+                                                {task.archived ? "Unarchive" : "Archive"}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="danger"
+                                                onSelect={() => setConfirmDelete(true)}
+                                            >
+                                                Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                            </div>
                         </header>
 
                         {/* Each column scrolls on its own so a long thread cannot
@@ -493,7 +510,7 @@ export function TaskPanel({
                         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
                             <div className="flex flex-col gap-6 p-5 md:overflow-y-auto">
                                 <DialogTitle asChild>
-                                    <input
+                                    <TaskNameField
                                         defaultValue={task.name}
                                         key={task.id}
                                         disabled={!context.canEdit}
@@ -504,6 +521,7 @@ export function TaskPanel({
                                         onChange={(event) =>
                                             hold({ name: event.target.value.trim() })
                                         }
+                                        onEnter={(element) => element.blur()}
                                         onBlur={(event) => {
                                             const next = event.target.value.trim();
                                             // A task cannot be nameless: an emptied
@@ -513,7 +531,6 @@ export function TaskPanel({
                                             if (next) void save({ name: next });
                                             else event.target.value = task.name;
                                         }}
-                                        className="w-full bg-transparent text-xl font-semibold outline-none"
                                     />
                                 </DialogTitle>
 

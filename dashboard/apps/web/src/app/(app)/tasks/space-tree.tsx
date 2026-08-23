@@ -349,7 +349,7 @@ function TreeRow({
                             </div>
                         )}
                         {(rowActions.length > 0 || create) && (
-                            <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                            <span className="flex shrink-0 items-center transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100">
                                 {create}
                                 {rowActions
                                     .filter((action) => action.quick)

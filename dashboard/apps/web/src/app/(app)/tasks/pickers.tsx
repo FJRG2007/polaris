@@ -722,6 +722,10 @@ export function DateField({
 }) {
     return (
         <div className="flex items-center gap-1">
+            {/* Two date boxes stack on a phone, and stacked they are two identical
+                boxes: which is the start and which is the due date is only in the
+                label a mouse never reaches on one. */}
+            <span className="w-16 shrink-0 text-[11px] text-muted-foreground sm:hidden">{label}</span>
             <input
                 type={timed ? "datetime-local" : "date"}
                 aria-label={label}

@@ -18,11 +18,11 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { useEffect, useMemo, useState } from "react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
-import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { RelativeTime } from "@/components/relative-time";
 import { RichText } from "@/components/rich-text/rich-text";
-import { useEffect, useMemo, useState } from "react";
+import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { CheckCircle2, Play, SendHorizontal, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
@@ -204,7 +204,11 @@ export function ActivityStream({
     );
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        // Its own scrolling column only where it is one: from `md` the thread sits
+        // beside the task and holds its own bottom. Below that it is the last thing
+        // on a single scrolling page, and a nested scroller there collapsed the
+        // whole thread to the height of one line.
+        <div className="flex flex-col md:min-h-0 md:flex-1">
             <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
                 <h2 className="text-sm font-semibold">Activity</h2>
                 <SegmentedControl
@@ -222,7 +226,7 @@ export function ActivityStream({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4"
+                className="flex flex-col gap-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto"
             >
                 {stream.length === 0 && (
                     <p className="text-xs text-muted-foreground">Nothing has happened here yet.</p>
