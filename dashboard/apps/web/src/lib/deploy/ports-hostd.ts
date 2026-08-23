@@ -155,6 +155,33 @@ export class HostdPorts implements RuntimePorts {
     }
 }
 
+/** How much of a streamed command's output is kept for its error message. Two
+ *  thousand characters is several lines of a pull's progress and the line after
+ *  them, which is where the reason lives. */
+const RECENT_OUTPUT = 2000;
+
+/**
+ * The line a failed command ended on, for an error whose own message is a number.
+ *
+ * Progress lines are dropped - a pull writes one per layer and they are all
+ * "Pull complete" by the time it goes wrong - so what is left is the sentence
+ * the runtime finished with. Carriage returns count as line breaks: that is how
+ * a pull redraws its progress, and treating it as one line would return the
+ * whole screen of it.
+ */
+export function lastMeaningfulLine(output: string): string | null {
+    const lines = output
+        .split(/[\r\n]+/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !/^\[polaris:exit:-?\d+\]$/.test(line));
+    // "3db4007d5a31: Pull complete", "latest: Pulling from fjrg2007/polaris-vision".
+    const said = lines.filter(
+        (line) => !/^[0-9a-f]{8,}: |^[a-z0-9._-]+: (Pulling|Waiting|Already)/i.test(line)
+    );
+    const line = (said.length > 0 ? said : lines).pop();
+    return line ? line.slice(0, 400) : null;
+}
+
 /** Pipe a streamed daemon response into a sink and resolve when it ends. */
 function drain(stream: Readable & { statusCode?: number }, onOutput?: OutputSink): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -168,11 +195,15 @@ function drain(stream: Readable & { statusCode?: number }, onOutput?: OutputSink
         const failedStatus = status < 200 || status >= 300;
         let tail = "";
         let body = "";
+        let recent = "";
         stream.on("data", (chunk: Buffer) => {
             if (onOutput) onOutput(chunk);
             const text = chunk.toString("utf8");
             tail = (tail + text).slice(-120);
             if (failedStatus) body = (body + text).slice(-500);
+            // Kept whether or not this ends badly, because by the time it does
+            // the words are already gone. See below.
+            recent = (recent + text).slice(-RECENT_OUTPUT);
         });
         stream.on("end", () => {
             if (failedStatus) {
@@ -180,8 +211,17 @@ function drain(stream: Readable & { statusCode?: number }, onOutput?: OutputSink
                 return;
             }
             const match = tail.match(/\[polaris:exit:(-?\d+)\]/);
-            if (match && match[1] !== "0") reject(new Error(`the command failed (exit ${match[1]})`));
-            else resolve();
+            if (!match || match[1] === "0") {
+                resolve();
+                return;
+            }
+            // What the command said, not only that it failed. An exit code on
+            // its own defeats the whole of deploy-failure.ts: the sentence that
+            // says the disk filled up is in the output, the error carried a
+            // number, and the operator was told "the command failed (exit 1)"
+            // about a machine with no room on it.
+            const said = lastMeaningfulLine(recent);
+            reject(new Error(`the command failed (exit ${match[1]})${said ? `: ${said}` : ""}`));
         });
         stream.on("error", reject);
     });
