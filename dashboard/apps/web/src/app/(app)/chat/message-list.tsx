@@ -28,6 +28,7 @@ import { MessageMenu } from "./message-menu";
 import { PollCard } from "./poll-card";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
+import { ReportPersonDialog } from "@/components/report-person-dialog";
 import { NicknameDialog } from "./nickname-dialog";
 import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
@@ -232,6 +233,12 @@ export function MessageList({
      *  open at a time and it covers the whole conversation. */
     const [reading, setReading] = useState<ViewedFile | null>(null);
     const [reporting, setReporting] = useState<string | null>(null);
+    /** The account being reported, when it is the account rather than one of its
+     *  messages. Held as the person rather than as a message id: it is about
+     *  them, and the message it was reached from has nothing to do with it. */
+    const [reportingAuthor, setReportingAuthor] = useState<{ id: string; name: string } | null>(
+        null
+    );
     const [explaining, setExplaining] = useState<ChatMessageView | null>(null);
     /** Whose nickname is being changed. Up here with the other dialogs, and for
      *  the same reason: the menu that asks for it is unmounted the moment an
@@ -326,6 +333,17 @@ export function MessageList({
                             onOpenImage={setViewing}
                             onOpenFile={setReading}
                             onReport={(target) => setReporting(target.id)}
+                            // The other question the same right-click asks, and
+                            // the more common one: a single message is rarely
+                            // the problem by itself.
+                            onReportAuthor={(target) =>
+                                target.authorId && target.authorName
+                                    ? setReportingAuthor({
+                                          id: target.authorId,
+                                          name: target.authorName
+                                      })
+                                    : undefined
+                            }
                             onExplain={setExplaining}
                             canPost={canPost}
                             canModerate={canModerate}
@@ -382,6 +400,13 @@ export function MessageList({
                 open={reporting !== null}
                 onOpenChange={(next) => !next && setReporting(null)}
             />
+            {reportingAuthor && (
+                <ReportPersonDialog
+                    open
+                    person={reportingAuthor}
+                    onOpenChange={(next) => !next && setReportingAuthor(null)}
+                />
+            )}
             <MessageInfoDialog
                 message={explaining}
                 onOpenChange={(next) => !next && setExplaining(null)}
@@ -529,6 +554,7 @@ function Message({
     onOpenImage,
     onOpenFile,
     onReport,
+    onReportAuthor,
     onExplain,
     viewerId,
     onMention,
@@ -565,6 +591,8 @@ function Message({
     /** Open a sent file in the reader rather than saving it. */
     onOpenFile: (file: ViewedFile) => void;
     onReport: (message: ChatMessageView) => void;
+    /** Report whoever wrote it, rather than the message. */
+    onReportAuthor: (message: ChatMessageView) => void;
     /** Open the three moments behind the ticks. */
     onExplain: (message: ChatMessageView) => void;
     /** Who is reading, which is what decides that their own name is a name
@@ -646,6 +674,7 @@ function Message({
                 onEdit: rewrite,
                 onDelete,
                 onReport,
+                onReportAuthor,
                 onExplain
             }}
         >

@@ -33,6 +33,7 @@ import {
     Download,
     ExternalLink,
     Flag,
+    ShieldAlert,
     CornerUpLeft,
     Forward,
     Info,
@@ -92,6 +93,20 @@ export interface MessageActions {
     /** Say something is wrong with it. Not offered on your own message: the
      *  thing to do about your own words is take them back, which is Delete. */
     readonly onReport: (message: ChatMessageView) => void;
+    /**
+     * Say something is wrong with whoever wrote it.
+     *
+     * The other question a right-click on somebody else's message is asking, and
+     * the more common one: a single message is rarely the problem by itself, and
+     * somebody who has decided to report is usually reporting a person. It was
+     * only on the name's own menu, which is a smaller target and is not there at
+     * all on a run of messages from the same person - so for most of a
+     * conversation there was no way to reach it.
+     *
+     * Absent where the author is not known any more, and then the item is not
+     * drawn rather than drawn doing nothing.
+     */
+    readonly onReportAuthor?: (message: ChatMessageView) => void;
     /** When it was sent, when it arrived, when it was read. */
     readonly onExplain: (message: ChatMessageView) => void;
 }
@@ -357,10 +372,25 @@ export function MessageMenu({
                 {!mine && !message.deleted && (
                     <>
                         <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => actions.onReport(message)}>
+                        {/* Both in red. They are the heavy end of this menu, and
+                            one of them reading like Copy is how a menu stops
+                            saying which of its items are consequences. */}
+                        <ContextMenuItem
+                            variant="danger"
+                            onSelect={() => actions.onReport(message)}
+                        >
                             <Flag className="size-3.5" />
-                            Report
+                            Report this message
                         </ContextMenuItem>
+                        {actions.onReportAuthor && message.authorId && (
+                            <ContextMenuItem
+                                variant="danger"
+                                onSelect={() => actions.onReportAuthor?.(message)}
+                            >
+                                <ShieldAlert className="size-3.5" />
+                                Report this account
+                            </ContextMenuItem>
+                        )}
                     </>
                 )}
 
