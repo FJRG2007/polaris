@@ -31,9 +31,11 @@ import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { MuteOptions, type MenuParts } from "./mute-menu";
+import { LeaveDialog } from "./leave-dialog";
+import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -45,6 +47,7 @@ import {
     Hash,
     Link2,
     Lock,
+    LogOut,
     Mail,
     MessageSquarePlus,
     Pencil,
@@ -808,11 +811,18 @@ function RowMenu({
     children: React.ReactNode;
 }) {
     const baseUrl = useAppUrl();
+    const router = useRouter();
+    const here = usePathname();
     const { refresh } = useChat();
     const [naming, setNaming] = useState(false);
+    const [leaving, setLeaving] = useState(false);
+    const [error, setError] = useState("");
     // A one-to-one conversation, which is the only kind where there is one
     // person to have a name for. A group is called what the group is called.
     const person = channel.kind === "dm" && channel.others.length === 1 ? channel.others[0]! : null;
+    // Only a group can be left. A direct message is between two people and has
+    // no door; a channel in a space is left by leaving the space.
+    const group = channel.kind === "group";
 
     return (
         <>
@@ -874,6 +884,22 @@ function RowMenu({
                         </ContextMenuItem>
                     )}
 
+                    {/* The same item the open conversation offers, offered from
+                    the row as well. Leaving is a decision about a conversation
+                    rather than something done inside it, and the place somebody
+                    reaches for it is the list - which is where they are when
+                    they decide they are done with it, and is the one place they
+                    do not have to open it first. */}
+                    {group && (
+                        <>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem variant="danger" onSelect={() => setLeaving(true)}>
+                                <LogOut className="size-3.5" />
+                                Leave this group
+                            </ContextMenuItem>
+                        </>
+                    )}
+
                     {/* Only for somebody who administers the space, and only for a
                     channel in one: a direct message has no settings and a group
                     is managed from its own header. */}
@@ -896,6 +922,35 @@ function RowMenu({
                 person={person}
                 onSaved={refresh}
             />
+            {group && (
+                <LeaveDialog
+                    open={leaving}
+                    onOpenChange={setLeaving}
+                    kind="group"
+                    name={channel.name}
+                    error={leaving ? error : ""}
+                    onLeave={async (quietly) => {
+                        setError("");
+                        const result = await runAction(
+                            () => actions.leaveChannelAction(channel.id, quietly),
+                            setError
+                        );
+                        // Left open on a refusal, with the reason on it: a dialog
+                        // that closes and leaves you in the group is a dialog that
+                        // looks like it worked.
+                        if (!result || result.error) {
+                            if (result?.error) setError(result.error);
+                            return;
+                        }
+                        setLeaving(false);
+                        refresh();
+                        // Only when it is the room on screen. Leaving one from
+                        // the list while reading another must not throw the
+                        // reader out of what they were reading.
+                        if (here.startsWith(`/chat/c/${channel.id}`)) router.push("/chat");
+                    }}
+                />
+            )}
         </>
     );
 }
