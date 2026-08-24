@@ -11,7 +11,7 @@
 import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
-import { connectionLinkAvailable } from "@/lib/connections/oauth";
+import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,16 @@ export default async function ConnectionsPage() {
             canSignIn: await connectionSignInAllowed(provider.slug),
             accounts: linked
                 .filter((account) => account.provider === provider.slug)
-                .map((account) => ({ ...account, signsIn: account.signInEnabled }))
+                .map((account) => ({
+                    ...account,
+                    signsIn: account.signInEnabled,
+                    // Measured against what is asked for now, not against what was
+                    // asked for the day this was linked. A consent screen that has
+                    // grown since leaves working links that cannot do the new
+                    // thing, and only their owner can approve the difference.
+                    needsReauthorization: !linkScopesSatisfied(account.provider, account.scope),
+                    missingScopes: missingLinkScopes(account.provider, account.scope)
+                }))
         }))
     );
 

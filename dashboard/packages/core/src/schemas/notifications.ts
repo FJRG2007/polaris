@@ -261,6 +261,19 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.connection.scopes",
+        group: "security",
+        label: "A connected account needs authorizing again",
+        description:
+            "Polaris now asks a service for more than it did when you linked your account, and it cannot use the new part until you approve it.",
+        // Not danger: nothing has broken and nothing has been taken away. What is
+        // waiting is a consent only the account's owner can give.
+        level: "warning",
+        // The bell is enough. Nothing stops working while this is outstanding, so
+        // mailing it would be mailing somebody about a feature they may not use.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.aiKey.expiring",
         group: "security",
         label: "An AI provider key is about to expire",

@@ -57,8 +57,14 @@ vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
     } as Response;
 });
 
-const { discordAuthorizeUrl, exchangeDiscordCode, getDiscordOAuthClient, identifyDiscordAccount } =
-    await import("@/lib/connections/discord");
+const {
+    discordAccessToken,
+    discordAuthorizeUrl,
+    exchangeDiscordCode,
+    getDiscordOAuthClient,
+    identifyDiscordAccount,
+    readDiscordGuilds
+} = await import("@/lib/connections/discord");
 const { connectionSignInAllowed } = await import("@/lib/connections/store");
 const { findConnectionProvider } = await import("@polaris/core");
 
@@ -117,19 +123,28 @@ describe("a Discord account is not a way in until somebody says so", () => {
         expect(discord?.requires).toBeTruthy();
     });
 
-    it("holds no address, so nothing here can be taken as proof of who somebody is", () => {
-        // Undefined rather than false: Polaris never asks Discord for an address,
-        // so there is nothing for an operator to be offered a switch about.
-        expect(findConnectionProvider("discord")?.emailTrustDefault).toBeUndefined();
+    it("holds the address without taking it as proof of who somebody is", () => {
+        // False, not undefined: an address is handed over now, so the operator is
+        // offered the switch - and it starts closed, because this is the account
+        // the warning above calls easy to take over.
+        expect(findConnectionProvider("discord")?.emailTrustDefault).toBe(false);
     });
 });
 
 describe("where somebody is sent to authorize", () => {
-    it("asks for identify and nothing else", () => {
+    it("asks for the account, the address and the server list", () => {
         const url = new URL(discordAuthorizeUrl(CLIENT, REDIRECT, "state-1"));
-        expect(url.searchParams.get("scope")).toBe("identify");
-        expect(url.searchParams.get("scope")).not.toContain("email");
-        expect(url.searchParams.get("scope")).not.toContain("guilds");
+        expect(url.searchParams.get("scope")).toBe("identify email guilds");
+    });
+
+    it("does not ask to read anybody inside a server", () => {
+        // guilds returns the servers an account is in. guilds.members.read would
+        // return their nickname and roles within one, which is a larger
+        // permission and nothing here asks for it.
+        const url = new URL(discordAuthorizeUrl(CLIENT, REDIRECT, "state-1"));
+        expect(url.searchParams.get("scope")).not.toContain("guilds.members.read");
+        expect(url.searchParams.get("scope")).not.toContain("messages");
+        expect(url.searchParams.get("scope")).not.toContain("bot");
     });
 
     it("carries the application, the registered redirect and the state to echo back", () => {
@@ -194,9 +209,35 @@ describe("reading back who authorized", () => {
         expect((await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).avatarUrl).toBeNull();
     });
 
-    it("keeps no credential: proving who they are was the whole errand", async () => {
-        authorizes({ id: "1234", username: "ana" });
-        expect((await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).credential).toEqual({});
+    it("keeps the grant, because the server list is read later and not copied now", async () => {
+        state.responses = [
+            {
+                ok: true,
+                body: {
+                    access_token: "token-1",
+                    refresh_token: "refresh-1",
+                    expires_in: 604800,
+                    scope: "identify email guilds"
+                }
+            },
+            { ok: true, body: { id: "1234", username: "ana" } }
+        ];
+        const { credential } = await exchangeDiscordCode(CLIENT, "code-1", REDIRECT);
+        expect(credential.accessToken).toBe("token-1");
+        expect(credential.refreshToken).toBe("refresh-1");
+        // Absolute, so what reads it compares against the clock rather than
+        // against the moment the response happened to arrive.
+        expect(credential.expiresAt).toBeGreaterThan(Date.now());
+    });
+
+    it("holds an address Discord says it confirmed", async () => {
+        authorizes({ id: "1234", username: "ana", email: "ana@example.com", verified: true });
+        expect((await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).email).toBe("ana@example.com");
+    });
+
+    it("drops one Discord has not confirmed, since that is where a code would go", async () => {
+        authorizes({ id: "1234", username: "ana", email: "ana@example.com", verified: false });
+        expect((await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).email).toBeNull();
     });
 
     it("spends the code against the same redirect it was minted for", async () => {
@@ -258,5 +299,92 @@ describe("the application an operator connected", () => {
     it("is absent with no client id, rather than a half-built one nobody can use", async () => {
         state.integration = { enabled: true, config: {} };
         expect(await getDiscordOAuthClient()).toBeNull();
+    });
+});
+
+/**
+ * The grant has to still be good when the server list is asked for.
+ *
+ * Discord's access tokens last a week. A link made and then left alone would
+ * have a dead token seven days later, and the failure would look exactly like an
+ * account whose owner revoked the authorization - so the refresh token is spent
+ * on the way past and the replacement handed back to be written down.
+ */
+describe("keeping the grant usable", () => {
+    it("uses the stored token while it is still good, without a round trip", async () => {
+        const held = {
+            accessToken: "token-1",
+            refreshToken: "refresh-1",
+            expiresAt: Date.now() + 600_000
+        };
+        expect(await discordAccessToken(CLIENT, held)).toEqual({
+            accessToken: "token-1",
+            refreshed: null
+        });
+        expect(state.requests).toHaveLength(0);
+    });
+
+    it("refreshes past the margin and hands back what to store", async () => {
+        state.responses = [
+            {
+                ok: true,
+                body: { access_token: "token-2", refresh_token: "refresh-2", expires_in: 604800 }
+            }
+        ];
+        const expired = {
+            accessToken: "token-1",
+            refreshToken: "refresh-1",
+            expiresAt: Date.now() - 1
+        };
+        const got = await discordAccessToken(CLIENT, expired);
+        expect(got?.accessToken).toBe("token-2");
+        expect(got?.refreshed?.refreshToken).toBe("refresh-2");
+        expect(new URLSearchParams(state.requests[0]?.body ?? "").get("grant_type")).toBe(
+            "refresh_token"
+        );
+    });
+
+    it("refreshes just before expiry, not at it, so a call is not signed with a dying token", async () => {
+        state.responses = [{ ok: true, body: { access_token: "token-2", expires_in: 604800 } }];
+        // Inside the margin: still valid by the clock, not worth starting a call with.
+        const nearly = {
+            accessToken: "token-1",
+            refreshToken: "refresh-1",
+            expiresAt: Date.now() + 10_000
+        };
+        expect((await discordAccessToken(CLIENT, nearly))?.accessToken).toBe("token-2");
+    });
+
+    it("reports a link with nothing to refresh rather than throwing at a list", async () => {
+        // A link made before the token was kept, or a grant its owner withdrew.
+        expect(await discordAccessToken(CLIENT, {})).toBeNull();
+    });
+});
+
+describe("the servers an account is in", () => {
+    it("reads the names and resolves the icons", async () => {
+        state.responses = [
+            {
+                ok: true,
+                body: [
+                    { id: "9", name: "Roleplay ES", icon: "abc", owner: true },
+                    { id: "10", name: "Test", icon: null }
+                ]
+            }
+        ];
+        expect(await readDiscordGuilds("token-1")).toEqual([
+            {
+                id: "9",
+                name: "Roleplay ES",
+                iconUrl: "https://cdn.discordapp.com/icons/9/abc.png?size=128",
+                owner: true
+            },
+            { id: "10", name: "Test", iconUrl: null, owner: false }
+        ]);
+    });
+
+    it("says what Discord said when it refuses, rather than an empty list", async () => {
+        state.responses = [{ ok: false, status: 401, body: { message: "401: Unauthorized" } }];
+        await expect(readDiscordGuilds("token-1")).rejects.toThrow(/would not list the servers/);
     });
 });

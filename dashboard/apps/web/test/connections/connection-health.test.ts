@@ -55,7 +55,9 @@ vi.mock("@polaris/db", () => ({
 }));
 
 vi.mock("@/lib/connections/store", () => ({
-    readCredential: async (id: string) => state.credentials.get(id) ?? null
+    readCredential: async (id: string) => state.credentials.get(id) ?? null,
+    // Read by oauth.ts, which health.ts now reaches for the scope comparison.
+    connectionSignInAllowed: async () => false
 }));
 
 vi.mock("@/lib/notifications/dispatch", () => ({
@@ -64,13 +66,33 @@ vi.mock("@/lib/notifications/dispatch", () => ({
     }
 }));
 
+// The sweep now also measures grants against the scopes each provider asks for,
+// which reaches the adapter table - so the modules that table names have to
+// answer on import. Only readGithubAccount is exercised here.
 vi.mock("@/lib/github-service", () => ({
     readGithubAccount: async () => {
         if (state.answer === "unauthorized") throw new Error("GitHub rejected the token (unauthorized)");
         if (state.answer === "offline") throw new Error("fetch failed");
         return { login: "ana" };
-    }
+    },
+    githubLinkCallbackUrl: (baseUrl: string) => `${baseUrl}/api/integrations/github/link/callback`,
+    getGithubUserAuth: async () => null,
+    authorizeGithubUser: async () => ({ account: { id: 0, login: "" }, token: {} })
 }));
+
+vi.mock("@/lib/google-calendar/service", () => ({
+    getGoogleOAuthClient: async () => null,
+    googleAuthorizeUrl: () => "",
+    exchangeGoogleCode: async () => ({}),
+    identifyGoogleAccount: async () => ({ accountId: "" }),
+    verifyGoogleOAuthClient: async () => null
+}));
+vi.mock("@/lib/integration-service", () => ({
+    getIntegrationState: async () => null,
+    getIntegrationSecret: async () => null
+}));
+vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example.com" }));
+vi.mock("@/lib/connections/proven", () => ({ connectionProven: async () => true }));
 
 const { sweepConnectionHealth } = await import("@/lib/connections/health");
 
