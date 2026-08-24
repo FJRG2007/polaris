@@ -7,14 +7,24 @@
  * through it, and the dashboard stops looking like it is failing to load an
  * image for every account that has not set one. See lib/avatar-blank.
  *
- * Signed in only. Confirming that a given account exists, and handing over the
- * photo attached to it, is not something to serve to whoever asks; a profile
- * photo is personal data even when the person chose it.
+ * Signed in only, with one exception. Confirming that a given account exists,
+ * and handing over the photo attached to it, is not something to serve to whoever
+ * asks; a profile photo is personal data even when the person chose it.
+ *
+ * The exception is a guest sitting in a call. They have no account and never
+ * will, and every face in the room came back as initials for them while everybody
+ * else in the same call saw photographs - one room, drawn two different ways,
+ * which is exactly what a guest link is meant not to be. So a guest holding an
+ * admitted seat may fetch the face of somebody admitted to the same call, and
+ * nobody else's. They are still nobody as far as the privacy rule goes, so only a
+ * picture whose audience is everybody reaches them.
  */
 
-import { requireUser } from "@/lib/session";
 import { maySee } from "@/lib/privacy-service";
+import { resolveSession } from "@/lib/session";
 import { resolveAvatar } from "@/lib/avatar-service";
+import { inCallTogether } from "@/lib/chat/meetings";
+import { resolveGuestSeat } from "@/lib/chat/meeting-seat";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 
 export const runtime = "nodejs";
@@ -49,18 +59,38 @@ const CACHE = "private, no-cache";
  */
 const NO_CACHE = "private, no-store";
 
+/**
+ * Who this request may be answered as, or null when it may not be answered.
+ *
+ * An account speaks for itself. A guest speaks for nothing, and is let through
+ * only for the faces of the people in the call they are actually sitting in -
+ * checked against the seat their cookie names rather than anything the request
+ * asked for, so a guest link cannot be turned into a way to read faces off the
+ * rest of the instance.
+ */
+async function whoIsAsking(subjectId: string): Promise<{ id: string; isAdmin: boolean } | null> {
+    const session = await resolveSession();
+    if (session) return { id: session.id, isAdmin: Boolean(session.isAdmin) };
+
+    const seat = await resolveGuestSeat();
+    if (!seat || seat.admission !== "admitted") return null;
+    if (!(await inCallTogether(seat.meetingId, subjectId))) return null;
+    return { id: "", isAdmin: false };
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }): Promise<Response> {
-    const viewer = await requireUser();
     const { userId } = await params;
+    const viewer = await whoIsAsking(userId);
+    if (!viewer) return new Response("Unauthorized", { status: 401 });
 
     // Somebody who keeps their photo to themselves, or to their friends. The
     // answer is the same one an account with no photo gives - the blank pixel,
     // with the component's initials showing through - rather than a refusal:
     // a 403 here would tell the person asking that there is one to see.
-    const visible = await maySee(userId, "avatar", {
-        id: viewer.id,
-        isAdmin: Boolean(viewer.isAdmin)
-    });
+    //
+    // A guest asks as nobody: an empty id is on no friend list and in no privacy
+    // list, so the only audience that lets them through is everybody.
+    const visible = await maySee(userId, "avatar", viewer);
     if (!visible) return blankAvatarResponse(CACHE);
 
     const { picture, certain } = await resolveAvatar(userId);

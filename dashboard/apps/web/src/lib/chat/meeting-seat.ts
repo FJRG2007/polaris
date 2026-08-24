@@ -8,10 +8,16 @@
  * somebody arrived.
  *
  * The guest cookie is the credential for one participant row and nothing else.
- * It is httpOnly, so a script on the page cannot read it; it is scoped to the
- * meeting routes; and it stops meaning anything the moment that row is left or
- * the call ends. Losing it is losing a seat in one call, which is why it is
- * allowed to exist at all for somebody with no account.
+ * It is httpOnly, so a script on the page cannot read it, and it stops meaning
+ * anything the moment that row is left or the call ends. Losing it is losing a
+ * seat in one call, which is why it is allowed to exist at all for somebody with
+ * no account.
+ *
+ * It is sent on every path rather than only the meeting ones, because a call is
+ * not only its own routes: the faces in it are fetched from the avatar route, and
+ * a cookie the browser withheld there is what left a guest looking at a room full
+ * of initials. Nothing reads it without asking what seat it names first, so its
+ * reach is the seat and not the path.
  */
 
 import { cookies } from "next/headers";

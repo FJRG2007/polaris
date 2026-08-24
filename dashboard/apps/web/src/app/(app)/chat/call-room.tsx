@@ -311,6 +311,8 @@ export function CallRoom({
                             focused
                             onFocus={() => focus(live)}
                             cameraOff={!call.cameraOn}
+                            muted={!call.micOn}
+                            deafened={call.deafened}
                         />
                     ) : (
                         (() => {
@@ -365,6 +367,14 @@ export function CallRoom({
                         }
                         cameraOff={!call.cameraOn}
                         sharing={call.sharing}
+                        // Your own tile says it too. It used to be the one tile
+                        // that did not: everybody else's face carried the icon
+                        // and yours carried nothing, so the only way to tell
+                        // whether you were muted was to look away from the
+                        // people and down at the buttons - which is the moment
+                        // somebody talks into a dead microphone.
+                        muted={!call.micOn}
+                        deafened={call.deafened}
                         focused={live === `camera:${call.participantId}`}
                         onFocus={
                             call.participantId
@@ -811,8 +821,9 @@ function Tile({
      *  this tile would tell you it is going out. */
     sharing?: boolean;
     speaking?: boolean;
-    /** Their microphone is off, or they have stopped listening altogether.
-     *  Neither can be heard, so both are drawn. */
+    /** This person's microphone is off, or they have stopped listening
+     *  altogether. Neither can be heard, so both are drawn - on your own tile as
+     *  much as on anybody else's. */
     muted?: boolean;
     deafened?: boolean;
     /** Whether this tile is the one filling the room right now. */
@@ -995,10 +1006,10 @@ function Tile({
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
-                {/* Their controls, drawn because they cannot be heard. Deafened
-                    wins the space: somebody who is not listening is not reached
-                    by talking louder, and their microphone being off follows
-                    from it anyway. */}
+                {/* Drawn because this person cannot be heard, yours included.
+                    Deafened wins the space: somebody who is not listening is not
+                    reached by talking louder, and their microphone being off
+                    follows from it anyway. */}
                 {deafened ? (
                     <HeadphoneOff className="size-3 text-danger" aria-label="Not listening" />
                 ) : muted ? (

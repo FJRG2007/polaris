@@ -744,6 +744,23 @@ export async function seatForGuestKey(guestKey: string): Promise<MeetingSeat | n
     };
 }
 
+/**
+ * Whether an account is in this call, let in.
+ *
+ * Asked by anything that has to decide what somebody sitting in a call may know
+ * about the people sitting in it with them - a guest's browser fetching a face,
+ * first among them. Being in the room together is the whole of the permission:
+ * their name is already on the tile, somebody in the call let this person in, and
+ * a call whose faces are grey rectangles for one participant and photographs for
+ * the rest is not the same room.
+ */
+export async function inCallTogether(meetingId: string, userId: string): Promise<boolean> {
+    const seated = await prisma.meetingParticipant.count({
+        where: { meetingId, userId, leftAt: null, admission: "admitted" }
+    });
+    return seated > 0;
+}
+
 /** Resolve an account's seat in a meeting they say they are in. */
 export async function seatForUser(userId: string, meetingId: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findFirst({
