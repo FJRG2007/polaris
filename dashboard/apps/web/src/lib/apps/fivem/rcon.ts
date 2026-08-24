@@ -31,9 +31,15 @@ const PRINT_PREFIX = "print\n";
  */
 const COLOR_CODE = /\^\d/g;
 
-/** How the server names a password it did not accept. Either half is enough: the
- *  wording has changed between builds and the point is the same both times. */
-const REFUSAL = /invalid password|rcon_password/i;
+/**
+ * How the server names a password it did not accept.
+ *
+ * Both wordings, because the build that has no password set says something other
+ * than the one that was given a wrong one - and anchored to the words around the
+ * variable rather than to its bare name, because a reply that merely mentions
+ * `rcon_password` is usually a `set rcon_password ...` that worked.
+ */
+const REFUSAL = /invalid password|(?:bad|no|must set) rcon_password/i;
 
 /** The longest command Polaris will send. A datagram has to fit in one packet,
  *  and no screen here composes anything close to this. */

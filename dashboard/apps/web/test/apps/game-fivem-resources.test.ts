@@ -108,6 +108,17 @@ describe("a link to fetch one from", () => {
         expect(resources.isResourceUrl("file:///etc/passwd")).toBe(false);
         expect(resources.isResourceUrl("not a url")).toBe(false);
     });
+
+    it("says which unpacker the archive needs, from the path and not the whole link", () => {
+        expect(resources.resourceArchiveOf("https://example.com/res.zip")).toBe("zip");
+        expect(resources.resourceArchiveOf("https://example.com/res.tar.gz")).toBe("tar");
+        expect(resources.resourceArchiveOf("https://example.com/res.tgz")).toBe("tar");
+        // A signed link carries the extension in the middle, and the one accepted
+        // has to be the one unpacked.
+        expect(resources.resourceArchiveOf("https://example.com/res.zip?token=abc")).toBe("zip");
+        expect(resources.resourceArchiveOf("https://example.com/res.tgz#sha256")).toBe("tar");
+        expect(resources.resourceArchiveOf("https://example.com/y?file=res.zip")).toBe(null);
+    });
 });
 
 describe("the suggested name", () => {

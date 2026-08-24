@@ -102,6 +102,19 @@ describe("an identifier", () => {
         expect(players.isIdentifier("license:a b")).toBe(false);
     });
 
+    it("cannot carry a second console command in its value", () => {
+        // One of these is written into `server.cfg` as an `add_principal` line and
+        // sent to the running console as one, and both read `;` as the end of the
+        // command.
+        expect(players.isIdentifier("license:abc;quit")).toBe(false);
+        expect(players.isIdentifier('license:abc"')).toBe(false);
+        expect(players.isIdentifier("license:abc quit")).toBe(false);
+        // What the game actually presents still passes.
+        expect(players.isIdentifier("ip:203.0.113.9")).toBe(true);
+        expect(players.isIdentifier("ip:2001:db8::1")).toBe(true);
+        expect(players.isIdentifier("license:3f2a-1b_c.d")).toBe(true);
+    });
+
     it("is stored lowercased, because the door compares it that way", () => {
         expect(players.normalizeIdentifier(" LICENSE:AbCdEf ")).toBe("license:abcdef");
     });

@@ -155,14 +155,26 @@ export function primaryIdentifier(player: { identifiers: readonly string[] }): s
     return null;
 }
 
+/**
+ * What an identifier's value may be made of.
+ *
+ * Every kind the game presents is hex, digits or an address, so this is not a
+ * narrowing of anything real - and it is what keeps an identifier a single
+ * console token. One of these is written into `server.cfg` as an `add_principal`
+ * line and sent to the running console as one, and both of those read `;` as the
+ * end of the command: a value carrying one would be a second command that
+ * somebody typed into a name field.
+ */
+const IDENTIFIER_VALUE = /^[A-Za-z0-9._:-]+$/;
+
 /** Whether a string is shaped like an identifier at all, for a field somebody
  *  types one into. The kind has to be one the game actually presents; the value
- *  is whatever that kind's issuer made it. */
+ *  is whatever that kind's issuer made it, within what a console line can carry. */
 export function isIdentifier(value: string): boolean {
     const trimmed = value.trim();
     const at = trimmed.indexOf(":");
     if (at <= 0 || at === trimmed.length - 1) return false;
-    if (/[\s"]/.test(trimmed)) return false;
+    if (!IDENTIFIER_VALUE.test(trimmed.slice(at + 1))) return false;
     return (IDENTIFIER_KINDS as readonly string[]).includes(trimmed.slice(0, at).toLowerCase());
 }
 

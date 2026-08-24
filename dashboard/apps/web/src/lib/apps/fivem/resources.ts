@@ -123,23 +123,38 @@ export function foldResources(
     return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
+/** How an archive has to be unpacked, which is the only thing its extension is
+ *  read for. */
+export type ResourceArchive = "zip" | "tar";
+
 /**
- * Where a resource may be fetched from.
+ * Which archive a link points at, or null when it points at nothing installable.
  *
  * HTTPS only, and an archive rather than a repository: a resource is published as
  * a release zip or a source tarball, and anything else is a link somebody pasted
  * from the wrong place. GitHub's own "download as zip" links end in `.zip`, so
  * this is not as narrow as it reads.
+ *
+ * One function rather than a check here and a match at the point of unpacking:
+ * the extension is on the path and nowhere else, so a link with a query string
+ * after it - `.../res.zip?token=...` - has to be read the same way twice or it is
+ * accepted as a zip and handed to `tar`.
  */
-export function isResourceUrl(value: string): boolean {
+export function resourceArchiveOf(value: string): ResourceArchive | null {
     let url: URL;
     try {
         url = new URL(value.trim());
     } catch {
-        return false;
+        return null;
     }
-    if (url.protocol !== "https:") return false;
-    return /\.(zip|tar\.gz|tgz)$/i.test(url.pathname);
+    if (url.protocol !== "https:") return null;
+    if (/\.zip$/i.test(url.pathname)) return "zip";
+    return /\.(tar\.gz|tgz)$/i.test(url.pathname) ? "tar" : null;
+}
+
+/** Where a resource may be fetched from. */
+export function isResourceUrl(value: string): boolean {
+    return resourceArchiveOf(value) !== null;
 }
 
 /** What to say when a link is refused, in the terms it was refused on. */

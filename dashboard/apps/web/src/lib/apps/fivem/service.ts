@@ -50,9 +50,9 @@ import {
 import {
     foldResources,
     isResourceName,
-    isResourceUrl,
     parseResourceListing,
     RESOURCE_URL_HINT,
+    resourceArchiveOf,
     type FivemResource,
     type ResourceAction
 } from "@/lib/apps/fivem/resources";
@@ -317,14 +317,20 @@ export async function broadcastToFivem(ownerId: string, installedAppId: string, 
 }
 
 /** Say something to one person. The console can only broadcast, so this goes
- *  through the command Polaris' own resource adds. */
+ *  through the command Polaris' own resource adds.
+ *
+ *  One quoted argument rather than the words left loose: the console splits a
+ *  line on `;` before any resource sees it, so a message typed with one in it
+ *  would be a second command run as the console itself. The resource joins its
+ *  arguments back with a space, so a single token says the same thing. */
 export async function messageFivemPlayer(
     ownerId: string,
     installedAppId: string,
     playerId: number,
     message: string
 ): Promise<void> {
-    await runFivemCommand(ownerId, installedAppId, `${guard.DM_COMMAND} ${playerId} ${message}`);
+    if (!access.isBanReason(message)) throw new Error(access.REASON_HINT);
+    await runFivemCommand(ownerId, installedAppId, `${guard.DM_COMMAND} ${playerId} ${quoteArgument(message)}`);
 }
 
 /** Throw somebody off. They can come straight back unless the allow list or a ban
@@ -415,15 +421,25 @@ export async function addAllowedPlayer(
     return handOver(ownerId, installedAppId);
 }
 
+/**
+ * Take somebody off the list.
+ *
+ * The last one cannot come off while the server is closed, for the same reason it
+ * cannot be closed with nobody on it: a closed server with an empty list refuses
+ * every client there is, starting with whoever was trying to fix it, and the door
+ * would say nothing that explained why.
+ */
 export async function removeAllowedPlayer(
     ownerId: string,
     installedAppId: string,
     identifier: string
 ): Promise<FivemAccessView> {
     const config = await configOf(ownerId, installedAppId);
-    await patchInstallConfig(installedAppId, {
-        [access.ALLOW_LIST_KEY]: access.withoutAllowed(access.readAllowList(config), identifier)
-    });
+    const next = access.withoutAllowed(access.readAllowList(config), identifier);
+    if (next.length === 0 && access.readExclusiveJoin(config)) {
+        throw new Error("Open the server to everyone first, or taking the last player off would keep you out too");
+    }
+    await patchInstallConfig(installedAppId, { [access.ALLOW_LIST_KEY]: next });
     return handOver(ownerId, installedAppId);
 }
 
@@ -528,7 +544,7 @@ export async function setFivemAdmin(
     await runFivemCommand(
         ownerId,
         installedAppId,
-        `${isAdmin ? "add_principal" : "remove_principal"} identifier.${identifier} group.admin`
+        `${isAdmin ? "add_principal" : "remove_principal"} ${quoteArgument(`identifier.${identifier}`)} group.admin`
     ).catch(() => undefined);
     return view;
 }
@@ -599,6 +615,7 @@ function handedDigest(current: access.FivemAccess): string {
         .update(JSON.stringify(current.bans))
         .update(String(current.exclusiveJoin))
         .update(JSON.stringify(access.adminCfgLines(current.admins)))
+        .update(guard.GUARD_MANIFEST)
         .update(guard.GUARD_SCRIPT)
         .digest("hex");
 }
@@ -899,7 +916,8 @@ export async function installResourceFromUrl(
     url: string,
     name: string
 ): Promise<void> {
-    if (!isResourceUrl(url)) throw new Error(RESOURCE_URL_HINT);
+    const archive = resourceArchiveOf(url);
+    if (archive === null) throw new Error(RESOURCE_URL_HINT);
     if (!isResourceName(name)) throw new Error("A resource name is letters, digits, dots, dashes and underscores");
     if (name.toLowerCase() === guard.GUARD_RESOURCE) throw new Error("That name belongs to Polaris' own resource");
     const link = Buffer.from(url.trim(), "utf8").toString("base64");
@@ -913,10 +931,12 @@ export async function installResourceFromUrl(
         'if command -v wget >/dev/null 2>&1; then wget -q -O "$work/archive" "$url";',
         'elif command -v curl >/dev/null 2>&1; then curl -fsSL -o "$work/archive" "$url";',
         `else exit ${NO_HTTP_CLIENT}; fi`,
-        'case "$url" in',
-        `  *.zip) command -v unzip >/dev/null 2>&1 || exit ${NO_UNPACKER}; unzip -q "$work/archive" -d "$work/unpacked" ;;`,
-        `  *) command -v tar >/dev/null 2>&1 || exit ${NO_UNPACKER}; tar xzf "$work/archive" -C "$work/unpacked" ;;`,
-        "esac",
+        // Which unpacker to use is read off the path rather than off the whole
+        // link, because a signed one - `.../res.zip?token=...` - ends in neither
+        // extension.
+        archive === "zip"
+            ? `command -v unzip >/dev/null 2>&1 || exit ${NO_UNPACKER}; unzip -q "$work/archive" -d "$work/unpacked"`
+            : `command -v tar >/dev/null 2>&1 || exit ${NO_UNPACKER}; tar xzf "$work/archive" -C "$work/unpacked"`,
         // The archive is usually one folder with the resource inside it, and
         // sometimes the resource itself. The manifest is what says which.
         'found="$(find "$work/unpacked" -maxdepth 3 -name fxmanifest.lua -o -maxdepth 3 -name __resource.lua | head -n 1)"',

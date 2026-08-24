@@ -61,6 +61,13 @@ describe("a refusal", () => {
         expect(rcon.isRconRefusal("2 players")).toBe(false);
         expect(rcon.isRconRefusal("")).toBe(false);
     });
+
+    it("is not a reply that merely names the variable", () => {
+        // A password that was changed from the console tab answers with the
+        // variable it just set, which is the opposite of a refusal.
+        expect(rcon.isRconRefusal('rcon_password: "abc123" -> "def456"')).toBe(false);
+        expect(rcon.isRconRefusal("set rcon_password def456")).toBe(false);
+    });
 });
 
 describe("a command", () => {
