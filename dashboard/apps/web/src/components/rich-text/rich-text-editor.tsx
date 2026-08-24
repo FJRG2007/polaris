@@ -101,6 +101,18 @@ export interface RichTextEditorProps {
      * shared space anywhere else in Polaris.
      */
     mentionsIn?: string | null;
+    /**
+     * Where @ looks, when the usual place is the wrong one.
+     *
+     * The default asks which people this account shares work with, scoped to the
+     * conversation the caret is in. That question does not exist inside a call:
+     * half the room are guests who share nothing, and a guest doing the asking
+     * has no account for it to be asked about. A caller with its own roster
+     * hands it over here, and the picker knows no different.
+     */
+    mentionSource?: ((kinds: readonly refs.ReferenceKind[], query: string) => Promise<
+        readonly { kind: refs.ReferenceKind; id: string; label: string; detail?: string; image?: string | null }[]
+    >) | null;
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
@@ -137,6 +149,7 @@ export function RichTextEditor({
     focusWhere = "end",
     onPasteFiles,
     mentionsIn = null,
+    mentionSource = null,
     bordered = false,
     className
 }: RichTextEditorProps) {
@@ -151,6 +164,16 @@ export function RichTextEditor({
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
+            if (mentionSource) {
+                const found = await mentionSource(kinds, query).catch(() => []);
+                return found.map((entry) => ({
+                    kind: entry.kind,
+                    id: entry.id,
+                    label: entry.label,
+                    detail: entry.detail ?? "",
+                    image: entry.image ?? null
+                }));
+            }
             const result = await runAction(
                 () =>
                     searchMentionsAction({
@@ -162,7 +185,7 @@ export function RichTextEditor({
             );
             return result?.results ?? [];
         },
-        [mentionsIn]
+        [mentionsIn, mentionSource]
     );
 
     const extensions = useMemo(

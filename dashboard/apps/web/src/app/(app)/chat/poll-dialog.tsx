@@ -54,12 +54,21 @@ export function PollDialog({
     onOpenChange,
     onConfirm,
     busy = false,
+    timed = true,
     error
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onConfirm: (draft: PollDraft) => void;
     busy?: boolean;
+    /**
+     * Whether the question has a clock of its own.
+     *
+     * Off inside a call, where the call is the clock: it closes when the room
+     * does, and offering "open for three days" would be offering a poll that
+     * outlives the only place it can be answered.
+     */
+    timed?: boolean;
     /** What the server said, when it refused one this dialog thought was fine. */
     error?: string;
 }) {
@@ -259,17 +268,19 @@ export function PollDialog({
                         />
                     </label>
 
-                    <label className="flex items-center justify-between gap-3 text-sm">
-                        <span id="poll-length">Open for</span>
-                        <Select
-                            value={String(hours)}
-                            disabled={busy}
-                            options={durations}
-                            aria-label="How long the poll stays open"
-                            className="w-44"
-                            onValueChange={(value) => setHours(Number(value))}
-                        />
-                    </label>
+                    {timed && (
+                        <label className="flex items-center justify-between gap-3 text-sm">
+                            <span id="poll-length">Open for</span>
+                            <Select
+                                value={String(hours)}
+                                disabled={busy}
+                                options={durations}
+                                aria-label="How long the poll stays open"
+                                className="w-44"
+                                onValueChange={(value) => setHours(Number(value))}
+                            />
+                        </label>
+                    )}
 
                     {(error || refusal) && (
                         <p

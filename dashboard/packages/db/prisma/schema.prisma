@@ -6888,13 +6888,99 @@ model MeetingMessage {
     id            String   @id @default(uuid(7)) @db.Uuid
     meetingId     String   @db.Uuid
     participantId String   @db.Uuid
+    // Markdown, the way every other writing surface in Polaris stores it. It was
+    // a line of plain text once, which is why an address pasted into a call was
+    // an address and never a link, and why nobody could put a picture in.
     body          String
     createdAt     DateTime @default(now())
 
-    meeting     Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-    participant MeetingParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+    meeting     Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+    participant MeetingParticipant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+    attachments MeetingAttachment[]
+    poll        MeetingPoll?
 
     @@index([meetingId, createdAt])
+}
+
+// A file somebody put in a call.
+//
+// Its own table rather than ChatAttachment's, and its own folder rather than the
+// chat's, and both for the same reason: what is written in a call is deleted
+// with the call. The chat's housekeeping removes any folder under its root that
+// no conversation answers for, so a meeting's files kept there would be swept by
+// the very sweep they have to survive - and a meeting's files have to be
+// findable in one delete when it ends.
+model MeetingAttachment {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    messageId    String   @db.Uuid
+    name         String
+    size         BigInt   @default(0)
+    contentType  String   @default("application/octet-stream")
+    // The storage it was written to, or null for the disk Polaris runs on.
+    // Recorded per file rather than read back from the setting, like every other
+    // upload here: where a file went is a fact about the file.
+    connectionId String?  @db.Uuid
+    path         String
+    createdAt    DateTime @default(now())
+
+    message MeetingMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@index([messageId])
+}
+
+// A question asked in a call, with answers under it.
+//
+// Deliberately not ChatPoll. That one is voted on by accounts, and half a
+// meeting has none - a poll in a room where the guests cannot answer is a poll
+// asked of the wrong people. So this one is voted on by seats.
+model MeetingPoll {
+    messageId   String  @id @db.Uuid
+    // Whether somebody may pick more than one answer.
+    multiple    Boolean @default(false)
+    // Whether the tallies stay hidden until it closes. A show of hands where the
+    // first few answers are visible is one where they decide the rest, which is
+    // exactly what a room asking something contentious wants to avoid.
+    hideResults Boolean @default(false)
+    // When somebody ended it early. A poll in a call has no clock of its own:
+    // the call is the clock, and both end together.
+    closedAt  DateTime?
+    createdAt DateTime  @default(now())
+
+    message MeetingMessage      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    options MeetingPollOption[]
+}
+
+// One answer, in the order it was written.
+model MeetingPollOption {
+    id       String @id @default(uuid(7)) @db.Uuid
+    pollId   String @db.Uuid
+    text     String
+    position Int
+
+    poll  MeetingPoll       @relation(fields: [pollId], references: [messageId], onDelete: Cascade)
+    votes MeetingPollVote[]
+
+    @@index([pollId, position])
+}
+
+// Somebody in the room picking an answer.
+//
+// Keyed by the seat rather than by the account, which is what lets a guest vote
+// at all. It costs one thing and the trade is deliberate: somebody who drops out
+// and rejoins gets a new seat, so they could answer twice. In a room where the
+// poll is a show of hands that lasts as long as the call, that is a better price
+// than half the room being unable to answer.
+model MeetingPollVote {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    optionId      String   @db.Uuid
+    participantId String   @db.Uuid
+    createdAt     DateTime @default(now())
+
+    option      MeetingPollOption  @relation(fields: [optionId], references: [id], onDelete: Cascade)
+    participant MeetingParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+    @@unique([optionId, participantId])
+    @@index([optionId])
 }
 
 // Somebody in a call, or somebody at the door.
@@ -6923,8 +7009,9 @@ model MeetingParticipant {
     // laptop shut is swept rather than left in the room forever.
     lastSeenAt DateTime  @default(now())
 
-    meeting  Meeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+    meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]
+    votes    MeetingPollVote[]
 
     @@index([meetingId, leftAt])
     @@index([meetingId, admission])

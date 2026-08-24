@@ -77,6 +77,8 @@ export function Composer({
     rules,
     disabled,
     attachable = true,
+    mentionSource = null,
+    inCall = false,
     placeholder,
     editing,
     replyingTo,
@@ -103,6 +105,23 @@ export function Composer({
      *  rather than read from the chat's own context, because this composer is
      *  also the one under a task, where there is no such context. */
     attachable?: boolean;
+    /** Where @ looks, for a surface whose roster is not a conversation's - a
+     *  call, where half the room are guests. Left unset everywhere else, and the
+     *  editor asks the usual question. */
+    mentionSource?: React.ComponentProps<typeof RichTextEditor>["mentionSource"];
+    /**
+     * Whether this box is inside a call.
+     *
+     * Everything it changes is the same fact wearing different clothes. The picker
+     * offers emoji and nothing else, because the GIF search and the kept pictures
+     * belong to an account and half a call has none. A question asked here has no
+     * clock of its own, because the call is the clock. Nothing announces that
+     * somebody is typing, because there is nowhere in a call that would draw it
+     * and no session for a guest to announce under. And neither the microphone
+     * nor the screen recorder is offered, because both of those are already on
+     * the table - the room is the recording.
+     */
+    inCall?: boolean;
     placeholder: string;
     /** The message being rewritten, if any. */
     editing?: ChatMessageView | null;
@@ -442,6 +461,10 @@ export function Composer({
     };
 
     const announce = () => {
+        // Nobody to tell, and nobody to tell them as. A call has no typing
+        // indicator, and half the people in one have no session for an action
+        // that starts with `requirePermission` to run under.
+        if (inCall) return;
         const now = Date.now();
         if (now - lastAnnounced.current < TYPING_EVERY_MS) return;
         lastAnnounced.current = now;
@@ -457,7 +480,7 @@ export function Composer({
      * lapses after a few seconds by design, and a recording runs for minutes.
      */
     useEffect(() => {
-        if (!voice.recording || disabled) return;
+        if (!voice.recording || disabled || inCall) return;
         const say = () => {
             lastAnnounced.current = Date.now();
             void typingAction(channelId, "recording");
@@ -465,7 +488,7 @@ export function Composer({
         say();
         const timer = setInterval(say, TYPING_EVERY_MS);
         return () => clearInterval(timer);
-    }, [voice.recording, disabled, channelId]);
+    }, [voice.recording, disabled, inCall, channelId]);
 
     return (
         <div
@@ -641,6 +664,7 @@ export function Composer({
                         // this account shares a Tasks space with, which is what
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
+                        mentionSource={mentionSource}
                         focusWhere={focusWhere}
                         // A screenshot on the clipboard is a screenshot somebody
                         // is sending: it is staged like a picked file, with the
@@ -723,7 +747,7 @@ export function Composer({
                                 recording is one - and only in a browser that can
                                 record, rather than as a button that apologises
                                 when it is pressed. */}
-                            {mayAttach && recordable && (
+                            {mayAttach && recordable && !inCall && (
                                 <MicButton
                                     disabled={disabled || files.length >= rules.maxAttachments}
                                     onStart={voice.start}
@@ -735,7 +759,7 @@ export function Composer({
                                 said. Only where a file may be sent, since what
                                 it makes is one, and only in a browser that can
                                 share a screen - which is no phone. */}
-                            {mayAttach && clippable && (
+                            {mayAttach && clippable && !inCall && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -769,6 +793,7 @@ export function Composer({
                             )}
                             <EmojiPicker
                                 disabled={disabled}
+                                media={!inCall}
                                 // Back to the box, caret at the end. Picking an
                                 // emoji is part of writing the message, and
                                 // leaving the focus on the closed picker means
@@ -897,6 +922,9 @@ export function Composer({
             {polling && onPoll && (
                 <PollDialog
                     open
+                    // A call is the clock its own questions run on, so the
+                    // dialog does not offer a second one.
+                    timed={!inCall}
                     busy={pollBusy}
                     error={pollError || undefined}
                     onOpenChange={(next) => !next && setPolling(false)}

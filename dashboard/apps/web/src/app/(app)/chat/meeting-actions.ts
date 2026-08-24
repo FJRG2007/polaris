@@ -19,11 +19,12 @@ import * as core from "@polaris/core";
 import { cookies } from "next/headers";
 import * as chat from "@/lib/chat/chat-service";
 import * as meetings from "@/lib/chat/meetings";
+import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { createNotification } from "@/lib/notification-service";
-import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
+import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { ChatAccessError, requireChannel } from "@/lib/chat/access";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
 
@@ -547,14 +548,87 @@ export async function sayInMeetingAction(
 ): Promise<{ error?: string }> {
     const seat = await resolveSeat(String(meetingId));
     if (!seat) return { error: "You are not in that meeting" };
-    return guard(() => meetings.sayInMeeting(seat, String(body ?? "")));
+    return guard(() => room.sayInMeeting(seat, String(body ?? "")));
 }
 
 export async function saidInMeetingAction(
     meetingId: string
-): Promise<{ lines?: readonly meetings.MeetingLine[]; error?: string }> {
+): Promise<{ lines?: readonly room.MeetingLine[]; error?: string }> {
     const seat = await resolveSeat(String(meetingId));
     if (!seat) return { lines: [] };
-    const result = await guard(() => meetings.saidInMeeting(seat));
+    const result = await guard(() => room.saidInMeeting(seat));
     return result.error ? { error: result.error } : { lines: result.value ?? [] };
+}
+
+const pollSchema = z.object({
+    meetingId: z.string().uuid(),
+    question: z.string().trim().min(1).max(MAX_MEETING_LINE),
+    options: z.array(z.string()).min(2).max(room.MAX_POLL_OPTIONS),
+    multiple: z.boolean().optional(),
+    hideResults: z.boolean().optional()
+});
+
+/** Ask the room a question. Anybody in it, not only the host: a call is a
+ *  conversation, and whoever needs to know which of three dates suits everybody
+ *  is whoever is asking. */
+export async function pollInMeetingAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = pollSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That could not be asked" };
+
+    const seat = await resolveSeat(parsed.data.meetingId);
+    if (!seat) return { error: "You are not in that meeting" };
+    const { question, options, multiple, hideResults } = parsed.data;
+    return guard(() => room.pollInMeeting(seat, { question, options, multiple, hideResults }));
+}
+
+/** Pick an answer, or take the pick back by pressing it again. */
+export async function voteInMeetingAction(
+    meetingId: string,
+    optionId: string
+): Promise<{ error?: string }> {
+    const seat = await resolveSeat(String(meetingId));
+    if (!seat) return { error: "You are not in that meeting" };
+    return guard(() => room.voteInMeeting(seat, String(optionId ?? "")));
+}
+
+/** Stop taking answers. */
+export async function closePollInMeetingAction(
+    meetingId: string,
+    messageId: string
+): Promise<{ error?: string }> {
+    const seat = await resolveSeat(String(meetingId));
+    if (!seat) return { error: "You are not in that meeting" };
+    return guard(() => room.closePollInMeeting(seat, String(messageId ?? "")));
+}
+
+/**
+ * Who @ offers inside a call.
+ *
+ * The people in the room, and only them. The editor's usual source asks who this
+ * account shares work with, which is the wrong question here twice over: half a
+ * meeting is guests who share nothing, and a guest doing the asking has no
+ * account for it to ask about. Proved by a seat like everything else on this
+ * side of the file.
+ *
+ * A guest is offered by name and cannot be addressed - there is no account
+ * behind them to point a chip at - so only the seats with an account come back.
+ */
+export async function mentionsInMeetingAction(
+    meetingId: string,
+    query: string
+): Promise<{ results: { kind: "user"; id: string; label: string }[] }> {
+    const seat = await resolveSeat(String(meetingId));
+    if (!seat || seat.admission !== "admitted") return { results: [] };
+
+    const wanted = String(query ?? "").trim().toLowerCase();
+    const people = await meetings.readMeeting(seat);
+    const results = (people?.participants ?? [])
+        .filter((person) => person.admission === "admitted" && person.userId !== null)
+        .filter((person) => !wanted || person.name.toLowerCase().includes(wanted))
+        .slice(0, 10)
+        .map((person) => ({ kind: "user" as const, id: person.userId!, label: person.name }));
+    // One seat per person in a call, but a rejoin makes a second row, so the
+    // same account can appear twice in a roster that has not been swept yet.
+    const seen = new Set<string>();
+    return { results: results.filter((entry) => (seen.has(entry.id) ? false : (seen.add(entry.id), true))) };
 }

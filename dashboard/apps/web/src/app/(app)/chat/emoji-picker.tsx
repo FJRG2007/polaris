@@ -161,11 +161,21 @@ function place(button: DOMRect): Placement {
 
 export function EmojiPicker({
     disabled,
+    media = true,
     onEmoji,
     onMedia,
     onSaved
 }: {
     disabled: boolean;
+    /**
+     * Whether there is anything here but emoji.
+     *
+     * Off inside a call. The GIF search and the kept pictures both belong to an
+     * account - one is looked up as this instance and the other is somebody's
+     * own library - and half a call has no account at all, so the tabs would be
+     * three ways of finding out you cannot use them.
+     */
+    media?: boolean;
     onEmoji: (char: string) => void;
     /** A chosen GIF or sticker, by address. The caller sends it. */
     onMedia: (address: string) => void;
@@ -390,7 +400,7 @@ export function EmojiPicker({
                     }}
                     className="fixed z-50 flex flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover"
                 >
-                    <div className="flex shrink-0 border-b border-border">
+                    <div className={cn("flex shrink-0 border-b border-border", !media && "hidden")}>
                         {(
                             [
                                 ["emoji", "Emoji"],

@@ -20,13 +20,9 @@
 
 import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
-import {
-    MAX_MEETING_LINE,
-    MAX_MEETING_TITLE,
-    MAX_SCHEDULE_AHEAD_MS,
-    MEETING_LINES
-} from "./meeting-limits";
+import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { blockersOf } from "@/lib/blocks";
+import { discardMeetingChat } from "./meeting-files";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
@@ -869,7 +865,7 @@ async function announceCall(
 
 /** The caller's own row, which is both the proof and the answer to "what am I
  *  allowed to see" - so it is returned rather than thrown away. */
-async function requireSeated(seat: { meetingId: string; participantId: string }): Promise<{
+export async function requireSeated(seat: { meetingId: string; participantId: string }): Promise<{
     id: string;
     userId: string | null;
     name: string;
@@ -1035,6 +1031,17 @@ async function closeMeeting(meetingId: string): Promise<void> {
         })
     ]);
     publishMeetingEvent({ meetingId, kind: "ended" });
+    // What was said in it goes with it. A meeting is never deleted - it is marked
+    // ended and every join after that is refused - so without this the messages
+    // and the files sat in the database and on the disk for good: unreachable
+    // from every screen in Polaris, and readable by anybody who could read
+    // either. The room promised the people in it otherwise.
+    //
+    // Best-effort, and after the room is already closed. A share that will not
+    // answer must not leave everybody sitting in a call that is over.
+    await discardMeetingChat(meetingId).catch((error: unknown) => {
+        console.error("polaris: could not clear the chat of a call that ended:", error);
+    });
     // Only for the one caller that actually closed it. Ending is reached from
     // several places - the last person out, a lone call timing out, the host
     // pressing the button - and each would otherwise announce it again.
@@ -1417,81 +1424,4 @@ async function requireHost(
         throw new ChatAccessError("Only whoever is hosting the meeting can do that");
     }
     return { title: meeting.title, hostId: meeting.hostId };
-}
-
-// ---------------------------------------------------------------------------
-// What the room says to itself
-// ---------------------------------------------------------------------------
-
-/**
- * The chat inside a call.
- *
- * Its own table rather than the conversation's, and it has to be: every message
- * in Chat is written by an account against a channel somebody is a member of,
- * and neither is true of a guest who typed a name into a link ten seconds ago.
- * So a line here belongs to a *seat*, which is the only identity a meeting can
- * promise for everybody in it, and it goes when the meeting goes.
- *
- * It is where a link, an address or a name gets dropped while people are
- * talking, which is the one thing a call cannot do out loud.
- */
-export interface MeetingLine {
-    readonly id: string;
-    /** The seat that said it, so a screen can tell its own lines apart. */
-    readonly participantId: string;
-    readonly name: string;
-    readonly guest: boolean;
-    readonly body: string;
-    readonly at: string;
-}
-
-/** Say something to the room. Only somebody actually in it: the lobby is not a
- *  place to be heard from. */
-export async function sayInMeeting(
-    seat: { meetingId: string; participantId: string },
-    body: string
-): Promise<void> {
-    const seated = await requireSeated(seat);
-    if (seated.admission !== "admitted") {
-        throw new ChatAccessError("You are still waiting to be let in");
-    }
-    const said = body.trim().slice(0, MAX_MEETING_LINE);
-    if (!said) throw new ChatAccessError("Write something first");
-
-    await prisma.meetingMessage.create({
-        data: { meetingId: seat.meetingId, participantId: seat.participantId, body: said }
-    });
-    publishMeetingEvent({ meetingId: seat.meetingId, kind: "said" });
-}
-
-/** What the room has said. The name comes off the seat that said it, so a guest
- *  is named the way they named themselves and nobody has to have an account. */
-export async function saidInMeeting(seat: {
-    meetingId: string;
-    participantId: string;
-}): Promise<readonly MeetingLine[]> {
-    const seated = await requireSeated(seat);
-    if (seated.admission !== "admitted") return [];
-
-    const rows = await prisma.meetingMessage.findMany({
-        where: { meetingId: seat.meetingId },
-        orderBy: { createdAt: "desc" },
-        take: MEETING_LINES,
-        select: {
-            id: true,
-            participantId: true,
-            body: true,
-            createdAt: true,
-            participant: { select: { name: true, userId: true } }
-        }
-    });
-
-    return rows.reverse().map((row) => ({
-        id: row.id,
-        participantId: row.participantId,
-        name: row.participant.name,
-        guest: row.participant.userId === null,
-        body: row.body,
-        at: row.createdAt.toISOString()
-    }));
 }
