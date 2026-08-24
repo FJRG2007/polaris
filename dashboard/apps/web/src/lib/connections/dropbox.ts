@@ -15,8 +15,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const DROPBOX_PROVIDER = "dropbox";
 
@@ -42,13 +42,8 @@ export interface DropboxOAuthClient {
 }
 
 /** The app an operator connected, or null when this deployment has none. */
-export async function getDropboxOAuthClient(): Promise<DropboxOAuthClient | null> {
-    const state = await getIntegrationState(DROPBOX_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(DROPBOX_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getDropboxOAuthClient(): Promise<DropboxOAuthClient | null> {
+    return oauthClientFor(DROPBOX_PROVIDER);
 }
 
 export function dropboxAuthorizeUrl(

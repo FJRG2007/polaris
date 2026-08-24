@@ -23,8 +23,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const DISCORD_PROVIDER = "discord";
 
@@ -59,13 +59,8 @@ export interface DiscordOAuthClient {
 }
 
 /** The application an operator registered, or null when this deployment has none. */
-export async function getDiscordOAuthClient(): Promise<DiscordOAuthClient | null> {
-    const state = await getIntegrationState(DISCORD_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(DISCORD_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getDiscordOAuthClient(): Promise<DiscordOAuthClient | null> {
+    return oauthClientFor(DISCORD_PROVIDER);
 }
 
 /**
@@ -134,14 +129,13 @@ function displayName(user: z.infer<typeof userSchema>): string {
 
 /** The account's picture on Discord's CDN, or null when it has none and Discord
  *  is drawing a default. Animated hashes are marked with an `a_` prefix and are
- *  the one case that is not a png. */
+ *  the one case that is not a png: an animated asset is served as a gif, which is
+ *  the extension Discord documents for one. */
 function avatarUrl(user: z.infer<typeof userSchema>): string | null {
     const hash = user.avatar?.trim();
     if (!hash) return null;
-    const animated = hash.startsWith("a_");
-    const url = new URL(`${AVATAR_CDN}/${user.id}/${hash}.${animated ? "webp" : "png"}`);
+    const url = new URL(`${AVATAR_CDN}/${user.id}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}`);
     url.searchParams.set("size", String(AVATAR_SIZE));
-    if (animated) url.searchParams.set("animated", "true");
     return url.toString();
 }
 

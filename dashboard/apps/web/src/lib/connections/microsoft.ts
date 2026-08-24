@@ -13,8 +13,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const MICROSOFT_PROVIDER = "microsoft";
 
@@ -35,13 +35,8 @@ export interface MicrosoftOAuthClient {
 }
 
 /** The application an operator connected, or null when this deployment has none. */
-export async function getMicrosoftOAuthClient(): Promise<MicrosoftOAuthClient | null> {
-    const state = await getIntegrationState(MICROSOFT_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(MICROSOFT_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getMicrosoftOAuthClient(): Promise<MicrosoftOAuthClient | null> {
+    return oauthClientFor(MICROSOFT_PROVIDER);
 }
 
 export function microsoftAuthorizeUrl(

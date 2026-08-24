@@ -21,10 +21,10 @@ import type { CfAccount } from "@/lib/integrations/cloudflare-api";
 import { setDomainConfig, syncDuckDns } from "@/lib/domain-service";
 import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token";
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
-import { connectionRedirectUri, verifyConnectionOAuthApp } from "@/lib/connections/oauth";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
+import { OAUTH_APP_SLUGS, connectionRedirectUri, verifyConnectionOAuthApp } from "@/lib/connections/oauth";
 import {
     connectCloudflareToken,
     disconnectCloudflareToken
@@ -159,7 +159,7 @@ export async function saveOAuthAppAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const slug = input.slug;
-    if (!["google", "microsoft", "dropbox", "epic", "minecraft"].includes(slug)) {
+    if (!OAUTH_APP_SLUGS.includes(slug)) {
         return { error: "That integration does not take an OAuth application" };
     }
     const clientId = input.clientId.trim();

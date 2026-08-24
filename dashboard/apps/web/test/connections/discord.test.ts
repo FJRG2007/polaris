@@ -167,7 +167,7 @@ describe("reading back who authorized", () => {
     it("asks for an animated avatar the one way Discord serves one", async () => {
         authorizes({ id: "1234", username: "ana", avatar: "a_abc123" });
         const { avatarUrl } = await exchangeDiscordCode(CLIENT, "code-1", REDIRECT);
-        expect(avatarUrl).toBe("https://cdn.discordapp.com/avatars/1234/a_abc123.webp?size=128&animated=true");
+        expect(avatarUrl).toBe("https://cdn.discordapp.com/avatars/1234/a_abc123.gif?size=128");
     });
 
     it("draws no avatar for an account that has none, rather than a broken image", async () => {

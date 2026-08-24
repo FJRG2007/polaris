@@ -221,6 +221,20 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
     }
 };
 
+/**
+ * The services whose card on the Integrations screen configures an OAuth
+ * application the operator registers: a client id, a secret, and a redirect URI
+ * to paste into the vendor's console.
+ *
+ * Every adapter but GitHub, whose credentials are written by the App install
+ * rather than typed into a dialog. Read off the table rather than listed again,
+ * because the two lists that used to say this - the one deciding which cards get
+ * the dialog and the one deciding which slugs the save action accepts - could
+ * drift, and a provider missing from the second is one whose Save button refuses
+ * every application with no way for the operator to tell why.
+ */
+export const OAUTH_APP_SLUGS: readonly string[] = Object.keys(ADAPTERS).filter((slug) => slug !== "github");
+
 /** Whether this provider can be authorized at all here. */
 export function supportsOAuth(provider: string): boolean {
     return findConnectionProvider(provider) !== undefined && provider in ADAPTERS;

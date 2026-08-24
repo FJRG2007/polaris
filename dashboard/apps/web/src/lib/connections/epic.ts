@@ -17,8 +17,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const EPIC_PROVIDER = "epic";
 
@@ -39,13 +39,8 @@ export interface EpicOAuthClient {
 }
 
 /** The product an operator registered, or null when this deployment has none. */
-export async function getEpicOAuthClient(): Promise<EpicOAuthClient | null> {
-    const state = await getIntegrationState(EPIC_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(EPIC_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getEpicOAuthClient(): Promise<EpicOAuthClient | null> {
+    return oauthClientFor(EPIC_PROVIDER);
 }
 
 export function epicAuthorizeUrl(client: EpicOAuthClient, redirectUri: string, state: string): string {

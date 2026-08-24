@@ -15,8 +15,8 @@ import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
-import { connectionCallbackUrl, connectionFlowOrigin } from "@/lib/connections/oauth";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
+import { OAUTH_APP_SLUGS, connectionCallbackUrl, connectionFlowOrigin } from "@/lib/connections/oauth";
 import { SERVICE_INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
 import { connectionEmailTrusted, connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
 
@@ -50,11 +50,6 @@ async function provenApplications(): Promise<Map<string, boolean>> {
     );
     return new Map(entries);
 }
-
-/** The services whose card configures an OAuth application the operator
- *  registers. Kept beside the page because it decides which cards get a client
- *  id, a redirect URI and an account limit. */
-const OAUTH_APP_SLUGS: readonly string[] = ["google", "microsoft", "dropbox", "epic", "minecraft", "discord"];
 
 export default async function IntegrationsPage() {
     await requireAdmin();

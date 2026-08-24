@@ -24,7 +24,7 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { oauthClientFor } from "./oauth-app";
 
 export const MINECRAFT_PROVIDER = "minecraft";
 
@@ -49,13 +49,8 @@ export interface MinecraftOAuthClient {
     readonly clientSecret: string;
 }
 
-export async function getMinecraftOAuthClient(): Promise<MinecraftOAuthClient | null> {
-    const state = await getIntegrationState(MINECRAFT_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(MINECRAFT_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getMinecraftOAuthClient(): Promise<MinecraftOAuthClient | null> {
+    return oauthClientFor(MINECRAFT_PROVIDER);
 }
 
 export function minecraftAuthorizeUrl(client: MinecraftOAuthClient, redirectUri: string, state: string): string {
