@@ -16,6 +16,7 @@ import { useState } from "react";
 import * as core from "@polaris/core";
 import { Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
+import { BlockAfterReport } from "@/components/block-after-report";
 import { reportPersonAction } from "@/app/(app)/account/report-actions";
 import {
     Button,
@@ -73,7 +74,7 @@ export function ReportPersonDialog({
         >
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Report {person.name}</DialogTitle>
+                    <DialogTitle>Report this account</DialogTitle>
                     <DialogDescription>
                         {sent
                             ? "It has gone to whoever administers this Polaris. They decide what happens next."
@@ -81,7 +82,9 @@ export function ReportPersonDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                {sent ? null : (
+                {sent ? (
+                    <BlockAfterReport person={person} />
+                ) : (
                     <div className="flex flex-col gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             What is wrong
@@ -114,8 +117,11 @@ export function ReportPersonDialog({
                 )}
 
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        {sent ? "Close" : "Cancel"}
+                    <Button
+                        variant={sent ? "primary" : "ghost"}
+                        onClick={() => onOpenChange(false)}
+                    >
+                        {sent ? "Done" : "Cancel"}
                     </Button>
                     {sent ? null : (
                         <Button variant="danger" disabled={busy} onClick={() => void send()}>

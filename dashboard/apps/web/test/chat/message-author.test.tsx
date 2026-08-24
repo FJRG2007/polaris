@@ -125,6 +125,26 @@ describe("somebody else's name", () => {
     });
 });
 
+describe("right-clicking somebody's name", () => {
+    it("asks about the person, not about the message under it", async () => {
+        // The name sits inside the message's own context menu, so two menus are
+        // listening for the same right-click and only one of them is about a
+        // person. This pins which one answers.
+        //
+        // It does not discriminate the fix that makes the inner menu stop the
+        // event: jsdom resolves the nesting the right way on its own, and it
+        // passed before that was added. What it does catch is the name losing
+        // its menu altogether, which is the way this actually breaks.
+        const user = userEvent.setup();
+        list();
+        await user.pointer({ target: screen.getByRole("button", { name: "grace" }), keys: "[MouseRight]" });
+
+        expect(screen.queryByText("Report this account")).not.toBeNull();
+        // And the message menu is not the one that opened.
+        expect(screen.queryByText("Report this message")).toBeNull();
+    });
+});
+
 describe("your own name", () => {
     it("is not pressable, because none of it is aimed at yourself", () => {
         list();

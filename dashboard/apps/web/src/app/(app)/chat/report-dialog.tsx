@@ -15,6 +15,7 @@
 
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { BlockAfterReport } from "@/components/block-after-report";
 import { reportMessageAction } from "./actions";
 import type { ChatReportReason } from "@polaris/core";
 import {
@@ -40,6 +41,7 @@ import {
 export function ReportDialog({
     messageId,
     body = "",
+    author = null,
     open,
     onOpenChange
 }: {
@@ -49,6 +51,10 @@ export function ReportDialog({
      *  to report. The server decides; this is the same rule, one step earlier,
      *  so nobody writes a note about a message that will be refused. */
     body?: string;
+    /** Who wrote it, so blocking them is one press once the report has gone -
+     *  the same moment, and the half that otherwise does not happen. Null where
+     *  the account is not known, and then nothing is offered. */
+    author?: { id: string; name: string } | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -97,6 +103,8 @@ export function ReportDialog({
                     </DialogDescription>
                 </DialogHeader>
 
+                {sent && <BlockAfterReport person={author} />}
+
                 {!sent && nothingToReport && (
                     <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                         {PLEASANTRY_REFUSAL}
@@ -138,8 +146,11 @@ export function ReportDialog({
                 )}
 
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => close(false)}>
-                        {sent || nothingToReport ? "Close" : "Cancel"}
+                    <Button
+                        variant={sent ? "primary" : "ghost"}
+                        onClick={() => close(false)}
+                    >
+                        {sent ? "Done" : nothingToReport ? "Close" : "Cancel"}
                     </Button>
                     {!sent && !nothingToReport && (
                         <Button

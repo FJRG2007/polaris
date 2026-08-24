@@ -370,6 +370,15 @@ export function MessageList({
             <ReportDialog
                 messageId={reporting}
                 body={messages.find((entry) => entry.id === reporting)?.body ?? ""}
+                // Whoever wrote it, so blocking them is one press once the
+                // report has gone. Null for a message whose author has left,
+                // and then the offer is not made rather than made and refused.
+                author={(() => {
+                    const said = messages.find((entry) => entry.id === reporting);
+                    return said?.authorId && said.authorName
+                        ? { id: said.authorId, name: said.authorName }
+                        : null;
+                })()}
                 open={reporting !== null}
                 onOpenChange={(next) => !next && setReporting(null)}
             />

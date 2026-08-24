@@ -38,7 +38,12 @@ import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { useState, type ComponentType, type ReactNode } from "react";
+import {
+    useState,
+    type ComponentType,
+    type MouseEvent as ReactMouseEvent,
+    type ReactNode
+} from "react";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
@@ -133,7 +138,11 @@ function mentionOf(member: MenuPerson): string {
  */
 interface MenuParts {
     readonly Root: ComponentType<{ children: ReactNode }>;
-    readonly Trigger: ComponentType<{ asChild?: boolean; children: ReactNode }>;
+    readonly Trigger: ComponentType<{
+        asChild?: boolean;
+        onContextMenu?: (event: ReactMouseEvent) => void;
+        children: ReactNode;
+    }>;
     readonly Content: ComponentType<{
         className?: string;
         align?: "start" | "center" | "end";
@@ -271,7 +280,24 @@ export function MemberMenu({
 
     return (
         <menu.Root>
-            <menu.Trigger asChild>{children}</menu.Trigger>
+            {/*
+                The right-click is this menu's and stops here.
+
+                A name inside a message sits inside the message's own context
+                menu, and Radix does not stop a trigger's event reaching an outer
+                one - so both opened and the outer one won. Right-clicking
+                somebody's name gave the menu about the message, which is why
+                every item here appeared in the members panel and in a profile
+                and nowhere else. The pointer is on a person; the person's menu
+                is the one that means something.
+
+                Stopping propagation only. Preventing the default would also stop
+                Radix's own handler on this trigger, which is the one that opens
+                it.
+            */}
+            <menu.Trigger asChild onContextMenu={(event) => event.stopPropagation()}>
+                {children}
+            </menu.Trigger>
             {/* Focus is not handed back to whatever was right-clicked. Mention
                 puts the caret in the composer, and the hand-back landed a beat
                 later and took it straight out again - which read as a mention
@@ -415,9 +441,17 @@ export function MemberMenu({
                             person rather than one message, which is the question
                             people actually have about somebody who is fine in
                             any one message and not over forty of them. */}
-                        <menu.Item disabled={working} onSelect={() => setReporting(true)}>
+                        <menu.Item
+                            disabled={working}
+                            // Red, like Block above it. Both are heavy, and one
+                            // of the two reading as ordinary was the one that
+                            // made the pair look like a setting and an action
+                            // rather than two ways of dealing with somebody.
+                            variant="danger"
+                            onSelect={() => setReporting(true)}
+                        >
                             <Flag className="size-3.5" />
-                            Report this person
+                            Report this account
                         </menu.Item>
                     </>
                 )}
