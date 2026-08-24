@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { enrollmentScript } from "../../src/lib/enrollment-script";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const script = enrollmentScript({
@@ -275,6 +275,11 @@ const shell = (() => {
         return false;
     }
 })();
+
+// Each test shells out through the real harness, which itself shells out again to
+// the systemsetup/dscl/dseditgroup/curl stubs - nested process spawns that run well
+// past vitest's default 5s budget on this machine, timeout rather than a script defect.
+vi.setConfig({ testTimeout: 20000 });
 
 describe.runIf(shell)("the macOS branch, run against a simulated Mac", () => {
     // The machine this whole change exists for: Remote Login off, no access list,
