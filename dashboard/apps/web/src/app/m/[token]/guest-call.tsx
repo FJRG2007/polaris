@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
+import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { CallAudio } from "@/app/(app)/chat/call-audio";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
@@ -66,8 +67,15 @@ export function GuestCall({
         setSeat({ meetingId: result.meetingId, admission: result.admission ?? "admitted" });
     };
 
-    // Waiting at the door. The seat is re-read rather than pushed, because the
-    // signalling stream deliberately tells somebody in the lobby nothing.
+    // Let in, heard the moment it happens. The poll below still runs and is what
+    // catches a refusal - which the stream does not carry - and a stream that
+    // never opened.
+    useLobbyAdmission(
+        seat?.admission === "waiting" ? seat.meetingId : null,
+        () => setSeat((current) => (current ? { ...current, admission: "admitted" } : current))
+    );
+
+    // Waiting at the door, asked for as well as listened for.
     useEffect(() => {
         if (!seat || seat.admission !== "waiting") return;
         const timer = setInterval(async () => {

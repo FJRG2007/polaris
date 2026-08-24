@@ -115,6 +115,26 @@ export function MeetingChat({
      * the wrong question twice over - half a meeting are guests who share
      * nothing, and a guest doing the asking has no account to be asked about.
      */
+    /**
+     * Who is in the room right now, by seat.
+     *
+     * Being in the call is the strongest thing that can be known about where
+     * somebody is, and for a guest it is the only thing: they have no account
+     * for the presence store to have heard of, so their face was the one in the
+     * conversation with no dot at all. Somebody who has since left falls back to
+     * whatever the store says, which for a guest is nothing - correctly, because
+     * by then nobody here knows where they are.
+     */
+    const present = useMemo(
+        () =>
+            new Set(
+                (call.meeting?.participants ?? [])
+                    .filter((person) => person.admission === "admitted")
+                    .map((person) => person.id)
+            ),
+        [call.meeting]
+    );
+
     const mentions = useCallback(
         async (_kinds: readonly string[], query: string) => {
             const result = await mentionsInMeetingAction(meetingId, query);
@@ -199,6 +219,9 @@ export function MeetingChat({
                             <li key={line.id} className="flex gap-2">
                                 <Avatar
                                     size={22}
+                                    presence={
+                                        present.has(line.participantId) ? "online" : undefined
+                                    }
                                     person={{
                                         // Null for a guest, deliberately. There
                                         // is no account behind them, so a face

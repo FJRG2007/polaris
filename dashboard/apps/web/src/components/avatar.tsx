@@ -133,11 +133,23 @@ export function Avatar({
     className,
     square = false,
     status = true,
+    presence,
     openable = false
 }: {
     person: AvatarPerson;
     size?: number;
     className?: string;
+    /**
+     * Where they are, when the caller already knows better than the store does.
+     *
+     * For somebody sitting in a call, chiefly. Being in the room is the strongest
+     * statement of presence there is - stronger than anything the store keeps -
+     * and it is the only one available for a guest, who has no account for the
+     * store to have heard of. Without this their face was the one in the room
+     * with no dot at all, which reads as "nobody knows" rather than as "they are
+     * right here".
+     */
+    presence?: Presence;
     /**
      * Whether pressing the face opens the photo full size.
      *
@@ -168,7 +180,10 @@ export function Avatar({
     status?: boolean;
 }) {
     const source = person.image ?? (person.id ? avatarUrl(person.id) : null);
-    const where = usePresence(status && !square ? person.id : null);
+    // Nothing is asked when the caller has already answered - and a guest has no
+    // id to ask about in the first place.
+    const known = usePresence(presence || !status || square ? null : person.id);
+    const where = presence ? { status: presence, inCall: false } : known;
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
@@ -276,7 +291,14 @@ export function Avatar({
     }
 
     return (
-        <span className="relative inline-flex shrink-0 align-middle">
+        // `h-fit`, and it is load-bearing. This wrapper is often a flex item -
+        // a face beside a message, a name, a row of text - and a flex item with
+        // an automatic cross size is stretched to the tallest thing beside it.
+        // The face inside kept its size, so nothing looked wrong until the dot,
+        // which hangs off the wrapper's bottom edge: beside a three-line message
+        // it was drawn three lines below the face it belongs to. A definite
+        // height is not stretched.
+        <span className="relative inline-flex h-fit shrink-0 align-middle">
             {shown}
             {viewer}
             {where.inCall ? (

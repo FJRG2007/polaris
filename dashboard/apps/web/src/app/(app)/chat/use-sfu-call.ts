@@ -41,6 +41,9 @@ import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
 import { callServerUrl } from "./call-address";
+// What somebody says about their own controls, and why muting has to be said
+// out loud at all rather than read off the publication.
+import { DEAFENED, MUTED, peerState } from "./call-peer-state";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -135,17 +138,6 @@ const frameSchema = z.discriminatedUnion("kind", [
     /** Another browser of this same account took the call. */
     z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
 ]);
-
-/**
- * Where "they have their headphones off" is written down.
- *
- * A muted microphone the media server already knows about - a publication is
- * muted or it is not, and everybody is told. Deafening it cannot know, because
- * nothing about it is visible in what somebody sends: they publish exactly the
- * same audio either way. So it rides in a participant attribute, which is the
- * one small key-value bag the server keeps per person and gossips to the room.
- */
-const DEAFENED = "deafened";
 
 /** What asking for a ticket answers. Named so a request that could not be made
  *  at all can be turned into the same shape and read the same way. */
@@ -359,17 +351,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setScreens((held) => settle(held, shared));
     }, []);
 
-    /** What everybody's controls are set to, from what the server already knows
-     *  plus the one thing it cannot: whether they are listening. */
+    /** What everybody's controls are set to: what they say about themselves,
+     *  and what the publication says for anybody who says nothing. */
     const resortStates = useCallback(() => {
         const current = room.current;
         if (!current) return;
         const next = new Map<string, PeerState>();
         for (const participant of current.remoteParticipants.values()) {
-            next.set(participant.identity, {
-                muted: !participant.isMicrophoneEnabled,
-                deafened: participant.attributes?.[DEAFENED] === "1"
-            });
+            next.set(participant.identity, peerState(participant));
         }
         setStates(next);
     }, []);
@@ -476,6 +465,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const setVoiceEnabled = useCallback((on: boolean) => {
         if (mic.current) mic.current.enabled = on;
         if (filtered.current) filtered.current.track.enabled = on;
+        // Said out loud as well as done, so it reaches whoever joins next. The
+        // publication's own flag only travels to the browsers that were in the
+        // room when it changed.
+        void room.current?.localParticipant
+            .setAttributes({ [MUTED]: on ? "0" : "1" })
+            .catch(() => undefined);
         const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
@@ -753,6 +748,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // room muted looked exactly like somebody who could hear the room
             // perfectly well and was choosing not to answer.
             if (mic.current && !mic.current.enabled) setVoiceEnabled(false);
+            // Said even when there was nothing to mute, so that an absent
+            // attribute means one thing only: a browser from before this
+            // existed, which is the one case the publication is read for.
+            else {
+                await joined.localParticipant
+                    .setAttributes({ [MUTED]: mic.current ? "0" : "1" })
+                    .catch(() => undefined);
+            }
             await publish(CAMERA, camera.current);
             if (screen.current) await publish(SCREEN, screen.current);
             if (deafenedRef.current) {

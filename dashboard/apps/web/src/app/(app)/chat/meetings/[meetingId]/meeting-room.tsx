@@ -32,6 +32,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
+import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { Crown, Link2, LogOut, Loader2, Pencil, UserMinus, UserPlus, Video } from "lucide-react";
 import {
     Button,
@@ -134,10 +135,13 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     /**
      * Waiting at the door.
      *
-     * The signalling stream tells somebody in the lobby nothing, on purpose, so
-     * being let in is found out by asking. It is the same shape the guest page
-     * uses and for the same reason.
+     * Heard first and asked for second. The room's own stream says the moment a
+     * seat is let in, which is what takes the wait after somebody presses "let
+     * them in" down from up to three seconds of nothing to none; the poll behind
+     * it catches a refusal, which the stream deliberately does not carry, and a
+     * stream that could not be opened at all. The guest page does the same.
      */
+    useLobbyAdmission(waiting ? meetingId : null, () => void join());
     useEffect(() => {
         if (!waiting) return;
         const timer = setInterval(() => void join(), LOBBY_POLL_MS);
