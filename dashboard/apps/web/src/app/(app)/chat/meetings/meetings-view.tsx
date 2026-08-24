@@ -23,7 +23,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { MeetingSummary } from "@/lib/chat/meetings";
 import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { useDisplayFormat } from "@/components/display-format";
-import { Calendar, Link2, Loader2, Plus, Users, Video } from "lucide-react";
+import { MeetingDetailsDialog } from "./meeting-details-dialog";
+import { Calendar, Link2, Loader2, Pencil, Plus, Users, Video } from "lucide-react";
 import { createMeetingAction, listMeetingsAction } from "@/app/(app)/chat/meeting-actions";
 import {
     Button,
@@ -50,6 +51,8 @@ export function MeetingsView() {
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
     const [copied, setCopied] = useState("");
+    /** The meeting whose name and hour are being changed, if any. */
+    const [editing, setEditing] = useState<MeetingSummary | null>(null);
 
     const load = useCallback(async () => {
         const result = await listMeetingsAction();
@@ -151,6 +154,17 @@ export function MeetingsView() {
                                                 {copied === meeting.id ? "Copied" : "Copy link"}
                                             </Button>
                                         )}
+                                        {meeting.mine && (
+                                            <Button
+                                                size="icon-xs"
+                                                variant="secondary"
+                                                title="Rename or reschedule"
+                                                aria-label={`Rename or reschedule ${meeting.title}`}
+                                                onClick={() => setEditing(meeting)}
+                                            >
+                                                <Pencil className="size-3.5" />
+                                            </Button>
+                                        )}
                                         <Button
                                             size="xs"
                                             onClick={() =>
@@ -167,6 +181,16 @@ export function MeetingsView() {
                     </ul>
                 )}
             </div>
+
+            <MeetingDetailsDialog
+                open={editing !== null}
+                meetingId={editing?.id ?? ""}
+                title={editing?.title ?? ""}
+                scheduledAt={editing?.scheduledAt ?? null}
+                onClose={() => setEditing(null)}
+                onSaved={load}
+                onError={setError}
+            />
 
             <NewMeetingDialog
                 open={creating}

@@ -88,11 +88,8 @@ export function GuestCall({
     if (seat?.admission === "admitted") {
         return (
             <div className="flex h-screen flex-col overflow-hidden">
-                <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
-                    <Video className="size-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{title || "Call"}</span>
-                </header>
                 <GuestRoom
+                    title={title}
                     meetingId={seat.meetingId}
                     onLeave={() => {
                         setSeat(null);
@@ -166,24 +163,43 @@ export function GuestCall({
  * dashboard - one page, one room, and leaving it is closing the tab. So this is
  * where their call lives.
  */
-function GuestRoom({ meetingId, onLeave }: { meetingId: string; onLeave: () => void }) {
+function GuestRoom({
+    meetingId,
+    title,
+    onLeave
+}: {
+    meetingId: string;
+    /** What the link said it was called. The room's own copy wins once it
+     *  arrives, so a host renaming the meeting reaches the guest too rather than
+     *  leaving them on the name the page was built with. */
+    title: string;
+    onLeave: () => void;
+}) {
     const call = useCall(meetingId, { video: true });
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-            {/* The room, played. In the dashboard this is mounted beside the
-                call so it survives walking away from the conversation; here
-                there is nowhere to walk, and it still has to be mounted by
-                somebody - the tiles carry the picture and nothing else. */}
-            <CallAudio call={call} />
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
+        <>
+            <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
+                <Video className="size-4 text-muted-foreground" />
+                <span className="truncate text-sm font-medium">
+                    {call.meeting?.title || title || "Call"}
+                </span>
+            </header>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+                {/* The room, played. In the dashboard this is mounted beside the
+                    call so it survives walking away from the conversation; here
+                    there is nowhere to walk, and it still has to be mounted by
+                    somebody - the tiles carry the picture and nothing else. */}
+                <CallAudio call={call} />
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <CallRoom meetingId={meetingId} call={call} onLeave={onLeave} />
+                </div>
+                {/* The same column an account gets. A guest is in the same room, not
+                    a lesser copy of it - and they are the person most likely to be
+                    sent an address in it. */}
+                <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
+                    <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
+                </aside>
             </div>
-            {/* The same column an account gets. A guest is in the same room, not
-                a lesser copy of it - and they are the person most likely to be
-                sent an address in it. */}
-            <aside className="flex min-h-0 w-full shrink-0 flex-col border-t border-border lg:w-80 lg:border-l lg:border-t-0">
-                <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
-            </aside>
-        </div>
+        </>
     );
 }

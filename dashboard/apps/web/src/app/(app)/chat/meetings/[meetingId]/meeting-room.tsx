@@ -31,7 +31,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { Crown, Link2, LogOut, Loader2, UserMinus, UserPlus, Video } from "lucide-react";
+import { MeetingDetailsDialog } from "../meeting-details-dialog";
+import { Crown, Link2, LogOut, Loader2, Pencil, UserMinus, UserPlus, Video } from "lucide-react";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -71,6 +72,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     const [error, setError] = useState("");
     const [inviting, setInviting] = useState(false);
     const [ending, setEnding] = useState(false);
+    /** Whether the name and hour are being changed. */
+    const [editing, setEditing] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const load = useCallback(async () => {
@@ -161,7 +164,12 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 <header className="flex h-header shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
                     <Video className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm">
-                        <span className="font-medium">{about?.title ?? "Meeting"}</span>
+                        {/* The room's own copy first: it is re-read whenever the
+                            roster moves, so a host renaming the meeting mid-call
+                            reaches everybody in it rather than only themselves. */}
+                        <span className="font-medium">
+                            {call.meeting?.title || about?.title || "Meeting"}
+                        </span>
                         {about && (
                             <span className="text-muted-foreground">
                                 {" - "}
@@ -195,6 +203,19 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             >
                                 <UserPlus className="size-3.5" />
                                 Invite
+                            </Button>
+                            {/* The name and the hour, which used to be settable
+                                once and never again: a meeting that moved could
+                                only be ended and made afresh, taking its link
+                                with it. */}
+                            <Button
+                                size="icon-xs"
+                                variant="secondary"
+                                title="Rename or reschedule"
+                                aria-label="Rename or reschedule this meeting"
+                                onClick={() => setEditing(true)}
+                            >
+                                <Pencil className="size-3.5" />
                             </Button>
                             <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
                                 <LogOut className="size-3.5" />
@@ -262,6 +283,16 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
                 </aside>
             )}
+
+            <MeetingDetailsDialog
+                open={editing}
+                meetingId={meetingId}
+                title={about?.title ?? ""}
+                scheduledAt={about?.scheduledAt ?? null}
+                onClose={() => setEditing(false)}
+                onSaved={load}
+                onError={setError}
+            />
 
             <InviteDialog
                 open={inviting}
