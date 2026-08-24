@@ -10,7 +10,14 @@ import { prisma } from "@polaris/db";
 import { ProfilePicturesCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
+import { getSetting } from "@/lib/setting-store";
 import { getAuthMailStatus } from "@/lib/auth-mail";
+import {
+    usernameChangeAllowedAt,
+    usernameCooldownDays,
+    usernameCooldownRemaining,
+    USERNAME_COOLDOWN_KEY
+} from "@polaris/core";
 import { getUserPhone, listUserEmails } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +32,7 @@ export default async function AccountPage() {
                 firstName: true,
                 lastName: true,
                 username: true,
+                usernameChangedAt: true,
                 company: true,
                 description: true
             }
@@ -45,6 +53,20 @@ export default async function AccountPage() {
         })
     ]);
 
+    // How long until this account may take a different handle, as a phrase the
+    // field can print. Undefined when it may now, which is what leaves the field
+    // open. Worked out here rather than in the browser so the server and the
+    // client cannot disagree about what the clock says.
+    const now = new Date();
+    const allowedAt = usernameChangeAllowedAt(
+        user?.usernameChangedAt ?? null,
+        usernameCooldownDays(await getSetting(USERNAME_COOLDOWN_KEY))
+    );
+    const usernameChangeIn =
+        allowedAt && allowedAt.getTime() > now.getTime()
+            ? usernameCooldownRemaining(allowedAt, now)
+            : undefined;
+
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
@@ -62,6 +84,10 @@ export default async function AccountPage() {
                 firstName={user?.firstName ?? ""}
                 lastName={user?.lastName ?? ""}
                 username={user?.username ?? ""}
+                // How long until they may take a different handle, so the field
+                // can say so before anybody types into it - finding out by being
+                // refused is the version that wastes somebody's time.
+                usernameChangeIn={usernameChangeIn}
                 company={user?.company ?? ""}
                 description={user?.description ?? ""}
                 emails={emails}

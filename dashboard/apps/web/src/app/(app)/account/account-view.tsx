@@ -70,6 +70,7 @@ export function AccountView({
     firstName,
     lastName,
     username,
+    usernameChangeIn,
     company,
     description,
     emails,
@@ -81,6 +82,17 @@ export function AccountView({
     firstName: string;
     lastName: string;
     username: string;
+    /**
+     * How long until a different handle may be taken - "3 days" - or undefined
+     * when one may be taken now.
+     *
+     * A phrase rather than an instant, worked out on the server. A handle is how
+     * other people address somebody, so changing it costs a wait, and the field
+     * says so rather than springing it on them after they have typed a new one
+     * and pressed Save. Resolved server-side because doing the arithmetic here
+     * would render one answer on the server and another in the browser.
+     */
+    usernameChangeIn?: string;
     company: string;
     description: string;
     emails: UserEmailView[];
@@ -93,6 +105,10 @@ export function AccountView({
 }) {
     const router = useRouter();
     const primary = emails.find((entry) => entry.primary)?.email ?? "";
+
+    // The server decides for real; this is what stops somebody typing into a
+    // field whose Save was never going to work.
+    const usernameLocked = usernameChangeIn !== undefined;
 
     const stored: Profile = { name, firstName, lastName, username, company, description };
     const [profile, setProfile] = useState<Profile>(stored);
@@ -203,10 +219,14 @@ export function AccountView({
                             value={profile.username}
                             placeholder="Optional"
                             autoComplete="off"
+                            disabled={usernameLocked}
+                            aria-describedby="username-hint"
                             onChange={(event) => setProfile({ ...profile, username: event.target.value })}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            3-32 characters: letters, numbers, and . _ - Used to sign in.
+                        <span id="username-hint" className="text-xs text-muted-foreground">
+                            {usernameLocked
+                                ? `Other people find and address you by this, so it can only be changed once in a while. You can change it again in ${usernameChangeIn}.`
+                                : "3-32 characters: letters, numbers, and . _ - Used to sign in."}
                         </span>
                     </label>
                     <label className="flex flex-col gap-1 text-sm">

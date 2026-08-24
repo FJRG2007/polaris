@@ -47,6 +47,13 @@ model User {
     email         String   @unique
     // Unique handle; sign-in accepts either this or the email.
     username      String?  @unique
+    // When this account last took a different handle, or null while it never
+    // has. A handle is how other people find and address somebody, so changing
+    // one costs a waiting period rather than being free every time - this is
+    // what that wait is measured from. Null lets an existing account make its
+    // first change straight away, rather than serving a wait for something it
+    // did before the rule existed.
+    usernameChangedAt DateTime?
     emailVerified Boolean  @default(false)
     image         String?
     // Free-text organisation the account belongs to; shown on the profile only.

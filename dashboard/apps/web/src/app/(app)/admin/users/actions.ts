@@ -14,8 +14,15 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { setSetting } from "@/lib/setting-store";
 import { setSharingPolicy } from "@/lib/sharing-policy";
-import { accessRulesSchema, createInviteSchema, sharingPolicySchema } from "@polaris/core";
+import {
+    accessRulesSchema,
+    createInviteSchema,
+    sharingPolicySchema,
+    USERNAME_COOLDOWN_KEY,
+    USERNAME_COOLDOWN_MAX_DAYS
+} from "@polaris/core";
 import { decideRecoveryRequest } from "@/lib/account-recovery-service";
 import { listUserSessions, type SessionView } from "@/lib/session-directory";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
@@ -172,6 +179,35 @@ export async function deleteUserAction(userId: string): Promise<{ error?: string
 }
 
 /** Who, besides an administrator, may bring somebody in. */
+/**
+ * How long an account waits between handle changes.
+ *
+ * On this page because it is a rule about accounts rather than about security:
+ * nothing here decides who gets in, only how often somebody may change the name
+ * everyone else finds them by. Zero is a real answer and means no wait at all.
+ */
+export async function setUsernameCooldownAction(days: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z
+        .number()
+        .int("Whole days only.")
+        .min(0, "Use 0 for no wait at all.")
+        .max(USERNAME_COOLDOWN_MAX_DAYS, `That is longer than ${USERNAME_COOLDOWN_MAX_DAYS} days.`)
+        .safeParse(days);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the number of days." };
+
+    await setSetting(USERNAME_COOLDOWN_KEY, String(parsed.data));
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.username-cooldown",
+        targetType: "setting",
+        targetId: USERNAME_COOLDOWN_KEY,
+        metadata: { days: parsed.data }
+    });
+    revalidatePath("/admin/users");
+    return {};
+}
+
 export async function setSharingPolicyAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = sharingPolicySchema.safeParse(input);

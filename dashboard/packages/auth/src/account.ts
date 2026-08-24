@@ -9,7 +9,14 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
-import { companyField, descriptionField, displayNameField, nameHalfField } from "@polaris/core";
+import {
+    companyField,
+    descriptionField,
+    displayNameField,
+    nameHalfField,
+    usernameChangeRefusal,
+    USERNAME_COOLDOWN_DAYS
+} from "@polaris/core";
 
 /** Read the credential password hash for a user, or null if they have none. */
 async function credentialHash(userId: string): Promise<string | null> {
@@ -40,6 +47,16 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
  * somebody who writes their name in lower case meant to.
  *
  * Username must stay unique; everything else is free text and may be cleared.
+ *
+ * It also costs a wait. A handle is how other people find and address somebody,
+ * so an account cannot cycle through them: the previous change is remembered and
+ * a new one is refused until the operator's cooldown has passed. Enforced here
+ * rather than in the action that calls it, because this is the copy that decides
+ * what is stored - the same reason the display name is re-checked below.
+ *
+ * `cooldownDays` is passed in because the operator's setting lives in the
+ * dashboard's own store and this package deliberately does not read it. Omitted,
+ * the default applies, so a caller that forgets gets the rule rather than no rule.
  */
 export async function updateUserProfile(
     userId: string,
@@ -50,13 +67,15 @@ export async function updateUserProfile(
         username?: string | null;
         company?: string | null;
         description?: string | null;
-    }
+    },
+    options?: { cooldownDays?: number; now?: Date }
 ): Promise<{ error?: string }> {
     const data: {
         name?: string;
         firstName?: string | null;
         lastName?: string | null;
         username?: string | null;
+        usernameChangedAt?: Date;
         company?: string | null;
         description?: string;
     } = {};
@@ -79,17 +98,37 @@ export async function updateUserProfile(
     }
     if (input.username !== undefined) {
         const username = input.username?.trim().toLowerCase() || null;
-        if (username) {
-            if (!/^[a-z0-9_.-]{3,32}$/.test(username)) {
-                return { error: "Username must be 3-32 characters: letters, numbers, . _ -" };
+        const held = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true, usernameChangedAt: true }
+        });
+        // Compared the way a username is matched, so retyping the same handle in
+        // different capitals is not a change and never costs anybody a wait.
+        const changing = username !== (held?.username ?? null);
+        if (changing) {
+            const now = options?.now ?? new Date();
+            const refusal = usernameChangeRefusal(
+                held?.usernameChangedAt ?? null,
+                now,
+                options?.cooldownDays ?? USERNAME_COOLDOWN_DAYS
+            );
+            if (refusal) return { error: refusal };
+            if (username) {
+                if (!/^[a-z0-9_.-]{3,32}$/.test(username)) {
+                    return { error: "Username must be 3-32 characters: letters, numbers, . _ -" };
+                }
+                const taken = await prisma.user.findFirst({
+                    where: { username, id: { not: userId } },
+                    select: { id: true }
+                });
+                if (taken) return { error: "That username is already taken." };
             }
-            const taken = await prisma.user.findFirst({
-                where: { username, id: { not: userId } },
-                select: { id: true }
-            });
-            if (taken) return { error: "That username is already taken." };
+            data.username = username;
+            // Clearing a handle starts the clock too. Otherwise clear-then-set
+            // would be two changes for the price of none, which is the whole
+            // thing this is here to stop.
+            data.usernameChangedAt = now;
         }
-        data.username = username;
     }
     if (input.company !== undefined) {
         const parsed = companyField.safeParse(input.company ?? "");

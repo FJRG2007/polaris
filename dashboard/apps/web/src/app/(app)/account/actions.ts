@@ -16,10 +16,11 @@
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
-import { emailField } from "@polaris/core";
+import { emailField, USERNAME_COOLDOWN_KEY, usernameCooldownDays } from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { getSetting } from "@/lib/setting-store";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { requestEmailVerification } from "@/lib/email-verification-service";
@@ -84,14 +85,21 @@ export async function updateProfileAction(input: {
         const blocked = await newDeviceRefusal(user);
         if (blocked) return { error: blocked };
     }
-    const result = await updateUserProfile(user.id, {
-        name: typeof input.name === "string" ? input.name : undefined,
-        firstName: input.firstName === undefined ? undefined : (input.firstName ?? ""),
-        lastName: input.lastName === undefined ? undefined : (input.lastName ?? ""),
-        username: input.username === undefined ? undefined : (input.username ?? ""),
-        company: input.company === undefined ? undefined : (input.company ?? ""),
-        description: input.description === undefined ? undefined : (input.description ?? "")
-    });
+    const result = await updateUserProfile(
+        user.id,
+        {
+            name: typeof input.name === "string" ? input.name : undefined,
+            firstName: input.firstName === undefined ? undefined : (input.firstName ?? ""),
+            lastName: input.lastName === undefined ? undefined : (input.lastName ?? ""),
+            username: input.username === undefined ? undefined : (input.username ?? ""),
+            company: input.company === undefined ? undefined : (input.company ?? ""),
+            description: input.description === undefined ? undefined : (input.description ?? "")
+        },
+        // The operator's wait between handle changes. Read here because the
+        // setting store is the dashboard's, and the auth package deliberately
+        // does not reach into it.
+        { cooldownDays: usernameCooldownDays(await getSetting(USERNAME_COOLDOWN_KEY)) }
+    );
     if (!result.error) revalidatePath("/account");
     return result;
 }

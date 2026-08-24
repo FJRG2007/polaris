@@ -25,6 +25,7 @@ export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
 export * from "./user-agent.js";
 export * from "./session-names.js";
+export * from "./username-cooldown.js";
 export * from "./password-safety.js";
 export * from "./pleasantries.js";
 export * from "./paths.js";
