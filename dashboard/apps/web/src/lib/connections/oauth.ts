@@ -33,6 +33,7 @@ import {
     githubLinkCallbackUrl
 } from "@/lib/github-service";
 import {
+    DISCORD_REQUIRED_SCOPES,
     discordAuthorizeUrl,
     exchangeDiscordCode,
     getDiscordOAuthClient,
@@ -122,6 +123,16 @@ interface ProviderOAuth {
      *  find out from somebody else's failed Connect button. Absent where the
      *  provider gives no answer that can be read without guessing. */
     verify?(client: OAuthClient, redirectUri: string): Promise<string | null>;
+    /**
+     * What a link has to have been granted to be worth anything.
+     *
+     * Declared so that widening a provider's consent screen is something the
+     * people who already linked are told about, rather than something they find
+     * out when a feature built on the new scope quietly returns nothing. Absent
+     * where the scopes are not this deployment's to decide: a GitHub App's user
+     * token carries the app's own permissions, and Steam has no scopes at all.
+     */
+    scopes?: readonly string[];
 }
 
 const ADAPTERS: Record<string, ProviderOAuth> = {
@@ -221,13 +232,12 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
         client: getDiscordOAuthClient,
         authorizeUrl: (client, redirectUri, state) =>
             discordAuthorizeUrl(client, redirectUri, state),
-        exchange: async (client, code, redirectUri) => {
-            const granted = await exchangeDiscordCode(client, code, redirectUri);
-            // Discord is asked for the identify scope alone, so it hands over no
-            // address and there is none here to hold for anybody.
-            return { ...granted, email: null };
-        },
-        identify: identifyDiscordAccount
+        // The address is already decided inside the exchange: Discord states on
+        // the account whether it confirmed one, and only a confirmed address is
+        // worth holding for its owner.
+        exchange: exchangeDiscordCode,
+        identify: identifyDiscordAccount,
+        scopes: DISCORD_REQUIRED_SCOPES
     },
     dropbox: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/dropbox/callback`,
@@ -388,4 +398,36 @@ export function connectionIdentity(
     redirectUri: string
 ): Promise<ConnectionIdentity> {
     return adapter(provider).identify(client, code, redirectUri);
+}
+
+/**
+ * Whether a link was granted everything this deployment now asks for.
+ *
+ * A provider's consent screen grows: `guilds` was added to Discord's after
+ * people had already linked, and their grants carry the old, narrower scope. The
+ * token still works, the account still shows on the screen, and the feature
+ * built on the new scope returns nothing at all - which reads as the feature
+ * being broken rather than as a consent nobody was asked for.
+ *
+ * Compared against what the provider actually granted rather than against what
+ * was asked for at the time: a scope can be declined, and a declined scope is
+ * the same problem as one never requested.
+ *
+ * True for anything this cannot answer - a provider with no declared scopes, one
+ * that is not in the table - because the alternative is telling somebody to
+ * re-link an account over a question that was never asked.
+ */
+export function linkScopesSatisfied(provider: string, granted: string): boolean {
+    const required = ADAPTERS[provider]?.scopes;
+    if (!required || required.length === 0) return true;
+    const held = new Set(granted.split(/[\s,]+/).filter(Boolean));
+    return required.every((scope) => held.has(scope));
+}
+
+/** The scopes a link is missing, for the sentence that asks somebody to
+ *  authorize again. Empty when it is not missing any. */
+export function missingLinkScopes(provider: string, granted: string): string[] {
+    const required = ADAPTERS[provider]?.scopes ?? [];
+    const held = new Set(granted.split(/[\s,]+/).filter(Boolean));
+    return required.filter((scope) => !held.has(scope));
 }

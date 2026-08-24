@@ -438,7 +438,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Automation",
         summary: "Let people link their Discord account, so game servers can recognize them.",
         description:
-            "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by, and records it against their Polaris account instead of leaving it to be read out over chat. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
+            "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by, and records it against their Polaris account instead of leaving it to be read out over chat. It also reads their address and the servers they are in, which is what the consent screen will say. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
         docsUrl: "https://discord.com/developers/docs/topics/oauth2",
         setupLinks: [
             {

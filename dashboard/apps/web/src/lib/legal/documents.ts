@@ -85,7 +85,8 @@ export function privacyDocument(contact: string | null): LegalDocument {
                     "Google: read-only access to the calendar, so events appear beside the tasks. Polaris cannot change or delete anything in a Google account.",
                     "Microsoft and Dropbox: access to the folder Polaris creates for backups. Nothing else in the account is reachable from here.",
                     "GitHub: the repositories the account allows, so they can be built and deployed.",
-                    "Steam, Epic Games, Minecraft and Discord: the account id and the display name, and no credential at all. Proving which player an account belongs to is the whole errand, and Polaris never acts as one afterwards. Discord is asked for that and nothing more, so it hands over no address, no message and no list of the servers the account is in.",
+                    "Steam, Epic Games and Minecraft: the account id and the display name, and no credential at all. Proving which player an account belongs to is the whole errand, and Polaris never acts as one afterwards.",
+                    "Discord: the account id, the display name, the address on the account, and the list of servers it is in - their names, and nothing inside them. Unlike the other game identities the authorization is kept, encrypted, because the server list is read when it is wanted rather than copied once at linking. Polaris cannot post as the account or read its messages.",
                     "The credentials behind these are encrypted before they are written down. Unlinking an account destroys the credential immediately, and what it reached stops being reachable."
                 ]
             },

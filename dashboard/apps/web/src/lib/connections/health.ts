@@ -14,22 +14,43 @@
  * the moment it answers again, so a renewed token is announced afresh if it ever
  * runs out a second time.
  *
- * Only GitHub for now, because GitHub is the only linked account Polaris does
- * unattended work with. The shape is per provider on purpose: the question "is
- * this credential still good" has a different answer for each of them and no
- * generic one.
+ * Only GitHub for the credential question, because GitHub is the only linked
+ * account Polaris does unattended work with. The shape is per provider on
+ * purpose: the question "is this credential still good" has a different answer
+ * for each of them and no generic one.
+ *
+ * The second question here IS generic, and costs no network call at all: whether
+ * a link still carries the scopes this deployment asks for. A consent screen
+ * grows - `guilds` was added to Discord's after people had linked - and every
+ * grant made before it carries the narrower set. Nothing breaks and nothing
+ * announces it; the feature built on the new scope simply returns nothing, which
+ * reads as the feature being broken rather than as a consent nobody was asked
+ * for. So the grants are measured against what is asked for now, and whoever has
+ * to approve it is the one told.
  */
 
 import { prisma } from "@polaris/db";
 import { readCredential } from "./store";
+import { findConnectionProvider } from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
 import { readGithubAccount } from "@/lib/github-service";
+import { linkScopesSatisfied, missingLinkScopes } from "./oauth";
 
 /** Nothing here is urgent enough to be worth a long scan on a busy box. */
 const BATCH = 200;
 
-/** What a link is worth right now. */
-export type LinkHealth = "working" | "expired" | "unknown";
+/**
+ * What a link is worth right now.
+ *
+ * `stale-scopes` is not a broken link: the credential works and everything it
+ * could do yesterday it can still do. What it cannot do is the thing the wider
+ * consent was added for, and only its owner can fix that.
+ */
+export type LinkHealth = "working" | "expired" | "unknown" | "stale-scopes";
+
+/** What is written on the row once its owner has been told, so a sweep every few
+ *  hours is not a notification every few hours. */
+type HealthNotice = "" | "expired" | "scopes";
 
 /**
  * Ask GitHub whether this credential still speaks for anybody.
@@ -71,6 +92,37 @@ export async function sweepConnectionHealth(): Promise<void> {
         const health = token ? await githubLinkHealth(token) : "expired";
         await record(row, health);
     }
+
+    await sweepLinkScopes();
+}
+
+/**
+ * One pass over every authorized link, asking whether it still carries what this
+ * deployment now requires.
+ *
+ * No network call: the grant is on the row, and what is required is in the
+ * adapter table. That is what makes it safe to run over every provider rather
+ * than the one Polaris does unattended work with.
+ *
+ * Only `oauth` links. A pasted token was never granted through a consent screen,
+ * so it has no scopes to have fallen behind and asking its owner to re-authorize
+ * would be asking them to repeat something they never did.
+ */
+export async function sweepLinkScopes(): Promise<void> {
+    const rows = await prisma.userConnection.findMany({
+        where: { method: "oauth" },
+        select: { id: true, userId: true, provider: true, label: true, method: true, scope: true, healthNotice: true },
+        take: BATCH
+    });
+
+    for (const row of rows) {
+        // An expired link is the worse of the two and already says "link it
+        // again", which is the same action. Telling somebody twice about one
+        // account, for two reasons, is how a notification stops being read.
+        if (row.healthNotice === "expired") continue;
+        const satisfied = linkScopesSatisfied(row.provider, row.scope);
+        await record(row, satisfied ? "working" : "stale-scopes").catch(() => undefined);
+    }
 }
 
 /**
@@ -81,7 +133,15 @@ export async function sweepConnectionHealth(): Promise<void> {
  * order the provider-key sweep uses, and for the same reason.
  */
 async function record(
-    row: { id: string; userId: string; label: string; method: string; healthNotice: string },
+    row: {
+        id: string;
+        userId: string;
+        label: string;
+        method: string;
+        healthNotice: string;
+        provider?: string;
+        scope?: string;
+    },
     health: LinkHealth
 ): Promise<void> {
     if (health === "unknown") return;
@@ -99,7 +159,22 @@ async function record(
         });
     }
 
-    const notice = health === "expired" ? "expired" : "";
+    if (health === "stale-scopes" && row.healthNotice !== "scopes") {
+        const name = findConnectionProvider(row.provider ?? "")?.name ?? row.provider ?? "That service";
+        // Named rather than counted. "Polaris needs one more permission" tells
+        // somebody nothing about whether to grant it, and this is a consent -
+        // the whole point is that they get to decide with the facts.
+        const missing = missingLinkScopes(row.provider ?? "", row.scope ?? "");
+        await notify({
+            userId: row.userId,
+            event: "account.connection.scopes",
+            title: `Connect ${name} again to finish setting it up`,
+            body: `Polaris now asks ${name} for ${listed(missing)}, which your account ${row.label} was not linked with. Nothing you have has stopped working - connecting it again is what grants the new part.`,
+            href: "/account/connections"
+        });
+    }
+
+    const notice: HealthNotice = health === "expired" ? "expired" : health === "stale-scopes" ? "scopes" : "";
     if (notice === row.healthNotice) {
         await prisma.userConnection.update({ where: { id: row.id }, data: { checkedAt: new Date() } });
         return;
@@ -108,6 +183,14 @@ async function record(
         where: { id: row.id },
         data: { healthNotice: notice, checkedAt: new Date() }
     });
+}
+
+/** The missing permissions as a person would read them out, rather than a JSON
+ *  array printed into a sentence. */
+function listed(scopes: string[]): string {
+    if (scopes.length === 0) return "more than it used to";
+    if (scopes.length === 1) return `one more permission (${scopes[0]})`;
+    return `${scopes.length} more permissions (${scopes.slice(0, -1).join(", ")} and ${scopes[scopes.length - 1]})`;
 }
 
 /**

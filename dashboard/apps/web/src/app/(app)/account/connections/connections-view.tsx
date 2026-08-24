@@ -41,6 +41,13 @@ export interface LinkedAccount {
      *  and shown here because this is the screen where somebody has just added
      *  one and is wondering what it now does. */
     signsIn: boolean;
+    /** Whether Polaris now asks this service for more than this link was granted.
+     *  Nothing has broken; a consent is outstanding and only its owner can give
+     *  it, so the row says so and offers the way to. */
+    needsReauthorization?: boolean;
+    /** The permissions it is short of, named so somebody can decide rather than
+     *  being asked to approve an unspecified "more". */
+    missingScopes?: string[];
     linkedAt: string;
 }
 
@@ -199,6 +206,18 @@ function ProviderCard({
                                 <span className="min-w-0 flex-1 truncate text-sm">
                                     {account.label}
                                 </span>
+                                {account.needsReauthorization ? (
+                                    <Badge
+                                        variant="warning"
+                                        title={
+                                            account.missingScopes?.length
+                                                ? `Not granted: ${account.missingScopes.join(", ")}. Connect again to approve.`
+                                                : "Connect again to approve what Polaris now asks for."
+                                        }
+                                    >
+                                        Needs approving
+                                    </Badge>
+                                ) : null}
                                 {account.signsIn ? (
                                     <Badge variant="neutral" title="This account can sign you in">
                                         Signs you in

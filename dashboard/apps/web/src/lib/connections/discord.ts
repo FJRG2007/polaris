@@ -8,12 +8,22 @@
  * cannot be mistyped.
  *
  * Ordinary OAuth: the operator registers an application in Discord's developer
- * portal and pastes its client id and secret. `identify` is the only scope asked
- * for - it returns the account id and the name, and deliberately not the address,
- * because an address is not what a game server's door is closed by and a consent
- * screen should ask for what the errand needs. The token is spent and dropped:
- * proving who somebody is was the whole of it, and nothing here is ever able to
- * post as them or read what they are in.
+ * portal and pastes its client id and secret. Three scopes are asked for -
+ * `identify` for the account and its name, `email` for the address, and `guilds`
+ * for the list of servers the account is in - because the servers and the address
+ * are wanted for what is built on top of this next.
+ *
+ * That last one is why the token is kept, where Steam, Epic and Minecraft keep
+ * nothing. A server list is not a fact that stays true: somebody joins one an
+ * hour after linking, and a copy taken at link time is wrong by the time anything
+ * reads it. So the grant is stored encrypted and the list is asked for when it is
+ * wanted. Discord's access tokens last a week, so the refresh token is stored
+ * with it and spent on the way past - a token nothing refreshed would be dead
+ * seven days after the link and the failure would look like a revoked account.
+ *
+ * `guilds` reads which servers somebody is in, and nothing inside them: not the
+ * channels, not the messages, not who else is there. Polaris still cannot post as
+ * anybody.
  *
  * The name is read twice over because Discord has two account eras. A migrated
  * account has a unique `username` and shows a `global_name` on top of it; an old
@@ -35,16 +45,33 @@ const TOKEN = "https://discord.com/api/oauth2/token";
  *  against is the version it should keep asking. */
 const CURRENT_USER = "https://discord.com/api/v10/users/@me";
 const AVATAR_CDN = "https://cdn.discordapp.com/avatars";
+const GUILD_ICON_CDN = "https://cdn.discordapp.com/icons";
 
 /**
- * Who the account is, and nothing else.
+ * What the consent screen asks for.
  *
- * Not `email`: no screen here needs the address on a Discord account, and asking
- * for one would put a line on the consent screen that buys this deployment
- * nothing. Not `guilds` either - which servers somebody is in is their business,
- * and Polaris has no use for the list.
+ * `guilds` is the widest of the three and is still only a list of servers: the
+ * read it allows is `/users/@me/guilds`, which returns the id, the name and the
+ * icon of each, and reaches nothing inside any of them. `guilds.members.read`,
+ * which would return somebody's nickname and roles in a server, is deliberately
+ * not here - it is a larger permission and nothing asks for it yet.
+ *
+ * Adding to this list is a change every person who has already linked has to
+ * consent to again. `REQUIRED_SCOPES` below is what makes that visible to them
+ * rather than surfacing later as an empty server list.
  */
-const SCOPES = ["identify"];
+const SCOPES = ["identify", "email", "guilds"];
+
+/** The scopes a link has to carry to be worth anything, so one granted before
+ *  this list grew can be spotted and its owner asked to authorize again. */
+export const DISCORD_REQUIRED_SCOPES: readonly string[] = SCOPES;
+
+/** Where the servers an account is in are read from. */
+const CURRENT_GUILDS = "https://discord.com/api/v10/users/@me/guilds";
+
+/** Spent this far before expiry rather than exactly at it, so a call that takes
+ *  a moment is not signed with a token that dies mid-flight. */
+const REFRESH_MARGIN_MS = 60_000;
 
 /** How long to wait on Discord. Somebody is watching a redirect resolve. */
 const TIMEOUT_MS = 10_000;
@@ -103,13 +130,35 @@ const userSchema = z.object({
     username: z.string().optional(),
     global_name: z.string().nullish(),
     discriminator: z.string().optional(),
-    avatar: z.string().nullish()
+    avatar: z.string().nullish(),
+    email: z.string().nullish(),
+    /** Discord's own word on whether anybody proved they read that address. */
+    verified: z.boolean().nullish()
 });
+
+/** One server, as `/users/@me/guilds` returns it. Only the fields worth having:
+ *  the id is the identity, the rest is what a person would recognise it by. */
+const guildSchema = z.object({
+    id: z.string().min(1),
+    name: z.string().optional(),
+    icon: z.string().nullish(),
+    owner: z.boolean().nullish()
+});
+
+export interface DiscordGuild {
+    readonly id: string;
+    readonly name: string;
+    readonly iconUrl: string | null;
+    readonly owner: boolean;
+}
 
 export interface DiscordAuthorization {
     readonly accountId: string;
     readonly label: string;
     readonly avatarUrl: string | null;
+    /** The address on the account, when Discord says it confirmed one. Null
+     *  otherwise: an unproved address is where a second-factor code would go. */
+    readonly email: string | null;
     readonly scope: string;
     readonly credential: ConnectionCredential;
 }
@@ -145,12 +194,11 @@ function avatarUrl(user: z.infer<typeof userSchema>): string | null {
     return url.toString();
 }
 
-/** Spend the code. Discord takes the application's credentials in the form body
+/** Spend a grant. Discord takes the application's credentials in the form body
  *  on this endpoint, which is what its own examples do. */
 async function postToken(
     client: DiscordOAuthClient,
-    code: string,
-    redirectUri: string
+    grant: Record<string, string>
 ): Promise<z.infer<typeof tokenSchema>> {
     const response = await fetch(TOKEN, {
         method: "POST",
@@ -158,9 +206,7 @@ async function postToken(
         body: new URLSearchParams({
             client_id: client.clientId,
             client_secret: client.clientSecret,
-            grant_type: "authorization_code",
-            code,
-            redirect_uri: redirectUri
+            ...grant
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
@@ -186,24 +232,91 @@ async function readUser(accessToken: string): Promise<z.infer<typeof userSchema>
     return userSchema.parse(await response.json());
 }
 
+/** What a token response is worth storing, as the credential column holds it. */
+function credentialFrom(token: z.infer<typeof tokenSchema>): ConnectionCredential {
+    return {
+        accessToken: token.access_token,
+        ...(token.refresh_token ? { refreshToken: token.refresh_token } : {}),
+        // Absolute rather than the seconds Discord counts in, because what reads
+        // this next is comparing it against the clock, not against the moment
+        // this response happened to arrive.
+        ...(token.expires_in ? { expiresAt: Date.now() + token.expires_in * 1000 } : {})
+    };
+}
+
 /** Spend the code and read back who authorized. */
 export async function exchangeDiscordCode(
     client: DiscordOAuthClient,
     code: string,
     redirectUri: string
 ): Promise<DiscordAuthorization> {
-    const token = await postToken(client, code, redirectUri);
+    const token = await postToken(client, {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri
+    });
     const user = await readUser(token.access_token);
     return {
         accountId: user.id,
         label: displayName(user),
         avatarUrl: avatarUrl(user),
+        // Only an address Discord states it confirmed. What reads this next makes
+        // it one of this person's own addresses, and an unproved one is where a
+        // second-factor code would be sent.
+        email: user.verified === true && user.email ? user.email : null,
         scope: token.scope ?? SCOPES.join(" "),
-        // Nothing is kept. Polaris never acts as somebody's Discord account, so
-        // holding a token that could would be storing a way to do something it
-        // has no reason to do.
-        credential: {}
+        // Kept, unlike the other game identities: the server list is asked for
+        // when it is wanted rather than copied at link time, and that needs a
+        // grant that is still good. Encrypted by the store before it is written.
+        credential: credentialFrom(token)
     };
+}
+
+/**
+ * An access token for this link that is good right now.
+ *
+ * Refreshes past the margin and hands the replacement back to be written, so the
+ * next read does not repeat the round trip. Null when there is nothing to refresh
+ * with - a link made before the token was kept, or a grant its owner withdrew -
+ * which is a link that has to be made again rather than an error worth throwing
+ * from a list nobody asked to fail.
+ */
+export async function discordAccessToken(
+    client: DiscordOAuthClient,
+    credential: ConnectionCredential
+): Promise<{ accessToken: string; refreshed: ConnectionCredential | null } | null> {
+    const fresh = credential.expiresAt === undefined || credential.expiresAt - REFRESH_MARGIN_MS > Date.now();
+    if (credential.accessToken && fresh) return { accessToken: credential.accessToken, refreshed: null };
+    if (!credential.refreshToken) return null;
+
+    const token = await postToken(client, {
+        grant_type: "refresh_token",
+        refresh_token: credential.refreshToken
+    });
+    return { accessToken: token.access_token, refreshed: credentialFrom(token) };
+}
+
+/**
+ * The servers this account is in.
+ *
+ * Asked for rather than remembered: somebody joins a server an hour after
+ * linking, and a copy taken at link time would be answering about the past. The
+ * icon is resolved here so nothing downstream has to know Discord's CDN.
+ */
+export async function readDiscordGuilds(accessToken: string): Promise<DiscordGuild[]> {
+    const response = await fetch(CURRENT_GUILDS, {
+        headers: { authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (!response.ok) throw new Error(await refusalMessage(response, "Discord would not list the servers"));
+    const parsed = z.array(guildSchema).safeParse(await response.json());
+    if (!parsed.success) throw new Error("Discord's server list was not the shape it documents");
+    return parsed.data.map((guild) => ({
+        id: guild.id,
+        name: guild.name?.trim() || guild.id,
+        iconUrl: guild.icon ? `${GUILD_ICON_CDN}/${guild.id}/${guild.icon}.png?size=${AVATAR_SIZE}` : null,
+        owner: guild.owner === true
+    }));
 }
 
 /** Whose account a sign-in's code belongs to. */
