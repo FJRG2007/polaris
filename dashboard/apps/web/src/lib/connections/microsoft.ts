@@ -13,8 +13,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const MICROSOFT_PROVIDER = "microsoft";
 
@@ -35,13 +35,8 @@ export interface MicrosoftOAuthClient {
 }
 
 /** The application an operator connected, or null when this deployment has none. */
-export async function getMicrosoftOAuthClient(): Promise<MicrosoftOAuthClient | null> {
-    const state = await getIntegrationState(MICROSOFT_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(MICROSOFT_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getMicrosoftOAuthClient(): Promise<MicrosoftOAuthClient | null> {
+    return oauthClientFor(MICROSOFT_PROVIDER);
 }
 
 export function microsoftAuthorizeUrl(
@@ -155,7 +150,8 @@ export async function identifyMicrosoftAccount(
 
 async function identify(accessToken: string): Promise<z.infer<typeof meSchema>> {
     const response = await fetch(GRAPH_ME, { headers: { authorization: `Bearer ${accessToken}` } });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Microsoft would not say who authorized"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Microsoft would not say who authorized"));
     return meSchema.parse(await response.json());
 }
 
@@ -181,7 +177,10 @@ export async function microsoftAccessToken(
         throw new MicrosoftAuthExpiredError((error as Error).message);
     }
     const ttl = (token.expires_in ?? 3600) * 1000;
-    accessTokens.set(refreshToken, { token: token.access_token, expiresAt: Date.now() + Math.max(0, ttl) });
+    accessTokens.set(refreshToken, {
+        token: token.access_token,
+        expiresAt: Date.now() + Math.max(0, ttl)
+    });
     return token.access_token;
 }
 

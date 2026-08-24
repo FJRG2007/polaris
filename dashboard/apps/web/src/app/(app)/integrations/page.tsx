@@ -15,10 +15,22 @@ import { getDomainConfig, publicAppUrl } from "@/lib/domain-service";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
 import { IntegrationsView, type IntegrationCard } from "./integrations-view";
 import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
-import { connectionCallbackUrl, connectionFlowOrigin } from "@/lib/connections/oauth";
 import { getCloudflareAccountStatus } from "@/lib/integrations/cloudflare-account-service";
-import { SERVICE_INTEGRATIONS, readDymoConfig, readVirusTotalConfig } from "@/lib/integrations/registry";
-import { connectionEmailTrusted, connectionLimit, connectionSignInAllowed } from "@/lib/connections/store";
+import {
+    OAUTH_APP_SLUGS,
+    connectionCallbackUrl,
+    connectionFlowOrigin
+} from "@/lib/connections/oauth";
+import {
+    SERVICE_INTEGRATIONS,
+    readDymoConfig,
+    readVirusTotalConfig
+} from "@/lib/integrations/registry";
+import {
+    connectionEmailTrusted,
+    connectionLimit,
+    connectionSignInAllowed
+} from "@/lib/connections/store";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +38,10 @@ export const dynamic = "force-dynamic";
  *  keyed by slug. Read together so the cards can be built without awaiting. */
 async function signInAllowances(): Promise<Map<string, boolean>> {
     const entries = await Promise.all(
-        CONNECTION_PROVIDERS.map(async (provider) => [provider.slug, await connectionSignInAllowed(provider.slug)] as const)
+        CONNECTION_PROVIDERS.map(
+            async (provider) =>
+                [provider.slug, await connectionSignInAllowed(provider.slug)] as const
+        )
     );
     return new Map(entries);
 }
@@ -36,7 +51,8 @@ async function signInAllowances(): Promise<Map<string, boolean>> {
 async function emailTrustAllowances(): Promise<Map<string, boolean>> {
     const entries = await Promise.all(
         CONNECTION_PROVIDERS.filter((provider) => provider.emailTrustDefault !== undefined).map(
-            async (provider) => [provider.slug, await connectionEmailTrusted(provider.slug)] as const
+            async (provider) =>
+                [provider.slug, await connectionEmailTrusted(provider.slug)] as const
         )
     );
     return new Map(entries);
@@ -46,22 +62,31 @@ async function emailTrustAllowances(): Promise<Map<string, boolean>> {
  *  has, it is offered to nobody but an administrator, and the dialog says so. */
 async function provenApplications(): Promise<Map<string, boolean>> {
     const entries = await Promise.all(
-        CONNECTION_PROVIDERS.map(async (provider) => [provider.slug, await connectionProven(provider.slug)] as const)
+        CONNECTION_PROVIDERS.map(
+            async (provider) => [provider.slug, await connectionProven(provider.slug)] as const
+        )
     );
     return new Map(entries);
 }
-
-/** The services whose card configures an OAuth application the operator
- *  registers. Kept beside the page because it decides which cards get a client
- *  id, a redirect URI and an account limit. */
-const OAUTH_APP_SLUGS: readonly string[] = ["google", "microsoft", "dropbox", "epic", "minecraft", "discord"];
 
 export default async function IntegrationsPage() {
     await requireAdmin();
     // Three of these reach outside the box (GitHub twice, Cloudflare once), so
     // they are awaited together rather than one after another - in sequence the
     // page took as long as all of them added up.
-    const [states, github, domains, cloudflare, baseUrl, publicUrl, githubLimit, oauthLimits, signIn, proven, emailTrust] = await Promise.all([
+    const [
+        states,
+        github,
+        domains,
+        cloudflare,
+        baseUrl,
+        publicUrl,
+        githubLimit,
+        oauthLimits,
+        signIn,
+        proven,
+        emailTrust
+    ] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
         // DuckDNS config lives with the domain settings (Setting keys), not an Integration row.
@@ -81,7 +106,9 @@ export default async function IntegrationsPage() {
         // How many accounts of each service one person may connect, shown in the
         // dialog that sets it.
         connectionLimit("github"),
-        Promise.all(OAUTH_APP_SLUGS.map(async (slug) => [slug, await connectionLimit(slug)] as const)),
+        Promise.all(
+            OAUTH_APP_SLUGS.map(async (slug) => [slug, await connectionLimit(slug)] as const)
+        ),
         // Whether each of those services may sign anybody in here. Resolved for
         // every provider at once so the card mapping below stays synchronous.
         signInAllowances(),
@@ -107,13 +134,16 @@ export default async function IntegrationsPage() {
         // Set only for the services somebody can link an account of; the rest
         // have nothing to sign in with, so the switch is left out entirely.
         const connection = findConnectionProvider(entry.slug);
-        const virustotal = entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
+        const virustotal =
+            entry.slug === "virustotal" ? readVirusTotalConfig(state?.config) : undefined;
         const dymo = entry.slug === "dymo" ? readDymoConfig(state?.config) : undefined;
         // Criminal IP carries the same shape - which verdicts block - read through
         // its own module because the rule names are theirs, not Dymo's.
-        const criminalIp = entry.slug === "criminalip" ? readCriminalIpConfig(state?.config) : undefined;
+        const criminalIp =
+            entry.slug === "criminalip" ? readCriminalIpConfig(state?.config) : undefined;
         const isDuck = entry.slug === "duckdns";
-        const duckConfigured = isDuck && domains.hasDuckdnsToken && Boolean(domains.duckdnsSubdomain);
+        const duckConfigured =
+            isDuck && domains.hasDuckdnsToken && Boolean(domains.duckdnsSubdomain);
         return {
             slug: entry.slug,
             name: entry.name,
@@ -129,8 +159,10 @@ export default async function IntegrationsPage() {
             }),
             // Only where an authorization can fail: a card with no round trip has
             // nothing to have been refused.
-            failure: connection ? readConnectionFailure(state?.config) ?? undefined : undefined,
-            signInAllowed: connection ? signIn.get(entry.slug) ?? connection.signInDefault : undefined,
+            failure: connection ? (readConnectionFailure(state?.config) ?? undefined) : undefined,
+            signInAllowed: connection
+                ? (signIn.get(entry.slug) ?? connection.signInDefault)
+                : undefined,
             signInWarning: connection?.signInWarning,
             // Undefined for a service that vouches for no address, which is what
             // leaves the switch out rather than drawing one that decides nothing.
@@ -138,23 +170,25 @@ export default async function IntegrationsPage() {
             requiresApiKey: entry.requiresApiKey,
             apiKeyLabel: entry.apiKeyLabel,
             apiKeyHelp: entry.apiKeyHelp,
-            enabled: isDuck ? duckConfigured : state?.enabled ?? false,
-            hasSecret: isDuck ? domains.hasDuckdnsToken : state?.hasSecret ?? false,
+            enabled: isDuck ? duckConfigured : (state?.enabled ?? false),
+            hasSecret: isDuck ? domains.hasDuckdnsToken : (state?.hasSecret ?? false),
             duckdnsSubdomain: isDuck ? domains.duckdnsSubdomain : undefined,
             scanDropPoints: virustotal?.scanDropPoints ?? true,
             onDetection: virustotal?.onDetection ?? "block",
             verifyAccessIp: dymo?.verifyAccessIp ?? true,
             deny: dymo?.deny ?? criminalIp?.deny ?? ["FRAUD"],
             githubMethod: entry.slug === "github" ? github.method : undefined,
-            githubLogin: entry.slug === "github" ? github.login ?? undefined : undefined,
+            githubLogin: entry.slug === "github" ? (github.login ?? undefined) : undefined,
             githubInstallations: entry.slug === "github" ? github.installations : undefined,
-            githubHtmlUrl: entry.slug === "github" ? github.htmlUrl ?? undefined : undefined,
+            githubHtmlUrl: entry.slug === "github" ? (github.htmlUrl ?? undefined) : undefined,
             githubRunnersReady: entry.slug === "github" ? runners?.ready : undefined,
-            githubRunnersAdvice: entry.slug === "github" ? runners?.advice ?? undefined : undefined,
-            githubPublicUrl: entry.slug === "github" ? publicUrl ?? undefined : undefined,
+            githubRunnersAdvice:
+                entry.slug === "github" ? (runners?.advice ?? undefined) : undefined,
+            githubPublicUrl: entry.slug === "github" ? (publicUrl ?? undefined) : undefined,
             cloudflareApiConnected: entry.slug === "cloudflare" ? cloudflare.connected : undefined,
             cloudflareDnsConnected: entry.slug === "cloudflare" ? cloudflare.dnsReady : undefined,
-            cloudflareAccountName: entry.slug === "cloudflare" ? cloudflare.accountName ?? undefined : undefined,
+            cloudflareAccountName:
+                entry.slug === "cloudflare" ? (cloudflare.accountName ?? undefined) : undefined,
             oauthClientId:
                 OAUTH_APP_SLUGS.includes(entry.slug) && typeof state?.config.clientId === "string"
                     ? state.config.clientId
@@ -165,7 +199,10 @@ export default async function IntegrationsPage() {
             // Whether anybody has been taken through this application yet. Set for
             // the services somebody links an account of, and only where there is
             // an application to prove - Steam has none.
-            proven: connection && entry.slug !== "steam" ? proven.get(entry.slug) ?? false : undefined,
+            proven:
+                connection && entry.slug !== "steam"
+                    ? (proven.get(entry.slug) ?? false)
+                    : undefined,
             // Where the licensed call filter is served from. Not a secret - the
             // token beside it is - so it is read back into the dialog.
             filterModuleUrl:
@@ -186,8 +223,8 @@ export default async function IntegrationsPage() {
             <div>
                 <h1 className="text-[17px] font-semibold tracking-tight">Integrations</h1>
                 <p className="text-sm text-muted-foreground">
-                    Connect Polaris to outside services. Enabled integrations run across the platform. The model
-                    providers agents run on are under{" "}
+                    Connect Polaris to outside services. Enabled integrations run across the
+                    platform. The model providers agents run on are under{" "}
                     <Link href="/integrations/models" className="text-primary hover:underline">
                         AI providers
                     </Link>

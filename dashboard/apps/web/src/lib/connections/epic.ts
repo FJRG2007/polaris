@@ -17,8 +17,8 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
+import { oauthClientFor } from "./oauth-app";
 import type { ConnectionCredential } from "./store";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 export const EPIC_PROVIDER = "epic";
 
@@ -39,16 +39,15 @@ export interface EpicOAuthClient {
 }
 
 /** The product an operator registered, or null when this deployment has none. */
-export async function getEpicOAuthClient(): Promise<EpicOAuthClient | null> {
-    const state = await getIntegrationState(EPIC_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(EPIC_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getEpicOAuthClient(): Promise<EpicOAuthClient | null> {
+    return oauthClientFor(EPIC_PROVIDER);
 }
 
-export function epicAuthorizeUrl(client: EpicOAuthClient, redirectUri: string, state: string): string {
+export function epicAuthorizeUrl(
+    client: EpicOAuthClient,
+    redirectUri: string,
+    state: string
+): string {
     const url = new URL(AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -98,13 +97,16 @@ async function postToken(
     // Epic's reason is the whole value of this failing: a client whose policy
     // forbids the grant, one not linked to the application, and a secret from a
     // different client are three different switches and one status code.
-    if (!response.ok) throw new Error(await refusalMessage(response, "Epic refused the token request"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Epic refused the token request"));
     return tokenSchema.parse(await response.json());
 }
 
 /** What the account calls itself, when the token did not already say. Null rather
  *  than a failure: a link is not worth refusing over a missing display name. */
-async function readDisplayName(accessToken: string): Promise<{ id: string | null; name: string | null }> {
+async function readDisplayName(
+    accessToken: string
+): Promise<{ id: string | null; name: string | null }> {
     const response = await fetch(USER_INFO, {
         headers: { authorization: `Bearer ${accessToken}` },
         signal: AbortSignal.timeout(TIMEOUT_MS)
@@ -114,7 +116,11 @@ async function readDisplayName(accessToken: string): Promise<{ id: string | null
     if (!parsed.success) return { id: null, name: null };
     return {
         id: parsed.data.sub,
-        name: parsed.data.displayName ?? parsed.data.display_name ?? parsed.data.preferred_username ?? null
+        name:
+            parsed.data.displayName ??
+            parsed.data.display_name ??
+            parsed.data.preferred_username ??
+            null
     };
 }
 

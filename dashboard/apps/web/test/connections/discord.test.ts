@@ -57,9 +57,8 @@ vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
     } as Response;
 });
 
-const { discordAuthorizeUrl, exchangeDiscordCode, getDiscordOAuthClient, identifyDiscordAccount } = await import(
-    "@/lib/connections/discord"
-);
+const { discordAuthorizeUrl, exchangeDiscordCode, getDiscordOAuthClient, identifyDiscordAccount } =
+    await import("@/lib/connections/discord");
 const { connectionSignInAllowed } = await import("@/lib/connections/store");
 const { findConnectionProvider } = await import("@polaris/core");
 
@@ -104,6 +103,20 @@ describe("a Discord account is not a way in until somebody says so", () => {
         expect(findConnectionProvider("discord")?.signInWarning).toBeTruthy();
     });
 
+    it("is still linkable while it is refused as a way in, which is the whole point of it", () => {
+        // The two switches answer two questions. Discord is connected so a FiveM
+        // server can recognise a player by their Polaris name; closing the door
+        // must not take that away, or the operator would have to choose between
+        // the feature and the risk. connectionSignInAllowed gates the login
+        // screen alone - link-gate.test.ts holds the general rule.
+        const discord = findConnectionProvider("discord");
+        expect(discord?.signInDefault).toBe(false);
+        // Nothing on the provider entry makes linking conditional on signing in:
+        // acceptsToken and defaultLimit describe the link and are untouched by it.
+        expect(discord?.defaultLimit).toBeGreaterThan(0);
+        expect(discord?.requires).toBeTruthy();
+    });
+
     it("holds no address, so nothing here can be taken as proof of who somebody is", () => {
         // Undefined rather than false: Polaris never asks Discord for an address,
         // so there is nothing for an operator to be offered a switch about.
@@ -136,7 +149,13 @@ describe("where somebody is sent to authorize", () => {
 
 describe("reading back who authorized", () => {
     it("takes the display name a migrated account shows", async () => {
-        authorizes({ id: "1234", username: "ana", global_name: "Ana R", discriminator: "0", avatar: null });
+        authorizes({
+            id: "1234",
+            username: "ana",
+            global_name: "Ana R",
+            discriminator: "0",
+            avatar: null
+        });
         expect(await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).toMatchObject({
             accountId: "1234",
             label: "Ana R"
@@ -167,7 +186,7 @@ describe("reading back who authorized", () => {
     it("asks for an animated avatar the one way Discord serves one", async () => {
         authorizes({ id: "1234", username: "ana", avatar: "a_abc123" });
         const { avatarUrl } = await exchangeDiscordCode(CLIENT, "code-1", REDIRECT);
-        expect(avatarUrl).toBe("https://cdn.discordapp.com/avatars/1234/a_abc123.webp?size=128&animated=true");
+        expect(avatarUrl).toBe("https://cdn.discordapp.com/avatars/1234/a_abc123.gif?size=128");
     });
 
     it("draws no avatar for an account that has none, rather than a broken image", async () => {
@@ -192,7 +211,9 @@ describe("reading back who authorized", () => {
 
     it("reports the account and nothing else when the trip was a sign-in", async () => {
         authorizes({ id: "1234", username: "ana", global_name: "Ana R", avatar: "abc123" });
-        expect(await identifyDiscordAccount(CLIENT, "code-1", REDIRECT)).toEqual({ accountId: "1234" });
+        expect(await identifyDiscordAccount(CLIENT, "code-1", REDIRECT)).toEqual({
+            accountId: "1234"
+        });
     });
 });
 
@@ -202,7 +223,10 @@ describe("when Discord refuses", () => {
             {
                 ok: false,
                 status: 401,
-                body: { error: "invalid_client", error_description: "Invalid client_id or client_secret" }
+                body: {
+                    error: "invalid_client",
+                    error_description: "Invalid client_id or client_secret"
+                }
             }
         ];
         await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(
@@ -215,7 +239,9 @@ describe("when Discord refuses", () => {
             { ok: true, body: { access_token: "token-1" } },
             { ok: false, status: 401, body: { message: "401: Unauthorized" } }
         ];
-        await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(/which account authorized/);
+        await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(
+            /which account authorized/
+        );
     });
 });
 

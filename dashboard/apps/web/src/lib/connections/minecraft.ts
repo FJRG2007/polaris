@@ -24,7 +24,7 @@
 
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
-import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { oauthClientFor } from "./oauth-app";
 
 export const MINECRAFT_PROVIDER = "minecraft";
 
@@ -49,16 +49,15 @@ export interface MinecraftOAuthClient {
     readonly clientSecret: string;
 }
 
-export async function getMinecraftOAuthClient(): Promise<MinecraftOAuthClient | null> {
-    const state = await getIntegrationState(MINECRAFT_PROVIDER);
-    if (!state?.enabled) return null;
-    const clientId = typeof state.config.clientId === "string" ? state.config.clientId.trim() : "";
-    if (!clientId) return null;
-    const clientSecret = await getIntegrationSecret(MINECRAFT_PROVIDER);
-    return clientSecret ? { clientId, clientSecret } : null;
+export function getMinecraftOAuthClient(): Promise<MinecraftOAuthClient | null> {
+    return oauthClientFor(MINECRAFT_PROVIDER);
 }
 
-export function minecraftAuthorizeUrl(client: MinecraftOAuthClient, redirectUri: string, state: string): string {
+export function minecraftAuthorizeUrl(
+    client: MinecraftOAuthClient,
+    redirectUri: string,
+    state: string
+): string {
     const url = new URL(AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -120,12 +119,15 @@ async function microsoftToken(
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Microsoft refused the token request"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Microsoft refused the token request"));
     return msTokenSchema.parse(await response.json()).access_token;
 }
 
 /** The Xbox Live token and the user hash that has to travel with it. */
-async function xboxToken(microsoftAccessToken: string): Promise<{ token: string; userHash: string }> {
+async function xboxToken(
+    microsoftAccessToken: string
+): Promise<{ token: string; userHash: string }> {
     const response = await postJson(XBL, {
         Properties: {
             AuthMethod: "RPS",
@@ -151,10 +153,14 @@ async function xstsToken(xboxLiveToken: string): Promise<string> {
     if (response.status === 401) {
         const said = (await response.json().catch(() => null)) as { XErr?: number } | null;
         if (said?.XErr === 2148916238) {
-            throw new Error("This Microsoft account is a child account and has to be added to a family first");
+            throw new Error(
+                "This Microsoft account is a child account and has to be added to a family first"
+            );
         }
         if (said?.XErr === 2148916233) {
-            throw new Error("This Microsoft account has no Xbox profile yet. Sign in to Xbox once and try again.");
+            throw new Error(
+                "This Microsoft account has no Xbox profile yet. Sign in to Xbox once and try again."
+            );
         }
         throw new Error("Xbox refused this account");
     }
@@ -163,8 +169,13 @@ async function xstsToken(xboxLiveToken: string): Promise<string> {
 }
 
 /** The Minecraft token, and then the profile it names. */
-async function minecraftProfile(xsts: string, userHash: string): Promise<z.infer<typeof profileSchema>> {
-    const login = await postJson(LOGIN_WITH_XBOX, { identityToken: `XBL3.0 x=${userHash};${xsts}` });
+async function minecraftProfile(
+    xsts: string,
+    userHash: string
+): Promise<z.infer<typeof profileSchema>> {
+    const login = await postJson(LOGIN_WITH_XBOX, {
+        identityToken: `XBL3.0 x=${userHash};${xsts}`
+    });
     if (!login.ok) throw new Error(await refusalMessage(login, "Minecraft refused the sign-in"));
     const token = minecraftTokenSchema.parse(await login.json()).access_token;
 
@@ -179,7 +190,8 @@ async function minecraftProfile(xsts: string, userHash: string): Promise<z.infer
             "This account has no Minecraft profile. Somebody on Game Pass has to open the launcher once first."
         );
     }
-    if (!profile.ok) throw new Error(await refusalMessage(profile, "Minecraft refused the profile request"));
+    if (!profile.ok)
+        throw new Error(await refusalMessage(profile, "Minecraft refused the profile request"));
     return profileSchema.parse(await profile.json());
 }
 

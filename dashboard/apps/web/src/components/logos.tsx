@@ -80,7 +80,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
     // DuckDNS ships only an official raster mark; served from public/ as a static asset.
-    if (slug === "duckdns") return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
+    if (slug === "duckdns")
+        return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
     return <Blocks className={className} />;

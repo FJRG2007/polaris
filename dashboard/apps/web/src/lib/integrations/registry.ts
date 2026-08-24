@@ -22,7 +22,13 @@ export type IntegrationCategory =
  * form that wants it, instead of in one list at the bottom that an operator has
  * to match up by eye.
  */
-export type IntegrationSetupValue = "redirectUri" | "homeUrl" | "privacyUrl" | "termsUrl" | "logoUrl" | "domain";
+export type IntegrationSetupValue =
+    | "redirectUri"
+    | "homeUrl"
+    | "privacyUrl"
+    | "termsUrl"
+    | "logoUrl"
+    | "domain";
 
 /**
  * A page on the vendor's own site that produces what the dialog is asking for.
@@ -95,10 +101,14 @@ export interface VirusTotalConfig {
 export const VIRUSTOTAL_DEFAULTS: VirusTotalConfig = { scanDropPoints: true, onDetection: "block" };
 
 /** Read a stored VirusTotal config object, applying defaults for missing keys. */
-export function readVirusTotalConfig(config: Record<string, unknown> | undefined): VirusTotalConfig {
+export function readVirusTotalConfig(
+    config: Record<string, unknown> | undefined
+): VirusTotalConfig {
     const action = config?.onDetection;
     const onDetection: ScanAction =
-        action === "quarantine" || action === "notify" || action === "block" ? action : VIRUSTOTAL_DEFAULTS.onDetection;
+        action === "quarantine" || action === "notify" || action === "block"
+            ? action
+            : VIRUSTOTAL_DEFAULTS.onDetection;
     return {
         scanDropPoints: config?.scanDropPoints !== false,
         onDetection
@@ -128,7 +138,9 @@ export const DYMO_DEFAULTS: DymoConfig = { verifyAccessIp: true, deny: ["FRAUD"]
 export function readDymoConfig(config: Record<string, unknown> | undefined): DymoConfig {
     const valid = new Set(DYMO_IP_RULES.map((rule) => rule.value));
     const raw = Array.isArray(config?.deny) ? (config?.deny as unknown[]) : [];
-    const deny = raw.filter((value): value is string => typeof value === "string" && valid.has(value));
+    const deny = raw.filter(
+        (value): value is string => typeof value === "string" && valid.has(value)
+    );
     return {
         verifyAccessIp: config?.verifyAccessIp !== false,
         deny: deny.length > 0 ? deny : DYMO_DEFAULTS.deny
@@ -159,7 +171,8 @@ export interface GatewayConfig {
  *  the dialog and the save action both treat as "not set yet". */
 export function readGatewayConfig(config: Record<string, unknown> | undefined): GatewayConfig {
     const text = (value: unknown): string => (typeof value === "string" ? value : "");
-    const count = (value: unknown): number => (typeof value === "number" && value > 0 ? Math.floor(value) : 0);
+    const count = (value: unknown): number =>
+        typeof value === "number" && value > 0 ? Math.floor(value) : 0;
     return {
         baseUrl: text(config?.baseUrl),
         model: text(config?.model),
@@ -177,10 +190,13 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "Automatically scans files uploaded to your drop points with the VirusTotal Public API and alerts you when something is flagged. Choose whether a detection blocks, quarantines, or just notifies.",
         docsUrl: "https://docs.virustotal.com/reference/overview",
-        setupLinks: [{ label: "Get your API key", url: "https://www.virustotal.com/gui/my-apikey" }],
+        setupLinks: [
+            { label: "Get your API key", url: "https://www.virustotal.com/gui/my-apikey" }
+        ],
         requiresApiKey: true,
         apiKeyLabel: "Public API key",
-        apiKeyHelp: "Find it under your VirusTotal profile -> API key. The free Public API allows about 4 lookups per minute."
+        apiKeyHelp:
+            "Find it under your VirusTotal profile -> API key. The free Public API allows about 4 lookups per minute."
     },
     {
         slug: "dymo",
@@ -202,7 +218,9 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "The firewall asks Criminal IP about addresses it sees in your traffic and blocks the ones that match the conditions you choose. Lookups happen in the background, never while a request is waiting, and the answer is cached - so a slow or unreachable provider can never slow down or open up your site.",
         docsUrl: "https://www.criminalip.io/developer/api/get-ip-summary",
-        setupLinks: [{ label: "Get your API key", url: "https://www.criminalip.io/mypage/information" }],
+        setupLinks: [
+            { label: "Get your API key", url: "https://www.criminalip.io/mypage/information" }
+        ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "It is on the My Information page, under API Key."
@@ -224,7 +242,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "google",
         name: "Google",
         category: "Automation",
-        summary: "Let people connect their Google account, sign in with it, and show their calendar.",
+        summary:
+            "Let people connect their Google account, sign in with it, and show their calendar.",
         description:
             "Connect a Google Cloud OAuth client and everyone here gets a Connect button for their own Google account. Their events then appear in the Tasks calendar, read-only, and they can sign in with the account they linked if you allow it. Polaris never holds a credential that reaches everybody's calendar - only the access each person granted.",
         docsUrl: "https://developers.google.com/identity/protocols/oauth2",
@@ -271,7 +290,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         ],
         requiresApiKey: true,
         apiKeyLabel: "Client secret",
-        apiKeyHelp: "Shown once when the client is created, and downloadable from the client afterwards."
+        apiKeyHelp:
+            "Shown once when the client is created, and downloadable from the client afterwards."
     },
     {
         slug: "microsoft",
@@ -391,7 +411,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         slug: "minecraft",
         name: "Minecraft",
         category: "Automation",
-        summary: "Let people link their Minecraft account, so a server can be opened to them by name.",
+        summary:
+            "Let people link their Minecraft account, so a server can be opened to them by name.",
         description:
             "A separate Entra application from the Microsoft one: this asks only for Xbox sign-in, and Microsoft gates the Minecraft API behind an application it has approved. Once it is connected, linking an account hands Polaris the username as Mojang spells it - which is exactly what a server's player list is keyed by.",
         docsUrl: "https://learn.microsoft.com/entra/identity-platform/quickstart-register-app",
@@ -417,8 +438,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         category: "Automation",
         summary: "Let people link their Discord account, so game servers can recognize them.",
         description:
-            "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by - so somebody can be added to one by their Polaris name instead of being asked to copy an id out of Discord. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
-        docsUrl: "https://docs.discord.com/developers/topics/oauth2",
+            "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by, and records it against their Polaris account instead of leaving it to be read out over chat. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
+        docsUrl: "https://discord.com/developers/docs/topics/oauth2",
         setupLinks: [
             {
                 label: "Create an application",
@@ -508,7 +529,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/",
         requiresApiKey: true,
         apiKeyLabel: "Tunnel token",
-        apiKeyHelp: "The token shown when you create a tunnel (Zero Trust -> Networks -> Tunnels -> Install connector)."
+        apiKeyHelp:
+            "The token shown when you create a tunnel (Zero Trust -> Networks -> Tunnels -> Install connector)."
     },
     {
         slug: "ngrok",
@@ -519,7 +541,10 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             "Runs an ngrok agent from this server that forwards inbound traffic to Polaris. Good for quick public access; a reserved domain (ngrok paid) is recommended for a stable URL.",
         docsUrl: "https://ngrok.com/docs/agent/",
         setupLinks: [
-            { label: "Get your authtoken", url: "https://dashboard.ngrok.com/get-started/your-authtoken" }
+            {
+                label: "Get your authtoken",
+                url: "https://dashboard.ngrok.com/get-started/your-authtoken"
+            }
         ],
         requiresApiKey: true,
         apiKeyLabel: "Authtoken"
@@ -549,7 +574,9 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "Connects your Anthropic account so agents can run on Claude. Polaris hands the key to a run over an authenticated call and never writes a copy into your repositories, so rotating it here takes effect everywhere at once. Usage is billed by Anthropic directly.",
         docsUrl: "https://docs.claude.com/en/api/overview",
-        setupLinks: [{ label: "Create an API key", url: "https://console.anthropic.com/settings/keys" }],
+        setupLinks: [
+            { label: "Create an API key", url: "https://console.anthropic.com/settings/keys" }
+        ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "Starts with sk-ant-. Needs no particular scope.",
@@ -617,7 +644,9 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         description:
             "Connects your Moonshot AI account so agents can run on Kimi. The key is held here and handed to a run over an authenticated call, never copied into your repositories. Usage is billed by Moonshot directly.",
         docsUrl: "https://platform.moonshot.ai/docs",
-        setupLinks: [{ label: "Create an API key", url: "https://platform.moonshot.ai/console/api-keys" }],
+        setupLinks: [
+            { label: "Create an API key", url: "https://platform.moonshot.ai/console/api-keys" }
+        ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
         defaultModel: { label: "Kimi K3 (Moonshot AI)", slug: "moonshotai/kimi-k3" }
@@ -672,7 +701,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         docsUrl: "https://github.com/FJRG2007/enigma",
         requiresApiKey: true,
         apiKeyLabel: "Token",
-        apiKeyHelp: "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
+        apiKeyHelp:
+            "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
         defaultModel: { label: "Your gateway's model", slug: "openai-compatible/byok" }
     }
 ];

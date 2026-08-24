@@ -180,7 +180,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         name: "Discord",
         summary: "Be recognised by the servers and screens that know you by your Discord account.",
         description:
-            "A FiveM server identifies a player by their Discord account and nothing else, so linking yours is what lets whoever runs one add you by your Polaris name instead of asking you to copy an eighteen-digit id out of Discord. Polaris reads the account id and the name you go by, and keeps nothing it could act with: it never posts as you, never reads your messages, and never sees the servers you are in.",
+            "A FiveM server identifies a player by their Discord account and nothing else. Linking yours records that account id and the name you go by against your Polaris account, so it is held here in a form that cannot be mistyped rather than copied out of Discord and sent over chat. Polaris keeps nothing it could act with: it never posts as you, never reads your messages, and never sees the servers you are in.",
         acceptsToken: false,
         defaultLimit: 1,
         requires: "a Discord application",
