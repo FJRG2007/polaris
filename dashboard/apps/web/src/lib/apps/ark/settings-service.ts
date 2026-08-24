@@ -15,7 +15,8 @@
 
 import { prisma } from "@polaris/db";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
-import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
+import { ARK_ROOT } from "@/lib/apps/ark/files";
+import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import {
     ARK_PENDING_SETTINGS_KEY,
@@ -61,8 +62,8 @@ const NOTHING: ArkRules = { overrides: {}, live: {}, reason: null };
 export async function readArkRules(ownerId: string, installedAppId: string): Promise<ArkRules> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         const [config, ini] = await Promise.all([
-            readArkFile(server, CONFIG_FILE),
-            readArkFile(server, INI_FILE)
+            readContainerFile(server, CONFIG_FILE),
+            readContainerFile(server, INI_FILE)
         ]);
         if (config === null && ini === null) {
             return {
@@ -111,14 +112,14 @@ export async function setArkRules(
     if (wanted.size === 0) return readArkRules(ownerId, installedAppId);
 
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const config = (await readArkFile(server, CONFIG_FILE)) ?? "";
+        const config = (await readContainerFile(server, CONFIG_FILE)) ?? "";
         const overrides: Record<string, string> = { ...parseArkOverrides(config) };
         for (const [key, value] of wanted) {
             if (value === null) delete overrides[key];
             else overrides[key] = value;
         }
-        await writeArkFile(server, CONFIG_FILE, writeArkOverrides(config, overrides));
-        const ini = await readArkFile(server, INI_FILE);
+        await writeContainerFile(server, CONFIG_FILE, writeArkOverrides(config, overrides));
+        const ini = await readContainerFile(server, INI_FILE);
         return {
             overrides,
             live: Object.fromEntries(
@@ -186,7 +187,7 @@ export async function applyPendingArkRules(ownerId: string, installedAppId: stri
     }
     try {
         const applied = await withServerContainer(ownerId, installedAppId, async (server) => {
-            const config = await readArkFile(server, CONFIG_FILE);
+            const config = await readContainerFile(server, CONFIG_FILE);
             // No config file yet means the server has never started, and writing
             // one before arkmanager generates its own would be a file the image
             // then refuses to replace.
@@ -194,7 +195,7 @@ export async function applyPendingArkRules(ownerId: string, installedAppId: stri
             const overrides = parseArkOverrides(config);
             const missing = Object.entries(pending).filter(([key]) => overrides[key] === undefined);
             if (missing.length > 0) {
-                await writeArkFile(
+                await writeContainerFile(
                     server,
                     CONFIG_FILE,
                     writeArkOverrides(config, { ...overrides, ...Object.fromEntries(missing) })

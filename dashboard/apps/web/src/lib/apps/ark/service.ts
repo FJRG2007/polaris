@@ -29,7 +29,8 @@ import { arkExperienceCommand } from "@/lib/apps/ark/experience";
 import { withServerContainer } from "@/lib/apps/minecraft/service";
 import { parseProfileDump, type ArkProfile } from "@/lib/apps/ark/profile";
 import { readCrashLoop, readRestartWatch } from "@/lib/apps/games-health";
-import { ARK_ROOT, readArkFile, writeArkFile } from "@/lib/apps/ark/files";
+import { ARK_ROOT } from "@/lib/apps/ark/files";
+import { readContainerFile, writeContainerFile } from "@/lib/apps/container-files";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { crashLoopOf, isCrashLooping, type CrashLoop } from "@/lib/apps/crash-loop";
 import { isRconRefusal, parseArkPlayers, type ArkPlayer } from "@/lib/apps/ark/parse";
@@ -677,7 +678,7 @@ const MAX_PROFILE_READS = 40;
  */
 export async function readArkAdmins(ownerId: string, installedAppId: string): Promise<string[]> {
     return withServerContainer(ownerId, installedAppId, async (server) =>
-        arkAdmins.parseAdminList((await readArkFile(server, ADMIN_FILE)) ?? "")
+        arkAdmins.parseAdminList((await readContainerFile(server, ADMIN_FILE)) ?? "")
     );
 }
 
@@ -698,9 +699,9 @@ export async function setArkAdmin(
     if (!arkAccess.isSteamId(steamId)) throw new Error("That is not a Steam id");
     const id = steamId.trim();
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        const current = arkAdmins.parseAdminList((await readArkFile(server, ADMIN_FILE)) ?? "");
+        const current = arkAdmins.parseAdminList((await readContainerFile(server, ADMIN_FILE)) ?? "");
         const next = admin ? arkAdmins.withAdmin(current, id) : arkAdmins.withoutAdmin(current, id);
-        await writeArkFile(server, ADMIN_FILE, arkAdmins.formatAdminList(next));
+        await writeContainerFile(server, ADMIN_FILE, arkAdmins.formatAdminList(next));
         return next;
     });
 }
