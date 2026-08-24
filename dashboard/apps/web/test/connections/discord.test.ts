@@ -103,6 +103,20 @@ describe("a Discord account is not a way in until somebody says so", () => {
         expect(findConnectionProvider("discord")?.signInWarning).toBeTruthy();
     });
 
+    it("is still linkable while it is refused as a way in, which is the whole point of it", () => {
+        // The two switches answer two questions. Discord is connected so a FiveM
+        // server can recognise a player by their Polaris name; closing the door
+        // must not take that away, or the operator would have to choose between
+        // the feature and the risk. connectionSignInAllowed gates the login
+        // screen alone - link-gate.test.ts holds the general rule.
+        const discord = findConnectionProvider("discord");
+        expect(discord?.signInDefault).toBe(false);
+        // Nothing on the provider entry makes linking conditional on signing in:
+        // acceptsToken and defaultLimit describe the link and are untouched by it.
+        expect(discord?.defaultLimit).toBeGreaterThan(0);
+        expect(discord?.requires).toBeTruthy();
+    });
+
     it("holds no address, so nothing here can be taken as proof of who somebody is", () => {
         // Undefined rather than false: Polaris never asks Discord for an address,
         // so there is nothing for an operator to be offered a switch about.

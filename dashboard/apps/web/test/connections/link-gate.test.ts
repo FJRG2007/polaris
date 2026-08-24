@@ -23,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = {
     integration: null as { enabled: boolean; config: Record<string, unknown>; hasSecret: boolean } | null,
     linked: false,
+    signInAllowed: true,
     written: [] as Array<Record<string, unknown>>
 };
 
@@ -57,7 +58,7 @@ vi.mock("@/lib/google-calendar/service", () => ({
     verifyGoogleOAuthClient: async () => null
 }));
 
-vi.mock("@/lib/connections/store", () => ({ connectionSignInAllowed: async () => true }));
+vi.mock("@/lib/connections/store", () => ({ connectionSignInAllowed: async () => state.signInAllowed }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example.com" }));
 
 const { connectionLinkAvailable, connectionSignInOffered } = await import("@/lib/connections/oauth");
@@ -67,6 +68,7 @@ describe("offering a service nobody has been through yet", () => {
     beforeEach(() => {
         state.integration = { enabled: true, config: { clientId: "client-id" }, hasSecret: true };
         state.linked = false;
+        state.signInAllowed = true;
         state.written = [];
     });
 
@@ -116,5 +118,44 @@ describe("offering a service nobody has been through yet", () => {
 
         expect(await connectionLinkAvailable("google", { admin: true })).toBe(false);
         expect(await connectionSignInOffered("google")).toBe(false);
+    });
+});
+
+/**
+ * Refusing a service as a way in must not also stop somebody linking an account
+ * of it.
+ *
+ * They are two switches because they answer two questions, and for the services
+ * that arrive closed - Discord, Steam, Epic, Minecraft - the link is the entire
+ * reason the operator connected the application: it is what lets a game server
+ * recognise a player. A deployment that closed the door and thereby also took
+ * the linking away would have removed the feature in order to protect the
+ * account, which is not the trade anybody asked for.
+ *
+ * The distinction is easy to collapse by accident, because both are read on the
+ * same screen and one of them is called `connectionSignInAllowed`.
+ */
+describe("a service the operator refuses as a way in", () => {
+    beforeEach(() => {
+        state.integration = { enabled: true, config: { clientId: "client-id" }, hasSecret: true };
+        // Already proven, so the only thing in question is the sign-in switch.
+        state.linked = true;
+        state.signInAllowed = false;
+        state.written = [];
+    });
+
+    it("can still have an account linked to it, by anybody and not only an administrator", async () => {
+        expect(await connectionLinkAvailable("google")).toBe(true);
+        expect(await connectionLinkAvailable("google", { admin: true })).toBe(true);
+    });
+
+    it("is still kept off the login screen", async () => {
+        expect(await connectionSignInOffered("google")).toBe(false);
+    });
+
+    it("starts offering the way in the moment the operator allows it, with the linking unchanged", async () => {
+        state.signInAllowed = true;
+        expect(await connectionSignInOffered("google")).toBe(true);
+        expect(await connectionLinkAvailable("google")).toBe(true);
     });
 });
