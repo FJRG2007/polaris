@@ -182,3 +182,22 @@ export function matchesFivemFilter(entry: FivemPlayerEntry, filter: string): boo
             return true;
     }
 }
+
+/**
+ * Whether two readings of who is on are about the same people.
+ *
+ * By the identifiers, never by how many there are. The panel has two sources -
+ * a stream that arrives in seconds and carries no slot, and a poll that arrives
+ * later and does - and it prefers the poll's richer rows whenever the two agree.
+ * Agreeing on a count is not agreeing: one player leaving and another joining
+ * between the two leaves the table showing a departed name against a slot the
+ * newcomer now holds, with a kick offered on it.
+ */
+export function sameRoster(
+    streamed: readonly { readonly id: string | null }[],
+    polled: readonly { readonly identifiers: readonly string[] }[]
+): boolean {
+    if (streamed.length !== polled.length) return false;
+    const held = new Set(polled.flatMap((player) => player.identifiers.map(normalizeIdentifier)));
+    return streamed.every((player) => player.id !== null && held.has(normalizeIdentifier(player.id)));
+}

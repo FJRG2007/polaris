@@ -50,7 +50,13 @@ import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "@/lib/apps/fivem/
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { canOpenGameTab, gameTabHref, gameTabLabel, isGameTab, visibleGameTabs } from "./tabs";
 import { CONSUMPTION_METRICS, MetricsHistory, PLAYER_METRICS } from "@/components/metrics-history";
-import { foldFivemPlayers, matchesFivemFilter, matchesFivemPlayer, type FivemPlayerEntry } from "@/lib/apps/fivem/roster";
+import {
+    foldFivemPlayers,
+    matchesFivemFilter,
+    matchesFivemPlayer,
+    sameRoster,
+    type FivemPlayerEntry
+} from "@/lib/apps/fivem/roster";
 import {
     generateConsolePassword,
     isBanReason,
@@ -426,9 +432,13 @@ function withPresence(
         crashLoop: presence.crashLoop
     };
     if (status) {
-        // The poll's own player rows are richer - they carry the slot number every
-        // console command takes - so they win whenever the two agree on the count.
-        return presence.players.length === status.players.length && status.answering
+        // The poll's own rows are richer - they carry the slot number every console
+        // command takes - so they win, but only when they are about the same people.
+        // An equal count is not the same roster: one player leaving and another
+        // joining inside the window leaves the table showing a departed name
+        // against a slot the newcomer now holds, with Kick offered on it.
+        const same = sameRoster(presence.players, status.players);
+        return same && status.answering
             ? { ...status, answering: presence.answering, containerRunning: presence.containerRunning }
             : { ...status, ...live };
     }

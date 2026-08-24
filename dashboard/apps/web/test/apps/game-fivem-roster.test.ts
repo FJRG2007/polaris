@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { foldFivemPlayers, matchesFivemFilter, matchesFivemPlayer } from "@/lib/apps/fivem/roster";
+import { foldFivemPlayers, matchesFivemFilter, matchesFivemPlayer, sameRoster } from "@/lib/apps/fivem/roster";
 
 const LICENSE = "license:0123456789abcdef0123456789abcdef01234567";
 const DISCORD = "discord:112233445566778899";
@@ -122,5 +122,27 @@ describe("the filters", () => {
         expect(rows.filter((row) => matchesFivemFilter(row, "operators"))).toHaveLength(1);
         expect(rows.filter((row) => matchesFivemFilter(row, "banned"))).toHaveLength(1);
         expect(rows.filter((row) => matchesFivemFilter(row, "all"))).toHaveLength(2);
+    });
+});
+
+describe("comparing two readings of who is on", () => {
+    const polled = [{ identifiers: [LICENSE, DISCORD] }, { identifiers: ["license:bbb"] }];
+
+    it("is the same roster when the identifiers match, whichever way they were cased", () => {
+        expect(sameRoster([{ id: LICENSE.toUpperCase() }, { id: "license:bbb" }], polled)).toBe(true);
+    });
+
+    it("is not the same roster when one left and another joined", () => {
+        // The count still matches, which is exactly the case that used to leave a
+        // departed player's name against a slot the newcomer now holds.
+        expect(sameRoster([{ id: LICENSE }, { id: "license:ccc" }], polled)).toBe(false);
+    });
+
+    it("is not the same roster when the counts differ", () => {
+        expect(sameRoster([{ id: LICENSE }], polled)).toBe(false);
+    });
+
+    it("is not the same roster when a reading carried no identifier at all", () => {
+        expect(sameRoster([{ id: LICENSE }, { id: null }], polled)).toBe(false);
     });
 });

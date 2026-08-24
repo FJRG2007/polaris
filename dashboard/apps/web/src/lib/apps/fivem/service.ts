@@ -737,6 +737,23 @@ export function readPendingSetup(config: Record<string, unknown>): PendingSetup 
  * the first.
  */
 export async function applyPendingSetup(ownerId: string, installedAppId: string): Promise<boolean> {
+    // Two callers drive this - the panel's poll and the cron walk - and the work
+    // between reading the pending key and clearing it is several container execs
+    // and two console waits, comfortably longer than the poll interval. Without a
+    // claim both would see the key set and both would stop and start the deploy.
+    // One promise per server is the whole of the fix: both callers live in this
+    // process, so the second one waits on the first rather than repeating it.
+    const held = claimed.get(installedAppId);
+    if (held) return held;
+    const work = applyPendingSetupOnce(ownerId, installedAppId).finally(() => claimed.delete(installedAppId));
+    claimed.set(installedAppId, work);
+    return work;
+}
+
+/** The setup pass in flight for a server, by install. */
+const claimed = new Map<string, Promise<boolean>>();
+
+async function applyPendingSetupOnce(ownerId: string, installedAppId: string): Promise<boolean> {
     const config = await configOf(ownerId, installedAppId);
     const pending = readPendingSetup(config);
     if (!pending) return false;
@@ -844,9 +861,13 @@ export async function writeFivemRules(
     });
     // The slot count is the one setting something outside this file reads: the
     // server list prints "3 / 32" about a server that is switched off, and there
-    // is nothing to ask when it is.
-    const slots = Number.parseInt(changes[SLOTS_SETTING] ?? "", 10);
-    if (Number.isFinite(slots)) await patchInstallConfig(installedAppId, { slots });
+    // is nothing to ask when it is. Taking the line out has to clear it too, or
+    // the list keeps printing a number the config no longer sets.
+    if (SLOTS_SETTING in changes) {
+        const written = changes[SLOTS_SETTING];
+        const slots = written === null ? Number.NaN : Number.parseInt(written, 10);
+        await patchInstallConfig(installedAppId, { slots: Number.isFinite(slots) ? slots : null });
+    }
 }
 
 /** The setting the list's slot figure comes from. */
@@ -999,21 +1020,26 @@ export async function revealConsolePassword(ownerId: string, installedAppId: str
 export async function setConsolePassword(ownerId: string, installedAppId: string, password: string): Promise<void> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     if (!access.isConsolePassword(password)) throw new Error(access.CONSOLE_PASSWORD_HINT);
+    // Order matters, and it is the running server first.
+    //
+    // Polaris authenticates with what the deploy's environment holds. If that were
+    // written before the server had been told, one lost datagram would leave
+    // Polaris speaking a password the server has never heard - and the retry could
+    // not recover it, because the retry would authenticate with the new one too.
+    // Telling the server first is the step that can fail harmlessly: nothing has
+    // changed, and pressing the button again still speaks the password that works.
     await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
         if (cfg === null) throw new Error("The server has not written its config yet. Start it once and try again.");
-        await writeContainerFile(
-            server.container,
-            SERVER_CFG,
-            writeSetting(cfg, RCON_PASSWORD_KEY, password)
-        );
-        // The running server keeps the old one until it is told; `set` is how the
-        // console changes a variable it already holds.
-        await server.rcon(`set rcon_password ${quoteArgument(password)}`).catch(() => undefined);
+        // `set` is how the console changes a variable it already holds. Not
+        // swallowed: a change the server did not take is not a change.
+        await server.rcon(`set rcon_password ${quoteArgument(password)}`);
+        await setEnvVars("application", applicationId, ownerId, [
+            { key: RCON_PASSWORD_VAR, value: password, isSecret: true }
+        ]);
+        // Last, because it is the one that only matters at the next boot.
+        await writeContainerFile(server.container, SERVER_CFG, writeSetting(cfg, RCON_PASSWORD_KEY, password));
     });
-    await setEnvVars("application", applicationId, ownerId, [
-        { key: RCON_PASSWORD_VAR, value: password, isSecret: true }
-    ]);
 }
 
 /**

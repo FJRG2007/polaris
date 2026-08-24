@@ -17,6 +17,10 @@ let sentCommands: string[] = [];
 /** What the next container command answers with. */
 let containerAnswer = { code: 0, output: "" };
 
+/** Set to have the fake server refuse every console command, which is what a
+ *  dropped datagram looks like from here. */
+let consoleRefuses = false;
+
 /** The install's settings blob, as `configOf`/`patchInstallConfig` see it. */
 let config: Record<string, unknown> = {};
 
@@ -28,6 +32,7 @@ vi.mock("@/lib/apps/fivem/transport", () => ({
             running: true,
             document: async () => ({}),
             rcon: async (command: string) => {
+                if (consoleRefuses) throw new Error("The server did not answer in time");
                 sentCommands.push(command);
                 return "";
             },
@@ -42,8 +47,12 @@ vi.mock("@/lib/apps/fivem/transport", () => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findFirst: vi.fn(async () => ({ config: JSON.stringify(config) })),
-            findUnique: vi.fn(async () => ({ config: JSON.stringify(config) })),
+            findFirst: vi.fn(async () => ({
+                config: JSON.stringify(config),
+                catalogId: "fivem",
+                applicationId: "app-1"
+            })),
+            findUnique: vi.fn(async () => ({ config: JSON.stringify(config), sourceConfig: "{}" })),
             update: vi.fn(async () => undefined)
         }
     }
@@ -69,15 +78,25 @@ vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: (raw: string | null | undefined) => (raw ? (JSON.parse(raw) as Record<string, unknown>) : {})
 }));
 
-const { installResourceFromUrl, messageFivemPlayer, removeAllowedPlayer, setFivemAdmin } = await import(
-    "@/lib/apps/fivem/service"
-);
+const { setEnvVars } = await import("@/lib/env-var-service");
+
+const {
+    applyPendingSetup,
+    installResourceFromUrl,
+    messageFivemPlayer,
+    removeAllowedPlayer,
+    setConsolePassword,
+    setFivemAdmin,
+    writeFivemRules
+} = await import("@/lib/apps/fivem/service");
 
 beforeEach(() => {
     ran = [];
     sentCommands = [];
     containerAnswer = { code: 0, output: "" };
+    consoleRefuses = false;
     config = {};
+    vi.mocked(setEnvVars).mockClear();
 });
 
 describe("installing a resource from a link", () => {
@@ -160,5 +179,87 @@ describe("making somebody an admin", () => {
         // change that let something unsafe reach `add_principal` unquoted again
         // would fail loudly instead of only in a container nobody was watching.
         expect(principalCommand).toBe("add_principal identifier.license:abc123 group.admin");
+    });
+});
+
+describe("changing the console password", () => {
+    it("tells the running server before it writes what Polaris will authenticate with", async () => {
+        containerAnswer = { code: 0, output: "rcon_password abc" };
+
+        await setConsolePassword("owner-1", "install-1", "NewPassword123");
+
+        // The order is the whole of the fix: the environment is what Polaris
+        // speaks, so it must never name a password the server has not been told.
+        expect(sentCommands).toEqual(["set rcon_password NewPassword123"]);
+        expect(vi.mocked(setEnvVars)).toHaveBeenCalledTimes(1);
+    });
+
+    it("changes nothing at all when the server did not take it", async () => {
+        // One lost datagram used to leave Polaris speaking a password the server
+        // had never heard, which the retry could not recover either - it would
+        // have authenticated with the new one too. Now the failure is harmless:
+        // nothing moved, and pressing the button again still speaks the password
+        // that works.
+        containerAnswer = { code: 0, output: "rcon_password abc" };
+        consoleRefuses = true;
+
+        await expect(setConsolePassword("owner-1", "install-1", "NewPassword123")).rejects.toThrow();
+
+        expect(vi.mocked(setEnvVars)).not.toHaveBeenCalled();
+        // And the config it would next boot on is untouched.
+        expect(ran.some((argv) => argv.join(" ").includes("base64 -d"))).toBe(false);
+    });
+});
+
+describe("changing the slot count", () => {
+    it("mirrors it onto the install, so a stopped server still says what size it is", async () => {
+        containerAnswer = { code: 0, output: "sv_maxclients 32" };
+
+        await writeFivemRules("owner-1", "install-1", { sv_maxclients: "48" });
+
+        expect(config.slots).toBe(48);
+    });
+
+    it("clears it when the line is taken out, rather than leaving the old number", async () => {
+        config = { slots: 48 };
+        containerAnswer = { code: 0, output: "sv_maxclients 48" };
+
+        await writeFivemRules("owner-1", "install-1", { sv_maxclients: null });
+
+        expect(config.slots).toBe(null);
+    });
+
+    it("leaves it alone when the change was about something else", async () => {
+        config = { slots: 48 };
+        containerAnswer = { code: 0, output: "sv_hostname x" };
+
+        await writeFivemRules("owner-1", "install-1", { sv_hostname: "Los Santos" });
+
+        expect(config.slots).toBe(48);
+    });
+});
+
+describe("handing a new server what it was created with", () => {
+    it("does the work once when the poll and the sweep arrive together", async () => {
+        // Both callers live in this process and the work between reading the
+        // pending key and clearing it ends in a stop and a start of the deploy.
+        // Without a claim, both would restart a server minutes old.
+        config = { fivemPendingSetup: { settings: { sv_hostname: "Los Santos" } } };
+        containerAnswer = { code: 0, output: "sv_hostname x" };
+
+        const [first, second] = await Promise.all([
+            applyPendingSetup("owner-1", "install-1"),
+            applyPendingSetup("owner-1", "install-1")
+        ]);
+
+        expect(first).toBe(second);
+        expect(config.fivemPendingSetup).toBe(null);
+    });
+
+    it("does nothing at all once there is nothing pending, which is every later poll", async () => {
+        config = {};
+
+        expect(await applyPendingSetup("owner-1", "install-1")).toBe(false);
+        expect(ran).toEqual([]);
     });
 });

@@ -18,7 +18,6 @@ import { recordAudit } from "@/lib/audit-service";
 import { isIdentifier } from "@/lib/apps/fivem/players";
 import { isLicenseKey, LICENSE_KEY_HINT } from "@/lib/apps/fivem/config";
 import { MAX_TIMEOUT_MINUTES } from "@/lib/apps/player-timeout";
-import { findSetting, settingError } from "@/lib/apps/fivem/settings";
 import { requireGameServer, requireGameServerOwner } from "@/lib/apps/install-access";
 import { isResourceName, isResourceUrl, resourceNameFromUrl, type FivemResource } from "@/lib/apps/fivem/resources";
 import {
@@ -309,15 +308,12 @@ export async function saveFivemRulesAction(
     const entries = Object.entries(changes);
     if (entries.length === 0) return {};
     if (entries.length > 64) return { error: "That is more settings than this screen has" };
-    for (const [key, value] of entries) {
-        const setting = findSetting(key);
-        if (!setting) return { error: "That is not a setting this server has" };
-        if (value !== null) {
-            const problem = settingError(setting, value);
-            if (problem) return { error: problem };
-        }
-    }
     try {
+        // Before anything is judged about the values: somebody who may not touch
+        // this server should be told that, not told their value is wrong. What a
+        // setting will accept is `writeFivemRules`' own rule and is checked there,
+        // so it is not restated here - two copies of it are two answers waiting to
+        // disagree.
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         await fivem.writeFivemRules(access.ownerId, installedAppId, changes);
         await recordAudit({

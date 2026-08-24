@@ -23,7 +23,7 @@ import Link from "next/link";
 import * as actions from "./fivem-actions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlayersTable, PlayerIconAction } from "@/components/game-players-table";
-import { isResourceUrl, RESOURCE_URL_HINT, type FivemResource } from "@/lib/apps/fivem/resources";
+import { isResourceName, isResourceUrl, RESOURCE_URL_HINT, type FivemResource } from "@/lib/apps/fivem/resources";
 import { AlertTriangle, FolderOpen, Play, Plus, RefreshCw, RotateCw, Square } from "lucide-react";
 import {
     Badge,
@@ -268,6 +268,10 @@ function AddResourceDialog({
     const [error, setError] = useState<string | null>(null);
 
     const linkError = url.trim().length === 0 || isResourceUrl(url) ? null : RESOURCE_URL_HINT;
+    const nameError =
+        name.trim().length === 0 || isResourceName(name.trim())
+            ? null
+            : "Letters, digits, dots, dashes and underscores - it is a folder name.";
 
     useEffect(() => {
         if (named || !isResourceUrl(url)) return;
@@ -325,9 +329,9 @@ function AddResourceDialog({
                             autoComplete="off"
                             spellCheck={false}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            What the server will know it by. A folder of this name is replaced outright if there is
-                            one.
+                        <span className={cn("text-xs", nameError ? "text-danger" : "text-muted-foreground")}>
+                            {nameError ??
+                                "What the server will know it by. A folder of this name is replaced outright if there is one."}
                         </span>
                     </label>
                     {error && <p className="text-sm text-danger">{error}</p>}
@@ -338,7 +342,7 @@ function AddResourceDialog({
                     </Button>
                     <Button
                         onClick={() => void install()}
-                        disabled={pending || !isResourceUrl(url) || name.trim().length === 0}
+                        disabled={pending || !isResourceUrl(url) || !isResourceName(name.trim())}
                     >
                         {pending ? "Fetching..." : "Add"}
                     </Button>
