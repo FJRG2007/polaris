@@ -14,7 +14,7 @@
  * gate whether the Drive feature is usable, not which connections can be read.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import {
     resolvePrincipalPolicyStatements,
     resolvePrincipalPolicyStatementsBySource,
@@ -254,7 +254,7 @@ export async function canAny(userId: string, permission: Permission): Promise<bo
  * Meant for the rare fan-out (an update to announce), not for a request path.
  */
 export async function usersWithPermission(permission: Permission): Promise<string[]> {
-    const users = await prisma.user.findMany({ where: { bannedAt: null }, select: { id: true } });
+    const users = await prisma.user.findMany({ where: { ...VISIBLE_USER }, select: { id: true } });
     const decisions = await Promise.all(
         users.map(async (user) => ((await can(user.id, permission)) ? user.id : null))
     );

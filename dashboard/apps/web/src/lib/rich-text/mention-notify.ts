@@ -12,7 +12,7 @@
  * knows.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import * as access from "@/lib/tasks/access";
 import { notify } from "@/lib/notifications/dispatch";
 import { extractReferences } from "@/components/rich-text/markdown";
@@ -86,7 +86,7 @@ export async function notifyMentions(input: MentionNotice): Promise<void> {
 async function reachable(userIds: readonly string[], spaceId: string | null): Promise<string[]> {
     if (!spaceId) return [];
     const users = await prisma.user.findMany({
-        where: { id: { in: [...userIds] }, bannedAt: null },
+        where: { id: { in: [...userIds] }, ...VISIBLE_USER },
         select: { id: true, isAdmin: true }
     });
     const checked = await Promise.all(

@@ -12,7 +12,7 @@
  * where everybody may know everybody.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { blockedBetween } from "@/lib/blocks";
 import { discoverableBy } from "@/lib/privacy-service";
 import { like } from "@/lib/rich-text/mention-service";
@@ -57,7 +57,7 @@ export async function findPeople(
     const found = await prisma.user.findMany({
         where: {
             id: { not: viewer.id },
-            bannedAt: null,
+            ...VISIBLE_USER,
             OR: [{ name: contains }, { email: contains }, { username: contains }]
         },
         select: { id: true, name: true, username: true },

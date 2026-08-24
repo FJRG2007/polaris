@@ -8,7 +8,7 @@
 
 import { EMAIL_PLATFORM } from "@polaris/core";
 import { loadEnv } from "@polaris/config";
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { capabilitiesFor } from "@polaris/messaging";
 import type {
@@ -341,7 +341,7 @@ export async function listConversations(ownerId: string): Promise<ConversationVi
 /** Workspace users who can be assigned a conversation. */
 export async function listAgents(): Promise<AgentView[]> {
     const rows = await prisma.user.findMany({
-        where: { bannedAt: null },
+        where: { ...VISIBLE_USER },
         select: { id: true, name: true },
         orderBy: { name: "asc" }
     });

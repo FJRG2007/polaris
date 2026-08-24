@@ -30,7 +30,7 @@
  * Server-only.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
 import { channelAccess, type ChatActor } from "./access";
@@ -72,7 +72,7 @@ export async function chatProfile(
 
     const [person, together, blocked, mayReadName] = await Promise.all([
         prisma.user.findFirst({
-            where: { id: userId, bannedAt: null },
+            where: { id: userId, ...VISIBLE_USER },
             select: { id: true, name: true, firstName: true, lastName: true, username: true, description: true }
         }),
         // Asked the same way about them, rather than by looking for a membership

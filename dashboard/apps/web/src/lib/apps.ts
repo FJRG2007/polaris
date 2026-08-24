@@ -957,10 +957,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Reported messages",
-            href: "/admin/reports",
+            label: "Safety",
+            href: "/admin/safety",
             icon: Flag,
-            keywords: ["reports", "moderation", "abuse", "spam", "flagged", "chat"],
+            keywords: [
+                "reports",
+                "moderation",
+                "abuse",
+                "spam",
+                "flagged",
+                "chat",
+                "lockdown",
+                "locked down",
+                "quarantine",
+                "reported user",
+                "reported account"
+            ],
             group: ADMIN_COMMUNICATION_GROUP
         },
         {

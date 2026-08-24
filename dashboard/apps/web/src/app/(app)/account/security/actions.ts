@@ -26,6 +26,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { setConnectionSignIn } from "@/lib/connections/store";
+import { stepUpGranted } from "@/lib/step-up-grant";
 import { revokeOtherSessions, sessionSignInRecord } from "@/lib/session-directory";
 import {
     newDeviceGraceSchema,
@@ -60,6 +61,14 @@ import {
 type ActionResult = { error?: string };
 
 /**
+ * What a screen is told when its two minutes have run out.
+ *
+ * A sentence rather than a code, because it is shown: the dialog reopens on it
+ * and the person types one proof rather than reading about an error.
+ */
+const NEEDS_PROOF = "Confirm it is you again before changing this.";
+
+/**
  * Allow, or stop allowing, one connected account as a way into this Polaris.
  *
  * A way in, so it is gated like the rest of this page: a browser the account has
@@ -71,6 +80,12 @@ export async function setConnectionSignInAction(connectionId: string, enabled: b
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return { error: blocked };
+    // Proved once for this screen and good for two minutes, so a person changing
+    // three of these answers one challenge. See `step-up-grant` for why that is
+    // the stronger gate rather than the softer one.
+    if (!(await stepUpGranted(user.id, user.sessionId, "connected-sign-in"))) {
+        return { error: NEEDS_PROOF };
+    }
 
     const parsed = z.string().uuid().safeParse(connectionId);
     if (!parsed.success) return { error: "That account is no longer connected." };
@@ -93,6 +108,9 @@ export async function setConnectionSignInChallengeAction(challenge: boolean): Pr
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return { error: blocked };
+    if (!(await stepUpGranted(user.id, user.sessionId, "connected-sign-in"))) {
+        return { error: NEEDS_PROOF };
+    }
 
     await setConnectionSignInChallenge(user.id, challenge === true);
     await recordAudit({

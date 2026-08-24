@@ -43,6 +43,7 @@ import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
+import { ReportPersonDialog } from "@/components/report-person-dialog";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import {
     AtSign,
@@ -51,6 +52,7 @@ import {
     MessageSquare,
     Phone,
     PenLine,
+    Flag,
     ShieldBan,
     Timer,
     UserMinus,
@@ -216,6 +218,11 @@ export function MemberMenu({
     // Read once, when the menu is built. A volume is not something that changes
     // under somebody while they are looking at the menu that sets it.
     const [silenced, setSilenced] = useState(() => volumeFor(member.userId) === 0);
+    /** Whether the report dialog is open. Held here rather than in the item, so
+     *  it outlives the menu closing under it - which it does the moment the item
+     *  is pressed. A dialog needs none of the focus care an inline field opened
+     *  from a menu does: it traps focus itself. */
+    const [reporting, setReporting] = useState(false);
 
     /** What this reader may do about them here - see `memberActions`, which is
      *  where the rules live and where they are asserted. */
@@ -401,6 +408,17 @@ export function MemberMenu({
                             <ShieldBan className="size-3.5" />
                             {shut ? "Unblock" : "Block"}
                         </menu.Item>
+                        {/* Beside blocking because it is the other half of the
+                            same moment, and separate from it because they are
+                            different acts: blocking is this reader deciding, and
+                            reporting is asking somebody else to. About the
+                            person rather than one message, which is the question
+                            people actually have about somebody who is fine in
+                            any one message and not over forty of them. */}
+                        <menu.Item disabled={working} onSelect={() => setReporting(true)}>
+                            <Flag className="size-3.5" />
+                            Report this person
+                        </menu.Item>
                     </>
                 )}
 
@@ -510,6 +528,15 @@ export function MemberMenu({
                     </>
                 )}
             </menu.Content>
+            {/* Inside Root rather than around it: a fragment wrapping the return
+                would re-indent everything above for a change that is not about
+                any of it. Radix is content with a sibling here, and the dialog
+                portals out of the menu either way. */}
+            <ReportPersonDialog
+                open={reporting}
+                person={{ id: member.userId, name: member.name }}
+                onOpenChange={setReporting}
+            />
         </menu.Root>
     );
 }

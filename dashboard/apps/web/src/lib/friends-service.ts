@@ -13,7 +13,7 @@
  * wearing one name.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { blockedEitherWay } from "@/lib/blocks";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
@@ -242,7 +242,7 @@ export async function requestFriendByUsername(userId: string, username: string):
     if (!handle) return;
 
     const other = await prisma.user.findFirst({
-        where: { username: handle, bannedAt: null },
+        where: { username: handle, ...VISIBLE_USER },
         select: { id: true }
     });
     // Nothing to say and nothing to do. Deliberately indistinguishable from the

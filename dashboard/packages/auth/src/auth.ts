@@ -870,6 +870,21 @@ export async function refuseProtectedEndpoint(auth: Auth, request: Request): Pro
     const session = await auth.api.getSession({ headers: request.headers }).catch(() => null);
     if (!session) return null;
 
+    // An account its owner has shut down changes nothing, by any door. Checked
+    // here as well as in the server actions because these endpoints are the
+    // browser's to call directly, and a lockdown that only held on one of the two
+    // would hold on neither.
+    const security = await prisma.userSecurity.findUnique({
+        where: { userId: session.user.id },
+        select: { lockdownAt: true }
+    });
+    if (security?.lockdownAt) {
+        return refused(
+            "Your account is locked down. Lift it under Security before changing anything else.",
+            "ACCOUNT_LOCKED_DOWN"
+        );
+    }
+
     const standing = await sessionDeviceStanding(session.user.id, session.session.id);
     if (!standing.settled) {
         return refused(newDeviceWaitMessage(standing), "NEW_DEVICE_WAITING");

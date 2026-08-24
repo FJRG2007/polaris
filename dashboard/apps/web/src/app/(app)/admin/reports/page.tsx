@@ -1,44 +1,21 @@
 /**
- * Reported messages (/admin/reports).
+ * Where reported messages used to live.
  *
- * The one place an instance answers for what is said inside it. Reporting is
- * open to anybody who can see a message; answering for it is the instance's, and
- * that is the only check here.
+ * They are on the safety queue now, beside the reports about people and the
+ * accounts that have shut themselves down - one screen, because "what needs
+ * looking at" is one question. The address stays and forwards, because it is in
+ * bookmarks and in old alerts, and a link from a notification about something
+ * urgent must not land on a 404.
+ *
+ * Temporary on purpose: nothing here is permanently redirected, so the day this
+ * moves again nobody is fighting a cached 308 in every browser that ever opened
+ * it.
  */
 
-import { PageHeader } from "@polaris/ui";
-import { requireAdmin } from "@/lib/session";
-import { ReportsView } from "./reports-view";
-import { listReports } from "@/lib/chat/reports";
-import { CHAT_REPORT_STATUSES } from "@polaris/core";
-import type { ChatReportStatus } from "@polaris/core";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-/** The filter as a value the service takes, from a string in an address bar. */
-function statusFrom(raw: string | undefined): ChatReportStatus | "all" {
-    if (raw === "all") return "all";
-    return (CHAT_REPORT_STATUSES as readonly string[]).includes(raw ?? "")
-        ? (raw as ChatReportStatus)
-        : "open";
-}
-
-export default async function ReportsPage({
-    searchParams
-}: {
-    searchParams: Promise<{ status?: string }>;
-}) {
-    await requireAdmin();
-    const status = statusFrom((await searchParams).status);
-    const reports = await listReports(status);
-
-    return (
-        <>
-            <PageHeader
-                title="Reported messages"
-                description="What people in this instance have said is wrong with something. Removing a message here follows the same rules a moderator inside the conversation would."
-            />
-            <ReportsView reports={reports} status={status} />
-        </>
-    );
+export default function ReportsPage(): never {
+    redirect("/admin/safety");
 }

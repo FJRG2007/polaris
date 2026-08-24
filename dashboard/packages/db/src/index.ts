@@ -19,3 +19,18 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export * from "../generated/client/index.js";
+
+/**
+ * The accounts that exist as far as everybody else is concerned.
+ *
+ * Two ways an account stops being one, and every screen that lists, searches,
+ * mentions or opens a person has to hide both: the instance suspended it, or its
+ * owner switched it off. They were one condition spelled out in eight places,
+ * which is eight places to forget the second one - and forgetting it is a
+ * disabled account still turning up in a search, which is precisely what
+ * disabling is for.
+ *
+ * Deliberately not applied on the sign-in path. A disabled account signing in is
+ * how it comes back, so the challenge that resolves it must still find it.
+ */
+export const VISIBLE_USER = { bannedAt: null, disabledAt: null } as const;

@@ -59,6 +59,10 @@ function findUsers({ where }: { where: Record<string, unknown> }) {
 }
 
 vi.mock("@polaris/db", () => ({
+    // The filter every screen hides a suspended or switched-off account with.
+    // A constant rather than a stub: it is the real value, and a test that
+    // invented its own would be checking a different rule than the code runs.
+    VISIBLE_USER: { bannedAt: null, disabledAt: null },
     prisma: {
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },

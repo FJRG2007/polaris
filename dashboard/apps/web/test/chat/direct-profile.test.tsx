@@ -60,6 +60,9 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
     blockPersonAction: async () => ({}),
     unblockPersonAction: async () => ({})
 }));
+vi.mock("@/app/(app)/account/report-actions", () => ({
+    reportPersonAction: async () => ({})
+}));
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined })

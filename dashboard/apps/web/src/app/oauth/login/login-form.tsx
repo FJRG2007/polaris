@@ -32,7 +32,12 @@ const SESSION_NOTICES: Readonly<Record<string, string>> = {
     // took the cookie. It says what happened and nothing about the account, and
     // the owner has the full account of it waiting on the other side.
     compromised:
-        "That session was tied to another device or network and has been ended. The account owner has been told."
+        "That session was tied to another device or network and has been ended. The account owner has been told.",
+    // Said plainly, because whoever is reading it is either the owner - who
+    // pressed this themselves and needs to know it worked - or somebody holding
+    // their password, who learns only that it did not.
+    lockdown:
+        "That account is locked down. New sign-ins are refused until its owner lifts it from a device already signed in."
 };
 
 /**

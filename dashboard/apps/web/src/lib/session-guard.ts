@@ -22,6 +22,7 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { sessionClient } from "@/lib/session-device";
+import { restoreAccount } from "@/lib/account-lifecycle";
 import { notifySessionCompromised } from "@/lib/notifications/session-breach";
 import {
     bindingBreach,
@@ -184,6 +185,10 @@ export async function guardSession({
             where: { id: userId },
             select: {
                 bannedAt: true,
+                // The owner's own two, which behave nothing like a ban: a new
+                // session is what undoes them rather than what they refuse.
+                disabledAt: true,
+                deletionRequestedAt: true,
                 // The other way a sign-in proves itself. The approval gate stands
                 // in for a second factor rather than stacking on top of one.
                 twoFactorEnabled: true,
@@ -193,7 +198,8 @@ export async function guardSession({
                         sessionMaxMinutes: true,
                         requireLoginApproval: true,
                         bindSessionsToClient: true,
-                        pinSessionsToAddress: true
+                        pinSessionsToAddress: true,
+                        lockdownAt: true
                     }
                 }
             }
@@ -209,6 +215,34 @@ export async function guardSession({
 
     const settings = record.security;
     const now = Date.now();
+
+    // 0. What the owner did to their own account, which is decided before
+    //    anything about this session because it decides whether there is an
+    //    account to have one on.
+    //
+    //    A session that already exists is one from before any of this and is left
+    //    alone; `state` being absent is what says this is a new one, which is the
+    //    only kind either half of this concerns.
+    if (!state) {
+        // Switched off, or waiting to be deleted: signing in is how it comes
+        // back, and it is deliberately the only thing anybody has to do.
+        if (record.disabledAt || record.deletionRequestedAt) {
+            await restoreAccount(userId);
+        }
+        // Locked down: no new session, whatever the password was. The ones
+        // already open keep working, which is the point - the owner has to be
+        // able to reach the screen that lifts it.
+        else if (settings?.lockdownAt) {
+            await revokeSession(sessionId);
+            await recordAudit({
+                actorId: userId,
+                action: "account.lockdown.refused-signin",
+                targetType: "session",
+                targetId: sessionId
+            });
+            return { ok: false, redirect: "/oauth/login?lockdown=1" };
+        }
+    }
 
     // 1. Absolute lifetime. A session past its ceiling is over, not locked:
     //    the user signs in again with their password.

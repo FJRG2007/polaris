@@ -16,7 +16,7 @@
 
 import { request as httpsRequest } from "node:https";
 import type { TLSSocket } from "node:tls";
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import type { ServerEnvironment } from "@polaris/core";
 import { getHostLanIp } from "./host-address";
 import { notify } from "./notifications/dispatch";
@@ -419,7 +419,7 @@ export async function reportRouterAdvice(
  *  one user's, and whoever opens the dashboard first should see it. */
 async function notifyAdmins(advice: RouterAdvice): Promise<void> {
     const admins = await prisma.user
-        .findMany({ where: { isAdmin: true, bannedAt: null }, select: { id: true } })
+        .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
         .catch(() => []);
     const body = advice.steps.length > 0 ? `${advice.detail}\n\n${advice.steps.join("\n")}` : advice.detail;
     await Promise.all(

@@ -27,7 +27,9 @@ import { TwoFactorMethodsCard } from "./two-factor-methods-card";
 import { SuccessorCard, type SuccessorPerson } from "./successor-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
+import { LockdownCard } from "./lockdown-card";
 import { SessionBindingCard } from "./session-binding-card";
+import type { AccountStanding } from "@/lib/account-lifecycle";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
@@ -68,6 +70,7 @@ export function SecurityView({
     idleLockMinutes,
     bindSessionsToClient,
     pinSessionsToAddress,
+    standing,
     sessionMaxMinutes,
     requireLoginApproval,
     emailLinkSignIn,
@@ -98,6 +101,8 @@ export function SecurityView({
      *  in, and which devices are also tied to their address. */
     bindSessionsToClient: boolean;
     pinSessionsToAddress: AddressPinScope;
+    /** Whether the account is shut down, switched off, or on its way out. */
+    standing: AccountStanding;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
     /** Whether a link emailed to this account signs it in. Off unless asked for. */
@@ -382,6 +387,9 @@ export function SecurityView({
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
             <SuccessorCard successor={successor} lock={lock} />
+            {/* Last, because it is the end of the page: the emergency switch and
+                the two ways out, with nothing under them. */}
+            <LockdownCard standing={standing} lock={lock} />
 
             <ChangePasswordDialog open={dialog === "password"} onOpenChange={(open) => !open && close()} />
             <RecoverPasswordDialog

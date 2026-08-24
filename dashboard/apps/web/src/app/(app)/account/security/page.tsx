@@ -21,6 +21,7 @@ import { getSuccessor } from "@/lib/successor-service";
 import { currentDeviceStanding } from "@/lib/device-grace";
 import { listUserSessions } from "@/lib/session-directory";
 import { getInstanceSecurity } from "@/lib/instance-security";
+import { accountLifecycle } from "@/lib/account-lifecycle";
 import type { ConnectedSignIn } from "./connected-sign-in-card";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { CONNECTION_PROVIDERS, findConnectionProvider } from "@polaris/core";
@@ -81,7 +82,8 @@ export default async function SecurityPage() {
         connections,
         instancePolicy,
         successor,
-        mail
+        mail,
+        lifecycle
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -105,7 +107,10 @@ export default async function SecurityPage() {
         getSuccessor(user.id),
         // Only for the emailed-link switch: with no channel to send from there is
         // nowhere for the link to go, and the switch says so instead of turning on.
-        getAuthMailStatus()
+        getAuthMailStatus(),
+        // What the account is doing to itself: locked down, switched off, or on
+        // its way out.
+        accountLifecycle(user.id)
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
@@ -125,6 +130,7 @@ export default async function SecurityPage() {
                 idleLockMinutes={settings.idleLockMinutes}
                 bindSessionsToClient={settings.bindSessionsToClient}
                 pinSessionsToAddress={settings.pinSessionsToAddress}
+                standing={lifecycle}
                 sessionMaxMinutes={settings.sessionMaxMinutes}
                 requireLoginApproval={settings.requireLoginApproval}
                 emailLinkSignIn={settings.emailLinkSignIn}

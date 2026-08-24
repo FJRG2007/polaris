@@ -224,6 +224,18 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "admin.safety.case",
+        group: "system",
+        label: "Something needs an administrator",
+        description:
+            "An account locked itself down, or somebody reported a person. Only reaches administrators.",
+        // An account shutting itself down means its owner believes somebody else
+        // is in it. Whatever else an administrator has muted, they hear this.
+        level: "warning",
+        critical: true,
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.friend",
         group: "people",
         // One entry for both halves of the same exchange: being asked, and

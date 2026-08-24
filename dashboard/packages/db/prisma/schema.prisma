@@ -125,6 +125,23 @@ model User {
     // When set, the account is banned: sign-in is refused and sessions are void.
     bannedAt      DateTime?
     banReason     String?
+    // The owner switched their own account off.
+    //
+    // Deliberately its own column rather than a reason on `bannedAt`, because the
+    // two must behave differently in the one place it matters: signing in
+    // restores this and must never lift a suspension the instance imposed. An
+    // account can hold both, and then signing in clears only this one and the
+    // person is told they are still suspended.
+    //
+    // Everything that hides a banned account hides one of these too, through the
+    // one filter both are named in - see `VISIBLE_USER` in @polaris/db.
+    disabledAt    DateTime?
+    // The owner asked for the account to be deleted, and this is when they asked.
+    // Nothing is removed until the wait is up; signing in before then calls it
+    // off, which is the whole design - the account somebody deletes in anger on a
+    // Friday is the account they want back on Monday, and the only credential
+    // needed to get it back is the one they already have.
+    deletionRequestedAt DateTime?
     // When a ban ends, for one that was meant to. Null is a ban with no end.
     //
     // Nothing reads this to decide whether somebody is banned - `bannedAt` alone
@@ -228,6 +245,10 @@ model User {
     chatReportsMade     ChatReport[]         @relation("ChatReportsMade")
     chatScheduled       ChatScheduledMessage[]
     chatReportsHandled  ChatReport[]         @relation("ChatReportsHandled")
+    safetyCasesAbout    SafetyCase[]         @relation("SafetyCasesAbout")
+    safetyCasesMade     SafetyCase[]         @relation("SafetyCasesMade")
+    safetyCasesHandled  SafetyCase[]         @relation("SafetyCasesHandled")
+    stepUpGrants        StepUpGrant[]
     searches            SearchHistory[]
     backupDestinations  BackupDestination[]
     backupPlans         BackupPlan[]
@@ -801,6 +822,23 @@ model UserSecurity {
     // else's, and short enough that a walked-away-from screen does not carry it.
     reauthUntil          DateTime?
     reauthSessionId      String?   @db.Uuid
+    // The account is shut down to everything that could change how it is
+    // protected, by its owner, because they think somebody else is in it.
+    //
+    // What it stops: every security setting, every new way in, and every new
+    // session. What it deliberately does not stop is the sessions already open -
+    // an owner who locks themselves out of the screen they need is an owner who
+    // cannot lift it again, and the whole point is that they keep the account
+    // while somebody sorts it out.
+    //
+    // Lifting it costs the account's strongest proof, the same one every other
+    // irreversible act asks for. An administrator is told the moment it goes on:
+    // it is the one setting whose meaning is "something has gone wrong here".
+    lockdownAt   DateTime?
+    // What they said was happening, in their own words, for whoever reads the
+    // case. Optional: making somebody write an essay while they are frightened is
+    // how the switch does not get pressed.
+    lockdownNote String?
     // Whether a session stops working when it turns up in a different browser or
     // on a different operating system than the one it was opened in.
     //
@@ -6289,6 +6327,78 @@ model ChatReport {
     @@unique([messageId, reporterId])
     @@index([status, createdAt])
     @@index([channelId])
+}
+
+// Something about an account that an administrator has to look at.
+//
+// The other half of the moderation queue. `ChatReport` is about a thing that was
+// said; this is about a person, and about an account saying something is wrong
+// with itself - which is what a lockdown is. Both end up on the same screen,
+// because "what needs looking at" is one question and an instance that answers it
+// in two places answers it in neither.
+//
+// Deliberately not folded into ChatReport. That row is anchored to a message and
+// carries what the message said; forcing a person or a lockdown through it would
+// mean a table of mostly-null message columns and a status that means different
+// things per row.
+model SafetyCase {
+    id        String @id @default(uuid(7)) @db.Uuid
+    // lockdown - an account shut itself down and wants somebody to look;
+    // user - somebody reported a person rather than one of their messages.
+    kind      String
+    // Whose account it is about. Both kinds have one; for a lockdown it is also
+    // who raised it.
+    subjectId String @db.Uuid
+    // Who reported it, or null for a lockdown, which the account raised itself.
+    reporterId String? @db.Uuid
+    // From core's list for a user report; the fixed "lockdown" for the other.
+    reason    String
+    note      String @default("")
+    // open | resolved | dismissed. No middle state, for the reason ChatReport has
+    // none: a queue with one is a queue with rows nobody owns.
+    status    String @default("open")
+    handledById String?   @db.Uuid
+    handledAt   DateTime?
+    // What an administrator wrote when they settled it, which is the record of
+    // why - and, for a lockdown, what the owner is told when it is lifted.
+    outcome     String    @default("")
+    createdAt   DateTime  @default(now())
+
+    subject   User  @relation("SafetyCasesAbout", fields: [subjectId], references: [id], onDelete: Cascade)
+    reporter  User? @relation("SafetyCasesMade", fields: [reporterId], references: [id], onDelete: SetNull)
+    handledBy User? @relation("SafetyCasesHandled", fields: [handledById], references: [id], onDelete: SetNull)
+
+    @@index([status, createdAt])
+    @@index([subjectId])
+    // One open lockdown case per account: pressing the switch twice is the same
+    // emergency, and a queue with four rows for one person is a queue nobody can
+    // read. Enforced in the service rather than here, because "open" is a value
+    // and a partial unique index is not portable across the two engines.
+}
+
+// A proof this session gave a moment ago, so a screen that asks for one does not
+// ask again for every switch on it.
+//
+// The window is short and the row is scoped to one session and one purpose. Both
+// halves matter: a proof given on a laptop is not a proof given on a phone, and a
+// proof given to add a passkey is not permission to change how sign-in works.
+//
+// Rows are consumed by time rather than by use, so a person flipping four
+// switches answers once. Anything past its moment is ignored and swept.
+model StepUpGrant {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    sessionId String   @db.Uuid
+    // What it was proved for. Never a wildcard: one grant, one screen.
+    purpose   String
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([sessionId, purpose])
+    @@index([userId])
+    @@index([expiresAt])
 }
 
 // A file that was on the message when somebody reported it.

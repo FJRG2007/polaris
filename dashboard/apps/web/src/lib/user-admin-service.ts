@@ -13,7 +13,7 @@
  * no reachable administrator is only recoverable from the database.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, VISIBLE_USER } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
@@ -153,7 +153,9 @@ export async function listImposableGroups(adminId: string): Promise<AccessGroupV
 async function wouldStrandInstance(userId: string): Promise<boolean> {
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
     if (!target?.isAdmin) return false;
-    const others = await prisma.user.count({ where: { isAdmin: true, bannedAt: null, id: { not: userId } } });
+    const others = await prisma.user.count({
+        where: { isAdmin: true, ...VISIBLE_USER, id: { not: userId } }
+    });
     return others === 0;
 }
 

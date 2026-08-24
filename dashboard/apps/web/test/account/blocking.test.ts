@@ -83,6 +83,10 @@ vi.mock("@/lib/privacy-service", () => ({
 }));
 
 vi.mock("@polaris/db", () => ({
+    // The filter every screen hides a suspended or switched-off account with.
+    // A constant rather than a stub: it is the real value, and a test that
+    // invented its own would be checking a different rule than the code runs.
+    VISIBLE_USER: { bannedAt: null, disabledAt: null },
     prisma: {
         user: {
             findUnique: async ({ where }: { where: { id: string } }) =>
