@@ -57,9 +57,8 @@ vi.stubGlobal("fetch", async (input: string | URL, init?: RequestInit) => {
     } as Response;
 });
 
-const { discordAuthorizeUrl, exchangeDiscordCode, getDiscordOAuthClient, identifyDiscordAccount } = await import(
-    "@/lib/connections/discord"
-);
+const { discordAuthorizeUrl, exchangeDiscordCode, getDiscordOAuthClient, identifyDiscordAccount } =
+    await import("@/lib/connections/discord");
 const { connectionSignInAllowed } = await import("@/lib/connections/store");
 const { findConnectionProvider } = await import("@polaris/core");
 
@@ -136,7 +135,13 @@ describe("where somebody is sent to authorize", () => {
 
 describe("reading back who authorized", () => {
     it("takes the display name a migrated account shows", async () => {
-        authorizes({ id: "1234", username: "ana", global_name: "Ana R", discriminator: "0", avatar: null });
+        authorizes({
+            id: "1234",
+            username: "ana",
+            global_name: "Ana R",
+            discriminator: "0",
+            avatar: null
+        });
         expect(await exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).toMatchObject({
             accountId: "1234",
             label: "Ana R"
@@ -192,7 +197,9 @@ describe("reading back who authorized", () => {
 
     it("reports the account and nothing else when the trip was a sign-in", async () => {
         authorizes({ id: "1234", username: "ana", global_name: "Ana R", avatar: "abc123" });
-        expect(await identifyDiscordAccount(CLIENT, "code-1", REDIRECT)).toEqual({ accountId: "1234" });
+        expect(await identifyDiscordAccount(CLIENT, "code-1", REDIRECT)).toEqual({
+            accountId: "1234"
+        });
     });
 });
 
@@ -202,7 +209,10 @@ describe("when Discord refuses", () => {
             {
                 ok: false,
                 status: 401,
-                body: { error: "invalid_client", error_description: "Invalid client_id or client_secret" }
+                body: {
+                    error: "invalid_client",
+                    error_description: "Invalid client_id or client_secret"
+                }
             }
         ];
         await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(
@@ -215,7 +225,9 @@ describe("when Discord refuses", () => {
             { ok: true, body: { access_token: "token-1" } },
             { ok: false, status: 401, body: { message: "401: Unauthorized" } }
         ];
-        await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(/which account authorized/);
+        await expect(exchangeDiscordCode(CLIENT, "code-1", REDIRECT)).rejects.toThrow(
+            /which account authorized/
+        );
     });
 });
 

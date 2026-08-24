@@ -16,8 +16,22 @@ import { CopyButton } from "@/components/copy-button";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import { useState, useTransition, type ComponentType } from "react";
 import type { ConnectionFailure } from "@/lib/connections/attention";
-import { isTunnelToken, tunnelTokenHint, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
-import { CheckCircle2, Circle, Download, ExternalLink, Loader2, RefreshCw, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+    isTunnelToken,
+    tunnelTokenHint,
+    type TunnelProviderSlug
+} from "@/lib/integrations/tunnel-token";
+import {
+    CheckCircle2,
+    Circle,
+    Download,
+    ExternalLink,
+    Loader2,
+    RefreshCw,
+    ShieldAlert,
+    ShieldCheck,
+    TriangleAlert
+} from "lucide-react";
 import {
     CLOUDFLARE_TOKEN_LINKS,
     CLOUDFLARE_TOKEN_PERMISSIONS,
@@ -182,10 +196,16 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <h2 className="truncate text-sm font-medium">{card.name}</h2>
-                                        {mixed ? <Badge variant="neutral">{card.category}</Badge> : null}
+                                        <h2 className="truncate text-sm font-medium">
+                                            {card.name}
+                                        </h2>
+                                        {mixed ? (
+                                            <Badge variant="neutral">{card.category}</Badge>
+                                        ) : null}
                                     </div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">{card.summary}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {card.summary}
+                                    </p>
                                 </div>
                                 {/* A service that refused the last person to try it is
                                     the one thing on this grid worth reading before
@@ -208,7 +228,11 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
                                     Docs
                                     <ExternalLink className="size-3" />
                                 </a>
-                                <Button size="sm" variant="secondary" onClick={() => setConfiguring(card)}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setConfiguring(card)}
+                                >
                                     {card.hasSecret ? "Configure" : "Set up"}
                                 </Button>
                             </div>
@@ -244,7 +268,8 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
         return (
             <p className="flex items-start gap-2 rounded-md border border-border p-3 text-xs text-muted-foreground">
                 <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
-                An account has been connected through this application, so everybody here is offered it.
+                An account has been connected through this application, so everybody here is offered
+                it.
             </p>
         );
     }
@@ -255,9 +280,9 @@ function ProvenState({ slug, name, proven }: { slug: string; name: string; prove
                 <span>
                     <span className="font-medium">Not proven yet</span>
                     <span className="block text-xs text-muted-foreground">
-                        Nobody else can connect {name} or sign in with it until one authorization has gone through
-                        here. Connect your own account to check it - whatever {name} refuses, you are the one who can
-                        change it.
+                        Nobody else can connect {name} or sign in with it until one authorization
+                        has gone through here. Connect your own account to check it - whatever{" "}
+                        {name} refuses, you are the one who can change it.
                     </span>
                 </span>
             </span>
@@ -295,7 +320,10 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
         if (parsed === saved) return;
         setError(null);
         startTransition(async () => {
-            const result = await runAction(() => integrationActions.saveConnectionLimitAction(slug, parsed), setError);
+            const result = await runAction(
+                () => integrationActions.saveConnectionLimitAction(slug, parsed),
+                setError
+            );
             if (!result) return;
             if (result.error) {
                 setError(result.error);
@@ -320,8 +348,8 @@ function AccountLimitField({ slug, current }: { slug: string; current: number })
                 onBlur={commit}
             />
             <span className="text-xs text-muted-foreground">
-                How many of these accounts one person may connect. Zero turns connecting off; lowering it never
-                disconnects anybody already over the limit.
+                How many of these accounts one person may connect. Zero turns connecting off;
+                lowering it never disconnects anybody already over the limit.
             </span>
             {error ? <span className="text-xs text-danger">{error}</span> : null}
         </label>
@@ -353,7 +381,9 @@ const SETUP_VALUE_LABEL: Record<IntegrationSetupValue, string> = {
 function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: string }) {
     return (
         <div className="flex items-center gap-2 rounded border border-border bg-field px-2 py-1">
-            <span className="shrink-0 text-xs text-muted-foreground">{SETUP_VALUE_LABEL[kind]}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+                {SETUP_VALUE_LABEL[kind]}
+            </span>
             <code className="min-w-0 flex-1 truncate text-xs" title={value}>
                 {value}
             </code>
@@ -367,7 +397,10 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
                     Download
                 </a>
             ) : (
-                <CopyButton value={value} label={`Copy the ${SETUP_VALUE_LABEL[kind].toLowerCase()}`} />
+                <CopyButton
+                    value={value}
+                    label={`Copy the ${SETUP_VALUE_LABEL[kind].toLowerCase()}`}
+                />
             )}
         </div>
     );
@@ -407,16 +440,25 @@ function SetupSteps({
                             {step.label}
                             <ExternalLink className="size-3 shrink-0" />
                         </a>
-                        {step.help ? <span className="text-xs text-muted-foreground">{step.help}</span> : null}
+                        {step.help ? (
+                            <span className="text-xs text-muted-foreground">{step.help}</span>
+                        ) : null}
                         {step.values
                             ?.map((kind) => ({ kind, value: values?.[kind] }))
                             // A value this deployment does not know is left out rather
                             // than shown empty: an operator pasting a blank field in
                             // is worse off than one who was never offered it.
-                            .filter((entry): entry is { kind: IntegrationSetupValue; value: string } =>
-                                Boolean(entry.value)
+                            .filter(
+                                (entry): entry is { kind: IntegrationSetupValue; value: string } =>
+                                    Boolean(entry.value)
                             )
-                            .map((entry) => <SetupValue key={entry.kind} kind={entry.kind} value={entry.value} />)}
+                            .map((entry) => (
+                                <SetupValue
+                                    key={entry.kind}
+                                    kind={entry.kind}
+                                    value={entry.value}
+                                />
+                            ))}
                     </div>
                 </li>
             ))}
@@ -437,7 +479,9 @@ function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: 
         <div className="flex gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">Somebody could not connect their account</span>
+                <span className="text-sm font-medium">
+                    Somebody could not connect their account
+                </span>
                 <span className="text-muted-foreground">
                     The last attempt was refused. {name} said: {failure.reason}
                 </span>
@@ -477,7 +521,10 @@ function SignInSwitch({
         setValue(next);
         setError(null);
         startTransition(async () => {
-            const result = await runAction(() => integrationActions.saveConnectionSignInAction(slug, next), setError);
+            const result = await runAction(
+                () => integrationActions.saveConnectionSignInAction(slug, next),
+                setError
+            );
             if (!result || result.error) {
                 setValue(!next);
                 if (result?.error) setError(result.error);
@@ -491,8 +538,9 @@ function SignInSwitch({
                 <span>
                     <span className="font-medium">Allow signing in with {name}</span>
                     <span className="block text-xs text-muted-foreground">
-                        People who have connected a {name} account get a sign-in button for it. It never creates an
-                        account: only someone who already has one, and connected it themselves, can use it.
+                        People who have connected a {name} account get a sign-in button for it. It
+                        never creates an account: only someone who already has one, and connected it
+                        themselves, can use it.
                     </span>
                 </span>
                 <Switch
@@ -522,7 +570,15 @@ function SignInSwitch({
  * costs nothing but a confirmation link - the address is held for its owner
  * either way, which is the part that stops anybody else being given it.
  */
-function EmailTrustSwitch({ slug, name, trusted }: { slug: string; name: string; trusted: boolean }) {
+function EmailTrustSwitch({
+    slug,
+    name,
+    trusted
+}: {
+    slug: string;
+    name: string;
+    trusted: boolean;
+}) {
     const [value, setValue] = useState(trusted);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -546,10 +602,13 @@ function EmailTrustSwitch({ slug, name, trusted }: { slug: string; name: string;
         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
             <div className="flex items-start justify-between gap-3">
                 <span>
-                    <span className="font-medium">Take {name}&apos;s word for an email address</span>
+                    <span className="font-medium">
+                        Take {name}&apos;s word for an email address
+                    </span>
                     <span className="block text-xs text-muted-foreground">
-                        An address on a connected {name} account is added to that person&apos;s Polaris account
-                        already confirmed, instead of them being sent a link to confirm it.
+                        An address on a connected {name} account is added to that person&apos;s
+                        Polaris account already confirmed, instead of them being sent a link to
+                        confirm it.
                     </span>
                 </span>
                 <Switch
@@ -560,9 +619,10 @@ function EmailTrustSwitch({ slug, name, trusted }: { slug: string; name: string;
                 />
             </div>
             <p className="flex items-start gap-2 text-xs text-muted-foreground">
-                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
-                A confirmed address is where a password reset and a sign-in code are sent. With this off the
-                address is still held for whoever connected it, so nobody else can be given an account under it.
+                <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />A confirmed address
+                is where a password reset and a sign-in code are sent. With this off the address is
+                still held for whoever connected it, so nobody else can be given an account under
+                it.
             </p>
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>
@@ -578,7 +638,15 @@ function EmailTrustSwitch({ slug, name, trusted }: { slug: string; name: string;
  * service has that half to decide - a provider that vouches for no address gets
  * no switch about addresses.
  */
-function ConnectionPolicy({ card, slug, name }: { card: IntegrationCard; slug: string; name: string }) {
+function ConnectionPolicy({
+    card,
+    slug,
+    name
+}: {
+    card: IntegrationCard;
+    slug: string;
+    name: string;
+}) {
     return (
         <>
             {card.signInAllowed === undefined ? null : (
@@ -655,9 +723,15 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             autoComplete="off"
                             value={apiKey}
                             onChange={(event) => setApiKey(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new key to replace it"
+                                    : "Paste your key"
+                            }
                         />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                     </label>
 
                     <div className="flex flex-col gap-1.5">
@@ -680,8 +754,9 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             ))}
                         </div>
                         <span className="text-xs text-muted-foreground">
-                            Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the background and the
-                            answer is cached as an ordinary ban, so nothing here slows a request down.
+                            Hosting and VPN cover a lot of ordinary traffic. Lookups happen in the
+                            background and the answer is cached as an ordinary ban, so nothing here
+                            slows a request down.
                         </span>
                     </div>
 
@@ -690,7 +765,11 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                             <ShieldCheck className="size-4 text-primary" />
                             Enable {card.name}
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Enable ${card.name}`} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={`Enable ${card.name}`}
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -779,7 +858,9 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
                             placeholder={
-                                card.hasSecret ? "Saved - enter a new one to replace it" : "Optional"
+                                card.hasSecret
+                                    ? "Saved - enter a new one to replace it"
+                                    : "Optional"
                             }
                         />
                         <span className="text-xs text-muted-foreground">
@@ -797,7 +878,11 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                                 Anyone whose browser cannot load it gets the free one.
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Use it in calls" />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label="Use it in calls"
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -864,7 +949,9 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             value={apiKey}
                             onChange={(event) => setApiKey(event.target.value)}
                             placeholder={
-                                card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"
+                                card.hasSecret
+                                    ? "Saved - enter a new key to replace it"
+                                    : "Paste your key"
                             }
                         />
                         {card.apiKeyHelp ? (
@@ -881,7 +968,11 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                                 announced to anyone.
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Search for GIFs and stickers" />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label="Search for GIFs and stickers"
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -921,7 +1012,12 @@ function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.saveModelProviderAction({ slug: card.slug, enabled, apiKey }),
+                () =>
+                    integrationActions.saveModelProviderAction({
+                        slug: card.slug,
+                        enabled,
+                        apiKey
+                    }),
                 setError
             );
             if (!result) return;
@@ -933,7 +1029,10 @@ function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose
     function onDisconnect() {
         setError(null);
         startRemove(async () => {
-            const result = await runAction(() => integrationActions.disconnectModelProviderAction(card.slug), setError);
+            const result = await runAction(
+                () => integrationActions.disconnectModelProviderAction(card.slug),
+                setError
+            );
             if (!result) return;
             if (result.error) setError(result.error);
             else onClose();
@@ -961,20 +1060,31 @@ function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose
                             autoComplete="off"
                             value={apiKey}
                             onChange={(event) => setApiKey(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new key to replace it"
+                                    : "Paste your key"
+                            }
                         />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                     </label>
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
                             <span className="font-medium">Let agents use it</span>
                             <span className="block text-xs text-muted-foreground">
-                                Runs are handed this key over an authenticated call. It is never written into a
-                                repository, so rotating it here takes effect everywhere at once.
+                                Runs are handed this key over an authenticated call. It is never
+                                written into a repository, so rotating it here takes effect
+                                everywhere at once.
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Let agents use ${card.name}`} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={`Let agents use ${card.name}`}
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -988,7 +1098,11 @@ function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose
                                 onClick={onDisconnect}
                                 disabled={saving || removing}
                             >
-                                {removing ? <Loader2 className="size-4 animate-spin" /> : "Forget key"}
+                                {removing ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    "Forget key"
+                                )}
                             </Button>
                         ) : null}
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -1066,8 +1180,8 @@ function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             spellCheck={false}
                         />
                         <span className="text-xs text-muted-foreground">
-                            Reachable from wherever runs happen. A loopback address works for runs on this server and
-                            not for runs on GitHub-hosted machines.
+                            Reachable from wherever runs happen. A loopback address works for runs
+                            on this server and not for runs on GitHub-hosted machines.
                         </span>
                     </label>
 
@@ -1107,8 +1221,8 @@ function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                         </label>
                     </div>
                     <span className="-mt-2 text-xs text-muted-foreground">
-                        Both in tokens, from whatever the endpoint serves. Left unset, a run answers in 32000-token
-                        slices and never compacts.
+                        Both in tokens, from whatever the endpoint serves. Left unset, a run answers
+                        in 32000-token slices and never compacts.
                     </span>
 
                     <label className="flex flex-col gap-1 text-sm">
@@ -1118,14 +1232,24 @@ function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             autoComplete="off"
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Optional"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new token to replace it"
+                                    : "Optional"
+                            }
                         />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                     </label>
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span className="font-medium">Let agents use it</span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={`Let agents use ${card.name}`} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={`Let agents use ${card.name}`}
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -1183,14 +1307,19 @@ const OAUTH_APPS: Record<string, { name: string; idLabel: string; idPlaceholder:
 };
 
 function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const app = OAUTH_APPS[card.slug] ?? { name: card.name, idLabel: "Client ID", idPlaceholder: "" };
+    const app = OAUTH_APPS[card.slug] ?? {
+        name: card.name,
+        idLabel: "Client ID",
+        idPlaceholder: ""
+    };
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [clientId, setClientId] = useState(card.oauthClientId ?? "");
     const [clientSecret, setClientSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const canSave = clientId.trim().length > 0 && (card.hasSecret || clientSecret.trim().length > 0);
+    const canSave =
+        clientId.trim().length > 0 && (card.hasSecret || clientSecret.trim().length > 0);
 
     function onSave() {
         setError(null);
@@ -1223,7 +1352,9 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    {card.failure ? <AttentionNotice failure={card.failure} name={app.name} /> : null}
+                    {card.failure ? (
+                        <AttentionNotice failure={card.failure} name={app.name} />
+                    ) : null}
 
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
 
@@ -1248,7 +1379,11 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                             type="password"
                             value={clientSecret}
                             onChange={(event) => setClientSecret(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new secret to replace it" : "Paste the secret"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new secret to replace it"
+                                    : "Paste the secret"
+                            }
                             autoComplete="off"
                         />
                         {card.apiKeyHelp ? (
@@ -1268,12 +1403,20 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                         <div className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 p-3 text-sm">
                             <span className="font-medium">Authorized redirect URI</span>
                             <div className="flex items-center gap-2">
-                                <code className="min-w-0 flex-1 truncate text-xs" title={card.oauthCallbackUrl}>{card.oauthCallbackUrl}</code>
-                                <CopyButton value={card.oauthCallbackUrl} label="Copy the redirect URI" />
+                                <code
+                                    className="min-w-0 flex-1 truncate text-xs"
+                                    title={card.oauthCallbackUrl}
+                                >
+                                    {card.oauthCallbackUrl}
+                                </code>
+                                <CopyButton
+                                    value={card.oauthCallbackUrl}
+                                    label="Copy the redirect URI"
+                                />
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                Paste this into the app under its redirect URIs. {app.name} refuses an authorization
-                                that arrives from any other address.
+                                Paste this into the app under its redirect URIs. {app.name} refuses
+                                an authorization that arrives from any other address.
                             </span>
                         </div>
                     ) : null}
@@ -1311,7 +1454,11 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => integrationActions.saveSteamAction({ enabled, apiKey: apiKey.trim() || undefined }),
+                () =>
+                    integrationActions.saveSteamAction({
+                        enabled,
+                        apiKey: apiKey.trim() || undefined
+                    }),
                 setError
             );
             if (!result) return;
@@ -1350,7 +1497,11 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             type="password"
                             value={apiKey}
                             onChange={(event) => setApiKey(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Optional"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new key to replace it"
+                                    : "Optional"
+                            }
                             autoComplete="off"
                         />
                         {card.apiKeyHelp ? (
@@ -1396,7 +1547,12 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => integrationActions.saveTunnelAction({ provider, enabled, token: entered || undefined }),
+                () =>
+                    integrationActions.saveTunnelAction({
+                        provider,
+                        enabled,
+                        token: entered || undefined
+                    }),
                 setError
             );
             if (!result) return;
@@ -1428,7 +1584,11 @@ function TunnelDialog({ card, onClose }: { card: IntegrationCard; onClose: () =>
                             type="password"
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste the token"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new token to replace it"
+                                    : "Paste the token"
+                            }
                             autoComplete="off"
                         />
                         {entered && !valid ? (
@@ -1492,7 +1652,12 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setNote(null);
         startTransition(async () => {
             const result = await runAction(
-                () => integrationActions.connectCloudflareAccountAction({ token, scope, accountId: chosen }),
+                () =>
+                    integrationActions.connectCloudflareAccountAction({
+                        token,
+                        scope,
+                        accountId: chosen
+                    }),
                 setError
             );
             if (!result) return;
@@ -1511,7 +1676,9 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                 // plainly here, because the row above simply not lighting up is the kind
                 // of half-success an operator reads as a bug.
                 if (scope === "all" && !stored.includes("tunnel")) {
-                    setNote("Connected for DNS. The token reaches no account, so tunnels still need one.");
+                    setNote(
+                        "Connected for DNS. The token reaches no account, so tunnels still need one."
+                    );
                 }
                 setAccounts([]);
                 setToken("");
@@ -1528,7 +1695,10 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await runAction(() => integrationActions.disconnectCloudflareAccountAction({ scope: which }), setError);
+            const result = await runAction(
+                () => integrationActions.disconnectCloudflareAccountAction({ scope: which }),
+                setError
+            );
             if (!result) return;
             if (result.error) {
                 setError(result.error);
@@ -1552,8 +1722,8 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
             <div className="flex flex-col gap-1">
                 <span className="text-sm font-medium">API access</span>
                 <span className="text-xs text-muted-foreground">
-                    Lets Polaris create your DNS records and each app&apos;s tunnel for you. One token can do both,
-                    or connect them separately.
+                    Lets Polaris create your DNS records and each app&apos;s tunnel for you. One
+                    token can do both, or connect them separately.
                 </span>
             </div>
 
@@ -1567,7 +1737,11 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                 />
                 <CloudflareCapability
                     label="Named tunnels"
-                    detail={tunnelConnected && accountName ? `Account: ${accountName}` : "One tunnel per app, no open ports."}
+                    detail={
+                        tunnelConnected && accountName
+                            ? `Account: ${accountName}`
+                            : "One tunnel per app, no open ports."
+                    }
                     connected={tunnelConnected}
                     pending={pending}
                     onDisconnect={() => onDisconnect("tunnel")}
@@ -1610,7 +1784,10 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             <Select
                                 value={accountId}
                                 onValueChange={setAccountId}
-                                options={accounts.map((account) => ({ value: account.id, label: account.name }))}
+                                options={accounts.map((account) => ({
+                                    value: account.id,
+                                    label: account.name
+                                }))}
                             />
                         </div>
                     ) : null}
@@ -1627,7 +1804,9 @@ function CloudflareApiTokenSection({ card }: { card: IntegrationCard }) {
                             type="button"
                             size="sm"
                             onClick={() => onConnect(accounts.length > 0 ? accountId : undefined)}
-                            disabled={pending || !token.trim() || (accounts.length > 0 && !accountId)}
+                            disabled={
+                                pending || !token.trim() || (accounts.length > 0 && !accountId)
+                            }
                         >
                             {pending ? (
                                 <Loader2 className="size-4 animate-spin" />
@@ -1677,7 +1856,13 @@ function CloudflareCapability({
                 </span>
             </span>
             {connected && (
-                <Button type="button" variant="ghost" size="sm" onClick={onDisconnect} disabled={pending}>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onDisconnect}
+                    disabled={pending}
+                >
                     {pending ? <Loader2 className="size-4 animate-spin" /> : "Disconnect"}
                 </Button>
             )}
@@ -1698,7 +1883,8 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
         setSynced(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.saveDuckdnsAction({ subdomain, token: token || undefined }),
+                () =>
+                    integrationActions.saveDuckdnsAction({ subdomain, token: token || undefined }),
                 setError
             );
             if (!result) return;
@@ -1741,7 +1927,9 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                                 placeholder="myhome"
                                 autoComplete="off"
                             />
-                            <span className="shrink-0 text-sm text-muted-foreground">.duckdns.org</span>
+                            <span className="shrink-0 text-sm text-muted-foreground">
+                                .duckdns.org
+                            </span>
                         </div>
                     </label>
 
@@ -1752,9 +1940,15 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             autoComplete="off"
                             value={token}
                             onChange={(event) => setToken(event.target.value)}
-                            placeholder={card.hasSecret ? "Saved - enter a new token to replace it" : "Paste your DuckDNS token"}
+                            placeholder={
+                                card.hasSecret
+                                    ? "Saved - enter a new token to replace it"
+                                    : "Paste your DuckDNS token"
+                            }
                         />
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                     </label>
 
                     {card.hasSecret ? (
@@ -1762,8 +1956,18 @@ function DuckDnsDialog({ card, onClose }: { card: IntegrationCard; onClose: () =
                             <span className="text-muted-foreground">
                                 Point the record at this server's current public IP now.
                             </span>
-                            <Button type="button" variant="ghost" size="sm" onClick={onSync} disabled={syncing}>
-                                {syncing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onSync}
+                                disabled={syncing}
+                            >
+                                {syncing ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <RefreshCw className="size-4" />
+                                )}
                                 Sync now
                             </Button>
                         </div>
@@ -1814,7 +2018,10 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await runAction(() => integrationActions.testDymoKeyAction(apiKey), setError);
+            const result = await runAction(
+                () => integrationActions.testDymoKeyAction(apiKey),
+                setError
+            );
             if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
@@ -1825,7 +2032,13 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.saveDymoAction({ enabled, verifyAccessIp, deny: [...deny], apiKey }),
+                () =>
+                    integrationActions.saveDymoAction({
+                        enabled,
+                        verifyAccessIp,
+                        deny: [...deny],
+                        apiKey
+                    }),
                 setError
             );
             if (!result) return;
@@ -1856,13 +2069,24 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                                 autoComplete="off"
                                 value={apiKey}
                                 onChange={(event) => setApiKey(event.target.value)}
-                                placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                                placeholder={
+                                    card.hasSecret
+                                        ? "Saved - enter a new key to replace it"
+                                        : "Paste your key"
+                                }
                             />
-                            <Button type="button" variant="ghost" onClick={onTest} disabled={testing || !apiKey.trim()}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={onTest}
+                                disabled={testing || !apiKey.trim()}
+                            >
                                 {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
                             </Button>
                         </div>
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                         {tested ? (
                             <span className="flex items-center gap-1 text-xs text-success">
                                 <CheckCircle2 className="size-3" />
@@ -1875,8 +2099,8 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                         <span>
                             <span className="font-medium">Verify visitor IPs on access</span>
                             <span className="block text-xs text-muted-foreground">
-                                Check the IP when someone opens a share link or drop point, and block the ones that
-                                match your rules.
+                                Check the IP when someone opens a share link or drop point, and
+                                block the ones that match your rules.
                             </span>
                         </span>
                         <Switch
@@ -1913,7 +2137,11 @@ function DymoDialog({ card, onClose }: { card: IntegrationCard; onClose: () => v
                             <ShieldCheck className="size-4 text-primary" />
                             Enable Dymo API
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enable Dymo API" />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label="Enable Dymo API"
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -1984,7 +2212,9 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                 <div className="flex flex-col gap-4">
                     {/* Connected and refusing people are not exclusive: the App is
                         installed, and the last person through it was turned away. */}
-                    {card.failure ? <AttentionNotice failure={card.failure} name={card.name} /> : null}
+                    {card.failure ? (
+                        <AttentionNotice failure={card.failure} name={card.name} />
+                    ) : null}
 
                     <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3 text-sm">
                         <CheckCircle2 className="size-4 text-success" />
@@ -2010,14 +2240,18 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                             {card.githubInstallations && card.githubInstallations.length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5">
                                     {card.githubInstallations.map((login) => (
-                                        <span key={login} className="rounded-full border border-border px-2 py-0.5 text-xs">
+                                        <span
+                                            key={login}
+                                            className="rounded-full border border-border px-2 py-0.5 text-xs"
+                                        >
                                             {login}
                                         </span>
                                     ))}
                                 </div>
                             ) : (
                                 <p className="text-xs text-muted-foreground">
-                                    Not installed on any account yet. Install the app to grant repository access.
+                                    Not installed on any account yet. Install the app to grant
+                                    repository access.
                                 </p>
                             )}
                             <div className="flex flex-wrap gap-2">
@@ -2039,7 +2273,8 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                                     onClick={() =>
                                         startBusy(async () => {
                                             const result = await runAction(
-                                                () => integrationActions.refreshGithubInstallationsAction(),
+                                                () =>
+                                                    integrationActions.refreshGithubInstallationsAction(),
                                                 setError
                                             );
                                             if (result?.error) setError(result.error);
@@ -2064,7 +2299,10 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                             disabled={busy}
                             onClick={() =>
                                 startBusy(async () => {
-                                    const result = await runAction(() => integrationActions.disconnectGithubAction(), setError);
+                                    const result = await runAction(
+                                        () => integrationActions.disconnectGithubAction(),
+                                        setError
+                                    );
                                     if (!result) return;
                                     if (result.error) setError(result.error);
                                     else onClose();
@@ -2104,7 +2342,13 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.connectGithubAppAction({ appId, pem, clientId, clientSecret }),
+                () =>
+                    integrationActions.connectGithubAppAction({
+                        appId,
+                        pem,
+                        clientId,
+                        clientSecret
+                    }),
                 setError
             );
             if (!result) return;
@@ -2139,14 +2383,16 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                     {method === "app" ? (
                         <div className="flex flex-col gap-3 text-sm">
                             <p className="text-muted-foreground">
-                                Create a GitHub App for this Polaris instance in one step. GitHub will ask you to
-                                confirm, then to choose which repositories it can access.
+                                Create a GitHub App for this Polaris instance in one step. GitHub
+                                will ask you to confirm, then to choose which repositories it can
+                                access.
                             </p>
                             {!card.githubPublicUrl ? (
                                 <p className="text-muted-foreground">
-                                    This instance has no address GitHub can reach, so the app is created without a
-                                    webhook. Deploys and runner pools poll instead; agent triggers need the webhook,
-                                    which you can add on GitHub once a domain is set.
+                                    This instance has no address GitHub can reach, so the app is
+                                    created without a webhook. Deploys and runner pools poll
+                                    instead; agent triggers need the webhook, which you can add on
+                                    GitHub once a domain is set.
                                 </p>
                             ) : null}
                             <a
@@ -2161,7 +2407,11 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                         <div className="flex flex-col gap-3 text-sm">
                             <label className="flex flex-col gap-1">
                                 <span className="font-medium">App ID</span>
-                                <Input value={appId} onChange={(event) => setAppId(event.target.value)} placeholder="123456" />
+                                <Input
+                                    value={appId}
+                                    onChange={(event) => setAppId(event.target.value)}
+                                    placeholder="123456"
+                                />
                             </label>
                             <label className="flex flex-col gap-1">
                                 <span className="font-medium">Private key (PEM)</span>
@@ -2193,13 +2443,21 @@ function GitHubConnect({ card, onClose }: { card: IntegrationCard; onClose: () =
                                     placeholder="Optional"
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Only needed so people can link their own GitHub account to their Polaris one. An app
-                                    created above already carries these.
+                                    Only needed so people can link their own GitHub account to their
+                                    Polaris one. An app created above already carries these.
                                 </span>
                             </label>
                             <div className="flex justify-end">
-                                <Button type="button" onClick={onConnectExisting} disabled={saving || !appId.trim() || !pem.trim()}>
-                                    {saving ? <Loader2 className="size-4 animate-spin" /> : "Connect app"}
+                                <Button
+                                    type="button"
+                                    onClick={onConnectExisting}
+                                    disabled={saving || !appId.trim() || !pem.trim()}
+                                >
+                                    {saving ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        "Connect app"
+                                    )}
                                 </Button>
                             </div>
                         </div>
@@ -2230,7 +2488,10 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
         setError(null);
         setTested(null);
         startTest(async () => {
-            const result = await runAction(() => integrationActions.testVirusTotalKeyAction(apiKey), setError);
+            const result = await runAction(
+                () => integrationActions.testVirusTotalKeyAction(apiKey),
+                setError
+            );
             if (!result) return;
             if (result.ok) setTested("The key works.");
             else setError(result.error ?? "The key was rejected");
@@ -2241,7 +2502,13 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
         setError(null);
         startSave(async () => {
             const result = await runAction(
-                () => integrationActions.saveVirusTotalAction({ enabled, scanDropPoints, onDetection, apiKey }),
+                () =>
+                    integrationActions.saveVirusTotalAction({
+                        enabled,
+                        scanDropPoints,
+                        onDetection,
+                        apiKey
+                    }),
                 setError
             );
             if (!result) return;
@@ -2272,7 +2539,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                 autoComplete="off"
                                 value={apiKey}
                                 onChange={(event) => setApiKey(event.target.value)}
-                                placeholder={card.hasSecret ? "Saved - enter a new key to replace it" : "Paste your key"}
+                                placeholder={
+                                    card.hasSecret
+                                        ? "Saved - enter a new key to replace it"
+                                        : "Paste your key"
+                                }
                             />
                             <Button
                                 type="button"
@@ -2283,7 +2554,9 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                 {testing ? <Loader2 className="size-4 animate-spin" /> : "Test"}
                             </Button>
                         </div>
-                        {card.apiKeyHelp ? <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span> : null}
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
                         {tested ? (
                             <span className="flex items-center gap-1 text-xs text-success">
                                 <CheckCircle2 className="size-3" />
@@ -2296,7 +2569,8 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                         <span>
                             <span className="font-medium">Scan drop-point uploads</span>
                             <span className="block text-xs text-muted-foreground">
-                                Every file uploaded to a drop point is scanned before it is accepted.
+                                Every file uploaded to a drop point is scanned before it is
+                                accepted.
                             </span>
                         </span>
                         <Switch
@@ -2324,7 +2598,9 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                     <span
                                         className={cn(
                                             "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full border",
-                                            onDetection === action.value ? "border-primary" : "border-muted-foreground"
+                                            onDetection === action.value
+                                                ? "border-primary"
+                                                : "border-muted-foreground"
                                         )}
                                     >
                                         {onDetection === action.value ? (
@@ -2333,7 +2609,9 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                                     </span>
                                     <span>
                                         <span className="font-medium">{action.label}</span>
-                                        <span className="block text-xs text-muted-foreground">{action.help}</span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            {action.help}
+                                        </span>
                                     </span>
                                 </button>
                             ))}
@@ -2345,7 +2623,11 @@ function VirusTotalDialog({ card, onClose }: { card: IntegrationCard; onClose: (
                             <ShieldCheck className="size-4 text-primary" />
                             Enable VirusTotal
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Enable VirusTotal" />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label="Enable VirusTotal"
+                        />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

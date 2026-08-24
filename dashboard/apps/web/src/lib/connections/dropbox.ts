@@ -100,7 +100,8 @@ async function postToken(
         },
         body: new URLSearchParams(body)
     });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Dropbox refused the token request"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Dropbox refused the token request"));
     return tokenSchema.parse(await response.json());
 }
 
@@ -155,24 +156,34 @@ async function identify(accessToken: string): Promise<z.infer<typeof accountSche
         method: "POST",
         headers: { authorization: `Bearer ${accessToken}` }
     });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Dropbox would not say who authorized"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Dropbox would not say who authorized"));
     return accountSchema.parse(await response.json());
 }
 
 const accessTokens = new Map<string, { token: string; expiresAt: number }>();
 
 /** A currently-valid access token for a stored refresh token. */
-export async function dropboxAccessToken(client: DropboxOAuthClient, refreshToken: string): Promise<string> {
+export async function dropboxAccessToken(
+    client: DropboxOAuthClient,
+    refreshToken: string
+): Promise<string> {
     const cached = accessTokens.get(refreshToken);
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
     let token: z.infer<typeof tokenSchema>;
     try {
-        token = await postToken(client, { grant_type: "refresh_token", refresh_token: refreshToken });
+        token = await postToken(client, {
+            grant_type: "refresh_token",
+            refresh_token: refreshToken
+        });
     } catch (error) {
         throw new DropboxAuthExpiredError((error as Error).message);
     }
     const ttl = (token.expires_in ?? 14_400) * 1000;
-    accessTokens.set(refreshToken, { token: token.access_token, expiresAt: Date.now() + Math.max(0, ttl) });
+    accessTokens.set(refreshToken, {
+        token: token.access_token,
+        expiresAt: Date.now() + Math.max(0, ttl)
+    });
     return token.access_token;
 }
 

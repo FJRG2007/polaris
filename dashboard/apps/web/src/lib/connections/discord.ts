@@ -73,7 +73,11 @@ export function getDiscordOAuthClient(): Promise<DiscordOAuthClient | null> {
  * about to be used rather than be silently bounced back as whoever the browser
  * happened to be logged in as.
  */
-export function discordAuthorizeUrl(client: DiscordOAuthClient, redirectUri: string, state: string): string {
+export function discordAuthorizeUrl(
+    client: DiscordOAuthClient,
+    redirectUri: string,
+    state: string
+): string {
     const url = new URL(AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -134,7 +138,9 @@ function displayName(user: z.infer<typeof userSchema>): string {
 function avatarUrl(user: z.infer<typeof userSchema>): string | null {
     const hash = user.avatar?.trim();
     if (!hash) return null;
-    const url = new URL(`${AVATAR_CDN}/${user.id}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}`);
+    const url = new URL(
+        `${AVATAR_CDN}/${user.id}/${hash}.${hash.startsWith("a_") ? "gif" : "png"}`
+    );
     url.searchParams.set("size", String(AVATAR_SIZE));
     return url.toString();
 }
@@ -162,7 +168,8 @@ async function postToken(
     // that is not registered, a secret that was reset, and an application whose
     // client id belongs to a different one are three different fixes behind one
     // status code, and the operator is not the person standing at the redirect.
-    if (!response.ok) throw new Error(await refusalMessage(response, "Discord refused the token request"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Discord refused the token request"));
     return tokenSchema.parse(await response.json());
 }
 
@@ -172,7 +179,10 @@ async function readUser(accessToken: string): Promise<z.infer<typeof userSchema>
         headers: { authorization: `Bearer ${accessToken}` },
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Discord would not say which account authorized"));
+    if (!response.ok)
+        throw new Error(
+            await refusalMessage(response, "Discord would not say which account authorized")
+        );
     return userSchema.parse(await response.json());
 }
 

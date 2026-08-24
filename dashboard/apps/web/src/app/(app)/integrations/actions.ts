@@ -23,8 +23,16 @@ import { isTunnelToken, tunnelTokenHint } from "@/lib/integrations/tunnel-token"
 import type { CloudflareTokenScope } from "@/lib/integrations/cloudflare-token-link";
 import { DYMO_IP_RULES, findIntegration, type ScanAction } from "@/lib/integrations/registry";
 import { connectGithubApp, disconnectGithub, refreshInstallations } from "@/lib/github-service";
-import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
-import { OAUTH_APP_SLUGS, connectionRedirectUri, verifyConnectionOAuthApp } from "@/lib/connections/oauth";
+import {
+    getIntegrationSecret,
+    getIntegrationState,
+    upsertIntegration
+} from "@/lib/integration-service";
+import {
+    OAUTH_APP_SLUGS,
+    connectionRedirectUri,
+    verifyConnectionOAuthApp
+} from "@/lib/connections/oauth";
 import {
     connectCloudflareToken,
     disconnectCloudflareToken
@@ -52,7 +60,10 @@ const MAX_ACCOUNTS_PER_USER = 20;
  * limit simply cannot add another - because silently disconnecting somebody's
  * account would stop their deployments with no warning.
  */
-export async function saveConnectionLimitAction(provider: string, limit: number): Promise<{ error?: string }> {
+export async function saveConnectionLimitAction(
+    provider: string,
+    limit: number
+): Promise<{ error?: string }> {
     const user = await requireAdmin();
     if (!findConnectionProvider(provider)) return { error: "Unknown service" };
     if (!Number.isInteger(limit) || limit < 0 || limit > MAX_ACCOUNTS_PER_USER) {
@@ -80,7 +91,10 @@ export async function saveConnectionLimitAction(provider: string, limit: number)
  * and only closes the door, so a service can be refused as a way in without
  * anybody losing the repositories or the calendar it was linked for.
  */
-export async function saveConnectionSignInAction(provider: string, allowed: boolean): Promise<{ error?: string }> {
+export async function saveConnectionSignInAction(
+    provider: string,
+    allowed: boolean
+): Promise<{ error?: string }> {
     const user = await requireAdmin();
     if (!findConnectionProvider(provider)) return { error: "Unknown service" };
 
@@ -112,7 +126,8 @@ export async function saveConnectionEmailTrustAction(
     const user = await requireAdmin();
     const entry = findConnectionProvider(provider);
     if (!entry) return { error: "Unknown service" };
-    if (entry.emailTrustDefault === undefined) return { error: `${entry.name} does not hand over an address.` };
+    if (entry.emailTrustDefault === undefined)
+        return { error: `${entry.name} does not hand over an address.` };
 
     await setSetting(connectionEmailTrustKey(provider), trusted === true ? "true" : "false");
     await recordAudit({
@@ -198,7 +213,9 @@ export async function saveOAuthAppAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The application could not be saved" };
+        return {
+            error: caught instanceof Error ? caught.message : "The application could not be saved"
+        };
     }
 
     revalidatePath("/integrations");
@@ -218,7 +235,10 @@ export async function saveOAuthAppAction(input: {
  * Tri-state on the key, like every other secret on this screen: a value replaces
  * it, blank keeps what is stored.
  */
-export async function saveSteamAction(input: { enabled: boolean; apiKey?: string }): Promise<{ error?: string }> {
+export async function saveSteamAction(input: {
+    enabled: boolean;
+    apiKey?: string;
+}): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
     try {
@@ -237,7 +257,10 @@ export async function saveSteamAction(input: { enabled: boolean; apiKey?: string
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The Steam settings could not be saved" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "The Steam settings could not be saved"
+        };
     }
 
     revalidatePath("/integrations");
@@ -358,7 +381,8 @@ export async function saveTunnelAction(input: {
     // Outside the try - it redirects an unauthorized caller by throwing.
     const user = await requireAdmin();
     const provider = input.provider;
-    if (provider !== "cloudflare" && provider !== "ngrok") return { error: "Unknown tunnel provider" };
+    if (provider !== "cloudflare" && provider !== "ngrok")
+        return { error: "Unknown tunnel provider" };
     const newToken = input.token && input.token.trim() ? input.token.trim() : undefined;
     if (newToken && !isTunnelToken(provider, newToken)) return { error: tunnelTokenHint(provider) };
 
@@ -372,7 +396,11 @@ export async function saveTunnelAction(input: {
             const other = provider === "cloudflare" ? "ngrok" : "cloudflare";
             await upsertIntegration(other, { enabled: false });
         }
-        await upsertIntegration(provider, { enabled: input.enabled, secret: newToken, installedById: user.id });
+        await upsertIntegration(provider, {
+            enabled: input.enabled,
+            secret: newToken,
+            installedById: user.id
+        });
         await recordAudit({
             actorId: user.id,
             action: "integration.configure",
@@ -381,7 +409,10 @@ export async function saveTunnelAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The tunnel settings could not be saved" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "The tunnel settings could not be saved"
+        };
     }
 
     // The settings are stored either way, so the page reflects them even when the
@@ -449,7 +480,10 @@ export async function connectCloudflareAccountAction(input: {
     const user = await requireAdmin();
     try {
         const scope = input.scope ?? "all";
-        const result = await connectCloudflareToken(input.token, { scope, ...(input.accountId ? { accountId: input.accountId } : {}) });
+        const result = await connectCloudflareToken(input.token, {
+            scope,
+            ...(input.accountId ? { accountId: input.accountId } : {})
+        });
         if (result.connected) {
             await recordAudit({
                 actorId: user.id,
@@ -469,7 +503,10 @@ export async function connectCloudflareAccountAction(input: {
             stored: result.stored
         };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not connect the Cloudflare token" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "Could not connect the Cloudflare token"
+        };
     }
 }
 
@@ -507,7 +544,8 @@ export async function saveVirusTotalAction(input: {
     const existing = await getIntegrationState(provider);
     const newKey = input.apiKey && input.apiKey.trim() ? input.apiKey.trim() : undefined;
     const willHaveKey = Boolean(newKey) || Boolean(existing?.hasSecret);
-    if (input.enabled && !willHaveKey) return { error: "Add a VirusTotal API key before enabling it" };
+    if (input.enabled && !willHaveKey)
+        return { error: "Add a VirusTotal API key before enabling it" };
 
     // Validate a newly supplied key so a typo does not silently disable scanning.
     if (newKey) {
@@ -538,7 +576,10 @@ async function testDymoKey(apiKey: string): Promise<{ ok: boolean; error?: strin
         await verifyIp(apiKey, "8.8.8.8", ["FRAUD"]);
         return { ok: true };
     } catch (caught) {
-        return { ok: false, error: caught instanceof Error ? caught.message : "The API key was rejected" };
+        return {
+            ok: false,
+            error: caught instanceof Error ? caught.message : "The API key was rejected"
+        };
     }
 }
 
@@ -605,7 +646,8 @@ export async function saveCriminalIpAction(input: {
 
         const known = new Set<string>(CRIMINALIP_RULES.map((rule) => rule.value));
         const deny = input.deny.filter((value) => known.has(value));
-        if (input.enabled && deny.length === 0) return { error: "Pick at least one verdict to block on" };
+        if (input.enabled && deny.length === 0)
+            return { error: "Pick at least one verdict to block on" };
 
         await upsertIntegration(provider, {
             enabled: input.enabled,
@@ -621,7 +663,12 @@ export async function saveCriminalIpAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The Criminal IP settings could not be saved" };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : "The Criminal IP settings could not be saved"
+        };
     }
 
     revalidatePath("/integrations");
@@ -651,12 +698,14 @@ export async function saveModelProviderAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const entry = findIntegration(input.slug);
-    if (!entry || entry.category !== "Models" || entry.slug === GATEWAY_SLUG) return { error: "Unknown model provider" };
+    if (!entry || entry.category !== "Models" || entry.slug === GATEWAY_SLUG)
+        return { error: "Unknown model provider" };
 
     try {
         const existing = await getIntegrationState(entry.slug);
         const newKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
-        if (input.enabled && !newKey && !existing?.hasSecret) return { error: "Add the API key before enabling it" };
+        if (input.enabled && !newKey && !existing?.hasSecret)
+            return { error: "Add the API key before enabling it" };
 
         await upsertIntegration(entry.slug, {
             enabled: input.enabled,
@@ -671,7 +720,12 @@ export async function saveModelProviderAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : `The ${entry.name} key could not be saved` };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : `The ${entry.name} key could not be saved`
+        };
     }
 
     revalidatePath("/integrations/models");
@@ -720,12 +774,15 @@ export async function saveGatewayAction(input: {
     const context = Math.floor(input.context);
     const maxOutput = Math.floor(input.maxOutput);
 
-    if (baseUrl && !/^https?:\/\/\S+$/.test(baseUrl)) return { error: "The base URL has to start with http:// or https://" };
+    if (baseUrl && !/^https?:\/\/\S+$/.test(baseUrl))
+        return { error: "The base URL has to start with http:// or https://" };
     if (input.enabled) {
         if (!baseUrl) return { error: "Add the base URL before enabling it" };
         if (!model) return { error: "Add the model id the endpoint serves" };
-        if (!(context > 0) || !(maxOutput > 0)) return { error: "Set both token limits to a number above zero" };
-        if (maxOutput > context) return { error: "The largest answer cannot exceed the context window" };
+        if (!(context > 0) || !(maxOutput > 0))
+            return { error: "Set both token limits to a number above zero" };
+        if (maxOutput > context)
+            return { error: "The largest answer cannot exceed the context window" };
     }
 
     try {
@@ -743,7 +800,10 @@ export async function saveGatewayAction(input: {
             metadata: { enabled: input.enabled }
         });
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "The gateway settings could not be saved" };
+        return {
+            error:
+                caught instanceof Error ? caught.message : "The gateway settings could not be saved"
+        };
     }
 
     revalidatePath("/integrations/models");
@@ -751,7 +811,10 @@ export async function saveGatewayAction(input: {
 }
 
 /** Turn an integration off without forgetting its configuration. */
-export async function setIntegrationEnabledAction(provider: string, enabled: boolean): Promise<{ error?: string }> {
+export async function setIntegrationEnabledAction(
+    provider: string,
+    enabled: boolean
+): Promise<{ error?: string }> {
     const user = await requireAdmin();
     if (!findIntegration(provider)) return { error: "Unknown integration" };
     if (enabled) {
@@ -770,7 +833,9 @@ export async function setIntegrationEnabledAction(provider: string, enabled: boo
 }
 
 /** Verify an API key without saving it (the configure dialog's Test button). */
-export async function testVirusTotalKeyAction(apiKey: string): Promise<{ ok: boolean; error?: string }> {
+export async function testVirusTotalKeyAction(
+    apiKey: string
+): Promise<{ ok: boolean; error?: string }> {
     await requireAdmin();
     if (!apiKey.trim()) return { ok: false, error: "Enter an API key first" };
     return verifyKey(apiKey.trim());
@@ -789,11 +854,19 @@ export async function connectGithubAppAction(input: {
     const user = await requireAdmin();
     try {
         const { installations } = await connectGithubApp(input);
-        await recordAudit({ actorId: user.id, action: "integration.configure", targetType: "integration", targetId: "github", metadata: { method: "app" } });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: "github",
+            metadata: { method: "app" }
+        });
         revalidatePath("/integrations");
         return { installations };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not connect the GitHub App" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not connect the GitHub App"
+        };
     }
 }
 
@@ -805,7 +878,9 @@ export async function refreshGithubInstallationsAction(): Promise<{ error?: stri
         revalidatePath("/integrations");
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : "Could not refresh installations" };
+        return {
+            error: caught instanceof Error ? caught.message : "Could not refresh installations"
+        };
     }
 }
 
@@ -813,7 +888,12 @@ export async function refreshGithubInstallationsAction(): Promise<{ error?: stri
 export async function disconnectGithubAction(): Promise<{ error?: string }> {
     const user = await requireAdmin();
     await disconnectGithub();
-    await recordAudit({ actorId: user.id, action: "integration.disable", targetType: "integration", targetId: "github" });
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.disable",
+        targetType: "integration",
+        targetId: "github"
+    });
     revalidatePath("/integrations");
     return {};
 }

@@ -60,7 +60,8 @@ function contactSection(contact: string | null): LegalSection[] {
 export function privacyDocument(contact: string | null): LegalDocument {
     return {
         title: "Privacy",
-        summary: "What Polaris stores, where it stays, and what happens to it when you unlink or leave.",
+        summary:
+            "What Polaris stores, where it stays, and what happens to it when you unlink or leave.",
         sections: [
             {
                 heading: "Who holds this data",

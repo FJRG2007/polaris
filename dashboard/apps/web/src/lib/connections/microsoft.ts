@@ -150,7 +150,8 @@ export async function identifyMicrosoftAccount(
 
 async function identify(accessToken: string): Promise<z.infer<typeof meSchema>> {
     const response = await fetch(GRAPH_ME, { headers: { authorization: `Bearer ${accessToken}` } });
-    if (!response.ok) throw new Error(await refusalMessage(response, "Microsoft would not say who authorized"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Microsoft would not say who authorized"));
     return meSchema.parse(await response.json());
 }
 
@@ -176,7 +177,10 @@ export async function microsoftAccessToken(
         throw new MicrosoftAuthExpiredError((error as Error).message);
     }
     const ttl = (token.expires_in ?? 3600) * 1000;
-    accessTokens.set(refreshToken, { token: token.access_token, expiresAt: Date.now() + Math.max(0, ttl) });
+    accessTokens.set(refreshToken, {
+        token: token.access_token,
+        expiresAt: Date.now() + Math.max(0, ttl)
+    });
     return token.access_token;
 }
 

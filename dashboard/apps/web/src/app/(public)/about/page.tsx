@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
     title: "Polaris",
-    description: "Polaris is a self-hosted control plane for files, tasks, deployments and game servers."
+    description:
+        "Polaris is a self-hosted control plane for files, tasks, deployments and game servers."
 };
 
 /**
@@ -32,13 +33,14 @@ export default function AboutPage() {
             <Reveal className="flex flex-col gap-5">
                 <h1 className="text-4xl font-medium tracking-tight sm:text-5xl">Polaris</h1>
                 <p className="text-lg leading-relaxed text-muted-foreground">
-                    A self-hosted control plane. One place to keep files, run tasks, deploy applications and manage game
-                    servers, on hardware its operator owns rather than on somebody else&apos;s service. This is one such
-                    deployment, run by the person or organization that installed it.
+                    A self-hosted control plane. One place to keep files, run tasks, deploy
+                    applications and manage game servers, on hardware its operator owns rather than
+                    on somebody else&apos;s service. This is one such deployment, run by the person
+                    or organization that installed it.
                 </p>
                 <p className="text-base leading-relaxed text-muted-foreground">
-                    Everything past this page needs an account here, which its operator hands out. There is nothing to
-                    sign up for.
+                    Everything past this page needs an account here, which its operator hands out.
+                    There is nothing to sign up for.
                 </p>
                 <div className="pt-1">
                     <Button asChild>
@@ -53,16 +55,17 @@ export default function AboutPage() {
             <Reveal className="flex flex-col gap-4">
                 <h2 className="text-xl font-medium tracking-tight">Connecting an account</h2>
                 <p className="text-base leading-relaxed text-muted-foreground">
-                    People with an account here can connect outside accounts of their own, and each connection asks for
-                    the least it can. A connected Google account is read-only, and only so the calendar can be shown
-                    beside the tasks - Polaris cannot change or delete anything in it. Microsoft and Dropbox are limited
-                    to the folder Polaris creates for backups. Steam, Epic Games, Minecraft and Discord hand over an
-                    account id and a display name, so a game server can tell one player from another, and no credential
-                    at all.
+                    People with an account here can connect outside accounts of their own, and each
+                    connection asks for the least it can. A connected Google account is read-only,
+                    and only so the calendar can be shown beside the tasks - Polaris cannot change
+                    or delete anything in it. Microsoft and Dropbox are limited to the folder
+                    Polaris creates for backups. Steam, Epic Games, Minecraft and Discord hand over
+                    an account id and a display name, so a game server can tell one player from
+                    another, and no credential at all.
                 </p>
                 <p className="text-base leading-relaxed text-muted-foreground">
-                    Connecting is always started by the account&apos;s owner, and unlinking it here destroys the
-                    credential and the access with it. The{" "}
+                    Connecting is always started by the account&apos;s owner, and unlinking it here
+                    destroys the credential and the access with it. The{" "}
                     <Link href={PUBLIC_PATHS.privacy} className="text-primary hover:underline">
                         privacy policy
                     </Link>{" "}
@@ -75,9 +78,9 @@ export default function AboutPage() {
                     <CardBody className="flex flex-col gap-3">
                         <h2 className="text-xl font-medium tracking-tight">The software</h2>
                         <p className="text-base leading-relaxed text-muted-foreground">
-                            Polaris is open source, published under the Apache 2.0 license. The people who write it
-                            operate no service and never see this deployment: it runs entirely on its operator&apos;s
-                            own machine.
+                            Polaris is open source, published under the Apache 2.0 license. The
+                            people who write it operate no service and never see this deployment: it
+                            runs entirely on its operator&apos;s own machine.
                         </p>
                         <a
                             href="https://github.com/FJRG2007/polaris"

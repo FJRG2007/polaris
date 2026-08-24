@@ -21,8 +21,17 @@ import { connectionSignInAllowed } from "./store";
 import type { ConnectionCredential } from "./store";
 import { findConnectionProvider } from "@polaris/core";
 import { getIntegrationState } from "@/lib/integration-service";
-import { epicAuthorizeUrl, exchangeEpicCode, getEpicOAuthClient, identifyEpicAccount } from "./epic";
-import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
+import {
+    epicAuthorizeUrl,
+    exchangeEpicCode,
+    getEpicOAuthClient,
+    identifyEpicAccount
+} from "./epic";
+import {
+    authorizeGithubUser,
+    getGithubUserAuth,
+    githubLinkCallbackUrl
+} from "@/lib/github-service";
 import {
     discordAuthorizeUrl,
     exchangeDiscordCode,
@@ -95,8 +104,17 @@ interface ProviderOAuth {
     callbackUrl(baseUrl: string): string;
     /** The operator's application, or null when this deployment has none. */
     client(): Promise<OAuthClient | null>;
-    authorizeUrl(client: OAuthClient, redirectUri: string, state: string, flow: ConnectionFlow): string;
-    exchange(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionAuthorization>;
+    authorizeUrl(
+        client: OAuthClient,
+        redirectUri: string,
+        state: string,
+        flow: ConnectionFlow
+    ): string;
+    exchange(
+        client: OAuthClient,
+        code: string,
+        redirectUri: string
+    ): Promise<ConnectionAuthorization>;
     /** Spend a sign-in's code and report whose account it was. */
     identify(client: OAuthClient, code: string, redirectUri: string): Promise<ConnectionIdentity>;
     /** Ask the provider whether it would accept this application and this redirect
@@ -188,7 +206,8 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
     minecraft: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/minecraft/callback`,
         client: getMinecraftOAuthClient,
-        authorizeUrl: (client, redirectUri, state) => minecraftAuthorizeUrl(client, redirectUri, state),
+        authorizeUrl: (client, redirectUri, state) =>
+            minecraftAuthorizeUrl(client, redirectUri, state),
         exchange: async (client, code, redirectUri) => {
             const granted = await exchangeMinecraftCode(client, code, redirectUri);
             // Nothing is kept: the username was the errand, and Polaris never acts
@@ -200,7 +219,8 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
     discord: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/discord/callback`,
         client: getDiscordOAuthClient,
-        authorizeUrl: (client, redirectUri, state) => discordAuthorizeUrl(client, redirectUri, state),
+        authorizeUrl: (client, redirectUri, state) =>
+            discordAuthorizeUrl(client, redirectUri, state),
         exchange: async (client, code, redirectUri) => {
             const granted = await exchangeDiscordCode(client, code, redirectUri);
             // Discord is asked for the identify scope alone, so it hands over no
@@ -233,7 +253,9 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
  * drift, and a provider missing from the second is one whose Save button refuses
  * every application with no way for the operator to tell why.
  */
-export const OAUTH_APP_SLUGS: readonly string[] = Object.keys(ADAPTERS).filter((slug) => slug !== "github");
+export const OAUTH_APP_SLUGS: readonly string[] = Object.keys(ADAPTERS).filter(
+    (slug) => slug !== "github"
+);
 
 /** Whether this provider can be authorized at all here. */
 export function supportsOAuth(provider: string): boolean {
@@ -252,8 +274,12 @@ export function supportsOAuth(provider: string): boolean {
  * neither: it proves an account over OpenID, so all that decides it is whether the
  * operator has switched the service on.
  */
-export async function connectionLinkAvailable(provider: string, options?: { admin?: boolean }): Promise<boolean> {
-    if (provider === STEAM_PROVIDER) return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
+export async function connectionLinkAvailable(
+    provider: string,
+    options?: { admin?: boolean }
+): Promise<boolean> {
+    if (provider === STEAM_PROVIDER)
+        return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
     if (!supportsOAuth(provider) || (await connectionOAuthClient(provider)) === null) return false;
     return options?.admin === true || (await connectionProven(provider));
 }
@@ -268,7 +294,10 @@ export async function connectionLinkAvailable(provider: string, options?: { admi
  */
 export async function connectionSignInOffered(provider: string): Promise<boolean> {
     if (!supportsOAuth(provider)) return false;
-    const [allowed, client] = await Promise.all([connectionSignInAllowed(provider), connectionOAuthClient(provider)]);
+    const [allowed, client] = await Promise.all([
+        connectionSignInAllowed(provider),
+        connectionOAuthClient(provider)
+    ]);
     return allowed && client !== null && (await connectionProven(provider));
 }
 
