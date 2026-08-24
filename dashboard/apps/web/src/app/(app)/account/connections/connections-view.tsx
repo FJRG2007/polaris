@@ -15,7 +15,7 @@ import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ExternalLink, KeyRound, Loader2, Plus, Unlink } from "lucide-react";
+import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Unlink } from "lucide-react";
 import { connectGithubTokenAction, disconnectAccountAction } from "./actions";
 import {
     Badge,
@@ -143,6 +143,9 @@ function ProviderCard({
         [provider.accounts, removed]
     );
     const slotsLeft = Math.max(0, provider.limit - accounts.length);
+    // Whether any of them is short of what this deployment now asks for, which
+    // changes what the line under a full list should be telling somebody to do.
+    const needsApproval = accounts.some((account) => account.needsReauthorization);
     const canAdd = slotsLeft > 0;
 
     function disconnect(account: LinkedAccount) {
@@ -234,6 +237,44 @@ function ProviderCard({
                                 <span className="hidden text-xs text-muted-foreground sm:inline">
                                     <RelativeTime iso={account.linkedAt} />
                                 </span>
+                                {account.method === "oauth" && provider.canAuthorize ? (
+                                    /*
+                                     * Authorize this same account again, in place.
+                                     *
+                                     * Without it, approving a widened consent meant
+                                     * disconnecting and connecting - because Connect is
+                                     * capped by the account limit, and somebody already at
+                                     * it is told to disconnect one first. Two deliberate
+                                     * actions, one of them destructive, to grant a
+                                     * permission.
+                                     *
+                                     * Nothing is spent: the store upserts on
+                                     * (provider, accountId), so an account its owner
+                                     * already holds is refreshed rather than counted
+                                     * again, and the sign-in choice on the row is left
+                                     * alone because only a first write sets it.
+                                     */
+                                    <Button
+                                        size="sm"
+                                        variant={account.needsReauthorization ? "secondary" : "ghost"}
+                                        aria-label={
+                                            account.needsReauthorization
+                                                ? `Reconnect ${account.label} to approve what Polaris now asks for`
+                                                : `Reconnect ${account.label}`
+                                        }
+                                        title={
+                                            account.needsReauthorization
+                                                ? `Reconnect ${account.label} to approve what Polaris now asks for`
+                                                : `Reconnect ${account.label}`
+                                        }
+                                        disabled={pending}
+                                        onClick={() =>
+                                            router.push(`/api/connections/${provider.slug}/link`)
+                                        }
+                                    >
+                                        <RefreshCw className="size-4" />
+                                    </Button>
+                                ) : null}
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -298,7 +339,14 @@ function ProviderCard({
                         ) : null}
                         {!canAdd ? (
                             <span className="text-xs text-muted-foreground">
-                                Disconnect one to connect another account.
+                                {needsApproval
+                                    ? // The literal advice - disconnect one first - is true of
+                                      // connecting a different account and useless here, where
+                                      // what is wanted is the one already listed, authorized
+                                      // again. Pointing at the wrong action is what made people
+                                      // unlink a working account to grant a permission.
+                                      "To approve what Polaris now asks for, use the reconnect button beside the account above."
+                                    : "Disconnect one to connect another account."}
                             </span>
                         ) : null}
                     </div>
