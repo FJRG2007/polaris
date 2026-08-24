@@ -123,6 +123,8 @@ export default async function SecurityPage() {
                 newDeviceGraceDays={settings.newDeviceGraceDays}
                 hasPin={settings.hasPin}
                 idleLockMinutes={settings.idleLockMinutes}
+                bindSessionsToClient={settings.bindSessionsToClient}
+                pinSessionsToAddress={settings.pinSessionsToAddress}
                 sessionMaxMinutes={settings.sessionMaxMinutes}
                 requireLoginApproval={settings.requireLoginApproval}
                 emailLinkSignIn={settings.emailLinkSignIn}

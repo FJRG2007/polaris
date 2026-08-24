@@ -34,6 +34,9 @@ vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/network-service", () => ({ networkPublicIp: async () => "85.87.156.88" }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The account's own rule about addresses, which the directory reads to
+        // say what each session's "follow the account" currently amounts to.
+        userSecurity: { findUnique: async () => null },
         session: {
             findMany: async () => sessionRows,
             findFirst: async ({ where }: { where: { id: string; userId: string } }) =>

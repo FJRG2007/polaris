@@ -21,6 +21,15 @@
 
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { sessionClient } from "@/lib/session-device";
+import { notifySessionCompromised } from "@/lib/notifications/session-breach";
+import {
+    bindingBreach,
+    describeClient,
+    isHandheld,
+    type AddressPinScope,
+    type BindingBreach
+} from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
 import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
@@ -182,7 +191,9 @@ export async function guardSession({
                     select: {
                         idleLockMinutes: true,
                         sessionMaxMinutes: true,
-                        requireLoginApproval: true
+                        requireLoginApproval: true,
+                        bindSessionsToClient: true,
+                        pinSessionsToAddress: true
                     }
                 }
             }
@@ -211,7 +222,42 @@ export async function guardSession({
 
     const ip = await clientIp();
 
-    // 2. First sight of this session, or a move to a new address: re-run the
+    // 2. Somebody else holding this session.
+    //
+    //    Everything else an account can arm guards the moment of signing in and
+    //    says nothing about the hours afterwards - which is exactly the window a
+    //    stolen cookie is worth something in. This is the window. It runs before
+    //    the network rules because it is about the cookie rather than about the
+    //    account, and a session that is not this person's should not get as far
+    //    as being judged as if it were.
+    if (state) {
+        const breach = await breachOf(state, settings, ip ?? null);
+        if (breach) {
+            await revokeSession(sessionId);
+            await recordAudit({
+                actorId: userId,
+                action: "account.session.compromised",
+                targetType: "session",
+                targetId: sessionId,
+                metadata: { breach, ip: ip ?? null }
+            });
+            await notifySessionCompromised({
+                userId,
+                report: {
+                    device: sessionClient({ userAgent: null, state }).label,
+                    breach,
+                    ip: ip ?? null,
+                    userAgent: (await clientUserAgent()) ?? null,
+                    brands: (await clientUserAgentBrands()) ?? null,
+                    platform: (await clientUserAgentPlatform()) ?? null,
+                    at: new Date()
+                }
+            });
+            return { ok: false, redirect: "/oauth/login?compromised=1" };
+        }
+    }
+
+    // 3. First sight of this session, or a move to a new address: re-run the
     //    account's network rules rather than trusting an old verdict forever.
     if (!state || state.ip !== (ip ?? null)) {
         const decision = await evaluateAccountAccess(userId, ip, await resolveSignInRules(userId));
@@ -247,14 +293,14 @@ export async function guardSession({
         });
     }
 
-    // 3. An explicit decision from another session wins over everything below.
+    // 4. An explicit decision from another session wins over everything below.
     if (state.approval === "denied") {
         await revokeSession(sessionId);
         return { ok: false, redirect: "/oauth/login?denied=1" };
     }
     if (state.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
 
-    // 4. The idle lock. Already locked, or idle long enough to lock now.
+    // 5. The idle lock. Already locked, or idle long enough to lock now.
     if (state.lockedAt) return { ok: false, redirect: "/oauth/lock" };
     const idleMinutes = settings?.idleLockMinutes ?? 0;
     if (idleMinutes > 0 && now - state.lastSeenAt.getTime() >= idleMinutes * 60_000) {
@@ -262,13 +308,13 @@ export async function guardSession({
         return { ok: false, redirect: "/oauth/lock" };
     }
 
-    // 5. The instance's demand for a second factor. After the lock, because a
+    // 6. The instance's demand for a second factor. After the lock, because a
     //    locked screen is the same person needing to prove themselves and asking
     //    them to arm a factor through it would be asking the wrong question first.
     const owed = await secondFactorVerdict(record.twoFactorEnabled === true);
     if (owed) return owed;
 
-    // 6. Keep the activity stamp fresh, but not on every single request. A
+    // 7. Keep the activity stamp fresh, but not on every single request. A
     //    session opened before the host was recorded adopts it here, which is the
     //    only way an already-open one ever gets a name against it.
     const host = state.host ?? (await clientHost()) ?? null;
@@ -279,6 +325,48 @@ export async function guardSession({
     }
 
     return { ok: true, view: state };
+}
+
+/**
+ * Whether this request is somebody other than whoever opened the session.
+ *
+ * Read off the session's own recorded client rather than better-auth's column,
+ * which is written once at sign-in and never followed - the same reading every
+ * screen names the device by, so what refuses a session is what the alert about
+ * it will say.
+ *
+ * The comparison itself is `bindingBreach` and lives in core, because every one
+ * of its judgement calls is a false positive waiting to happen and each of them
+ * is worth being able to state and check on its own.
+ */
+async function breachOf(
+    state: {
+        userAgent: string | null;
+        userAgentBrands: string | null;
+        userAgentPlatform: string | null;
+        ip: string | null;
+        pinToAddress: boolean | null;
+    },
+    settings: { bindSessionsToClient: boolean; pinSessionsToAddress: string } | null | undefined,
+    ip: string | null
+): Promise<BindingBreach | null> {
+    // No settings row means the account has never opened Security, which is the
+    // common case and carries the defaults - the client binding among them.
+    const bindClient = settings?.bindSessionsToClient ?? true;
+    const pinScope = (settings?.pinSessionsToAddress ?? "off") as AddressPinScope;
+    if (!bindClient && pinScope === "off" && state.pinToAddress !== true) return null;
+
+    const was = sessionClient({ userAgent: null, state });
+    const here = describeClient(
+        (await clientUserAgent()) ?? null,
+        (await clientUserAgentBrands()) ?? null,
+        (await clientUserAgentPlatform()) ?? null
+    );
+    return bindingBreach(
+        { bindClient, pinScope, pinThisSession: state.pinToAddress },
+        { os: was.os, browser: was.browser, ip: state.ip, handheld: isHandheld(was.os) },
+        { os: here.os, browser: here.browser, ip }
+    );
 }
 
 /**

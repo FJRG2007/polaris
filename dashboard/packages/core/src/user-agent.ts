@@ -316,3 +316,21 @@ export function userAgentAllowed(rules: UserAgentRules, userAgent: string | null
     if (rules.allowedUserAgents.length === 0) return true;
     return rules.allowedUserAgents.some((pattern) => userAgentMatches(client, pattern));
 }
+
+/**
+ * Whether a system name is one that lives in a hand.
+ *
+ * The distinction the address binding is scoped by, and the only thing it turns
+ * on: a phone changes address several times an hour walking between cell and
+ * wifi, and a desk does not. Read from the system rather than from the
+ * user-agent's "Mobile" token, which an iPad omits and a desktop browser in
+ * device-emulation mode adds.
+ *
+ * ChromeOS is a laptop and Linux might be anything, so both count as neither -
+ * which is to say, as a computer. An unknown system is a computer as well: a
+ * scope that named phones must not quietly include everything it could not read.
+ */
+export function isHandheld(os: string): boolean {
+    const name = os.trim().toLowerCase();
+    return name === "android" || name === "ios";
+}

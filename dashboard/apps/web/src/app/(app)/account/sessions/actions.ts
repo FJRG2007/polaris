@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { sessionName } from "@polaris/core";
@@ -74,6 +75,48 @@ export async function revokeSessionAction(sessionId: unknown): Promise<{ error?:
     if (!parsed.success) return { error: "Unknown session." };
     if (parsed.data === user.sessionId) return { error: "Use Sign out to end this session." };
     await revokeUserSession(user.id, parsed.data);
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/**
+ * Tie one session to its address, untie it, or hand it back to the account's own
+ * rule.
+ *
+ * Three answers rather than two, and the third is the one that matters: "follow
+ * the rule" is what nearly every session holds, and without it the account-wide
+ * setting would mean nothing the moment somebody touched a single row.
+ *
+ * No password asked for. Pinning only ever narrows where a session works, and
+ * unpinning one narrows nothing that was not already the account's default - the
+ * ways in are unchanged either way.
+ */
+export async function pinSessionAction(
+    sessionId: unknown,
+    pinned: unknown
+): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: "Unknown session." };
+    if (pinned !== null && typeof pinned !== "boolean") return { error: "Unknown setting." };
+
+    // Scoped to the caller's own account, so an id from somewhere else changes
+    // nothing rather than reaching another account's session.
+    const written = await prisma.sessionState.updateMany({
+        where: { sessionId: parsed.data, userId: user.id },
+        data: { pinToAddress: pinned }
+    });
+    if (written.count === 0) return { error: "That session is no longer signed in." };
+
+    await recordAudit({
+        actorId: user.id,
+        action: "account.session.pinned",
+        targetType: "session",
+        targetId: parsed.data,
+        metadata: { pinToAddress: pinned }
+    });
     revalidatePath("/account/sessions");
     return {};
 }

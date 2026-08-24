@@ -19,7 +19,16 @@ import { networkPublicIp } from "@/lib/network-service";
 import { sessionClient, sessionDevice } from "@/lib/session-device";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
-import { describeDevice, isIpv4, isPrivateIp, sessionName, type SignInRecord } from "@polaris/core";
+import {
+    addressPinned,
+    describeDevice,
+    isHandheld,
+    isIpv4,
+    isPrivateIp,
+    sessionName,
+    type AddressPinScope,
+    type SignInRecord
+} from "@polaris/core";
 import {
     sessionApproval,
     sessionSignIn,
@@ -95,6 +104,19 @@ export interface SessionView {
     lastSeenAt: string;
     createdAt: string;
     expiresAt: string;
+    /**
+     * Whether this one session is tied to the address it was opened at.
+     *
+     * Three answers rather than two. Null is "whatever the account says", which
+     * is what nearly every session holds and what lets the account-wide rule mean
+     * anything; true and false are a deliberate statement about this device - the
+     * desk it never leaves, or the laptop that lives on whichever network its
+     * owner is standing in.
+     */
+    pinToAddress: boolean | null;
+    /** What the account's own rule decides for this session, so a row can say
+     *  what "whatever the account says" currently amounts to. */
+    pinnedByRule: boolean;
 }
 
 /** One line describing where a sign-in came from, for a notification body. */
@@ -163,7 +185,8 @@ function toSessionView(
     row: SessionRow,
     currentSessionId: string,
     publicIp: string | null,
-    liveIds: ReadonlySet<string>
+    liveIds: ReadonlySet<string>,
+    pinScope: AddressPinScope
 ): SessionView {
     const ip = row.state?.ip ?? row.ipAddress;
     const authorizerId = row.state?.authorizedBySessionId ?? null;
@@ -197,7 +220,12 @@ function toSessionView(
             : null,
         lastSeenAt: (row.state?.lastSeenAt ?? row.createdAt).toISOString(),
         createdAt: row.createdAt.toISOString(),
-        expiresAt: row.expiresAt.toISOString()
+        expiresAt: row.expiresAt.toISOString(),
+        pinToAddress: row.state?.pinToAddress ?? null,
+        pinnedByRule: addressPinned(
+            { bindClient: true, pinScope, pinThisSession: null },
+            { os: client.os, browser: client.browser, ip, handheld: isHandheld(client.os) }
+        )
     };
 }
 
@@ -212,6 +240,16 @@ function toSessionView(
  * reading somebody else's list passes their own and gets no match, which is
  * exactly right - none of those sessions is the one they are reading from.
  */
+/** What the account's own rule says about addresses, defaulted for an account
+ *  that has never opened Security. */
+async function addressPinScope(userId: string): Promise<AddressPinScope> {
+    const row = await prisma.userSecurity.findUnique({
+        where: { userId },
+        select: { pinSessionsToAddress: true }
+    });
+    return (row?.pinSessionsToAddress ?? "off") as AddressPinScope;
+}
+
 export async function listUserSessions(
     userId: string,
     currentSessionId: string
@@ -219,7 +257,8 @@ export async function listUserSessions(
     const rows = await liveSessionRows(userId);
     const publicIp = await pairedPublicIp(rows.map((row) => row.state?.ip ?? row.ipAddress));
     const live = idsOf(rows);
-    return rows.map((row) => toSessionView(row, currentSessionId, publicIp, live));
+    const pinScope = await addressPinScope(userId);
+    return rows.map((row) => toSessionView(row, currentSessionId, publicIp, live, pinScope));
 }
 
 /**
@@ -400,12 +439,15 @@ export async function trustedDeviceDetail(
         ...matched.map((row) => row.state?.ip ?? row.ipAddress)
     ]);
     const live = idsOf(rows);
+    const pinScope = await addressPinScope(userId);
     return {
         device: toTrustedDeviceRow(view, publicIp),
         identified: true,
         // Judged against every live session, not only the ones this device holds:
         // the answer that let one of them in usually came from another device.
-        sessions: matched.map((row) => toSessionView(row, currentSessionId, publicIp, live)),
+        sessions: matched.map((row) =>
+            toSessionView(row, currentSessionId, publicIp, live, pinScope)
+        ),
         passkeys
     };
 }

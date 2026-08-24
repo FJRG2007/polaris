@@ -31,6 +31,7 @@ import {
     newDeviceGraceSchema,
     recoverPasswordSchema,
     securityQuestionsSchema,
+    sessionBindingSchema,
     sessionLimitsSchema,
     setPinSchema
 } from "@polaris/core";
@@ -48,6 +49,7 @@ import {
     setLoginApprovalRequired,
     setQuickPin,
     setSecurityQuestions,
+    updateSessionBinding,
     updateSessionLimits,
     verifyAccountPassword,
     verifySecurityAnswers,
@@ -251,6 +253,31 @@ export async function setNewDeviceGraceAction(days: unknown): Promise<ActionResu
         actorId: user.id,
         action: "account.new-device-grace.updated",
         metadata: { days: parsed.data }
+    });
+    revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Store what this account ties its sessions to.
+ *
+ * No password asked for, unlike the settings that take a protection away: both of
+ * these only ever narrow where a session works. Turning the client binding off
+ * does widen it, and is the one case worth a thought - but a session that has
+ * been stolen is already refused by the binding it would have to turn off, so
+ * asking would only be asking the real owner.
+ */
+export async function updateSessionBindingAction(input: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+    const parsed = sessionBindingSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    await updateSessionBinding(user.id, parsed.data);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.session-binding.updated",
+        metadata: parsed.data
     });
     revalidatePath("/account/security");
     return {};

@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { ADDRESS_PIN_SCOPES } from "../session-binding.js";
 import { isCidr, isIpAddress } from "../cidr.js";
 import { CONTINENTS, COUNTRY_CODES } from "../geo.js";
 import { USER_AGENT_PATTERN_MAX } from "../user-agent.js";
@@ -100,6 +101,23 @@ export const sessionLimitsSchema = z.object({
             message: "Unsupported session lifetime"
         })
 });
+
+/**
+ * What a session is tied to, beyond the cookie itself.
+ *
+ * The cookie is a bearer token - it is the account in whoever's hands it lands -
+ * and every other thing an account can arm guards the moment of signing in
+ * rather than the hours after it. These two are about the hours after it.
+ */
+export const sessionBindingSchema = z.object({
+    /** Refuse a session used from a different browser or system than the one it
+     *  was opened in. On by default, because nothing legitimate crosses it. */
+    bindSessionsToClient: z.boolean(),
+    /** Which sessions are also tied to the address they were opened at. */
+    pinSessionsToAddress: z.enum(ADDRESS_PIN_SCOPES)
+});
+
+export type SessionBindingInput = z.infer<typeof sessionBindingSchema>;
 
 /**
  * How long a device newly seen on an account waits before it may change what

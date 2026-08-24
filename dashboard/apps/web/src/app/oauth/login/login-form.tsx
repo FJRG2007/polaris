@@ -26,7 +26,13 @@ const SESSION_NOTICES: Readonly<Record<string, string>> = {
     banned: "That account has been suspended.",
     expired: "Your session reached its time limit. Sign in again.",
     blocked: "Sign-in is not allowed from this location.",
-    denied: "That sign-in was denied from another device."
+    denied: "That sign-in was denied from another device.",
+    // The one notice that is about the person reading it rather than about the
+    // session: whoever is at this screen may be the owner, and may be whoever
+    // took the cookie. It says what happened and nothing about the account, and
+    // the owner has the full account of it waiting on the other side.
+    compromised:
+        "That session was tied to another device or network and has been ended. The account owner has been told."
 };
 
 /**

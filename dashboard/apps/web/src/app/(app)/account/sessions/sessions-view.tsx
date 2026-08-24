@@ -26,6 +26,7 @@ import {
     decideLoginApprovalAction,
     noteSignOutAction,
     revokeOtherSessionsAction,
+    pinSessionAction,
     revokeSessionAction
 } from "./actions";
 import {
@@ -96,6 +97,18 @@ export function SessionsView({
         setBusyId(session.id);
         setError(null);
         const result = await revokeSessionAction(session.id);
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
+    /** Tie one session to its address, untie it, or hand it back to the account
+     *  rule. No confirmation: it takes nothing away that a press cannot put back,
+     *  and the button says what it is about to do. */
+    async function pin(session: SessionView, pinned: boolean | null) {
+        setBusyId(session.id);
+        setError(null);
+        const result = await pinSessionAction(session.id, pinned);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
@@ -205,6 +218,7 @@ export function SessionsView({
                         emptyLabel="Nothing is signed in."
                         activityHref={(session) => `/account/activity?session=${session.id}`}
                         onRevoke={(session) => void (session.current ? signOutHere() : revoke(session))}
+                        onPin={(session, pinned) => void pin(session, pinned)}
                     />
                 </CardBody>
             </Card>

@@ -87,6 +87,7 @@ export {
     clearSecurityQuestions,
     verifySecurityAnswers,
     resetUserPassword,
+    updateSessionBinding,
     updateSignInRules,
     updateEnforcedRules,
     getEnforcedRules,

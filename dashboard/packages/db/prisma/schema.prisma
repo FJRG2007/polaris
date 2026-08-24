@@ -801,6 +801,27 @@ model UserSecurity {
     // else's, and short enough that a walked-away-from screen does not carry it.
     reauthUntil          DateTime?
     reauthSessionId      String?   @db.Uuid
+    // Whether a session stops working when it turns up in a different browser or
+    // on a different operating system than the one it was opened in.
+    //
+    // On by default, and it is the cheap half of the pair below. A stolen cookie
+    // is worth exactly as much as the browser it is pasted into, and a cookie
+    // taken off a Windows machine running Brave and replayed from Chrome on Linux
+    // is not that person. Nothing legitimate crosses that line: a browser update
+    // changes a version and neither the browser nor the system it runs on, which
+    // is why only the names are compared and never the versions.
+    bindSessionsToClient Boolean @default(true)
+    // Which of this account's sessions are also tied to the address they were
+    // opened from: off | all | desktop | mobile.
+    //
+    // Off by default, and that default is not timidity. A phone moves between
+    // cell and wifi several times an hour and each move is a different address,
+    // so "all" on a phone is an account that signs itself out all day. `desktop`
+    // is the setting that is nearly always right: a laptop on a fixed network
+    // gains the strongest protection there is against a stolen cookie, and the
+    // phone in a pocket is left alone. One session can also answer differently
+    // from the rule - see SessionState.pinToAddress.
+    pinSessionsToAddress String  @default("off")
     // Days a device newly seen on this account waits before it may change
     // anything under Security. 0 turns the wait off, which is the default: it
     // protects an account whose password has just been taken, at the cost of
@@ -1012,6 +1033,11 @@ model SessionState {
     // become "nothing let this in" the moment that laptop goes.
     authorizedBySessionId String?  @db.Uuid
     authorizedByDevice    String?
+    // Whether this one session is tied to its address, whatever the account's own
+    // rule says. Null follows the rule; true and false are a deliberate answer
+    // about this device - the desk it never leaves, or the laptop that lives on
+    // whatever network its owner is standing in.
+    pinToAddress Boolean?
     // An administrator looking at Polaris as somebody else. Exactly one of the
     // two is set: viewAsUserId is another account this session is acting as,
     // viewAsRoleId is a role whose grants stand in for the administrator's own.
@@ -2695,6 +2721,20 @@ model GeoIpCache {
     countryCode String?
     country     String?
     continent   String?
+    // Everything below the country. Not needed by the access rules, which are
+    // decided per country and per continent - it is here for the one screen that
+    // has to describe somebody rather than judge them: the report an account is
+    // handed when a session of theirs was used from somewhere it should not have
+    // been. "Spain" is not something anybody can take to the police; a city, a
+    // network operator and the hour it happened in local time are.
+    city        String?
+    region      String?
+    // IANA zone, which is what turns a timestamp into the hour it was where they
+    // were standing.
+    timeZone    String?
+    // Whoever the address belongs to - the ISP, or the hosting company when it is
+    // a rented machine, which is itself worth reading.
+    network     String?
     source      String?
     updatedAt   DateTime @updatedAt
 }

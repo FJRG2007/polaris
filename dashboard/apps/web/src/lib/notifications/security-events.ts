@@ -56,6 +56,11 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.login-approval.disabled": { title: "Sign-ins no longer have to be approved", href: SECURITY },
     "account.new-device-grace.updated": { title: "The wait for a new device changed", href: SECURITY },
     "account.session-limits.updated": { title: "Your session limits changed", href: SECURITY },
+    "account.session-binding.updated": { title: "What your sessions are tied to changed", href: SECURITY },
+    // The pin itself, not the refusal it later causes. A session being refused
+    // has its own alert, with the whole account of who turned up - see
+    // notifications/session-breach.
+    "account.session.pinned": { title: "A session was tied to its address", href: SESSIONS },
     "account.successor.set": { title: "An account successor was named", href: SECURITY },
     "account.successor.cleared": { title: "The account successor was removed", href: SECURITY },
     "connection.signin.allowed": { title: "A connected account may now sign you in", href: SECURITY },

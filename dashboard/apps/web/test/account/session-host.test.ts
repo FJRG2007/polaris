@@ -22,6 +22,9 @@ vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The account's own rule about addresses, which the directory reads to
+        // say what each session's "follow the account" currently amounts to.
+        userSecurity: { findUnique: async () => null },
         session: {
             findMany: async (args: Record<string, unknown>) => {
                 sessionFindManyArgs.push(args);

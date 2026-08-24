@@ -18,6 +18,7 @@ import {
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHODS,
     type AccessRulesInput,
+    type AddressPinScope,
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod,
     type TwoFactorPreferencesInput
@@ -46,6 +47,12 @@ export interface UserSecuritySettings {
     /** Days a device newly seen on the account waits before it may change any
      *  of this. 0 when the account asks for no wait. */
     newDeviceGraceDays: number;
+    /** Refuse a session used from a different browser or system than the one it
+     *  was opened in. On unless the account turned it off. */
+    bindSessionsToClient: boolean;
+    /** Which of this account's sessions are tied to the address they were opened
+     *  at: off | all | desktop | mobile. */
+    pinSessionsToAddress: AddressPinScope;
     allowedCidrs: string[];
     allowedCountries: string[];
     allowedContinents: string[];
@@ -65,6 +72,11 @@ const DEFAULTS: UserSecuritySettings = {
     // directly, which is to say by scanning a QR code. Its authenticator is real.
     totpUnclaimed: false,
     newDeviceGraceDays: 0,
+    // On for an account that has never opened Security, which is most of them.
+    // It costs nothing anybody notices and it is the whole of the answer to a
+    // cookie pasted into another browser.
+    bindSessionsToClient: true,
+    pinSessionsToAddress: "off",
     allowedCidrs: [],
     allowedCountries: [],
     allowedContinents: [],
@@ -126,6 +138,8 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         totpUnclaimed: row.totpUnclaimed,
         newDeviceGraceDays: row.newDeviceGraceDays,
+        bindSessionsToClient: row.bindSessionsToClient,
+        pinSessionsToAddress: row.pinSessionsToAddress as AddressPinScope,
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
         allowedContinents: parseStringList(row.allowedContinents),
@@ -508,6 +522,14 @@ export async function resetUserPassword(
 // ---------------------------------------------------------------------------
 
 /** Replace the account's own sign-in restrictions and attached access groups. */
+/** Store what this account ties its sessions to. */
+export async function updateSessionBinding(
+    userId: string,
+    binding: { bindSessionsToClient: boolean; pinSessionsToAddress: AddressPinScope }
+): Promise<void> {
+    await upsertSecurity(userId, binding);
+}
+
 export async function updateSignInRules(userId: string, rules: AccessRulesInput): Promise<void> {
     await upsertSecurity(userId, {
         allowedCidrs: stringifyList(rules.allowedCidrs),

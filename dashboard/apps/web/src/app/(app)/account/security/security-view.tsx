@@ -27,6 +27,7 @@ import { TwoFactorMethodsCard } from "./two-factor-methods-card";
 import { SuccessorCard, type SuccessorPerson } from "./successor-card";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { Feedback, SettingCard, type SettingLock } from "./setting-card";
+import { SessionBindingCard } from "./session-binding-card";
 import { setNewDeviceGraceAction, updateSessionLimitsAction } from "./actions";
 import { ChangePasswordDialog, RecoverPasswordDialog } from "./password-dialogs";
 import { ClearQuestionsDialog, SecurityQuestionsDialog } from "./questions-dialog";
@@ -34,6 +35,7 @@ import { DisableTwoFactorDialog, EnableTwoFactorDialog } from "./two-factor-dial
 import { ConnectedSignInCard, type ConnectedSignIn, type ConnectionChallenge } from "./connected-sign-in-card";
 import {
     IDLE_LOCK_CHOICES,
+    type AddressPinScope,
     NEW_DEVICE_GRACE_CHOICES,
     SECURITY_QUESTION_COUNT,
     SESSION_MAX_CHOICES,
@@ -64,6 +66,8 @@ export function SecurityView({
     newDeviceGraceDays,
     hasPin,
     idleLockMinutes,
+    bindSessionsToClient,
+    pinSessionsToAddress,
     sessionMaxMinutes,
     requireLoginApproval,
     emailLinkSignIn,
@@ -90,6 +94,10 @@ export function SecurityView({
     newDeviceGraceDays: number;
     hasPin: boolean;
     idleLockMinutes: number;
+    /** What a session is tied to beyond the cookie: the browser it was opened
+     *  in, and which devices are also tied to their address. */
+    bindSessionsToClient: boolean;
+    pinSessionsToAddress: AddressPinScope;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
     /** Whether a link emailed to this account signs it in. Off unless asked for. */
@@ -365,6 +373,12 @@ export function SecurityView({
                     </Card>
                 </div>
             </div>
+
+            <SessionBindingCard
+                bindSessionsToClient={bindSessionsToClient}
+                pinSessionsToAddress={pinSessionsToAddress}
+                lock={lock}
+            />
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
             <SuccessorCard successor={successor} lock={lock} />

@@ -211,6 +211,19 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "account.session.compromised",
+        group: "security",
+        label: "A session was used by somebody else",
+        description:
+            "A session of yours was used from a device or an address it is not tied to, and was ended.",
+        // The most serious thing an account can be told about itself: somebody
+        // was holding a session that was not theirs. It goes everywhere it can
+        // and it is not something an account is allowed to switch off quietly.
+        level: "danger",
+        critical: true,
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "account.friend",
         group: "people",
         // One entry for both halves of the same exchange: being asked, and

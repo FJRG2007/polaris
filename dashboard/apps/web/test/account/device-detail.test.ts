@@ -48,6 +48,9 @@ vi.mock("@polaris/auth", () => ({
 }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The account's own rule about addresses, which the directory reads to
+        // say what each session's "follow the account" currently amounts to.
+        userSecurity: { findUnique: async () => null },
         session: {
             findMany: async () => sessionRows,
             deleteMany: async ({ where }: { where: Record<string, unknown> }) => {

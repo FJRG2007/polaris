@@ -21,7 +21,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInSummary } from "@polaris/core";
 import { Badge, Button, cn } from "@polaris/ui";
-import { History, KeyRound, LogOut } from "lucide-react";
+import { History, KeyRound, Lock, LockOpen, LogOut } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import type { SessionView } from "@/lib/session-directory";
 import { BrowserMark, SystemMark } from "@/components/client-marks";
@@ -97,6 +97,7 @@ export function SessionsTable({
     busyId,
     activityHref,
     onRevoke,
+    onPin,
     emptyLabel,
     compact = false
 }: {
@@ -107,6 +108,15 @@ export function SessionsTable({
      *  business reading the account's log. */
     activityHref?: (session: SessionView) => string;
     onRevoke: (session: SessionView) => void;
+    /**
+     * Tie this one session to its address, untie it, or hand it back to the
+     * account's rule (null).
+     *
+     * Left out where the reader is not the owner - an administrator reading
+     * somebody's sessions may end one, which is a safety valve, and may not
+     * quietly change what that person's laptop is allowed to do.
+     */
+    onPin?: (session: SessionView, pinned: boolean | null) => void;
     emptyLabel: string;
     /** For the dialogs, whose box is a fixed width the viewport says nothing
      *  about. The columns fold into the device cell rather than being decided by
@@ -178,6 +188,15 @@ export function SessionsTable({
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
                                                 <Badge>{signInSummary(session.signIn)}</Badge>
+                                                {/* Only where it is actually on. A
+                                                    badge on every row saying a session
+                                                    is not pinned is a column of "no". */}
+                                                {(session.pinToAddress ??
+                                                    session.pinnedByRule) ? (
+                                                    <Badge title="This session only works from the address it was opened at">
+                                                        Address-locked
+                                                    </Badge>
+                                                ) : null}
                                             </p>
                                             {/* The columns the narrow layouts drop, folded back in. */}
                                             <p
@@ -243,6 +262,13 @@ export function SessionsTable({
                                                 </Link>
                                             </Button>
                                         ) : null}
+                                        {onPin ? (
+                                            <PinButton
+                                                session={session}
+                                                busy={busyId !== null}
+                                                onPin={onPin}
+                                            />
+                                        ) : null}
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -261,5 +287,53 @@ export function SessionsTable({
                 </tbody>
             </table>
         </div>
+    );
+}
+
+/**
+ * The address lock on one session, as three states rather than two.
+ *
+ * A switch would have to lie about the third: nearly every session says "follow
+ * the account", and a two-way toggle showing that as either on or off would make
+ * the account-wide setting stop meaning anything the moment anybody touched a
+ * row. So the button cycles, and its title always says what the current answer
+ * actually is and what pressing will do.
+ */
+function PinButton({
+    session,
+    busy,
+    onPin
+}: {
+    session: SessionView;
+    busy: boolean;
+    onPin: (session: SessionView, pinned: boolean | null) => void;
+}) {
+    const state = session.pinToAddress;
+    const effective = state ?? session.pinnedByRule;
+    const next = state === null ? true : state === true ? false : null;
+    const says =
+        state === null
+            ? `Following your account setting, which is currently ${session.pinnedByRule ? "locked" : "not locked"}`
+            : state
+              ? "Locked to the address it was opened at"
+              : "Not locked, whatever your account setting says";
+    const then =
+        next === true ? "lock it" : next === false ? "leave it unlocked" : "follow your account setting";
+
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            disabled={busy}
+            title={`${says}. Press to ${then}.`}
+            aria-label={`Address lock for ${session.device}: ${says}`}
+            onClick={() => onPin(session, next)}
+        >
+            {effective ? (
+                <Lock className={cn("size-4", state !== null && "text-primary")} />
+            ) : (
+                <LockOpen className={cn("size-4", state !== null && "text-primary")} />
+            )}
+        </Button>
     );
 }

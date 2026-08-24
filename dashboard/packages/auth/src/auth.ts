@@ -700,7 +700,32 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
         },
         session: {
             expiresIn: SESSION_MAX_AGE,
-            updateAge: SESSION_UPDATE_AGE
+            updateAge: SESSION_UPDATE_AGE,
+            /**
+             * Off, because Polaris asks a better question in the one place this
+             * was being asked.
+             *
+             * better-auth calls a session "fresh" for a day after it was created,
+             * and the passkey plugin refuses to start a registration ceremony
+             * once it is not. `createdAt` is never moved by a refresh - so a
+             * phone signed in since the week it was set up is permanently stale,
+             * and adding a passkey from it answers "Session is not fresh" after
+             * the password has already been typed and accepted. There is nothing
+             * on the screen to do about it and nothing wrong with the account.
+             *
+             * What that check stands for - "prove this is really you before
+             * attaching a permanent way in" - is already enforced here, and
+             * enforced properly: `refuseProtectedEndpoint` refuses the same two
+             * endpoints unless the account password has been confirmed against
+             * this session in the last few minutes. That is a proof of the
+             * account rather than an accident of when it signed in, and it does
+             * not go stale with the session.
+             *
+             * The only other endpoint behind the same middleware is better-auth's
+             * `/unlink-account`, which nothing in Polaris uses: connected accounts
+             * are Polaris's own and are unlinked through their own actions.
+             */
+            freshAge: 0
         },
         hooks: { after: recordSignInMethod },
         plugins: buildPlugins(options, address ?? new URL(env.POLARIS_APP_URL).host),
