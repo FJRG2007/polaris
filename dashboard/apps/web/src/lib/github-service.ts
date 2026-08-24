@@ -244,6 +244,9 @@ export const APP_PERMISSIONS: Readonly<Record<string, string>> = {
     actions: "write",
     // Post the run-status check a pull request shows while a run is in flight.
     checks: "write",
+    // Announce a deploy on the commit it came from, so the repository shows what
+    // Polaris is doing with it the way it shows Vercel and Railway.
+    deployments: "write",
     // Write the workflow file itself. GitHub gates this separately from contents.
     workflows: "write",
     // Register self-hosted runners on a repository, which is what a runner pool
@@ -1068,6 +1071,116 @@ export async function getChangedFiles(
         );
     } catch {
         return [];
+    }
+}
+
+// --- Deployments -----------------------------------------------------------
+//
+// The deployment box GitHub renders on a commit and on a pull request, with a
+// state and a "View deployment" link - the one Vercel and Railway fill in. It is
+// two calls: GitHub mints a Deployment against a commit, and every state after
+// that is posted against the id it minted.
+//
+// Both are best-effort throughout. A repository that refuses them is a repository
+// whose deploys still work; announcing is something a deploy does, never
+// something it depends on.
+
+/** The states GitHub accepts for a deployment. `error` is the one a cancel lands
+ *  on: there is no cancelled state, and leaving it in progress is worse. */
+export type DeploymentState = "queued" | "in_progress" | "success" | "failure" | "error" | "inactive";
+
+/** GitHub truncates a longer description; trimming here keeps what it shows ours. */
+function shortDescription(text: string): string {
+    const line = text.split("\n").map((part) => part.trim()).find((part) => part.length > 0) ?? "";
+    return line.length > 140 ? `${line.slice(0, 137)}...` : line;
+}
+
+/**
+ * Mint a Deployment on a commit, and hand back the id its states are posted
+ * against. Null when GitHub would not create one.
+ *
+ * The two flags are not optional in practice, whatever the API defaults say.
+ * Without `auto_merge: false` GitHub answers a ref behind its base branch by
+ * merging into it - a deploy that silently writes to somebody's repository.
+ * Without an empty `required_contexts` it refuses outright whenever a check on
+ * that commit has not passed yet, which for a push-triggered deploy is nearly
+ * always: the build starts long before CI has finished.
+ */
+export async function createDeployment(input: {
+    owner: string;
+    repo: string;
+    /** The commit SHA. A branch name would deploy whatever is at its head later. */
+    ref: string;
+    environment: string;
+    description: string;
+    production: boolean;
+    token: string;
+}): Promise<string | null> {
+    try {
+        const res = await fetch(`${API}/repos/${input.owner}/${input.repo}/deployments`, {
+            method: "POST",
+            headers: { ...apiHeaders(input.token), "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify({
+                ref: input.ref,
+                environment: input.environment,
+                description: shortDescription(input.description),
+                production_environment: input.production,
+                auto_merge: false,
+                required_contexts: []
+            })
+        });
+        // 202 and 409 both come back with a message instead of a deployment: a merge
+        // GitHub performed, or a conflict it refused over. Neither has an id, so
+        // neither is something later states can be posted against.
+        if (res.status !== 201) return null;
+        const data = (await res.json()) as { id?: number };
+        return typeof data.id === "number" ? String(data.id) : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Post a state against a deployment. False when GitHub would not take it, which
+ * the caller uses only to decide what to log.
+ *
+ * `environment_url` is the "View deployment" link, so it is left off rather than
+ * pointed at a name only this network resolves - a button that goes nowhere is
+ * worse than no button. `log_url` is where GitHub sends whoever asks what
+ * happened, which is this deployment's own log.
+ */
+export async function setDeploymentState(input: {
+    owner: string;
+    repo: string;
+    deploymentId: string;
+    state: DeploymentState;
+    description: string;
+    environmentUrl?: string | null;
+    logUrl?: string | null;
+    token: string;
+}): Promise<boolean> {
+    try {
+        const res = await fetch(
+            `${API}/repos/${input.owner}/${input.repo}/deployments/${encodeURIComponent(input.deploymentId)}/statuses`,
+            {
+                method: "POST",
+                headers: { ...apiHeaders(input.token), "Content-Type": "application/json" },
+                cache: "no-store",
+                body: JSON.stringify({
+                    state: input.state,
+                    description: shortDescription(input.description),
+                    // Retires whatever was serving this environment before, so the
+                    // repository shows one active release rather than a pile of them.
+                    auto_inactive: true,
+                    ...(input.environmentUrl ? { environment_url: input.environmentUrl } : {}),
+                    ...(input.logUrl ? { log_url: input.logUrl } : {})
+                })
+            }
+        );
+        return res.status === 201;
+    } catch {
+        return false;
     }
 }
 

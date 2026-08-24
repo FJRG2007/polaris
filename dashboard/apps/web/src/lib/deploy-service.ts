@@ -31,6 +31,7 @@ import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
 import { parseGithubRepo } from "./repo-reference";
+import { announceDeployFinished, announceDeployQueued, announceDeployStarted } from "./deploy/github-deployment";
 import { githubCloneIdentity, githubCloneProblem, githubRepoReach, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
@@ -1798,6 +1799,12 @@ export async function deployApplication(
             isolated: keepsHistory
         }
     });
+    // Put it in the commit's deployment box before anything else happens, so a
+    // deploy that then sits on a busy target's queue is visible on GitHub as
+    // queued rather than as nothing at all. Awaited rather than left running: the
+    // id it records is what the states after it are posted against, and a build
+    // that started first would find nothing to post against.
+    await announceDeployQueued(deployment.id);
     // A service that keeps its history needs the release's own hostname and its own
     // project before the plan is handed to the runtime, so the container comes up
     // answering on it. Only that case pays for the second plan.
@@ -2400,17 +2407,24 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
  * still going, which is the state an operator waits on instead of retrying.
  */
 export async function recoverAbandonedDeployments(): Promise<void> {
-    const abandoned = await prisma.deployment.updateMany({
+    // Read before the write, because the ids are needed afterwards: any of these
+    // that reached GitHub is sitting in a repository reading "in progress", and
+    // nothing will ever move it - the runner behind it died with the last process.
+    const abandoned = await prisma.deployment.findMany({
         where: { status: { in: ["queued", "deploying"] } },
+        select: { id: true }
+    });
+    if (abandoned.length === 0) return;
+    await prisma.deployment.updateMany({
+        where: { id: { in: abandoned.map((row) => row.id) } },
         data: {
             status: "failed",
             error: "Polaris restarted while this deploy was running",
             finishedAt: new Date()
         }
     });
-    if (abandoned.count > 0) {
-        console.warn(`polaris: ${abandoned.count} deploy(s) were interrupted by a restart and are marked failed`);
-    }
+    console.warn(`polaris: ${abandoned.length} deploy(s) were interrupted by a restart and are marked failed`);
+    for (const row of abandoned) await announceDeployFinished(row.id, "failed");
 }
 
 /**
@@ -2459,6 +2473,7 @@ export async function executeDeployment(
         where: { id: deploymentId },
         data: { status: "deploying", startedAt: new Date(), logPath: `${deploymentId}.log` }
     });
+    await announceDeployStarted(deploymentId);
 
     const controller = new AbortController();
     running.set(deploymentId, controller);
@@ -2546,7 +2561,12 @@ async function settleDeployment(
         where: { id: deploymentId, status: { notIn: [...TERMINAL_DEPLOY_STATUSES] } },
         data
     });
-    return written.count > 0;
+    if (written.count === 0) return false;
+    // Here rather than at each of the four callers, for the same reason the alert
+    // is raised here: this is the one place a deploy ends, and a verdict that
+    // reached GitHub on some paths and not others is the gap worth closing.
+    await announceDeployFinished(deploymentId, data.status);
+    return true;
 }
 
 /** Finish a deployment that was stopped rather than allowed to fail: the release is

@@ -3519,6 +3519,13 @@ model Deployment {
     isolated       Boolean   @default(false)
     // Relative path (under the deploy dir) of the streamed build/deploy log file.
     logPath        String?
+    // The GitHub Deployment this release was announced as, so its state can be
+    // updated as the build moves - which is what puts Polaris in the commit's
+    // deployment box next to Vercel and Railway. "owner/repo" and the numeric id
+    // GitHub minted, both null when the source is not GitHub or nothing here can
+    // write to it.
+    githubRepo         String?
+    githubDeploymentId String?
     triggeredById  String?   @db.Uuid
     startedAt      DateTime?
     finishedAt     DateTime?

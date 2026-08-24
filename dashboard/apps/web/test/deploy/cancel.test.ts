@@ -19,6 +19,8 @@ interface DeploymentRow {
 }
 
 let found: DeploymentRow | null = null;
+/** What is still in flight when the process comes back up. */
+let inFlight: Array<{ id: string }> = [];
 const updateMany = vi.fn(async () => ({ count: 1 }));
 const deploymentUpdateMany = vi.fn(async (args: unknown) => {
     void args;
@@ -31,6 +33,7 @@ vi.mock("@polaris/db", () => ({
         deployment: {
             findFirst: vi.fn(async () => found),
             findUnique: vi.fn(async () => found),
+            findMany: vi.fn(async () => inFlight),
             updateMany: deploymentUpdateMany
         },
         domain: { deleteMany: vi.fn(async () => ({ count: 0 })) }
@@ -43,6 +46,7 @@ const { TERMINAL_DEPLOY_STATUSES } = await import("@/lib/deploy/status");
 
 beforeEach(() => {
     found = { status: "deploying" };
+    inFlight = [{ id: "dep-1" }, { id: "dep-2" }];
     deploymentUpdateMany.mockClear();
     deploymentUpdateMany.mockResolvedValue({ count: 1 });
     updateMany.mockClear();
@@ -93,10 +97,19 @@ describe("recovering after a restart", () => {
     it("closes out whatever was still in flight, since nothing is driving it any more", async () => {
         await recoverAbandonedDeployments();
         const [args] = deploymentUpdateMany.mock.calls[0] as [
-            { where: { status: { in: string[] } }; data: { status: string } }
+            { where: { id: { in: string[] } }; data: { status: string } }
         ];
-        expect(args.where.status.in).toEqual(["queued", "deploying"]);
+        // Read first and updated by id, because the ids are needed afterwards: any of
+        // these that reached GitHub is sitting in a repository reading "in progress",
+        // and nothing else will ever move it off that.
+        expect(args.where.id.in).toEqual(["dep-1", "dep-2"]);
         expect(args.data.status).toBe("failed");
+    });
+
+    it("writes nothing when nothing was in flight", async () => {
+        inFlight = [];
+        await recoverAbandonedDeployments();
+        expect(deploymentUpdateMany).not.toHaveBeenCalled();
     });
 });
 
