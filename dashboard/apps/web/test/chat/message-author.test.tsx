@@ -140,39 +140,33 @@ describe("right-clicking somebody's name", () => {
         await user.pointer({ target: screen.getByRole("button", { name: "grace" }), keys: "[MouseRight]" });
 
         expect(screen.queryByText("Report this account")).not.toBeNull();
-        // And the message menu is not the one that opened. Told apart by the item
-        // only its menu has: both now offer reporting the account, which is the
-        // point of the change that put it on the message menu as well.
+        // And the message menu is not the one that opened: the two menus name
+        // different things, which is what tells them apart.
         expect(screen.queryByText("Report this message")).toBeNull();
     });
 });
 
 describe("right-clicking the message itself", () => {
-    it("offers both reports, because the account is the more common one", async () => {
-        // A single message is rarely the problem by itself: somebody who has
-        // decided to report is usually reporting a person. That was only on the
-        // name's own menu - a smaller target, and absent entirely on a run of
-        // messages from the same person, which is most of a conversation.
+    it("asks about the message, and only about the message", async () => {
+        // The account has its own menu on the name. Two reports side by side made
+        // the common one - the message - a choice somebody had to read twice.
         const user = userEvent.setup();
         list();
         await user.pointer({ target: screen.getByText("message m1"), keys: "[MouseRight]" });
 
         expect(screen.queryByText("Report this message")).not.toBeNull();
-        expect(screen.queryByText("Report this account")).not.toBeNull();
+        expect(screen.queryByText("Report this account")).toBeNull();
     });
 
-    it("draws both as consequences rather than as one", async () => {
-        // Red on both. One of them reading like Copy is how a menu stops saying
-        // which of its items are heavy - which is what this looked like when the
-        // account report was red on one menu and the message report was not.
+    it("draws it as a consequence rather than as another Copy", async () => {
+        // It is the one heavy item in this menu, and it sat under a separator on
+        // its own reading exactly like the rest.
         const user = userEvent.setup();
         list();
         await user.pointer({ target: screen.getByText("message m1"), keys: "[MouseRight]" });
 
-        for (const label of ["Report this message", "Report this account"]) {
-            const item = screen.getByText(label).closest("[role='menuitem']");
-            expect(item?.className).toContain("text-danger");
-        }
+        const item = screen.getByText("Report this message").closest("[role='menuitem']");
+        expect(item?.className).toContain("text-danger");
     });
 });
 
