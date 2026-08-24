@@ -407,7 +407,9 @@ function withPresence(
 ): FivemStatus | null {
     if (!presence) return status;
     // The stream carries a name and the identifier a rule can be written against,
-    // which is what the row needs; the ping and the rest arrive on the poll.
+    // which is what the row needs; the ping and the slot arrive on the poll. The
+    // slot is deliberately out of range rather than invented: a kick addressed to
+    // a number nobody checked is a kick against whoever is in that slot now.
     const players = presence.players.map((player) => ({
         id: -1,
         name: player.name,
@@ -920,7 +922,7 @@ function PlayerRow({
                             onClick={onDisallow}
                         />
                     )}
-                    {canModerate && entry.online && (
+                    {canModerate && entry.online && entry.playerId !== null && (
                         <PlayerIconAction
                             label={playerAction.kick(entry.name)}
                             icon={<DoorOpen className="size-4" />}
@@ -944,7 +946,7 @@ function PlayerRow({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
-                                {entry.online && (
+                                {entry.online && entry.playerId !== null && (
                                     <DropdownMenuItem onSelect={onMessage}>
                                         <MessageSquare className="size-4" /> {playerMenuItem.message}
                                     </DropdownMenuItem>

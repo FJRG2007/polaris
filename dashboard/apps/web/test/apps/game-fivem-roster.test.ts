@@ -55,6 +55,15 @@ describe("the roster", () => {
         expect(rows[0]).toMatchObject({ name: "Alice", online: true, allowed: true, admin: true });
     });
 
+    it("offers no slot for a reading that carried none", () => {
+        // The live stream reports a name and an identifier and no slot at all.
+        // A kick addressed to an invented number is a kick against whoever is in
+        // that slot right now, so the row has to say it cannot be kicked.
+        const [row] = foldFivemPlayers([{ ...ALICE, id: -1 }], EMPTY);
+        expect(row?.online).toBe(true);
+        expect(row?.playerId).toBe(null);
+    });
+
     it("says when the server has not been handed somebody yet", () => {
         const [row] = foldFivemPlayers([], {
             ...EMPTY,

@@ -25,8 +25,15 @@ export interface FivemPlayerEntry {
     readonly identifier: string | null;
     readonly name: string;
     readonly online: boolean;
-    /** Their slot, which is what the console's commands take. Null when they are
-     *  not connected, because the number is reused the moment they leave. */
+    /**
+     * Their slot, which is what the console's commands take.
+     *
+     * Null when they are not connected - the number is reused the moment they
+     * leave - and also null for somebody the live stream reported, which carries
+     * a name and an identifier and no slot. A verb that needs one is not offered
+     * against a row that has none, rather than sent with a number that addresses
+     * whoever is in that slot now.
+     */
     readonly playerId: number | null;
     readonly ping: number | null;
     readonly allowed: boolean;
@@ -84,7 +91,8 @@ export function foldFivemPlayers(
             identifier: primaryIdentifier(player),
             name: player.name,
             online: true,
-            playerId: player.id,
+            // Negative is how a reading that has no slot at all says so.
+            playerId: player.id >= 0 ? player.id : null,
             ping: player.ping,
             allowed: false,
             waiting: false,
