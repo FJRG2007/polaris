@@ -26,6 +26,11 @@ export interface GameTab {
     /** The path segment, and the empty string for the screen the bare id shows. */
     readonly slug: string;
     readonly label: string;
+    /** What one game calls this screen, where the shared name would be wrong.
+     *  A Minecraft mod and a FiveM resource are the same tab and not the same
+     *  word, and calling a FiveM server's resources "mods" is the sort of thing
+     *  that makes an operator wonder whether they are on the right screen. */
+    readonly labelByGame?: Partial<Record<GameId, string>>;
     /** What the viewer needs on this server to open it. */
     readonly permission: Permission;
     /** The games that actually have this screen. A Minecraft world can be
@@ -34,7 +39,7 @@ export interface GameTab {
     readonly games: readonly GameId[];
 }
 
-const EVERY_GAME: readonly GameId[] = ["minecraft", "ark"];
+const EVERY_GAME: readonly GameId[] = ["minecraft", "ark", "fivem"];
 
 export const GAME_TABS: readonly GameTab[] = [
     { slug: "", label: "Overview", permission: "games.read", games: EVERY_GAME },
@@ -42,12 +47,23 @@ export const GAME_TABS: readonly GameTab[] = [
     { slug: "players", label: "Players", permission: "games.read", games: EVERY_GAME },
     { slug: "world", label: "World", permission: "games.manage", games: ["minecraft"] },
     { slug: "rules", label: "Rules", permission: "games.read", games: EVERY_GAME },
-    { slug: "mods", label: "Mods", permission: "games.manage", games: EVERY_GAME },
+    {
+        slug: "mods",
+        label: "Mods",
+        labelByGame: { fivem: "Resources" },
+        permission: "games.manage",
+        games: EVERY_GAME
+    },
     { slug: "usage", label: "Usage", permission: "games.read", games: EVERY_GAME },
     { slug: "security", label: "Security", permission: "games.manage", games: EVERY_GAME },
     { slug: "access", label: "Access", permission: "games.read", games: EVERY_GAME },
     { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME }
 ];
+
+/** What this game calls one screen. */
+export function gameTabLabel(tab: GameTab, game: GameId | null): string {
+    return (game && tab.labelByGame?.[game]) || tab.label;
+}
 
 /** The screens one game has at all, before anything about the viewer. */
 export function tabsForGame(game: GameId | null): GameTab[] {

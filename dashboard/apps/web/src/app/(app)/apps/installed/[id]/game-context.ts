@@ -19,6 +19,7 @@ import { readInstallConfig } from "@/lib/apps/install-config";
 import { gameDomainSuffix } from "@/lib/apps/minecraft/address";
 import { BLUEPRINT_KEY, MAP_KEY } from "@/lib/apps/games-create";
 import { readArkAccess, readArkPorts } from "@/lib/apps/ark/service";
+import { readFivemAccess, readFivemPort, type FivemAccessView } from "@/lib/apps/fivem/service";
 import { listPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
@@ -75,14 +76,17 @@ export interface GameContext {
      */
     readonly arkAccess: ArkAccessView | null;
     readonly playerAccess: PlayerAccessView | null;
+    readonly fivemAccess: FivemAccessView | null;
     /**
-     * The two ports an ARK server is joined on, and null for a game with one.
+     * The port a player connects on, and - for ARK - the second one its server
+     * browser is asked on.
      *
      * Facts about the deploy rather than anything the server has to be asked, so
-     * the card that tells somebody what to paste into Steam can print it at once.
-     * The one that needs the query port was blank until the container answered,
-     * which on a server that was still loading meant the address nobody could
-     * work out by themselves was the last thing to appear.
+     * the card that tells somebody what to paste into Steam or type after the
+     * address can print it at once. The one that needs the query port was blank
+     * until the container answered, which on a server that was still loading
+     * meant the address nobody could work out by themselves was the last thing to
+     * appear.
      */
     readonly gamePort: number | null;
     readonly queryPort: number | null;
@@ -105,14 +109,16 @@ export async function gameContextFor(app: {
         select: { config: true, ownerId: true }
     });
     const ownerId = app.ownerId ?? install?.ownerId ?? null;
-    const [suffix, facts, arkAccess, playerAccess, ports] = await Promise.all([
+    const [suffix, facts, arkAccess, playerAccess, fivemAccess, ports, fivemPort] = await Promise.all([
         // Each game's servers live under a label of their own, so the address
         // picker has to be told which one it is naming a server in.
         gameDomainSuffix(game.domainLabel).catch(() => null),
         ownerId ? gameServerFacts(ownerId, app.id).catch(() => null) : null,
         game.id === "ark" && ownerId ? readArkAccess(ownerId, app.id).catch(() => null) : null,
         game.id === "minecraft" && ownerId ? listPlayerAccess(ownerId, app.id).catch(() => null) : null,
-        game.id === "ark" ? readArkPorts(app.applicationId).catch(() => null) : null
+        game.id === "fivem" && ownerId ? readFivemAccess(ownerId, app.id).catch(() => null) : null,
+        game.id === "ark" ? readArkPorts(app.applicationId).catch(() => null) : null,
+        game.id === "fivem" ? readFivemPort(app.applicationId).catch(() => null) : null
     ]);
     const config = readInstallConfig(install?.config);
     return {
@@ -130,7 +136,8 @@ export async function gameContextFor(app: {
         routineRuns: readRoutineRuns(config),
         arkAccess,
         playerAccess,
-        gamePort: ports?.gamePort ?? null,
+        fivemAccess,
+        gamePort: ports?.gamePort ?? fivemPort ?? null,
         queryPort: ports?.queryPort ?? null
     };
 }

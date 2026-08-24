@@ -183,20 +183,31 @@ export async function createGameServerAction(
             action: "games.create",
             targetType: "installedApp",
             targetId: created.installedAppId,
-            metadata:
-                parsed.data.game === "ark"
-                    ? { game: "ark", map: parsed.data.map, closed: parsed.data.exclusiveJoin }
-                    : {
-                          game: "minecraft",
-                          edition: parsed.data.edition,
-                          blueprint: parsed.data.blueprintId,
-                          map: parsed.data.mapId ?? null
-                      }
+            metadata: createMetadata(parsed.data)
         });
         revalidatePath("/apps/games");
         return { installedAppId: created.installedAppId, hostname: created.hostname };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not create the server" };
+    }
+}
+
+/** What the audit records about a create, in each game's own terms. Its own
+ *  function because a conditional expression with a branch per game is a shape
+ *  that stops being readable at the third one. */
+function createMetadata(input: CreateGameServerInput): Record<string, unknown> {
+    switch (input.game) {
+        case "ark":
+            return { game: "ark", map: input.map, closed: input.exclusiveJoin };
+        case "fivem":
+            return { game: "fivem", onesync: input.onesync, closed: input.exclusiveJoin };
+        default:
+            return {
+                game: "minecraft",
+                edition: input.edition,
+                blueprint: input.blueprintId,
+                map: input.mapId ?? null
+            };
     }
 }
 

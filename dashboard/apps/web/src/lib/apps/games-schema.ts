@@ -6,16 +6,19 @@
  *
  * One schema per game, joined on the game itself. The questions genuinely differ -
  * a Minecraft server has an edition and a world seed, an ARK server has a map and
- * a Steam id - and a single flat object with half its fields optional is a schema
- * that cannot refuse anything: it would accept a seed for ARK and an ARK map for
- * Bedrock, and the refusal would land at the container instead of at the form.
+ * a Steam id, a FiveM server has a key its owner had to go and get - and a single
+ * flat object with half its fields optional is a schema that cannot refuse
+ * anything: it would accept a seed for ARK and an ARK map for Bedrock, and the
+ * refusal would land at the container instead of at the form.
  */
 
 import { z } from "zod";
 import { isArkMap } from "@/lib/apps/ark/maps";
 import { isWorldMap } from "@/lib/apps/minecraft/maps";
 import { isBiome, isLevelType, isSeed } from "@/lib/apps/minecraft/world";
+import { isIdentifier } from "@/lib/apps/fivem/players";
 import { isAddressRule, isPlayerName } from "@/lib/apps/minecraft/access";
+import { isLicenseKey, LICENSE_KEY_HINT } from "@/lib/apps/fivem/config";
 import { isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "@/lib/apps/ark/access";
 
 /** What every server is asked, whatever it plays: what it is called, where it
@@ -84,8 +87,42 @@ const arkServerSchema = z.object({
     mods: z.string().trim().max(512).optional()
 });
 
+const fivemServerSchema = z.object({
+    game: z.literal("fivem"),
+    ...commonFields,
+    /** The free Cfx key the server will not start without. The one value Polaris
+     *  cannot mint for them. */
+    licenseKey: z.string().trim().min(1, "Paste the server key from keymaster.fivem.net"),
+    /** The name the server shows in the in-game browser, which is not the name
+     *  Polaris files it under. */
+    sessionName: z.string().trim().min(1, "Name the server as players will see it").max(96),
+    /**
+     * Whoever is creating it, as the game will know them.
+     *
+     * Optional, and that is the whole design of this field. A player's identifier
+     * is something the game hands over when they connect - it is not printed
+     * anywhere they can copy it from beforehand unless they happen to know their
+     * Discord id or have linked Steam here. So a server can be created without
+     * one, and it is then created open: the alternative is a closed server whose
+     * own owner cannot get in, and no screen would be able to tell them why.
+     */
+    ownerIdentifier: z
+        .string()
+        .trim()
+        .max(96)
+        .refine((value) => value.length === 0 || isIdentifier(value), "That is not a player identifier")
+        .optional(),
+    /** How the owner is listed, since an identifier names nobody on sight. */
+    ownerLabel: z.string().trim().max(48).optional(),
+    /** Whether only the players on the allow list may join. Only offered once
+     *  there is somebody to be on that list. */
+    exclusiveJoin: z.boolean().default(false),
+    /** The state synchronisation everything above 32 slots needs. */
+    onesync: z.enum(["on", "legacy", "off"]).default("on")
+});
+
 export const createGameServerSchema = z
-    .discriminatedUnion("game", [minecraftServerSchema, arkServerSchema])
+    .discriminatedUnion("game", [minecraftServerSchema, arkServerSchema, fivemServerSchema])
     .superRefine((value, ctx) => {
         if (value.concurrentPlayers > value.maxPlayers) {
             ctx.addIssue({
@@ -93,6 +130,26 @@ export const createGameServerSchema = z
                 path: ["concurrentPlayers"],
                 message: "There cannot be more players at once than there are slots"
             });
+        }
+        if (value.game === "fivem") {
+            if (!isLicenseKey(value.licenseKey)) {
+                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["licenseKey"], message: LICENSE_KEY_HINT });
+            }
+            if (value.exclusiveJoin && !value.ownerIdentifier) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["exclusiveJoin"],
+                    message: "A closed server needs somebody on its list, or nobody can join it"
+                });
+            }
+            if (value.maxPlayers > 32 && value.onesync === "off") {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["onesync"],
+                    message: "More than 32 slots needs OneSync on"
+                });
+            }
+            return;
         }
         if (value.game === "ark") {
             if (!isSteamId(value.ownerSteamId)) {
@@ -197,3 +254,4 @@ export function isModIdList(value: string): boolean {
 export type CreateGameServerInput = z.infer<typeof createGameServerSchema>;
 export type CreateMinecraftServerInput = z.infer<typeof minecraftServerSchema>;
 export type CreateArkServerInput = z.infer<typeof arkServerSchema>;
+export type CreateFivemServerInput = z.infer<typeof fivemServerSchema>;

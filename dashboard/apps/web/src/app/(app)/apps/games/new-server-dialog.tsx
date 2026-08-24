@@ -5,9 +5,10 @@
  *
  * The game is the first question because it changes the rest of them - a
  * Minecraft server has an edition and a world seed, an ARK server has a map and a
- * Steam id - and everything that does not change is asked once, in the same place,
- * for both: what it is called, how big it is, which machine it goes on and what
- * players will type to reach it.
+ * Steam id, a FiveM server has a key its owner had to go and get - and everything
+ * that does not change is asked once, in the same place, for all of them: what it
+ * is called, how big it is, which machine it goes on and what players will type to
+ * reach it.
  *
  * How much memory it gets follows from the players it expects rather than from a
  * number nobody can calibrate, and the machine list says what each one has left so
@@ -26,6 +27,9 @@ import * as world from "@/lib/apps/minecraft/world";
 import { CopyButton } from "@/components/copy-button";
 import { GamePicker } from "@/components/game-picker";
 import { expectedArkMemoryMb } from "@/lib/apps/ark/config";
+import { isIdentifier } from "@/lib/apps/fivem/players";
+import { expectedFivemMemoryMb } from "@/lib/apps/fivem/config";
+import { isLicenseKey, KEYMASTER_URL, LICENSE_KEY_HINT } from "@/lib/apps/fivem/config";
 import { GAMES, type GameId } from "@/lib/apps/games-catalog";
 import { ARK_MAPS, mapRequirementHint } from "@/lib/apps/ark/maps";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -89,6 +93,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const [exclusiveJoin, setExclusiveJoin] = useState(true);
     const [mods, setMods] = useState("");
 
+    const [licenseKey, setLicenseKey] = useState("");
+    const [onesync, setOnesync] = useState<"on" | "legacy" | "off">("on");
+    /** Who the creator is as the game will know them - `license:...`, `discord:...`.
+     *  Optional, because it is not something anybody can copy before they have
+     *  connected once. See the schema for what an empty one means. */
+    const [ownerIdentifier, setOwnerIdentifier] = useState("");
+
     // Offered rather than imposed: it is where this operator is right now, which is
     // where their own client would arrive from, and they can widen or replace it.
     useEffect(() => {
@@ -147,7 +158,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     const memory =
         game === "ark"
             ? formatMemory(expectedArkMemoryMb(concurrentPlayers))
-            : formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
+            : game === "fivem"
+              ? formatMemory(expectedFivemMemoryMb(concurrentPlayers))
+              : formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
     const machine = setup?.machines.find((entry) => entry.id === serverId) ?? null;
 
     // Crossplay is a Java server Bedrock can also join, so it cannot survive a
@@ -173,11 +186,20 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             : "17 digits, starting 7656119";
     const passwordError = arkAccess.isJoinPassword(joinPassword) ? null : arkAccess.JOIN_PASSWORD_HINT;
     const modsError = mods.trim().length === 0 || isModIdList(mods) ? null : "Workshop ids are numbers, comma separated";
+    const licenseError = licenseKey.trim().length === 0 || isLicenseKey(licenseKey) ? null : LICENSE_KEY_HINT;
+    const identifierError =
+        ownerIdentifier.trim().length === 0 || isIdentifier(ownerIdentifier)
+            ? null
+            : "Paste it whole, as the game gives it: license:... or discord:...";
+    const onesyncError =
+        game === "fivem" && maxPlayers > 32 && onesync === "off" ? "More than 32 slots needs OneSync on" : null;
     const ready =
         name.trim().length > 0 &&
         (game === "ark"
             ? arkAccess.isSteamId(ownerSteamId) && passwordError === null && modsError === null
-            : isPlayerName(edition, ownerPlayer) && isAddressRule(ownerAddress) && seedError === null);
+            : game === "fivem"
+              ? isLicenseKey(licenseKey) && identifierError === null && onesyncError === null
+              : isPlayerName(edition, ownerPlayer) && isAddressRule(ownerAddress) && seedError === null);
 
     const label = (subdomain.trim() || name.trim() || "server")
         .toLowerCase()
@@ -196,7 +218,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
             subdomain: subdomain.trim() || undefined
         };
         const parsed = createGameServerSchema.safeParse(
-            game === "ark"
+            game === "fivem"
+                ? {
+                      game: "fivem" as const,
+                      ...common,
+                      licenseKey: licenseKey.trim(),
+                      sessionName: sessionName.trim() || name.trim(),
+                      ownerIdentifier: ownerIdentifier.trim() || undefined,
+                      ownerLabel: ownerPlayer.trim() || undefined,
+                      exclusiveJoin: exclusiveJoin && ownerIdentifier.trim().length > 0,
+                      onesync
+                  }
+                : game === "ark"
                 ? {
                       game: "ark" as const,
                       ...common,
@@ -267,7 +300,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder={game === "ark" ? "The Island" : "Survival"}
+                            placeholder={game === "ark" ? "The Island" : game === "fivem" ? "Los Santos" : "Survival"}
                         />
                     </label>
 
@@ -349,6 +382,67 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 onChange={setShape}
                             />
                         </>
+                    ) : game === "fivem" ? (
+                        <>
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">Server key</span>
+                                <Input
+                                    value={licenseKey}
+                                    onChange={(event) => setLicenseKey(event.target.value)}
+                                    placeholder="cfxk_..."
+                                    className="font-mono"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                />
+                                <span className={cn("text-xs", licenseError ? "text-danger" : "text-muted-foreground")}>
+                                    {licenseError ?? (
+                                        <>
+                                            FiveM will not start without one. They are free:{" "}
+                                            <a
+                                                href={KEYMASTER_URL}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-primary hover:underline"
+                                            >
+                                                get one from keymaster
+                                            </a>
+                                            .
+                                        </>
+                                    )}
+                                </span>
+                            </label>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">Name in the server browser</span>
+                                    <Input
+                                        value={sessionName}
+                                        onChange={(event) => setSessionName(event.target.value)}
+                                        placeholder={name.trim() || "Los Santos"}
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                        Blank uses the name above. This is what players search for in game.
+                                    </span>
+                                </label>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">OneSync</span>
+                                    <Select
+                                        value={onesync}
+                                        onValueChange={(value) => setOnesync(value as "on" | "legacy" | "off")}
+                                        options={[
+                                            { value: "on", label: "On" },
+                                            { value: "legacy", label: "Legacy" },
+                                            { value: "off", label: "Off" }
+                                        ]}
+                                        aria-label="OneSync"
+                                    />
+                                    <span className={cn("text-xs", onesyncError ? "text-danger" : "text-muted-foreground")}>
+                                        {onesyncError ??
+                                            "What everything above 32 slots and most roleplay resources need. Leave it on unless something asks otherwise."}
+                                    </span>
+                                </label>
+                            </div>
+                        </>
                     ) : (
                         <>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -424,6 +518,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <strong className="text-foreground">{memory}</strong> of memory and about 30 GB of
                                     disk, downloaded the first time it starts.
                                 </>
+                            ) : game === "fivem" ? (
+                                <>
+                                    A FiveM server for {concurrentPlayers}{" "}
+                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses around{" "}
+                                    <strong className="text-foreground">{memory}</strong> of memory, plus whatever the
+                                    resources you install weigh.
+                                </>
                             ) : (
                                 <>
                                     Polaris will give it <strong className="text-foreground">{memory}</strong> of memory
@@ -469,7 +570,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     Players will connect to <code className="font-mono">{address}</code>
-                                    {game === "ark" || edition === "bedrock" ? " and its port." : "."}
+                                    {game === "ark" || game === "fivem" || edition === "bedrock"
+                                        ? " and its port."
+                                        : "."}
                                 </span>
                             </>
                         ) : (
@@ -482,7 +585,59 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
                     <div className="flex flex-col gap-2">
                         <span className="text-sm font-medium">Who can connect</span>
-                        {game === "ark" ? (
+                        {game === "fivem" ? (
+                            <>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="text-muted-foreground">Your player identifier</span>
+                                        <Input
+                                            value={ownerIdentifier}
+                                            onChange={(event) => setOwnerIdentifier(event.target.value)}
+                                            placeholder="discord:123456789012345678"
+                                            className="font-mono"
+                                            autoComplete="off"
+                                            spellCheck={false}
+                                        />
+                                        <span
+                                            className={cn(
+                                                "text-xs",
+                                                identifierError ? "text-danger" : "text-muted-foreground"
+                                            )}
+                                        >
+                                            {identifierError ??
+                                                "Optional. Your Discord user id is the easiest to copy; a license: one comes from the game. Leave it blank and add yourself from the Players screen after you connect."}
+                                        </span>
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="text-muted-foreground">Your name on the list</span>
+                                        <Input
+                                            value={ownerPlayer}
+                                            onChange={(event) => setOwnerPlayer(event.target.value)}
+                                            placeholder="You"
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            Optional. An identifier names nobody at a glance.
+                                        </span>
+                                    </label>
+                                </div>
+                                <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
+                                    <span className="flex flex-col gap-0.5 text-sm">
+                                        <span className="font-medium">Only players you add can join</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {ownerIdentifier.trim().length > 0
+                                                ? "Everyone else is turned away at the door until you add them."
+                                                : "Needs your identifier above - a closed server with nobody on its list is one you cannot join either."}
+                                        </span>
+                                    </span>
+                                    <Switch
+                                        checked={exclusiveJoin && ownerIdentifier.trim().length > 0}
+                                        onChange={setExclusiveJoin}
+                                        disabled={ownerIdentifier.trim().length === 0}
+                                        aria-label="Only players you add can join"
+                                    />
+                                </label>
+                            </>
+                        ) : game === "ark" ? (
                             <>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="text-muted-foreground">Join password</span>
@@ -577,7 +732,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <span>
                                 {game === "ark"
                                     ? "The server starts closed: a password of its own, an admin password Polaris keeps for you, and nobody else let in until you add them. It is opened from the server's own Access screen."
-                                    : "The server starts closed: nobody else can join until you add them, and each player is only let in from the address registered to them. Change it later under Firewall."}
+                                    : game === "fivem"
+                                      ? "It starts with a console password Polaris keeps for you, player addresses hidden and ScriptHook mods refused. Who may join is changed from the server's own Security screen."
+                                      : "The server starts closed: nobody else can join until you add them, and each player is only let in from the address registered to them. Change it later under Firewall."}
                             </span>
                         </p>
                     </div>

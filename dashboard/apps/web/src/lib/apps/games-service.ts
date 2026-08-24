@@ -26,6 +26,14 @@ import { sweepArkTimeouts } from "@/lib/apps/ark/timeout-service";
 import type { PortBlocks, PortPolicy } from "@/lib/apps/port-block";
 import { wantsLatest } from "@/lib/apps/minecraft/blueprint-version";
 import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
+import { primaryIdentifier } from "@/lib/apps/fivem/players";
+import {
+    applyFivemAccess,
+    applyFivemFirewallBans,
+    applyPendingSetup,
+    getFivemPlayers,
+    sweepFivemBans
+} from "@/lib/apps/fivem/service";
 import { sweepTimeouts } from "@/lib/apps/minecraft/timeout-service";
 import { applyAllowList, getArkPlayers } from "@/lib/apps/ark/service";
 import { applyPendingArkRules } from "@/lib/apps/ark/settings-service";
@@ -314,7 +322,10 @@ export async function listGameServerFacts(
             applicationId: install.applicationId,
             serverName: install.targetId ? (targetName.get(install.targetId) ?? null) : null,
             running,
-            slots: Number.isFinite(slots) ? slots : null,
+            // The setting, or what the install recorded when it was created for a
+            // game that keeps its slot count in a file rather than in the
+            // environment. FiveM is that game.
+            slots: Number.isFinite(slots) ? slots : typeof config.slots === "number" ? config.slots : null,
             release: releaseOf(config, env.get(RELEASE_VAR)),
             software: (env.get(SOFTWARE_VAR) ?? "").trim()
                 ? titleCase((env.get(SOFTWARE_VAR) as string).trim())
@@ -427,8 +438,36 @@ async function readPresence(ownerId: string, server: GameServerFacts): Promise<S
         };
     }
     // Each game is asked in its own language - Minecraft over rcon-cli, ARK
-    // through arkmanager - and both answer the same shape, because the row that
-    // renders it is one row.
+    // through arkmanager, FiveM over the documents it publishes - and all of them
+    // answer the same shape, because the row that renders it is one row.
+    if (server.game === "fivem") {
+        const live = await getFivemPlayers(ownerId, server.id).catch((caught: unknown) => ({
+            answering: false,
+            containerRunning: null,
+            players: [],
+            max: 0,
+            message: caught instanceof Error ? caught.message : "The server is not answering",
+            crashLoop: null
+        }));
+        return {
+            id: server.id,
+            answering: live.answering,
+            containerRunning: live.containerRunning,
+            online: live.players.length,
+            // What the running server says it holds, and the recorded slot count
+            // for one that is not up - the number is not unknown just because
+            // nobody is there to ask.
+            max: live.max || (server.slots ?? 0),
+            players: live.players.map((player) => ({
+                name: player.name,
+                // What a rule about them can be written against, which is never
+                // the name they chose.
+                id: primaryIdentifier(player)
+            })),
+            message: live.message,
+            crashLoop: live.crashLoop
+        };
+    }
     if (server.game === "ark") {
         const ark = await getArkPlayers(ownerId, server.id).catch((caught: unknown) => ({
             answering: false,
@@ -638,6 +677,21 @@ export async function syncFirewallBans(
             // It does have timeouts, though - Polaris' own, built on the ban it
             // does have - and this walk is what comes back to lift them.
             await sweepArkTimeouts(ownerId, install.id).catch(() => 0);
+            continue;
+        }
+        // FiveM has no ban command and no whitelist of its own, so all three of
+        // those live on Polaris' side and are handed to the small resource it
+        // installs into the server. This walk is what hands them over - and, on a
+        // server that has just been created, what gives it everything it was
+        // created with in the first place.
+        if (gameOfServer(install.catalogId)?.id === "fivem") {
+            servers += 1;
+            await applyPendingSetup(ownerId, install.id).catch(() => false);
+            allowed += await applyFivemAccess(ownerId, install.id).catch(() => 0);
+            banned += await applyFivemFirewallBans(ownerId, install.id).catch(() => 0);
+            // A ban with an end is only a timeout if something comes back to lift
+            // it. This is that something.
+            await sweepFivemBans(ownerId, install.id).catch(() => 0);
             continue;
         }
         // Bedrock has no ban command at all, so there is nothing to hand it.

@@ -8,9 +8,10 @@
  * in one place rather than spread across a form.
  *
  * One entry point and one branch per game, because the games differ in what they
- * are made of and agree on what surrounds them: both are an install on a machine,
- * both get a name on the operator's domain, and both are created closed. The
- * shared half is at the bottom of this file and neither game gets its own copy.
+ * are made of and agree on what surrounds them: each is an install on a machine,
+ * each gets a name on the operator's domain, and each is created as closed as its
+ * game can be. The shared half is at the bottom of this file and no game gets its
+ * own copy.
  *
  * The address is the last step and the only one allowed to fail quietly: a server
  * whose DNS could not be written is a working server that players reach by IP,
@@ -20,6 +21,8 @@
 import { installApp } from "@/lib/apps/install-service";
 import { joinAccess } from "@/lib/apps/minecraft/access";
 import { allocateArkPorts } from "@/lib/apps/ark/create";
+import { allocateFivemPort } from "@/lib/apps/fivem/create";
+import * as fivemAccess from "@/lib/apps/fivem/access";
 import { availableHostPort } from "@/lib/apps/port-registry";
 import { promptedEnvVars, findApp } from "@/lib/apps/catalog";
 import { setGameHostname } from "@/lib/apps/minecraft/address";
@@ -29,6 +32,9 @@ import { ALLOW_LIST_KEY, withPlayer } from "@/lib/apps/ark/access";
 import { grantPlayerAccess } from "@/lib/apps/minecraft/player-access";
 import { findGame, type GameDefinition } from "@/lib/apps/games-catalog";
 import { arkServerEnv, expectedArkMemoryMb } from "@/lib/apps/ark/config";
+import { normalizeIdentifier } from "@/lib/apps/fivem/players";
+import { mintConsolePassword, PENDING_SETUP_KEY } from "@/lib/apps/fivem/service";
+import { expectedFivemMemoryMb, fivemServerEnv, FIVEM_CATALOG_ID, FIVEM_CONTAINER_PORT } from "@/lib/apps/fivem/config";
 import { applyAllowList, ARK_CATALOG_ID, mintJoinPassword } from "@/lib/apps/ark/service";
 import { ARK_PENDING_SETTINGS_KEY, RECOMMENDED_ARK_SETTINGS } from "@/lib/apps/ark/settings";
 import { isMapResourcePack, mapFor, pinnedRelease, type WorldMap } from "@/lib/apps/minecraft/maps";
@@ -36,6 +42,7 @@ import { commonVersions, knownUnsupported, wantsLatest } from "@/lib/apps/minecr
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "@/lib/apps/minecraft/modrinth";
 import type {
     CreateArkServerInput,
+    CreateFivemServerInput,
     CreateGameServerInput,
     CreateMinecraftServerInput
 } from "@/lib/apps/games-schema";
@@ -261,9 +268,9 @@ export async function createGameServer(
     actorId: string,
     input: CreateGameServerInput
 ): Promise<CreatedGameServer> {
-    return input.game === "ark"
-        ? createArkServer(ownerId, actorId, input)
-        : createMinecraftServer(ownerId, actorId, input);
+    if (input.game === "ark") return createArkServer(ownerId, actorId, input);
+    if (input.game === "fivem") return createFivemServer(ownerId, actorId, input);
+    return createMinecraftServer(ownerId, actorId, input);
 }
 
 async function createMinecraftServer(
@@ -425,6 +432,88 @@ async function createArkServer(
     // it is, and the difference between "the sweep will get to it" and "it is
     // already done" is the whole first evening on a server somebody just made.
     await applyAllowList(ownerId, install.installedAppId).catch(() => 0);
+
+    const hostname = await attachHostname(ownerId, install.installedAppId, input, { srv: false });
+    return { installedAppId: install.installedAppId, hostname };
+}
+
+/**
+ * Create a FiveM server.
+ *
+ * Two things are unusual about this one and both are the game's. The key is a
+ * value nobody but its owner can get - it is issued per machine at keymaster and
+ * the server refuses to start without it - so it is asked for on the form and
+ * written straight into the deploy's environment.
+ *
+ * The other is that almost nothing about the server can be decided here. FiveM
+ * keeps every setting in a config file that the image writes on the container's
+ * very first start, which has not happened yet: there is no file to edit at the
+ * moment the server is created. So what it was created with is written down and
+ * handed over by the first sweep that finds the container up, exactly as ARK's
+ * allow list is - see `applyPendingSetup`.
+ */
+async function createFivemServer(
+    ownerId: string,
+    actorId: string,
+    input: CreateFivemServerInput
+): Promise<CreatedGameServer> {
+    const manifest = findApp(FIVEM_CATALOG_ID);
+    if (!manifest) throw new Error("FiveM is not available");
+
+    const port = await allocateFivemPort();
+    const base = defaultInstallInput(manifest, input.serverId);
+    // Only the values the operator actually chose, plus the two the server cannot
+    // start without. An empty string is not the same as an unset variable here:
+    // the image's own entrypoint branches on whether each is set at all.
+    const env = new Map(base.env.filter((entry) => entry.value.length > 0).map((entry) => [entry.key, entry.value]));
+    for (const [key, value] of Object.entries(fivemServerEnv(input.licenseKey, mintConsolePassword()))) {
+        env.set(key, value);
+    }
+
+    const install = await installApp(
+        ownerId,
+        actorId,
+        { ...base, name: input.name, env: [...env.entries()].map(([key, value]) => ({ key, value })) },
+        {
+            // One number published twice. A FiveM client begins over TCP and plays
+            // over UDP, on the same port, and an address carries only the one.
+            primary: { host: port, container: FIVEM_CONTAINER_PORT, protocol: "tcp" },
+            extra: [{ host: port, container: FIVEM_CONTAINER_PORT, protocol: "udp" }]
+        }
+    );
+
+    const now = new Date().toISOString();
+    const owner = input.ownerIdentifier
+        ? { identifier: normalizeIdentifier(input.ownerIdentifier), label: input.ownerLabel?.trim() || "You" }
+        : null;
+    await patchInstallConfig(install.installedAppId, {
+        [fivemAccess.ALLOW_LIST_KEY]: owner ? fivemAccess.withAllowed([], owner, now) : [],
+        [fivemAccess.ADMIN_LIST_KEY]: owner ? fivemAccess.withAdmin([], owner, now) : [],
+        // Never closed without somebody on the list: the schema refuses that
+        // combination, and a server nobody at all can join is not a state worth
+        // being able to reach.
+        [fivemAccess.EXCLUSIVE_JOIN_KEY]: owner ? input.exclusiveJoin : false,
+        // What the machine picker bills this server at. FiveM has no heap to set,
+        // so without this a machine running four of them looks empty on the form
+        // that decides where the fifth goes.
+        memoryMb: expectedFivemMemoryMb(input.concurrentPlayers),
+        // FiveM keeps its slot count in the config file rather than in the
+        // environment, and that file does not exist yet - so the list is told here
+        // and a stopped server can still say what size it is.
+        slots: input.maxPlayers,
+        [PENDING_SETUP_KEY]: {
+            settings: {
+                sv_hostname: input.sessionName,
+                sv_maxclients: String(input.maxPlayers),
+                onesync: input.onesync,
+                // The two that are only off because FiveM's defaults were written
+                // for a public server: mods that let a player run anything they
+                // like, and a log that prints everybody's address.
+                sv_scriptHookAllowed: "0",
+                sv_endpointprivacy: "true"
+            }
+        }
+    });
 
     const hostname = await attachHostname(ownerId, install.installedAppId, input, { srv: false });
     return { installedAppId: install.installedAppId, hostname };

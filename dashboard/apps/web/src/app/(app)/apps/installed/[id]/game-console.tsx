@@ -18,7 +18,7 @@
 import { useRuntimeLog } from "./use-runtime-log";
 import { LogViewer } from "@/components/log-viewer";
 import { GAME_RULES } from "@/lib/apps/minecraft/rules";
-import { applyCompletion, completeConsole } from "@/lib/apps/console-complete";
+import { applyCompletion, completeConsole, type ConsoleGame } from "@/lib/apps/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import { CornerDownLeft, History, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
@@ -112,7 +112,7 @@ export function GameConsole({
     applicationId: string | null;
     running: boolean;
     /** Which command table to complete from. The three do not share a command. */
-    game?: "java" | "bedrock" | "ark";
+    game?: ConsoleGame;
     /** Who is on, for the arguments that name a player. The panel is already
      *  drawing this list, so completing from it costs nothing. */
     players?: readonly string[];
@@ -157,7 +157,9 @@ export function GameConsole({
     // list to complete from than every item in the game: somebody who gave out
     // diamonds yesterday is giving out diamonds today.
     useEffect(() => {
-        if (game === "ark") return;
+        // Only Minecraft hands out items, so only Minecraft has a list of the ones
+        // this server has been handing out.
+        if (game !== "java" && game !== "bedrock") return;
         void recentItemsAction(installedAppId).then((answer) => setItems(answer.items));
     }, [installedAppId, game]);
 

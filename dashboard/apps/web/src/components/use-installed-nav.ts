@@ -40,9 +40,16 @@ export function useInstalledNav(id: string | null): InstalledAppNav | null {
             .then(async (response) => {
                 if (!response.ok) return;
                 const body = (await response.json()) as Partial<InstalledAppNav>;
+                const labels =
+                    typeof body.labels === "object" && body.labels !== null
+                        ? Object.fromEntries(
+                              Object.entries(body.labels).filter(([, label]) => typeof label === "string")
+                          )
+                        : {};
                 const value: InstalledAppNav = {
                     name: typeof body.name === "string" && body.name ? body.name : "Server",
-                    tabs: Array.isArray(body.tabs) ? body.tabs.filter((tab) => typeof tab === "string") : []
+                    tabs: Array.isArray(body.tabs) ? body.tabs.filter((tab) => typeof tab === "string") : [],
+                    labels
                 };
                 setNav(value);
                 writeSnapshot(key(id), value);

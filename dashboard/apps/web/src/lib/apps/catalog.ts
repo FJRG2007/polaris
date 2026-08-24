@@ -214,9 +214,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         category: "Game servers",
         icon: Gamepad2,
         opensAt: "/apps/games",
-        summary: "Create and run Minecraft and ARK servers on your own machines.",
+        summary: "Create and run Minecraft, ARK and FiveM servers on your own machines.",
         description:
-            "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, or ARK: Survival Evolved. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.",
+            "Install it once and create as many servers as you want, of any game Polaris knows: Minecraft for PC, phones and consoles, ARK: Survival Evolved, or FiveM for GTA V. Each server gets an address on your domain, a console, player moderation, its own schedule, and the memory it needs for the players you expect. Nothing is downloaded until you create a server, and only for the game that server plays.",
         installMethod: "builtin",
         capabilities: ["game-manager"],
         dashboard: "builtin",
@@ -861,6 +861,67 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                 { container: 7778, protocol: "udp", host: 7778, label: "Raw socket" },
                 { container: 27015, protocol: "udp", host: 27015, label: "Server list" }
             ]
+        }
+    },
+    {
+        id: "fivem",
+        name: "FiveM",
+        internal: true,
+        category: "Game servers",
+        icon: Gamepad2,
+        summary: "A GTA V server of your own, closed to everyone you have not added.",
+        description:
+            "Runs a FiveM server on the machine you choose, with its files on a server-local volume or a NAS. It comes closed: a console password Polaris mints and keeps, player addresses hidden, ScriptHook mods refused, and only the players you add allowed in. Manage it from the Game servers panel: console, players, resources and settings. It needs a free server key from keymaster.fivem.net.",
+        docsUrl: "https://docs.fivem.net/docs/server-manual/setting-up-a-server/",
+        installMethod: "compose-template",
+        capabilities: ["game-server"],
+        dashboard: "builtin",
+        template: {
+            image: "spritsail/fivem:latest",
+            env: [
+                {
+                    // The one value Polaris cannot mint and the server will not
+                    // start without. Free, tied to the machine's address, and
+                    // issued at keymaster.fivem.net. Asked for on the create form
+                    // and never shown again.
+                    key: "LICENSE_KEY",
+                    label: "Server key",
+                    help: "The free key from keymaster.fivem.net. Change it from the server's Settings screen.",
+                    secret: true,
+                    required: true
+                },
+                {
+                    // What opens the server's own console. The image writes it into
+                    // the config it generates on the first start, which is the only
+                    // moment anything can - so it is minted by the create flow and
+                    // never left at the random one the image would invent, which is
+                    // printed in the container's log.
+                    //
+                    // Deliberately not `generated`: that mints 48 hex characters and
+                    // is never shown to anybody, and this one is a value an operator
+                    // may want to hand to a tool of their own.
+                    key: "RCON_PASSWORD",
+                    label: "Console password",
+                    help: "What opens the server console. Change it from the server's Access screen.",
+                    secret: true,
+                    required: true
+                },
+                {
+                    // The image would otherwise force OneSync on the command line,
+                    // where nothing can change it. It is set in the server's own
+                    // config instead, so the rules screen shows what is actually
+                    // running. Not tunable: the rules screen owns it.
+                    key: "NO_ONESYNC",
+                    label: "Leave OneSync to the server config",
+                    default: "1"
+                }
+            ],
+            volumes: [{ name: "config", mountPath: "/config", label: "Server files and resources" }],
+            // One number, two transports: a FiveM client speaks both to the same
+            // port and an address carries only the one. Published onto the port the
+            // image binds inside, which its own config writes before Polaris can
+            // reach the container at all.
+            ports: [{ container: 30120, protocol: "tcp", host: 30120, label: "Server port" }]
         }
     },
     {

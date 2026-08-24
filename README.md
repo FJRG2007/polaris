@@ -45,7 +45,7 @@ on hardware you already own, sharing one account and one interface.
 | Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips |
 | GitHub Actions | The same workflows on your own runners, so a private repository costs no minutes |
 | CodeRabbit | Reviews and coding agents that run here, on your own model keys |
-| Pterodactyl and a pile of scripts | Game servers - Minecraft and ARK - with worlds, mods, players and schedules |
+| Pterodactyl and a pile of scripts | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules |
 | ClickUp, Jira, Linear | Spaces, lists, boards, sprints, goals, docs and time tracking |
 | Home Assistant, a camera app | Places and cameras: live views, detections, clips, and alerts that arrive in chat |
 | Your NAS vendor's web UI | One file browser across every NAS you own, with sharing and drop points |
@@ -120,8 +120,8 @@ with one thing does not get the rest.
 - **Containers** and **Backups** - what is running on every host, and scheduled
   backups of it with restore.
 - **Marketplace** - one-press installs for the things people actually self-host,
-  including **game servers** (Minecraft and ARK, with worlds, mods, players,
-  schedules and crash detection).
+  including **game servers** (Minecraft, ARK and FiveM, with worlds, mods,
+  resources, players, schedules and crash detection).
 - **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
   policy and budgets.
 - **Agents** - coding agents that work in a repository, open pull requests and

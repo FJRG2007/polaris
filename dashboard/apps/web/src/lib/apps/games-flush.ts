@@ -35,6 +35,11 @@ export async function flushGameWorld(ownerId: string, installedAppId: string): P
     // what these actions are called for.
     const game = install ? gameOfServer(install.catalogId) : null;
     if (!game) return;
+    // A FiveM server holds no world of its own. What its resources have written
+    // down is in whatever database they were pointed at, and Polaris has never
+    // been told where that is - so there is genuinely nothing to flush, and
+    // pretending otherwise would be a save that never happened.
+    if (game.id === "fivem") return;
     if (game.id === "ark") {
         await saveArkWorld(ownerId, installedAppId).catch(() => undefined);
         return;

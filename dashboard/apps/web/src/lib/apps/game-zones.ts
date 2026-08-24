@@ -32,7 +32,10 @@ import { GAMES, type GameDefinition } from "@/lib/apps/games-catalog";
 
 /** Every game this Polaris has a server of, in catalog order. */
 export async function installedGames(): Promise<GameDefinition[]> {
-    const catalogIds = GAMES.flatMap((game) => [game.legacyManagerCatalogId, ...game.serverCatalogIds]);
+    const catalogIds = GAMES.flatMap((game) => [
+        ...(game.legacyManagerCatalogId ? [game.legacyManagerCatalogId] : []),
+        ...game.serverCatalogIds
+    ]);
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: { in: catalogIds }, status: { not: "removed" } },
         select: { catalogId: true }
@@ -42,7 +45,7 @@ export async function installedGames(): Promise<GameDefinition[]> {
     const present = new Set(installs.map((install) => install.catalogId));
     return GAMES.filter(
         (game) =>
-            present.has(game.legacyManagerCatalogId) ||
+            (game.legacyManagerCatalogId !== undefined && present.has(game.legacyManagerCatalogId)) ||
             game.serverCatalogIds.some((catalogId) => present.has(catalogId))
     );
 }

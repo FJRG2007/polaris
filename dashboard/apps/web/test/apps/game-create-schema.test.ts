@@ -30,6 +30,64 @@ const ark = {
     ownerSteamId: "76561198000000001"
 };
 
+const fivem = {
+    game: "fivem" as const,
+    name: "Los Santos",
+    serverId: "local",
+    licenseKey: "cfxk_ABCdef0123456789_1a2b3",
+    sessionName: "Los Santos"
+};
+
+describe("creating a FiveM server", () => {
+    it("takes the questions FiveM actually has", () => {
+        const parsed = createGameServerSchema.safeParse(fivem);
+        expect(parsed.success).toBe(true);
+        if (parsed.success && parsed.data.game === "fivem") {
+            expect(parsed.data.onesync).toBe("on");
+            // Open unless somebody named themselves - see below.
+            expect(parsed.data.exclusiveJoin).toBe(false);
+        }
+    });
+
+    it("refuses a server with no key, because the game will not start without one", () => {
+        expect(createGameServerSchema.safeParse({ ...fivem, licenseKey: "" }).success).toBe(false);
+        expect(createGameServerSchema.safeParse({ ...fivem, licenseKey: "paste your key here" }).success).toBe(false);
+    });
+
+    it("refuses closing a server that has nobody on its list", () => {
+        // Otherwise the person creating it cannot join it either, and no screen
+        // would be able to tell them why.
+        expect(createGameServerSchema.safeParse({ ...fivem, exclusiveJoin: true }).success).toBe(false);
+        expect(
+            createGameServerSchema.safeParse({
+                ...fivem,
+                exclusiveJoin: true,
+                ownerIdentifier: "license:0123456789abcdef"
+            }).success
+        ).toBe(true);
+    });
+
+    it("refuses an identifier that is not one the game hands over", () => {
+        expect(createGameServerSchema.safeParse({ ...fivem, ownerIdentifier: "Alice" }).success).toBe(false);
+    });
+
+    it("refuses more than 32 slots without the synchronisation that allows them", () => {
+        expect(
+            createGameServerSchema.safeParse({ ...fivem, maxPlayers: 64, concurrentPlayers: 30, onesync: "off" })
+                .success
+        ).toBe(false);
+        expect(
+            createGameServerSchema.safeParse({ ...fivem, maxPlayers: 64, concurrentPlayers: 30, onesync: "on" }).success
+        ).toBe(true);
+    });
+
+    it("refuses an ARK map and a Minecraft seed alongside its own questions", () => {
+        const parsed = createGameServerSchema.safeParse({ ...fivem, map: "TheIsland", seed: "12345" });
+        expect(parsed.success && "map" in parsed.data).toBe(false);
+        expect(parsed.success && "seed" in parsed.data).toBe(false);
+    });
+});
+
 describe("creating an ARK server", () => {
     it("takes the questions ARK actually has", () => {
         const parsed = createGameServerSchema.safeParse(ark);

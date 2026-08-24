@@ -139,15 +139,55 @@ export const ARK_COMMANDS: readonly CommandSpec[] = [
     { name: "UnbanPlayer", args: ["player"] }
 ];
 
+/**
+ * FiveM's own console commands, and the one Polaris adds.
+ *
+ * Every one of these is either documented by the game as a server console command
+ * or is a command Polaris itself sends somewhere else in the app, which is what
+ * makes the list trustworthy rather than remembered. A resource can add hundreds
+ * more and none of them can be known from out here - which is the trade named at
+ * the top of this file.
+ *
+ * Players are `free` rather than `player` throughout, deliberately: FiveM's
+ * commands take the slot number and the completion list holds names, so offering
+ * one where the other belongs would put a name in a position that only accepts a
+ * number.
+ */
+export const FIVEM_COMMANDS: readonly CommandSpec[] = [
+    { name: "add_ace", args: ["free", "free", "free"] },
+    { name: "add_principal", args: ["free", "free"] },
+    { name: "clientkick", args: ["free", "free"] },
+    { name: "ensure", args: ["free"] },
+    { name: "exec", args: ["free"] },
+    { name: "load_server_icon", args: ["free"] },
+    { name: "polaris_dm", args: ["free", "free"] },
+    { name: "quit", args: ["free"] },
+    { name: "refresh", args: [] },
+    { name: "remove_ace", args: ["free", "free", "free"] },
+    { name: "remove_principal", args: ["free", "free"] },
+    { name: "restart", args: ["free"] },
+    { name: "say", args: ["free"] },
+    { name: "start", args: ["free"] },
+    { name: "status", args: [] },
+    { name: "stop", args: ["free"] },
+    { name: "sv_maxclients", args: ["free"] },
+    { name: "test_ace", args: ["free", "free"] }
+];
+
 /** Which table a server's console draws from. */
-export function commandsFor(game: "java" | "bedrock" | "ark"): readonly CommandSpec[] {
+export function commandsFor(game: ConsoleGame): readonly CommandSpec[] {
     if (game === "ark") return ARK_COMMANDS;
+    if (game === "fivem") return FIVEM_COMMANDS;
     return game === "bedrock" ? BEDROCK_COMMANDS : JAVA_COMMANDS;
 }
 
+/** The consoles this knows the commands of. Not the same as a game: Minecraft has
+ *  two and they take different commands. */
+export type ConsoleGame = "java" | "bedrock" | "ark" | "fivem";
+
 /** What is known that could fill an argument. */
 export interface CompletionSources {
-    readonly game: "java" | "bedrock" | "ark";
+    readonly game: ConsoleGame;
     /** Who is on right now. The screen has this already - it is the roster it draws. */
     readonly players: readonly string[];
     /** Item ids worth offering, e.g. the ones this server has been handing out. */

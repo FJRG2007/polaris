@@ -36,6 +36,7 @@ import { writeContainerFile } from "@/lib/container-files-service";
 import type { InventoryItem } from "@/lib/apps/minecraft/inventory";
 import { setGameSchedule } from "@/lib/apps/minecraft/schedule-service";
 import { readMinecraftStats } from "@/lib/apps/minecraft/stats-service";
+import { runFivemCommand } from "@/lib/apps/fivem/service";
 import { gameOfServer, routesByHostname } from "@/lib/apps/games-catalog";
 import { setGameHostname, setGameRouted } from "@/lib/apps/minecraft/address";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
@@ -1408,12 +1409,17 @@ export async function sendConsoleCommandAction(
             targetId: parsed.data.installedAppId,
             metadata: { line: parsed.data.line }
         });
-        // One console, two languages underneath. Which one is decided here rather
-        // than by the screen: the panel that renders the console is the same one.
+        // One console, a language per game underneath. Which one is decided here
+        // rather than by the screen: the panel that renders the console is the
+        // same one.
+        const game = gameOfServer(access.install.catalogId)?.id;
+        const typed = parsed.data.line.replace(/^\//, "");
         const output =
-            gameOfServer(access.install.catalogId)?.id === "ark"
-                ? await runArkCommand(access.ownerId, parsed.data.installedAppId, parsed.data.line.replace(/^\//, ""))
-                : await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
+            game === "ark"
+                ? await runArkCommand(access.ownerId, parsed.data.installedAppId, typed)
+                : game === "fivem"
+                  ? await runFivemCommand(access.ownerId, parsed.data.installedAppId, typed)
+                  : await runConsoleLine(access.ownerId, parsed.data.installedAppId, parsed.data.line);
         return { output: output.trim() };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "The server did not accept that command" };

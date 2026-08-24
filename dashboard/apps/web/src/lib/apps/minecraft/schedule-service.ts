@@ -17,7 +17,8 @@ import { withTimeout } from "@polaris/core";
 import { createWorldBackup } from "./world-service";
 import { runArkCommand } from "@/lib/apps/ark/service";
 import { getArkPlayers } from "@/lib/apps/ark/service";
-import { gameOfServer } from "@/lib/apps/games-catalog";
+import { gameOfServer, type GameId } from "@/lib/apps/games-catalog";
+import { broadcastToFivem, getFivemPlayers, runFivemCommand } from "@/lib/apps/fivem/service";
 import { flushGameWorld } from "@/lib/apps/games-flush";
 import { getServerPlayers, runConsoleLine } from "./service";
 import { setApplicationRunning } from "@/lib/deploy-service";
@@ -203,10 +204,13 @@ export async function sweepGameSchedules(
  * finishes and a schedule that never fires again.
  */
 async function countOnline(ownerId: string, install: { id: string; catalogId: string }): Promise<number | null> {
+    const game = gameOfServer(install.catalogId)?.id;
     const ask =
-        gameOfServer(install.catalogId)?.id === "ark"
+        game === "ark"
             ? getArkPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.length : null))
-            : getServerPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.online : null));
+            : game === "fivem"
+              ? getFivemPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.length : null))
+              : getServerPlayers(ownerId, install.id).then((live) => (live.answering ? live.players.online : null));
     return withTimeout(ask, COUNT_TIMEOUT_MS, "the server did not say who was on it").catch(() => null);
 }
 
@@ -268,10 +272,10 @@ export async function runGameRoutines(ownerId: string, installedAppId: string, n
     const due = routinesDue(readSchedule(config), now, readRoutineRuns(config));
     if (due.length === 0) return 0;
 
-    const ark = gameOfServer(install.catalogId)?.id === "ark";
+    const game = gameOfServer(install.catalogId)?.id ?? null;
     let ran = 0;
     for (const routine of due) {
-        const outcome = await runRoutine(ownerId, installedAppId, routine, ark);
+        const outcome = await runRoutine(ownerId, installedAppId, routine, game);
         // Written whether it worked or not, and written first: a routine whose last
         // step killed the process still has to be recorded as having started, or
         // the next sweep runs the whole thing again.
@@ -292,7 +296,7 @@ async function runRoutine(
     ownerId: string,
     installedAppId: string,
     routine: ScheduledRoutine,
-    ark: boolean
+    game: GameId | null
 ): Promise<string | null> {
     for (const action of routine.actions) {
         try {
@@ -300,17 +304,20 @@ async function runRoutine(
                 case "broadcast":
                     // Each game says it its own way, and saying it the other way is
                     // a message nobody in the game ever sees.
-                    if (ark) await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
+                    if (game === "ark") await runArkCommand(ownerId, installedAppId, `Broadcast ${action.value}`);
+                    else if (game === "fivem") await broadcastToFivem(ownerId, installedAppId, action.value);
                     else await runConsoleLine(ownerId, installedAppId, `say ${action.value}`);
                     break;
                 case "command":
-                    if (ark) await runArkCommand(ownerId, installedAppId, action.value);
+                    if (game === "ark") await runArkCommand(ownerId, installedAppId, action.value);
+                    else if (game === "fivem") await runFivemCommand(ownerId, installedAppId, action.value);
                     else await runConsoleLine(ownerId, installedAppId, action.value);
                     break;
                 case "backup":
-                    // ARK has no backup in Polaris at all, so this is a step that
-                    // would silently do nothing - said out loud instead.
-                    if (ark) return "This server has no backups to take";
+                    // Only Minecraft has backups in Polaris, so for the others this
+                    // is a step that would silently do nothing - said out loud
+                    // instead.
+                    if (game !== "minecraft") return "This server has no backups to take";
                     await createWorldBackup(ownerId, installedAppId);
                     break;
                 case "restart":

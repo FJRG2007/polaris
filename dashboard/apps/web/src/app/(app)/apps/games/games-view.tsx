@@ -604,9 +604,19 @@ function TurnOnGameServers({ canAdd }: { canAdd: boolean }) {
  *  keeps them somewhere else, and landing on an empty directory reads as a server
  *  with nothing in it. */
 function filesHref(applicationId: string | null, game: GameId | null): string | null {
-    return applicationId
-        ? `/drive?c=container:${applicationId}&p=${game === "ark" ? "/app" : "/data"}`
-        : null;
+    return applicationId ? `/drive?c=container:${applicationId}&p=${filesRoot(game)}` : null;
+}
+
+/** Where each game keeps the files somebody came here to look at. */
+function filesRoot(game: GameId | null): string {
+    switch (game) {
+        case "ark":
+            return "/app";
+        case "fivem":
+            return "/config";
+        default:
+            return "/data";
+    }
 }
 
 /** Why a server has no files to browse: it has never been deployed, so there is

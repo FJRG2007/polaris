@@ -48,7 +48,12 @@ describe("the app every game is created from", () => {
         // Deleting these would leave somebody who installed one with a row that
         // renders as a catalog id. They are never offered again - the adoption
         // pass turns them into the app above - but they still have to have a name.
+        //
+        // Only for the games that ever had one: a game added after there was one
+        // app for all of them never shipped a manager of its own, so there is no
+        // install anywhere carrying its id.
         for (const game of GAMES) {
+            if (game.legacyManagerCatalogId === undefined) continue;
             const legacy = findApp(game.legacyManagerCatalogId);
             expect(legacy, `${game.id} manager`).toBeDefined();
             expect(legacy!.legacy).toBe(true);

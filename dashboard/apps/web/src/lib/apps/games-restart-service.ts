@@ -126,6 +126,8 @@ export async function runDueRestart(
  *  words. Failure is not fatal: a server that is up but not answering still has to
  *  be restartable, and that is exactly the state somebody is trying to get out of. */
 async function saveWorld(ownerId: string, installedAppId: string, catalogId: string): Promise<void> {
+    // A FiveM server has no world of its own to write out. See `games-flush`.
+    if (gameOfServer(catalogId)?.id === "fivem") return;
     if (gameOfServer(catalogId)?.id === "ark") {
         const { saveArkWorld } = await import("@/lib/apps/ark/service");
         await saveArkWorld(ownerId, installedAppId).catch(() => undefined);

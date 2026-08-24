@@ -25,7 +25,8 @@ import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 /** The apps that have ever meant "this Polaris can create game servers". */
 function managerCatalogIds(): string[] {
-    return [GAME_SERVERS_APP_ID, ...GAMES.map((game) => game.legacyManagerCatalogId)];
+    // A game that arrived after there was one app never had a manager of its own.
+    return [GAME_SERVERS_APP_ID, ...GAMES.flatMap((game) => (game.legacyManagerCatalogId ? [game.legacyManagerCatalogId] : []))];
 }
 
 /**

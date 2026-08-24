@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { ArkPanel } from "./ark-panel";
+import { FivemPanel } from "./fivem-panel";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { Permission } from "@polaris/core";
@@ -75,6 +76,17 @@ function adaptedPanelFor(
                         </Link>
                     </CardBody>
                 </Card>
+            );
+        case "fivem":
+            return (
+                <FivemPanel
+                    installedAppId={app.id}
+                    applicationId={app.applicationId}
+                    running={running}
+                    game={game}
+                    held={held}
+                    onStatus={onStatus}
+                />
             );
         case "ark":
             return (

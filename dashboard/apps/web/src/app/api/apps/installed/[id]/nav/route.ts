@@ -18,7 +18,7 @@ import { resourceAccess } from "@/lib/resource-access";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
-import { GAME_TABS, visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
+import { gameTabLabel, GAME_TABS, visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,9 +44,17 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     // Narrowed to the game as well as to the reader. A screen this game has
     // nothing behind opens on an error, which is worse than not being offered.
     const tabs = game ? visibleGameTabs(held, game.id).map((tab) => tab.slug) : [];
+    const shown = GAME_TABS.filter((tab) => tabs.includes(tab.slug));
     return Response.json({
         name: app.name,
         // Ordered as the tab bar has them, whatever order the grants came back in.
-        tabs: GAME_TABS.filter((tab) => tabs.includes(tab.slug)).map((tab) => tab.slug)
+        tabs: shown.map((tab) => tab.slug),
+        // Only the screens this game calls something else, so the rail and the tab
+        // bar on the page cannot disagree about what a screen is.
+        labels: Object.fromEntries(
+            shown
+                .filter((tab) => game && gameTabLabel(tab, game.id) !== tab.label)
+                .map((tab) => [tab.slug, gameTabLabel(tab, game!.id)])
+        )
     });
 }

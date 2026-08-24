@@ -1318,6 +1318,15 @@ export interface InstalledAppNav {
      *  and a rail that replaced the app's own list with a list of one would be a
      *  worse place to stand than the list it replaced. */
     readonly tabs: readonly string[];
+    /**
+     * What this game calls a screen, where the shared name would be wrong.
+     *
+     * Only the ones that differ. A Minecraft mod and a FiveM resource are the
+     * same screen and not the same word, and the rail calling it one thing while
+     * the tab bar on the page calls it another is a disagreement about what a
+     * screen is - which is the one thing a navigation must not be.
+     */
+    readonly labels?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -1331,7 +1340,9 @@ export function installedAppSubapp(id: string, nav: InstalledAppNav): AppSubapp 
     const base = `${INSTALLED_BASE}/${id}`;
     const sections = nav.tabs.flatMap((slug) => {
         const entry = GAME_RAIL[slug];
-        return entry ? [{ ...entry, href: slug ? `${base}/${slug}` : base }] : [];
+        if (!entry) return [];
+        const label = nav.labels?.[slug];
+        return [{ ...entry, ...(label ? { label } : {}), href: slug ? `${base}/${slug}` : base }];
     });
     if (sections.length === 0) return null;
     return {

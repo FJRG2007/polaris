@@ -3,7 +3,7 @@
  *
  * The marketplace already describes each app; what it cannot say is which apps
  * belong to the same game. A game is the manifests its servers are actually
- * created from - Minecraft is two, ARK is one - and every screen that has to
+ * created from - Minecraft is two, ARK and FiveM one each - and every screen that has to
  * reason about "which game is this" was reading a catalog id and guessing. This
  * is that answer in one place.
  *
@@ -21,7 +21,7 @@
 export const GAME_SERVERS_APP_ID = "game-servers";
 
 /** The games a server can be created for. */
-export type GameId = "minecraft" | "ark";
+export type GameId = "minecraft" | "ark" | "fivem";
 
 export interface GameDefinition {
     readonly id: GameId;
@@ -39,13 +39,14 @@ export interface GameDefinition {
      * Minecraft's is the grass block out of the vendored texture set
      * (`resources/mcicons`), ARK's is the emblem from its Steam store logo with
      * the wordmark cropped off - the words under it are pale grey and vanish on a
-     * light background at this size.
+     * light background at this size, and FiveM's is its own single-colour mark.
      */
     readonly logo: string;
     /** The per-game manager app this game used to be installed as, before there
      *  was one app for all of them. Only for recognising the installs that still
-     *  carry it; nothing new is ever created under it. */
-    readonly legacyManagerCatalogId: string;
+     *  carry it; nothing new is ever created under it. Absent for a game that
+     *  arrived after there was one app, which never had a manager of its own. */
+    readonly legacyManagerCatalogId?: string;
     /** Every manifest a server of this game is created from. */
     readonly serverCatalogIds: readonly string[];
     /** The label its servers' names live under, so two games' servers can never
@@ -78,6 +79,16 @@ export const GAMES: readonly GameDefinition[] = [
         legacyManagerCatalogId: "ark-manager",
         serverCatalogIds: ["ark"],
         domainLabel: "ark",
+        srv: false
+    },
+    {
+        id: "fivem",
+        name: "FiveM",
+        summary: "Grand Theft Auto V on a server of your own, running the resources you choose.",
+        demands: "About 2 GB of memory and 3 GB of disk, plus whatever your resources weigh.",
+        logo: "/logos/fivem.svg",
+        serverCatalogIds: ["fivem"],
+        domainLabel: "gta",
         srv: false
     }
 ];
