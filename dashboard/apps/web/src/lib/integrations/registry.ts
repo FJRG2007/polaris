@@ -412,6 +412,36 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "The secret's value, not its id. Shown once when it is created."
     },
     {
+        slug: "discord",
+        name: "Discord",
+        category: "Automation",
+        summary: "Let people link their Discord account, so game servers can recognize them.",
+        description:
+            "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by - so somebody can be added to one by their Polaris name instead of being asked to copy an id out of Discord. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
+        docsUrl: "https://docs.discord.com/developers/topics/oauth2",
+        setupLinks: [
+            {
+                label: "Create an application",
+                url: "https://discord.com/developers/applications",
+                help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one."
+            },
+            {
+                label: "Register the redirect URI on it",
+                url: "https://discord.com/developers/applications",
+                help: "The application -> OAuth2 -> Redirects. Discord matches this string exactly and accepts no wildcard, so paste it whole.",
+                values: ["redirectUri"]
+            },
+            {
+                label: "Copy the client id and secret",
+                url: "https://discord.com/developers/applications",
+                help: "Both on the OAuth2 tab. Reset Secret shows the value once; if it was not kept, reset it again rather than guessing."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Client secret",
+        apiKeyHelp: "The OAuth2 tab's client secret, shown once when it is reset."
+    },
+    {
         slug: "krisp",
         name: "Krisp",
         category: "Productivity",

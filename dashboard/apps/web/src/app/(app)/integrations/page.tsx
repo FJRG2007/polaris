@@ -54,7 +54,7 @@ async function provenApplications(): Promise<Map<string, boolean>> {
 /** The services whose card configures an OAuth application the operator
  *  registers. Kept beside the page because it decides which cards get a client
  *  id, a redirect URI and an account limit. */
-const OAUTH_APP_SLUGS: readonly string[] = ["google", "microsoft", "dropbox", "epic", "minecraft"];
+const OAUTH_APP_SLUGS: readonly string[] = ["google", "microsoft", "dropbox", "epic", "minecraft", "discord"];
 
 export default async function IntegrationsPage() {
     await requireAdmin();

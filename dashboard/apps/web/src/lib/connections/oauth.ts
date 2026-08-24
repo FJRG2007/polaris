@@ -24,6 +24,12 @@ import { getIntegrationState } from "@/lib/integration-service";
 import { epicAuthorizeUrl, exchangeEpicCode, getEpicOAuthClient, identifyEpicAccount } from "./epic";
 import { authorizeGithubUser, getGithubUserAuth, githubLinkCallbackUrl } from "@/lib/github-service";
 import {
+    discordAuthorizeUrl,
+    exchangeDiscordCode,
+    getDiscordOAuthClient,
+    identifyDiscordAccount
+} from "./discord";
+import {
     dropboxAuthorizeUrl,
     exchangeDropboxCode,
     getDropboxOAuthClient,
@@ -190,6 +196,18 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
             return { ...granted, avatarUrl: null, email: null, credential: {} };
         },
         identify: identifyMinecraftAccount
+    },
+    discord: {
+        callbackUrl: (baseUrl) => `${baseUrl}/api/connections/discord/callback`,
+        client: getDiscordOAuthClient,
+        authorizeUrl: (client, redirectUri, state) => discordAuthorizeUrl(client, redirectUri, state),
+        exchange: async (client, code, redirectUri) => {
+            const granted = await exchangeDiscordCode(client, code, redirectUri);
+            // Discord is asked for the identify scope alone, so it hands over no
+            // address and there is none here to hold for anybody.
+            return { ...granted, email: null };
+        },
+        identify: identifyDiscordAccount
     },
     dropbox: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/dropbox/callback`,

@@ -13,7 +13,15 @@
  * will one day be half added.
  */
 
-export type ConnectionProviderSlug = "github" | "google" | "microsoft" | "dropbox" | "steam" | "epic" | "minecraft";
+export type ConnectionProviderSlug =
+    | "github"
+    | "google"
+    | "microsoft"
+    | "dropbox"
+    | "steam"
+    | "epic"
+    | "minecraft"
+    | "discord";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -166,6 +174,27 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         signInDefault: false,
         signInWarning:
             "The account behind a Minecraft profile is a Microsoft account, which often reaches an inbox as well. It is linked here to name a player on a server."
+    },
+    {
+        slug: "discord",
+        name: "Discord",
+        summary: "Be recognised by the servers and screens that know you by your Discord account.",
+        description:
+            "A FiveM server identifies a player by their Discord account and nothing else, so linking yours is what lets whoever runs one add you by your Polaris name instead of asking you to copy an eighteen-digit id out of Discord. Polaris reads the account id and the name you go by, and keeps nothing it could act with: it never posts as you, never reads your messages, and never sees the servers you are in.",
+        acceptsToken: false,
+        defaultLimit: 1,
+        requires: "a Discord application",
+        // The account most likely to be shared with a friend, phished in a game
+        // chat, or signed in on a machine at a LAN party - and the one whose
+        // takeover people notice last. It is linked here to name a player, and
+        // that is all it should unlock. An operator can still allow it, having
+        // read why.
+        signInDefault: false,
+        signInWarning:
+            "Discord accounts are phished and shared more than most, and a stolen one is often noticed late. This one is linked to be recognised on a game server; letting it sign in makes it a way into Polaris as well."
+        // No emailTrustDefault, and no switch offered for one: Polaris asks
+        // Discord for the identify scope alone, so no address is handed over and
+        // there is nothing here to take anybody's word about.
     },
     {
         slug: "dropbox",

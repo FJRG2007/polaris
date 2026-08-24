@@ -56,8 +56,9 @@ export default function AboutPage() {
                     People with an account here can connect outside accounts of their own, and each connection asks for
                     the least it can. A connected Google account is read-only, and only so the calendar can be shown
                     beside the tasks - Polaris cannot change or delete anything in it. Microsoft and Dropbox are limited
-                    to the folder Polaris creates for backups. Steam, Epic Games and Minecraft hand over an account id
-                    and a display name, so a game server can tell one player from another, and no credential at all.
+                    to the folder Polaris creates for backups. Steam, Epic Games, Minecraft and Discord hand over an
+                    account id and a display name, so a game server can tell one player from another, and no credential
+                    at all.
                 </p>
                 <p className="text-base leading-relaxed text-muted-foreground">
                     Connecting is always started by the account&apos;s owner, and unlinking it here destroys the

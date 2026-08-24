@@ -70,6 +70,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     dropbox: brand.DropboxMark,
     steam: brand.SteamMark,
     epic: brand.EpicGamesMark,
+    discord: brand.DiscordMark,
     cloudflare: brand.CloudflareMark,
     ngrok: brand.NgrokMark,
     dymo: DymoMark
