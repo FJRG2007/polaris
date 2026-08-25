@@ -27,7 +27,7 @@
  */
 
 import { useChat } from "./chat-context";
-import { useMemo, useState } from "react";
+import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { lastChannelIn } from "./recents";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
@@ -287,26 +287,28 @@ function SpacePicture({ spaceId }: { spaceId: string }) {
  * glance down a narrow column. Radius does the rest: the open one is drawn
  * tighter than the others, which is the motion this pattern is known by, and
  * both steps are on the four-step scale rather than beyond it.
+ *
+ * It takes a ref and passes the rest of its props to its outer element, and that
+ * is not decoration: the right-click menu wraps one of these with `asChild`,
+ * which hands the child a ref and the handlers that open the menu. A plain
+ * function component drops both silently, which is exactly what happened - every
+ * space in the column had a menu that nothing could open.
  */
-function Pill({
-    label,
-    active,
-    unread,
-    color,
-    onClick,
-    children
-}: {
-    label: string;
-    active: boolean;
-    unread: number;
-    /** The space's own colour as `#rrggbb`, already checked. Direct messages
-     *  have none: they are not a space and borrow no identity. */
-    color?: string | null;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
+const Pill = forwardRef<
+    HTMLSpanElement,
+    {
+        label: string;
+        active: boolean;
+        unread: number;
+        /** The space's own colour as `#rrggbb`, already checked. Direct messages
+         *  have none: they are not a space and borrow no identity. */
+        color?: string | null;
+        onClick: () => void;
+        children: React.ReactNode;
+    } & Omit<ComponentPropsWithoutRef<"span">, "color" | "onClick" | "children">
+>(function Pill({ label, active, unread, color, onClick, children, ...rest }, ref) {
     return (
-        <span className="relative flex shrink-0 items-center">
+        <span {...rest} ref={ref} className="relative flex shrink-0 items-center">
             <span
                 aria-hidden="true"
                 className={cn(
@@ -350,7 +352,7 @@ function Pill({
             )}
         </span>
     );
-}
+});
 
 /**
  * Right-clicking a space.
