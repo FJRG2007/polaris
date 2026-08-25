@@ -384,16 +384,29 @@ export function ChatSidebar() {
                     <>
                         {/* Above the first heading: the channels that belong to
                             no category, drawn without one rather than under an
-                            invented "General". */}
-                        <ChannelRows
-                            channels={inSpace.filter((channel) => channel.categoryId === null)}
-                            open={open}
-                            inRoom={inRoom}
-                            drag={drag}
-                            manages={manages}
-                            categoryId={null}
-                            onManage={setManaging}
-                        />
+                            invented "General".
+
+                            The strip stays even with nothing in it, because it
+                            is where a channel goes to belong to no heading -
+                            without it there was nowhere to drop one. */}
+                        <div
+                            {...(manages ? drag.areaProps(null) : {})}
+                            className={cn(
+                                "mb-1 min-h-2 rounded-md ring-1 ring-inset transition-colors duration-fast",
+                                drag.dropInto && drag.dropInto.categoryId === null
+                                    ? "bg-primary/5 ring-primary/40"
+                                    : "ring-transparent"
+                            )}
+                        >
+                            <ChannelRows
+                                channels={inSpace.filter((channel) => channel.categoryId === null)}
+                                open={open}
+                                inRoom={inRoom}
+                                drag={drag}
+                                manages={manages}
+                                onManage={setManaging}
+                            />
+                        </div>
 
                         {categories
                             .filter((category) => category.spaceId === space.id)
@@ -422,6 +435,8 @@ export function ChatSidebar() {
                                                 : "before"
                                             : null
                                     }
+                                    area={manages ? drag.areaProps(category.id) : undefined}
+                                    into={drag.dropInto?.categoryId === category.id}
                                     action={
                                         manages ? (
                                             <DropdownMenu>
@@ -473,7 +488,6 @@ export function ChatSidebar() {
                                         inRoom={inRoom}
                                         drag={drag}
                                         manages={manages}
-                                        categoryId={category.id}
                                         onManage={setManaging}
                                         empty="Nothing here yet."
                                     />
@@ -554,7 +568,6 @@ function ChannelRows({
     inRoom,
     drag,
     manages,
-    categoryId,
     onManage,
     empty
 }: {
@@ -564,25 +577,20 @@ function ChannelRows({
     /** Absent in the direct-message list, which has no order to arrange. */
     drag?: ReturnType<typeof useRailDrag>;
     manages?: boolean;
-    categoryId?: string | null;
     onManage?: (channel: ChatChannelView) => void;
     empty?: string;
 }) {
-    // The whole group is a drop target as well as each row, so a heading with
-    // nothing under it is somewhere a channel can go and the space past the last
-    // row means the end rather than nothing.
-    const area = drag && manages ? drag.areaProps(categoryId ?? null) : {};
-
+    // Dropping into the group rather than between two of its rows is the
+    // caller's to hold: it owns the heading, which stays a target while folded
+    // and while empty, and this only ever draws what is in it.
     if (channels.length === 0) {
         return empty ? (
-            <p {...area} className="px-2 py-1 text-xs text-foreground-subtle">
-                {empty}
-            </p>
+            <p className="px-2 py-1 text-xs text-foreground-subtle">{empty}</p>
         ) : null;
     }
 
     return (
-        <div {...area} className="mb-2 flex flex-col gap-px">
+        <div className="mb-2 flex flex-col gap-px">
             {channels.map((channel) => {
                 const inside = inRoom[channel.id] ?? [];
                 const dropping =
@@ -595,14 +603,7 @@ function ChannelRows({
                     <div
                         key={channel.id}
                         className={cn(
-                            "relative",
-                            // A line rather than a gap: a row that moved aside
-                            // would shift every row under it on every pointer
-                            // move, and the list would appear to twitch.
-                            dropping === "before" &&
-                                "before:absolute before:inset-x-2 before:-top-px before:h-0.5 before:rounded-full before:bg-primary",
-                            dropping === "after" &&
-                                "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary",
+                            "relative transition-opacity duration-fast",
                             drag?.dragging?.id === channel.id && "opacity-40"
                         )}
                         {...(manages && drag
@@ -612,6 +613,8 @@ function ChannelRows({
                               }
                             : {})}
                     >
+                        <DropLine shown={dropping === "before"} where="top" />
+                        <DropLine shown={dropping === "after"} where="bottom" />
                         <Row
                             channel={channel}
                             // Pressing a voice room's name is how somebody says
@@ -672,6 +675,31 @@ function ChannelRows({
     );
 }
 
+/**
+ * Where a dragged row would land.
+ *
+ * Always in the tree and never conditionally rendered, which is the whole point:
+ * an element that appears the instant it is needed cannot be animated into
+ * place, and a line that blinks on is one somebody has to look for. This one
+ * grows out from the left in the same fast step everything else in the rail
+ * moves in, so the eye follows it down the list as the pointer moves.
+ *
+ * A line rather than a gap that opens: a row moving aside would shift every row
+ * under it on every pointer move, and the list would appear to twitch.
+ */
+function DropLine({ shown, where }: { shown: boolean; where: "top" | "bottom" }) {
+    return (
+        <span
+            aria-hidden="true"
+            className={cn(
+                "pointer-events-none absolute inset-x-2 h-0.5 origin-left rounded-full bg-primary transition-transform duration-fast",
+                where === "top" ? "-top-px" : "-bottom-px",
+                shown ? "scale-x-100" : "scale-x-0"
+            )}
+        />
+    );
+}
+
 function Section({
     label,
     folded,
@@ -679,6 +707,8 @@ function Section({
     action,
     handle,
     dropping = null,
+    area,
+    into = false,
     children
 }: {
     label: string;
@@ -689,20 +719,29 @@ function Section({
      *  the space. Absent everywhere else. */
     handle?: Record<string, unknown>;
     dropping?: "before" | "after" | null;
+    /** What makes the whole heading somewhere a channel can be dropped. On the
+     *  outside rather than around the rows, so a folded heading and one with
+     *  nothing under it are both targets - which is where a channel is put when
+     *  it is being moved into a heading rather than between two rows. */
+    area?: Record<string, unknown>;
+    /** Whether a channel is being held over it right now. */
+    into?: boolean;
     children: React.ReactNode;
 }) {
     return (
-        <div className="mb-3">
+        <div
+            {...area}
+            className={cn(
+                "mb-3 rounded-md ring-1 ring-inset transition-colors duration-fast",
+                into ? "bg-primary/5 ring-primary/40" : "ring-transparent"
+            )}
+        >
             <div
                 {...handle}
-                className={cn(
-                    "group relative flex items-center gap-1 px-1",
-                    dropping === "before" &&
-                        "before:absolute before:inset-x-2 before:-top-px before:h-0.5 before:rounded-full before:bg-primary",
-                    dropping === "after" &&
-                        "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full after:bg-primary"
-                )}
+                className="group relative flex items-center gap-1 px-1"
             >
+                <DropLine shown={dropping === "before"} where="top" />
+                <DropLine shown={dropping === "after"} where="bottom" />
                 <button
                     type="button"
                     onClick={onToggle}

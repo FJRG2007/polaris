@@ -16,6 +16,12 @@
  * The drop line goes above or below the row under the pointer depending on which
  * half of it the pointer is in. Without that there is no way to put a channel at
  * the very bottom of a heading.
+ *
+ * A heading being hovered as a whole is reported separately, and it has to be.
+ * Dropping into an empty heading, into a folded one, or past the last row under
+ * one is a real move with no row to draw a line beside, so without this the
+ * pointer sat over the target showing nothing at all and the only way to find
+ * out where a channel would land was to let go of it.
  */
 
 import type { DragEvent } from "react";
@@ -35,6 +41,12 @@ export interface DropAt {
     readonly after: boolean;
 }
 
+/** A whole heading under the pointer, when no particular row is. `null` is the
+ *  group above the first heading, which is a place a channel can land. */
+export interface DropInto {
+    readonly categoryId: string | null;
+}
+
 /** Where something was let go. */
 export type DropTarget =
     | { readonly at: "row"; readonly id: string; readonly after: boolean }
@@ -50,6 +62,7 @@ export function useRailDrag({
 }) {
     const [dragging, setDragging] = useState<Dragging | null>(null);
     const [dropAt, setDropAt] = useState<DropAt | null>(null);
+    const [dropInto, setDropInto] = useState<DropInto | null>(null);
     // Both read inside handlers that run before React has re-rendered, so the
     // state from this render can be a pointer move behind what is on screen.
     const held = useRef<Dragging | null>(null);
@@ -60,6 +73,7 @@ export function useRailDrag({
         over.current = null;
         setDragging(null);
         setDropAt(null);
+        setDropInto(null);
     }, []);
 
     /** What can be picked up. */
@@ -92,6 +106,8 @@ export function useRailDrag({
                 const next = { kind, id, after: event.clientY > box.top + box.height / 2 };
                 over.current = next;
                 setDropAt(next);
+                // A row is the precise answer, so the heading stops claiming it.
+                setDropInto(null);
             },
             onDragLeave: () => {
                 if (over.current?.id !== id) return;
@@ -121,6 +137,15 @@ export function useRailDrag({
             onDragOver: (event: DragEvent) => {
                 if (held.current?.kind !== "channel") return;
                 event.preventDefault();
+                // Only where no row has claimed the pointer. Rows stop this
+                // event, so reaching here means the gap, the heading, or a
+                // heading with nothing under it.
+                setDropInto((current) =>
+                    current?.categoryId === categoryId ? current : { categoryId }
+                );
+            },
+            onDragLeave: () => {
+                setDropInto((current) => (current?.categoryId === categoryId ? null : current));
             },
             onDrop: (event: DragEvent) => {
                 const source = held.current;
@@ -133,7 +158,7 @@ export function useRailDrag({
         [finish, onDrop]
     );
 
-    return { dragging, dropAt, handleProps, rowProps, areaProps };
+    return { dragging, dropAt, dropInto, handleProps, rowProps, areaProps };
 }
 
 /**
