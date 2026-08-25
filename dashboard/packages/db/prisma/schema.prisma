@@ -234,6 +234,7 @@ model User {
     notes               Note[]
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
+    chatSpacePreferences ChatSpacePreference[]
     chatSpaceBans       ChatSpaceBan[] @relation("ChatSpaceBanUser")
     chatSpaceBansMade   ChatSpaceBan[] @relation("ChatSpaceBanBy")
     chatSpaceInvites     ChatSpaceInvite[]
@@ -5891,8 +5892,9 @@ model ChatSpace {
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-    avatar     ChatSpaceAvatar?
-    members    ChatSpaceMember[]
+    avatar      ChatSpaceAvatar?
+    members     ChatSpaceMember[]
+    preferences ChatSpacePreference[]
     bans       ChatSpaceBan[]
     channels   ChatChannel[]
     categories ChatCategory[]
@@ -5973,6 +5975,34 @@ model ChatSpaceMember {
     // to remember to lift is a timeout that becomes a ban by accident.
     timeoutUntil DateTime?
     createdAt DateTime @default(now())
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, userId])
+    @@index([userId])
+}
+
+// What one person has decided about a space, for themselves.
+//
+// Not on `ChatSpaceMember`, and the reason is the owner: they are deliberately
+// never a row there, so a preference kept beside the membership would be one the
+// person who started the space could not set. It is also not a membership - an
+// internal space is reachable by everybody who can see its owner, and somebody
+// who reads one without ever being added to it still gets to say how loudly it
+// may interrupt them.
+//
+// One column today, and the row is the point: it is the answer to "what does
+// this space do to me", which is a different thing from "am I in it".
+model ChatSpacePreference {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    spaceId     String   @db.Uuid
+    userId      String   @db.Uuid
+    // all | mentions | none. What every channel in the space means by
+    // `inherit`, which is what every channel says until somebody says otherwise.
+    notifyLevel String   @default("all")
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
 
     space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -6148,6 +6178,13 @@ model ChatChannelMember {
     // claim to having read them: one is the device, the other is the person.
     // What the second tick means.
     lastDeliveredAt   DateTime?
+    // How much of this conversation is worth being interrupted for: all,
+    // mentions, none - or `inherit`, which is the space's answer. A different
+    // question from the mute below it: a mute is a silence with an end and
+    // takes the badge with it, this is a standing preference that leaves the
+    // unread marks alone. `inherit` is stored rather than left null so that
+    // "follow the server" stays a choice somebody can go back to.
+    notifyLevel       String    @default("inherit")
     // No badge, and no notification, without leaving the channel.
     muted             Boolean   @default(false)
     // When the quiet ends. Null while `muted` means "until I turn it back on",

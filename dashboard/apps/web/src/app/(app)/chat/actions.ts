@@ -944,6 +944,35 @@ export async function setMutedAction(
     return result;
 }
 
+/**
+ * What one conversation is allowed to interrupt with: every message, only the
+ * ones that name you or the room, or nothing. Separate from the mute above it,
+ * which is a silence with an end and takes the unread badge with it.
+ *
+ * @param level - One of the three, or `inherit` to follow the space.
+ */
+export async function setChannelNotifyAction(
+    channelId: string,
+    level: string
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.setChannelNotify(me, channelId, level));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
+/** The same answer for a whole space, which every channel in it follows unless
+ *  it was given one of its own. */
+export async function setSpaceNotifyAction(
+    spaceId: string,
+    level: string
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.setSpaceNotify(me, spaceId, level));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 /** Keep a conversation at the top of your own list, or stop. Yours alone: the
  *  other people in it are told nothing and their rail does not move. */
 export async function setPinnedAction(

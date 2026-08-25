@@ -28,7 +28,10 @@ export type CallState = "ringing" | "moved" | "ended";
 
 /** Something worth waking the other screens for. */
 export interface ChatChange {
-    readonly channelId: string;
+    /** Absent only on a `channels` change that is not about one conversation:
+     *  a preference set for a whole space is about every channel in it, and
+     *  naming one of them would be a lie the stream then filters on. */
+    readonly channelId?: string;
     /** posted - a message arrived or changed, pull the channel again.
      *  channels - what this person can reach changed, redraw the rail.
      *  typing - somebody is composing right now.

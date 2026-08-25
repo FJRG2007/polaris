@@ -14,6 +14,10 @@
  * - only conversations this reader is actually in;
  * - never a muted one, muted being worked out rather than read, since a mute
  *   with an end that has passed is not a mute;
+ * - never one they set to nothing, and in one they set to mentions only the
+ *   messages that name them or the room - the standing preference beside the
+ *   mute, which is the whole of what a toast, a sound and a desktop notice
+ *   obey;
  * - never somebody they have blocked, which is the same rule as the mute and a
  *   stronger one: a mute silences a room, and this silences a person in every
  *   room at once;
@@ -24,6 +28,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
+import { mentionsReader, notifyLevels } from "./notify";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 
@@ -79,7 +84,12 @@ export async function messageToasts(
         memberships.filter((row) => core.muteInForce(row)).map((row) => row.channelId)
     );
 
-    const wanted = asked.filter((id) => !quiet.has(id));
+    // What each of them is allowed to interrupt with. A conversation set to
+    // nothing is dropped here; one set to mentions keeps its place and has its
+    // messages sifted below, because the newest message in it is usually not the
+    // one that names anybody.
+    const levels = await notifyLevels(actor.id, asked);
+    const wanted = asked.filter((id) => !quiet.has(id) && levels.get(id) !== "none");
     if (wanted.length === 0) return [];
 
     const since = new Date(Date.now() - RECENT_MS);
@@ -135,6 +145,13 @@ export async function messageToasts(
     const toasts: MessageToast[] = [];
     for (const row of rows) {
         if (seen.has(row.channelId)) continue;
+        // Not `seen` on the way past: the next message down in the same
+        // conversation may be the one that named them, and a channel followed
+        // for mentions is announced by the mention rather than by whatever was
+        // said after it.
+        if (levels.get(row.channelId) === "mentions" && !mentionsReader(row.body, actor.id)) {
+            continue;
+        }
         if (row.authorId && blocked.has(row.authorId)) {
             seen.add(row.channelId);
             continue;

@@ -33,6 +33,7 @@ import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
+import { NotifyOptions } from "./notify-menu";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
@@ -872,6 +873,20 @@ function RowMenu({
                             refresh();
                         }}
                     />
+                    {/* Not in a one-to-one conversation: every message in one is
+                        addressed to you, so "only mentions" would mean nothing
+                        and the mute is the whole of the question. */}
+                    {channel.kind !== "dm" && (
+                        <NotifyOptions
+                            level={channel.notifyLevel}
+                            parts={CONTEXT_PARTS}
+                            inheritable={channel.spaceId !== null}
+                            onChoose={async (level) => {
+                                await actions.setChannelNotifyAction(channel.id, level);
+                                refresh();
+                            }}
+                        />
+                    )}
 
                     {/* What you call them, offered from the row as well as from
                     the open conversation: it is a note about a person, and the

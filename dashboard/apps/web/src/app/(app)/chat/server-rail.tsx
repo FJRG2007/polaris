@@ -32,13 +32,16 @@ import { lastChannelIn } from "./recents";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { LeaveDialog } from "./leave-dialog";
-import { leaveSpaceAction } from "./actions";
+import * as core from "@polaris/core";
+import { leaveSpaceAction, setSpaceNotifyAction } from "./actions";
 import { BansDialog } from "./bans-dialog";
 import { InviteDialog } from "./invite-dialog";
 import { chatAvatarUrl } from "@/lib/avatar-url";
 import { NewSpaceDialog } from "./new-space-dialog";
 import { ChatPictureDialog } from "./picture-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
+import { NotifyOptions } from "./notify-menu";
+import type { MenuParts } from "./mute-menu";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { Ban, Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
 import {
@@ -48,8 +51,19 @@ import {
     ContextMenuItem,
     ContextMenuLabel,
     ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
     ContextMenuTrigger
 } from "@polaris/ui";
+
+/** How the shared notification list draws itself inside a right-click menu. */
+const CONTEXT_PARTS: MenuParts = {
+    Item: ContextMenuItem,
+    Sub: ContextMenuSub,
+    SubTrigger: ContextMenuSubTrigger,
+    SubContent: ContextMenuSubContent
+};
 
 /** A stored colour as `#rrggbb`, or null when it is not one this can draw with.
  *  The column is a free string, so a space could hold anything at all. */
@@ -147,6 +161,12 @@ export function ServerRail() {
                         onBans={() => setShowingBans(space)}
                         onPicture={() => setPicturing(space)}
                         onLeave={() => setLeaving(space)}
+                        onNotify={(level) => {
+                            void runAction(
+                                () => setSpaceNotifyAction(space.id, level),
+                                setError
+                            ).then(refresh);
+                        }}
                     >
                         <Pill
                             label={space.name}
@@ -342,7 +362,9 @@ function Pill({
  *
  * What is offered depends on the seat: adding a channel is an administrator's,
  * and so is inviting into a private space, because a private space is one whose
- * roster was chosen.
+ * roster was chosen. How loudly it may interrupt is nobody's but the reader's,
+ * so it is offered to everybody and sits at the top - it is the one thing here
+ * somebody comes back to.
  */
 function SpaceMenu({
     space,
@@ -351,6 +373,7 @@ function SpaceMenu({
     onPicture,
     onBans,
     onLeave,
+    onNotify,
     children
 }: {
     space: ChatSpaceView;
@@ -359,6 +382,7 @@ function SpaceMenu({
     onPicture: () => void;
     onBans: () => void;
     onLeave: () => void;
+    onNotify: (level: core.ChatChannelNotifyLevel) => void;
     children: React.ReactNode;
 }) {
     const administers = space.access !== "member";
@@ -376,6 +400,15 @@ function SpaceMenu({
             <ContextMenuContent className="w-52">
                 <ContextMenuLabel>{space.name}</ContextMenuLabel>
                 <ContextMenuSeparator />
+                {/* What every channel in the space follows unless it was given
+                    an answer of its own. Not a mute: the unread marks go on
+                    counting whatever is chosen here. */}
+                <NotifyOptions
+                    level={space.notifyLevel}
+                    parts={CONTEXT_PARTS}
+                    onChoose={onNotify}
+                />
+                {(mayInvite || administers || mayLeave) && <ContextMenuSeparator />}
                 {mayInvite && (
                     <ContextMenuItem onSelect={onInvite}>
                         <UserPlus className="size-3.5" />
@@ -412,11 +445,6 @@ function SpaceMenu({
                             Leave this space
                         </ContextMenuItem>
                     </>
-                )}
-                {!mayInvite && !administers && !mayLeave && (
-                    <ContextMenuItem disabled>
-                        Only an administrator can change this space
-                    </ContextMenuItem>
                 )}
             </ContextMenuContent>
         </ContextMenu>

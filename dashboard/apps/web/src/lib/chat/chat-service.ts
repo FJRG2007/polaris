@@ -42,6 +42,10 @@ export interface ChatSpaceView {
     readonly archived: boolean;
     /** What this reader may do in it, so the UI hides what it would refuse. */
     readonly access: "member" | "admin" | "owner";
+    /** How much of it may interrupt this reader, and what every channel in it
+     *  means by "follow the server". Nothing to do with the mute on a
+     *  conversation, which is a silence with an end. */
+    readonly notifyLevel: core.ChatNotifyLevel;
 }
 
 /** A heading inside a space. */
@@ -69,6 +73,11 @@ export interface ChatChannelView {
      *  never opened and nothing has happened in. */
     readonly unread: number;
     readonly muted: boolean;
+    /** How much of this conversation is worth interrupting for. `inherit` is
+     *  whatever its space says, and is what a channel says until somebody has
+     *  chosen otherwise. Separate from the mute below it, and it leaves the
+     *  unread count alone: it decides what interrupts, not what is counted. */
+    readonly notifyLevel: core.ChatChannelNotifyLevel;
     /** Whether this reader keeps it at the top of their list. Theirs alone -
      *  pinning a conversation says nothing to the other people in it. */
     readonly pinned: boolean;
@@ -146,7 +155,7 @@ export async function listSpaces(actor: ChatActor): Promise<ChatSpaceView[]> {
     const ids = await reachableSpaceIds(actor);
     if (ids.size === 0) return [];
 
-    const [spaces, memberships] = await Promise.all([
+    const [spaces, memberships, preferences] = await Promise.all([
         prisma.chatSpace.findMany({
             where: { id: { in: [...ids] } },
             orderBy: [{ order: "asc" }, { createdAt: "asc" }],
@@ -165,10 +174,15 @@ export async function listSpaces(actor: ChatActor): Promise<ChatSpaceView[]> {
         prisma.chatSpaceMember.findMany({
             where: { userId: actor.id, spaceId: { in: [...ids] } },
             select: { spaceId: true, role: true }
+        }),
+        prisma.chatSpacePreference.findMany({
+            where: { userId: actor.id, spaceId: { in: [...ids] } },
+            select: { spaceId: true, notifyLevel: true }
         })
     ]);
 
     const roles = new Map(memberships.map((row) => [row.spaceId, row.role]));
+    const levels = new Map(preferences.map((row) => [row.spaceId, row.notifyLevel]));
     return spaces.map((space) => ({
         id: space.id,
         name: space.name,
@@ -183,7 +197,10 @@ export async function listSpaces(actor: ChatActor): Promise<ChatSpaceView[]> {
                 ? "owner"
                 : roles.get(space.id) === "admin"
                   ? "admin"
-                  : "member"
+                  : "member",
+        // Nothing stored is "all", which is also what a stored word this
+        // version does not know means: the column is free text.
+        notifyLevel: core.resolveChatNotify(null, levels.get(space.id))
     }));
 }
 
@@ -569,6 +586,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
                 lastReadAt: true,
                 muted: true,
                 mutedUntil: true,
+                notifyLevel: true,
                 pinnedAt: true,
                 role: true
             }
@@ -651,6 +669,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
+            notifyLevel: channelNotifyOf(membership?.notifyLevel),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister,
             // The one standing a group confers: its owner may take a message
@@ -670,6 +689,12 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
                 channel.kind === "dm" && others.some((other) => shut.has(other.id))
         };
     });
+}
+
+/** A stored channel level, or `inherit` for anything the column holds that this
+ *  version does not know - including the row not existing at all. */
+function channelNotifyOf(stored: string | null | undefined): core.ChatChannelNotifyLevel {
+    return core.isChatNotifyLevel(stored) ? stored : core.CHAT_NOTIFY_INHERIT;
 }
 
 /** The spaces this actor administers, by either of the two ways of doing so.
@@ -1171,6 +1196,64 @@ export async function setMuted(
     // The rail draws the bell, and the tab that pressed it is not the only one
     // showing this conversation.
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * How much of one conversation is worth being interrupted for.
+ *
+ * Not a mute, and the difference is the whole point of it existing. A mute is a
+ * silence with an end and takes the unread badge with it, which is the right
+ * answer to "leave me alone about this" and the wrong one to "tell me when
+ * somebody needs me, and let me find the rest later" - the second is what
+ * anybody following a busy channel actually wants, and using a mute for it costs
+ * them the marks that are how they find the room again.
+ *
+ * So the two sit side by side and neither replaces the other: this decides what
+ * interrupts, the mute decides whether the conversation makes any sign at all.
+ *
+ * Upserted like the mute beside it, so somebody reading a channel of an open
+ * space they were never added to can still say how loudly it may reach them.
+ */
+export async function setChannelNotify(
+    actor: ChatActor,
+    channelId: string,
+    level: string
+): Promise<void> {
+    await requireChannel(actor, channelId);
+    const parsed = core.chatChannelNotifySchema.safeParse({ channelId, level });
+    if (!parsed.success) throw new ChatAccessError("That is not a notification setting");
+
+    const notifyLevel = parsed.data.level;
+    await prisma.chatChannelMember.upsert({
+        where: { channelId_userId: { channelId, userId: actor.id } },
+        update: { notifyLevel },
+        create: { channelId, userId: actor.id, notifyLevel }
+    });
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * The same answer for a whole space, which is what every channel in it means
+ * until one of them says otherwise.
+ *
+ * Its own row rather than a column on the membership, because the owner of a
+ * space is deliberately not a member of it - a preference kept beside the
+ * roster would be one the person who started the space could not set.
+ */
+export async function setSpaceNotify(actor: ChatActor, spaceId: string, level: string): Promise<void> {
+    await requireSpace(actor, spaceId);
+    const parsed = core.chatSpaceNotifySchema.safeParse({ spaceId, level });
+    if (!parsed.success) throw new ChatAccessError("That is not a notification setting");
+
+    const notifyLevel = parsed.data.level;
+    await prisma.chatSpacePreference.upsert({
+        where: { spaceId_userId: { spaceId, userId: actor.id } },
+        update: { notifyLevel },
+        create: { spaceId, userId: actor.id, notifyLevel }
+    });
+    // Every conversation in the space follows this unless it was given an answer
+    // of its own, so the whole rail is what changed.
+    publishChatChange({ kind: "channels", actorId: actor.id, audience: [actor.id] });
 }
 
 /**

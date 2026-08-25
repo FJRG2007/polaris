@@ -820,6 +820,80 @@ export function muteInForce(
 }
 
 /**
+ * How much of a conversation is worth being interrupted for.
+ *
+ * A different question from muting, and the reason both exist. A mute is a
+ * silence with an end: nothing at all from this room, not even the badge, until
+ * it lapses. This is a standing answer to "which of these is worth telling me
+ * about" - a busy server somebody follows but is not on call for is set to
+ * mentions once and never thought about again, and the unread marks go on
+ * working, because they are how you find the room later rather than how it
+ * interrupts you.
+ *
+ * Three, and no more. Anything finer is a rule nobody can read back six months
+ * later, and every messenger that tried it ended here.
+ */
+export const CHAT_NOTIFY_LEVELS = ["all", "mentions", "none"] as const;
+
+export type ChatNotifyLevel = (typeof CHAT_NOTIFY_LEVELS)[number];
+
+/** What a channel says when it has no opinion of its own: whatever its space
+ *  says. Stored rather than absent, so "follow the server" is a choice somebody
+ *  can go back to after setting one - not just the state of never having
+ *  touched it. */
+export const CHAT_NOTIFY_INHERIT = "inherit";
+
+/** A channel can also defer to the space it is in. A space cannot: it is where
+ *  the answer comes from. */
+export const CHAT_CHANNEL_NOTIFY_LEVELS = [CHAT_NOTIFY_INHERIT, ...CHAT_NOTIFY_LEVELS] as const;
+
+export type ChatChannelNotifyLevel = (typeof CHAT_CHANNEL_NOTIFY_LEVELS)[number];
+
+export const CHAT_NOTIFY_LABEL: Readonly<Record<ChatChannelNotifyLevel, string>> = {
+    [CHAT_NOTIFY_INHERIT]: "Follow the server",
+    all: "Every message",
+    mentions: "Only mentions",
+    none: "Nothing"
+};
+
+/** Whether a stored string is a level anything can act on. The columns are free
+ *  text, so a row could hold a word no version of this ever wrote. */
+export function isChatNotifyLevel(value: unknown): value is ChatNotifyLevel {
+    return CHAT_NOTIFY_LEVELS.includes(value as ChatNotifyLevel);
+}
+
+/**
+ * What one person actually gets from one conversation.
+ *
+ * The channel wins where it has been set, the space answers where it has not,
+ * and `all` is what both mean before anybody has chosen anything - including
+ * for a group or a direct message, which belong to no space and so have nothing
+ * to inherit from.
+ */
+export function resolveChatNotify(
+    channel: string | null | undefined,
+    space: string | null | undefined
+): ChatNotifyLevel {
+    if (isChatNotifyLevel(channel)) return channel;
+    if (isChatNotifyLevel(space)) return space;
+    return "all";
+}
+
+export const chatChannelNotifySchema = z.object({
+    channelId: z.string().uuid(),
+    level: z.enum(CHAT_CHANNEL_NOTIFY_LEVELS)
+});
+
+export type ChatChannelNotifyInput = z.infer<typeof chatChannelNotifySchema>;
+
+export const chatSpaceNotifySchema = z.object({
+    spaceId: z.string().uuid(),
+    level: z.enum(CHAT_NOTIFY_LEVELS)
+});
+
+export type ChatSpaceNotifyInput = z.infer<typeof chatSpaceNotifySchema>;
+
+/**
  * Putting the channels of one space in the order somebody dragged them into.
  *
  * The whole list for a heading rather than one move: the client already knows

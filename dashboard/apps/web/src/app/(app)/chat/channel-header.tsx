@@ -27,6 +27,7 @@ import { useAppUrl } from "@/components/app-url";
 import { ChatPictureDialog } from "./picture-dialog";
 import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { NotifyOptions } from "./notify-menu";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { GroupSettingsDialog } from "./group-settings-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -323,6 +324,22 @@ export function ChannelHeader({
                                     void act(() => actions.setMutedAction(channel.id, minutes))
                                 }
                             />
+                            {/* Not in a one-to-one conversation, where the mute
+                                is the whole of the question: every message in
+                                one is addressed to you, so "only mentions" is a
+                                choice that would mean nothing. */}
+                            {channel.kind !== "dm" && (
+                                <NotifyOptions
+                                    level={channel.notifyLevel}
+                                    parts={DROPDOWN_PARTS}
+                                    inheritable={channel.spaceId !== null}
+                                    onChoose={(level) =>
+                                        void act(() =>
+                                            actions.setChannelNotifyAction(channel.id, level)
+                                        )
+                                    }
+                                />
+                            )}
                             {/* A conversation with one other person in it. What
                                 you call them is yours: nothing is announced, and
                                 they go on being called what they call themselves

@@ -128,7 +128,9 @@ export async function GET(request: Request): Promise<Response> {
                 // case - so the audience decides, and the set is re-resolved.
                 if (change.kind === "channels") {
                     const forThem = !change.audience || change.audience.includes(actor.id);
-                    if (!forThem && !reachable.has(change.channelId)) return;
+                    // No channel means the change is about a whole space, and
+                    // those are always addressed: there is nothing to intersect.
+                    if (!forThem && (!change.channelId || !reachable.has(change.channelId))) return;
                     resolvedAt = 0;
                     void refreshReachable().then(() => {
                         if (!closed) send({ kind: "channels" });
@@ -149,6 +151,7 @@ export async function GET(request: Request): Promise<Response> {
                 // somebody read something, because the fact is on the wire
                 // whether or not a screen draws it.
                 if (change.kind === "read") {
+                    if (!change.channelId) return;
                     if (change.audience && !change.audience.includes(actor.id)) return;
                     if (change.actorId !== actor.id && !reachable.has(change.channelId)) return;
                     send({
@@ -162,7 +165,11 @@ export async function GET(request: Request): Promise<Response> {
                 // Their own writing already settled in the tab that did it.
                 if (change.actorId === actor.id) return;
 
-                if (reachable.has(change.channelId)) {
+                // Everything left is about one conversation and names it.
+                const channelId = change.channelId;
+                if (!channelId) return;
+
+                if (reachable.has(channelId)) {
                     if (change.kind === "call") {
                         // Never coalesced. A call frame is not "something
                         // changed, go and look" - it is what makes a browser
@@ -176,7 +183,7 @@ export async function GET(request: Request): Promise<Response> {
                         if (change.call) {
                             send({
                                 kind: "call",
-                                channelId: change.channelId,
+                                channelId,
                                 meetingId: change.call.meetingId,
                                 state: change.call.state,
                                 count: change.call.count,
@@ -190,13 +197,13 @@ export async function GET(request: Request): Promise<Response> {
                     if (change.kind === "typing") {
                         send({
                             kind: "typing",
-                            channelId: change.channelId,
+                            channelId,
                             userId: change.actorId,
                             name: change.actorName ?? "",
                             activity: change.activity ?? "typing"
                         });
                     } else {
-                        wake(change.channelId);
+                        wake(channelId);
                     }
                     return;
                 }
@@ -204,7 +211,6 @@ export async function GET(request: Request): Promise<Response> {
                 // An unfamiliar channel is usually somebody else's. Re-ask once
                 // the TTL is up, in case it is one they were just added to.
                 if (Date.now() - resolvedAt < SCOPE_TTL_MS) return;
-                const channelId = change.channelId;
                 const kind = change.kind;
                 void refreshReachable().then(() => {
                     if (!closed && kind === "posted" && reachable.has(channelId)) wake(channelId);
