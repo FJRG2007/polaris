@@ -12,6 +12,9 @@ Polaris host's own edge.
 ## Phase 1 - done
 
 - `Router` interface + `renderDynamicConfig()` + `LocalRouter` (`deploy/router.ts`).
+  `LocalRouter` writes through `writeDynamicFile` (`lib/traefik-dynamic.ts`), which
+  renames a temp file over the target instead of truncating it in place, so a failed
+  write leaves the previous routes serving instead of an empty file.
 - `syncAppRoutes()` groups enabled domains by their app's target server. Local-target
   apps route through `LocalRouter` exactly as before; remote-target apps are excluded
   from the local edge (never funnelled through Polaris) and logged pending their own edge.
@@ -30,7 +33,9 @@ Polaris host's own edge.
 2. **RemoteRouter.** Implement `Router` by writing `renderDynamicConfig(routes)` to the
    remote host's `/dynamic/polaris-apps.yml` over SSH/SFTP. `dialHost` for a remote
    route is the app's origin as seen from that host (its own published port on
-   127.0.0.1 / the host IP), not the Polaris host.
+   127.0.0.1 / the host IP), not the Polaris host. Write it the same way `LocalRouter`
+   does - a temp file on the remote host renamed over the target - so a dropped SSH
+   session mid-transfer cannot leave that edge with an empty routing file either.
 3. **Dispatch in `syncAppRoutes`.** Build one `Router` per distinct server from the
    grouped domains (LocalRouter for the local target, a RemoteRouter per remote host)
    and `sync()` each with its own route set. Replace the Phase-1 "log and skip".
