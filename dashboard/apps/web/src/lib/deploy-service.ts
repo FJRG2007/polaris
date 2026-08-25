@@ -6,7 +6,6 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
-import { join } from "node:path";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import * as follow from "./follow/follow";
@@ -27,6 +26,7 @@ import { resolveMountTarget } from "./storage-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
+import { deployLogDir, deployLogPath } from "./deploy/log-file";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -53,14 +53,9 @@ const HUB_CATALOG_ID = "messaging-bridge";
 const HUB_NETWORK = "polaris-hub";
 const WEB_INTERNAL_INGEST_URL = "http://web:3000/api/inbox/ingest";
 
-/** Directory the web process writes deploy log files to (tailed by the UI). */
-function logDir(): string {
-    return join(loadEnv().POLARIS_DATA_DIR, "deploy-logs");
-}
-
-export function deployLogPath(deploymentId: string): string {
-    return join(logDir(), `${deploymentId}.log`);
-}
+/** Re-exported: a deploy is a row plus this file, and callers of this module ask
+ *  it where the file is rather than knowing about the directory themselves. */
+export { deployLogPath };
 
 /** Read a deployment's status and current log, ownership-checked. Returns null if
  *  the deployment does not belong to the owner. */
@@ -2463,7 +2458,7 @@ export async function executeDeployment(
     const queuedRow = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { status: true } });
     if (!queuedRow || TERMINAL_DEPLOY_STATUSES.has(queuedRow.status)) return;
 
-    await mkdir(logDir(), { recursive: true });
+    await mkdir(deployLogDir(), { recursive: true });
     const logStream = createWriteStream(deployLogPath(deploymentId), { flags: "a" });
     const log = (chunk: Buffer): void => {
         logStream.write(chunk);

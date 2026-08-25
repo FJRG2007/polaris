@@ -18,6 +18,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeployment, setDeploymentState } from "@/lib/github-service";
+import { announceRefusal } from "@/lib/deploy/github-deployment";
 
 const SHA = "9f2c1b0a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90";
 const CALL = { owner: "acme", repo: "widgets", token: "gho_test" };
@@ -56,22 +57,24 @@ describe("minting the deployment", () => {
 
     it("hands back the id every later state is posted against", async () => {
         githubAnswers(201, { id: 4212 });
-        const id = await createDeployment({
+        const minted = await createDeployment({
             ...CALL,
             ref: SHA,
             environment: "production/api",
             description: "Deploying Acme / api on Polaris",
             production: true
         });
-        expect(id).toBe("4212");
+        expect(minted.id).toBe("4212");
     });
 
     it("has nothing to post against when GitHub refuses over a conflict", async () => {
         // 409 and 202 both answer with a message instead of a deployment. Reading
         // one as a deployment would leave every later state posting to a made-up id.
         githubAnswers(409, { message: "Conflict merging main into 9f2c1b0" });
-        const id = await createDeployment({ ...CALL, ref: SHA, environment: "production/api", description: "x", production: true });
-        expect(id).toBeNull();
+        const minted = await createDeployment({ ...CALL, ref: SHA, environment: "production/api", description: "x", production: true });
+        expect(minted.id).toBeNull();
+        // Kept, because the sentence the deploy log gets is chosen by it.
+        expect(minted.status).toBe(409);
     });
 
     it("keeps the first line of a description, cut to what GitHub shows", async () => {
@@ -130,8 +133,42 @@ describe("posting a state against it", () => {
 
     it("reports a refusal rather than throwing into the deploy that called it", async () => {
         githubAnswers(403, { message: "Resource not accessible by integration" });
-        await expect(
-            setDeploymentState({ ...CALL, deploymentId: "4212", state: "failure", description: "The deploy failed" })
-        ).resolves.toBe(false);
+        const posted = await setDeploymentState({
+            ...CALL,
+            deploymentId: "4212",
+            state: "failure",
+            description: "The deploy failed"
+        });
+        expect(posted.status).toBe(403);
+    });
+});
+
+/**
+ * A refusal that only reached the server console was a refusal nobody here could
+ * ever see: the deploy worked, the commit stayed empty, and the one screen its
+ * operator opens said nothing about it. It is nearly always the same cause -
+ * a token that can read a repository's contents cannot write its deployments -
+ * and that is a permission to go and tick rather than a mystery.
+ */
+describe("what the deploy log is told when GitHub refuses", () => {
+    it("names the permission behind a refusal, and where to add it", () => {
+        const said = announceRefusal(403, "acme", "widgets");
+        expect(said).toContain("Deployments: Read and write");
+        expect(said).toContain("acme/widgets");
+        expect(said).toContain("Connected accounts");
+    });
+
+    it("reads a repository it cannot see as the same thing to go and do", () => {
+        expect(announceRefusal(404, "acme", "widgets")).toContain("Deployments: Read and write");
+    });
+
+    it("does not blame a permission for GitHub being unreachable", () => {
+        const said = announceRefusal(0, "acme", "widgets");
+        expect(said).toContain("could not be reached");
+        expect(said).not.toContain("Deployments: Read and write");
+    });
+
+    it("says the status rather than guessing at anything else", () => {
+        expect(announceRefusal(422, "acme", "widgets")).toContain("422");
     });
 });

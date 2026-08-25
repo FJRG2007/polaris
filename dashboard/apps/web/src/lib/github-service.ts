@@ -1089,6 +1089,22 @@ export async function getChangedFiles(
  *  on: there is no cancelled state, and leaving it in progress is worse. */
 export type DeploymentState = "queued" | "in_progress" | "success" | "failure" | "error" | "inactive";
 
+/**
+ * What GitHub did with an announcement.
+ *
+ * The status comes back with it because a refusal is the whole of what the
+ * operator sees: a deploy that never appeared on the commit and no reason given
+ * anywhere they can read. 403 is a token without the permission, 404 a repository
+ * it cannot see at all, and they are two different things to go and do. Zero is
+ * GitHub not answering, which is neither.
+ */
+export interface AnnounceResult {
+    /** The deployment id, set only where GitHub minted one. */
+    id: string | null;
+    /** GitHub's status code, or 0 when the request never reached it. */
+    status: number;
+}
+
 /** GitHub truncates a longer description; trimming here keeps what it shows ours. */
 function shortDescription(text: string): string {
     const line = text.split("\n").map((part) => part.trim()).find((part) => part.length > 0) ?? "";
@@ -1097,7 +1113,8 @@ function shortDescription(text: string): string {
 
 /**
  * Mint a Deployment on a commit, and hand back the id its states are posted
- * against. Null when GitHub would not create one.
+ * against. No id when GitHub would not create one, with its answer beside it so
+ * the deploy log can say which refusal this was.
  *
  * The two flags are not optional in practice, whatever the API defaults say.
  * Without `auto_merge: false` GitHub answers a ref behind its base branch by
@@ -1115,7 +1132,7 @@ export async function createDeployment(input: {
     description: string;
     production: boolean;
     token: string;
-}): Promise<string | null> {
+}): Promise<AnnounceResult> {
     try {
         const res = await fetch(`${API}/repos/${input.owner}/${input.repo}/deployments`, {
             method: "POST",
@@ -1133,17 +1150,18 @@ export async function createDeployment(input: {
         // 202 and 409 both come back with a message instead of a deployment: a merge
         // GitHub performed, or a conflict it refused over. Neither has an id, so
         // neither is something later states can be posted against.
-        if (res.status !== 201) return null;
+        if (res.status !== 201) return { id: null, status: res.status };
         const data = (await res.json()) as { id?: number };
-        return typeof data.id === "number" ? String(data.id) : null;
+        return { id: typeof data.id === "number" ? String(data.id) : null, status: res.status };
     } catch {
-        return null;
+        return { id: null, status: 0 };
     }
 }
 
 /**
- * Post a state against a deployment. False when GitHub would not take it, which
- * the caller uses only to decide what to log.
+ * Post a state against a deployment. 201 is the one status that took; the rest
+ * are what the deploy's own log says instead of showing a state that never
+ * reached the commit.
  *
  * `environment_url` is the "View deployment" link, so it is left off rather than
  * pointed at a name only this network resolves - a button that goes nowhere is
@@ -1159,7 +1177,7 @@ export async function setDeploymentState(input: {
     environmentUrl?: string | null;
     logUrl?: string | null;
     token: string;
-}): Promise<boolean> {
+}): Promise<AnnounceResult> {
     try {
         const res = await fetch(
             `${API}/repos/${input.owner}/${input.repo}/deployments/${encodeURIComponent(input.deploymentId)}/statuses`,
@@ -1178,9 +1196,9 @@ export async function setDeploymentState(input: {
                 })
             }
         );
-        return res.status === 201;
+        return { id: null, status: res.status };
     } catch {
-        return false;
+        return { id: null, status: 0 };
     }
 }
 

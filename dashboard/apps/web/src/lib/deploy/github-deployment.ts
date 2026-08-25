@@ -28,7 +28,8 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
-import { createDeployment, setDeploymentState, type DeploymentState } from "@/lib/github-service";
+import { noteOnDeploy } from "@/lib/deploy/log-file";
+import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
 
 /** What a deploy needs before it can be announced at all. */
 interface Announceable {
@@ -148,6 +149,26 @@ async function logUrl(applicationId: string): Promise<string | null> {
 }
 
 /**
+ * Why GitHub would not show this deploy, written for the deploy's own log.
+ *
+ * It goes there because that is the only place its operator looks, and because
+ * the commonest answer by far is a token nobody told them needed anything else:
+ * Polaris asks for a GitHub token that can read a repository's contents, and
+ * writing to a repository's deployments is a permission of its own that a
+ * fine-grained token does not carry unless it was ticked.
+ */
+export function announceRefusal(status: number, owner: string, repo: string): string {
+    if (status === 403 || status === 404) {
+        return `[warn] GitHub will not show this deploy on the commit: the connected account needs Deployments: Read and write on ${owner}/${repo}. Add it to the token under Connected accounts, or connect the account through the GitHub App.`;
+    }
+    if (status === 409) {
+        return `[warn] GitHub will not show this deploy on the commit: ${owner}/${repo} answered that this commit conflicts with the branch it deploys.`;
+    }
+    if (status === 0) return "[warn] GitHub could not be reached, so this deploy is not shown on the commit.";
+    return `[warn] GitHub answered ${status} and will not show this deploy on the commit.`;
+}
+
+/**
  * Announce a deploy that has just been queued: mint the GitHub deployment and
  * record the id the rest of its life is posted against.
  *
@@ -160,7 +181,7 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
         const info = await announceable(deploymentId);
         if (!info) return;
 
-        const githubId = await createDeployment({
+        const minted = await createDeployment({
             owner: info.owner,
             repo: info.repo,
             ref: info.commitSha,
@@ -169,12 +190,11 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
             production: info.production,
             token: info.token
         });
-        if (!githubId) {
-            console.info(
-                `polaris: ${info.owner}/${info.repo} did not accept a deployment for ${info.commitSha.slice(0, 7)}, so this deploy carries on unannounced`
-            );
+        if (!minted.id) {
+            await noteOnDeploy(deploymentId, announceRefusal(minted.status, info.owner, info.repo));
             return;
         }
+        const githubId = minted.id;
         await prisma.deployment.update({
             where: { id: deploymentId },
             data: { githubRepo: `${info.owner}/${info.repo}`, githubDeploymentId: githubId }
@@ -238,7 +258,7 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
         );
         if (!token) return;
 
-        const posted = await setDeploymentState({
+        const posted: AnnounceResult = await setDeploymentState({
             owner: target.owner,
             repo: target.repo,
             deploymentId: target.id,
@@ -250,10 +270,11 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
             logUrl: await logUrl(deployment.deployableId),
             token
         });
-        if (!posted) {
-            console.info(
-                `polaris: ${target.owner}/${target.repo} did not accept the "${state}" state for deployment ${target.id}`
-            );
+        // Said once, when the deploy ends. A "queued" or "in progress" that GitHub
+        // turned down is the same refusal as the verdict that follows it, and three
+        // identical warnings in one log is noise nobody reads to the end of.
+        if (posted.status !== 201 && state !== "queued" && state !== "in_progress") {
+            await noteOnDeploy(deploymentId, announceRefusal(posted.status, target.owner, target.repo));
         }
     } catch (error) {
         console.error("polaris: could not update this deploy on GitHub:", error);

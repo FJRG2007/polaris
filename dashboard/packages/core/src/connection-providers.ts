@@ -83,7 +83,7 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         acceptsToken: true,
         tokenLabel: "Personal access token",
         tokenHelp:
-            "A fine-grained token with Contents: Read on the repositories you want to deploy, or a classic token with the 'repo' scope.",
+            "A fine-grained token on the repositories you want to deploy, with Contents: Read and Deployments: Read and write, or a classic token with the 'repo' scope.",
         tokenUrl: "https://github.com/settings/tokens",
         defaultLimit: 1,
         requires: "a GitHub App",

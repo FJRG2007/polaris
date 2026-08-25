@@ -236,7 +236,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Personal Access Token",
         apiKeyHelp:
-            "A fine-grained token with Contents: Read on the repositories you want to deploy (or a classic token with the 'repo' scope)."
+            "A fine-grained token on the repositories you want to deploy, with Contents: Read and Deployments: Read and write (or a classic token with the 'repo' scope)."
     },
     {
         slug: "google",
