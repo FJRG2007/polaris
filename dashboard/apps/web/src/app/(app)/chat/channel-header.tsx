@@ -309,9 +309,7 @@ export function ChannelHeader({
                                 a channel, a group or one person - they are one
                                 kind of thing with one id. */}
                             <DropdownMenuItem
-                                onSelect={() =>
-                                    void copyText(channelLink(baseUrl, channel.id))
-                                }
+                                onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
                             >
                                 <Link2 className="size-3.5" />
                                 Copy link
@@ -418,10 +416,7 @@ export function ChannelHeader({
             </div>
 
             {error && (
-                <p
-                    role="alert"
-                    className="border-b border-border px-4 py-1 text-xs text-danger"
-                >
+                <p role="alert" className="border-b border-border px-4 py-1 text-xs text-danger">
                     {error}
                 </p>
             )}

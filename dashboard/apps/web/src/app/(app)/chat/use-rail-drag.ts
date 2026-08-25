@@ -117,10 +117,12 @@ export function useRailDrag({
             onDrop: (event: DragEvent) => {
                 const source = held.current;
                 const where = over.current;
-                if (!source || source.kind !== kind || source.id === id) {
-                    finish();
-                    return;
-                }
+                // Left alone rather than cleared: a heading is inside the area
+                // that owns dropping into it, and this runs first. Clearing what
+                // is held here would leave that handler with nothing to move, so
+                // a channel let go on a folded heading went nowhere. The drag
+                // ending is what ends it, and that happens either way.
+                if (!source || source.kind !== kind || source.id === id) return;
                 event.preventDefault();
                 event.stopPropagation();
                 finish();

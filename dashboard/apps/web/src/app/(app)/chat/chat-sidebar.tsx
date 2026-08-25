@@ -584,9 +584,7 @@ function ChannelRows({
     // caller's to hold: it owns the heading, which stays a target while folded
     // and while empty, and this only ever draws what is in it.
     if (channels.length === 0) {
-        return empty ? (
-            <p className="px-2 py-1 text-xs text-foreground-subtle">{empty}</p>
-        ) : null;
+        return empty ? <p className="px-2 py-1 text-xs text-foreground-subtle">{empty}</p> : null;
     }
 
     return (
@@ -736,10 +734,7 @@ function Section({
                 into ? "bg-primary/5 ring-primary/40" : "ring-transparent"
             )}
         >
-            <div
-                {...handle}
-                className="group relative flex items-center gap-1 px-1"
-            >
+            <div {...handle} className="group relative flex items-center gap-1 px-1">
                 <DropLine shown={dropping === "before"} where="top" />
                 <DropLine shown={dropping === "after"} where="bottom" />
                 <button

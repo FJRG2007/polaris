@@ -46,6 +46,7 @@ import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { Ban, Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
 import {
     cn,
+    useToast,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
@@ -86,6 +87,32 @@ export function ServerRail() {
     const [picturing, setPicturing] = useState<ChatSpaceView | null>(null);
     const [leaving, setLeaving] = useState<ChatSpaceView | null>(null);
     const [error, setError] = useState("");
+    const toast = useToast();
+
+    /**
+     * A refusal, said where the reader is looking.
+     *
+     * The column is a strip of tiles with nowhere to write a line, and the one
+     * piece of state here that holds a message is drawn inside the leave dialog
+     * - so putting one there says nothing now and surfaces it later, attached to
+     * the wrong question. A note is what this column has room for.
+     */
+    const announce = (message: string): void => {
+        toast.show({ key: "space-notify", title: message });
+    };
+
+    /**
+     * The standing answer for a whole space. A refusal comes back as a value
+     * rather than as a throw, so it is read out of the result as well as caught.
+     */
+    const setNotify = async (
+        spaceId: string,
+        level: core.ChatChannelNotifyLevel
+    ): Promise<void> => {
+        const result = await runAction(() => setSpaceNotifyAction(spaceId, level), announce);
+        if (result?.error) announce(result.error);
+        refresh();
+    };
 
     /**
      * Open a space, and a conversation inside it. Null is direct messages, which
@@ -161,12 +188,7 @@ export function ServerRail() {
                         onBans={() => setShowingBans(space)}
                         onPicture={() => setPicturing(space)}
                         onLeave={() => setLeaving(space)}
-                        onNotify={(level) => {
-                            void runAction(
-                                () => setSpaceNotifyAction(space.id, level),
-                                setError
-                            ).then(refresh);
-                        }}
+                        onNotify={(level) => void setNotify(space.id, level)}
                     >
                         <Pill
                             label={space.name}

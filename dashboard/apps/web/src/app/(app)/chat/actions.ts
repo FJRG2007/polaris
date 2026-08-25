@@ -633,7 +633,9 @@ export async function profileAction(
  * written before there is anything to attach them to - see
  * `/api/chat/channels/[id]/scheduled`.
  */
-export async function scheduleMessageAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function scheduleMessageAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatScheduleSchema.safeParse(input);
     if (!parsed.success) {

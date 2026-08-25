@@ -108,20 +108,52 @@ export async function silencedIn(
     return silenced;
 }
 
+/** Nobody, for a reader whose teams have not been looked up because nothing
+ *  needed them. */
+const NO_TEAMS: ReadonlySet<string> = new Set<string>();
+
+/**
+ * The teams a reader is in, lowercased, ready to match a `@team` against.
+ *
+ * Read once for a whole announcement rather than once per message: a mention of
+ * a team names everybody in it, which is the rule the notifications already
+ * follow, and a level that missed it would leave somebody named at work with
+ * nothing at all - Chat writes no record for a plain mention either.
+ */
+export async function readerTeams(userId: string): Promise<ReadonlySet<string>> {
+    const rows = await prisma.teamMember.findMany({ where: { userId }, select: { teamId: true } });
+    return new Set(rows.map((row) => row.teamId.toLowerCase()));
+}
+
 /**
  * Whether a message is one the reader asked to hear about at `mentions`.
  *
- * Their own name, or the room's - `@everyone` and `@here` are how somebody
- * addresses a channel, and a level that let them through unread would be one
- * nobody could use for the channel they are on call for.
+ * Their own name, their team's, or the room's - `@everyone` and `@here` are how
+ * somebody addresses a channel, and a level that let them through unread would
+ * be one nobody could use for the channel they are on call for.
  *
- * Both go through the same parse the editor uses, so an address inside a code
- * fence is code rather than a ping.
+ * All of them go through the same parse the editor uses, so an address inside a
+ * code fence is code rather than a ping. That parse is the expensive part and it
+ * runs on every message of a busy room, so a body carrying neither a `@` nor an
+ * address is ruled out before either one happens - which is nearly all of them.
+ *
+ * @param teamIds - The reader's teams, from `readerTeams`. Empty means a `@team`
+ *   names nobody, which is the right answer when nothing looked them up.
  */
-export function mentionsReader(body: string, userId: string): boolean {
-    if (channelMentions(body).size > 0) return true;
+export function mentionsReader(
+    body: string,
+    userId: string,
+    teamIds: ReadonlySet<string> = NO_TEAMS
+): boolean {
+    const written = body.includes("@");
+    const addressed = body.includes("polaris:");
+    if (!written && !addressed) return false;
+    if (written && channelMentions(body).size > 0) return true;
+    if (!addressed) return false;
     const me = userId.toLowerCase();
-    return extractReferences(body).some(
-        (reference) => reference.kind === "user" && reference.id.toLowerCase() === me
+    return extractReferences(body).some((reference) =>
+        reference.kind === "user"
+            ? reference.id.toLowerCase() === me
+            : reference.kind === "team" && teamIds.has(reference.id.toLowerCase())
     );
 }
