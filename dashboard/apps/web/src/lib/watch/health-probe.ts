@@ -3,7 +3,8 @@
  * whether it actually serves, so a free subdomain that resolves but returns
  * nothing (LAN-only, app down, 5xx) is marked down instead of being shown as if
  * it works. Up = an HTTP response with status < 500; down = a 5xx, a network
- * error, or a timeout. A redirect (e.g. to a login page) still counts as up.
+ * error, a timeout, or the edge answering that it routes this name nowhere. A
+ * redirect (e.g. to a login page) still counts as up.
  *
  * A sustained outage also raises an alert to whoever is answerable for the service.
  * Recording it was never enough on its own: nobody watches a status column, and the
@@ -11,10 +12,21 @@
  */
 
 import { prisma } from "@polaris/db";
+import { VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
 import { notifyDomainHealthChanged } from "@/lib/notifications/domain-events";
 
 const PROBE_TIMEOUT_MS = 6000;
 const PROBE_CONCURRENCY = 6;
+
+/**
+ * Traefik's answer when no router claims the hostname, verbatim: Go's `http.NotFound`,
+ * plain text, nineteen bytes. It is worth matching on because it is the one 404 that
+ * did not come from anything deployed - the request never reached a service at all.
+ */
+const EDGE_NO_ROUTE = "404 page not found";
+/** Enough for that body and nothing else, so an app's own plain-text 404 is not read
+ *  into memory to be compared against it. */
+const EDGE_NO_ROUTE_MAX_BYTES = 256;
 
 /**
  * Consecutive failures before anybody is told. At the poller's one-minute interval
@@ -36,12 +48,41 @@ export interface DomainHealth {
     code: number | null;
     latencyMs: number;
     detail: string | null;
+    /** Set when the edge itself answered that nothing serves this hostname, rather than
+     *  a service answering badly. Not persisted - it is what tells the poller to
+     *  republish the routes, since that is a fault Polaris can repair on its own. */
+    notRouted?: true;
 }
 
 /** The health columns a transition is decided from, as stored before this probe. */
 interface HealthState {
     healthFailures: number;
     healthAlertedAt: Date | null;
+}
+
+/**
+ * Whether this response is the edge saying nothing serves the name, rather than
+ * something serving it. Both of these answer below 500 and so used to read as up:
+ *
+ * - Traefik's own `404 page not found`, returned when no router matches the hostname.
+ *   That is the shape of a route that went missing - the file the app routes live in
+ *   emptied by a failed write, a domain that was never published - and it is the outage
+ *   nobody was ever told about, because a 404 looks like an answer.
+ * - The vacant page, which says the same thing deliberately for a name in the zone with
+ *   nothing deployed on it, and marks itself with a header so it can be recognised.
+ *
+ * A 404 an app produced is left as up. It answered; which of its paths exist is not
+ * this probe's business.
+ */
+async function edgeSaysNotRouted(response: Response): Promise<boolean> {
+    if (response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE) return true;
+    if (response.status !== 404) return false;
+    if (!(response.headers.get("content-type") ?? "").startsWith("text/plain")) return false;
+    // A declared length, and a small one. Without the header there is no bound on what
+    // reading the body would pull into memory, and the edge always declares this one.
+    const length = Number(response.headers.get("content-length") ?? NaN);
+    if (!(length > 0 && length <= EDGE_NO_ROUTE_MAX_BYTES)) return false;
+    return (await response.text().catch(() => "")).trim() === EDGE_NO_ROUTE;
 }
 
 /** Probe one domain and return its health without persisting. */
@@ -52,6 +93,15 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
     const started = Date.now();
     try {
         const response = await fetch(url, { method: "GET", redirect: "manual", signal: controller.signal });
+        if (await edgeSaysNotRouted(response)) {
+            return {
+                status: "down",
+                code: response.status,
+                latencyMs: Date.now() - started,
+                detail: "Not routed at the edge",
+                notRouted: true
+            };
+        }
         const status: "up" | "down" = response.status < 500 ? "up" : "down";
         return {
             status,
@@ -132,6 +182,23 @@ async function persistHealth(id: string, previous: HealthState, health: DomainHe
     return health;
 }
 
+/**
+ * Write the edge's app routes again, after a probe found a hostname the edge routes
+ * nowhere.
+ *
+ * A missing route is the one outage on this page that Polaris caused and Polaris can
+ * undo, and nothing on any screen offers to - so an operator told about it could only
+ * wait for something else to happen to trigger a resync. It is idempotent and it writes
+ * one file, so repeating it on a name that is 404ing for its own reasons costs nothing.
+ *
+ * Imported here rather than at the top: the deploy service reaches most of the control
+ * plane, and this module is loaded by a poller that starts before any of it is needed.
+ */
+async function republishAppRoutes(): Promise<void> {
+    const { syncAppRoutes } = await import("@/lib/deploy-service");
+    await syncAppRoutes();
+}
+
 /** Probe every enabled domain, with bounded concurrency. */
 export async function probeAllDomains(): Promise<void> {
     const domains = await prisma.domain.findMany({
@@ -145,8 +212,9 @@ export async function probeAllDomains(): Promise<void> {
             healthAlertedAt: true
         }
     });
+    let notRouted = false;
     for (let i = 0; i < domains.length; i += PROBE_CONCURRENCY) {
-        await Promise.all(
+        const batch = await Promise.all(
             domains
                 .slice(i, i + PROBE_CONCURRENCY)
                 .map((domain) =>
@@ -154,6 +222,13 @@ export async function probeAllDomains(): Promise<void> {
                         .then((health) => persistHealth(domain.id, domain, health))
                         .catch(() => undefined)
                 )
+        );
+        if (batch.some((health) => health?.notRouted === true)) notRouted = true;
+    }
+    // Once for the pass, however many names were affected: they share one routing file.
+    if (notRouted) {
+        await republishAppRoutes().catch((error) =>
+            console.error("polaris: republishing the edge routes after an unrouted address failed:", error)
         );
     }
 }
