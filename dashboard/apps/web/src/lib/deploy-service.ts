@@ -105,6 +105,22 @@ async function visibleProjectWhere(userId: string) {
 }
 
 /**
+ * The ids of those projects, as a set.
+ *
+ * For a screen that lists things across the whole deployment and has to decide,
+ * row by row, whether this reader may open the one in front of them. A link into
+ * a project they cannot read is worse than no link: it looks like the way in and
+ * ends on "not found".
+ */
+export async function visibleProjectIds(userId: string): Promise<Set<string>> {
+    const projects = await prisma.project.findMany({
+        where: await visibleProjectWhere(userId),
+        select: { id: true }
+    });
+    return new Set(projects.map((project) => project.id));
+}
+
+/**
  * The same, narrowed to one shelf.
  *
  * Two clauses rather than one because they answer different questions: the first

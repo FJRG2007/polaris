@@ -7,6 +7,7 @@ import {
     Bot,
     Building2,
     ChevronRight,
+    Gauge,
     Globe,
     HardDrive,
     IdCard,
@@ -68,6 +69,12 @@ const SECTIONS = [
         description: "Who Polaris sends mail as, and the channel that carries sign-in messages."
     },
     { href: "/admin/domains", icon: Globe, title: "Domains", description: "App and sharing domains, DuckDNS sync." },
+    {
+        href: "/admin/consumption",
+        icon: Gauge,
+        title: "Consumption",
+        description: "What this machine is being spent on: Polaris itself, installed apps, and everything else running."
+    },
     {
         href: "/admin/organizations",
         icon: Building2,

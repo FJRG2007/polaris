@@ -29,6 +29,7 @@ import {
     FolderGit2,
     FolderOpen,
     Gamepad2,
+    Gauge,
     GitPullRequest,
     Globe,
     HardDrive,
@@ -974,6 +975,25 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "reported account"
             ],
             group: ADMIN_COMMUNICATION_GROUP
+        },
+        {
+            label: "Consumption",
+            href: "/admin/consumption",
+            icon: Gauge,
+            keywords: [
+                "usage",
+                "resources",
+                "memory",
+                "ram",
+                "cpu",
+                "disk",
+                "footprint",
+                "what is using",
+                "containers",
+                "apps",
+                "marketplace"
+            ],
+            group: ADMIN_PLATFORM_GROUP
         },
         {
             label: "Domains",
