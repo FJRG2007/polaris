@@ -10,9 +10,11 @@
  */
 
 import Link from "next/link";
-import { cn, Skeleton } from "@polaris/ui";
+import { useMemo, useState } from "react";
 import { Bell, Container, Rocket, Server } from "lucide-react";
+import { cn, Select, Skeleton } from "@polaris/ui";
 import type { WatchCard, WatchSubjectKind } from "@/lib/watch-overview-service";
+import { ORDER_LABELS, sortByConsumption, type ConsumptionOrder } from "@/lib/watch/card-order";
 
 const KIND_ICON: Record<WatchSubjectKind, typeof Server> = {
     server: Server,
@@ -121,6 +123,49 @@ export function WatchCardGridSkeleton({ count = 6 }: { count?: number }) {
                     </div>
                 </div>
             ))}
+        </div>
+    );
+}
+
+/** The orders a list of these offers, busiest first because that is what somebody
+ *  opens Watch to find. */
+const ORDERS: ConsumptionOrder[] = ["cpu", "memory", "name", "state"];
+
+/**
+ * A whole list of cards, with the control that decides what comes first.
+ *
+ * For the screens that show everything. The overview's own groups show only the
+ * first few and are sorted where they are assembled, since which few they are is
+ * the whole point of a group that stops at six.
+ */
+export function WatchCardList({
+    cards,
+    empty,
+    label
+}: {
+    cards: WatchCard[];
+    empty: string;
+    /** What the list holds, for the control's accessible name. */
+    label: string;
+}) {
+    const [order, setOrder] = useState<ConsumptionOrder>("cpu");
+    const sorted = useMemo(() => sortByConsumption(cards, order), [cards, order]);
+
+    return (
+        <div className="flex flex-col gap-3">
+            {cards.length > 1 ? (
+                <div className="flex items-center justify-end gap-2">
+                    <span className="text-xs text-muted-foreground">Sort by</span>
+                    <Select
+                        value={order}
+                        onValueChange={(value) => setOrder(value as ConsumptionOrder)}
+                        aria-label={`Sort ${label} by`}
+                        className="w-32"
+                        options={ORDERS.map((option) => ({ value: option, label: ORDER_LABELS[option] }))}
+                    />
+                </div>
+            ) : null}
+            <WatchCardGrid cards={sorted} empty={empty} />
         </div>
     );
 }

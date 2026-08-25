@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
 import { WatchCardGrid } from "./watch-cards";
+import { sortByConsumption } from "@/lib/watch/card-order";
 import { Button, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
 import { WatchContainersSection } from "./watch-containers";
@@ -74,7 +75,10 @@ function Group({
     cards: Awaited<ReturnType<typeof getWatchOverview>>["servers"];
     empty: string;
 }) {
-    const shown = cards.slice(0, GROUP_LIMIT);
+    // Busiest first, because a group that stops at six has to be the six worth
+    // stopping at. The screen behind "View all" is where the whole list is, in
+    // whatever order the reader asks for.
+    const shown = sortByConsumption(cards, "cpu").slice(0, GROUP_LIMIT);
     return (
         <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">

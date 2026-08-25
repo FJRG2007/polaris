@@ -22,6 +22,12 @@ import { formatAge, STALE_AFTER_MS } from "./freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PolarisFootprintCard } from "./polaris-footprint";
 import { useLiveResource } from "@/components/use-live-resource";
+import {
+    DEFAULT_DIRECTION,
+    sortByConsumption,
+    type ConsumptionOrder,
+    type SortDirection
+} from "@/lib/watch/card-order";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
@@ -34,6 +40,8 @@ import type {
     OverviewData
 } from "./types";
 import {
+    ArrowDown,
+    ArrowUp,
     Boxes,
     Cpu,
     FileText,
@@ -80,6 +88,13 @@ export function ContainersView({
     // Why an action failed, which is a different thing from the host having
     // stopped answering and must not be wiped by the next successful poll.
     const [actionError, setActionError] = useState<string | null>(null);
+    // What the table is ordered by. By name to begin with rather than by load: the
+    // figures move every five seconds, and a table that reorders itself under a
+    // pointer is only wanted by somebody who asked for it.
+    const [sort, setSort] = useState<{ order: ConsumptionOrder; direction: SortDirection }>({
+        order: "name",
+        direction: "asc"
+    });
 
     // Seeded from the last answer this tab held for the host, polled while the
     // tab is in front, and folded in so only the numbers that moved re-render.
@@ -174,9 +189,29 @@ export function ContainersView({
         });
     }
 
-    const containers = (snapshot?.containers ?? []).filter(
-        (container) => !removing.includes(container.id)
+    const containers = useMemo(
+        () =>
+            sortByConsumption(
+                (snapshot?.containers ?? [])
+                    .filter((container) => !removing.includes(container.id))
+                    // The table calls it memUsage and the sort calls it what every
+                    // other screen does; carried rather than renamed, so the rows
+                    // below are still container rows.
+                    .map((container) => ({ ...container, memUsedBytes: container.memUsage })),
+                sort.order,
+                sort.direction
+            ),
+        [snapshot, removing, sort]
     );
+
+    /** Sort by this column, or turn it round when it is the one already sorted. */
+    function sortBy(order: ConsumptionOrder): void {
+        setSort((held) =>
+            held.order === order
+                ? { order, direction: held.direction === "asc" ? "desc" : "asc" }
+                : { order, direction: DEFAULT_DIRECTION[order] }
+        );
+    }
     // Usage is sampled behind the request, so the listing can be answered without
     // waiting for it. Say when what is shown was taken rather than let a reading
     // that has aged pass for this instant's.
@@ -332,10 +367,10 @@ export function ContainersView({
                             <table className="w-full min-w-[44rem] text-sm">
                                 <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Container</th>
-                                        <th className="px-3 py-2 font-medium">State</th>
-                                        <th className="px-3 py-2 font-medium">CPU</th>
-                                        <th className="px-3 py-2 font-medium">Memory</th>
+                                        <SortHeader label="Container" order="name" sort={sort} onSort={sortBy} />
+                                        <SortHeader label="State" order="state" sort={sort} onSort={sortBy} />
+                                        <SortHeader label="CPU" order="cpu" sort={sort} onSort={sortBy} />
+                                        <SortHeader label="Memory" order="memory" sort={sort} onSort={sortBy} />
                                         <th className="px-3 py-2" />
                                     </tr>
                                 </thead>
@@ -580,6 +615,48 @@ function Stat({
 
 /** A usage cell. A running container with no reading yet has one coming, which
  *  is a skeleton; a stopped one has nothing to read, which is a dash. */
+/**
+ * A column heading that sorts by its own column.
+ *
+ * The whole heading is the control rather than an icon beside it: the target is
+ * the width of the column, which is what makes this usable on a phone and with a
+ * pointer somebody is not aiming carefully. `aria-sort` is what carries the same
+ * fact to a screen reader, where the arrow is not there to be seen.
+ */
+function SortHeader({
+    label,
+    order,
+    sort,
+    onSort
+}: {
+    label: string;
+    order: ConsumptionOrder;
+    sort: { order: ConsumptionOrder; direction: SortDirection };
+    onSort: (order: ConsumptionOrder) => void;
+}) {
+    const active = sort.order === order;
+    const Arrow = sort.direction === "asc" ? ArrowUp : ArrowDown;
+    return (
+        <th
+            scope="col"
+            className="px-0 py-0 font-medium"
+            aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(order)}
+                className={cn(
+                    "flex w-full items-center gap-1 px-3 py-2 text-left transition-colors hover:text-foreground",
+                    active && "text-foreground"
+                )}
+            >
+                {label}
+                {active ? <Arrow className="size-3" aria-hidden="true" /> : null}
+            </button>
+        </th>
+    );
+}
+
 function UsageCell({ running, value }: { running: boolean; value: string | null }) {
     return (
         <td className="px-3 py-2 text-muted-foreground">
