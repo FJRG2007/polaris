@@ -376,14 +376,18 @@ export function SecurityView({
                             </div>
                         </CardBody>
                     </Card>
+                    {/* In the column rather than across the page under it. Two
+                        settings and a Save do not fill the width of this screen, and
+                        a card that does not fill it leaves the empty half sitting
+                        beside the one thing on the page about the hours AFTER
+                        signing in. */}
+                    <SessionBindingCard
+                        bindSessionsToClient={bindSessionsToClient}
+                        pinSessionsToAddress={pinSessionsToAddress}
+                        lock={lock}
+                    />
                 </div>
             </div>
-
-            <SessionBindingCard
-                bindSessionsToClient={bindSessionsToClient}
-                pinSessionsToAddress={pinSessionsToAddress}
-                lock={lock}
-            />
 
             <PasskeysCard passkeys={passkeys} lock={lock} />
             <SuccessorCard successor={successor} lock={lock} />

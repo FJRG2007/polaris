@@ -1,5 +1,5 @@
 import { PageHeader } from "@polaris/ui";
-import { WatchCardGrid } from "../watch-cards";
+import { WatchCardList } from "../watch-cards";
 import { requirePermission } from "@/lib/session";
 import { getWatchServices } from "@/lib/watch-overview-service";
 
@@ -15,7 +15,7 @@ export default async function WatchServicesPage() {
                 title="Services"
                 description="Every deployed service, with the last hour of its consumption."
             />
-            <WatchCardGrid cards={services} empty="No deployed services yet." />
+            <WatchCardList cards={services} label="services" empty="No deployed services yet." />
         </div>
     );
 }

@@ -160,7 +160,22 @@ export interface PolarisFootprint {
      *  rather than a total, and the panel says so rather than quietly under-
      *  reporting. */
     readonly diskComplete: boolean;
+    /** Everything else running on the same machine, added up: the services Polaris
+     *  deploys, the apps installed through it, and anything started outside it.
+     *
+     *  Here because the figure above it means nothing on its own. "Polaris is using
+     *  4 GB" is a number; "Polaris is using 4 GB and what it runs is using 11 of the
+     *  machine's 30" is the answer to what somebody opened this card to ask. */
+    readonly rest: FootprintRest;
     readonly at: string;
+}
+
+/** What the machine is running that is not Polaris. */
+export interface FootprintRest {
+    /** How many of them are running. */
+    readonly containers: number;
+    readonly cpuPercent: number;
+    readonly memUsedBytes: number;
 }
 
 /** Everything Polaris occupies on disk, which is the three figures added up. */

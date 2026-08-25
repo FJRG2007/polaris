@@ -19,11 +19,11 @@ import { WidgetCard } from "./widget-card";
 import { ShortcutPicker } from "./shortcut-picker";
 import { CustomizeDialog } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
+import { packOverviewSpans } from "@/lib/overview/pack";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { emptyCards, relevanceOrder, rememberEmptyCards } from "@/lib/overview/relevance";
 import { overviewSize, overviewWidget, OVERVIEW_SIZE_LABELS } from "@/lib/overview/catalog";
 import { AppsWidget, NotificationsWidget, RecentWidget, ShortcutsWidget } from "./widgets/personal";
 import { AlarmsWidget, GamesWidget, ServicesWidget, StorageWidget, TasksWidget, UsageWidget } from "./widgets/infrastructure";
@@ -60,10 +60,11 @@ const SAVE_DEBOUNCE_MS = 600;
 let dataCache: { at: number; key: string; data: OverviewData } | null = null;
 
 /**
- * How wide each stored size is drawn. The columns themselves, and the clamp that
- * keeps a span inside the columns that exist at this width, are in globals.css:
- * the grid measures itself with a container query, because the shell's sidebar
- * sits between the viewport and the width the grid actually has.
+ * How wide each stored size is drawn before the grid has been measured - the
+ * first paint, and any browser without a container query. The columns themselves
+ * and the clamp that keeps a span inside the ones that exist are in globals.css,
+ * because the shell's sidebar sits between the viewport and the width the grid
+ * actually has and only the grid can see it.
  */
 const SPAN: Record<OverviewWidgetSize, string> = {
     sm: "overview-card",
@@ -71,6 +72,9 @@ const SPAN: Record<OverviewWidgetSize, string> = {
     lg: "overview-card overview-card-lg",
     xl: "overview-card overview-card-xl"
 };
+
+/** The same widths as columns, for the arithmetic that fits a row to the grid. */
+const COLUMNS: Record<OverviewWidgetSize, number> = { sm: 1, md: 2, lg: 3, xl: 4 };
 
 /** "Good morning" and the rest, by the reader's own clock. */
 function greetingFor(date: Date): string {
@@ -120,6 +124,9 @@ export function OverviewGrid({
     // The greeting is the reader's local time of day, which the server does not
     // know: rendering it during SSR would hydrate into a different sentence.
     const [hello, setHello] = useState<string | null>(null);
+    // Columns the grid has right now. 0 until it has been measured, which is the
+    // server render and the first paint.
+    const [columns, setColumns] = useState(0);
 
     // What the server last accepted, to put back if it refuses the next change.
     const accepted = useRef<{ widgets: OverviewWidgetPreference[]; shortcuts: OverviewShortcut[]; greeting: boolean }>({
@@ -128,28 +135,9 @@ export function OverviewGrid({
         greeting: preferences.greeting
     });
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const gridRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => setHello(greetingFor(new Date())), []);
-
-    /** Cards this reader has arranged themselves. Everything else is ours to
-     *  order, and stops being so the moment they touch it. */
-    const arranged = useMemo(
-        () => new Set(preferences.widgets.map((widget) => widget.id)),
-        [preferences.widgets]
-    );
-
-    // Once, before the figures are asked for, so the grid is in its final order
-    // by the time it is read rather than rearranging itself under the reader.
-    // What it ranks on is what the last visit saw (see relevance).
-    useEffect(() => {
-        setWidgets((held) => relevanceOrder(held, arranged));
-    }, [arranged]);
-
-    // And what THIS visit saw, for the next one.
-    useEffect(() => {
-        if (!data) return;
-        rememberEmptyCards(emptyCards(data, { shortcuts: shortcuts.length, apps: apps.length }));
-    }, [data, shortcuts.length, apps.length]);
 
     /** Cards this account holds but cannot currently see. Carried through every
      *  save untouched, so losing access to an app for a week does not silently
@@ -292,7 +280,48 @@ export function OverviewGrid({
         setNonce((value) => value + 1);
     }
 
-    const visible = widgets.filter((widget) => !widget.hidden);
+    const visible = useMemo(() => widgets.filter((widget) => !widget.hidden), [widgets]);
+
+    // How many columns the grid ended up with. Read off the tracks the browser
+    // worked out rather than worked out again here: the grid sizes itself against
+    // the space the shell leaves it, and counting what it settled on is the only
+    // way to be certain of agreeing with it.
+    useEffect(() => {
+        const element = gridRef.current;
+        if (!element || typeof ResizeObserver === "undefined") return;
+        const measure = (): void => {
+            const tracks = window.getComputedStyle(element).gridTemplateColumns;
+            const count = tracks && tracks !== "none" ? tracks.split(" ").filter(Boolean).length : 0;
+            setColumns((held) => (held === count ? held : count));
+        };
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [visible.length]);
+
+    /**
+     * The width each card is actually drawn at.
+     *
+     * A stored width is what its reader asked for, and the widths in a row rarely
+     * add up to the columns there are - so the cards are fitted to the row, inside
+     * the sizes each one is legible at. Null until the grid has been measured, and
+     * then the stylesheet's own widths are what is drawn.
+     */
+    const spans = useMemo(() => {
+        if (columns <= 0) return null;
+        return packOverviewSpans(
+            visible.map((widget) => {
+                const { sizes } = overviewWidget(widget.id);
+                return {
+                    preferred: COLUMNS[overviewSize(widget.id, widget.size)],
+                    min: COLUMNS[sizes[0] ?? "sm"],
+                    max: COLUMNS[sizes[sizes.length - 1] ?? "xl"]
+                };
+            }),
+            columns
+        );
+    }, [visible, columns]);
 
     return (
         <div className="flex flex-col gap-4">
@@ -337,13 +366,14 @@ export function OverviewGrid({
                     </Button>
                 </div>
             ) : (
-                <div className="overview-grid">
+                <div ref={gridRef} className="overview-grid">
                     {visible.map((widget, index) => {
                         const entry = overviewWidget(widget.id);
                         return (
                             <div
                                 key={widget.id}
                                 data-widget={widget.id}
+                                style={spans ? { gridColumn: `span ${spans[index]}` } : undefined}
                                 className={cn(
                                     "min-w-0 rounded-lg transition-opacity",
                                     SPAN[overviewSize(widget.id, widget.size)],

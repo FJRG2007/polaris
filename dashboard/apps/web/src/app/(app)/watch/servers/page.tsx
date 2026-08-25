@@ -1,5 +1,5 @@
 import { PageHeader } from "@polaris/ui";
-import { WatchCardGrid } from "../watch-cards";
+import { WatchCardList } from "../watch-cards";
 import { requirePermission } from "@/lib/session";
 import { getWatchServers } from "@/lib/watch-overview-service";
 
@@ -15,7 +15,11 @@ export default async function WatchServersPage() {
                 title="Servers"
                 description="Load on every server Polaris can reach, sampled from the containers running on it."
             />
-            <WatchCardGrid cards={servers} empty="No servers yet. The machine Polaris runs on appears here once it has been sampled." />
+            <WatchCardList
+                cards={servers}
+                label="servers"
+                empty="No servers yet. The machine Polaris runs on appears here once it has been sampled."
+            />
         </div>
     );
 }

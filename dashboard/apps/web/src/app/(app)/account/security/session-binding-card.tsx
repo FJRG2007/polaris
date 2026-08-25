@@ -54,7 +54,7 @@ export function SessionBindingCard({
 
     return (
         <Card>
-            <CardBody className="flex flex-col gap-3">
+            <CardBody className="flex flex-col gap-4">
                 <div>
                     <h2 className="text-sm font-medium">Where your sessions may be used</h2>
                     <p className="text-xs text-muted-foreground">
@@ -63,51 +63,62 @@ export function SessionBindingCard({
                     </p>
                 </div>
 
-                <label className="flex items-start justify-between gap-4">
-                    <span className="min-w-0">
-                        <span className="block text-sm">Only the browser it was opened in</span>
-                        <span className="block text-xs text-muted-foreground">
-                            A session used from a different browser or a different operating system
-                            is ended and you are told. Nothing you do normally crosses this: an
-                            update changes a version, not a name.
+                {/* Both settings read the same way round - what it does on the left, the
+                    control that changes it on the right - so the eye runs down one column
+                    of prose and one column of controls instead of stepping around a
+                    full-width dropdown between two rows that are not. */}
+                <div className="flex flex-col gap-3">
+                    <label className="flex items-start justify-between gap-4">
+                        <span className="min-w-0">
+                            <span className="block text-sm">Only the browser it was opened in</span>
+                            <span className="block text-xs text-muted-foreground">
+                                A session used from a different browser or a different operating
+                                system is ended and you are told. Nothing you do normally crosses
+                                this: an update changes a version, not a name.
+                            </span>
                         </span>
-                    </span>
-                    <Switch
-                        checked={bindClient}
-                        disabled={locked}
-                        onChange={setBindClient}
-                        aria-label="Only the browser it was opened in"
-                    />
-                </label>
+                        <Switch
+                            checked={bindClient}
+                            disabled={locked}
+                            onChange={setBindClient}
+                            aria-label="Only the browser it was opened in"
+                        />
+                    </label>
 
-                <label className="flex flex-col gap-1 text-sm">
-                    Also tie to the network address
-                    <Select
-                        value={scope}
-                        disabled={locked}
-                        onValueChange={(value) => setScope(value as AddressPinScope)}
-                        options={ADDRESS_PIN_SCOPES.map((option) => ({
-                            value: option,
-                            label: ADDRESS_PIN_LABELS[option]
-                        }))}
-                    />
-                    <span className="text-xs text-muted-foreground">{ADDRESS_PIN_NOTES[scope]}</span>
-                </label>
+                    <div className="flex items-start justify-between gap-4">
+                        <span className="min-w-0">
+                            <span className="block text-sm">Also tie to the network address</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {ADDRESS_PIN_NOTES[scope]}
+                            </span>
+                        </span>
+                        <Select
+                            value={scope}
+                            disabled={locked}
+                            onValueChange={(value) => setScope(value as AddressPinScope)}
+                            aria-label="Also tie to the network address"
+                            className="w-44 shrink-0"
+                            options={ADDRESS_PIN_SCOPES.map((option) => ({
+                                value: option,
+                                label: ADDRESS_PIN_LABELS[option]
+                            }))}
+                        />
+                    </div>
+                </div>
 
-                <p className="text-xs text-muted-foreground">
-                    One device can answer differently from this: open Sessions and set it on the
-                    session itself.
-                </p>
-
-                <div className="flex items-center justify-between gap-2">
-                    <Feedback error={result?.error} ok={result?.ok} />
-                    <Button
-                        onClick={() => void save()}
-                        disabled={locked || busy || !changed}
-                        className="ml-auto"
-                    >
-                        {busy ? "Saving..." : "Save"}
-                    </Button>
+                {/* The footnote and Save share the last line rather than taking one each:
+                    a button alone on a row leaves the width of the card empty beside it. */}
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                        One device can answer differently from this: open Sessions and set it on the
+                        session itself.
+                    </p>
+                    <div className="flex shrink-0 items-center gap-3">
+                        <Feedback error={result?.error} ok={result?.ok} />
+                        <Button onClick={() => void save()} disabled={locked || busy || !changed}>
+                            {busy ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
                 </div>
             </CardBody>
         </Card>

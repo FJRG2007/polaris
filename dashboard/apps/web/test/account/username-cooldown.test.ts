@@ -131,8 +131,19 @@ describe("the operator's own wait", () => {
 
     it("applies the default when the caller says nothing, rather than no rule", async () => {
         rows = [{ id: "ana", username: "ana", usernameChangedAt: NOW }];
-        const result = await updateUserProfile("ana", { username: "anaR" });
-        expect(result.error).toContain("30 days");
+        // With no clock passed the rule reads the real one, and what it reports is
+        // how much of the wait is LEFT - so this said "30 days" on the day it was
+        // written and "29 days" the morning after, failing for the calendar rather
+        // than for the code. Only Date is faked: faking the timers as well would
+        // hang anything inside that waits on one.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(NOW);
+        try {
+            const result = await updateUserProfile("ana", { username: "anaR" });
+            expect(result.error).toContain("30 days");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
 

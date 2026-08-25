@@ -148,6 +148,21 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
             on disk - {formatBytes(footprint.imageBytes)} of images,{" "}
             {formatBytes(footprint.volumeBytes)} of data, {formatBytes(footprint.writableBytes)}{" "}
             written by the containers themselves.
+            {footprint.rest.containers > 0 ? (
+                <>
+                    {" "}
+                    Everything else running here -{" "}
+                    <span className="font-medium text-foreground">
+                        {footprint.rest.containers} container{footprint.rest.containers === 1 ? "" : "s"}
+                    </span>{" "}
+                    of services and installed apps - is using{" "}
+                    <span className="font-medium text-foreground">
+                        {formatBytes(footprint.rest.memUsedBytes)}
+                    </span>{" "}
+                    and <span className="font-medium text-foreground">{footprint.rest.cpuPercent}%</span>{" "}
+                    CPU.
+                </>
+            ) : null}
         </p>
     );
 }

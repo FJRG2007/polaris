@@ -27,6 +27,7 @@ import { localDockerDriver } from "@/lib/docker-service";
 import { describePart, isPolarisPart } from "@/lib/polaris-parts";
 import type {
     FootprintPart,
+    FootprintRest,
     FootprintVolume,
     PolarisFootprint
 } from "@/app/(app)/apps/containers/types";
@@ -71,11 +72,19 @@ async function measureOnce(): Promise<PolarisFootprint> {
 }
 
 async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
-    const own = (await driver.listContainers(true)).filter(isPolarisPart);
+    const all = await driver.listContainers(true);
+    const own = all.filter(isPolarisPart);
     const running = own.filter((container) => container.state === "running");
+    // Everything else that is running: what Polaris deploys, what was installed
+    // through it, and anything started on the box by hand. Read in the same pass
+    // and the same batch as the parts, so the two halves of the machine are
+    // measured a moment apart rather than a request apart.
+    const rest = all.filter(
+        (container) => container.state === "running" && !isPolarisPart(container)
+    );
     const [info, stats] = await Promise.all([
         driver.info().catch(() => null),
-        driver.statsMany(running.map((container) => container.id))
+        driver.statsMany([...running, ...rest].map((container) => container.id))
     ]);
 
     // One inspect per part, for what it has written and what its image weighs.
@@ -160,8 +169,16 @@ async function measure(driver: DockerDriver): Promise<PolarisFootprint> {
         if (part.imageBytes !== null) images.set(part.image, part.imageBytes);
     }
 
+    const restTotals: FootprintRest = {
+        containers: rest.length,
+        cpuPercent:
+            Math.round(sum(rest.map((container) => stats.get(container.id)?.cpuPercent ?? null)) * 100) / 100,
+        memUsedBytes: sum(rest.map((container) => stats.get(container.id)?.memUsage ?? null))
+    };
+
     return {
         parts: measuredParts,
+        rest: restTotals,
         memUsedBytes: sum(measuredParts.map((part) => part.memUsedBytes)),
         memTotalBytes: info?.memTotal ?? null,
         cpuPercent: Math.round(sum(measuredParts.map((part) => part.cpuPercent)) * 100) / 100,

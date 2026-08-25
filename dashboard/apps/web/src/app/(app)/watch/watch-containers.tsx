@@ -16,8 +16,9 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { RefreshCw } from "lucide-react";
 import type { WatchCard } from "@/lib/watch-overview-service";
+import { sortByConsumption } from "@/lib/watch/card-order";
 import { useLiveResource } from "@/components/use-live-resource";
-import { WatchCardGrid, WatchCardGridSkeleton } from "./watch-cards";
+import { WatchCardGrid, WatchCardGridSkeleton, WatchCardList } from "./watch-cards";
 
 /** How often the list re-reads. Slower than the collector's own cadence would
  *  suggest, because every pass costs a stats read per container on every machine
@@ -62,7 +63,7 @@ export function WatchContainersView() {
             {loading ? (
                 <WatchCardGridSkeleton count={6} />
             ) : (
-                <WatchCardGrid cards={data ?? []} empty={error ?? EMPTY} />
+                <WatchCardList cards={data ?? []} label="containers" empty={error ?? EMPTY} />
             )}
         </div>
     );
@@ -86,7 +87,7 @@ export function WatchContainersSection({ limit }: { limit: number }) {
             {loading ? (
                 <WatchCardGridSkeleton count={3} />
             ) : (
-                <WatchCardGrid cards={(data ?? []).slice(0, limit)} empty={error ?? EMPTY} />
+                <WatchCardGrid cards={sortByConsumption(data ?? [], "cpu").slice(0, limit)} empty={error ?? EMPTY} />
             )}
         </section>
     );
