@@ -13,18 +13,12 @@
  * dashboard's own labels do for the local names.
  */
 
-import { join } from "node:path";
-import { writeFile } from "node:fs/promises";
 import { getSetting } from "./setting-store";
 import { polarisZoneHost } from "./domain-zones";
 import { resolvePolarisWaf } from "./waf-service";
 import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule } from "@polaris/core/waf";
-
-/** Traefik's file-provider directory, the volume both containers mount. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
+import { writeDynamicFile } from "@/lib/traefik-dynamic";
 
 /** The origin the edge dials for the dashboard, by service DNS on the compose network.
  *  By the SERVICE name, never the container's: the container is replaced (and renamed)
@@ -252,7 +246,7 @@ export async function syncDashboardRoute(): Promise<boolean> {
             sqlInjectionProtection: waf.sqlInjectionProtection,
             xssProtection: waf.xssProtection
         };
-        await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
+        await writeDynamicFile(FILE, renderDashboardConfig(hosts, rule));
         // The call server's path rides on these same hostnames and carries the same
         // allowlist, so it is rewritten here rather than at each of the half-dozen
         // places a domain or a firewall rule changes - one of which would eventually

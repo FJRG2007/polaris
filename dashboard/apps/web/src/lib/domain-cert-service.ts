@@ -22,12 +22,9 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { X509Certificate, createPrivateKey } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink } from "node:fs/promises";
+import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { judgeCertificate, type CertificateVerdict } from "@polaris/core";
-
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
 
 /** Prefix for every file this writes, so publishing can clear its own and never
  *  anything the local CA or the wildcard put there. */
@@ -181,8 +178,8 @@ export async function publishDomainCertificates(): Promise<void> {
         if (!reviewCertificate(row.certPem, key, row.hostname).verdict.usable) continue;
         const crtName = `${PREFIX}${row.id}.crt`;
         const keyName = `${PREFIX}${row.id}.key`;
-        await writeFile(join(dyn, crtName), row.certPem, "utf8");
-        await writeFile(join(dyn, keyName), key, { encoding: "utf8", mode: 0o600 });
+        await writeDynamicFile(crtName, row.certPem);
+        await writeDynamicFile(keyName, key, { mode: 0o600 });
         written.add(crtName);
         written.add(keyName);
         entries.push(`    - certFile: ${join(dyn, crtName)}`, `      keyFile: ${join(dyn, keyName)}`);
@@ -204,5 +201,5 @@ export async function publishDomainCertificates(): Promise<void> {
     // would exist on disk and never serve. The clean-up above already removed a stale
     // copy, since this file carries the same prefix as the certificates themselves.
     if (entries.length === 0) return;
-    await writeFile(join(dyn, TLS_FILE), ["tls:", "  certificates:", ...entries, ""].join("\n"), "utf8");
+    await writeDynamicFile(TLS_FILE, ["tls:", "  certificates:", ...entries, ""].join("\n"));
 }

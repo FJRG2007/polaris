@@ -26,7 +26,8 @@ import { loadEnv } from "@polaris/config";
 import { X509Certificate } from "node:crypto";
 import { deployBase } from "@/lib/domain-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import {
     deleteDnsRecord,
@@ -36,10 +37,6 @@ import {
 } from "@/lib/integrations/cloudflare-api";
 
 /** Where the certificate and its key are written for the edge to read. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
-
 const DYNAMIC_CRT = "polaris-wildcard.crt";
 const DYNAMIC_KEY = "polaris-wildcard.key";
 /** Its own file rather than an edit of the local CA's: the edge merges every file in
@@ -207,10 +204,10 @@ async function publish(certificate: string, key: string): Promise<void> {
     const crtPath = join(dyn, DYNAMIC_CRT);
     const keyPath = join(dyn, DYNAMIC_KEY);
     await mkdir(dyn, { recursive: true });
-    await writeFile(crtPath, certificate, "utf8");
-    await writeFile(keyPath, key, { encoding: "utf8", mode: 0o600 });
+    await writeDynamicFile(DYNAMIC_CRT, certificate);
+    await writeDynamicFile(DYNAMIC_KEY, key, { mode: 0o600 });
     const tls = ["tls:", "  certificates:", `    - certFile: ${crtPath}`, `      keyFile: ${keyPath}`, ""].join("\n");
-    await writeFile(join(dyn, DYNAMIC_TLS), tls, "utf8");
+    await writeDynamicFile(DYNAMIC_TLS, tls);
 }
 
 /** Check daily, which is often enough for a 90-day certificate renewed at 30 days

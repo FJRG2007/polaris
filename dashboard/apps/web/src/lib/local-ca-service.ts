@@ -19,6 +19,7 @@ import { loadEnv } from "@polaris/config";
 import { networkInterfaces } from "node:os";
 import { execFile } from "node:child_process";
 import { getHostLanIp } from "@/lib/host-address";
+import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { mkdir, readFile, writeFile, access } from "node:fs/promises";
 
 const run = promisify(execFile);
@@ -30,10 +31,6 @@ function caDir(): string {
 
 /** The Traefik file-provider directory, shared with the edge container. Both mount
  *  the same volume at this path, so a file written here is readable there verbatim. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
-
 const CA_KEY = "ca.key";
 const CA_CRT = "ca.crt";
 const LEAF_KEY = "leaf.key";
@@ -190,8 +187,8 @@ export async function ensureLocalCa(): Promise<void> {
             readFile(certs.caCrt, "utf8"),
             readFile(certs.leafKey, "utf8")
         ]);
-        await writeFile(crtPath, `${leaf.trimEnd()}\n${ca.trimEnd()}\n`, "utf8");
-        await writeFile(keyPath, key, "utf8");
+        await writeDynamicFile(DYNAMIC_CRT, `${leaf.trimEnd()}\n${ca.trimEnd()}\n`);
+        await writeDynamicFile(DYNAMIC_KEY, key);
         const tls = [
             "tls:",
             "  stores:",
@@ -204,7 +201,7 @@ export async function ensureLocalCa(): Promise<void> {
             `      keyFile: ${keyPath}`,
             ""
         ].join("\n");
-        await writeFile(join(dyn, DYNAMIC_TLS), tls, "utf8");
+        await writeDynamicFile(DYNAMIC_TLS, tls);
     } catch (error) {
         console.error("polaris: publishing local TLS default failed:", error instanceof Error ? error.message : error);
     }

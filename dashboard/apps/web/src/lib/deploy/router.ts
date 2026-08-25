@@ -17,7 +17,7 @@
  * keeps enforcing when Polaris is down, on both the local and remote edges.
  */
 
-import { writeFile } from "node:fs/promises";
+import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { encodeGuardRule, signEdgeOrigin } from "@polaris/core/waf";
 import type { WafCustomRule, WafPrincipalGrant } from "@polaris/core";
 import { VACANT_DOWN_PATH, VACANT_HEADER, VACANT_HEADER_VALUE, VACANT_PATH } from "@polaris/core";
@@ -420,10 +420,12 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
     return `http:\n  routers:\n${routers.join("\n")}\n  services:\n${services.join("\n")}\n  middlewares:\n${middlewares}\n`;
 }
 
+/** The file in the edge's watched directory that holds every deployed app's route. */
+const FILE = "polaris-apps.yml";
+
 /** The Polaris host's own edge: writes the Traefik file-provider config it watches. */
 export class LocalRouter implements Router {
-    private readonly file =
-        `${process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic"}/polaris-apps.yml`;
+    private readonly file = FILE;
 
     /** `vacantZones` are the deploy zones whose unclaimed names get the "nothing is
      *  running here" page. The caller resolves them, because the zone layout is Polaris
@@ -448,10 +450,13 @@ export class LocalRouter implements Router {
                 `polaris: the edge guard does not serve ${VACANT_PATH} on ${guardProxyUrl()}; an unused hostname keeps answering with the edge's own 404 and a stopped app with Bad Gateway. Update the polaris-edge-guard container to restore it.`
             );
         }
-        await writeFile(
+        // Atomic, because this one file is the whole of how every deployed domain is
+        // reached: written in place, a failed or interrupted write leaves it empty, and
+        // an empty routing file is an edge that answers `404 page not found` for every
+        // service while all of them are running. See `traefik-dynamic`.
+        await writeDynamicFile(
             this.file,
-            renderDynamicConfig(routes, { proxyAvailable, vacantAvailable, vacantZones: this.vacantZones }),
-            "utf8"
+            renderDynamicConfig(routes, { proxyAvailable, vacantAvailable, vacantZones: this.vacantZones })
         );
     }
 }
