@@ -112,6 +112,73 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
 }
 
 /**
+ * The machine's own disk, read from inside the container Polaris runs in.
+ *
+ * `/` in a container is an overlay whose upper layer lives on the machine's
+ * filesystem, and `statfs` there reports that filesystem - the same figures `df`
+ * gives on the box. It is the only reading of the disk available in every
+ * edition: it needs no privileged daemon, no shell on the host and no new
+ * transport, which is what a deployment that is only ever updated from a button
+ * can be counted on to have.
+ *
+ * Used, not free-as-used: what is counted is what `df` calls used, so the number
+ * beside the total is the number an operator would see on the machine.
+ */
+async function localDisk(): Promise<{ used: number; total: number } | null> {
+    try {
+        const { statfs } = await import("node:fs/promises");
+        const info = await statfs("/");
+        const size = Number(info.bsize);
+        const total = Number(info.blocks) * size;
+        const free = Number(info.bfree) * size;
+        if (!Number.isFinite(total) || total <= 0) return null;
+        return { total, used: Math.max(0, total - free) };
+    } catch {
+        // Not a filesystem this can be asked about (a dev run on Windows).
+        return null;
+    }
+}
+
+/**
+ * How much the containers on one machine have moved, as a counter that only goes
+ * up.
+ *
+ * Summing what each container reports would not do. That sum falls the moment one
+ * of them stops or is replaced, and the reader turns a counter into a rate by
+ * differencing it - a fall reads as "it restarted and has moved this much since",
+ * so every deploy would draw a burst of traffic that never happened. What is kept
+ * instead is each container's last reading and a total that only ever has forward
+ * movement added to it.
+ *
+ * A container seen for the first time contributes nothing: it may have been
+ * running for a month before this process started, and its counter is a position,
+ * not something that moved during this tick.
+ *
+ * Held in memory, by the one process that collects. After a restart the total
+ * begins again at zero, which the reader sees as a single fall followed by
+ * ordinary rates rather than as a machine that sent everything at once.
+ */
+const traffic = new Map<string, { rx: bigint; tx: bigint; seen: Map<string, { rx: number; tx: number }> }>();
+
+function advanceTraffic(
+    subjectId: string,
+    readings: Map<string, { rx: number; tx: number }>
+): { rx: bigint; tx: bigint } {
+    const held = traffic.get(subjectId);
+    let rx = held?.rx ?? 0n;
+    let tx = held?.tx ?? 0n;
+    for (const [id, now] of readings) {
+        const before = held?.seen.get(id);
+        if (!before) continue;
+        // A counter below where it was is a container that started again.
+        rx += bigBytes(now.rx >= before.rx ? now.rx - before.rx : now.rx) ?? 0n;
+        tx += bigBytes(now.tx >= before.tx ? now.tx - before.tx : now.tx) ?? 0n;
+    }
+    traffic.set(subjectId, { rx, tx, seen: readings });
+    return { rx, tx };
+}
+
+/**
  * Sample each server's load: how much of it the containers running on it are
  * using, against what the machine actually has.
  *
@@ -175,6 +242,7 @@ async function sampleHost(
             ownerId === null ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${subjectId}`;
         let cpu = 0;
         let memory = 0;
+        const readings = new Map<string, { rx: number; tx: number }>();
         for (const container of running) {
             const stats = samples.get(container.id);
             // A container that stopped between the list and the read.
@@ -182,7 +250,13 @@ async function sampleHost(
             rememberSample(connectionId, [container.id, container.name], stats);
             cpu += stats.cpuPercent;
             memory += stats.memUsage;
+            readings.set(container.id, { rx: stats.netRx, tx: stats.netTx });
         }
+        const moved = advanceTraffic(subjectId, readings);
+        // Only the machine Polaris is installed on: a server reached over SSH has
+        // no filesystem this process can ask about, so its storage stays unmeasured
+        // rather than being answered with this box's disk.
+        const disk = ownerId === null ? await localDisk() : null;
         return {
             dockerId: info.id,
             row: {
@@ -195,7 +269,11 @@ async function sampleHost(
                 // back a set that adds up to a hair over the whole machine.
                 cpuPercent: round2(Math.min(100, cpu)),
                 memUsedBytes: bigBytes(memory),
-                memTotalBytes: bigBytes(info.memTotal)
+                memTotalBytes: bigBytes(info.memTotal),
+                diskUsedBytes: bigBytes(disk?.used),
+                diskTotalBytes: bigBytes(disk?.total),
+                netRxBytes: moved.rx,
+                netTxBytes: moved.tx
             }
         };
     } catch {
