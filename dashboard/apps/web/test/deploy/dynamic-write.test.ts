@@ -57,7 +57,9 @@ async function leftovers(): Promise<string[]> {
 
 describe("writing a file the edge watches", () => {
     it("leaves the content in place and nothing beside it", async () => {
-        await (await writer())("polaris-apps.yml", "http: {}\n");
+        await (
+            await writer()
+        )("polaris-apps.yml", "http: {}\n");
 
         expect(await readFile(join(dynamic, "polaris-apps.yml"), "utf8")).toBe("http: {}\n");
         expect(await readdir(dynamic)).toEqual(["polaris-apps.yml"]);
@@ -86,7 +88,9 @@ describe("writing a file the edge watches", () => {
         expect(new Set(temps).size).toBe(2);
         // Whichever renamed last, the file is one of the two configs whole - never a
         // mixture of both, and never the empty file one shared name can leave behind.
-        expect(["http: first\n", "http: second\n"]).toContain(await readFile(join(dynamic, file), "utf8"));
+        expect(["http: first\n", "http: second\n"]).toContain(
+            await readFile(join(dynamic, file), "utf8")
+        );
         expect(await leftovers()).toEqual([]);
     });
 

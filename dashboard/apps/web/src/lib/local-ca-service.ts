@@ -71,8 +71,17 @@ async function exists(path: string): Promise<boolean> {
  * worth pinning without generating a certificate to read it back out of.
  */
 export async function subjectAltNames(): Promise<string[]> {
-    const host = process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
-    const dns = new Set<string>([host, `${host}.local`, "polaris", "polaris.local", "plr.local", "*.plr.local", "localhost"]);
+    const host =
+        process.env.POLARIS_MDNS_HOSTNAME || process.env.POLARIS_LOCAL_HOSTNAME || "polaris";
+    const dns = new Set<string>([
+        host,
+        `${host}.local`,
+        "polaris",
+        "polaris.local",
+        "plr.local",
+        "*.plr.local",
+        "localhost"
+    ]);
     const publicDomain = process.env.POLARIS_PUBLIC_DOMAIN;
     if (publicDomain && publicDomain !== "polaris.internal") dns.add(publicDomain);
 
@@ -122,7 +131,11 @@ async function inContainer(): Promise<boolean> {
 
 /** Generate the CA (once) and a leaf for the current names, if not already present.
  *  Returns the paths, or null when OpenSSL is unavailable or generation failed. */
-async function ensureCertificates(): Promise<{ leafCrt: string; leafKey: string; caCrt: string } | null> {
+async function ensureCertificates(): Promise<{
+    leafCrt: string;
+    leafKey: string;
+    caCrt: string;
+} | null> {
     const dir = caDir();
     await mkdir(dir, { recursive: true });
     const caKey = join(dir, CA_KEY);
@@ -133,11 +146,24 @@ async function ensureCertificates(): Promise<{ leafCrt: string; leafKey: string;
     try {
         if (!(await exists(caCrt)) || !(await exists(caKey))) {
             await run("openssl", [
-                "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
-                "-keyout", caKey, "-out", caCrt, "-days", "3650",
-                "-subj", "/O=Polaris/CN=Polaris Local CA",
-                "-addext", "basicConstraints=critical,CA:TRUE,pathlen:0",
-                "-addext", "keyUsage=critical,keyCertSign,cRLSign"
+                "req",
+                "-x509",
+                "-newkey",
+                "rsa:2048",
+                "-sha256",
+                "-nodes",
+                "-keyout",
+                caKey,
+                "-out",
+                caCrt,
+                "-days",
+                "3650",
+                "-subj",
+                "/O=Polaris/CN=Polaris Local CA",
+                "-addext",
+                "basicConstraints=critical,CA:TRUE,pathlen:0",
+                "-addext",
+                "keyUsage=critical,keyCertSign,cRLSign"
             ]);
         }
 
@@ -151,19 +177,52 @@ async function ensureCertificates(): Promise<{ leafCrt: string; leafKey: string;
             const ext = join(dir, "leaf.ext");
             await writeFile(
                 ext,
-                ["basicConstraints=CA:FALSE", "keyUsage=digitalSignature,keyEncipherment", "extendedKeyUsage=serverAuth", sanLine].join("\n"),
+                [
+                    "basicConstraints=CA:FALSE",
+                    "keyUsage=digitalSignature,keyEncipherment",
+                    "extendedKeyUsage=serverAuth",
+                    sanLine
+                ].join("\n"),
                 "utf8"
             );
-            await run("openssl", ["req", "-newkey", "rsa:2048", "-nodes", "-keyout", leafKey, "-out", csr, "-subj", "/O=Polaris/CN=polaris.local"]);
             await run("openssl", [
-                "x509", "-req", "-in", csr, "-CA", caCrt, "-CAkey", caKey, "-CAcreateserial",
-                "-out", leafCrt, "-days", "825", "-sha256", "-extfile", ext
+                "req",
+                "-newkey",
+                "rsa:2048",
+                "-nodes",
+                "-keyout",
+                leafKey,
+                "-out",
+                csr,
+                "-subj",
+                "/O=Polaris/CN=polaris.local"
+            ]);
+            await run("openssl", [
+                "x509",
+                "-req",
+                "-in",
+                csr,
+                "-CA",
+                caCrt,
+                "-CAkey",
+                caKey,
+                "-CAcreateserial",
+                "-out",
+                leafCrt,
+                "-days",
+                "825",
+                "-sha256",
+                "-extfile",
+                ext
             ]);
             await writeFile(sanMarker, sanLine, "utf8");
         }
         return { leafCrt, leafKey, caCrt };
     } catch (error) {
-        console.error("polaris: local CA generation skipped:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: local CA generation skipped:",
+            error instanceof Error ? error.message : error
+        );
         return null;
     }
 }
@@ -203,7 +262,10 @@ export async function ensureLocalCa(): Promise<void> {
         ].join("\n");
         await writeDynamicFile(DYNAMIC_TLS, tls);
     } catch (error) {
-        console.error("polaris: publishing local TLS default failed:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: publishing local TLS default failed:",
+            error instanceof Error ? error.message : error
+        );
     }
 }
 

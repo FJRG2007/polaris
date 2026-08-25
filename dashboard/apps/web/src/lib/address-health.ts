@@ -119,7 +119,10 @@ export async function checkedAddresses(): Promise<CheckedAddress[]> {
         reachableAddresses(),
         storedHealth().catch(() => new Map<string, AddressHealth>())
     ]);
-    return addresses.map((address) => ({ ...address, health: health.get(address.host) ?? UNKNOWN }));
+    return addresses.map((address) => ({
+        ...address,
+        health: health.get(address.host) ?? UNKNOWN
+    }));
 }
 
 /** Why an address could not be taken off the list, when it could not. */
@@ -137,7 +140,9 @@ export type AddressRemoval = "removed" | "unknown" | "built-in" | "managed";
  *   host from the guided setup, so neither is a list entry to delete.
  */
 export async function removeAddress(host: string): Promise<AddressRemoval> {
-    const address = (await reachableAddresses()).find((entry) => entry.host === host.trim().toLowerCase());
+    const address = (await reachableAddresses()).find(
+        (entry) => entry.host === host.trim().toLowerCase()
+    );
     if (!address) return "unknown";
     if (address.kind === "app" || address.kind === "local") return "built-in";
     if (address.kind === "tunnel") {
@@ -198,7 +203,10 @@ async function record(host: string, state: AddressState, value: string): Promise
  *  does not leave a row that outlives it. */
 async function forgetMissing(hosts: readonly string[]): Promise<void> {
     await prisma.setting.deleteMany({
-        where: { key: { startsWith: KEY_PREFIX }, ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(keyFor) } } } : {}) }
+        where: {
+            key: { startsWith: KEY_PREFIX },
+            ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(keyFor) } } } : {})
+        }
     });
 }
 
@@ -228,7 +236,10 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
     // next sweep is what says whether it worked.
     if (notRouted) {
         await syncDashboardRoute().catch((error: unknown) =>
-            console.error("polaris: republishing the dashboard route after an unrouted address failed:", error)
+            console.error(
+                "polaris: republishing the dashboard route after an unrouted address failed:",
+                error
+            )
         );
     }
     if (claim === "same") return;
@@ -288,7 +299,9 @@ export function startAddressWatcher(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
-        void sweepAddresses().catch((error) => console.error("polaris: address health sweep failed:", error));
+        void sweepAddresses().catch((error) =>
+            console.error("polaris: address health sweep failed:", error)
+        );
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();

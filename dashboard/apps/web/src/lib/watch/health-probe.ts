@@ -109,7 +109,11 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
     const started = Date.now();
     try {
-        const response = await fetch(url, { method: "GET", redirect: "manual", signal: controller.signal });
+        const response = await fetch(url, {
+            method: "GET",
+            redirect: "manual",
+            signal: controller.signal
+        });
         if (await edgeSaysNotRouted(response)) {
             return {
                 status: "down",
@@ -131,7 +135,11 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
             status: "down",
             code: null,
             latencyMs: Date.now() - started,
-            detail: controller.signal.aborted ? "Timed out" : caught instanceof Error ? caught.message : "Unreachable"
+            detail: controller.signal.aborted
+                ? "Timed out"
+                : caught instanceof Error
+                  ? caught.message
+                  : "Unreachable"
         };
     } finally {
         clearTimeout(timer);
@@ -184,9 +192,13 @@ export const NO_REPAIR: RepairState = { passesSinceAttempt: null };
  * never a missing route - so it fires once when the outage appears, then at the retry
  * interval for as long as it lasts, and arms itself again the moment everything is routed.
  */
-export function nextRepairState(previous: RepairState, unrouted: boolean): { state: RepairState; republish: boolean } {
+export function nextRepairState(
+    previous: RepairState,
+    unrouted: boolean
+): { state: RepairState; republish: boolean } {
     if (!unrouted) return { state: NO_REPAIR, republish: false };
-    if (previous.passesSinceAttempt === null) return { state: { passesSinceAttempt: 0 }, republish: true };
+    if (previous.passesSinceAttempt === null)
+        return { state: { passesSinceAttempt: 0 }, republish: true };
     const passes = previous.passesSinceAttempt + 1;
     if (passes >= REPAIR_RETRY_PASSES) return { state: { passesSinceAttempt: 0 }, republish: true };
     return { state: { passesSinceAttempt: passes }, republish: false };
@@ -198,11 +210,19 @@ export async function probeDomain(target: ProbeTarget & { id: string }): Promise
         where: { id: target.id },
         select: { healthFailures: true, healthAlertedAt: true }
     });
-    return persistHealth(target.id, previous ?? { healthFailures: 0, healthAlertedAt: null }, await checkDomain(target));
+    return persistHealth(
+        target.id,
+        previous ?? { healthFailures: 0, healthAlertedAt: null },
+        await checkDomain(target)
+    );
 }
 
 /** Write one probe's result and raise the alert when it crossed a threshold. */
-async function persistHealth(id: string, previous: HealthState, health: DomainHealth): Promise<DomainHealth> {
+async function persistHealth(
+    id: string,
+    previous: HealthState,
+    health: DomainHealth
+): Promise<DomainHealth> {
     const next = nextAlertState(previous, health, new Date());
     await prisma.domain.update({
         where: { id },
@@ -219,7 +239,11 @@ async function persistHealth(id: string, previous: HealthState, health: DomainHe
     // After the write, so a delivery that hangs cannot hold the streak back and alert
     // the same outage twice on the next pass.
     if (next.alert) {
-        await notifyDomainHealthChanged({ domainId: id, status: next.alert, detail: health.detail });
+        await notifyDomainHealthChanged({
+            domainId: id,
+            status: next.alert,
+            detail: health.detail
+        });
     }
     return health;
 }
@@ -260,18 +284,19 @@ export async function probeAllDomains(): Promise<void> {
     let repairable = false;
     for (let i = 0; i < domains.length; i += PROBE_CONCURRENCY) {
         const batch = await Promise.all(
-            domains
-                .slice(i, i + PROBE_CONCURRENCY)
-                .map((domain) =>
-                    checkDomain(domain)
-                        .then((health) => persistHealth(domain.id, domain, health))
-                        // Repairable only where the local edge is the one that serves the address.
-                        // An app on a remote server is served by that server's own edge and is
-                        // deliberately kept out of the local routing file, so it answers the same
-                        // 404 permanently and rewriting that file is not what it is waiting for.
-                        .then((health) => health.notRouted === true && domain.application.target.kind === "local")
-                        .catch(() => false)
-                )
+            domains.slice(i, i + PROBE_CONCURRENCY).map((domain) =>
+                checkDomain(domain)
+                    .then((health) => persistHealth(domain.id, domain, health))
+                    // Repairable only where the local edge is the one that serves the address.
+                    // An app on a remote server is served by that server's own edge and is
+                    // deliberately kept out of the local routing file, so it answers the same
+                    // 404 permanently and rewriting that file is not what it is waiting for.
+                    .then(
+                        (health) =>
+                            health.notRouted === true && domain.application.target.kind === "local"
+                    )
+                    .catch(() => false)
+            )
         );
         if (batch.some(Boolean)) repairable = true;
     }
@@ -280,7 +305,10 @@ export async function probeAllDomains(): Promise<void> {
     repair = next.state;
     if (next.republish) {
         await republishAppRoutes().catch((error) =>
-            console.error("polaris: republishing the edge routes after an unrouted address failed:", error)
+            console.error(
+                "polaris: republishing the edge routes after an unrouted address failed:",
+                error
+            )
         );
     }
 }

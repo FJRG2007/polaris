@@ -61,7 +61,8 @@ export function publicHostname(value: string | null | undefined): string | null 
         .replace(/:\d+$/, "")
         .replace(/\.$/, "");
     if (!host || !host.includes(".")) return null;
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return null;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host))
+        return null;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
     if (PRIVATE_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null;
     return host;
@@ -111,7 +112,11 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     if (allow.length > 0) {
         const mw = `${ROUTER}-allow`;
         middlewares.push(mw);
-        definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
+        definitions.push(
+            `    ${mw}:`,
+            "      ipAllowList:",
+            `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`
+        );
     }
     if (
         deny.length > 0 ||
@@ -132,7 +137,8 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
             `        address: "${guardUrl()}/authz"`
         );
     }
-    const httpsMiddlewares = middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
+    const httpsMiddlewares =
+        middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
     // The allowlist still applies to the :80 router; the guard does not, since that
     // router only redirects and the canonical https URL is where a request is judged.
     const httpMiddlewares = [allow.length > 0 ? `${ROUTER}-allow` : null, REDIRECT].filter(
@@ -211,7 +217,9 @@ function parseExtra(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -258,7 +266,10 @@ export async function syncDashboardRoute(): Promise<boolean> {
         // missing call route is an edge that serves every page and no call.
         return await syncCallServerRoute();
     } catch (error) {
-        console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: publishing the dashboard route failed:",
+            error instanceof Error ? error.message : error
+        );
         return false;
     }
 }

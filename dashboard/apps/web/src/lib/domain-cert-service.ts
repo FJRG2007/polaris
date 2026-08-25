@@ -56,7 +56,12 @@ export interface CertificateReview {
  * anything. The same call the save path makes, so what the operator is told when they
  * paste it is exactly what decides whether it gets served.
  */
-export function reviewCertificate(certPem: string, keyPem: string, hostname: string, now = new Date()): CertificateReview {
+export function reviewCertificate(
+    certPem: string,
+    keyPem: string,
+    hostname: string,
+    now = new Date()
+): CertificateReview {
     let certificate: X509Certificate;
     try {
         certificate = new X509Certificate(certPem);
@@ -71,7 +76,10 @@ export function reviewCertificate(certPem: string, keyPem: string, hostname: str
     try {
         if (!certificate.checkPrivateKey(createPrivateKey(keyPem))) {
             return {
-                verdict: { usable: false, reason: "That private key does not belong to that certificate." },
+                verdict: {
+                    usable: false,
+                    reason: "That private key does not belong to that certificate."
+                },
                 names: namesOf(certificate),
                 expiresAt: new Date(certificate.validTo)
             };
@@ -86,7 +94,11 @@ export function reviewCertificate(certPem: string, keyPem: string, hostname: str
     const names = namesOf(certificate);
     return {
         verdict: judgeCertificate(
-            { names, validFrom: new Date(certificate.validFrom), validTo: new Date(certificate.validTo) },
+            {
+                names,
+                validFrom: new Date(certificate.validFrom),
+                validTo: new Date(certificate.validTo)
+            },
             hostname,
             now
         ),
@@ -114,7 +126,10 @@ export async function setDomainCertificate(
     if (!domain) return { error: "Domain not found" };
 
     if (!input || !input.certPem.trim()) {
-        await prisma.domain.update({ where: { id: domainId }, data: { certPem: null, certKey: null } });
+        await prisma.domain.update({
+            where: { id: domainId },
+            data: { certPem: null, certKey: null }
+        });
         await publishDomainCertificates();
         return {};
     }
@@ -182,7 +197,10 @@ export async function publishDomainCertificates(): Promise<void> {
         await writeDynamicFile(keyName, key, { mode: 0o600 });
         written.add(crtName);
         written.add(keyName);
-        entries.push(`    - certFile: ${join(dyn, crtName)}`, `      keyFile: ${join(dyn, keyName)}`);
+        entries.push(
+            `    - certFile: ${join(dyn, crtName)}`,
+            `      keyFile: ${join(dyn, keyName)}`
+        );
     }
 
     // Only ever this module's own files: a certificate withdrawn, expired, or whose

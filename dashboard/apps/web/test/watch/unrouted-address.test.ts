@@ -26,7 +26,10 @@ function edge404(): Response {
 }
 
 function answering(response: Response): void {
-    vi.stubGlobal("fetch", vi.fn(async () => response));
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => response)
+    );
 }
 
 afterEach(() => {
@@ -54,7 +57,10 @@ describe("an address the edge does not route", () => {
         answering(
             new Response("<html>nothing is deployed here</html>", {
                 status: 404,
-                headers: { "content-type": "text/html; charset=utf-8", [VACANT_HEADER]: VACANT_HEADER_VALUE }
+                headers: {
+                    "content-type": "text/html; charset=utf-8",
+                    [VACANT_HEADER]: VACANT_HEADER_VALUE
+                }
             })
         );
 
@@ -73,7 +79,10 @@ describe("an address that is serving", () => {
         answering(
             new Response("<html>the app here is not running</html>", {
                 status: 502,
-                headers: { "content-type": "text/html; charset=utf-8", [VACANT_HEADER]: VACANT_HEADER_VALUE }
+                headers: {
+                    "content-type": "text/html; charset=utf-8",
+                    [VACANT_HEADER]: VACANT_HEADER_VALUE
+                }
             })
         );
 
@@ -85,7 +94,12 @@ describe("an address that is serving", () => {
     });
 
     it("leaves an app's own 404 alone", async () => {
-        answering(new Response("<html>no such page</html>", { status: 404, headers: { "content-type": "text/html" } }));
+        answering(
+            new Response("<html>no such page</html>", {
+                status: 404,
+                headers: { "content-type": "text/html" }
+            })
+        );
 
         const health = await checkDomain(TARGET);
 
@@ -118,7 +132,12 @@ describe("an address that is serving", () => {
     });
 
     it("does not read a body whose size the answer never declared", async () => {
-        answering(new Response("404 page not found\n", { status: 404, headers: { "content-type": "text/plain" } }));
+        answering(
+            new Response("404 page not found\n", {
+                status: 404,
+                headers: { "content-type": "text/plain" }
+            })
+        );
 
         expect((await checkDomain(TARGET)).status).toBe("up");
     });
@@ -135,7 +154,10 @@ describe("an address that is serving", () => {
 
 describe("writing the routes again", () => {
     it("happens the pass an address turns up unrouted", () => {
-        expect(nextRepairState(NO_REPAIR, true)).toEqual({ state: { passesSinceAttempt: 0 }, republish: true });
+        expect(nextRepairState(NO_REPAIR, true)).toEqual({
+            state: { passesSinceAttempt: 0 },
+            republish: true
+        });
     });
 
     it("does not happen again on the passes that follow", () => {

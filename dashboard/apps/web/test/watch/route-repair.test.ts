@@ -62,7 +62,10 @@ function edge404(): Response {
     const body = "404 page not found\n";
     return new Response(body, {
         status: 404,
-        headers: { "content-type": "text/plain; charset=utf-8", "content-length": String(body.length) }
+        headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "content-length": String(body.length)
+        }
     });
 }
 
@@ -75,7 +78,10 @@ beforeEach(() => {
     republished = 0;
     domains = [];
     vi.resetModules();
-    vi.stubGlobal("fetch", vi.fn(async () => edge404()));
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => edge404())
+    );
 });
 
 describe("an unrouted address the local edge serves", () => {
@@ -120,7 +126,10 @@ describe("an unrouted address served by another server's edge", () => {
 describe("addresses that answer", () => {
     it("leave the routing file alone", async () => {
         domains = [domain("shop", "local")];
-        vi.stubGlobal("fetch", vi.fn(async () => new Response("hello", { status: 200 })));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => new Response("hello", { status: 200 }))
+        );
 
         await pass();
 

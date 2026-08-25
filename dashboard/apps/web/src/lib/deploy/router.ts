@@ -310,7 +310,9 @@ function usableZone(zone: string): boolean {
  */
 function vacantRouters(zones: readonly string[], defs: Map<string, string>): string[] {
     const rule = zones
-        .map((zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`)
+        .map(
+            (zone) => `HostRegexp(\`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]${hostPattern(zone)}$\`)`
+        )
         .join(" || ");
     // An empty rule: no denylist, no login, no inspection. It exists so the guard runs
     // at all, and what it does when it runs is the ban check every request gets.
@@ -347,18 +349,28 @@ function vacantRouters(zones: readonly string[], defs: Map<string, string>): str
 
 /** Render Traefik dynamic config for a set of app routes. Shared by every Router
  *  implementation so local and remote edges serve byte-identical config. */
-export function renderDynamicConfig(routes: readonly AppRoute[], options: RenderOptions = {}): string {
+export function renderDynamicConfig(
+    routes: readonly AppRoute[],
+    options: RenderOptions = {}
+): string {
     const routers: string[] = [];
     const services: string[] = [];
     const defs = new Map<string, string>([
-        ["polaris-redirect-https", "    polaris-redirect-https:\n      redirectScheme:\n        scheme: https"]
+        [
+            "polaris-redirect-https",
+            "    polaris-redirect-https:\n      redirectScheme:\n        scheme: https"
+        ]
     ]);
-    const zones = options.vacantAvailable === false ? [] : (options.vacantZones ?? []).filter(usableZone);
+    const zones =
+        options.vacantAvailable === false ? [] : (options.vacantZones ?? []).filter(usableZone);
     // The guard serves the page, so it is one service reached by both the catch-all
     // router and every app route's error page.
     const vacant = zones.length > 0 || (options.vacantAvailable === true && routes.length > 0);
     if (vacant) {
-        defs.set(VACANT_REWRITE, `    ${VACANT_REWRITE}:\n      replacePath:\n        path: "${VACANT_PATH}"`);
+        defs.set(
+            VACANT_REWRITE,
+            `    ${VACANT_REWRITE}:\n      replacePath:\n        path: "${VACANT_PATH}"`
+        );
         // 502 and 504 only, and this list is narrower than it looks like it should be.
         //
         // The middleware matches the status the service RESPONDED with; it cannot tell
@@ -376,7 +388,9 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
             VACANT_ERRORS,
             `    ${VACANT_ERRORS}:\n      errors:\n        status: ["502", "504"]\n        service: ${VACANT}\n        query: "${VACANT_DOWN_PATH}"`
         );
-        services.push(`    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`);
+        services.push(
+            `    ${VACANT}:\n      loadBalancer:\n        servers:\n          - url: "${guardProxyUrl()}"`
+        );
     }
     for (const route of routes) {
         const name = `polaris-app-${route.id}`;
@@ -384,14 +398,20 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
         // First in the chain, so it wraps the rest of it and the service behind it. It
         // only ever fires on a status the app never returned, so nothing else in the
         // chain is affected by sitting inside it.
-        const appMw = [...(vacant ? [VACANT_ERRORS] : []), ...routeMiddlewares(route, name, defs, options)];
+        const appMw = [
+            ...(vacant ? [VACANT_ERRORS] : []),
+            ...routeMiddlewares(route, name, defs, options)
+        ];
         const appMwLine = appMw.length > 0 ? `\n      middlewares: [${appMw.join(", ")}]` : "";
         if (route.certResolver === "none") {
             routers.push(
                 `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}${appMwLine}`
             );
         } else {
-            const tls = route.certResolver === "le" ? "\n      tls:\n        certResolver: letsencrypt" : "\n      tls: {}";
+            const tls =
+                route.certResolver === "le"
+                    ? "\n      tls:\n        certResolver: letsencrypt"
+                    : "\n      tls: {}";
             routers.push(
                 `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [websecure]\n      service: ${name}${appMwLine}${tls}`
             );
@@ -399,7 +419,8 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
             // the guard runs only on the canonical https URL (redirect goes first).
             const httpMw = [
                 ...appMw.filter(
-                    (m) => m !== "polaris-waf-guard" && m !== VACANT_ERRORS && !m.endsWith("-waf-ctx")
+                    (m) =>
+                        m !== "polaris-waf-guard" && m !== VACANT_ERRORS && !m.endsWith("-waf-ctx")
                 ),
                 "polaris-redirect-https"
             ];
@@ -411,7 +432,9 @@ export function renderDynamicConfig(routes: readonly AppRoute[], options: Render
         // travels in the signed header above, so the guard is the only thing that
         // learns it.
         const upstream = proxied(route, options) ? guardProxyUrl() : `http://${dial}`;
-        services.push(`    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`);
+        services.push(
+            `    ${name}:\n      loadBalancer:\n        servers:\n          - url: "${upstream}"`
+        );
     }
     // Last, so it loses the length-ranked tie to every app router above it.
     if (zones.length > 0) routers.push(...vacantRouters(zones, defs));
@@ -456,7 +479,11 @@ export class LocalRouter implements Router {
         // service while all of them are running. See `traefik-dynamic`.
         await writeDynamicFile(
             this.file,
-            renderDynamicConfig(routes, { proxyAvailable, vacantAvailable, vacantZones: this.vacantZones })
+            renderDynamicConfig(routes, {
+                proxyAvailable,
+                vacantAvailable,
+                vacantZones: this.vacantZones
+            })
         );
     }
 }
