@@ -28,7 +28,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
-import { mentionsReader, notifyLevels } from "./notify";
+import { mentionsReader, notifyLevels, readerTeams } from "./notify";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 
@@ -44,6 +44,17 @@ const MOST_CHANNELS = 6;
  *  triggered this is seconds old; anything older came back with it and has been
  *  waiting, which is the unread badge's job rather than a toast's. */
 const RECENT_MS = 60_000;
+
+/** How far down one conversation is read to find its newest message. More than
+ *  one because the newest may be from somebody blocked, and then the answer is
+ *  nothing rather than whatever they said before it. */
+const NEWEST = 4;
+
+/** How far down a conversation followed for mentions is read. Further, and it
+ *  has to be: the message that names somebody is usually not the newest one, and
+ *  a share of one window across every conversation would lose it behind a burst
+ *  in a busier room - which is the room somebody sets this on. */
+const SIFTED = 60;
 
 /** One arrival, as the toast draws it. */
 export interface MessageToast {
@@ -93,34 +104,25 @@ export async function messageToasts(
     if (wanted.length === 0) return [];
 
     const since = new Date(Date.now() - RECENT_MS);
-    const rows = await prisma.chatMessage.findMany({
-        where: {
-            channelId: { in: wanted },
-            deletedAt: null,
-            createdAt: { gte: since },
-            // Never your own: the tab that sent it is already showing it, and
-            // the other tabs of the same person do not need telling.
-            authorId: { not: actor.id }
-        },
-        orderBy: { createdAt: "desc" },
-        // One per conversation is the shape, and this is the cheap way to it:
-        // a small window, then the first of each channel.
-        take: MOST_CHANNELS * 4,
-        select: {
-            id: true,
-            channelId: true,
-            body: true,
-            createdAt: true,
-            authorId: true,
-            channel: {
-                select: {
-                    name: true,
-                    spaceId: true,
-                    members: { select: { userId: true, user: { select: { name: true } } } }
-                }
-            }
-        }
-    });
+    // A conversation followed for mentions is read on its own and read deeper.
+    // Sharing one window across all of them looks the same until a busy room is
+    // in it, and then that room's traffic pushes everybody else's mention out of
+    // the window and the mention is never announced at all - Chat writes no
+    // record for one, so it is lost rather than waiting in the bell.
+    const sifted = wanted.filter((id) => levels.get(id) === "mentions");
+    const plain = wanted.filter((id) => levels.get(id) !== "mentions");
+    const [teams, windows] = await Promise.all([
+        // Only where something is being sifted: everywhere else a `@team` is
+        // just another message, which is already being announced.
+        sifted.length ? readerTeams(actor.id) : Promise.resolve(new Set<string>()),
+        Promise.all([
+            ...(plain.length ? [recentIn(actor.id, plain, since, plain.length * NEWEST)] : []),
+            ...sifted.map((id) => recentIn(actor.id, [id], since, SIFTED))
+        ])
+    ]);
+    // Newest first within each window, which is all the loop below reads, and no
+    // conversation is in two of them.
+    const rows = windows.flat();
 
     // The author is not a relation - a message outlives the account that wrote
     // it - so the names are a second, small lookup.
@@ -149,7 +151,10 @@ export async function messageToasts(
         // conversation may be the one that named them, and a channel followed
         // for mentions is announced by the mention rather than by whatever was
         // said after it.
-        if (levels.get(row.channelId) === "mentions" && !mentionsReader(row.body, actor.id)) {
+        if (
+            levels.get(row.channelId) === "mentions" &&
+            !mentionsReader(row.body, actor.id, teams)
+        ) {
             continue;
         }
         if (row.authorId && blocked.has(row.authorId)) {
@@ -175,4 +180,39 @@ export async function messageToasts(
         });
     }
     return toasts;
+}
+
+/**
+ * The recent messages of these conversations, newest first, up to `take`.
+ *
+ * One shape for both windows so the two reads cannot drift apart in what they
+ * select or in what they leave out. Never the reader's own: the tab that sent it
+ * is already showing it, and the other tabs of the same person do not need
+ * telling.
+ */
+function recentIn(userId: string, channelIds: readonly string[], since: Date, take: number) {
+    return prisma.chatMessage.findMany({
+        where: {
+            channelId: { in: [...channelIds] },
+            deletedAt: null,
+            createdAt: { gte: since },
+            authorId: { not: userId }
+        },
+        orderBy: { createdAt: "desc" },
+        take,
+        select: {
+            id: true,
+            channelId: true,
+            body: true,
+            createdAt: true,
+            authorId: true,
+            channel: {
+                select: {
+                    name: true,
+                    spaceId: true,
+                    members: { select: { userId: true, user: { select: { name: true } } } }
+                }
+            }
+        }
+    });
 }

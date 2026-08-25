@@ -53,6 +53,17 @@ export function MessageToasts() {
     go.current = router.push;
 
     const pending = useRef(new Set<string>());
+    /**
+     * The last message announced in each conversation.
+     *
+     * A conversation followed for mentions answers with the newest message that
+     * names this reader, which is usually not the newest message in it - so
+     * every ordinary message that lands in the minute after one fetches the same
+     * mention back. Without this, that channel raises the note and plays the
+     * chime again for each of them, which is the interruption the level exists
+     * to prevent. One entry per conversation, so it is bounded by the rail.
+     */
+    const announced = useRef(new Map<string, string>());
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const device = useRef(scope);
     device.current = scope;
@@ -68,6 +79,9 @@ export function MessageToasts() {
             // The conversation somebody is standing in needs no announcement:
             // the message is already on their screen.
             if (here.current.startsWith(`/chat/c/${message.channelId}`)) continue;
+            // Already said, and saying it twice is not a second message.
+            if (announced.current.get(message.channelId) === message.messageId) continue;
+            announced.current.set(message.channelId, message.messageId);
 
             const who = message.inChannel
                 ? `${message.authorName} in ${message.conversation}`

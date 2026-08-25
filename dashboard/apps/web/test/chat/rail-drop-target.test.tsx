@@ -13,21 +13,29 @@
  * heading reports itself while something is held over it - and it stops the
  * moment a row claims the pointer, because two answers on screen at once is
  * worse than one that is late.
+ *
+ * The third is what showing a landing spot is for: letting go on the heading has
+ * to make the move it was advertising. The heading is a row of its own inside
+ * the area that owns the drop, so the two handlers run one after the other, and
+ * the first has to leave the drag intact for the second.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
-import { useRailDrag } from "@/app/(app)/chat/use-rail-drag";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useRailDrag, type Dragging, type DropTarget } from "@/app/(app)/chat/use-rail-drag";
 
 /** The rail in miniature: one heading holding one channel, and the reported
  *  answer written out where a test can read it. */
-function Rail() {
-    const drag = useRailDrag({ enabled: true, onDrop: () => undefined });
+function Rail({ onDrop = () => undefined }: { onDrop?: (source: Dragging, target: DropTarget) => void }) {
+    const drag = useRailDrag({ enabled: true, onDrop });
     return (
         <div>
             <span data-testid="into">{drag.dropInto ? String(drag.dropInto.categoryId) : "-"}</span>
             <span data-testid="at">{drag.dropAt ? drag.dropAt.id : "-"}</span>
             <div data-testid="area" {...drag.areaProps("voice")}>
+                {/* Inside the area, as the rail draws it: the heading is what is
+                    left to aim at once a section is folded. */}
+                <div data-testid="heading" {...drag.rowProps("category", "voice")} />
                 <div
                     data-testid="row"
                     {...drag.handleProps({ kind: "channel", id: "general" })}
@@ -71,6 +79,30 @@ describe("where a dragged channel says it will land", () => {
         // beside a row and a lit heading at the same time say two things.
         expect(screen.getByTestId("at").textContent).toBe("random");
         expect(screen.getByTestId("into").textContent).toBe("-");
+    });
+
+    it("lights the heading a channel is held over, folded or not", () => {
+        render(<Rail />);
+        pickUp();
+
+        fireEvent.dragOver(screen.getByTestId("heading"));
+        expect(screen.getByTestId("into").textContent).toBe("voice");
+        // Not a line beside the heading: a channel is not going above or below
+        // it, it is going into it.
+        expect(screen.getByTestId("at").textContent).toBe("-");
+    });
+
+    it("makes the move when the channel is let go on the heading", () => {
+        const dropped = vi.fn();
+        render(<Rail onDrop={dropped} />);
+        pickUp();
+        fireEvent.dragOver(screen.getByTestId("heading"));
+
+        fireEvent.drop(screen.getByTestId("heading"));
+        expect(dropped).toHaveBeenCalledWith(
+            { kind: "channel", id: "general" },
+            { at: "end", categoryId: "voice" }
+        );
     });
 
     it("forgets both when the drag ends", () => {

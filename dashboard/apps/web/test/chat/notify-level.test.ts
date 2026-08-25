@@ -198,5 +198,20 @@ describe("what counts as a mention", () => {
 
     it("counts nothing in an ordinary message", () => {
         expect(mentionsReader("deployed, looks fine", ada)).toBe(false);
+        // Nor an address that names somebody else, which is the cheap check's
+        // job not to short-circuit into a yes.
+        expect(mentionsReader("see [#build](polaris:channel/abc)", ada)).toBe(false);
+    });
+
+    it("counts their team, because naming a team names everybody in it", () => {
+        const platform = "0193b0f0-0000-7000-8000-00000000fee1";
+        const body = `[Platform](polaris:team/${platform}) can somebody look`;
+        expect(mentionsReader(body, ada, new Set([platform]))).toBe(true);
+        // A team they are not in is somebody else being asked.
+        expect(mentionsReader(body, ada, new Set(["0193b0f0-0000-7000-8000-00000000bee2"]))).toBe(
+            false
+        );
+        // And nothing looked up is nobody named, rather than everybody.
+        expect(mentionsReader(body, ada)).toBe(false);
     });
 });
