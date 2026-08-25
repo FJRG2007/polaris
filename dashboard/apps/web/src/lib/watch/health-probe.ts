@@ -29,6 +29,16 @@ const EDGE_NO_ROUTE = "404 page not found";
 const EDGE_NO_ROUTE_MAX_BYTES = 256;
 
 /**
+ * Passes to let go by before writing the routes again while the same addresses stay
+ * unrouted. Repeating the repair every minute forever is what an address the local edge
+ * is not the one serving would otherwise cost - five queries, a rewritten routing file
+ * and a log line, on a condition no rewrite of that file can change. One attempt ends the
+ * outage this repairs; the rest is a half-hourly retry, for the case where something
+ * empties the file again between two passes.
+ */
+const REPAIR_RETRY_PASSES = 30;
+
+/**
  * Consecutive failures before anybody is told. At the poller's one-minute interval
  * that is roughly three minutes of being down - long enough that a restart, a redeploy
  * or a single dropped packet passes unmentioned, short enough to still be news.
@@ -71,12 +81,19 @@ interface HealthState {
  * - The vacant page, which says the same thing deliberately for a name in the zone with
  *   nothing deployed on it, and marks itself with a header so it can be recognised.
  *
+ * The status is what separates that page from the other thing it is used for. It has two
+ * states and carries the same header in both: 404 for a name nothing claims, and 502 for
+ * an app that IS routed and is not running - which is also the error page an app router
+ * shows for its own 502 and 504. A stopped container is already down by its status, its
+ * route exists and is correct, and writing the routing file again would never bring it
+ * back, so only the 404 reads as no route.
+ *
  * A 404 an app produced is left as up. It answered; which of its paths exist is not
  * this probe's business.
  */
 async function edgeSaysNotRouted(response: Response): Promise<boolean> {
-    if (response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE) return true;
     if (response.status !== 404) return false;
+    if (response.headers.get(VACANT_HEADER) === VACANT_HEADER_VALUE) return true;
     if (!(response.headers.get("content-type") ?? "").startsWith("text/plain")) return false;
     // A declared length, and a small one. Without the header there is no bound on what
     // reading the body would pull into memory, and the edge always declares this one.
@@ -150,6 +167,31 @@ export function nextAlertState(
     return { failures: 0, alertedAt: null, alert: recovered ? "up" : null };
 }
 
+/** What the poller carries between passes about a repair it already attempted.
+ *  `passesSinceAttempt` is null while every address is routed. */
+export interface RepairState {
+    passesSinceAttempt: number | null;
+}
+
+/** Nothing unrouted, nothing attempted: where a poller starts. */
+export const NO_REPAIR: RepairState = { passesSinceAttempt: null };
+
+/**
+ * Whether this pass should write the routes again.
+ *
+ * Pure, so the damping can be asserted without a poller or a clock. The repair is
+ * idempotent but not free, and what it repairs is either gone by the next pass or was
+ * never a missing route - so it fires once when the outage appears, then at the retry
+ * interval for as long as it lasts, and arms itself again the moment everything is routed.
+ */
+export function nextRepairState(previous: RepairState, unrouted: boolean): { state: RepairState; republish: boolean } {
+    if (!unrouted) return { state: NO_REPAIR, republish: false };
+    if (previous.passesSinceAttempt === null) return { state: { passesSinceAttempt: 0 }, republish: true };
+    const passes = previous.passesSinceAttempt + 1;
+    if (passes >= REPAIR_RETRY_PASSES) return { state: { passesSinceAttempt: 0 }, republish: true };
+    return { state: { passesSinceAttempt: passes }, republish: false };
+}
+
 /** Probe one domain by id and persist its health, alerting on a sustained change. */
 export async function probeDomain(target: ProbeTarget & { id: string }): Promise<DomainHealth> {
     const previous = await prisma.domain.findUnique({
@@ -188,8 +230,7 @@ async function persistHealth(id: string, previous: HealthState, health: DomainHe
  *
  * A missing route is the one outage on this page that Polaris caused and Polaris can
  * undo, and nothing on any screen offers to - so an operator told about it could only
- * wait for something else to happen to trigger a resync. It is idempotent and it writes
- * one file, so repeating it on a name that is 404ing for its own reasons costs nothing.
+ * wait for something else to happen to trigger a resync.
  *
  * Imported here rather than at the top: the deploy service reaches most of the control
  * plane, and this module is loaded by a poller that starts before any of it is needed.
@@ -198,6 +239,9 @@ async function republishAppRoutes(): Promise<void> {
     const { syncAppRoutes } = await import("@/lib/deploy-service");
     await syncAppRoutes();
 }
+
+/** Carried between passes, so an address that stays unrouted is not repaired every minute. */
+let repair: RepairState = NO_REPAIR;
 
 /** Probe every enabled domain, with bounded concurrency. */
 export async function probeAllDomains(): Promise<void> {
@@ -209,10 +253,11 @@ export async function probeAllDomains(): Promise<void> {
             https: true,
             pathPrefix: true,
             healthFailures: true,
-            healthAlertedAt: true
+            healthAlertedAt: true,
+            application: { select: { target: { select: { kind: true } } } }
         }
     });
-    let notRouted = false;
+    let repairable = false;
     for (let i = 0; i < domains.length; i += PROBE_CONCURRENCY) {
         const batch = await Promise.all(
             domains
@@ -220,13 +265,20 @@ export async function probeAllDomains(): Promise<void> {
                 .map((domain) =>
                     checkDomain(domain)
                         .then((health) => persistHealth(domain.id, domain, health))
-                        .catch(() => undefined)
+                        // Repairable only where the local edge is the one that serves the address.
+                        // An app on a remote server is served by that server's own edge and is
+                        // deliberately kept out of the local routing file, so it answers the same
+                        // 404 permanently and rewriting that file is not what it is waiting for.
+                        .then((health) => health.notRouted === true && domain.application.target.kind === "local")
+                        .catch(() => false)
                 )
         );
-        if (batch.some((health) => health?.notRouted === true)) notRouted = true;
+        if (batch.some(Boolean)) repairable = true;
     }
     // Once for the pass, however many names were affected: they share one routing file.
-    if (notRouted) {
+    const next = nextRepairState(repair, repairable);
+    repair = next.state;
+    if (next.republish) {
         await republishAppRoutes().catch((error) =>
             console.error("polaris: republishing the edge routes after an unrouted address failed:", error)
         );

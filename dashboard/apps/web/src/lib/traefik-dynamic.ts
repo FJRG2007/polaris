@@ -17,9 +17,16 @@
  *
  * Traefik ignores the temporary file - its file provider reads only `.toml`, `.yaml`,
  * `.yml` and `.json` - so the window in which it exists cannot be observed by the edge.
+ *
+ * The temporary name is unique per write, because nothing serialises the callers: the
+ * deploy pipeline, the tunnel service, the firewall actions, the boot pass and the
+ * health poller's repair all write the app routes, and two of them sharing one
+ * temporary name is two sets of bytes landing in one file and the mixture being renamed
+ * over the live config - the corruption this whole module exists to prevent.
  */
 
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { rename, unlink, writeFile } from "node:fs/promises";
 
 /** Traefik's file-provider directory, the volume the edge and the dashboard share. */
@@ -44,13 +51,14 @@ export async function writeDynamicFile(
     options: { mode?: number } = {}
 ): Promise<void> {
     const target = dynamicPath(fileName);
-    const temp = `${target}.tmp`;
+    const temp = `${target}.${randomUUID()}.tmp`;
     try {
         await writeFile(temp, content, { encoding: "utf8", mode: options.mode });
         await rename(temp, target);
     } catch (error) {
         // A leftover temporary file would otherwise accumulate one per failure, and the
-        // cleanup passes that sweep this directory match on their own prefixes.
+        // cleanup passes that sweep this directory match on their own prefixes, which
+        // the unique name keeps.
         await unlink(temp).catch(() => undefined);
         throw error;
     }

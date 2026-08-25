@@ -7,9 +7,9 @@
  * 404 from a real one is who wrote it, which is what these assert.
  */
 
-import { checkDomain } from "@/lib/watch/health-probe";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
+import { checkDomain, NO_REPAIR, nextRepairState } from "@/lib/watch/health-probe";
 
 const TARGET = { hostname: "app.plr.example.com", https: true };
 
@@ -66,6 +66,24 @@ describe("an address the edge does not route", () => {
 });
 
 describe("an address that is serving", () => {
+    it("leaves a deployed app that is stopped alone", async () => {
+        // The same page and the same header, in its other state: an app that IS routed and
+        // is not answering. Down by its status, and no rewrite of the routing file starts a
+        // container.
+        answering(
+            new Response("<html>the app here is not running</html>", {
+                status: 502,
+                headers: { "content-type": "text/html; charset=utf-8", [VACANT_HEADER]: VACANT_HEADER_VALUE }
+            })
+        );
+
+        const health = await checkDomain(TARGET);
+
+        expect(health.status).toBe("down");
+        expect(health.detail).toBe("HTTP 502");
+        expect(health.notRouted).toBeUndefined();
+    });
+
     it("leaves an app's own 404 alone", async () => {
         answering(new Response("<html>no such page</html>", { status: 404, headers: { "content-type": "text/html" } }));
 
@@ -112,5 +130,45 @@ describe("an address that is serving", () => {
 
         expect(health.status).toBe("up");
         expect(health.notRouted).toBeUndefined();
+    });
+});
+
+describe("writing the routes again", () => {
+    it("happens the pass an address turns up unrouted", () => {
+        expect(nextRepairState(NO_REPAIR, true)).toEqual({ state: { passesSinceAttempt: 0 }, republish: true });
+    });
+
+    it("does not happen again on the passes that follow", () => {
+        let state = nextRepairState(NO_REPAIR, true).state;
+
+        for (let pass = 0; pass < 20; pass += 1) {
+            const next = nextRepairState(state, true);
+            expect(next.republish).toBe(false);
+            state = next.state;
+        }
+    });
+
+    it("is retried, for the case where something empties the file again", () => {
+        let state = nextRepairState(NO_REPAIR, true).state;
+        let attempts = 0;
+
+        for (let pass = 0; pass < 90; pass += 1) {
+            const next = nextRepairState(state, true);
+            if (next.republish) attempts += 1;
+            state = next.state;
+        }
+
+        expect(attempts).toBe(3);
+    });
+
+    it("arms itself again once everything is routed", () => {
+        const settled = nextRepairState(nextRepairState(NO_REPAIR, true).state, false);
+
+        expect(settled).toEqual({ state: NO_REPAIR, republish: false });
+        expect(nextRepairState(settled.state, true).republish).toBe(true);
+    });
+
+    it("does nothing while every address answers", () => {
+        expect(nextRepairState(NO_REPAIR, false)).toEqual({ state: NO_REPAIR, republish: false });
     });
 });
