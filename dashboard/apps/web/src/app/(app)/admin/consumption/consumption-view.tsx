@@ -25,7 +25,12 @@ import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { PolarisFootprintCard } from "@/app/(app)/apps/containers/polaris-footprint";
 import { Badge, Button, Card, CardBody, cn, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
-import { consumedMemBytes, type Consumption, type ConsumptionGroup, type ConsumptionRow } from "./types";
+import {
+    consumedMemBytes,
+    type Consumption,
+    type ConsumptionGroup,
+    type ConsumptionRow
+} from "./types";
 
 /** The readings come from the sampler every other screen shares, which takes a
  *  pass a minute. Polling faster than that would redraw the same numbers. */
@@ -117,7 +122,9 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-sm font-medium">{consumption.machine.name}</span>
                     <span className="text-xs text-muted-foreground">
-                        {total ? `${formatBytes(used)} of ${formatBytes(total)} in containers` : formatBytes(used)}
+                        {total
+                            ? `${formatBytes(used)} of ${formatBytes(total)} in containers`
+                            : formatBytes(used)}
                         {consumption.machine.ncpu > 0
                             ? ` - ${consumption.machine.ncpu} core${consumption.machine.ncpu === 1 ? "" : "s"}`
                             : ""}
@@ -127,7 +134,10 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     </span>
                 </div>
 
-                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-border" role="presentation">
+                <div
+                    className="flex h-2.5 w-full overflow-hidden rounded-full bg-border"
+                    role="presentation"
+                >
                     {groups.map((group) => {
                         const share = total ? (group.memUsedBytes / total) * 100 : 0;
                         if (share <= 0) return null;
@@ -146,8 +156,12 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     {groups.map((group) => (
                         <div key={group.id} className="flex min-w-0 flex-col gap-0.5">
                             <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <span className={cn("size-2 shrink-0 rounded-full", TONE[group.id])} />
-                                <span className="truncate" title={group.label}>{group.label}</span>
+                                <span
+                                    className={cn("size-2 shrink-0 rounded-full", TONE[group.id])}
+                                />
+                                <span className="truncate" title={group.label}>
+                                    {group.label}
+                                </span>
                             </dt>
                             <dd className="text-sm font-medium tabular-nums">
                                 {formatBytes(group.memUsedBytes)}
@@ -165,8 +179,8 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                 </dl>
 
                 <p className="text-xs text-muted-foreground">
-                    Only this machine. Memory and CPU are what the containers hold right now; a service counts
-                    the releases it keeps and the tunnel publishing it.
+                    Only this machine. Memory and CPU are what the containers hold right now; a
+                    service counts the releases it keeps and the tunnel publishing it.
                 </p>
             </CardBody>
         </Card>
@@ -187,7 +201,9 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                         {formatBytes(group.memUsedBytes)} - {group.cpuPercent}% CPU
-                        {group.running < group.containers ? ` - ${group.running} of ${group.containers} running` : ""}
+                        {group.running < group.containers
+                            ? ` - ${group.running} of ${group.containers} running`
+                            : ""}
                     </span>
                 </div>
 
@@ -240,7 +256,9 @@ function Row({ row }: { row: ConsumptionRow }) {
                         {name}
                     </span>
                     {row.state === "running" ? null : (
-                        <Badge variant={row.state === "stopped" ? "neutral" : "warning"}>{row.stateLabel}</Badge>
+                        <Badge variant={row.state === "stopped" ? "neutral" : "warning"}>
+                            {row.stateLabel}
+                        </Badge>
                     )}
                 </div>
                 <div className="truncate text-xs text-muted-foreground" title={row.detail}>

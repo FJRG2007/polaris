@@ -11,7 +11,14 @@
 
 import { shortHash } from "@polaris/deploy";
 import { describe, expect, it } from "vitest";
-import { attribute, projectSubject, subjectHash, type Attributable, type Claim, type ClaimIndex } from "@/lib/consumption";
+import {
+    attribute,
+    projectSubject,
+    subjectHash,
+    type Attributable,
+    type Claim,
+    type ClaimIndex
+} from "@/lib/consumption";
 
 const APP = "0198f4c1-2b7a-7000-8000-000000000001";
 const OTHER_APP = "0198f4c1-2b7a-7000-8000-000000000002";
@@ -86,7 +93,10 @@ function container(overrides: Partial<Attributable> & { name: string }): Attribu
     };
 }
 
-function claim(key: string, bucket: Partial<Claim["bucket"]> & { group: Claim["bucket"]["group"] }): Claim {
+function claim(
+    key: string,
+    bucket: Partial<Claim["bucket"]> & { group: Claim["bucket"]["group"] }
+): Claim {
     return {
         key,
         bucket: {
@@ -130,9 +140,23 @@ describe("adding the machine up", () => {
     it("keeps the stack's own containers out of everything it runs", () => {
         const groups = attribute(
             [
-                container({ name: "polaris-web-181", composeProject: "polaris", composeService: "web", memUsedBytes: 900 }),
-                container({ name: "ptunnel", composeProject: "polaris-ptunnel", composeService: "ptunnel", memUsedBytes: 100 }),
-                container({ name: "survival", composeProject: `polaris-${subjectHash(APP)}`, memUsedBytes: 4000 })
+                container({
+                    name: "polaris-web-181",
+                    composeProject: "polaris",
+                    composeService: "web",
+                    memUsedBytes: 900
+                }),
+                container({
+                    name: "ptunnel",
+                    composeProject: "polaris-ptunnel",
+                    composeService: "ptunnel",
+                    memUsedBytes: 100
+                }),
+                container({
+                    name: "survival",
+                    composeProject: `polaris-${subjectHash(APP)}`,
+                    memUsedBytes: 4000
+                })
             ],
             full,
             "local"
@@ -147,28 +171,55 @@ describe("adding the machine up", () => {
     it("counts a service's releases and its tunnel as one service", () => {
         const groups = attribute(
             [
-                container({ name: "api", composeProject: `polaris-${subjectHash(OTHER_APP)}`, memUsedBytes: 300 }),
-                container({ name: "api-a1b2c3d", composeProject: `polaris-${subjectHash(OTHER_APP)}-a1b2c3d`, memUsedBytes: 200 }),
-                container({ name: "qtunnel", composeProject: `polaris-qtunnel-${subjectHash(OTHER_APP)}`, memUsedBytes: 50 })
+                container({
+                    name: "api",
+                    composeProject: `polaris-${subjectHash(OTHER_APP)}`,
+                    memUsedBytes: 300
+                }),
+                container({
+                    name: "api-a1b2c3d",
+                    composeProject: `polaris-${subjectHash(OTHER_APP)}-a1b2c3d`,
+                    memUsedBytes: 200
+                }),
+                container({
+                    name: "qtunnel",
+                    composeProject: `polaris-qtunnel-${subjectHash(OTHER_APP)}`,
+                    memUsedBytes: 50
+                })
             ],
             full,
             "local"
         );
         const rows = group(groups, "services").rows;
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ id: "2", containers: 3, memUsedBytes: 550, state: "running" });
+        expect(rows[0]).toMatchObject({
+            id: "2",
+            containers: 3,
+            memUsedBytes: 550,
+            state: "running"
+        });
     });
 
     it("does not let a tunnel that is up say the app behind it is running", () => {
         const groups = attribute(
             [
-                container({ name: "api", composeProject: `polaris-${subjectHash(OTHER_APP)}`, state: "exited" }),
-                container({ name: "qtunnel", composeProject: `polaris-qtunnel-${subjectHash(OTHER_APP)}` })
+                container({
+                    name: "api",
+                    composeProject: `polaris-${subjectHash(OTHER_APP)}`,
+                    state: "exited"
+                }),
+                container({
+                    name: "qtunnel",
+                    composeProject: `polaris-qtunnel-${subjectHash(OTHER_APP)}`
+                })
             ],
             full,
             "local"
         );
-        expect(group(groups, "services").rows[0]).toMatchObject({ state: "stopped", stateLabel: "Stopped" });
+        expect(group(groups, "services").rows[0]).toMatchObject({
+            state: "stopped",
+            stateLabel: "Stopped"
+        });
         // The group counts containers, and the tunnel is one that is up.
         expect(group(groups, "services").containers).toBe(2);
         expect(group(groups, "services").running).toBe(1);
@@ -176,7 +227,13 @@ describe("adding the machine up", () => {
 
     it("reads a tunnel whose service is gone as what it is: a container that is up", () => {
         const groups = attribute(
-            [container({ name: "qtunnel", composeProject: "polaris-qtunnel-deadbeef", memUsedBytes: 50 })],
+            [
+                container({
+                    name: "qtunnel",
+                    composeProject: "polaris-qtunnel-deadbeef",
+                    memUsedBytes: 50
+                })
+            ],
             full,
             "local"
         );
@@ -194,33 +251,63 @@ describe("adding the machine up", () => {
 
     it("still calls a tunnel whose service is gone stopped when it is", () => {
         const groups = attribute(
-            [container({ name: "qtunnel", composeProject: "polaris-qtunnel-deadbeef", state: "exited" })],
+            [
+                container({
+                    name: "qtunnel",
+                    composeProject: "polaris-qtunnel-deadbeef",
+                    state: "exited"
+                })
+            ],
             full,
             "local"
         );
-        expect(group(groups, "other").rows[0]).toMatchObject({ state: "stopped", stateLabel: "Stopped" });
+        expect(group(groups, "other").rows[0]).toMatchObject({
+            state: "stopped",
+            stateLabel: "Stopped"
+        });
     });
 
     it("reads a marketplace app as the app, not as the service it runs under", () => {
         const groups = attribute(
-            [container({ name: "survival", composeProject: `polaris-${subjectHash(APP)}`, memUsedBytes: 4000 })],
+            [
+                container({
+                    name: "survival",
+                    composeProject: `polaris-${subjectHash(APP)}`,
+                    memUsedBytes: 4000
+                })
+            ],
             full,
             "local"
         );
-        expect(group(groups, "apps").rows[0]).toMatchObject({ id: "1", name: "Survival", href: null });
+        expect(group(groups, "apps").rows[0]).toMatchObject({
+            id: "1",
+            name: "Survival",
+            href: null
+        });
         expect(group(groups, "services").rows).toHaveLength(0);
     });
 
     it("still gives a row to an install whose containers are on another server", () => {
         const groups = attribute([], full, "local");
         expect(group(groups, "apps").rows).toEqual([
-            expect.objectContaining({ id: "1", state: "elsewhere", containers: 0, memUsedBytes: null })
+            expect.objectContaining({
+                id: "1",
+                state: "elsewhere",
+                containers: 0,
+                memUsedBytes: null
+            })
         ]);
     });
 
     it("gathers a managed database with the services rather than with the strangers", () => {
         const groups = attribute(
-            [container({ name: "pg", composeProject: `polaris-db-${subjectHash(DB)}`, memUsedBytes: 700 })],
+            [
+                container({
+                    name: "pg",
+                    composeProject: `polaris-db-${subjectHash(DB)}`,
+                    memUsedBytes: 700
+                })
+            ],
             full,
             "local"
         );
@@ -231,10 +318,18 @@ describe("adding the machine up", () => {
     it("leaves a container nothing here claims as itself, linked to its own page", () => {
         const groups = attribute(
             [
-                container({ name: "someone-elses", composeProject: "their-stack", memUsedBytes: 20 }),
+                container({
+                    name: "someone-elses",
+                    composeProject: "their-stack",
+                    memUsedBytes: 20
+                }),
                 // A project shaped like ours whose hash resolves to nothing is not
                 // ours: a record has to exist for it to be claimed.
-                container({ name: "lookalike", composeProject: "polaris-deadbeef", memUsedBytes: 10 })
+                container({
+                    name: "lookalike",
+                    composeProject: "polaris-deadbeef",
+                    memUsedBytes: 10
+                })
             ],
             full,
             "local"
@@ -245,8 +340,15 @@ describe("adding the machine up", () => {
     });
 
     it("leaves an unsampled container without a figure rather than at zero", () => {
-        const groups = attribute([container({ name: "fresh", composeProject: "their-stack" })], full, "local");
-        expect(group(groups, "other").rows[0]).toMatchObject({ cpuPercent: null, memUsedBytes: null });
+        const groups = attribute(
+            [container({ name: "fresh", composeProject: "their-stack" })],
+            full,
+            "local"
+        );
+        expect(group(groups, "other").rows[0]).toMatchObject({
+            cpuPercent: null,
+            memUsedBytes: null
+        });
         expect(group(groups, "other").memUsedBytes).toBe(0);
     });
 
@@ -260,6 +362,10 @@ describe("adding the machine up", () => {
             index(),
             "local"
         );
-        expect(group(groups, "other").rows.map((row) => row.name)).toEqual(["big", "middle", "small"]);
+        expect(group(groups, "other").rows.map((row) => row.name)).toEqual([
+            "big",
+            "middle",
+            "small"
+        ]);
     });
 });

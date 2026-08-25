@@ -27,7 +27,12 @@ import { visibleProjectIds } from "@/lib/deploy-service";
 import type { Consumption } from "@/app/(app)/admin/consumption/types";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 import { attribute, subjectHash, type Claim, type ClaimIndex } from "@/lib/consumption";
-import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "@/lib/container-stats-cache";
+import {
+    cachedSamples,
+    oldestSampleAt,
+    refreshSamples,
+    STATS_TTL_MS
+} from "@/lib/container-stats-cache";
 
 /**
  * Read the split.
@@ -44,7 +49,10 @@ export async function readConsumption(viewerId: string): Promise<Consumption> {
         (async () => {
             const driver = localDockerDriver();
             try {
-                return await Promise.all([driver.listContainers(true), driver.info().catch(() => null)]);
+                return await Promise.all([
+                    driver.listContainers(true),
+                    driver.info().catch(() => null)
+                ]);
             } finally {
                 await driver.dispose().catch(() => undefined);
             }
@@ -58,7 +66,8 @@ export async function readConsumption(viewerId: string): Promise<Consumption> {
             // A stopped container has nothing to sample, and its last reading is
             // not carried: the row already says it is stopped, and a figure beside
             // that reads as though it still were running.
-            const sample = container.state === "running" ? (samples.get(container.id) ?? null) : null;
+            const sample =
+                container.state === "running" ? (samples.get(container.id) ?? null) : null;
             return {
                 ...container,
                 cpuPercent: sample ? Math.round(sample.stats.cpuPercent * 10) / 10 : null,
@@ -112,7 +121,11 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
                 id: true,
                 name: true,
                 environment: {
-                    select: { name: true, projectId: true, project: { select: { name: true, ownerId: true } } }
+                    select: {
+                        name: true,
+                        projectId: true,
+                        project: { select: { name: true, ownerId: true } }
+                    }
                 }
             }
         }),
@@ -122,7 +135,9 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
                 name: true,
                 engine: true,
                 version: true,
-                environment: { select: { projectId: true, project: { select: { name: true, ownerId: true } } } }
+                environment: {
+                    select: { projectId: true, project: { select: { name: true, ownerId: true } } }
+                }
             }
         }),
         prisma.installedApp.findMany({
@@ -184,7 +199,9 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
     // and the operator knows it as the app they installed rather than as the
     // service slug it happens to run under.
     for (const install of installs) {
-        const application = install.applicationId ? byApplication.get(install.applicationId) : undefined;
+        const application = install.applicationId
+            ? byApplication.get(install.applicationId)
+            : undefined;
         if (!application) continue;
         const claim: Claim = {
             key: `install:${install.id}`,
@@ -208,6 +225,9 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
 async function ownerNames(ids: readonly string[]): Promise<Map<string, string>> {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return new Map();
-    const users = await prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, name: true } });
+    const users = await prisma.user.findMany({
+        where: { id: { in: unique } },
+        select: { id: true, name: true }
+    });
     return new Map(users.map((user) => [user.id, user.name]));
 }

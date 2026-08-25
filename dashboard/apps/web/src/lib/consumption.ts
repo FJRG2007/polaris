@@ -62,7 +62,9 @@ export function subjectHash(id: string): string {
  * three tunnel prefixes are a door opened for the service whose hash they carry.
  */
 export function projectSubject(project: string | null): ProjectSubject | null {
-    const match = project ? /^polaris-(?:(db|qtunnel|ntunnel|ngrok)-)?([0-9a-f]{8})(?:-[a-z0-9-]+)?$/.exec(project) : null;
+    const match = project
+        ? /^polaris-(?:(db|qtunnel|ntunnel|ngrok)-)?([0-9a-f]{8})(?:-[a-z0-9-]+)?$/.exec(project)
+        : null;
     if (!match) return null;
     const prefix = match[1];
     const hash = match[2] as string;
@@ -72,28 +74,31 @@ export function projectSubject(project: string | null): ProjectSubject | null {
 }
 
 /** What each group is, in the order the screen reads them. */
-export const GROUPS: ReadonlyArray<{ id: ConsumptionGroupId; label: string; description: string }> = [
-    {
-        id: "polaris",
-        label: "Polaris itself",
-        description: "The control plane: the dashboard, the database, the edge, and the rest of the stack."
-    },
-    {
-        id: "apps",
-        label: "Marketplace apps",
-        description: "Everything installed from the marketplace, game servers included."
-    },
-    {
-        id: "services",
-        label: "Deployed services",
-        description: "Services and databases deployed here, with the releases and tunnels they keep."
-    },
-    {
-        id: "other",
-        label: "Everything else",
-        description: "Containers on this machine that Polaris did not start."
-    }
-];
+export const GROUPS: ReadonlyArray<{ id: ConsumptionGroupId; label: string; description: string }> =
+    [
+        {
+            id: "polaris",
+            label: "Polaris itself",
+            description:
+                "The control plane: the dashboard, the database, the edge, and the rest of the stack."
+        },
+        {
+            id: "apps",
+            label: "Marketplace apps",
+            description: "Everything installed from the marketplace, game servers included."
+        },
+        {
+            id: "services",
+            label: "Deployed services",
+            description:
+                "Services and databases deployed here, with the releases and tunnels they keep."
+        },
+        {
+            id: "other",
+            label: "Everything else",
+            description: "Containers on this machine that Polaris did not start."
+        }
+    ];
 
 /** How a thing reads once something of it has been found. */
 export interface ClaimBucket {
@@ -196,7 +201,15 @@ export function attribute(
 }
 
 function open(bucket: ClaimBucket): Bucket {
-    return { ...bucket, containers: 0, running: 0, self: 0, selfRunning: 0, cpuPercent: null, memUsedBytes: null };
+    return {
+        ...bucket,
+        containers: 0,
+        running: 0,
+        self: 0,
+        selfRunning: 0,
+        cpuPercent: null,
+        memUsedBytes: null
+    };
 }
 
 /** Which thing a container belongs to, and how that thing reads if it is the

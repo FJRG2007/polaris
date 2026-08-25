@@ -11,8 +11,15 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import type { Consumption, ConsumptionGroup, ConsumptionRow } from "@/app/(app)/admin/consumption/types";
-import { ConsumptionGroupTable, ConsumptionSplit } from "@/app/(app)/admin/consumption/consumption-view";
+import type {
+    Consumption,
+    ConsumptionGroup,
+    ConsumptionRow
+} from "@/app/(app)/admin/consumption/types";
+import {
+    ConsumptionGroupTable,
+    ConsumptionSplit
+} from "@/app/(app)/admin/consumption/consumption-view";
 
 /** Bytes are formatted in binary units, so the fixtures are round in those. */
 const GB = 1024 ** 3;
@@ -32,7 +39,9 @@ function row(overrides: Partial<ConsumptionRow> & { id: string; name: string }):
     };
 }
 
-function group(overrides: Partial<ConsumptionGroup> & { id: ConsumptionGroup["id"] }): ConsumptionGroup {
+function group(
+    overrides: Partial<ConsumptionGroup> & { id: ConsumptionGroup["id"] }
+): ConsumptionGroup {
     return {
         label: "Marketplace apps",
         description: "Everything installed from the marketplace.",
@@ -52,10 +61,31 @@ afterEach(cleanup);
 const CONSUMPTION: Consumption = {
     machine: { name: "lirio", ncpu: 8, memTotalBytes: 32 * GB },
     groups: [
-        group({ id: "polaris", label: "Polaris itself", memUsedBytes: 1.5 * GB, containers: 6, running: 6, cpuPercent: 4 }),
+        group({
+            id: "polaris",
+            label: "Polaris itself",
+            memUsedBytes: 1.5 * GB,
+            containers: 6,
+            running: 6,
+            cpuPercent: 4
+        }),
         group({ id: "apps", memUsedBytes: 8 * GB, containers: 3, running: 2, cpuPercent: 22 }),
-        group({ id: "services", label: "Deployed services", memUsedBytes: 0, containers: 0, running: 0, cpuPercent: 0 }),
-        group({ id: "other", label: "Everything else", memUsedBytes: 400 * MB, containers: 1, running: 1, cpuPercent: 1 })
+        group({
+            id: "services",
+            label: "Deployed services",
+            memUsedBytes: 0,
+            containers: 0,
+            running: 0,
+            cpuPercent: 0
+        }),
+        group({
+            id: "other",
+            label: "Everything else",
+            memUsedBytes: 400 * MB,
+            containers: 1,
+            running: 1,
+            cpuPercent: 1
+        })
     ],
     sampledAt: Date.now() - 20_000,
     at: new Date().toISOString()
@@ -75,14 +105,19 @@ describe("the split at the top", () => {
         // Polaris, apps and everything else - not the empty services group, which
         // would be a sliver of colour standing for nothing.
         expect(bar?.children).toHaveLength(3);
-        expect([...(bar?.children ?? [])].map((segment) => segment.getAttribute("title"))).toContain(
-            "Marketplace apps: 8 GB"
-        );
+        expect(
+            [...(bar?.children ?? [])].map((segment) => segment.getAttribute("title"))
+        ).toContain("Marketplace apps: 8 GB");
     });
 
     it("gives every group a figure in the legend, including the empty one", () => {
         render(<ConsumptionSplit consumption={CONSUMPTION} />);
-        for (const label of ["Polaris itself", "Marketplace apps", "Deployed services", "Everything else"]) {
+        for (const label of [
+            "Polaris itself",
+            "Marketplace apps",
+            "Deployed services",
+            "Everything else"
+        ]) {
             expect(screen.getAllByTitle(label).length).toBeGreaterThan(0);
         }
         expect(screen.getByText("22% CPU")).toBeTruthy();
@@ -133,7 +168,9 @@ describe("a group's table", () => {
                 })}
             />
         );
-        expect(container.querySelector('a[href="/apps/installed/1"]')?.textContent).toBe("Survival");
+        expect(container.querySelector('a[href="/apps/installed/1"]')?.textContent).toBe(
+            "Survival"
+        );
         expect(screen.getByText("Hidden").closest("a")).toBeNull();
     });
 
@@ -165,7 +202,10 @@ describe("a group's table", () => {
     it("counts the containers behind a row that is more than one", () => {
         render(
             <ConsumptionGroupTable
-                group={group({ id: "services", rows: [row({ id: "2", name: "api", detail: "Web / prod", containers: 3 })] })}
+                group={group({
+                    id: "services",
+                    rows: [row({ id: "2", name: "api", detail: "Web / prod", containers: 3 })]
+                })}
             />
         );
         expect(screen.getByText(/Web \/ prod - 3 containers/)).toBeTruthy();

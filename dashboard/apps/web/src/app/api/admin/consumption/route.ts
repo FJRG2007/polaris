@@ -32,7 +32,12 @@ export async function GET(): Promise<Response> {
         // does so behind it: the engine unreachable, hostd refusing, a query
         // timing out. Reported as what it is, and left legible to logs and retries.
         return NextResponse.json(
-            { error: caught instanceof Error ? caught.message : "Could not read what the machine is using" },
+            {
+                error:
+                    caught instanceof Error
+                        ? caught.message
+                        : "Could not read what the machine is using"
+            },
             { status: 502 }
         );
     }
