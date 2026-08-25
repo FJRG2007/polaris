@@ -52,10 +52,10 @@ afterEach(cleanup);
 const CONSUMPTION: Consumption = {
     machine: { name: "lirio", ncpu: 8, memTotalBytes: 32 * GB },
     groups: [
-        group({ id: "polaris", label: "Polaris itself", memUsedBytes: 1.5 * GB, containers: 6, cpuPercent: 4 }),
-        group({ id: "apps", memUsedBytes: 8 * GB, containers: 3, cpuPercent: 22 }),
-        group({ id: "services", label: "Deployed services", memUsedBytes: 0, containers: 0, cpuPercent: 0 }),
-        group({ id: "other", label: "Everything else", memUsedBytes: 400 * MB, containers: 1, cpuPercent: 1 })
+        group({ id: "polaris", label: "Polaris itself", memUsedBytes: 1.5 * GB, containers: 6, running: 6, cpuPercent: 4 }),
+        group({ id: "apps", memUsedBytes: 8 * GB, containers: 3, running: 2, cpuPercent: 22 }),
+        group({ id: "services", label: "Deployed services", memUsedBytes: 0, containers: 0, running: 0, cpuPercent: 0 }),
+        group({ id: "other", label: "Everything else", memUsedBytes: 400 * MB, containers: 1, running: 1, cpuPercent: 1 })
     ],
     sampledAt: Date.now() - 20_000,
     at: new Date().toISOString()
@@ -63,14 +63,14 @@ const CONSUMPTION: Consumption = {
 
 describe("the split at the top", () => {
     it("names the machine and says how much of it is in containers", () => {
-        const { container } = render(<ConsumptionSplit consumption={CONSUMPTION} loading={false} />);
+        const { container } = render(<ConsumptionSplit consumption={CONSUMPTION} />);
         expect(screen.getByText("lirio")).toBeTruthy();
         expect(container.textContent).toContain("9.9 GB of 32 GB in containers");
         expect(container.textContent).toContain("8 cores");
     });
 
     it("draws a segment for every group that is using something, and none for one that is not", () => {
-        const { container } = render(<ConsumptionSplit consumption={CONSUMPTION} loading={false} />);
+        const { container } = render(<ConsumptionSplit consumption={CONSUMPTION} />);
         const bar = container.querySelector('[role="presentation"]');
         // Polaris, apps and everything else - not the empty services group, which
         // would be a sliver of colour standing for nothing.
@@ -81,15 +81,23 @@ describe("the split at the top", () => {
     });
 
     it("gives every group a figure in the legend, including the empty one", () => {
-        render(<ConsumptionSplit consumption={CONSUMPTION} loading={false} />);
+        render(<ConsumptionSplit consumption={CONSUMPTION} />);
         for (const label of ["Polaris itself", "Marketplace apps", "Deployed services", "Everything else"]) {
             expect(screen.getAllByTitle(label).length).toBeGreaterThan(0);
         }
         expect(screen.getByText("22% CPU")).toBeTruthy();
     });
 
+    it("says how many of a group's containers are up when they are not all up", () => {
+        render(<ConsumptionSplit consumption={CONSUMPTION} />);
+        expect(screen.getByText("2 of 3 running")).toBeTruthy();
+        // Everything up is a count, not a fraction: "6 of 6" is a number to read
+        // twice for nothing.
+        expect(screen.getByText("6 containers")).toBeTruthy();
+    });
+
     it("says the figures are still being taken rather than showing an age it does not have", () => {
-        render(<ConsumptionSplit consumption={{ ...CONSUMPTION, sampledAt: null }} loading={false} />);
+        render(<ConsumptionSplit consumption={{ ...CONSUMPTION, sampledAt: null }} />);
         expect(screen.getByText(/measuring/)).toBeTruthy();
     });
 });
@@ -105,7 +113,6 @@ describe("a group's table", () => {
                     memUsedBytes: 4 * GB,
                     cpuPercent: 12
                 })}
-                loading={false}
             />
         );
         expect(screen.getByText("Survival")).toBeTruthy();
@@ -124,7 +131,6 @@ describe("a group's table", () => {
                         row({ id: "2", name: "Hidden", href: null })
                     ]
                 })}
-                loading={false}
             />
         );
         expect(container.querySelector('a[href="/apps/installed/1"]')?.textContent).toBe("Survival");
@@ -148,7 +154,6 @@ describe("a group's table", () => {
                         })
                     ]
                 })}
-                loading={false}
             />
         );
         expect(screen.getByText("Not on this machine")).toBeTruthy();
@@ -161,14 +166,13 @@ describe("a group's table", () => {
         render(
             <ConsumptionGroupTable
                 group={group({ id: "services", rows: [row({ id: "2", name: "api", detail: "Web / prod", containers: 3 })] })}
-                loading={false}
             />
         );
         expect(screen.getByText(/Web \/ prod - 3 containers/)).toBeTruthy();
     });
 
     it("says a group is empty rather than drawing an empty table", () => {
-        render(<ConsumptionGroupTable group={group({ id: "services", rows: [] })} loading={false} />);
+        render(<ConsumptionGroupTable group={group({ id: "services", rows: [] })} />);
         expect(screen.getByText("Nothing deployed here yet.")).toBeTruthy();
     });
 });

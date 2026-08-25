@@ -169,7 +169,36 @@ describe("adding the machine up", () => {
             "local"
         );
         expect(group(groups, "services").rows[0]).toMatchObject({ state: "stopped", stateLabel: "Stopped" });
-        expect(group(groups, "services").running).toBe(0);
+        // The group counts containers, and the tunnel is one that is up.
+        expect(group(groups, "services").containers).toBe(2);
+        expect(group(groups, "services").running).toBe(1);
+    });
+
+    it("reads a tunnel whose service is gone as what it is: a container that is up", () => {
+        const groups = attribute(
+            [container({ name: "qtunnel", composeProject: "polaris-qtunnel-deadbeef", memUsedBytes: 50 })],
+            full,
+            "local"
+        );
+        // Nothing claims the hash, so the row is the tunnel itself - and badging a
+        // running container "Stopped" while counting its memory says the machine is
+        // spending it on nothing.
+        expect(group(groups, "other").rows[0]).toMatchObject({
+            name: "qtunnel",
+            state: "running",
+            stateLabel: "Running",
+            memUsedBytes: 50
+        });
+        expect(group(groups, "other").running).toBe(1);
+    });
+
+    it("still calls a tunnel whose service is gone stopped when it is", () => {
+        const groups = attribute(
+            [container({ name: "qtunnel", composeProject: "polaris-qtunnel-deadbeef", state: "exited" })],
+            full,
+            "local"
+        );
+        expect(group(groups, "other").rows[0]).toMatchObject({ state: "stopped", stateLabel: "Stopped" });
     });
 
     it("reads a marketplace app as the app, not as the service it runs under", () => {

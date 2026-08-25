@@ -140,6 +140,9 @@ export interface Attributable {
 /** One thing being added up, before it becomes a row. */
 interface Bucket extends ClaimBucket {
     containers: number;
+    /** Containers of any kind that are up, which is what the group's count is in
+     *  terms of and what a bucket that is nothing but a tunnel reads from. */
+    running: number;
     /** Containers that are the thing itself rather than a tunnel in front of it -
      *  a tunnel that is up says nothing about whether the app is. */
     self: number;
@@ -166,9 +169,11 @@ export function attribute(
         const bucket = buckets.get(claim.key) ?? open(claim.bucket);
         buckets.set(claim.key, bucket);
         bucket.containers += 1;
+        const running = container.state === "running";
+        if (running) bucket.running += 1;
         if (projectSubject(container.composeProject)?.role !== "tunnel") {
             bucket.self += 1;
-            if (container.state === "running") bucket.selfRunning += 1;
+            if (running) bucket.selfRunning += 1;
         }
         if (container.cpuPercent !== null) {
             bucket.cpuPercent = round((bucket.cpuPercent ?? 0) + container.cpuPercent);
@@ -191,7 +196,7 @@ export function attribute(
 }
 
 function open(bucket: ClaimBucket): Bucket {
-    return { ...bucket, containers: 0, self: 0, selfRunning: 0, cpuPercent: null, memUsedBytes: null };
+    return { ...bucket, containers: 0, running: 0, self: 0, selfRunning: 0, cpuPercent: null, memUsedBytes: null };
 }
 
 /** Which thing a container belongs to, and how that thing reads if it is the
@@ -244,7 +249,7 @@ function build(
         // no rows: one bucket holding the whole stack would be a table of one.
         rows: group.id === "polaris" ? [] : mine.map(toRow).sort(byWeight),
         containers: mine.reduce((total, bucket) => total + bucket.containers, 0),
-        running: mine.reduce((total, bucket) => total + bucket.selfRunning, 0),
+        running: mine.reduce((total, bucket) => total + bucket.running, 0),
         cpuPercent: round(mine.reduce((total, bucket) => total + (bucket.cpuPercent ?? 0), 0)),
         memUsedBytes: mine.reduce((total, bucket) => total + (bucket.memUsedBytes ?? 0), 0)
     };
@@ -273,10 +278,12 @@ function toRow(bucket: Bucket): ConsumptionRow {
 
 function state(bucket: Bucket): { state: ConsumptionRow["state"]; stateLabel: string } {
     if (bucket.containers === 0) return { state: "elsewhere", stateLabel: "Not on this machine" };
-    if (bucket.selfRunning === 0) return { state: "stopped", stateLabel: "Stopped" };
-    if (bucket.selfRunning < bucket.self) {
-        return { state: "partial", stateLabel: `${bucket.selfRunning} of ${bucket.self} running` };
-    }
+    // A bucket with nothing of its own in it is a tunnel whose record is gone, and
+    // the tunnel is the row: its own container is what says whether it is up.
+    const [up, total] =
+        bucket.self === 0 ? [bucket.running, bucket.containers] : [bucket.selfRunning, bucket.self];
+    if (up === 0) return { state: "stopped", stateLabel: "Stopped" };
+    if (up < total) return { state: "partial", stateLabel: `${up} of ${total} running` };
     return { state: "running", stateLabel: "Running" };
 }
 

@@ -38,16 +38,20 @@ import { cachedSamples, oldestSampleAt, refreshSamples, STATS_TTL_MS } from "@/l
  *                 than no link.
  */
 export async function readConsumption(viewerId: string): Promise<Consumption> {
-    const driver = localDockerDriver();
-    const [containers, info] = await (async () => {
-        try {
-            return await Promise.all([driver.listContainers(true), driver.info().catch(() => null)]);
-        } finally {
-            await driver.dispose().catch(() => undefined);
-        }
-    })();
+    // The engine listing and the records are independent, and this endpoint exists
+    // to cost a listing plus a handful of queries rather than the sum of both.
+    const [[containers, info], index] = await Promise.all([
+        (async () => {
+            const driver = localDockerDriver();
+            try {
+                return await Promise.all([driver.listContainers(true), driver.info().catch(() => null)]);
+            } finally {
+                await driver.dispose().catch(() => undefined);
+            }
+        })(),
+        readIndex(viewerId)
+    ]);
 
-    const index = await readIndex(viewerId);
     const samples = cachedSamples(LOCAL_DOCKER_CONNECTION_ID);
     const groups = attribute(
         containers.map((container) => {

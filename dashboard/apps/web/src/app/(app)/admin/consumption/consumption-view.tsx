@@ -76,11 +76,11 @@ export function ConsumptionView() {
             ) : (
                 <div className="flex flex-col gap-4">
                     {stale ? <p className="text-sm text-warning">{stale}</p> : null}
-                    <ConsumptionSplit consumption={data} loading={loading} />
+                    <ConsumptionSplit consumption={data} />
                     <PolarisFootprintCard />
                     {(data?.groups ?? []).map((group) =>
                         group.id === "polaris" ? null : (
-                            <ConsumptionGroupTable key={group.id} group={group} loading={loading} />
+                            <ConsumptionGroupTable key={group.id} group={group} />
                         )
                     )}
                     {loading && !data
@@ -95,13 +95,7 @@ export function ConsumptionView() {
 /** The machine as one bar. What is left over is not called free: the host's own
  *  processes are outside every container measured here, so the remainder is
  *  everything this screen cannot see plus whatever is genuinely unused. */
-export function ConsumptionSplit({
-    consumption,
-    loading
-}: {
-    consumption: Consumption | null;
-    loading: boolean;
-}) {
+export function ConsumptionSplit({ consumption }: { consumption: Consumption | null }) {
     if (!consumption) {
         return (
             <Card>
@@ -162,24 +156,24 @@ export function ConsumptionSplit({
                                 </span>
                             </dd>
                             <dd className="text-xs text-foreground-subtle">
-                                {group.containers} container{group.containers === 1 ? "" : "s"}
+                                {group.running < group.containers
+                                    ? `${group.running} of ${group.containers} running`
+                                    : `${group.containers} container${group.containers === 1 ? "" : "s"}`}
                             </dd>
                         </div>
                     ))}
                 </dl>
 
-                {loading ? null : (
-                    <p className="text-xs text-muted-foreground">
-                        Only this machine. Memory and CPU are what the containers hold right now; a service
-                        counts the releases it keeps and the tunnel publishing it.
-                    </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                    Only this machine. Memory and CPU are what the containers hold right now; a service counts
+                    the releases it keeps and the tunnel publishing it.
+                </p>
             </CardBody>
         </Card>
     );
 }
 
-export function ConsumptionGroupTable({ group, loading }: { group: ConsumptionGroup; loading: boolean }) {
+export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -193,13 +187,12 @@ export function ConsumptionGroupTable({ group, loading }: { group: ConsumptionGr
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
                         {formatBytes(group.memUsedBytes)} - {group.cpuPercent}% CPU
+                        {group.running < group.containers ? ` - ${group.running} of ${group.containers} running` : ""}
                     </span>
                 </div>
 
                 {group.rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        {loading ? "Reading the machine." : emptyLine(group.id)}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{emptyLine(group.id)}</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[34rem] text-sm">

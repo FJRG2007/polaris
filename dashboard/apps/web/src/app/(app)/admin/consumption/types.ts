@@ -37,6 +37,8 @@ export interface ConsumptionGroup {
      *  more to read. The totals here are what the split above the page needs. */
     readonly rows: readonly ConsumptionRow[];
     readonly containers: number;
+    /** How many of those containers are up, so a group can say what is running
+     *  without adding its rows up. */
     readonly running: number;
     readonly cpuPercent: number;
     readonly memUsedBytes: number;
