@@ -153,6 +153,19 @@ Platform:
 - [x] Edition/capability boundary + graceful degradation (fixed: the capability refresh loop now actually runs from `instrumentation.register()`, so the edition flips to full when hostd answers - it was never started before)
 - [x] Full edition is the installer default (opt out with `install.sh --limited`): hostd runs by default so in-band updates and the local Docker host work with no flags. hostd + updater container images now build and publish (were missing entirely)
 - [x] Auto-update via hostd: `POST /v1/update` runs a one-shot `polaris-updater` container that re-runs `install.sh` (git pull -> reconcile .env -> pull images -> migrate -> redeploy -> verify)
+- [x] Consumption (`/admin/consumption`): where the machine went, split into
+      Polaris itself (totals only, since the part-by-part table already lives on
+      the footprint card), marketplace installs, deployed services/databases (a
+      kept release and a service's quick/named/ngrok tunnel fold into that
+      service's row), and everything else on the box. Attributed by compose
+      project rather than container name, since names are operator-chosen and
+      change on redeploy; an install placed on another server reads "Not on this
+      machine" instead of disappearing. Figures reuse the shared
+      container-stats-cache sampler (no fresh `stats` call per container); disk is
+      left out for the whole machine, since measuring it means asking every
+      container to walk its own volumes. Admin-only, and reads every owner's
+      records on purpose - an operator screen that stopped at the reader's own
+      shelf would not answer where the machine went
 - [ ] Digest/signature-verified image provenance for updates (still trusts the `latest` tag, as before - pre-existing accepted risk)
 - [ ] CI / release / deploy / agent-maintenance workflows
 - [ ] Marketing landing + demo
