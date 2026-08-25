@@ -93,7 +93,10 @@ export function MessageToasts() {
                 icon: (
                     <Avatar
                         size={28}
-                        person={{ id: message.authorId ?? message.channelId, name: message.authorName }}
+                        person={{
+                            id: message.authorId ?? message.channelId,
+                            name: message.authorName
+                        }}
                     />
                 ),
                 onPress: () => go.current(`/chat/c/${message.channelId}/${message.messageId}`)

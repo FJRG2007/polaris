@@ -26,7 +26,11 @@ import { useRailDrag, type Dragging, type DropTarget } from "@/app/(app)/chat/us
 
 /** The rail in miniature: one heading holding one channel, and the reported
  *  answer written out where a test can read it. */
-function Rail({ onDrop = () => undefined }: { onDrop?: (source: Dragging, target: DropTarget) => void }) {
+function Rail({
+    onDrop = () => undefined
+}: {
+    onDrop?: (source: Dragging, target: DropTarget) => void;
+}) {
     const drag = useRailDrag({ enabled: true, onDrop });
     return (
         <div>

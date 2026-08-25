@@ -84,7 +84,9 @@ export async function messageToasts(
     channelIds: readonly string[]
 ): Promise<MessageToast[]> {
     const reachable = await reachableChannelIds(actor);
-    const asked = [...new Set(channelIds)].filter((id) => reachable.has(id)).slice(0, MOST_CHANNELS);
+    const asked = [...new Set(channelIds)]
+        .filter((id) => reachable.has(id))
+        .slice(0, MOST_CHANNELS);
     if (asked.length === 0) return [];
 
     const memberships = await prisma.chatChannelMember.findMany({

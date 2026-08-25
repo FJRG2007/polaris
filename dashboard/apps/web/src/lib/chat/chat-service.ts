@@ -685,8 +685,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             membersMayEdit: channel.membersMayEdit,
             slowmode: channel.slowmode,
             others: channel.spaceId ? [] : others,
-            blocked:
-                channel.kind === "dm" && others.some((other) => shut.has(other.id))
+            blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id))
         };
     });
 }
@@ -1240,7 +1239,11 @@ export async function setChannelNotify(
  * space is deliberately not a member of it - a preference kept beside the
  * roster would be one the person who started the space could not set.
  */
-export async function setSpaceNotify(actor: ChatActor, spaceId: string, level: string): Promise<void> {
+export async function setSpaceNotify(
+    actor: ChatActor,
+    spaceId: string,
+    level: string
+): Promise<void> {
     await requireSpace(actor, spaceId);
     const parsed = core.chatSpaceNotifySchema.safeParse({ spaceId, level });
     if (!parsed.success) throw new ChatAccessError("That is not a notification setting");
@@ -1474,7 +1477,11 @@ export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
     });
     if (live.length === 0) return { messages: 0, conversations: 0 };
 
-    const counts = await unreadCounts(actor, live, new Map(heard.map((row) => [row.channelId, row])));
+    const counts = await unreadCounts(
+        actor,
+        live,
+        new Map(heard.map((row) => [row.channelId, row]))
+    );
     let messages = 0;
     let conversations = 0;
     for (const count of counts.values()) {
