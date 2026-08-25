@@ -22,12 +22,9 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { X509Certificate, createPrivateKey } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
-import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, unlink } from "node:fs/promises";
+import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { judgeCertificate, type CertificateVerdict } from "@polaris/core";
-
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
 
 /** Prefix for every file this writes, so publishing can clear its own and never
  *  anything the local CA or the wildcard put there. */
@@ -59,7 +56,12 @@ export interface CertificateReview {
  * anything. The same call the save path makes, so what the operator is told when they
  * paste it is exactly what decides whether it gets served.
  */
-export function reviewCertificate(certPem: string, keyPem: string, hostname: string, now = new Date()): CertificateReview {
+export function reviewCertificate(
+    certPem: string,
+    keyPem: string,
+    hostname: string,
+    now = new Date()
+): CertificateReview {
     let certificate: X509Certificate;
     try {
         certificate = new X509Certificate(certPem);
@@ -74,7 +76,10 @@ export function reviewCertificate(certPem: string, keyPem: string, hostname: str
     try {
         if (!certificate.checkPrivateKey(createPrivateKey(keyPem))) {
             return {
-                verdict: { usable: false, reason: "That private key does not belong to that certificate." },
+                verdict: {
+                    usable: false,
+                    reason: "That private key does not belong to that certificate."
+                },
                 names: namesOf(certificate),
                 expiresAt: new Date(certificate.validTo)
             };
@@ -89,7 +94,11 @@ export function reviewCertificate(certPem: string, keyPem: string, hostname: str
     const names = namesOf(certificate);
     return {
         verdict: judgeCertificate(
-            { names, validFrom: new Date(certificate.validFrom), validTo: new Date(certificate.validTo) },
+            {
+                names,
+                validFrom: new Date(certificate.validFrom),
+                validTo: new Date(certificate.validTo)
+            },
             hostname,
             now
         ),
@@ -117,7 +126,10 @@ export async function setDomainCertificate(
     if (!domain) return { error: "Domain not found" };
 
     if (!input || !input.certPem.trim()) {
-        await prisma.domain.update({ where: { id: domainId }, data: { certPem: null, certKey: null } });
+        await prisma.domain.update({
+            where: { id: domainId },
+            data: { certPem: null, certKey: null }
+        });
         await publishDomainCertificates();
         return {};
     }
@@ -181,11 +193,14 @@ export async function publishDomainCertificates(): Promise<void> {
         if (!reviewCertificate(row.certPem, key, row.hostname).verdict.usable) continue;
         const crtName = `${PREFIX}${row.id}.crt`;
         const keyName = `${PREFIX}${row.id}.key`;
-        await writeFile(join(dyn, crtName), row.certPem, "utf8");
-        await writeFile(join(dyn, keyName), key, { encoding: "utf8", mode: 0o600 });
+        await writeDynamicFile(crtName, row.certPem);
+        await writeDynamicFile(keyName, key, { mode: 0o600 });
         written.add(crtName);
         written.add(keyName);
-        entries.push(`    - certFile: ${join(dyn, crtName)}`, `      keyFile: ${join(dyn, keyName)}`);
+        entries.push(
+            `    - certFile: ${join(dyn, crtName)}`,
+            `      keyFile: ${join(dyn, keyName)}`
+        );
     }
 
     // Only ever this module's own files: a certificate withdrawn, expired, or whose
@@ -204,5 +219,5 @@ export async function publishDomainCertificates(): Promise<void> {
     // would exist on disk and never serve. The clean-up above already removed a stale
     // copy, since this file carries the same prefix as the certificates themselves.
     if (entries.length === 0) return;
-    await writeFile(join(dyn, TLS_FILE), ["tls:", "  certificates:", ...entries, ""].join("\n"), "utf8");
+    await writeDynamicFile(TLS_FILE, ["tls:", "  certificates:", ...entries, ""].join("\n"));
 }

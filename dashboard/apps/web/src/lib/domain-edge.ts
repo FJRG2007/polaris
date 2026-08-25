@@ -13,18 +13,12 @@
  * dashboard's own labels do for the local names.
  */
 
-import { join } from "node:path";
-import { writeFile } from "node:fs/promises";
 import { getSetting } from "./setting-store";
 import { polarisZoneHost } from "./domain-zones";
 import { resolvePolarisWaf } from "./waf-service";
 import type { WafCustomRule } from "@polaris/core";
 import { encodeGuardRule } from "@polaris/core/waf";
-
-/** Traefik's file-provider directory, the volume both containers mount. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
+import { writeDynamicFile } from "@/lib/traefik-dynamic";
 
 /** The origin the edge dials for the dashboard, by service DNS on the compose network.
  *  By the SERVICE name, never the container's: the container is replaced (and renamed)
@@ -67,7 +61,8 @@ export function publicHostname(value: string | null | undefined): string | null 
         .replace(/:\d+$/, "")
         .replace(/\.$/, "");
     if (!host || !host.includes(".")) return null;
-    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host)) return null;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(host))
+        return null;
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return null;
     if (PRIVATE_SUFFIXES.some((suffix) => host.endsWith(suffix))) return null;
     return host;
@@ -117,7 +112,11 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
     if (allow.length > 0) {
         const mw = `${ROUTER}-allow`;
         middlewares.push(mw);
-        definitions.push(`    ${mw}:`, "      ipAllowList:", `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`);
+        definitions.push(
+            `    ${mw}:`,
+            "      ipAllowList:",
+            `        sourceRange: [${allow.map((entry) => `"${entry}"`).join(", ")}]`
+        );
     }
     if (
         deny.length > 0 ||
@@ -138,7 +137,8 @@ export function renderDashboardConfig(hosts: readonly string[], waf?: DashboardW
             `        address: "${guardUrl()}/authz"`
         );
     }
-    const httpsMiddlewares = middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
+    const httpsMiddlewares =
+        middlewares.length > 0 ? [`      middlewares: [${middlewares.join(", ")}]`] : [];
     // The allowlist still applies to the :80 router; the guard does not, since that
     // router only redirects and the canonical https URL is where a request is judged.
     const httpMiddlewares = [allow.length > 0 ? `${ROUTER}-allow` : null, REDIRECT].filter(
@@ -217,7 +217,9 @@ function parseExtra(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
     } catch {
         return [];
     }
@@ -252,7 +254,7 @@ export async function syncDashboardRoute(): Promise<boolean> {
             sqlInjectionProtection: waf.sqlInjectionProtection,
             xssProtection: waf.xssProtection
         };
-        await writeFile(join(dynamicDir(), FILE), renderDashboardConfig(hosts, rule), "utf8");
+        await writeDynamicFile(FILE, renderDashboardConfig(hosts, rule));
         // The call server's path rides on these same hostnames and carries the same
         // allowlist, so it is rewritten here rather than at each of the half-dozen
         // places a domain or a firewall rule changes - one of which would eventually
@@ -264,7 +266,10 @@ export async function syncDashboardRoute(): Promise<boolean> {
         // missing call route is an edge that serves every page and no call.
         return await syncCallServerRoute();
     } catch (error) {
-        console.error("polaris: publishing the dashboard route failed:", error instanceof Error ? error.message : error);
+        console.error(
+            "polaris: publishing the dashboard route failed:",
+            error instanceof Error ? error.message : error
+        );
         return false;
     }
 }

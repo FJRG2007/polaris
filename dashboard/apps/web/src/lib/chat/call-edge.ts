@@ -20,16 +20,10 @@
  * leaving one behind would publish a path that reaches nothing.
  */
 
-import { join } from "node:path";
-import { writeFile } from "node:fs/promises";
 import { dashboardHosts } from "@/lib/domain-edge";
 import { resolvePolarisWaf } from "@/lib/waf-service";
+import { writeDynamicFile } from "@/lib/traefik-dynamic";
 import { CALL_PATH, callServer } from "@/lib/chat/call-server";
-
-/** Traefik's file-provider directory, the volume both containers mount. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
 
 /** Where the shipped media server answers, from inside the Docker network. By
  *  this name rather than by the box's address: that one is read once and stored,
@@ -156,7 +150,7 @@ export async function syncCallServerRoute(): Promise<boolean> {
         // that fails leaves the file as it is and says so below.
         const [hosts, waf] = await Promise.all([dashboardHosts(), resolvePolarisWaf()]);
         const guard = { hosts, allow: waf.allowLists[0] ?? [] };
-        await writeFile(join(dynamicDir(), FILE), renderCallServerRoute(serve, guard), "utf8");
+        await writeDynamicFile(FILE, renderCallServerRoute(serve, guard));
         // Written, and still not settled. There are two reasons this publishes
         // nothing - calls deliberately run somewhere else, or the shipped server
         // could not be prepared this early - and only the first is an answer, so

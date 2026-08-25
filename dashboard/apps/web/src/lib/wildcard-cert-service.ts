@@ -26,7 +26,8 @@ import { loadEnv } from "@polaris/config";
 import { X509Certificate } from "node:crypto";
 import { deployBase } from "@/lib/domain-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
+import { dynamicDir, writeDynamicFile } from "@/lib/traefik-dynamic";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 import {
     deleteDnsRecord,
@@ -36,10 +37,6 @@ import {
 } from "@/lib/integrations/cloudflare-api";
 
 /** Where the certificate and its key are written for the edge to read. */
-function dynamicDir(): string {
-    return process.env.POLARIS_TRAEFIK_DYNAMIC_DIR ?? "/dynamic";
-}
-
 const DYNAMIC_CRT = "polaris-wildcard.crt";
 const DYNAMIC_KEY = "polaris-wildcard.key";
 /** Its own file rather than an edit of the local CA's: the edge merges every file in
@@ -130,7 +127,11 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
         const { certificate, key } = await orderWildcard(base, token);
         await publish(certificate, key);
         await setSetting(ISSUED_FOR_SETTING, base);
-        return { base, expiresAt: new Date(new X509Certificate(certificate).validTo), reason: null };
+        return {
+            base,
+            expiresAt: new Date(new X509Certificate(certificate).validTo),
+            reason: null
+        };
     } catch (caught) {
         const reason = caught instanceof Error ? caught.message : "the order failed";
         console.error("polaris: could not obtain the wildcard certificate:", reason);
@@ -142,7 +143,10 @@ export async function ensureWildcardCertificate(): Promise<WildcardCertState> {
 
 /** Run the ACME order for `*.base` (and the base itself, which a wildcard does not
  *  cover) against the DNS-01 challenge. */
-async function orderWildcard(base: string, token: string): Promise<{ certificate: string; key: string }> {
+async function orderWildcard(
+    base: string,
+    token: string
+): Promise<{ certificate: string; key: string }> {
     // Imported here rather than at module load: this is a heavy dependency used by one
     // scheduled job, and every other request through this file should not pay for it.
     const acme = await import("acme-client");
@@ -162,7 +166,8 @@ async function orderWildcard(base: string, token: string): Promise<{ certificate
         termsOfServiceAgreed: true,
         challengePriority: ["dns-01"],
         challengeCreateFn: async (_authz, challenge, keyAuthorization) => {
-            if (challenge.type !== "dns-01") throw new Error("only the DNS challenge can issue a wildcard");
+            if (challenge.type !== "dns-01")
+                throw new Error("only the DNS challenge can issue a wildcard");
             await upsertTxtRecord(token, zone.id, `_acme-challenge.${base}`, keyAuthorization);
             // Both names on the order answer at the same record, so this is written
             // twice with different values. Cloudflare keeps them as separate TXT
@@ -173,7 +178,11 @@ async function orderWildcard(base: string, token: string): Promise<{ certificate
             // Best effort: a leftover challenge record is harmless, and failing the
             // whole order because the cleanup did not answer would be worse.
             try {
-                for (const record of await findTxtRecords(token, zone.id, `_acme-challenge.${base}`)) {
+                for (const record of await findTxtRecords(
+                    token,
+                    zone.id,
+                    `_acme-challenge.${base}`
+                )) {
                     await deleteDnsRecord(token, zone.id, record.id);
                 }
             } catch {
@@ -207,10 +216,16 @@ async function publish(certificate: string, key: string): Promise<void> {
     const crtPath = join(dyn, DYNAMIC_CRT);
     const keyPath = join(dyn, DYNAMIC_KEY);
     await mkdir(dyn, { recursive: true });
-    await writeFile(crtPath, certificate, "utf8");
-    await writeFile(keyPath, key, { encoding: "utf8", mode: 0o600 });
-    const tls = ["tls:", "  certificates:", `    - certFile: ${crtPath}`, `      keyFile: ${keyPath}`, ""].join("\n");
-    await writeFile(join(dyn, DYNAMIC_TLS), tls, "utf8");
+    await writeDynamicFile(DYNAMIC_CRT, certificate);
+    await writeDynamicFile(DYNAMIC_KEY, key, { mode: 0o600 });
+    const tls = [
+        "tls:",
+        "  certificates:",
+        `    - certFile: ${crtPath}`,
+        `      keyFile: ${keyPath}`,
+        ""
+    ].join("\n");
+    await writeDynamicFile(DYNAMIC_TLS, tls);
 }
 
 /** Check daily, which is often enough for a 90-day certificate renewed at 30 days

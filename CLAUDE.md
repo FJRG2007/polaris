@@ -69,6 +69,18 @@ One malformed file in Traefik's dynamic directory freezes the whole edge on its
 last good configuration, silently. Generated route files are rendered by a pure
 function so they can be asserted in a test.
 
+**Every write into that directory goes through `writeDynamicFile`**
+(`apps/web/src/lib/traefik-dynamic.ts`), never a direct `fs.writeFile`: a plain
+write truncates before it writes, so a failed or interrupted one leaves the file
+empty, and an empty `polaris-apps.yml` is every deployed domain answering
+Traefik's own `404 page not found` while the containers behind them are up.
+`writeDynamicFile` writes to a unique temp name in the same directory and renames
+it over the target, which Traefik's file provider never observes and a failed
+write never truncates. The health probe (`lib/watch/health-probe.ts`) also treats
+that edge 404 - and the vacant page - as down rather than up, and republishes the
+app routes itself the first time it finds an address unrouted, since that is the
+one outage here Polaris can end without a terminal.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started

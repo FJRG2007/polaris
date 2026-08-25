@@ -25,7 +25,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Permission } from "@polaris/core";
-import { publicHostname } from "@/lib/domain-edge";
+import { publicHostname, syncDashboardRoute } from "@/lib/domain-edge";
 import { checkDomain } from "@/lib/watch/health-probe";
 import { removeDashboardDomain } from "@/lib/domain-service";
 import { notifyOperators } from "@/lib/notifications/operators";
@@ -119,7 +119,10 @@ export async function checkedAddresses(): Promise<CheckedAddress[]> {
         reachableAddresses(),
         storedHealth().catch(() => new Map<string, AddressHealth>())
     ]);
-    return addresses.map((address) => ({ ...address, health: health.get(address.host) ?? UNKNOWN }));
+    return addresses.map((address) => ({
+        ...address,
+        health: health.get(address.host) ?? UNKNOWN
+    }));
 }
 
 /** Why an address could not be taken off the list, when it could not. */
@@ -137,7 +140,9 @@ export type AddressRemoval = "removed" | "unknown" | "built-in" | "managed";
  *   host from the guided setup, so neither is a list entry to delete.
  */
 export async function removeAddress(host: string): Promise<AddressRemoval> {
-    const address = (await reachableAddresses()).find((entry) => entry.host === host.trim().toLowerCase());
+    const address = (await reachableAddresses()).find(
+        (entry) => entry.host === host.trim().toLowerCase()
+    );
     if (!address) return "unknown";
     if (address.kind === "app" || address.kind === "local") return "built-in";
     if (address.kind === "tunnel") {
@@ -155,14 +160,16 @@ export async function removeAddress(host: string): Promise<AddressRemoval> {
  * counts as answering - what is being asked is whether anything is listening on that
  * name, not whether it hands this container a page.
  */
-async function probe(address: DeploymentAddress): Promise<{ state: "up" | "down"; detail: string | null; }> {
+async function probe(
+    address: DeploymentAddress
+): Promise<{ state: "up" | "down"; detail: string | null; notRouted: boolean }> {
     const target = { hostname: address.host, https: address.url.startsWith("https:") };
     const first = await checkDomain(target);
-    if (first.status === "up") return { state: "up", detail: null };
+    if (first.status === "up") return { state: "up", detail: null, notRouted: false };
     await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
     const second = await checkDomain(target);
-    if (second.status === "up") return { state: "up", detail: null };
-    return { state: "down", detail: tidy(second.detail) };
+    if (second.status === "up") return { state: "up", detail: null, notRouted: false };
+    return { state: "down", detail: tidy(second.detail), notRouted: second.notRouted === true };
 }
 
 /** What a sweep found for one address, relative to what was already known. */
@@ -196,7 +203,10 @@ async function record(host: string, state: AddressState, value: string): Promise
  *  does not leave a row that outlives it. */
 async function forgetMissing(hosts: readonly string[]): Promise<void> {
     await prisma.setting.deleteMany({
-        where: { key: { startsWith: KEY_PREFIX }, ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(keyFor) } } } : {}) }
+        where: {
+            key: { startsWith: KEY_PREFIX },
+            ...(hosts.length > 0 ? { NOT: { key: { in: hosts.map(keyFor) } } } : {})
+        }
     });
 }
 
@@ -218,8 +228,20 @@ async function dropDeadTunnel(host: string): Promise<boolean> {
 
 /** Probe one address and say what changed, once, whichever container gets there first. */
 async function sweepAddress(address: DeploymentAddress): Promise<void> {
-    const { state, detail } = await probe(address);
+    const { state, detail, notRouted } = await probe(address);
     const claim = await record(address.host, state, encode(state, detail));
+    // The edge answered that it routes this name nowhere. For a dashboard address that
+    // is a file this process writes, so write it again: no screen offers to, and an
+    // operator reading the alert has no terminal to do it from. Best-effort, and the
+    // next sweep is what says whether it worked.
+    if (notRouted) {
+        await syncDashboardRoute().catch((error: unknown) =>
+            console.error(
+                "polaris: republishing the dashboard route after an unrouted address failed:",
+                error
+            )
+        );
+    }
     if (claim === "same") return;
 
     if (state === "up") {
@@ -277,7 +299,9 @@ export function startAddressWatcher(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
-        void sweepAddresses().catch((error) => console.error("polaris: address health sweep failed:", error));
+        void sweepAddresses().catch((error) =>
+            console.error("polaris: address health sweep failed:", error)
+        );
     };
     setTimeout(tick, FIRST_PASS_MS).unref();
     setInterval(tick, INTERVAL_MS).unref();
