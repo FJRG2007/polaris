@@ -104,7 +104,7 @@ export function LeaveDialog({
                     <span>
                         Leave quietly
                         <span className="block text-xs text-muted-foreground">
-                            Nobody is shown a line saying you left.
+                            Leave without notifying other members.
                         </span>
                     </span>
                 </label>
