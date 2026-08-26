@@ -23,7 +23,7 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { chatAvatarUrl } from "@/lib/avatar-url";
-import { toSquare } from "@/components/picture-field";
+import { CROP_ACCEPTED, FACE_CROP, ImageCropDialog } from "@/components/image-cropper";
 import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
 import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
 import { openDirectAction, searchPeopleAction } from "./actions";
@@ -61,6 +61,8 @@ export function NewDirectDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const file = useRef<HTMLInputElement>(null);
+    /** Chosen, and waiting to be framed. Nothing is held until it has been. */
+    const [chosen, setChosen] = useState<File | null>(null);
 
     /** What the group is called if nobody types anything: the people in it, which
      *  is what the rail would show for one with no name. Shown rather than left
@@ -196,26 +198,12 @@ export function NewDirectDialog({
                         <input
                             ref={file}
                             type="file"
-                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            accept={CROP_ACCEPTED}
                             className="hidden"
-                            onChange={async (event) => {
-                                const chosen = event.target.files?.[0];
+                            onChange={(event) => {
+                                const picked = event.target.files?.[0];
                                 event.target.value = "";
-                                if (!chosen) return;
-                                try {
-                                    // Resized here, like every other picture:
-                                    // it drops the EXIF block a phone photo
-                                    // carries, and nobody setting a group photo
-                                    // means to publish where it was taken.
-                                    const square = await toSquare(chosen);
-                                    setPicture(square);
-                                    setPreview((was) => {
-                                        if (was) URL.revokeObjectURL(was);
-                                        return URL.createObjectURL(square);
-                                    });
-                                } catch {
-                                    setError("That file could not be read as an image");
-                                }
+                                if (picked) setChosen(picked);
                             }}
                         />
                         <Input
@@ -236,6 +224,25 @@ export function NewDirectDialog({
                         {error}
                     </p>
                 )}
+
+                {/* Framed before it is held, like every other picture. It
+                    drops the EXIF block a phone photo carries, and nobody
+                    setting a group photo means to publish where it was taken. */}
+                {chosen ? (
+                    <ImageCropDialog
+                        file={chosen}
+                        shape={FACE_CROP}
+                        onCancel={() => setChosen(null)}
+                        onCropped={(square) => {
+                            setChosen(null);
+                            setPicture(square);
+                            setPreview((was) => {
+                                if (was) URL.revokeObjectURL(was);
+                                return URL.createObjectURL(square);
+                            });
+                        }}
+                    />
+                ) : null}
 
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>

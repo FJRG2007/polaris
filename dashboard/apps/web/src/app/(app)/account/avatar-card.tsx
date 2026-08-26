@@ -11,13 +11,10 @@
  * everybody else will see, and the buttons for each picture sit under the thing
  * they change.
  *
- * Both are resized and re-encoded here, in the browser, before being sent. It
- * costs nothing, it means a phone photo does not arrive as eight megabytes of
- * something that will be drawn 24 pixels wide, and re-encoding drops the EXIF
- * block - which on a phone photo carries the place and time it was taken, and
- * which nobody setting a profile picture means to publish. The server checks the
- * bytes again regardless: this runs on the uploader's machine, so it is a
- * courtesy rather than a control.
+ * Choosing a file opens the cropper rather than uploading it: which part of a
+ * photograph becomes a face is the uploader's decision, not the middle of the
+ * frame's. `components/image-cropper.tsx` also does the resizing and the
+ * re-encoding that strips the EXIF block.
  *
  * An organization has a face and no banner, and keeps the plain card: it appears
  * in a switcher and a list, never as somebody's profile.
@@ -29,92 +26,20 @@ import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
 import { avatarUrl, bannerUrl, orgAvatarUrl } from "@/lib/avatar-url";
-
-/** Big enough for the largest place a face is drawn, small enough to be free. */
-const MAX_EDGE = 512;
-
-/** The widest a banner is stored at. Wider than anywhere it is drawn, so it
- *  still looks right on a screen that draws it big, and far short of what a
- *  camera hands you. */
-const MAX_BANNER_WIDTH = 1200;
-
-/** How much wider than tall a banner is. The band across a profile, at the
- *  proportions every client that has one settled on. */
-const BANNER_RATIO = 3;
-
-const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
-
-/**
- * The picture as a square of at most MAX_EDGE, centred on the middle.
- *
- * Cropped rather than squashed: every face in Polaris is drawn in a square box,
- * so a portrait that was letterboxed to fit would be drawn squashed anyway.
- */
-async function toSquare(file: File): Promise<Blob> {
-    const bitmap = await createImageBitmap(file);
-    try {
-        const edge = Math.min(bitmap.width, bitmap.height);
-        const size = Math.min(edge, MAX_EDGE);
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("This browser cannot resize the image");
-        context.drawImage(bitmap, (bitmap.width - edge) / 2, (bitmap.height - edge) / 2, edge, edge, 0, 0, size, size);
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
-        if (!blob) throw new Error("This browser cannot resize the image");
-        return blob;
-    } finally {
-        bitmap.close();
-    }
-}
-
-/**
- * The picture as a band, cropped to the middle of whatever was handed over.
- *
- * Cropped rather than squashed, like the square above: a banner is drawn at one
- * shape wherever it appears, so a tall photograph letterboxed to fit would be
- * drawn stretched anyway. Taking the middle is the crop that is right most
- * often - it is where the thing in a picture usually is.
- */
-async function toBand(file: File): Promise<Blob> {
-    const bitmap = await createImageBitmap(file);
-    try {
-        // The widest band this picture can fill, then the tallest slice of the
-        // picture that fits it.
-        const width = Math.min(bitmap.width, MAX_BANNER_WIDTH);
-        const height = Math.round(width / BANNER_RATIO);
-        const sourceHeight = Math.min(bitmap.height, Math.round(bitmap.width / BANNER_RATIO));
-        const sourceWidth = Math.round(sourceHeight * BANNER_RATIO);
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("This browser cannot resize the image");
-        context.drawImage(
-            bitmap,
-            (bitmap.width - sourceWidth) / 2,
-            (bitmap.height - sourceHeight) / 2,
-            sourceWidth,
-            sourceHeight,
-            0,
-            0,
-            width,
-            height
-        );
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
-        if (!blob) throw new Error("This browser cannot resize the image");
-        return blob;
-    } finally {
-        bitmap.close();
-    }
-}
+import {
+    BAND_CROP,
+    CROP_ACCEPTED,
+    FACE_CROP,
+    ImageCropDialog,
+    TILE_CROP,
+    type CropShape
+} from "@/components/image-cropper";
 
 /** One picture, and the two things that can be done to it. */
 interface Picture {
     busy: boolean;
     error: string;
-    /** The file chooser, which has to be rendered somewhere. */
+    /** The file chooser and the cropper, which have to be rendered somewhere. */
     field: ReactNode;
     /** Open it. */
     choose: () => void;
@@ -125,12 +50,13 @@ interface Picture {
  * Putting a picture up and taking it down, for one endpoint.
  *
  * A hook rather than a component because the profile card draws two of these
- * inside one preview: the parts that differ are the endpoint and the crop, and
- * everything else - the size limit, the formats, the cache dance after a
- * replace, the sentence when it fails - is the same for both.
+ * inside one preview: the parts that differ are the endpoint and the shape, and
+ * everything else - the cropper, the formats, the cache dance after a replace,
+ * the sentence when it fails - is the same for both.
  */
-function usePicture(endpoint: string, pictureUrl: string, shape: "square" | "band"): Picture {
+function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
     const input = useRef<HTMLInputElement>(null);
+    const [chosen, setChosen] = useState<File | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -157,36 +83,44 @@ function usePicture(endpoint: string, pictureUrl: string, shape: "square" | "ban
         }
     };
 
-    const upload = async (file: File) => {
-        let body: Blob;
-        try {
-            body = shape === "band" ? await toBand(file) : await toSquare(file);
-        } catch {
-            setError("That file could not be read as an image");
-            return;
-        }
-        await run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
-    };
+    const upload = (body: Blob) =>
+        run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
 
     return {
         busy,
         error,
         choose: () => input.current?.click(),
         remove: () => void run(() => fetch(endpoint, { method: "DELETE" })),
+        // Both are rendered wherever the buttons are. The dialog puts itself on
+        // top of the page from there, so where that is does not matter.
         field: (
-            <input
-                ref={input}
-                type="file"
-                accept={ACCEPTED}
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    // Cleared first, so picking the same file twice after a
-                    // failure still counts as a change.
-                    event.target.value = "";
-                    if (file) void upload(file);
-                }}
-            />
+            <>
+                <input
+                    ref={input}
+                    type="file"
+                    accept={CROP_ACCEPTED}
+                    className="hidden"
+                    onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        // Cleared first, so picking the same file twice after a
+                        // failure still counts as a change.
+                        event.target.value = "";
+                        if (file) setChosen(file);
+                    }}
+                />
+                {chosen ? (
+                    <ImageCropDialog
+                        file={chosen}
+                        shape={shape}
+                        busy={busy}
+                        onCancel={() => setChosen(null)}
+                        onCropped={(body) => {
+                            setChosen(null);
+                            void upload(body);
+                        }}
+                    />
+                ) : null}
+            </>
         )
     };
 }
@@ -229,8 +163,8 @@ export function ProfilePicturesCard({
     hasPhoto: boolean;
     hasBanner: boolean;
 }) {
-    const photo = usePicture("/api/avatar", avatarUrl(userId), "square");
-    const banner = usePicture("/api/banner", bannerUrl(userId), "band");
+    const photo = usePicture("/api/avatar", avatarUrl(userId), FACE_CROP);
+    const banner = usePicture("/api/banner", bannerUrl(userId), BAND_CROP);
     const error = photo.error || banner.error;
 
     return (
@@ -273,7 +207,7 @@ export function ProfilePicturesCard({
 
 /** An organization's face. One picture, so one button beside it. */
 export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: string; hasPhoto: boolean }) {
-    const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), "square");
+    const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), TILE_CROP);
 
     return (
         <Card>

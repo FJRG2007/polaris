@@ -16,6 +16,7 @@ import { chatAvatarUrl } from "@/lib/avatar-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import type { AvatarPerson } from "@/components/avatar";
 import { PictureField } from "@/components/picture-field";
+import { FACE_CROP, TILE_CROP } from "@/components/image-cropper";
 import {
     Dialog,
     DialogContent,
@@ -57,7 +58,8 @@ export function ChatPictureDialog({
 
                 <PictureField
                     endpoint={chatAvatarUrl(kind, id)}
-                    hint="PNG, JPEG, WebP or GIF. Cropped to a square."
+                    shape={kind === "space" ? TILE_CROP : FACE_CROP}
+                    hint="PNG, JPEG, WebP or GIF. You choose which part of it is used."
                     preview={
                         <ChatAvatar
                             kind={kind}

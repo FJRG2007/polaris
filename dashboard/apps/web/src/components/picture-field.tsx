@@ -3,71 +3,30 @@
 /**
  * Putting a picture on something, in a dialog rather than on a card.
  *
- * The same three steps the profile card takes - resize in the browser, post the
- * bytes, replace what the browser has cached before drawing again - without the
- * card around them, because a space icon is set from a menu and a group photo
- * from its header, and neither of those has room for a panel.
+ * The same three steps the profile card takes - frame it, post the bytes,
+ * replace what the browser has cached before drawing again - without the card
+ * around them, because a space icon is set from a menu and a group photo from
+ * its header, and neither of those has room for a panel.
  *
- * The resize is not a nicety. A phone photo arrives as several megabytes of
- * something that will be drawn eighteen pixels wide, and re-encoding drops the
- * EXIF block, which on a phone photo carries where and when it was taken -
- * nobody setting a group picture means to publish that. The server checks the
- * bytes again either way: this runs on the uploader's machine, so it is a
- * courtesy and not a control.
+ * Choosing a file opens the cropper (`components/image-cropper.tsx`), which is
+ * also where the resize and the re-encode happen. The resize is not a nicety: a
+ * phone photo arrives as several megabytes of something that will be drawn
+ * eighteen pixels wide, and re-encoding drops the EXIF block, which on a phone
+ * photo carries where and when it was taken - nobody setting a group picture
+ * means to publish that. The server checks the bytes again either way: this runs
+ * on the uploader's machine, so it is a courtesy and not a control.
  */
 
 import { Button } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
-
-/** Big enough for the largest place one of these is drawn, small enough to be
- *  free. */
-const MAX_EDGE = 512;
-
-const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
-
-/** A square of at most MAX_EDGE, centred. Cropped rather than squashed: these
- *  are drawn in square boxes, so a letterboxed portrait would be squashed
- *  anyway.
- *
- *  Exported because a picture chosen before the thing it belongs to exists - the
- *  photo on a group being started - is resized here and posted once there is
- *  somewhere to post it to. */
-export async function toSquare(file: File): Promise<Blob> {
-    const bitmap = await createImageBitmap(file);
-    try {
-        const edge = Math.min(bitmap.width, bitmap.height);
-        const size = Math.min(edge, MAX_EDGE);
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("This browser cannot resize the image");
-        context.drawImage(
-            bitmap,
-            (bitmap.width - edge) / 2,
-            (bitmap.height - edge) / 2,
-            edge,
-            edge,
-            0,
-            0,
-            size,
-            size
-        );
-        const blob = await new Promise<Blob | null>((resolve) =>
-            canvas.toBlob(resolve, "image/webp", 0.9)
-        );
-        if (!blob) throw new Error("This browser cannot resize the image");
-        return blob;
-    } finally {
-        bitmap.close();
-    }
-}
+import { CROP_ACCEPTED, ImageCropDialog, TILE_CROP, type CropShape } from "@/components/image-cropper";
 
 export function PictureField({
     endpoint,
     preview,
     hint,
+    shape = TILE_CROP,
     onDone
 }: {
     /** Where the bytes are posted and deleted. Also what is pulled fresh
@@ -76,11 +35,15 @@ export function PictureField({
     endpoint: string;
     preview: ReactNode;
     hint?: string;
+    /** The shape it will be drawn at, which is the shape it is framed in.
+     *  A square tile unless the caller says otherwise. */
+    shape?: CropShape;
     /** Called once the picture has changed and the cached copy has been
      *  replaced. */
     onDone: () => void;
 }) {
     const input = useRef<HTMLInputElement>(null);
+    const [chosen, setChosen] = useState<File | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -106,19 +69,6 @@ export function PictureField({
         }
     };
 
-    const upload = async (file: File) => {
-        let body: Blob;
-        try {
-            body = await toSquare(file);
-        } catch {
-            setError("That file could not be read as an image");
-            return;
-        }
-        await run(() =>
-            fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body })
-        );
-    };
-
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
@@ -127,14 +77,14 @@ export function PictureField({
                     <input
                         ref={input}
                         type="file"
-                        accept={ACCEPTED}
+                        accept={CROP_ACCEPTED}
                         className="hidden"
                         onChange={(event) => {
                             const file = event.target.files?.[0];
                             // Cleared first, so picking the same file again
                             // after a failure still counts as a change.
                             event.target.value = "";
-                            if (file) void upload(file);
+                            if (file) setChosen(file);
                         }}
                     />
                     <Button
@@ -167,6 +117,24 @@ export function PictureField({
                     {error}
                 </p>
             )}
+            {chosen ? (
+                <ImageCropDialog
+                    file={chosen}
+                    shape={shape}
+                    busy={busy}
+                    onCancel={() => setChosen(null)}
+                    onCropped={(body) => {
+                        setChosen(null);
+                        void run(() =>
+                            fetch(endpoint, {
+                                method: "POST",
+                                headers: { "Content-Type": body.type },
+                                body
+                            })
+                        );
+                    }}
+                />
+            ) : null}
         </div>
     );
 }
