@@ -11,7 +11,8 @@ top-down. Keep it updated as things land.
 Reference clones live in `references/repos/` (gitignored): `fluxer` (Discord-like,
 Rust + TS), `stoatchat` (formerly Revolt, Rust), `element-web` and `matrix-spec`
 (Matrix), `ess-helm` (Element's deployment charts), `platform` (Huly), `meet`,
-`jitsi-meet`.
+`jitsi-meet`, `spreed` (Nextcloud Talk, PHP + Vue - the most complete call
+client of the set; see section 5).
 
 ---
 
@@ -159,9 +160,58 @@ walk that aims at the top and backs off on encoder evidence, a quality bar per
 source, screen shares on a stage rather than in the sharer's own tile, several
 shares at once, and walking into a voice channel by opening it.
 
-| Item                        | Status | Prio | Size | Notes                                                                     |
-| --------------------------- | ------ | ---- | ---- | ------------------------------------------------------------------------- |
-| Push to talk                | ⬜     | P1   | S    | Every voice client has it; Polaris has the key handling already (F9/F10). |
-| Per-person volume in a call | ✅     | -    | -    | Right-click a tile.                                                       |
-| Recording a call            | ⬜     | P2   | L    | LiveKit has an egress service; it is another container.                   |
-| Watch together / streams    | ⬜     | P2   | L    |                                                                           |
+| Item                          | Status | Prio | Size | Notes                                                                                                                              |
+| ----------------------------- | ------ | ---- | ---- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Push to talk                  | ⬜     | P1   | S    | Every voice client has it; Polaris has the key handling already (F9/F10).                                                          |
+| Per-person volume in a call   | ✅     | -    | -    | Right-click a tile.                                                                                                                |
+| Recording a call              | ✅     | -    | -    | Done in the browser of whoever presses record - no second container. See `call-recorder`, and the honest limits written at the top of it. |
+| Combining audio in one room   | ✅     | -    | -    | Several devices sitting together share one microphone. Detected acoustically; see `call-nearby` and `call-combine`.                 |
+| Watch together / streams      | ⬜     | P2   | L    |                                                                                                                                    |
+
+### What Nextcloud Talk (spreed) has that Polaris does not
+
+Read from the clone in `references/repos/spreed`. It is the most complete call
+client of the references, and most of what is worth taking is small - the
+interesting part is that almost none of it is about media plumbing, which
+Polaris already has through the call server. It is about telling people what is
+happening.
+
+**Worth doing, cheapest first:**
+
+| Item                                | Prio | Size | Where it is in spreed                                    | Why                                                                                                                                                                                                       |
+| ----------------------------------- | ---- | ---- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "You seem to be talking while muted" | P0   | S    | `utils/webrtc/SpeakingWhileMutedWarner.js`               | Three seconds of speech into a dead microphone, then a warning - and a browser notification when the tab is not on screen. Polaris measures speaking already; this is the single highest value per line here. |
+| Keep the screen awake in a call     | P1   | S    | `components/CallView/useWakeLock.ts`                     | Ten lines of `navigator.wakeLock`. A laptop that sleeps mid-call is a call that ends.                                                                                                                       |
+| A device that changes mid-call      | P0   | M    | `composables/useDevices.js`, `MediaDevicesManager.js`    | A headset unplugged mid-call: spreed follows the change and reopens. Polaris listens for `devicechange` in the composer and the clip dialog, and **not in a call** - the call goes silent with nothing said. |
+| Connection warnings that say what to do | P1  | M    | `utils/webrtc/analyzers/PeerConnectionAnalyzer.js`      | 30% loss over 5s, under 10 packets a second, or RTT over 1.5s, and it says "turn your video off" rather than "poor connection". Polaris reads encoder evidence already; this is the sentence, not the metric. |
+| Check the devices before joining    | P1   | M    | `components/MediaSettings/`, `MediaDevicesSpeakerTest.vue` | A preview, a level meter and a speaker test before the call starts. Polaris opens the devices as the room opens, so a broken microphone is found by the other person.                                        |
+| Background blur                     | P1   | L    | `utils/media/effects/virtual-background/`                | MediaPipe selfie segmentation, tflite model **vendored in the repo** and a WebGL compositor - no network and no vendor. It fits beside `mic-filter`, which is the same shape of thing for sound.             |
+| Raise a hand, react in a call       | P2   | M    | `stores/participantActivity.ts`, `ReactionToaster.vue`   | Rides on participant state, which Polaris already broadcasts as attributes.                                                                                                                                |
+| Picture-in-picture call window      | P2   | M    | `mainFloatingCall.ts`, `ViewerOverlayCallView.vue`       | Polaris shrinks a call to a bar; spreed keeps the faces in a floating window, which is what people want while reading the document being discussed.                                                          |
+
+**Deliberately not taken:**
+
+- **Quality by head count** (`SentVideoQualityThrottler.js`): thresholds at 20, 80
+  and 120 video streams, with anybody speaking pushed to the top rung for five
+  seconds after they stop. Polaris caps a call at 8, so the thresholds are dead
+  code here - but the *speaker gets the best rung* rule is the good idea in it,
+  and it is what to copy if the cap is ever raised.
+- **Grid pagination and tile ordering** (`CallView/Grid/`): the same story. It is
+  what a call of forty needs, and Polaris is a lookup of column classes because
+  eight is the ceiling.
+- **Live transcription** (`stores/liveTranscription.ts`): needs a speech service
+  behind it, which is a container an operator would have to run.
+- **Breakout rooms**, **SIP dial-in**: both are large, and both are features of an
+  organisation running scheduled meetings rather than of a chat with calls in it.
+- **Server-side recording** (`docs/recording.md`): a headless browser joins the
+  call, records it, and uploads through a chunked public WebDAV share. It is the
+  right answer for an installation with an operator, and the wrong one here - see
+  the note at the top of `call-recorder`.
+
+**Still open from what spreed does and Polaris does not:** recording *consent*.
+Spreed can require every participant to tick a box before joining a call that may
+be recorded, and refuses the join without it (`recordingConsent` on the join
+endpoint). Polaris tells the room a recording is running, on every screen and to
+anybody who joins afterwards, but it does not gate the join on agreement. That is
+a policy decision an administrator should own, and it wants a setting rather than
+a default.
