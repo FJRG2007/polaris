@@ -399,7 +399,28 @@ function TreeRow({
 // The tree
 // ---------------------------------------------------------------------------
 
-export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeView[]; canCreate: boolean }) {
+/**
+ * The spaces, folders and lists column beside every task screen.
+ *
+ * `canManage` is the instance permission (`tasks.manage`), not a role in any one
+ * space: a role says which spaces somebody reaches, and this says whether they
+ * may reshape any of them. Without it the tree drew every space a reader could
+ * see with its rename, delete, create and drag affordances intact, all of which
+ * bounce off the actions behind them.
+ */
+export function SpaceTree({
+    spaces,
+    canCreate,
+    canManage
+}: {
+    spaces: readonly SpaceTreeView[];
+    /** Whether this screen offers to start a new space at all. Off on the
+     *  screens that read across every space rather than work inside one. */
+    canCreate: boolean;
+    /** Whether this account may change anything here - `tasks.manage`, held on
+     *  the instance rather than in any one space. */
+    canManage: boolean;
+}) {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [draft, setDraft] = useState<Draft | null>(null);
@@ -495,7 +516,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
         <nav aria-label="Spaces" className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
             <div className="flex items-center justify-between">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Spaces</h2>
-                {canCreate && (
+                {canManage && canCreate && (
                     <button
                         type="button"
                         aria-label="Create a space"
@@ -578,6 +599,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
                 <SpaceSection
                     key={space.id}
                     space={space}
+                    canManage={canManage}
                     pathname={pathname}
                     collapsed={collapsed}
                     onToggle={toggle}
@@ -599,7 +621,7 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
 
             <FolderAccessDialog
                 folderId={accessFolderId}
-                canManage={canAdmin(
+                canManage={canManage && canAdmin(
                     spaces.flatMap((space) => space.folders).find((folder) => folder.id === accessFolderId)?.role ??
                         "guest"
                 )}
@@ -640,6 +662,8 @@ export function SpaceTree({ spaces, canCreate }: { spaces: readonly SpaceTreeVie
 
 interface SectionProps {
     readonly space: SpaceTreeView;
+    /** Whether this account may change anything here at all. */
+    readonly canManage: boolean;
     readonly pathname: string;
     readonly collapsed: ReadonlySet<string>;
     readonly onToggle: (key: string) => void;
@@ -662,6 +686,7 @@ interface SectionProps {
 
 function SpaceSection({
     space,
+    canManage,
     pathname,
     collapsed,
     onToggle,
@@ -678,7 +703,7 @@ function SpaceSection({
     run
 }: SectionProps) {
     const open = !collapsed.has(space.id);
-    const editable = canWrite(space.role);
+    const editable = canManage && canWrite(space.role);
     const tree = useMemo(() => core.buildFolderTree(space.folders), [space.folders]);
     // Renaming a space is reached from its right-click menu; the field waits for
     // the menu to let go of focus before taking it.

@@ -3,7 +3,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import type { BurndownPoint } from "@polaris/core";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SprintsPage() {
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
     // A space-wide sprint needs the space. A sprint planning one folder is
@@ -43,11 +44,12 @@ export default async function SprintsPage() {
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate={false} />
+            <SpaceTree spaces={tree} canCreate={false} canManage={mayManage} />
             <SprintsView
                 sprints={named}
                 spaces={spaces.filter((space) => scope.spaceIds.includes(space.id))}
                 burndowns={burndowns}
+                canEdit={mayManage}
             />
         </div>
     );

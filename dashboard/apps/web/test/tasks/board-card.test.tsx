@@ -130,6 +130,14 @@ describe("board card", () => {
         expect(markup).toContain("line-clamp-3");
     });
 
+    it("does not let somebody who cannot edit pick a card up", () => {
+        // The drop is refused by the action behind it, and a card that springs
+        // back after a drag reads as the board being broken rather than as
+        // permission nobody has.
+        expect(card(taskRow(), false)).toContain('draggable="false"');
+        expect(card(taskRow())).toContain('draggable="true"');
+    });
+
     it("offers no controls to somebody who cannot edit", () => {
         const markup = card(taskRow(), false);
         expect(markup).not.toContain('aria-label="Priority"');

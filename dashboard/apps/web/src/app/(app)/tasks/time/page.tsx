@@ -6,7 +6,7 @@
  * rather than a click path.
  */
 
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
 import { TimesheetView } from "@/app/(app)/tasks/timesheet-view";
@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function TimesheetPage({ searchParams }: { searchParams: Promise<{ week?: string }> }) {
     const { week } = await searchParams;
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
 
@@ -35,7 +36,7 @@ export default async function TimesheetPage({ searchParams }: { searchParams: Pr
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate={false} />
+            <SpaceTree spaces={tree} canCreate={false} canManage={mayManage} />
             <TimesheetView sheet={sheet} timer={timer} weekOffset={Number.isFinite(offset) ? offset : 0} />
         </div>
     );

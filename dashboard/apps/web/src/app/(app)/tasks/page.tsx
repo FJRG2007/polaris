@@ -9,7 +9,7 @@
 import { prisma } from "@polaris/db";
 import { HomeView } from "./home-view";
 import { SpaceTree } from "./space-tree";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { listTasks } from "@/lib/tasks/task-service";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { runningTimer } from "@/lib/tasks/time-service";
@@ -22,6 +22,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TasksHomePage() {
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
 
@@ -54,12 +55,12 @@ export default async function TasksHomePage() {
     const contexts: Record<string, SpaceContext> = {};
     for (const spaceId of involved) {
         const role = await scopedSpaceRole(actor, scope, spaceId);
-        if (role) contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id, scope);
+        if (role) contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id, mayManage, scope);
     }
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate />
+            <SpaceTree spaces={tree} canCreate canManage={mayManage} />
             <HomeView tasks={tasks} counts={counts} timer={timer} contexts={contexts} lists={lists} />
         </div>
     );

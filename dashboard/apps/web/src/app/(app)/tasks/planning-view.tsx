@@ -27,12 +27,17 @@ import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
 export function SprintsView({
     sprints,
     spaces,
-    burndowns
+    burndowns,
+    canEdit
 }: {
     sprints: readonly (SprintView & { spaceId: string; spaceName: string })[];
     spaces: readonly { id: string; name: string }[];
     /** Points still open per day, keyed by sprint id. */
     burndowns: Readonly<Record<string, core.BurndownPoint[]>>;
+    /** Whether this account may change the plan at all. Reading it is a
+     *  different permission from reshaping it, and the buttons that reshape it
+     *  are not drawn for somebody who only holds the first. */
+    canEdit: boolean;
 }) {
     const format = useDisplayFormat();
     const [creating, setCreating] = useState(false);
@@ -50,7 +55,7 @@ export function SprintsView({
                     <p className="text-sm text-muted-foreground">Time-boxed runs of work, with what is left each day.</p>
                 </div>
                 <span className="flex-1" />
-                {spaces.length > 0 && !creating && (
+                {canEdit && spaces.length > 0 && !creating && (
                     <Button size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" /> New sprint
                     </Button>
@@ -166,6 +171,7 @@ export function SprintsView({
                                             </p>
                                         </div>
                                         <Select
+                                            disabled={!canEdit}
                                             value={sprint.status}
                                             onValueChange={async (status) => {
                                                 const result = await runAction(
@@ -187,7 +193,7 @@ export function SprintsView({
                                             aria-label={`Status of ${sprint.name}`}
                                             className="h-8 w-32 text-xs"
                                         />
-                                        <button
+                                        {canEdit && <button
                                             type="button"
                                             aria-label={`Delete ${sprint.name}`}
                                             title="Delete sprint"
@@ -201,7 +207,7 @@ export function SprintsView({
                                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                         >
                                             <Trash2 className="size-3.5" />
-                                        </button>
+                                        </button>}
                                     </div>
 
                                     <ProgressBar percent={percent} />
@@ -246,11 +252,14 @@ function Burndown({ points }: { points: readonly core.BurndownPoint[] }) {
 export function GoalsView({
     goals,
     spaces,
-    lists
+    lists,
+    canEdit
 }: {
     goals: readonly GoalView[];
     spaces: readonly { id: string; name: string }[];
     lists: readonly { id: string; name: string }[];
+    /** Whether this account may change the plan. See SprintsView. */
+    canEdit: boolean;
 }) {
     const format = useDisplayFormat();
     const [creating, setCreating] = useState(false);
@@ -269,7 +278,7 @@ export function GoalsView({
                     </p>
                 </div>
                 <span className="flex-1" />
-                {!creating && (
+                {canEdit && !creating && (
                     <Button size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" /> New goal
                     </Button>
@@ -348,7 +357,7 @@ export function GoalsView({
                                         </p>
                                     </div>
                                     <span className="text-sm font-semibold">{goal.percent}%</span>
-                                    <button
+                                    {canEdit && <button
                                         type="button"
                                         aria-label={`Delete ${goal.name}`}
                                         title="Delete goal"
@@ -359,7 +368,7 @@ export function GoalsView({
                                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                     >
                                         <Trash2 className="size-3.5" />
-                                    </button>
+                                    </button>}
                                 </div>
 
                                 <ProgressBar percent={goal.percent} />
@@ -375,6 +384,7 @@ export function GoalsView({
                                             ) : (
                                                 <input
                                                     type="number"
+                                                    disabled={!canEdit}
                                                     defaultValue={target.currentValue}
                                                     aria-label={`Value for ${target.name}`}
                                                     onBlur={async (event) => {
@@ -390,7 +400,7 @@ export function GoalsView({
                                                 />
                                             )}
                                             <span className="w-10 text-right text-muted-foreground">{target.percent}%</span>
-                                            <button
+                                            {canEdit && <button
                                                 type="button"
                                                 aria-label={`Remove ${target.name}`}
                                                 title="Remove target"
@@ -404,7 +414,7 @@ export function GoalsView({
                                                 className="rounded p-0.5 text-muted-foreground transition-colors hover:text-danger"
                                             >
                                                 <Trash2 className="size-3" />
-                                            </button>
+                                            </button>}
                                         </li>
                                     ))}
                                     {goal.targets.length === 0 && (
@@ -414,7 +424,7 @@ export function GoalsView({
                                     )}
                                 </ul>
 
-                                {targetFor === goal.id ? (
+                                {!canEdit ? null : targetFor === goal.id ? (
                                     <TargetForm
                                         lists={lists}
                                         onCancel={() => setTargetFor(null)}

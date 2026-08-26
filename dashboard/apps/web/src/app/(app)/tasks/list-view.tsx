@@ -901,27 +901,34 @@ export function ListScreen({
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
                     <span className="text-sm font-medium">{selected.length} selected</span>
                     {/* The same verbs the right-click menu applies, through the
-                        same call: two ways in, one answer to what each one does. */}
-                    <StatusPicker
-                        statuses={context.statuses}
-                        value={null}
-                        onChange={(statusId) => void applyToTasks(selected, { statusId })}
-                    />
-                    <AssigneePicker
-                        people={context.people}
-                        selected={[]}
-                        onChange={(ids) => void applyToTasks(selected, { addAssigneeIds: ids })}
-                    />
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void applyToTasks(selected, { archived: true })}
-                    >
-                        Archive
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
-                        Delete
-                    </Button>
+                        same call: two ways in, one answer to what each one does -
+                        including being absent for somebody who may read this work
+                        and not change it. Selecting is still theirs: it is how a
+                        few tasks are held together to be read. */}
+                    {context.canEdit && (
+                        <>
+                            <StatusPicker
+                                statuses={context.statuses}
+                                value={null}
+                                onChange={(statusId) => void applyToTasks(selected, { statusId })}
+                            />
+                            <AssigneePicker
+                                people={context.people}
+                                selected={[]}
+                                onChange={(ids) => void applyToTasks(selected, { addAssigneeIds: ids })}
+                            />
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void applyToTasks(selected, { archived: true })}
+                            >
+                                Archive
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
+                                Delete
+                            </Button>
+                        </>
+                    )}
                     <span className="flex-1" />
                     <button
                         type="button"

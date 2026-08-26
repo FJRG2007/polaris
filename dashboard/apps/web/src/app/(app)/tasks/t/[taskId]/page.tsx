@@ -9,7 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { listTasks } from "@/lib/tasks/task-service";
 import { listViews } from "@/lib/tasks/view-service";
 import { ListScreen } from "@/app/(app)/tasks/list-view";
@@ -23,6 +23,7 @@ export const dynamic = "force-dynamic";
 export default async function TaskPermalinkPage({ params }: { params: Promise<{ taskId: string }> }) {
     const { taskId } = await params;
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
 
     let resolved;
@@ -40,7 +41,7 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
         listSpaceTree(user.id, scope, user.isAdmin),
         listTasks({ listId: resolved.listId }, { limit: 2000 }),
         listViews(user.id, { listId: resolved.listId }),
-        buildSpaceContext(resolved.spaceId, resolved.role, user.id, scope),
+        buildSpaceContext(resolved.spaceId, resolved.role, user.id, mayManage, scope),
         prisma.taskList.findMany({
             where: {
                 spaceId: resolved.spaceId,
@@ -54,7 +55,7 @@ export default async function TaskPermalinkPage({ params }: { params: Promise<{ 
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate />
+            <SpaceTree spaces={tree} canCreate canManage={mayManage} />
             <ListScreen
                 listId={resolved.listId}
                 defaultListId={resolved.listId}

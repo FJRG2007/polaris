@@ -15,7 +15,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import * as spaces from "@/lib/tasks/space-service";
 import { listTasks } from "@/lib/tasks/task-service";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -34,6 +34,8 @@ export default async function EverythingPage({
     searchParams: Promise<{ assignee?: string }>;
 }) {
     const user = await requirePermission("tasks.read");
+    // Seeing every space's work does not mean being allowed to change any of it.
+    const mayManage = await sessionCan(user, "tasks.manage");
     const wanted = assigneeParam.safeParse((await searchParams).assignee);
     const assigneeId = wanted.success ? wanted.data : null;
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
@@ -111,8 +113,8 @@ export default async function EverythingPage({
             showOnCard: field.showOnCard
         })),
         people: roster,
-        canEdit: true,
-        canModerate: user.isAdmin,
+        canEdit: mayManage,
+        canModerate: mayManage && user.isAdmin,
         currentUserId: user.id,
         siblings: tasks
     };
@@ -128,7 +130,7 @@ export default async function EverythingPage({
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate />
+            <SpaceTree spaces={tree} canCreate canManage={mayManage} />
             <ListScreen
                 // The filter is this screen's opening state, not a prop it
                 // watches, and moving from one person to another is a soft

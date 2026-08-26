@@ -7,7 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { listTasks } from "@/lib/tasks/task-service";
 import { listViews } from "@/lib/tasks/view-service";
@@ -22,6 +22,10 @@ export const dynamic = "force-dynamic";
 export default async function TaskListPage({ params }: { params: Promise<{ listId: string }> }) {
     const { listId } = await params;
     const user = await requirePermission("tasks.read");
+    // Reaching a space and being allowed to change what is in it are two
+    // different questions, and a screen that asks only the first draws controls
+    // that bounce off the actions behind them.
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
 
     let role;
@@ -39,7 +43,7 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
         listSpaceTree(user.id, scope, user.isAdmin),
         listTasks({ listId }, { limit: 2000 }),
         listViews(user.id, { listId }),
-        buildSpaceContext(list.spaceId, role, user.id, scope),
+        buildSpaceContext(list.spaceId, role, user.id, mayManage, scope),
         // The lists work can be moved to: those in the space, narrowed to the
         // granted branch when that is all the reader reaches.
         prisma.taskList.findMany({
@@ -55,7 +59,7 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate />
+            <SpaceTree spaces={tree} canCreate canManage={mayManage} />
             <ListScreen
                 listId={listId}
                 defaultListId={listId}

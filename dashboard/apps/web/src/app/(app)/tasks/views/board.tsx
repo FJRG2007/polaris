@@ -268,20 +268,26 @@ export function TaskCard({
     return (
         <TaskMenu commands={commands}>
             <li
-                draggable
+                // Only somebody who may move work can pick a card up, and only
+                // then is a card a place to drop one: the row list has always
+                // read canEdit here and the board did not, so the same reader
+                // could drag a card on one screen and not the other - and the
+                // drop bounced off the action either way.
+                draggable={canEdit}
                 onDragStart={(event) => {
+                    if (!canEdit) return;
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", task.id);
                     onDragStart();
                 }}
                 onDragOver={(event) => {
-                    if (!accepting) return;
+                    if (!accepting || !canEdit) return;
                     event.preventDefault();
                     setOver(true);
                 }}
                 onDragLeave={() => setOver(false)}
                 onDrop={(event) => {
-                    if (!accepting) return;
+                    if (!accepting || !canEdit) return;
                     event.preventDefault();
                     event.stopPropagation();
                     setOver(false);

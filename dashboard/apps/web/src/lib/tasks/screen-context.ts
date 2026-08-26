@@ -20,6 +20,21 @@ export async function buildSpaceContext(
     spaceId: string,
     role: SpaceAccess,
     currentUserId: string,
+    /**
+     * Whether this account may change work at all - `tasks.manage`, held on the
+     * instance rather than in this space.
+     *
+     * Both questions have to be asked, and only one of them used to be. A role
+     * in a space says which work somebody reaches; the permission says whether
+     * they may reshape any of it. Somebody holding `tasks.read` and a place on a
+     * space's roster was drawn every control an owner sees - the status marker,
+     * the assignee picker, the drag handle, the delete - and every one of them
+     * bounced off the action behind it, which does not redraw the screen with an
+     * explanation but sends them to their home page. A control that cannot work
+     * is worse than no control: it reads as the software being broken rather
+     * than as permission they do not have.
+     */
+    mayManage: boolean,
     /** Passed when the reader only reaches part of this space, so the sibling
      *  list a dependency picker offers cannot name another client's work. */
     scope?: TaskScope
@@ -42,8 +57,8 @@ export async function buildSpaceContext(
         tags,
         fields,
         people,
-        canEdit: role === "owner" || role === "admin" || role === "member",
-        canModerate: role === "owner" || role === "admin",
+        canEdit: mayManage && (role === "owner" || role === "admin" || role === "member"),
+        canModerate: mayManage && (role === "owner" || role === "admin"),
         currentUserId,
         siblings
     };

@@ -5,7 +5,7 @@
  * same whether the workspace holds fifty tasks or fifty thousand.
  */
 
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { timeByPerson } from "@/lib/tasks/time-service";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { buildReport } from "@/lib/tasks/report-service";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     const scope = await shelfScope(actor);
 
@@ -34,7 +35,7 @@ export default async function ReportsPage() {
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate={false} />
+            <SpaceTree spaces={tree} canCreate={false} canManage={mayManage} />
             <ReportsView report={report} timeByPerson={byPerson} />
         </div>
     );

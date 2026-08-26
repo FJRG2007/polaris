@@ -3,7 +3,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { listGoals } from "@/lib/tasks/planning-service";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { listSpaceTree } from "@/lib/tasks/space-service";
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function GoalsPage() {
     const user = await requirePermission("tasks.read");
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
     // A goal is a space-level plan, so only the spaces the reader holds
     // outright contribute one - a folder grant reaches work, not planning.
@@ -36,8 +37,8 @@ export default async function GoalsPage() {
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate={false} />
-            <GoalsView goals={goals} spaces={spaces} lists={lists} />
+            <SpaceTree spaces={tree} canCreate={false} canManage={mayManage} />
+            <GoalsView goals={goals} spaces={spaces} lists={lists} canEdit={mayManage} />
         </div>
     );
 }

@@ -4,7 +4,7 @@
 
 import { prisma } from "@polaris/db";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import * as spaces from "@/lib/tasks/space-service";
 import { listForms } from "@/lib/tasks/form-service";
 import type { SpaceVisibility } from "@polaris/core";
@@ -28,6 +28,9 @@ export default async function SpacePage({
     // it - "edit statuses" from a status menu has to land on the statuses.
     const { tab } = await searchParams;
     const user = await requirePermission("tasks.read");
+    // Reaching a space and being allowed to reshape it are two different
+    // questions; a role here answers only the first.
+    const mayManage = await sessionCan(user, "tasks.manage");
     const actor: TaskActor = { id: user.id, isAdmin: user.isAdmin };
 
     let role;
@@ -51,7 +54,7 @@ export default async function SpacePage({
     });
     if (!space) redirect("/tasks");
 
-    const canManage = role === "owner" || role === "admin";
+    const canManage = mayManage && (role === "owner" || role === "admin");
     const [tree, statuses, fields, tags, members, automations, forms, baseUrl] = await Promise.all([
         spaces.listSpaceTree(user.id, await visibleScope(actor), user.isAdmin),
         spaces.listStatuses(spaceId),
@@ -72,7 +75,7 @@ export default async function SpacePage({
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
-            <SpaceTree spaces={tree} canCreate />
+            <SpaceTree spaces={tree} canCreate canManage={mayManage} />
             <SpaceScreen
                 spaceId={spaceId}
                 name={space.name}
