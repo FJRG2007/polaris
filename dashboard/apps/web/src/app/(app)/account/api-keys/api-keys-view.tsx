@@ -351,10 +351,18 @@ function KeyRow({
             <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
                 {entry.projectName ?? "None"}
             </td>
+            {/* The same tone as the two date columns beside it. A date that is
+                merely a date has nothing to say, and reading brighter than
+                "Created" made it look like it did; the colour is kept for the
+                two cases that do - it has run out, or it is about to. */}
             <td
                 className={cn(
                     "whitespace-nowrap py-2 pr-3 align-top",
-                    state === "expired" ? "text-danger" : soon ? "text-warning" : undefined
+                    state === "expired"
+                        ? "text-danger"
+                        : soon
+                          ? "text-warning"
+                          : "text-muted-foreground"
                 )}
             >
                 {entry.expiresAt ? (

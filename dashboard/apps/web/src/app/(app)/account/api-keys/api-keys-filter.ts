@@ -15,6 +15,7 @@
  * a browser or a database.
  */
 
+import { API_KEY_PREFIX } from "@polaris/core";
 import type { ApiKeyView } from "@polaris/auth";
 
 /** What a key's state actually is, whatever the row says about it. */
@@ -38,16 +39,21 @@ export function expiringSoon(key: ApiKeyView, now = Date.now()): boolean {
 }
 
 /**
- * The key as it can safely be shown: what it starts with, and what it ends with.
+ * The key as it can safely be shown, and no more of it than that.
  *
- * Both halves are needed and neither is the secret. The prefix is what Polaris
- * looks a key up by, so it identifies the row; the last few characters are what
- * somebody compares against the value sitting in their password manager, which
- * is the only way to answer "is this the key my deploy is using" without ever
- * showing the key again.
+ * What the column is for is answering "is this row the key my deploy is using",
+ * and the last few characters answer it on their own - they are what somebody
+ * compares against the value sitting in their password manager. The eight
+ * random characters of the public half identify the row to Polaris and nothing
+ * at all to a person reading a table, so they are left out: a column of
+ * `plk_IpZSCeDj...um90` is a column of noise with the answer at the end of it.
+ * Searching still matches them, because a key found in a log is pasted whole.
+ *
+ * A key issued before the tail was kept has nothing at the end to show, so it
+ * shows what it has rather than a marker that identifies every key equally.
  */
 export function maskedKey(key: ApiKeyView): string {
-    return key.tail ? `${key.prefix}...${key.tail}` : `${key.prefix}...`;
+    return key.tail ? `${API_KEY_PREFIX}_...${key.tail}` : `${key.prefix}...`;
 }
 
 export const EXPIRY_FILTERS = ["all", "never", "soon", "expired"] as const;

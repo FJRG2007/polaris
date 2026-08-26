@@ -79,12 +79,21 @@ describe("what state a key is in", () => {
 });
 
 describe("what a key looks like in the list", () => {
-    it("shows both halves it is allowed to show", () => {
-        expect(list.maskedKey(key())).toBe("plk_abc123...9f3c");
+    it("shows the end, which is the half a person can recognise", () => {
+        // Not the eight random characters of the public half: they identify the
+        // row to Polaris and nothing to somebody reading a table.
+        expect(list.maskedKey(key())).toBe("plk_...9f3c");
     });
 
     it("shows what it has for a key issued before the tail was kept", () => {
         expect(list.maskedKey(key({ tail: null }))).toBe("plk_abc123...");
+    });
+
+    it("still finds a key by the public half that is no longer drawn", () => {
+        const keys = [key({ id: "a" }), key({ id: "b", prefix: "plk_zzz999", tail: "0000" })];
+        expect(
+            list.filterKeys(keys, { ...list.NO_FILTERS, search: "abc123" }, NOW).map((r) => r.id)
+        ).toEqual(["a"]);
     });
 });
 
