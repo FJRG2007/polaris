@@ -35,11 +35,20 @@
  * appears in a switcher and a list, never as somebody's profile.
  */
 
+import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
 import { avatarUrl, bannerUrl, orgAvatarUrl } from "@/lib/avatar-url";
-import { Camera, Crop, Image as ImageIcon, Loader2, Trash2, Upload, type LucideIcon } from "lucide-react";
+import {
+    Camera,
+    Crop,
+    Image as ImageIcon,
+    Loader2,
+    Trash2,
+    Upload,
+    type LucideIcon
+} from "lucide-react";
 import {
     BAND_CROP,
     CROP_ACCEPTED,
@@ -60,7 +69,13 @@ import {
 
 /** One picture, and the three things that can be done to it. */
 interface Picture {
+    /** Something is happening to it, which the handle says with a spinner. */
     busy: boolean;
+    /** Bytes are on their way to the server, or a removal is - which is the
+     *  only state that has to stop a second one being started. Fetching the
+     *  picture back to reframe it does not: taking the handle away underneath
+     *  somebody mid-gesture costs them their place on the page. */
+    sending: boolean;
     error: string;
     /** The file chooser and the cropper, which have to be rendered somewhere. */
     field: ReactNode;
@@ -82,17 +97,18 @@ interface Picture {
 function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
     const input = useRef<HTMLInputElement>(null);
     const [chosen, setChosen] = useState<Blob | null>(null);
-    const [busy, setBusy] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [opening, setOpening] = useState(false);
     const [error, setError] = useState("");
 
     const run = async (work: () => Promise<Response>) => {
-        setBusy(true);
+        setSending(true);
         setError("");
         try {
             const response = await work();
             if (!response.ok) {
                 setError((await response.text()) || "Could not save that");
-                setBusy(false);
+                setSending(false);
                 return;
             }
             // The picture is drawn on this page, in the header, and in whatever
@@ -104,12 +120,14 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
             window.location.reload();
         } catch {
             setError("Could not reach the server");
-            setBusy(false);
+            setSending(false);
         }
     };
 
     const upload = (body: Blob) =>
-        run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
+        run(() =>
+            fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body })
+        );
 
     /**
      * Open the cropper on the picture that is already there.
@@ -121,14 +139,24 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
      */
     const reframe = async () => {
         setError("");
-        setBusy(true);
+        setOpening(true);
         try {
             const response = await fetch(pictureUrl);
-            const blob = response.ok ? await response.blob() : null;
-            // Only that there are bytes. What they are is the cropper's
-            // question, and it already has an answer for a file it cannot read -
-            // whereas refusing anything whose content type did not survive the
-            // round trip refuses pictures that are perfectly fine.
+            // Every picture route answers "I have nothing to serve" with a
+            // transparent pixel and a 200 rather than an error, because the
+            // initials underneath are what the screen wants and a browser
+            // complains about the honest reply - see lib/avatar-blank. It is the
+            // answer a picture whose bytes did not arrive gets too: a storage
+            // target that moved, a NAS not answering this second. Framing that
+            // would cut a one-pixel picture out of it and post it over the one
+            // the account still has, so the pixel is refused by the tag it
+            // carries before its bytes are ever read.
+            const blank = response.headers.get("etag") === BLANK_AVATAR_ETAG;
+            const blob = response.ok && !blank ? await response.blob() : null;
+            // Beyond that, only that there are bytes. What they are is the
+            // cropper's question, and it already has an answer for a file it
+            // cannot read - whereas refusing anything whose content type did not
+            // survive the round trip refuses pictures that are perfectly fine.
             if (!blob || blob.size === 0) {
                 setError("Could not open that picture again");
                 return;
@@ -137,12 +165,13 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
         } catch {
             setError("Could not reach the server");
         } finally {
-            setBusy(false);
+            setOpening(false);
         }
     };
 
     return {
-        busy,
+        busy: sending || opening,
+        sending,
         error,
         choose: () => input.current?.click(),
         reframe: () => void reframe(),
@@ -168,7 +197,7 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
                     <ImageCropDialog
                         file={chosen}
                         shape={shape}
-                        busy={busy}
+                        busy={sending}
                         onCancel={() => setChosen(null)}
                         onCropped={(body) => {
                             setChosen(null);
@@ -181,30 +210,44 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
     };
 }
 
+/** The corners the handle is cut to, which are the corners of the picture it is
+ *  laid over: a circle for a face, the card radius for an organization's tile,
+ *  and nothing at all for a band that runs to the edges. */
+const HANDLE_RADIUS = {
+    full: "rounded-full",
+    md: "rounded-md",
+    none: ""
+} as const;
+
 /**
  * The editing handle that sits on a picture.
  *
- * The whole picture is the button, and it shows nothing until the pointer is
- * over it: a preview whose job is to show what everybody else sees cannot spend
- * its life under a dark sheet. That leaves the two readers a hover never
- * reaches, and both are answered here rather than left to the idiom - a
- * keyboard, which uncovers it on focus, and a touch screen, where there is no
- * hover at all.
+ * The whole picture is the button, and over a picture that is there it shows
+ * nothing until the pointer is: a preview whose job is to show what everybody
+ * else sees cannot spend its life under a dark sheet. That leaves the readers a
+ * hover never reaches, and they are answered here rather than left to the idiom
+ * - a keyboard, which uncovers it on focus; a touch screen, where there is no
+ * hover at all; and an account that has put nothing up yet, where there is no
+ * preview to protect and the chip is the only thing saying that the initials
+ * behind it can be changed.
  *
  * Which is why the handle is two things rather than one. The sheet that dims the
  * picture belongs to hovering it - it is the thing that says the whole picture
  * is pressable, and it costs the picture its colours while it is up. The chip in
- * the middle is the handle itself, and on a screen with no pointer it is simply
- * always there: a phone gets the button it can press without the preview it came
- * to look at being dimmed for the rest of its life.
+ * the middle is the handle itself, and wherever the sheet would be a permanent
+ * tax the chip is simply always there: a phone, and an empty profile, get the
+ * button they can press without anything being dimmed for the rest of its life.
+ *
+ * The corners are a prop of their own rather than a class the caller passes in,
+ * because both of those elements are cut to them: a caller reaching for
+ * `className` would be laying its positioning over the sheet as well.
  */
 function PictureEditor({
     label,
     icon: Icon,
     picture,
     exists,
-    round,
-    className
+    radius
 }: {
     /** What this picture is, in the sentence a screen reader reads out. */
     label: string;
@@ -213,8 +256,7 @@ function PictureEditor({
     /** Whether there is a picture of their own here, which is what decides
      *  whether there is anything to reframe or to take away. */
     exists: boolean;
-    round: boolean;
-    className?: string;
+    radius: keyof typeof HANDLE_RADIUS;
 }) {
     return (
         <>
@@ -225,11 +267,10 @@ function PictureEditor({
                         type="button"
                         aria-label={`Edit ${label}`}
                         title={`Edit ${label}`}
-                        disabled={picture.busy}
+                        disabled={picture.sending}
                         className={cn(
                             "group/handle absolute inset-0 flex items-center justify-center",
-                            round && "rounded-full",
-                            className
+                            HANDLE_RADIUS[radius]
                         )}
                     >
                         <span
@@ -237,8 +278,7 @@ function PictureEditor({
                             className={cn(
                                 "absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-fast",
                                 "group-hover/handle:opacity-100 group-focus-visible/handle:opacity-100 group-data-[state=open]/handle:opacity-100",
-                                round && "rounded-full",
-                                className
+                                HANDLE_RADIUS[radius]
                             )}
                         />
                         <span
@@ -248,6 +288,12 @@ function PictureEditor({
                                 // Nothing here can hover, so the chip is the only
                                 // sign there is anything to press.
                                 "[@media(hover:none)]:opacity-100",
+                                // Nor is there a preview to keep clear on a
+                                // profile with nothing on it yet: behind the chip
+                                // are initials over a tint, and hiding the only
+                                // way to change them leaves somebody to guess
+                                // that a circle of letters is a button.
+                                !exists && "opacity-100",
                                 // Mid-upload the spinner is the only thing saying
                                 // that anything is happening.
                                 picture.busy && "opacity-100"
@@ -327,7 +373,7 @@ export function ProfilePicturesCard({
                             icon={ImageIcon}
                             picture={banner}
                             exists={hasBanner}
-                            round={false}
+                            radius="none"
                         />
                     </div>
                     <div className="flex flex-col gap-3 px-4 pb-4">
@@ -346,10 +392,12 @@ export function ProfilePicturesCard({
                                 icon={Camera}
                                 picture={photo}
                                 exists={hasPhoto}
-                                round
+                                radius="full"
                             />
                         </div>
-                        <p className="truncate text-sm font-medium" title={name}>{name}</p>
+                        <p className="truncate text-sm font-medium" title={name}>
+                            {name}
+                        </p>
                     </div>
                 </div>
 
@@ -360,7 +408,15 @@ export function ProfilePicturesCard({
 }
 
 /** An organization's face. One picture, and the same handle on it. */
-export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: string; hasPhoto: boolean }) {
+export function OrgPhotoCard({
+    orgId,
+    name,
+    hasPhoto
+}: {
+    orgId: string;
+    name: string;
+    hasPhoto: boolean;
+}) {
     const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), TILE_CROP);
 
     return (
@@ -380,8 +436,7 @@ export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: s
                         icon={Camera}
                         picture={photo}
                         exists={hasPhoto}
-                        round={false}
-                        className="rounded-md"
+                        radius="md"
                     />
                 </div>
                 {photo.error && <p className="text-sm text-danger">{photo.error}</p>}

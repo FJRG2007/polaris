@@ -17,6 +17,7 @@
 
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
 import { ProfilePicturesCard } from "@/app/(app)/account/avatar-card";
 import { cleanup, render, screen, within } from "@testing-library/react";
 
@@ -36,7 +37,68 @@ async function optionsOf(label: string): Promise<string[]> {
         .map((item) => item.textContent?.trim() ?? "");
 }
 
-afterEach(cleanup);
+/**
+ * What the card reads back off a picture route: whether it answered, the tag
+ * that marks the blank pixel, and the bytes.
+ *
+ * Answered by hand rather than with a `Response`, because how a blob from one
+ * realm travels through another one's `Response` is a runtime detail that
+ * differs between node versions, and these tests are about the card.
+ */
+interface PictureReply {
+    ok: boolean;
+    headers: { get: (name: string) => string | null };
+    blob: () => Promise<Blob>;
+}
+
+/** A picture a route would serve, under the tag it would carry. */
+function pictureReply(etag: string | null = null): PictureReply {
+    const picture = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
+    return {
+        ok: true,
+        headers: { get: (name) => (name.toLowerCase() === "etag" ? etag : null) },
+        blob: async () => picture
+    };
+}
+
+/**
+ * What the cropper needs from a browser and jsdom has none of: object URLs and a
+ * ResizeObserver, both wanted the moment it is handed a file.
+ *
+ * `URL` is replaced with a stand-in rather than patched, so unstubbing actually
+ * puts things back - assigning the two functions onto the real constructor
+ * leaves them on it for every test that follows, whatever happens to the stub.
+ */
+function stubTheBrowser(reply: () => PictureReply): string[] {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+        asked.push(String(input));
+        return reply();
+    });
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        }
+    );
+    vi.stubGlobal(
+        "URL",
+        class extends URL {
+            static createObjectURL = () => "blob:x";
+            static revokeObjectURL = () => undefined;
+        }
+    );
+    return asked;
+}
+
+afterEach(() => {
+    cleanup();
+    // In the test body this runs only when everything above it passed, and one
+    // failed assertion then leaves fetch stubbed for the rest of the file.
+    vi.unstubAllGlobals();
+});
 
 describe("the profile pictures card", () => {
     it("draws the band and the face together, as the profile does", () => {
@@ -66,19 +128,7 @@ describe("the profile pictures card", () => {
         // The bytes it goes and gets are the picture Polaris is serving: what was
         // cut off at upload is gone, so reframing pans and zooms inside what was
         // kept rather than pretending to have the original back.
-        const asked: string[] = [];
-        // Answered by hand rather than with a Response: how a blob from one
-        // realm travels through another one's Response is a runtime detail that
-        // differs between node versions, and this test is about the card.
-        const picture = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
-        vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
-            asked.push(String(input));
-            return { ok: true, blob: async () => picture };
-        });
-        // jsdom has neither object URLs nor a ResizeObserver, and the cropper
-        // wants both the moment it is handed a file.
-        vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
-        vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:x", revokeObjectURL: () => undefined }));
+        const asked = stubTheBrowser(() => pictureReply());
 
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
         const user = userEvent.setup();
@@ -87,6 +137,21 @@ describe("the profile pictures card", () => {
 
         expect(await screen.findByText("Frame the picture")).toBeDefined();
         expect(asked).toEqual([`/api/avatar/${PERSON.userId}`]);
-        vi.unstubAllGlobals();
+    });
+
+    it("refuses to frame the blank pixel a route answers with when it has no bytes", async () => {
+        // The row says there is a photo and the storage behind it did not
+        // answer, so the route serves one transparent pixel with a 200 - the
+        // same thing an account with no photo gets. Framing it would cut a
+        // one-pixel picture and post it over the photo that is still there.
+        stubTheBrowser(() => pictureReply(BLANK_AVATAR_ETAG));
+
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        const user = userEvent.setup();
+        await user.click(screen.getByRole("button", { name: "Edit photo" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Reframe" }));
+
+        expect(await screen.findByText("Could not open that picture again")).toBeDefined();
+        expect(screen.queryByText("Frame the picture")).toBeNull();
     });
 });

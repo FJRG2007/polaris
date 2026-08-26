@@ -17,6 +17,7 @@
         "@better-auth/passkey": "1.6.25",
         "@giphy/js-fetch-api": "5.8.0",
         "@github/relative-time-element": "4.4.4",
+        "@pdfslick/react": "4.0.2",
         "@polaris/agent-runtime": "*",
         "@polaris/auth": "0.1.0",
         "@polaris/config": "0.1.0",

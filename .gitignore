@@ -36,6 +36,8 @@ next-env.d.ts
 coverage/
 # pdf.js runtime assets, staged into public/ at build time from pdfjs-dist
 dashboard/apps/web/public/pdfjs/
+# pdf.js annotation and editor icons, which its viewer looks for at /images/
+dashboard/apps/web/public/images/
 # Minecraft item icons, staged into public/ at build time from resources/mcicons
 dashboard/apps/web/public/mcicons/
 # ARK item icons, staged into public/ at build time from resources/arkicons

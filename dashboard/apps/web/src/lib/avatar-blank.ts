@@ -24,17 +24,20 @@
 const TRANSPARENT_PNG_BASE64 =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-const BLANK = Buffer.from(TRANSPARENT_PNG_BASE64, "base64");
-
 /** Stable, so a browser that already has the blank pixel is answered with a 304
- *  rather than the bytes. */
+ *  rather than the bytes. It is also the only thing that tells this answer apart
+ *  from a real picture once it is bytes in a browser, so it is read on the client
+ *  too - hence the decoding below happening inside the function rather than at
+ *  module scope, where importing this constant would drag `Buffer` into a bundle
+ *  that has none. */
 export const BLANK_AVATAR_ETAG = '"blank"';
 
 export function blankAvatarResponse(cacheControl: string): Response {
-    return new Response(BLANK as unknown as BodyInit, {
+    const blank = Buffer.from(TRANSPARENT_PNG_BASE64, "base64");
+    return new Response(blank as unknown as BodyInit, {
         headers: {
             "Content-Type": "image/png",
-            "Content-Length": String(BLANK.length),
+            "Content-Length": String(blank.length),
             ETag: BLANK_AVATAR_ETAG,
             "Cache-Control": cacheControl,
             "X-Content-Type-Options": "nosniff",
