@@ -67,9 +67,13 @@ describe("the profile pictures card", () => {
         // cut off at upload is gone, so reframing pans and zooms inside what was
         // kept rather than pretending to have the original back.
         const asked: string[] = [];
+        // Answered by hand rather than with a Response: how a blob from one
+        // realm travels through another one's Response is a runtime detail that
+        // differs between node versions, and this test is about the card.
+        const picture = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
         vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
             asked.push(String(input));
-            return new Response(new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }));
+            return { ok: true, blob: async () => picture };
         });
         // jsdom has neither object URLs nor a ResizeObserver, and the cropper
         // wants both the moment it is handed a file.

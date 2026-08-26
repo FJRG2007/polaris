@@ -81,7 +81,7 @@ interface Picture {
  */
 function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
     const input = useRef<HTMLInputElement>(null);
-    const [chosen, setChosen] = useState<File | null>(null);
+    const [chosen, setChosen] = useState<Blob | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -114,9 +114,10 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
     /**
      * Open the cropper on the picture that is already there.
      *
-     * Fetched rather than pointed at: the cropper is handed a file everywhere
-     * else and reads the pixels back out of a canvas, so giving it the bytes
-     * keeps it one path instead of two that have to stay in step.
+     * Fetched rather than pointed at: the cropper cuts the picture out of a
+     * canvas, so what it needs is the bytes. It takes them as they arrive - a
+     * blob is what a file already is, and the name of a file nobody chose is
+     * not something to invent.
      */
     const reframe = async () => {
         setError("");
@@ -132,7 +133,7 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
                 setError("Could not open that picture again");
                 return;
             }
-            setChosen(new File([blob], "picture", { type: blob.type || "image/png" }));
+            setChosen(blob);
         } catch {
             setError("Could not reach the server");
         } finally {

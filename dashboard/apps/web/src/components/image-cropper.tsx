@@ -137,8 +137,14 @@ export function ImageCropDialog({
     onCancel,
     onCropped
 }: {
-    /** The file that was just chosen. Nothing has been sent yet. */
-    file: File;
+    /**
+     * The picture being framed. Nothing has been sent yet.
+     *
+     * A blob rather than a file because a name is not something this asks about:
+     * it is handed what somebody just chose, or the picture already on their
+     * profile fetched back to be framed again, and only the bytes differ.
+     */
+    file: Blob;
     shape: CropShape;
     /** Whether the caller is still sending the last one, so the button says so
      *  rather than looking like it did nothing. */
