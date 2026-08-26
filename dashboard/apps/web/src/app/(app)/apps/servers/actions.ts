@@ -18,6 +18,7 @@ import type { ServerMetrics } from "@/lib/server-probe";
 import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
 import { hostSpace, reclaimHostSpace, type HostSpace } from "@/lib/deploy/host-space";
+import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import {
@@ -406,4 +407,43 @@ export async function reclaimHostSpaceAction(): Promise<{ freed?: number; error?
     });
     revalidatePath("/apps/servers");
     return { freed };
+}
+
+/**
+ * Every volume on the machine Polaris runs on, and what it knows about each.
+ *
+ * The list a person reads before deleting anything, which is the whole point:
+ * the alternative on offer everywhere else is a prune that decides for itself.
+ */
+export async function hostVolumesAction(): Promise<HostVolume[] | null> {
+    await requirePermission("system.manage");
+    return hostVolumes().catch(() => null);
+}
+
+/**
+ * Remove one volume, named in full by whoever is looking at it.
+ *
+ * Audited with its size, because this is the one thing on the storage screen
+ * that does not come back: a rebuilt layer costs time, a deleted volume costs
+ * whatever was written in it. The checks that decide whether it may go at all
+ * are in `host-volumes.ts`, re-run there at the moment of the call.
+ */
+export async function removeHostVolumeAction(name: string): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const volumes = await hostVolumes().catch(() => null);
+    const before = volumes?.find((volume) => volume.name === name) ?? null;
+
+    const result = await removeHostVolume(name).catch(() => null);
+    if (!result) return { error: "This machine would not answer. Nothing was removed." };
+    if (!result.ok) return { error: result.reason };
+
+    await recordAudit({
+        actorId: user.id,
+        action: "server.volume.removed",
+        targetType: "volume",
+        targetId: name,
+        metadata: { bytes: before?.bytes ?? null, project: before?.project ?? null }
+    });
+    revalidatePath(SERVERS_PATH);
+    return {};
 }

@@ -79,11 +79,25 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         // Reclaiming, and only the two kinds that hold nothing anybody wrote.
         // Build cache is regenerable by definition and dangling images are the
         // layers no tag points at any more; both come back on the next build or
-        // pull, at the cost of time. Neither touches a volume, and
-        // `/volumes/prune` is deliberately absent from this list: that one
-        // deletes data, and no button should be able to reach it through here.
+        // pull, at the cost of time. Neither touches a volume.
         ("POST", ["build", "prune"]) => true,
         ("POST", ["images", "prune"]) => true,
+        // What volumes exist and what is holding them. Read-only, and the thing
+        // that makes the removal below reviewable rather than a leap of faith.
+        ("GET", ["volumes"]) => true,
+        // One volume, named in full by whoever is looking at it.
+        //
+        // The line this does not cross is `/volumes/prune`, still absent below:
+        // a prune decides for itself what counts as unused, at the moment it
+        // runs, and takes everything it decided in one go - which is how an
+        // operator ends up having deleted the data of an app that merely
+        // happened to be stopped. Naming one volume cannot do that by accident,
+        // it can be audited, and the daemon still refuses while a container
+        // holds it.
+        //
+        // No query string: `?force=` is the only thing that could be passed
+        // here, and forcing is exactly the judgement this route refuses to make.
+        ("DELETE", ["volumes", name]) => valid_volume_name(name) && !path.contains('?'),
         _ => false,
     };
     if !allowed {
@@ -105,6 +119,19 @@ fn valid_container_id(id: &str) -> bool {
         _ => return false,
     }
     id.len() <= 128 && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+}
+
+/// A Docker volume name, by the daemon's own rule: alphanumeric first, then
+/// alphanumerics and `_.-`. Deliberately stricter than the id check above in one
+/// way - no path separators and no dots on their own - so a name can never walk
+/// out of the `/volumes/` route it is a segment of.
+fn valid_volume_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphanumeric() => {}
+        _ => return false,
+    }
+    name.len() <= 255 && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
 }
 
 /// Forward one already-validated request to the Docker socket and return the
@@ -255,13 +282,24 @@ mod tests {
     }
 
     #[test]
-    fn reclaiming_never_reaches_a_volume() {
-        // The one line in the allowlist that would delete something somebody
-        // wrote. Build cache and dangling images come back on the next build or
-        // pull; a volume does not come back at all.
+    fn a_volume_goes_one_at_a_time_or_not_at_all() {
+        // Listing them, and removing one that was named in full - which is what
+        // a screen showing an operator what is on their disk needs.
+        assert!(validate("GET", "/volumes").is_ok());
+        assert!(validate("DELETE", "/volumes/polaris-abc_data.1").is_ok());
+
+        // What stays out. Build cache and dangling images come back on the next
+        // build or pull; a volume does not come back at all, so nothing here may
+        // decide by itself which ones are spare.
         assert!(validate("POST", "/volumes/prune").is_err());
         assert!(validate("POST", "/system/prune").is_err());
-        assert!(validate("DELETE", "/volumes/data").is_err());
+        // Removing one named volume is allowed; deciding for yourself which ones
+        // are unused and taking them all is not.
+        assert!(validate("DELETE", "/volumes").is_err());
+        // Forcing is the judgement this route refuses to make.
+        assert!(validate("DELETE", "/volumes/data?force=1").is_err());
+        assert!(validate("DELETE", "/volumes/-leading-dash").is_err());
+        assert!(validate("DELETE", "/volumes/..").is_err());
     }
 
     #[test]
@@ -276,7 +314,6 @@ mod tests {
         // or for anything else the DELETE verb reaches.
         assert!(validate("DELETE", "/containers").is_err());
         assert!(validate("DELETE", "/containers/abc/json").is_err());
-        assert!(validate("DELETE", "/volumes/data").is_err());
         assert!(validate("DELETE", "/images/nginx").is_err());
         // Method must match the route.
         assert!(validate("GET", "/containers/abc/start").is_err());

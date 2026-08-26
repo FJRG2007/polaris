@@ -16,9 +16,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ServerUsage } from "../server-usage";
-import { ContainerStorage } from "../container-storage";
+import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
 import { ServerNotesPanel } from "../server-notes-panel";
 import { ENVIRONMENT_META } from "../environment-meta";
@@ -48,11 +48,23 @@ const STATUS_POLL_MS = 30_000;
 
 const TABS = [
     { id: "overview", label: "Overview" },
+    // What the Storage figure on the overview is actually made of. Only for the
+    // machine Polaris runs on: it is the one it can reach through its own daemon
+    // to say what is on the disk, let alone take anything off it.
+    { id: "storage", label: "Storage", needsLocal: true },
     { id: "connection", label: "Connection" },
     // Only a registered server has an id to hang a history on: the box Polaris
     // runs on has no Host row until it is enrolled.
     { id: "notes", label: "Notes", needsHost: true }
 ] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+/** The tab a link can point at, so "where did the room go" is an address rather
+ *  than a click somebody has to be told to make. */
+function tabFromQuery(value: string | null): TabId | null {
+    return TABS.some((tab) => tab.id === value) ? (value as TabId) : null;
+}
 
 export function ServerDetail({
     server,
@@ -72,7 +84,8 @@ export function ServerDetail({
     initialUsage?: { at: number; value: ServerMetrics };
 }) {
     const router = useRouter();
-    const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("overview");
+    const query = useSearchParams();
+    const [tab, setTab] = useState<TabId>(() => tabFromQuery(query.get("tab")) ?? "overview");
     const [shellOpen, setShellOpen] = useState(false);
     const [asRoot, setAsRoot] = useState(false);
     const [location, setLocation] = useState<EnvironmentTarget | null>(null);
@@ -158,7 +171,11 @@ export function ServerDetail({
             </div>
 
             <div className="flex gap-1 border-b border-border/60">
-                {TABS.filter((entry) => !("needsHost" in entry) || server.hostId).map((entry) => (
+                {TABS.filter(
+                    (entry) =>
+                        (!("needsHost" in entry) || server.hostId) &&
+                        (!("needsLocal" in entry) || server.kind === "local")
+                ).map((entry) => (
                     <button
                         key={entry.id}
                         type="button"
@@ -178,6 +195,8 @@ export function ServerDetail({
 
             {tab === "notes" && server.hostId ? (
                 <ServerNotesPanel hostId={server.hostId} />
+            ) : tab === "storage" && server.kind === "local" ? (
+                <ServerStorage />
             ) : tab === "overview" ? (
                 <div className="flex flex-col gap-5">
                     <Reachability server={server} status={status} />
@@ -193,11 +212,6 @@ export function ServerDetail({
                         />
                     ) : null}
 
-                    {/* The machine Polaris runs on is the one whose disk filling
-                        up stops Polaris deploying at all, and the only one it can
-                        reach through its own daemon to do anything about it. */}
-                    {server.kind === "local" ? <ContainerStorage /> : null}
-
                     <ServerWorkload connectionId={connectionId} />
 
                     <section className="flex flex-col gap-1">
@@ -208,7 +222,18 @@ export function ServerDetail({
                         />
                         <p className="text-xs text-muted-foreground">
                             Measured from the containers running on this server, against what the
-                            machine has.
+                            machine has.{" "}
+                            {/* The Storage figure is the one people arrive at with a
+                                question the chart cannot answer: 89 GB of what. */}
+                            {server.kind === "local" ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setTab("storage")}
+                                    className="text-primary hover:underline"
+                                >
+                                    See what is taking up the disk
+                                </button>
+                            ) : null}
                         </p>
                     </section>
                 </div>
