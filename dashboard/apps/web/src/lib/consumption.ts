@@ -94,6 +94,12 @@ export const GROUPS: ReadonlyArray<{ id: ConsumptionGroupId; label: string; desc
                 "Services and databases deployed here, with the releases and tunnels they keep."
         },
         {
+            id: "leftover",
+            label: "Left behind by Polaris",
+            description:
+                "Started by Polaris for something that no longer exists. Nothing will start them again, and removing one frees what it holds."
+        },
+        {
             id: "other",
             label: "Everything else",
             description: "Containers on this machine that Polaris did not start."
@@ -167,6 +173,10 @@ interface Bucket extends ClaimBucket {
      *  a tunnel that is up says nothing about whether the app is. */
     self: number;
     selfRunning: number;
+    /** Containers the engine is restarting, which is what a crash loop looks like
+     *  from outside. Counted apart because it is neither up nor stopped, and
+     *  reading it as stopped hides the one state worth acting on. */
+    restarting: number;
     cpuPercent: number | null;
     memUsedBytes: number | null;
 }
@@ -227,6 +237,7 @@ function add(bucket: Bucket, container: Attributable, tunnel: boolean): void {
     bucket.containers += 1;
     const running = container.state === "running";
     if (running) bucket.running += 1;
+    if (container.state === "restarting") bucket.restarting += 1;
     if (!tunnel) {
         bucket.self += 1;
         if (running) bucket.selfRunning += 1;
@@ -247,6 +258,7 @@ function open(bucket: ClaimBucket): Bucket {
         running: 0,
         self: 0,
         selfRunning: 0,
+        restarting: 0,
         cpuPercent: null,
         memUsedBytes: null
     };
@@ -285,7 +297,12 @@ function claimFor(container: Attributable, index: ClaimIndex, connectionId: stri
             name: container.name,
             detail: container.image,
             owner: null,
-            group: "other",
+            // A compose project of ours whose record is gone is not a stranger's
+            // container: Polaris started it, and then whatever it was started for
+            // was deleted without it. Telling the operator that Polaris did not
+            // start a service still holding four hundred megabytes is how it goes
+            // on holding them - nobody removes what they are told is not theirs.
+            group: subject ? "leftover" : "other",
             href: `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId)}`
         }
     };
@@ -332,6 +349,16 @@ function toRow(bucket: Bucket): ConsumptionRow {
 
 function state(bucket: Bucket): { state: ConsumptionRow["state"]; stateLabel: string } {
     if (bucket.containers === 0) return { state: "elsewhere", stateLabel: "Not on this machine" };
+    // Before either of the two below. A container the engine keeps restarting is
+    // not stopped and not up: it is failing, over and over, and it is the one line
+    // on this screen somebody should act on today. Reading it as stopped - which
+    // is what counting only the running ones did - hides exactly that.
+    if (bucket.restarting > 0) {
+        return {
+            state: "restarting",
+            stateLabel: bucket.restarting === 1 ? "Restarting" : `${bucket.restarting} restarting`
+        };
+    }
     // A bucket with nothing of its own in it is a tunnel whose record is gone, and
     // the tunnel is the row: its own container is what says whether it is up.
     const [up, total] =

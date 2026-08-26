@@ -44,6 +44,9 @@ const TONE: Record<ConsumptionGroup["id"], string> = {
     polaris: "bg-primary",
     apps: "bg-accent",
     services: "bg-success",
+    // The one group that is a problem rather than a fact, and the only one
+    // painted like one: what is in it is holding memory for nothing.
+    leftover: "bg-warning",
     other: "bg-foreground-subtle"
 };
 
@@ -256,9 +259,17 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
     );
 }
 
+/** A container the engine keeps restarting is the one state on this screen that
+ *  is wrong rather than merely quiet, so it is the only one drawn in red. */
+function badge(state: ConsumptionRow["state"]): "neutral" | "warning" | "danger" {
+    if (state === "restarting") return "danger";
+    return state === "stopped" || state === "elsewhere" ? "neutral" : "warning";
+}
+
 function emptyLine(id: ConsumptionGroup["id"]): string {
     if (id === "apps") return "Nothing installed from the marketplace yet.";
     if (id === "services") return "Nothing deployed here yet.";
+    if (id === "leftover") return "Nothing has been left behind.";
     return "Nothing else is running on this machine.";
 }
 
@@ -307,9 +318,7 @@ function Row({
                         {name}
                     </span>
                     {row.state === "running" ? null : (
-                        <Badge variant={row.state === "stopped" ? "neutral" : "warning"}>
-                            {row.stateLabel}
-                        </Badge>
+                        <Badge variant={badge(row.state)}>{row.stateLabel}</Badge>
                     )}
                 </div>
                 <div className="truncate text-xs text-muted-foreground" title={row.detail}>

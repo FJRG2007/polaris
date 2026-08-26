@@ -1,7 +1,7 @@
 /** Client-safe shapes for the Consumption screen. */
 
-/** The four things a container on this machine can belong to. */
-export type ConsumptionGroupId = "polaris" | "apps" | "services" | "other";
+/** The five things a container on this machine can belong to. */
+export type ConsumptionGroupId = "polaris" | "apps" | "services" | "leftover" | "other";
 
 /** One thing that is using the machine: an installed app, a deployed service, a
  *  database, or a container nothing here claims. Several containers add up into
@@ -15,7 +15,7 @@ export interface ConsumptionRow {
     /** Whose it is, for the shelf it sits on. Null for a container nothing here
      *  owns. */
     readonly owner: string | null;
-    readonly state: "running" | "partial" | "stopped" | "elsewhere";
+    readonly state: "running" | "restarting" | "partial" | "stopped" | "elsewhere";
     readonly stateLabel: string;
     /** How many containers were added up into this row. */
     readonly containers: number;

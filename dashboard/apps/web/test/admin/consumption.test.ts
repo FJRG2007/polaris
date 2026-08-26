@@ -237,16 +237,16 @@ describe("adding the machine up", () => {
             full,
             "local"
         );
-        // Nothing claims the hash, so the row is the tunnel itself - and badging a
-        // running container "Stopped" while counting its memory says the machine is
-        // spending it on nothing.
-        expect(group(groups, "other").rows[0]).toMatchObject({
+        // Nothing claims the hash, so the row is the tunnel itself - left behind by
+        // Polaris, since the project is ours. Badging a running container "Stopped"
+        // while counting its memory says the machine is spending it on nothing.
+        expect(group(groups, "leftover").rows[0]).toMatchObject({
             name: "qtunnel",
             state: "running",
             stateLabel: "Running",
             memUsedBytes: 50
         });
-        expect(group(groups, "other").running).toBe(1);
+        expect(group(groups, "leftover").running).toBe(1);
     });
 
     it("still calls a tunnel whose service is gone stopped when it is", () => {
@@ -261,7 +261,7 @@ describe("adding the machine up", () => {
             full,
             "local"
         );
-        expect(group(groups, "other").rows[0]).toMatchObject({
+        expect(group(groups, "leftover").rows[0]).toMatchObject({
             state: "stopped",
             stateLabel: "Stopped"
         });
@@ -324,7 +324,8 @@ describe("adding the machine up", () => {
                     memUsedBytes: 20
                 }),
                 // A project shaped like ours whose hash resolves to nothing is not
-                // ours: a record has to exist for it to be claimed.
+                // an app: a record has to exist for it to be claimed. It is still
+                // ours, though, so it is left behind rather than a stranger's.
                 container({
                     name: "lookalike",
                     composeProject: "polaris-deadbeef",
@@ -335,8 +336,9 @@ describe("adding the machine up", () => {
             "local"
         );
         const rows = group(groups, "other").rows;
-        expect(rows.map((row) => row.name)).toEqual(["someone-elses", "lookalike"]);
+        expect(rows.map((row) => row.name)).toEqual(["someone-elses"]);
         expect(rows[0]?.href).toBe("/apps/containers/someone-elses?c=local");
+        expect(group(groups, "leftover").rows.map((row) => row.name)).toEqual(["lookalike"]);
     });
 
     it("leaves an unsampled container without a figure rather than at zero", () => {
@@ -443,5 +445,68 @@ describe("an app that makes other installs", () => {
         expect(group(groups, "apps").rows).toEqual([
             expect.objectContaining({ name: "Messaging bridge", parts: [] })
         ]);
+    });
+});
+
+describe("what Polaris started and then forgot", () => {
+    // The case that was being read as somebody else's: a compose project of ours
+    // whose Application row is gone. It happened on a live deployment - a
+    // messaging bridge holding 374 MB and a Minecraft server in a restart loop,
+    // both filed under "Polaris did not start this", which is how they went on
+    // holding it.
+    it("is left behind rather than filed as a stranger's", () => {
+        const groups = attribute(
+            [container({ name: "marketplace-messaging-bridge-4b4d", composeProject: "polaris-4b4d3c47", memUsedBytes: 374 })],
+            index(),
+            "local"
+        );
+        expect(group(groups, "leftover").rows).toEqual([
+            expect.objectContaining({ name: "marketplace-messaging-bridge-4b4d", memUsedBytes: 374 })
+        ]);
+        expect(group(groups, "other").rows).toHaveLength(0);
+    });
+
+    it("still leaves a container nobody here started where it was", () => {
+        const groups = attribute([container({ name: "someone-elses", composeProject: "their-stack" })], index(), "local");
+        expect(group(groups, "other").rows).toHaveLength(1);
+        expect(group(groups, "leftover").rows).toHaveLength(0);
+    });
+});
+
+describe("a container the engine keeps restarting", () => {
+    it("says so, instead of reading as stopped", () => {
+        // It is neither up nor stopped, and calling it stopped hides the one row
+        // on this screen worth acting on today.
+        const groups = attribute(
+            [container({ name: "loop", composeProject: "polaris-cc1a3ef8", state: "restarting" })],
+            index(),
+            "local"
+        );
+        expect(group(groups, "leftover").rows[0]).toMatchObject({
+            state: "restarting",
+            stateLabel: "Restarting"
+        });
+    });
+
+    it("counts them when an app is losing more than one", () => {
+        const app = claim("install:games", { group: "apps", id: "games", name: "Game servers" });
+        const groups = attribute(
+            [
+                container({ name: "a", composeProject: `polaris-${subjectHash(APP)}`, state: "restarting" }),
+                container({ name: "b", composeProject: `polaris-${subjectHash(APP)}`, state: "restarting" })
+            ],
+            index({ applications: new Map([[subjectHash(APP), app]]) }),
+            "local"
+        );
+        expect(group(groups, "apps").rows[0]?.stateLabel).toBe("2 restarting");
+    });
+
+    it("is not counted as running, which would make the group look healthy", () => {
+        const groups = attribute(
+            [container({ name: "loop", composeProject: "polaris-cc1a3ef8", state: "restarting" })],
+            index(),
+            "local"
+        );
+        expect(group(groups, "leftover").running).toBe(0);
     });
 });
