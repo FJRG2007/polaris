@@ -15,6 +15,7 @@
 
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { discardAvatars } from "@/lib/avatar-service";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
@@ -384,13 +385,21 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     if (!target) return { error: "User not found." };
     if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
 
+    // Their face and their banner, before the rows that say where those are
+    // cascade away with the account. A cascade takes rows, not bytes, so without
+    // this a deleted person's photo stays on the disk with nothing left anywhere
+    // that knows it is there.
+    const leftBehind = await discardAvatars("user", userId);
     await prisma.user.delete({ where: { id: userId } });
     await recordAudit({
         actorId,
         action: "user.delete",
         targetType: "user",
         targetId: userId,
-        metadata: { email: target.email }
+        // Named when the storage would not give a photo up - a NAS that is away,
+        // a connection that has been removed. Nothing retries, so the log is
+        // where an operator finds out at all.
+        metadata: { email: target.email, ...(leftBehind.length > 0 ? { leftBehind } : {}) }
     });
     return {};
 }

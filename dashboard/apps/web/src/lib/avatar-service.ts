@@ -206,6 +206,24 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
         mime,
         size: bytes.length
     };
+    // The bytes are on the disk and nothing points at them yet. If the row does
+    // not land, they never will be pointed at - and `placeFile` only tidies up
+    // after its own failures, not after one here.
+    try {
+        await writeRow(owner, stored);
+    } catch (error) {
+        await removeFile(stored.connectionId, path);
+        throw error;
+    }
+
+    if (previous) await removeFile(previous.connectionId, previous.path);
+}
+
+/** Where a photo landed, recorded against whoever it is of. */
+async function writeRow(
+    owner: AvatarOwner,
+    stored: { connectionId: string | null; path: string; mime: string; size: number }
+): Promise<void> {
     if (owner.kind === "user") {
         await prisma.userAvatar.upsert({
             where: { userId: owner.id },
@@ -237,8 +255,6 @@ export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: s
             update: stored
         });
     }
-
-    if (previous) await removeFile(previous.connectionId, previous.path);
 }
 
 /** Go back to initials - or, for an account, to Gravatar if this instance uses
@@ -258,6 +274,45 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
     await removeFile(existing.connectionId, existing.path);
 }
 
+/** The kinds of thing that have a photo and can themselves be deleted. An
+ *  account is one subject with two pictures; everything else has one. */
+export type AvatarSubject = "user" | "org" | "space" | "channel";
+
+/**
+ * Take a subject's photos with it, before the rows saying where they are go.
+ *
+ * Deleting an account, an organization, a space or a channel cascades its photo
+ * row away, and a cascade removes rows, not bytes - so the picture stayed on the
+ * disk with nothing left anywhere that knew it was there. For an account that is
+ * somebody's face outliving their account, which is the one kind of leftover
+ * nobody would defend, and it is unfindable afterwards: the only record of where
+ * it was written went with the row.
+ *
+ * Called before the delete, for the same reason the chat attachments are (see
+ * `discardChannelFiles`): afterwards there is nothing left to read the path from.
+ *
+ * Returns the paths the storage would not give up, so the caller can say so
+ * rather than let them go quiet. Nothing here throws: a photo that cannot be
+ * removed must not be able to stop an account from being deleted.
+ */
+export async function discardAvatars(subject: AvatarSubject, id: string): Promise<string[]> {
+    const owners: AvatarOwner[] =
+        subject === "user"
+            ? [
+                  { kind: "user", id },
+                  { kind: "banner", id }
+              ]
+            : [{ kind: subject, id }];
+
+    const left: string[] = [];
+    for (const owner of owners) {
+        const row = await readRow(owner).catch(() => null);
+        if (!row) continue;
+        if (!(await removeFile(row.connectionId, row.path))) left.push(row.path);
+    }
+    return left;
+}
+
 /**
  * Take the file with the row where that is possible.
  *
@@ -266,7 +321,7 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
  * photo to stop being their photo, and leaving an orphan on a disk its owner can
  * reach is a smaller problem than refusing them.
  */
-async function removeFile(connectionId: string | null, path: string): Promise<void> {
+async function removeFile(connectionId: string | null, path: string): Promise<boolean> {
     try {
         const driver = await driverForTarget(connectionId ?? LOCAL_TARGET, LOCAL_FOLDER);
         try {
@@ -274,8 +329,10 @@ async function removeFile(connectionId: string | null, path: string): Promise<vo
         } finally {
             await driver.dispose().catch(() => undefined);
         }
+        return true;
     } catch (error) {
         console.error(`avatars: could not remove ${path}:`, error);
+        return false;
     }
 }
 

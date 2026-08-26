@@ -15,6 +15,7 @@ import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
+import { discardAvatars } from "@/lib/avatar-service";
 import { discardChannelFiles } from "./attachments";
 import { postNotice, postSpaceNotice } from "./notices";
 import {
@@ -278,6 +279,10 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
         select: { id: true }
     });
     await discardChannelFiles(channels.map((channel) => channel.id));
+    // The pictures go the same way and for the same reason: the rows naming them
+    // cascade with the space, and a cascade takes rows, not bytes.
+    for (const channel of channels) await discardAvatars("channel", channel.id);
+    await discardAvatars("space", spaceId);
     await prisma.chatSpace.delete({ where: { id: spaceId } });
 }
 
@@ -1026,6 +1031,7 @@ export async function deleteChannel(actor: ChatActor, channelId: string): Promis
     // files would be unreachable and unfindable, and would sit on the NAS for
     // the life of the instance.
     await discardChannelFiles([channelId]);
+    await discardAvatars("channel", channelId);
     await prisma.chatChannel.delete({ where: { id: channelId } });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }

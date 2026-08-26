@@ -17,6 +17,7 @@ import { organizationPolicy } from "./policy";
 import { ensureSystemRoles } from "./role-service";
 import { OrgAccessError, OrgError } from "./errors";
 import { contactLines } from "@/lib/privacy-service";
+import { discardAvatars } from "@/lib/avatar-service";
 import { isSuccessorOf } from "@/lib/successor-service";
 
 export { OrgAccessError, OrgError } from "./errors";
@@ -834,6 +835,8 @@ export async function deleteOrg(orgId: string): Promise<void> {
             await tearDownProject(project.id, project.ownerId);
         }
     }
+    // Its photo, before the row saying where it is cascades away with it.
+    await discardAvatars("org", orgId);
     await prisma.organization.delete({ where: { id: orgId } });
 }
 
