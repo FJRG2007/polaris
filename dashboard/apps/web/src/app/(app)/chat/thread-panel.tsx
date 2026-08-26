@@ -16,6 +16,7 @@ import { X } from "lucide-react";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
+import { threadDraftKey } from "./drafts";
 import type { PollDraft } from "./poll-dialog";
 import { Skeleton } from "@polaris/ui";
 import { useChat } from "./chat-context";
@@ -161,6 +162,10 @@ export function ThreadPanel({
 
             <Composer
                 channelId={root.channelId}
+                // Its own, under the message it answers: a half-written reply
+                // to a thread belongs to that thread and not to the channel it
+                // hangs off.
+                draftKey={threadDraftKey(root.id)}
                 rules={rules}
                 insert={inserting}
                 disabled={!canPost}

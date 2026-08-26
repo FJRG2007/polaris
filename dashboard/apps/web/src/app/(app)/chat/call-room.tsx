@@ -13,9 +13,17 @@
  * cleverness paid for on every frame of every call.
  *
  * The control bar is the set everybody already knows: microphone, camera,
- * screen, and deafen. Each button carries the state it is in rather than the
- * action it performs, because a row of buttons that all say what they will do
- * cannot be read at a glance to find out what is currently on.
+ * screen, deafen and hang up. Each button carries the state it is in rather than
+ * the action it performs, because a row of buttons that all say what they will
+ * do cannot be read at a glance to find out what is currently on.
+ *
+ * They are icons without words, which is what every call client settled on and
+ * for the same reason: five labelled buttons is a sentence to read every time
+ * somebody wants to mute, and these five shapes are already known by everybody
+ * who has ever been in a call. The words are still there for anybody who needs
+ * them - as the title and the accessible name - and the two things that are not
+ * about the call itself, adding somebody and recording, sit out of the way at
+ * the top rather than competing with the controls at the bottom.
  *
  * A tile is ringed while its owner is talking. With cameras off - which is most
  * calls - there is otherwise nothing at all to say who is speaking, because the
@@ -132,9 +140,6 @@ export function CallRoom({
 }) {
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
-    const [guestLink, setGuestLink] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
-    const [shareError, setShareError] = useState("");
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
     /**
@@ -232,11 +237,6 @@ export function CallRoom({
         return () => onStage?.(false);
     }, [onStage, staged]);
 
-    useEffect(() => {
-        if (!call.meeting?.guestToken) return;
-        setGuestLink(`${window.location.origin}/m/${call.meeting.guestToken}`);
-    }, [call.meeting?.guestToken]);
-
     // The call ending under somebody - the host closing it, or the last other
     // person leaving a one-to-one - is the case that most needs a sound: the
     // screen they are looking at is not this one.
@@ -268,12 +268,59 @@ export function CallRoom({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-            {(call.error || shareError) && (
+            {/* What is not a control: bringing somebody in, and writing the call
+                down. Both are one-off decisions rather than things anybody
+                reaches for mid-sentence, so they sit up here as icons and leave
+                the bar at the bottom to the five that are. */}
+            {(viewerId || canRecord) && (
+                <div className="flex shrink-0 items-center justify-end gap-1">
+                    {canRecord && (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                call.recording ? held?.recording.stop() : setAsking(true)
+                            }
+                            aria-pressed={call.recording}
+                            aria-label={call.recording ? "Stop recording" : "Record this call"}
+                            title={
+                                call.recording
+                                    ? `Stop recording (${clock(held?.recording.seconds ?? 0)})`
+                                    : "Write this call to a video file in this browser"
+                            }
+                            className={cn(
+                                "rounded p-1.5 transition-colors hover:bg-muted",
+                                call.recording
+                                    ? "text-danger"
+                                    : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {call.recording ? (
+                                <Square className="size-4 fill-current" />
+                            ) : (
+                                <Circle className="size-4" />
+                            )}
+                        </button>
+                    )}
+                    {viewerId && (
+                        <button
+                            type="button"
+                            onClick={() => setInviting(true)}
+                            aria-label="Add people"
+                            title="Add people"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <UserPlus className="size-4" />
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {call.error && (
                 <p
                     role="alert"
                     className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
                 >
-                    {call.error || shareError}
+                    {call.error}
                 </p>
             )}
 
@@ -537,27 +584,16 @@ export function CallRoom({
                     qualityLabel="Screen quality"
                 />
 
-                {/* Bringing somebody in. In a group they are added and their
-                    telephone rings; in a one-to-one the call becomes a group,
-                    because a direct message is between the two people it is
-                    keyed by. Not offered to a guest, who is in one room on a
-                    link and has no conversation to add anybody to. */}
-                {viewerId && (
-                    <Button size="sm" variant="secondary" onClick={() => setInviting(true)}>
-                        <UserPlus className="size-4" />
-                        Add people
-                    </Button>
-                )}
-
                 <Button
-                    size="sm"
+                    size="icon"
                     variant={call.deafened ? "danger" : "secondary"}
                     onClick={call.toggleDeafen}
                     aria-pressed={call.deafened}
+                    aria-label={call.deafened ? "Undeafen" : "Deafen"}
                     title={
                         call.deafened
-                            ? "You cannot hear anybody, and nobody can hear you"
-                            : "Silence everybody, and yourself with them"
+                            ? "You cannot hear anybody, and nobody can hear you (F10)"
+                            : "Silence everybody, and yourself with them (F10)"
                     }
                 >
                     {call.deafened ? (
@@ -565,69 +601,19 @@ export function CallRoom({
                     ) : (
                         <Headphones className="size-4" />
                     )}
-                    {call.deafened ? "Undeafen" : "Deafen"}
                 </Button>
 
-                {/* Recording is the host's to start, and only where there is
-                    a provider holding the call: the guest page has no dashboard
-                    around it and nowhere to put what it made. */}
-                {canRecord && (
-                    <Button
-                        size="sm"
-                        variant={call.recording ? "danger" : "secondary"}
-                        aria-pressed={call.recording}
-                        onClick={() => (call.recording ? held?.recording.stop() : setAsking(true))}
-                        title={
-                            call.recording
-                                ? "Stop recording and keep what was made"
-                                : "Write this call to a video file in this browser"
-                        }
-                    >
-                        {call.recording ? (
-                            <Square className="size-4 fill-current" />
-                        ) : (
-                            <Circle className="size-4" />
-                        )}
-                        {call.recording ? `Stop (${clock(held?.recording.seconds ?? 0)})` : "Record"}
-                    </Button>
-                )}
-
-                {canShare && (
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={async () => {
-                            if (guestLink) {
-                                await navigator.clipboard
-                                    .writeText(guestLink)
-                                    .catch(() => undefined);
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 2000);
-                                return;
-                            }
-                            const result = await actions.setGuestLinkAction(meetingId, true, true);
-                            setShareError(result.error ?? "");
-                            if (result.token) {
-                                setGuestLink(`${window.location.origin}/m/${result.token}`);
-                            }
-                            call.refresh();
-                        }}
-                    >
-                        <Link2 className="size-4" />
-                        {guestLink ? (copied ? "Copied" : "Copy guest link") : "Invite by link"}
-                    </Button>
-                )}
-
                 <Button
-                    size="sm"
+                    size="icon"
                     variant="danger"
+                    aria-label="Leave the call"
+                    title="Leave the call"
                     onClick={() => {
                         playCallSound("hangUp");
                         onLeave();
                     }}
                 >
                     <PhoneOff className="size-4" />
-                    Leave
                 </Button>
             </div>
 
@@ -639,6 +625,12 @@ export function CallRoom({
                     already={(admitted ?? [])
                         .map((person) => person.userId)
                         .filter((id): id is string => Boolean(id))}
+                    // The link is a second way to do the same thing - bring
+                    // somebody in - so it is offered where that is asked for
+                    // rather than as a button of its own beside the microphone.
+                    canShare={canShare}
+                    guestToken={call.meeting?.guestToken ?? null}
+                    onShared={call.refresh}
                     onDone={(to) => {
                         setInviting(false);
                         if (to) onMoved?.(to);
@@ -679,12 +671,6 @@ export function CallRoom({
                 </DialogContent>
             </Dialog>
 
-            {canShare && guestLink && (
-                <p className="text-center text-xs text-muted-foreground">
-                    Anybody with this link can ask to join, and waits until somebody here lets them
-                    in. It stops working when the call ends.
-                </p>
-            )}
         </div>
     );
 }
@@ -754,24 +740,31 @@ function Split({
 
     return (
         <span className="flex items-center">
+            {/* The icon alone. What it does is in the title and in the
+                accessible name, which is where a person who needs the words
+                looks and where a screen reader reads from - the shape is what
+                everybody else has already learned from every other call they
+                have been in. */}
             <Button
-                size="sm"
+                size="icon"
                 variant={variant}
                 onClick={onClick}
                 aria-pressed={pressed}
+                aria-label={label}
+                title={label}
                 className={hasMenu ? "rounded-r-none" : undefined}
             >
                 {icon}
-                {label}
             </Button>
             {hasMenu && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button
-                            size="sm"
+                            size="icon"
                             variant={variant}
                             aria-label={`${devicesLabel} settings`}
-                            className="rounded-l-none border-l border-border-strong px-1.5"
+                            title={`${devicesLabel} settings`}
+                            className="w-6 rounded-l-none border-l border-border-strong"
                         >
                             <ChevronUp className="size-3.5" />
                         </Button>
@@ -1307,6 +1300,9 @@ function InviteToCallDialog({
     onOpenChange,
     meetingId,
     already,
+    canShare,
+    guestToken,
+    onShared,
     onDone
 }: {
     open: boolean;
@@ -1315,11 +1311,56 @@ function InviteToCallDialog({
     /** Who is in the call, so nobody is offered a person that picking would do
      *  nothing about. */
     already: readonly string[];
+    /** Whether this reader may open the call to people with no account. The
+     *  host's decision and nobody else's, so the section is simply absent for
+     *  everybody else rather than drawn and refused. */
+    canShare: boolean;
+    /** The link's token, when one has already been opened. */
+    guestToken: string | null;
+    /** Told when a link is opened, so the call refreshes and everybody's copy
+     *  of the meeting carries the token. */
+    onShared: () => void;
     onDone: (movedTo: { meetingId: string; channelId: string } | null) => void;
 }) {
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [link, setLink] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+    const [opening, setOpening] = useState(false);
+
+    // Built after mount rather than in the initial state: the address of the
+    // page is not something a server render knows.
+    useEffect(() => {
+        setLink(guestToken ? `${window.location.origin}/m/${guestToken}` : null);
+    }, [guestToken]);
+
+    /** Open a link if there is not one yet, then put it on the clipboard. One
+     *  press either way: "create a link" and "copy the link" are the same
+     *  intention a moment apart. */
+    const share = async () => {
+        setOpening(true);
+        setError("");
+        let address = link;
+        if (!address) {
+            const result = await actions.setGuestLinkAction(meetingId, true, true);
+            if (result.error) {
+                setOpening(false);
+                setError(result.error);
+                return;
+            }
+            if (result.token) {
+                address = `${window.location.origin}/m/${result.token}`;
+                setLink(address);
+                onShared();
+            }
+        }
+        setOpening(false);
+        if (!address) return;
+        await navigator.clipboard.writeText(address).catch(() => undefined);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const bring = async () => {
         setBusy(true);
@@ -1360,6 +1401,32 @@ function InviteToCallDialog({
                     search={searchPeopleAction}
                 />
 
+                {/* The other way to bring somebody in, for the people who
+                    have no account here. Beside the picker rather than a button
+                    of its own out on the call bar: it answers the same question
+                    and is asked far less often. */}
+                {canShare && (
+                    <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-medium">Anybody with a link</span>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={opening}
+                                onClick={() => void share()}
+                            >
+                                <Link2 className="size-4" />
+                                {link ? (copied ? "Copied" : "Copy link") : "Create a link"}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {link
+                                ? "Anybody with it can ask to join, and waits until somebody here lets them in. It stops working when the call ends."
+                                : "For somebody with no account here. They ask to join, and wait until somebody here lets them in."}
+                        </p>
+                    </div>
+                )}
+
                 {error && (
                     <p role="alert" className="text-sm text-danger">
                         {error}
@@ -1368,7 +1435,7 @@ function InviteToCallDialog({
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        Cancel
+                        Close
                     </Button>
                     <Button disabled={busy || picked.length === 0} onClick={() => void bring()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}

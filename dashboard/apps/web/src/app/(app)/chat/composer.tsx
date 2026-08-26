@@ -31,10 +31,11 @@ import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { dropDraft, keepDraft, readDraft } from "./drafts";
 import {
     canRecord,
     MAX_VOICE_SECONDS,
@@ -74,6 +75,7 @@ const COUNTER_WITHIN = 200;
 
 export function Composer({
     channelId,
+    draftKey = null,
     rules,
     disabled,
     attachable = true,
@@ -94,6 +96,16 @@ export function Composer({
     onCancelEdit
 }: {
     channelId: string;
+    /**
+     * Where an unsent message is kept for next time, or null for a box whose
+     * conversation does not outlive the sitting.
+     *
+     * The caller decides, because only the caller knows: a channel, a group and
+     * a direct message are all still there tomorrow, and the chat inside a call
+     * is not. What is typed into a room that is about to stop existing is a
+     * message that was not sent, not a draft - see `drafts`.
+     */
+    draftKey?: string | null;
     /** What this kind of conversation allows: how long a message may be, how
      *  many files it may carry and how big one may be. Enforced again on the
      *  server; here so a limit is met while typing rather than after a
@@ -241,13 +253,52 @@ export function Composer({
     useEffect(() => setClippable(canRecordClip()), []);
     const [clipping, setClipping] = useState(false);
 
+    /**
+     * What was left in this box last time, put back.
+     *
+     * On the key rather than on mount: one composer serves whichever
+     * conversation is on screen, so walking from one to another is this effect
+     * running again with a different key - which is exactly when the box should
+     * change what it is holding.
+     *
+     * Never over an edit. Rewriting a message puts that message in the box, and
+     * a draft landing on top of it would replace what somebody is correcting
+     * with something they wrote yesterday.
+     */
+    useEffect(() => {
+        if (!draftKey || editing) return;
+        const kept = readDraft(draftKey);
+        if (!kept) return;
+        setBody(kept);
+        setGeneration((current) => current + 1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the key, and only on the key
+    }, [draftKey]);
+
+    /**
+     * Everything that is typed, kept where the tab closing cannot take it.
+     *
+     * Written from the editor's own change rather than from an effect on the
+     * body, and that is the whole of it: the body is also set by sending, by
+     * clearing and by opening an edit, and a draft written on those would put
+     * back what somebody had just got rid of. Blank throws the draft away - see
+     * `keepDraft`.
+     */
+    const write = useCallback(
+        (value: string) => {
+            setBody(value);
+            if (draftKey && !editing) keepDraft(draftKey, value);
+        },
+        [draftKey, editing]
+    );
+
     // What is being written changes when the message being rewritten changes,
     // and not when the same message arrives again: a reload that replaced the
     // object would otherwise wipe what has been typed into it. Backing out of an
-    // edit empties the box rather than leaving the old text in it as a draft.
+    // edit puts back whatever was in the box before it started - the draft, or
+    // nothing - rather than leaving the message being corrected sitting there.
     const editingId = editing?.id ?? null;
     useEffect(() => {
-        setBody(editing?.body ?? "");
+        setBody(editing?.body ?? (draftKey ? readDraft(draftKey) : ""));
         setGeneration((current) => current + 1);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately the id
     }, [editingId]);
@@ -363,6 +414,8 @@ export function Composer({
         setFiles([]);
         setRefused("");
         setGeneration((current) => current + 1);
+        // It is somewhere that is not a browser now.
+        if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
         else await onSend(text, sending);
     };
@@ -390,6 +443,7 @@ export function Composer({
         setFiles([]);
         setRefused("");
         setGeneration((current) => current + 1);
+        if (draftKey) dropDraft(draftKey);
         setScheduling(false);
     };
 
@@ -679,7 +733,7 @@ export function Composer({
                             if (disabled) return false;
                             return stage(pasted) > 0;
                         }}
-                        onChange={setBody}
+                        onChange={write}
                         // From the keys and not from the document changing. A
                         // document changes for reasons that are not a person
                         // writing - a chip resolving its name, an extension

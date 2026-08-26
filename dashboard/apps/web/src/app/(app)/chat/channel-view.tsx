@@ -31,6 +31,7 @@ import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
+import { channelDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
 import { runAction } from "@/lib/run-action";
 import { useCallHold } from "./call-session";
@@ -1575,6 +1576,10 @@ export function ChannelView({
                     />
                     <Composer
                         channelId={channelId}
+                        // Kept for next time. A conversation is still here
+                        // tomorrow, whether it is a channel, a group or one
+                        // person - see `drafts`.
+                        draftKey={channelDraftKey(channelId)}
                     rules={rules}
                     disabled={!canPost}
                     attachable={may.attach}

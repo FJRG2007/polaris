@@ -25,6 +25,7 @@ import { RecordingPanel } from "./recording-panel";
 import { useCallRecorder } from "./call-recorder";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
+import { usePresenceRefresh } from "@/components/presence-store";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
 import { takeRememberedCall } from "./call-resume";
@@ -64,6 +65,25 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
         if (recorder.current.running) recorder.current.stop();
         setSession(null);
     }, []);
+
+    /**
+     * Everybody's face, asked again, the moment this browser joins or leaves.
+     *
+     * The badge that says somebody is on a call is presence, and presence is
+     * refreshed on a timer of its own - so hanging up left the reader looking at
+     * their own face still marked as being in a call for the best part of a
+     * minute. Nothing was wrong with it; it was simply the answer to a question
+     * asked before they pressed the button, and a reload was the only thing that
+     * looked like it fixed it.
+     *
+     * Both directions, on the meeting rather than on the session object: joining
+     * puts the badge up and leaving takes it down, and they are the same event
+     * seen from either end.
+     */
+    const refreshPresence = usePresenceRefresh();
+    useEffect(() => {
+        refreshPresence();
+    }, [refreshPresence, session?.meetingId]);
 
     /**
      * The call this tab was on before it reloaded to pick up an update.
