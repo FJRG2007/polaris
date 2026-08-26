@@ -5,7 +5,7 @@
  * `FileViewer` modal wraps it for the contexts that have nowhere to put it
  * inline (a public share). The Drive explorer embeds `FilePreview` directly.
  * By type: images natively, audio/video through a Polaris-themed Plyr, PDFs in
- * the browser's native viewer (with pdf.js behind an Edit mode), spreadsheets/CSV in
+ * an in-dashboard pdf.js viewer that also annotates them, spreadsheets/CSV in
  * an editable grid, .docx read-only through mammoth, .pptx read-only as scaled
  * slides, source files as editable highlighted code, and anything else as
  * editable plain text (Notepad-style), binary or oversized files read-only.
@@ -16,25 +16,24 @@
  * assets are ever fetched.
  */
 
-import { Download, Share2 } from "lucide-react";
-import { formatBytes } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
-import { extensionOf } from "./file-categories";
-import { CodeView } from "./viewer/code-view";
 import { viewerKind } from "./viewer/kind";
+import { formatBytes } from "@polaris/core";
 import { DocView } from "./viewer/doc-view";
-import { MarkdownView } from "./viewer/markdown-view";
-import { MediaView } from "./viewer/media-view";
 import { PdfView } from "./viewer/pdf-view";
+import { CodeView } from "./viewer/code-view";
 import { PptxView } from "./viewer/pptx-view";
+import { Download, Share2 } from "lucide-react";
+import { extensionOf } from "./file-categories";
+import { MediaView } from "./viewer/media-view";
 import { SheetEditor } from "./viewer/sheet-editor";
+import { MarkdownView } from "./viewer/markdown-view";
 import { PlainTextEditor } from "./viewer/text-editor";
-import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { useDisplayFormat } from "@/components/display-format";
+import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
 export { isViewable, viewerKind } from "./viewer/kind";
-
 
 /** Default byte URL for a Drive-owned file (served by the session-scoped route). */
 export function driveByteUrl(target: ViewerTarget, inline: boolean): string {

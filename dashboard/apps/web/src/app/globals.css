@@ -257,3 +257,30 @@ body {
         color: #003545;
     }
 }
+
+/*
+ * The PDF viewer renders through pdf.js, whose stylesheet paints a white page
+ * against a browser chrome that is not ours. These are the places that have to
+ * meet the dashboard: the paper's edge and the dialog printing puts on screen.
+ * The page's own colours are left alone - it is somebody's document, not a
+ * surface to theme.
+ */
+.pdfViewer {
+    --page-margin: 10px auto;
+    --page-border: 1px solid hsl(var(--border));
+}
+
+dialog.pdfSlick-dialog {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--elevated));
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: 0.5rem;
+    font: inherit;
+    font-size: 13px;
+}
+
+dialog.pdfSlick-dialog .dialogButton {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--muted));
+    border-radius: 0.375rem;
+}

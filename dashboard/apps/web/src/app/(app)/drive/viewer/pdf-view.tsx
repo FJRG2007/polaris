@@ -1,20 +1,16 @@
 "use client";
 
 /**
- * PDF preview. Viewing stays on the browser's native viewer (an inline iframe:
- * crisp, selectable text, search, zoom and print, with no library weight);
- * editing swaps in the pdf.js editor, which - along with its stylesheet - is
- * loaded only when it is actually opened.
+ * PDF preview. The document, its library and its stylesheet load only when a
+ * PDF is actually opened, and never on the server: pdf.js reaches for the DOM
+ * as it loads, and there is none there.
  */
 
-import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Pencil } from "lucide-react";
-import { Button } from "@polaris/ui";
 import { Loading } from "./status";
 import type { ViewerTarget } from "./types";
 
-const PdfEditor = dynamic(() => import("./pdf-editor"), {
+const PdfDocument = dynamic(() => import("./pdf-document"), {
     ssr: false,
     loading: () => <Loading />
 });
@@ -30,36 +26,10 @@ export function PdfView({
     readOnly?: boolean;
     onSaved?: (name: string) => void;
 }) {
-    const [editing, setEditing] = useState(false);
-
-    if (editing) {
-        return (
-            <PdfEditor
-                src={src}
-                target={target}
-                onSaved={onSaved}
-                onExit={() => setEditing(false)}
-            />
-        );
-    }
-
-    return (
-        <div className="flex max-h-[80vh] flex-col">
-            {!readOnly ? (
-                <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-                    <span className="text-xs font-medium text-muted-foreground">PDF</span>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="ml-auto"
-                        onClick={() => setEditing(true)}
-                    >
-                        <Pencil className="size-4" />
-                        Edit
-                    </Button>
-                </div>
-            ) : null}
-            <iframe title="PDF preview" src={src} className="h-[80vh] w-full border-0" />
-        </div>
-    );
+    // Keyed on the file: opening another document in the same place is a new
+    // viewer, not the old one told to load different bytes. The tool in hand,
+    // the panel and - the one that would be a defect rather than an
+    // inconvenience - what counts as an unsaved change all belong to the
+    // document they were measured against.
+    return <PdfDocument key={src} src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
 }

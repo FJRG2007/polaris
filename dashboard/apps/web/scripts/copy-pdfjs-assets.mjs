@@ -6,14 +6,15 @@
  * being committed. Runs from the web app's predev/prebuild hooks.
  */
 
-import { cpSync, mkdirSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { createRequire } from "node:module";
+import { cpSync, mkdirSync, rmSync } from "node:fs";
 
 const require = createRequire(import.meta.url);
 const pdfjsRoot = dirname(require.resolve("pdfjs-dist/package.json"));
-const target = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "pdfjs");
+const publicDir = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
+const target = join(publicDir, "pdfjs");
 
 rmSync(target, { recursive: true, force: true });
 mkdirSync(target, { recursive: true });
@@ -23,4 +24,12 @@ for (const folder of ["cmaps", "standard_fonts", "iccs", "wasm"]) {
     cpSync(join(pdfjsRoot, folder), join(target, folder), { recursive: true });
 }
 
-console.log(`Copied pdf.js assets to ${target}`);
+// The annotation layer and the editor's own toolbar ask for their icons at
+// /images/, a path the viewer component has baked in with nothing to override
+// it. Without them a document with a comment annotation, or a reader reaching
+// for the alt-text button, gets a broken icon.
+const images = join(publicDir, "images");
+rmSync(images, { recursive: true, force: true });
+cpSync(join(pdfjsRoot, "web", "images"), images, { recursive: true });
+
+console.log(`Copied pdf.js assets to ${target} and ${images}`);
