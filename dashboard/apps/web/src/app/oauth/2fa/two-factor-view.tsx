@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { abandonChallengeAction } from "./actions";
 import { KeyRound, Mail, Smartphone } from "lucide-react";
-import { WhatsAppLogo } from "@/app/(app)/inbox/channel-logos";
+import { WhatsAppLogo } from "@/app/(app)/admin/inbox/channel-logos";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import { Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, PolarisMark } from "@polaris/ui";
