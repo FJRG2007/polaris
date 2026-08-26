@@ -91,7 +91,8 @@ export function PdfToolbar({
 
     function setZoom(value: string) {
         if (!pdfSlick) return;
-        if (ZOOM_PRESETS.some((preset) => preset.value === value)) pdfSlick.currentScaleValue = value;
+        if (ZOOM_PRESETS.some((preset) => preset.value === value))
+            pdfSlick.currentScaleValue = value;
         else pdfSlick.currentScale = Number(value);
     }
 
@@ -209,9 +210,7 @@ export function PdfToolbar({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                            onSelect={() => pdfSlick?.setRotation(rotation + 90)}
-                        >
+                        <DropdownMenuItem onSelect={() => pdfSlick?.setRotation(rotation + 90)}>
                             <RotateCw />
                             Rotate
                         </DropdownMenuItem>

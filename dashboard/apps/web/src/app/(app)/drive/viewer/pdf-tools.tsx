@@ -56,7 +56,9 @@ export function PdfTools({
                         onClick={() => onSelect(id)}
                         className={cn(
                             "flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors hover:bg-card-hover disabled:opacity-50",
-                            tool === id ? "bg-muted font-medium text-foreground" : "text-muted-foreground"
+                            tool === id
+                                ? "bg-muted font-medium text-foreground"
+                                : "text-muted-foreground"
                         )}
                     >
                         <Icon className="size-4 shrink-0" />

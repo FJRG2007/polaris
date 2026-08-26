@@ -124,7 +124,9 @@ export function PdfSidebar({
                                 }
                             >
                                 <Paperclip className="size-4 shrink-0" />
-                                <span className="truncate" title={attachment.filename}>{attachment.filename}</span>
+                                <span className="truncate" title={attachment.filename}>
+                                    {attachment.filename}
+                                </span>
                             </Button>
                         ))}
                     </div>

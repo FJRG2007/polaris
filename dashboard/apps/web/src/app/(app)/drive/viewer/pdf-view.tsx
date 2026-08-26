@@ -31,5 +31,7 @@ export function PdfView({
     // the panel and - the one that would be a defect rather than an
     // inconvenience - what counts as an unsaved change all belong to the
     // document they were measured against.
-    return <PdfDocument key={src} src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+    return (
+        <PdfDocument key={src} src={src} target={target} readOnly={readOnly} onSaved={onSaved} />
+    );
 }
