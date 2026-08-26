@@ -131,7 +131,8 @@ fn valid_volume_name(name: &str) -> bool {
         Some(c) if c.is_ascii_alphanumeric() => {}
         _ => return false,
     }
-    name.len() <= 255 && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
+    name.len() <= 255
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
 }
 
 /// Forward one already-validated request to the Docker socket and return the
