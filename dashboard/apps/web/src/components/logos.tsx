@@ -32,7 +32,10 @@ const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     moonshot: MoonshotMark,
     groq: GroqMark,
     cerebras: CerebrasMark,
-    openrouter: OpenRouterMark
+    openrouter: OpenRouterMark,
+    // The gateway is not a provider, but it is a thing with a name and a mark,
+    // and it sits in the same list.
+    enigma: brand.EnigmaMark
 };
 
 interface LogoProps {
@@ -73,15 +76,45 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     discord: brand.DiscordMark,
     cloudflare: brand.CloudflareMark,
     ngrok: brand.NgrokMark,
+    giphy: brand.GiphyMark,
+    krisp: brand.KrispMark,
     dymo: DymoMark
 };
+
+/**
+ * The ones whose logo is a picture rather than a shape.
+ *
+ * A vendor that publishes only a full-colour mark cannot be drawn in
+ * `currentColor` without becoming a silhouette of itself, so its own file is
+ * served from `public/` instead. Kept apart from the marks above so it is
+ * obvious which kind each integration is - and so a slug that has neither is
+ * one line to spot.
+ */
+const SERVICE_IMAGES: Record<string, string> = {
+    duckdns: "/logos/duckdns.webp",
+    minecraft: "/logos/minecraft.webp",
+    tenor: "/logos/tenor.webp",
+    criminalip: "/logos/criminalip.webp"
+};
+
+/** Whether this slug has a logo of its own, which is what the catalogue test
+ *  asks so a new integration cannot ship drawing the generic block. */
+export function hasIntegrationLogo(slug: string): boolean {
+    return (
+        slug === "virustotal" ||
+        slug in SERVICE_IMAGES ||
+        slug in SERVICE_MARKS ||
+        slug in MODEL_MARKS
+    );
+}
 
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
-    // DuckDNS ships only an official raster mark; served from public/ as a static asset.
-    if (slug === "duckdns")
-        return <img src="/logos/duckdns.webp" alt="" className={cn("shrink-0", className)} />;
+    const image = SERVICE_IMAGES[slug];
+    // object-contain: these are the vendors' own files, and they are not all
+    // square. A logo stretched to fill a box is a logo nobody signed off on.
+    if (image) return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
     return <Blocks className={className} />;
