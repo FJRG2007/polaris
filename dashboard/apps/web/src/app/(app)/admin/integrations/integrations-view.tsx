@@ -1,11 +1,14 @@
 "use client";
 
 /**
- * The integrations grid and the configure dialog behind each card. Shared by the
- * marketplace and the AI providers screen, which pass different cards to the same
- * component. What a card opens is decided in one place (`dialogFor`) because a
- * card whose button opens nothing looks exactly like a broken page. Saving goes
- * through the admin-gated server actions.
+ * The integrations grid and the configure dialog behind each card. What a card
+ * opens is decided in one place (`dialogFor`) because a card whose button opens
+ * nothing looks exactly like a broken page. Saving goes through the admin-gated
+ * server actions.
+ *
+ * The model providers used to be cards here too, which made connecting a model
+ * look like connecting a service and left an operator with one key per provider
+ * and nothing to name it. They are a list of keys now, on their own screen.
  */
 
 import { useRouter } from "next/navigation";
@@ -14,7 +17,7 @@ import * as integrationActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { CopyButton } from "@/components/copy-button";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
-import { useState, useTransition, type ComponentType } from "react";
+import { useMemo, useState, useTransition, type ComponentType } from "react";
 import type { ConnectionFailure } from "@/lib/connections/attention";
 import {
     isTunnelToken,
@@ -28,6 +31,7 @@ import {
     ExternalLink,
     Loader2,
     RefreshCw,
+    Search,
     ShieldAlert,
     ShieldCheck,
     TriangleAlert
@@ -39,8 +43,8 @@ import {
 } from "@/lib/integrations/cloudflare-token-link";
 import {
     DYMO_IP_RULES,
+    INTEGRATION_CATEGORIES,
     SCAN_ACTIONS,
-    type GatewayConfig,
     type IntegrationSetupLink,
     type IntegrationSetupValue,
     type ScanAction
@@ -56,6 +60,7 @@ import {
     Switch,
     CardBody,
     Textarea,
+    EmptyState,
     DialogTitle,
     DialogHeader,
     DialogContent,
@@ -126,8 +131,6 @@ export interface IntegrationCard {
     setupValues?: Partial<Record<IntegrationSetupValue, string>>;
     /** What the last authorization was refused with, when one was. */
     failure?: ConnectionFailure;
-    /** The gateway's endpoint settings. Set for that card only. */
-    gateway?: GatewayConfig;
     /** Where a licensed call filter is served from. Set for that card only. */
     filterModuleUrl?: string;
     /** Whether a linked account of this service may sign anybody in here, for the
@@ -156,20 +159,53 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "tenor" || card.slug === "giphy") return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
-    // The gateway asks for an endpoint rather than a provider key, so it is told
-    // apart by carrying those settings and not by its slug.
-    if (card.gateway) return GatewayDialog;
-    if (card.category === "Models") return ModelProviderDialog;
     return null;
 }
 
-export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
+/** What a search matches on. The summary is in there because somebody looking
+ *  for "gif" or "noise" is describing what they want done, not naming a vendor. */
+function haystack(card: IntegrationCard): string {
+    return `${card.name} ${card.slug} ${card.category} ${card.summary}`.toLowerCase();
+}
+
+/** Set up, or set up and switched off. Either way there is something stored, and
+ *  that is what puts a service in front of the ones nobody has touched. */
+function isConnected(card: IntegrationCard): boolean {
+    return card.hasSecret || card.enabled;
+}
+
+export function IntegrationsView({ cards }: { cards: IntegrationCard[]; }) {
     const router = useRouter();
     const [configuring, setConfiguring] = useState<IntegrationCard | null>(null);
+    const [query, setQuery] = useState("");
     const ConfigureDialog = configuring ? dialogFor(configuring) : null;
-    // The category badge sorts a mixed grid. On a screen that is all one category
-    // it repeats the page title on every card, so it is left off there.
-    const mixed = new Set(cards.map((card) => card.category)).size > 1;
+
+    const needle = query.trim().toLowerCase();
+    const matches = useMemo(
+        () => (needle ? cards.filter((card) => haystack(card).includes(needle)) : cards),
+        [cards, needle]
+    );
+
+    /**
+     * The catalogue by category, in the catalogue's own order, with whatever is
+     * already set up at the top of each.
+     *
+     * A search collapses it to one list: somebody typing has already said what
+     * they are looking for, and answering with five headings and a single card
+     * under one of them makes them find it twice.
+     */
+    const sections = useMemo(() => {
+        if (needle) return [{ name: null as string | null, hint: null as string | null, cards: matches }];
+        return INTEGRATION_CATEGORIES.map(({ name, hint }) => ({
+            name: name as string | null,
+            hint: hint as string | null,
+            cards: matches
+                .filter((card) => card.category === name)
+                .sort((left, right) => Number(isConnected(right)) - Number(isConnected(left)))
+        })).filter((section) => section.cards.length > 0);
+    }, [matches, needle]);
+
+    const connected = cards.filter(isConnected).length;
 
     /**
      * These cards were rendered on the server, and a dialog saves through an
@@ -186,59 +222,108 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
 
     return (
         <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {cards.map((card) => (
-                    <Card key={card.slug}>
-                        <CardBody className="flex flex-col gap-3">
-                            <div className="flex items-start gap-3">
-                                <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
-                                    <IntegrationLogo slug={card.slug} className="size-6" />
+            <div className="flex flex-col gap-5">
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 size-4 shrink-0 -translate-y-1/2" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search integrations"
+                            aria-label="Search integrations"
+                            className="pl-9"
+                        />
+                    </div>
+                    <p className="text-muted-foreground whitespace-nowrap text-xs tabular-nums">
+                        {connected} of {cards.length} set up
+                    </p>
+                </div>
+
+                {matches.length === 0 ? (
+                    <EmptyState
+                        icon={<Search />}
+                        title="Nothing matches"
+                        description="Polaris connects to the services in this list and no others."
+                    />
+                ) : (
+                    sections.map((section) => (
+                        <section key={section.name ?? "results"} className="flex flex-col gap-3">
+                            {section.name ? (
+                                <div>
+                                    <h2 className="text-sm font-medium">
+                                        {section.name}
+                                        <span className="text-muted-foreground ml-2 text-xs font-normal tabular-nums">
+                                            {section.cards.length}
+                                        </span>
+                                    </h2>
+                                    <p className="text-muted-foreground text-xs">{section.hint}</p>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="truncate text-sm font-medium">
-                                            {card.name}
-                                        </h2>
-                                        {mixed ? (
-                                            <Badge variant="neutral">{card.category}</Badge>
-                                        ) : null}
-                                    </div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                        {card.summary}
-                                    </p>
-                                </div>
-                                {/* A service that refused the last person to try it is
-                                    the one thing on this grid worth reading before
-                                    "On": it is on, and it is not working. */}
-                                {card.failure ? (
-                                    <Badge variant="warning">Needs attention</Badge>
-                                ) : card.enabled ? (
-                                    <Badge variant="success">On</Badge>
-                                ) : card.hasSecret ? (
-                                    <Badge variant="neutral">Off</Badge>
-                                ) : null}
+                            ) : null}
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                {section.cards.map((card) => (
+                                    <Card key={card.slug}>
+                                        <CardBody className="flex flex-col gap-3">
+                                            <div className="flex items-start gap-3">
+                                                <div className="border-border bg-surface grid size-10 shrink-0 place-items-center rounded-md border">
+                                                    <IntegrationLogo
+                                                        slug={card.slug}
+                                                        className="size-6"
+                                                    />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="truncate text-sm font-medium">
+                                                            {card.name}
+                                                        </h3>
+                                                        {/* Only while searching: under a heading
+                                                            that already says it, the badge is the
+                                                            same word twice on every card. */}
+                                                        {needle ? (
+                                                            <Badge variant="neutral">
+                                                                {card.category}
+                                                            </Badge>
+                                                        ) : null}
+                                                    </div>
+                                                    <p className="text-muted-foreground mt-0.5 text-xs">
+                                                        {card.summary}
+                                                    </p>
+                                                </div>
+                                                {/* A service that refused the last person to try it
+                                                    is the one thing on this grid worth reading
+                                                    before "On": it is on, and it is not working. */}
+                                                {card.failure ? (
+                                                    <Badge variant="warning">Needs attention</Badge>
+                                                ) : card.enabled ? (
+                                                    <Badge variant="success">On</Badge>
+                                                ) : card.hasSecret ? (
+                                                    <Badge variant="neutral">Off</Badge>
+                                                ) : null}
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <a
+                                                    href={card.docsUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    className="text-muted-foreground hover:text-foreground mr-auto inline-flex items-center gap-1 text-xs"
+                                                >
+                                                    Docs
+                                                    <ExternalLink className="size-3 shrink-0" />
+                                                </a>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={() => setConfiguring(card)}
+                                                >
+                                                    {card.hasSecret ? "Configure" : "Set up"}
+                                                </Button>
+                                            </div>
+                                        </CardBody>
+                                    </Card>
+                                ))}
                             </div>
-                            <div className="flex items-center justify-end gap-2">
-                                <a
-                                    href={card.docsUrl}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                    className="mr-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                                >
-                                    Docs
-                                    <ExternalLink className="size-3" />
-                                </a>
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => setConfiguring(card)}
-                                >
-                                    {card.hasSecret ? "Configure" : "Set up"}
-                                </Button>
-                            </div>
-                        </CardBody>
-                    </Card>
-                ))}
+                        </section>
+                    ))
+                )}
             </div>
 
             {configuring && ConfigureDialog ? (
@@ -247,7 +332,6 @@ export function IntegrationsView({ cards }: { cards: IntegrationCard[] }) {
         </>
     );
 }
-
 /**
  * Whether this application has ever taken somebody through, and the way to find
  * out when it has not.
@@ -972,283 +1056,6 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                             checked={enabled}
                             onChange={setEnabled}
                             aria-label="Search for GIFs and stickers"
-                        />
-                    </div>
-
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button type="button" onClick={onSave} disabled={saving}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/**
- * Connect one model provider: a key, and whether runs may use it.
- *
- * One dialog for every provider in the Models category, because that is all
- * connecting one is - the key goes in, and a run is handed it. Nothing is
- * verified against the provider on save: every check costs tokens on the
- * operator's own account, and a wrong key fails at the start of the first run
- * naming itself.
- */
-function ModelProviderDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    // A first-time setup defaults to on: nobody pastes a key meaning to leave it unused.
-    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
-    const [apiKey, setApiKey] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [saving, startSave] = useTransition();
-    const [removing, startRemove] = useTransition();
-
-    function onSave() {
-        setError(null);
-        startSave(async () => {
-            const result = await runAction(
-                () =>
-                    integrationActions.saveModelProviderAction({
-                        slug: card.slug,
-                        enabled,
-                        apiKey
-                    }),
-                setError
-            );
-            if (!result) return;
-            if (result.error) setError(result.error);
-            else onClose();
-        });
-    }
-
-    function onDisconnect() {
-        setError(null);
-        startRemove(async () => {
-            const result = await runAction(
-                () => integrationActions.disconnectModelProviderAction(card.slug),
-                setError
-            );
-            if (!result) return;
-            if (result.error) setError(result.error);
-            else onClose();
-        });
-    }
-
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <IntegrationLogo slug={card.slug} className="size-5" />
-                        {card.name}
-                    </DialogTitle>
-                    <DialogDescription>{card.description}</DialogDescription>
-                </DialogHeader>
-
-                <div className="flex flex-col gap-4">
-                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "API key"}</span>
-                        <Input
-                            type="password"
-                            autoComplete="off"
-                            value={apiKey}
-                            onChange={(event) => setApiKey(event.target.value)}
-                            placeholder={
-                                card.hasSecret
-                                    ? "Saved - enter a new key to replace it"
-                                    : "Paste your key"
-                            }
-                        />
-                        {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
-                        ) : null}
-                    </label>
-
-                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span>
-                            <span className="font-medium">Let agents use it</span>
-                            <span className="block text-xs text-muted-foreground">
-                                Runs are handed this key over an authenticated call. It is never
-                                written into a repository, so rotating it here takes effect
-                                everywhere at once.
-                            </span>
-                        </span>
-                        <Switch
-                            checked={enabled}
-                            onChange={setEnabled}
-                            aria-label={`Let agents use ${card.name}`}
-                        />
-                    </div>
-
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-
-                    <div className="flex justify-end gap-2">
-                        {card.hasSecret ? (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                className="mr-auto text-danger"
-                                onClick={onDisconnect}
-                                disabled={saving || removing}
-                            >
-                                {removing ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    "Forget key"
-                                )}
-                            </Button>
-                        ) : null}
-                        <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button type="button" onClick={onSave} disabled={saving || removing}>
-                            {saving ? <Loader2 className="size-4 animate-spin" /> : "Save"}
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/**
- * Point runs at an OpenAI-compatible endpoint instead of a provider key.
- *
- * The two token limits are fields rather than assumptions: an endpoint publishes
- * no catalog, and a run that has to guess caps its answers at 32000 tokens and
- * stops compacting - which looks like the agent quitting halfway through, not
- * like a setting nobody filled in.
- */
-function GatewayDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
-    const saved = card.gateway ?? { baseUrl: "", model: "", context: 0, maxOutput: 0 };
-    const [enabled, setEnabled] = useState(card.hasSecret || saved.baseUrl ? card.enabled : true);
-    const [baseUrl, setBaseUrl] = useState(saved.baseUrl);
-    const [model, setModel] = useState(saved.model);
-    const [context, setContext] = useState(saved.context > 0 ? String(saved.context) : "");
-    const [maxOutput, setMaxOutput] = useState(saved.maxOutput > 0 ? String(saved.maxOutput) : "");
-    const [token, setToken] = useState("");
-    const [error, setError] = useState<string | null>(null);
-    const [saving, startSave] = useTransition();
-
-    function onSave() {
-        setError(null);
-        startSave(async () => {
-            const result = await runAction(
-                () =>
-                    integrationActions.saveGatewayAction({
-                        enabled,
-                        baseUrl,
-                        model,
-                        context: Number.parseInt(context, 10) || 0,
-                        maxOutput: Number.parseInt(maxOutput, 10) || 0,
-                        token
-                    }),
-                setError
-            );
-            if (!result) return;
-            if (result.error) setError(result.error);
-            else onClose();
-        });
-    }
-
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <IntegrationLogo slug={card.slug} className="size-5" />
-                        {card.name}
-                    </DialogTitle>
-                    <DialogDescription>{card.description}</DialogDescription>
-                </DialogHeader>
-
-                <div className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Base URL</span>
-                        <Input
-                            value={baseUrl}
-                            onChange={(event) => setBaseUrl(event.target.value)}
-                            placeholder="https://gateway.example.com/v1"
-                            autoComplete="off"
-                            spellCheck={false}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            Reachable from wherever runs happen. A loopback address works for runs
-                            on this server and not for runs on GitHub-hosted machines.
-                        </span>
-                    </label>
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">Model id</span>
-                        <Input
-                            value={model}
-                            onChange={(event) => setModel(event.target.value)}
-                            placeholder="The id the endpoint serves"
-                            autoComplete="off"
-                            spellCheck={false}
-                        />
-                    </label>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Context window</span>
-                            <Input
-                                type="number"
-                                min={1}
-                                inputMode="numeric"
-                                value={context}
-                                onChange={(event) => setContext(event.target.value)}
-                                placeholder="200000"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">Largest answer</span>
-                            <Input
-                                type="number"
-                                min={1}
-                                inputMode="numeric"
-                                value={maxOutput}
-                                onChange={(event) => setMaxOutput(event.target.value)}
-                                placeholder="64000"
-                            />
-                        </label>
-                    </div>
-                    <span className="-mt-2 text-xs text-muted-foreground">
-                        Both in tokens, from whatever the endpoint serves. Left unset, a run answers
-                        in 32000-token slices and never compacts.
-                    </span>
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{card.apiKeyLabel ?? "Token"}</span>
-                        <Input
-                            type="password"
-                            autoComplete="off"
-                            value={token}
-                            onChange={(event) => setToken(event.target.value)}
-                            placeholder={
-                                card.hasSecret
-                                    ? "Saved - enter a new token to replace it"
-                                    : "Optional"
-                            }
-                        />
-                        {card.apiKeyHelp ? (
-                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
-                        ) : null}
-                    </label>
-
-                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                        <span className="font-medium">Let agents use it</span>
-                        <Switch
-                            checked={enabled}
-                            onChange={setEnabled}
-                            aria-label={`Let agents use ${card.name}`}
                         />
                     </div>
 

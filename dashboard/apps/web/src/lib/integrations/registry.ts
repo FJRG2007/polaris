@@ -5,13 +5,32 @@
  * operator has enabled it. New integrations are added here.
  */
 
+/**
+ * What kind of job connecting this one is, which is how the screen is arranged.
+ *
+ * Grouped by what the operator came to do rather than by what the vendor sells:
+ * somebody registering an OAuth application is doing the same work whether it is
+ * Google's or Dropbox's, and nothing about that work resembles pointing a game
+ * server at Steam.
+ */
 export type IntegrationCategory =
     | "Security"
-    | "Notifications"
-    | "Storage"
-    | "Automation"
-    | "Productivity"
+    | "OAuth apps"
+    | "Networking"
+    | "Games"
+    | "Chat"
     | "Models";
+
+/** The order the screen shows them in, and the line under each heading. Security
+ *  first because it is the one group that is about refusing things rather than
+ *  reaching them. */
+export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; hint: string }> = [
+    { name: "Security", hint: "What checks a file, an address or a visitor before Polaris trusts it." },
+    { name: "OAuth apps", hint: "Applications you register with a provider so people here can link that account or sign in with it." },
+    { name: "Networking", hint: "How a deployment is reached from outside: names, records and tunnels." },
+    { name: "Games", hint: "The stores and accounts a game server needs to install, update and let people in." },
+    { name: "Chat", hint: "What conversations and calls here can reach." }
+];
 
 /**
  * Something this deployment knows that a vendor's form is asking for.
@@ -228,7 +247,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "github",
         name: "GitHub",
-        category: "Automation",
+        category: "OAuth apps",
         summary: "Let people connect their GitHub, sign in with it, and deploy their repositories.",
         description:
             "Create a GitHub App in one click and Polaris can build private repositories, register self-hosted runners, and give everyone here a Connect button for their own GitHub account. Each person then sees their own repositories and nobody else's, and can sign in with the account they linked if you allow it.",
@@ -241,7 +260,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "google",
         name: "Google",
-        category: "Automation",
+        category: "OAuth apps",
         summary:
             "Let people connect their Google account, sign in with it, and show their calendar.",
         description:
@@ -296,7 +315,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "microsoft",
         name: "Microsoft",
-        category: "Automation",
+        category: "OAuth apps",
         summary: "Let people connect their Microsoft account and keep backups in their OneDrive.",
         description:
             "Register an Entra application and everyone here gets a Connect button for their own Microsoft account. Their OneDrive can then be chosen as a backup destination, and Polaris only ever touches the folder it creates there. Polaris holds no credential that reaches anybody's files - only the access each person granted.",
@@ -320,7 +339,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "dropbox",
         name: "Dropbox",
-        category: "Automation",
+        category: "OAuth apps",
         summary: "Let people connect their Dropbox and keep backups in it.",
         description:
             "Create a Dropbox app and everyone here gets a Connect button for their own account. Their Dropbox can then be chosen as a backup destination. An app scoped to its own folder is the one to create: everything Polaris writes then lives in one folder, and nothing else in anybody's Dropbox is reachable from here.",
@@ -344,7 +363,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "steam",
         name: "Steam",
-        category: "Automation",
+        category: "Games",
         summary: "Let people link their Steam account, so game servers can recognize them.",
         description:
             "Steam needs nothing registered: it signs people in over OpenID, so the Connect button on everybody's account works the moment this is switched on. A Web API key is optional and buys one thing - the name and avatar beside a linked account, instead of a seventeen-digit number. An ARK server closed by Steam id can then be opened to somebody by their Polaris name.",
@@ -363,7 +382,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "epic",
         name: "Epic Games",
-        category: "Automation",
+        category: "Games",
         summary: "Let people link their Epic account, so game servers can recognize them.",
         description:
             "Register a product in Epic's developer portal and everyone here gets a Connect button for their own Epic account. Polaris reads the account id and the display name, which is what a server needs to tell one player from another. Games bought on the Epic Store carry no Steam id at all, so for those players this is the only id there is. The longest setup on this screen: Epic wants an application, a verified domain and a brand review before it will let anybody outside your own organisation authorize.",
@@ -410,7 +429,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "minecraft",
         name: "Minecraft",
-        category: "Automation",
+        category: "Games",
         summary:
             "Let people link their Minecraft account, so a server can be opened to them by name.",
         description:
@@ -435,7 +454,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "discord",
         name: "Discord",
-        category: "Automation",
+        category: "Chat",
         summary: "Let people link their Discord account, so game servers can recognize them.",
         description:
             "Register an application in Discord's developer portal and everyone here gets a Connect button for their own Discord account. Polaris reads the account id and the name they go by, which is what a FiveM server's door is keyed by, and records it against their Polaris account instead of leaving it to be read out over chat. It also reads their address and the servers they are in, which is what the consent screen will say. The shortest setup on this screen: an application, a redirect URI, and the secret. Signing in with a Discord account is a separate switch below, and it starts off.",
@@ -465,7 +484,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "krisp",
         name: "Krisp",
-        category: "Productivity",
+        category: "Chat",
         summary: "Use a licensed noise filter in calls instead of the free one.",
         description:
             "Calls already remove background noise with two free models that run in the browser and cost nothing. This is for an operator who has licensed a better one - Krisp being the one people ask for, since it is what Discord runs. Krisp does not publish its browser SDK for anyone to install, so what goes here is your own build of it: the address it is served from and the token it authenticates with. Both reach the browser, because that is where a filter on a microphone runs, and only ever a browser sitting in a call.",
@@ -484,7 +503,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "tenor",
         name: "Tenor",
-        category: "Productivity",
+        category: "Chat",
         summary: "Search GIFs and stickers from the chat composer.",
         description:
             "Adds a GIF and sticker search to the picker in Chat. Without it the picker still works - emoji, the pictures each person has kept, and anything sent by pasting its address - and only the search tab is missing. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Tenor for anything and nobody is told who read what.",
@@ -503,7 +522,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "giphy",
         name: "Giphy",
-        category: "Productivity",
+        category: "Chat",
         summary: "Search GIFs and stickers from the chat composer.",
         description:
             "The same search as Tenor, out of a Giphy account instead. Connect either one - the picker does not say which answered, and if both are connected Giphy does. A chosen GIF is fetched once and stored here like any other attachment, so a conversation never asks Giphy for anything and nobody is told who read what.",
@@ -522,7 +541,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "cloudflare",
         name: "Cloudflare",
-        category: "Automation",
+        category: "Networking",
         summary: "Create your DNS records and expose apps with no port-forwarding.",
         description:
             "Connect an API token and Polaris writes your zones' DNS records and gives each app its own tunnel, so nothing is typed into a DNS panel and no ports are opened. One token can do both, or connect DNS and tunnels separately. A connector token can also be pasted here to run a single server-wide tunnel instead.",
@@ -535,7 +554,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "ngrok",
         name: "ngrok",
-        category: "Automation",
+        category: "Networking",
         summary: "Expose deployed apps through an ngrok tunnel, no port-forwarding.",
         description:
             "Runs an ngrok agent from this server that forwards inbound traffic to Polaris. Good for quick public access; a reserved domain (ngrok paid) is recommended for a stable URL.",
@@ -552,7 +571,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     {
         slug: "duckdns",
         name: "DuckDNS",
-        category: "Automation",
+        category: "Networking",
         summary: "Free dynamic DNS - keep a subdomain pointed at your changing IP.",
         description:
             "Points a free <name>.duckdns.org subdomain at this server's public IP and keeps it updated as your ISP address changes, so a home box stays reachable. DuckDNS also resolves *.<name>.duckdns.org, so it works as a wildcard base for app subdomains.",

@@ -222,10 +222,11 @@ export default async function IntegrationsPage() {
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
                 <h1 className="text-[17px] font-semibold tracking-tight">Integrations</h1>
-                <p className="text-sm text-muted-foreground">
-                    Connect Polaris to outside services. Enabled integrations run across the
-                    platform. The model providers agents run on are under{" "}
-                    <Link href="/integrations/models" className="text-primary hover:underline">
+                <p className="text-muted-foreground text-sm">
+                    The outside services Polaris can use, grouped by the job connecting one does.
+                    Whatever is set up here works everywhere at once - there is nothing to switch on
+                    per screen. The model providers agents run on have their own list under{" "}
+                    <Link href="/admin/integrations/models" className="text-primary hover:underline">
                         AI providers
                     </Link>
                     .
