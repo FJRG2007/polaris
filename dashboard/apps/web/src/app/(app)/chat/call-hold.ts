@@ -18,6 +18,7 @@
 
 import { createContext, useContext } from "react";
 import type { CallState } from "./call-state";
+import type { CallRecording } from "./call-recorder";
 
 /** The call this browser is sitting in. */
 export interface CallSession {
@@ -40,6 +41,10 @@ export interface CallSession {
 
 export interface CallHold {
     readonly call: CallState;
+    /** Writing this call down, for as long as somebody is. Held beside the call
+     *  rather than by the screen that draws one, so pressing record and then
+     *  walking off to look something up does not end the recording. */
+    readonly recording: CallRecording;
     readonly session: CallSession | null;
     readonly viewerId: string;
     /** Step into a call. Replaces whatever this browser was in - one call at a

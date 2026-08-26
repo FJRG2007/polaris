@@ -38,6 +38,7 @@ import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { stagesOf, stagingOf } from "./call-media";
+import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CAMERA_LADDER,
@@ -50,6 +51,7 @@ import {
 import {
     Check,
     ChevronUp,
+    Circle,
     Expand,
     Headphones,
     HeadphoneOff,
@@ -63,7 +65,9 @@ import {
     MonitorX,
     PhoneOff,
     Shrink,
+    Square,
     UserPlus,
+    Users,
     Video,
     VideoOff,
     Volume2,
@@ -127,6 +131,7 @@ export function CallRoom({
     viewerId?: string;
 }) {
     const [inviting, setInviting] = useState(false);
+    const [asking, setAsking] = useState(false);
     const [guestLink, setGuestLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [shareError, setShareError] = useState("");
@@ -154,10 +159,40 @@ export function CallRoom({
     }, [call]);
 
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
+    /** Whether the call is being written down, and by whom - this browser
+     *  included, since the person recording needs telling as much as anybody. */
+    const recording = [...call.states].filter(([, state]) => state.recording).map(([id]) => id);
+    const recorded = call.recording || recording.length > 0;
     // This browser's own seat, which is where its own face comes from: a guest
     // has no account to draw one from, and the signed-in id is not on the seat.
     const mine = admitted?.find((person) => person.id === call.participantId);
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
+    const recordedBy =
+        call.meeting?.participants.find((person) => person.id === recording[0])?.name ??
+        "Somebody";
+
+    /**
+     * What somebody else's tile says and offers about sharing a room with them.
+     *
+     * Nothing at all once this device is already quiet for a room: a companion
+     * that combined again would be pointing at two devices at once, and the way
+     * out of one room before joining another is the strip above.
+     */
+    const combining = (personId: string) => {
+        const together = call.audioMembers.includes(personId);
+        // Drawn for anybody who has gone quiet for a room, not only for the
+        // room this reader is in. Somebody watching from elsewhere sees two
+        // people muted and no reason for it otherwise, which reads as two
+        // people refusing to answer.
+        const quiet = together || call.states.get(personId)?.group != null;
+        if (together || call.audioRole === "companion") return { sameRoom: quiet };
+        return {
+            sameRoom: quiet,
+            onCombine: () => call.combineWith(personId),
+            onAskCombine: () => call.askToCombine(personId),
+            combineAsked: call.combineAsked === personId
+        };
+    };
     const columns = gridColumns((admitted?.length ?? 1) || 1);
 
     /**
@@ -210,6 +245,10 @@ export function CallRoom({
     // where it is heard wherever the reader is standing. This is left for the
     // guest page, which has no provider and no other screen to be on.
     const held = useHeldCall();
+    /** Whether this screen may start a recording at all: the host, in a browser
+     *  that can record video, with the call held above it - the guest page has
+     *  no provider and nowhere to put what it would make. */
+    const canRecord = canShare && held !== null && held.recording.supported;
     const wasEnded = useRef(false);
     useEffect(() => {
         if (!held && call.ended && !wasEnded.current) playCallSound("hangUp");
@@ -237,6 +276,22 @@ export function CallRoom({
                     {call.error || shareError}
                 </p>
             )}
+
+            {/* Said before anything else on the screen, and to everybody: a
+                call being written down is the one fact in a room that changes
+                what people are willing to say in it. */}
+            {recorded && (
+                <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+                    <Circle className="size-3 shrink-0 fill-current" />
+                    <span className="min-w-0 flex-1">
+                        {call.recording
+                            ? "You are recording this call. Everybody in it can see that."
+                            : `${recordedBy} is recording this call.`}
+                    </span>
+                </p>
+            )}
+
+            <CombineStrip call={call} />
 
             {waiting && waiting.length > 0 && (
                 <ul className="flex flex-col gap-1">
@@ -329,7 +384,9 @@ export function CallRoom({
                                     muted={call.states.get(personId)?.muted}
                                     deafened={call.states.get(personId)?.deafened}
                                     speaking={call.speaking.has(personId)}
+                                    recording={call.states.get(personId)?.recording}
                                     volumeKey={person?.userId ?? personId}
+                                    {...combining(personId)}
                                 />
                             );
                         })()
@@ -375,6 +432,8 @@ export function CallRoom({
                         // somebody talks into a dead microphone.
                         muted={!call.micOn}
                         deafened={call.deafened}
+                        recording={call.recording}
+                        sameRoom={call.audioRole !== null}
                         focused={live === `camera:${call.participantId}`}
                         onFocus={
                             call.participantId
@@ -394,8 +453,10 @@ export function CallRoom({
                                 speaking={call.speaking.has(person.id)}
                                 muted={call.states.get(person.id)?.muted}
                                 deafened={call.states.get(person.id)?.deafened}
+                                recording={call.states.get(person.id)?.recording}
                                 focused={live === `camera:${person.id}`}
                                 onFocus={() => focus(`camera:${person.id}`)}
+                                {...combining(person.id)}
                                 // Their account where they have one, so turning
                                 // somebody down holds across calls; their seat
                                 // where they do not, which lasts as long as the
@@ -507,6 +568,30 @@ export function CallRoom({
                     {call.deafened ? "Undeafen" : "Deafen"}
                 </Button>
 
+                {/* Recording is the host's to start, and only where there is
+                    a provider holding the call: the guest page has no dashboard
+                    around it and nowhere to put what it made. */}
+                {canRecord && (
+                    <Button
+                        size="sm"
+                        variant={call.recording ? "danger" : "secondary"}
+                        aria-pressed={call.recording}
+                        onClick={() => (call.recording ? held?.recording.stop() : setAsking(true))}
+                        title={
+                            call.recording
+                                ? "Stop recording and keep what was made"
+                                : "Write this call to a video file in this browser"
+                        }
+                    >
+                        {call.recording ? (
+                            <Square className="size-4 fill-current" />
+                        ) : (
+                            <Circle className="size-4" />
+                        )}
+                        {call.recording ? `Stop (${clock(held?.recording.seconds ?? 0)})` : "Record"}
+                    </Button>
+                )}
+
                 {canShare && (
                     <Button
                         size="sm"
@@ -561,6 +646,38 @@ export function CallRoom({
                     }}
                 />
             )}
+
+            <CombineRequestDialog call={call} />
+
+            {/* Asked once, because it is a decision about everybody in the room
+                rather than about the person pressing it. */}
+            <Dialog open={asking} onOpenChange={setAsking}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Record this call?</DialogTitle>
+                        <DialogDescription>
+                            The recording is made in this browser, from what it can see and hear, and
+                            it stops if you leave the call or close the tab. Everybody in the call is
+                            told while it runs. When you stop, you choose whether it goes into the
+                            conversation or stays on this machine.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setAsking(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setAsking(false);
+                                held?.recording.start();
+                            }}
+                        >
+                            <Circle className="size-4" />
+                            Start recording
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {canShare && guestLink && (
                 <p className="text-center text-xs text-muted-foreground">
@@ -786,6 +903,11 @@ function Split({
     );
 }
 
+/** Seconds as a clock reads them, for a recording that is running. */
+function clock(seconds: number): string {
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 /** How big the face in an empty tile is. One size for every tile: a grid where
  *  the faces are different sizes reads as a mistake. */
 const AVATAR_SIZE = 72;
@@ -801,8 +923,13 @@ function Tile({
     speaking = false,
     muted = false,
     deafened = false,
+    sameRoom = false,
+    recording = false,
     focused = false,
     onFocus,
+    onCombine,
+    onAskCombine,
+    combineAsked = false,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -826,11 +953,22 @@ function Tile({
      *  much as on anybody else's. */
     muted?: boolean;
     deafened?: boolean;
+    /** Whether this person is sitting in the same room as the reader, sharing
+     *  one microphone between their devices - see `call-combine`. */
+    sameRoom?: boolean;
+    /** Whether this person is writing the call to a file. */
+    recording?: boolean;
     /** Whether this tile is the one filling the room right now. */
     focused?: boolean;
     /** Make this the big one, or put it back. Absent where there is nothing to
      *  enlarge - a tile with no picture in it. */
     onFocus?: () => void;
+    /** Go quiet and listen through this person's device, and ask them to go
+     *  quiet and listen through this one. Both absent once the two are already
+     *  sharing a room, and on a tile that is not somebody else's. */
+    onCombine?: () => void;
+    onAskCombine?: () => void;
+    combineAsked?: boolean;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -1018,6 +1156,18 @@ function Tile({
                 {volumeKey && volume === 0 && (
                     <VolumeX className="size-3 text-danger" aria-label="Silenced for you" />
                 )}
+                {sameRoom && (
+                    <Users
+                        className="size-3 text-primary"
+                        aria-label="Sharing a room's microphone"
+                    />
+                )}
+                {recording && (
+                    <Circle
+                        className="size-3 fill-current text-danger"
+                        aria-label="Recording this call"
+                    />
+                )}
             </span>
 
             {/* Two different things, which is why they are two buttons. Bigger
@@ -1122,6 +1272,23 @@ function Tile({
                     )}
                     {volume === 0 ? "Let them through" : "Silence them for you"}
                 </ContextMenuItem>
+
+                {/* The way to combine with somebody this browser did not hear -
+                    across a big room, on a laptop with the volume down, or on a
+                    machine where listening for the room is switched off. */}
+                {(onCombine || onAskCombine) && <ContextMenuSeparator />}
+                {onCombine && (
+                    <ContextMenuItem onSelect={onCombine}>
+                        <Headphones className="size-3.5" />
+                        Use their audio
+                    </ContextMenuItem>
+                )}
+                {onAskCombine && (
+                    <ContextMenuItem onSelect={onAskCombine} disabled={combineAsked}>
+                        <Users className="size-3.5" />
+                        {combineAsked ? "Asked to combine" : "Ask them to combine audio"}
+                    </ContextMenuItem>
+                )}
             </ContextMenuContent>
         </ContextMenu>
     );

@@ -10,11 +10,18 @@
 import type { MeetingView } from "@/lib/chat/meetings";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import type { CallLevel, CallQuality } from "./call-quality";
+import type { AudioRole, CombineRequest } from "./call-combine";
 
 /** What somebody else's controls are set to, as far as they have said. */
 export interface PeerState {
     readonly muted: boolean;
     readonly deafened: boolean;
+    /** Whether they are writing this call to a file. */
+    readonly recording: boolean;
+    /** The seat they are listening through, for people sitting in one room
+     *  sharing one microphone between their devices - see `call-combine`. Null
+     *  for an ordinary device, which is almost everybody. */
+    readonly group: string | null;
 }
 
 /** One microphone or camera, as the picker lists it. */
@@ -90,4 +97,38 @@ export interface CallState {
     chooseMicrophone: (deviceId: string) => void;
     chooseCamera: (deviceId: string) => void;
     refresh: () => void;
+
+    /**
+     * Everybody in this call whose device this one can hear in the room around
+     * it - see `call-nearby`. A suggestion and never an instruction: nothing is
+     * combined without somebody pressing something.
+     */
+    readonly nearby: ReadonlySet<string>;
+
+    /** The part this browser plays in its audio group, or null when it is in
+     *  none - which is every ordinary call. */
+    readonly audioRole: AudioRole | null;
+    /** The seat of the device carrying the room for the group. */
+    readonly audioHost: string | null;
+    /** The other seats in the group. */
+    readonly audioMembers: readonly string[];
+    /** Somebody this browser has asked to go quiet, until they answer. */
+    readonly combineAsked: string | null;
+    /** Somebody asking this browser to go quiet, until it answers. */
+    readonly combineRequest: CombineRequest | null;
+    /** Go quiet and let their device carry the room. Changes nothing for
+     *  anybody else, which is why it needs nobody's permission. */
+    combineWith: (participantId: string) => void;
+    /** Ask them to go quiet while this device carries the room. It turns off
+     *  their microphone and their speakers, so it is a request rather than an
+     *  instruction. */
+    askToCombine: (participantId: string) => void;
+    answerCombine: (accept: boolean) => void;
+    leaveCombine: () => void;
+
+    /** Whether this browser is announcing that it is recording. What is actually
+     *  being written lives with the recorder - see `call-recorder`; this is the
+     *  half everybody else in the call can see. */
+    readonly recording: boolean;
+    setRecording: (on: boolean) => void;
 }

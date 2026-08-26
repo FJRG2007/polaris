@@ -54,3 +54,24 @@ describe("somebody who says nothing", () => {
         );
     });
 });
+
+describe("the two facts a call cannot work out for itself", () => {
+    it("is recording only on the word for it", () => {
+        // Nothing about a recording is visible in what somebody publishes, so
+        // an absent attribute has to read as "not recording" and the spoken one
+        // has to reach whoever joins afterwards.
+        expect(peerState({ attributes: { recording: "1" }, isMicrophoneEnabled: true }).recording)
+            .toBe(true);
+        expect(peerState({ isMicrophoneEnabled: true }).recording).toBe(false);
+    });
+
+    it("names the seat it is listening through, and nothing when it is not", () => {
+        expect(peerState({ attributes: { audioGroup: "seat-1" }, isMicrophoneEnabled: false }).group)
+            .toBe("seat-1");
+        // Emptied is how a device stops pointing at anybody: it is out of the
+        // room's audio, not in a group whose name is the empty string.
+        expect(peerState({ attributes: { audioGroup: "" }, isMicrophoneEnabled: true }).group)
+            .toBeNull();
+        expect(peerState({ isMicrophoneEnabled: true }).group).toBeNull();
+    });
+});

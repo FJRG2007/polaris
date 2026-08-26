@@ -41,9 +41,10 @@ import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
 import { callServerUrl } from "./call-address";
+import { NEARBY_SLOTS, nearbyEnabled, scanNearby } from "./call-nearby";
 // What somebody says about their own controls, and why muting has to be said
 // out loud at all rather than read off the publication.
-import { DEAFENED, MUTED, peerState } from "./call-peer-state";
+import { DEAFENED, MUTED, RECORDING, peerState } from "./call-peer-state";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
@@ -53,10 +54,23 @@ import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
 import type { Participant, Room, Track, TrackPublication } from "livekit-client";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
+import {
+    AUDIO_GROUP,
+    audioPlan,
+    combineMessageSchema,
+    type AudioRole,
+    type CombineMessage,
+    type CombineRequest
+} from "./call-combine";
 
 /** How often the server is told this browser is still on the call. Comfortably
  *  inside the window it sweeps on. */
 const KEEPALIVE_MS = 10_000;
+
+/** How long after the roster changes this browser starts listening for the other
+ *  devices in the room. Long enough for whoever caused the change to have
+ *  finished joining, so they are playing their tone while everybody listens. */
+const LISTEN_AFTER_MS = 400;
 
 /**
  * How many times in a row the seat may fail to be kept before this stops asking.
@@ -171,6 +185,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [cameraId, setCameraId] = useState<string | null>(null);
     const [micFilter, setMicFilter] = useState<FilteredMic["using"] | null>(null);
     const [licensedFilter, setLicensedFilter] = useState(false);
+    /**
+     * Everything about sharing one microphone with the people sitting next to
+     * you - see `call-combine` for what a group is and `call-nearby` for how a
+     * room is noticed at all.
+     *
+     * The role is derived rather than chosen: it is `companion` while this
+     * browser is pointing at somebody, `room` while somebody is pointing here,
+     * and null in an ordinary call, which is almost all of them.
+     */
+    const [audioGroup, setAudioGroup] = useState<string | null>(null);
+    const [audioRole, setAudioRole] = useState<AudioRole | null>(null);
+    const [audioHost, setAudioHost] = useState<string | null>(null);
+    const [audioMembers, setAudioMembers] = useState<readonly string[]>([]);
+    const [combineAsked, setCombineAsked] = useState<string | null>(null);
+    const [combineRequest, setCombineRequest] = useState<CombineRequest | null>(null);
+    const [nearby, setNearby] = useState<ReadonlySet<string>>(new Set());
+    /** Whether this browser is telling the room it is recording. What is being
+     *  written lives in `call-recorder`; this is the half everybody can see. */
+    const [recording, setRecordingSaid] = useState(false);
 
     /**
      * How much picture this browser sends, and how much it is sending now.
@@ -229,6 +262,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this pair of ears is switched off, held beside the state it
      *  mirrors so a connection made after the press still says so. */
     const deafenedRef = useRef(false);
+    /** The same, for the two facts a reconnection has to say again: the seat
+     *  this device is listening through, and whether it is recording. */
+    const groupRef = useRef<string | null>(null);
+    const recordingRef = useRef(false);
+    const roleRef = useRef<AudioRole | null>(null);
+    /** Whether the microphone was on before this device went quiet for a room,
+     *  so leaving the group gives back what it took rather than a default. */
+    const micBeforeGroup = useRef(true);
+    /** Whether it is currently quiet because of a group, which is what tells the
+     *  restore apart from an ordinary render. */
+    const quieted = useRef(false);
+    /** The admitted roster, sorted, as the tone slots are handed out from it.
+     *  A ref because the scan is started from callbacks that must not be rebuilt
+     *  every time somebody joins. */
+    const seats = useRef<readonly string[]>([]);
+
+    /** The scan currently running, so a roster change can stop it and start one
+     *  against the roster it actually belongs to. */
+    const scan = useRef<AbortController | null>(null);
 
     /**
      * The rung in force right now, for one of the two ladders.
@@ -249,6 +301,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setCameraLevel(levelNow("camera"));
         setScreenLevel(levelNow("screen"));
     }, [levelNow]);
+
+    /**
+     * Say something about this browser to everybody in the room.
+     *
+     * Attributes are the one small bag of strings the call server keeps per
+     * person and hands to every subscriber, including somebody who joins
+     * afterwards - which is what makes them the place for a fact that is
+     * invisible in the media itself. An empty value is how one is taken back.
+     */
+    const say = useCallback((attributes: Record<string, string>) => {
+        void room.current?.localParticipant.setAttributes(attributes).catch(() => undefined);
+    }, []);
 
     /**
      * What this browser is putting out, in the two shapes the room draws.
@@ -468,14 +532,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // Said out loud as well as done, so it reaches whoever joins next. The
         // publication's own flag only travels to the browsers that were in the
         // room when it changed.
-        void room.current?.localParticipant
-            .setAttributes({ [MUTED]: on ? "0" : "1" })
-            .catch(() => undefined);
+        say({ [MUTED]: on ? "0" : "1" });
         const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
         if (!publication?.track) return;
         if (on) void publication.track.unmute().catch(() => undefined);
         else void publication.track.mute().catch(() => undefined);
-    }, []);
+    }, [say]);
 
     /**
      * Put the chosen filter between the microphone and the call, or take away
@@ -525,6 +587,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // button offering to stop a share nobody was making.
         setLocalScreen(null);
         setSharing(false);
+        // Nothing about the last room is true of this one: the seats it named
+        // are gone, and a browser that walked into a new call still pointing at
+        // one of them would be silent at both ends for nobody.
+        groupRef.current = null;
+        roleRef.current = null;
+        quieted.current = false;
+        setAudioGroup(null);
+        setAudioRole(null);
+        setAudioHost(null);
+        setAudioMembers([]);
+        setCombineAsked(null);
+        setCombineRequest(null);
+        setNearby(new Set());
     }, []);
 
     /** Open the devices, connect, publish, and take it all down again. */
@@ -697,6 +772,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 .on(RoomEvent.TrackMuted, onMuteChanged)
                 .on(RoomEvent.TrackUnmuted, onMuteChanged)
                 .on(RoomEvent.ParticipantAttributesChanged, () => resortStates())
+                .on(RoomEvent.DataReceived, onData)
                 .on(RoomEvent.ParticipantConnected, () => {
                     resort();
                     resortStates();
@@ -763,9 +839,52 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     .setAttributes({ [DEAFENED]: "1" })
                     .catch(() => undefined);
             }
+            // The two facts a reconnection would otherwise drop. A device that
+            // came back without saying it is quiet for a room reappears as a
+            // second live microphone in that room; one that came back without
+            // saying it is recording is recording a call that thinks it is not
+            // being recorded, which is the worse of the two.
+            if (groupRef.current) {
+                await joined.localParticipant
+                    .setAttributes({ [AUDIO_GROUP]: groupRef.current })
+                    .catch(() => undefined);
+            }
+            if (recordingRef.current) {
+                await joined.localParticipant
+                    .setAttributes({ [RECORDING]: "1" })
+                    .catch(() => undefined);
+            }
             publishLocalPreview();
             resort();
             resortStates();
+        }
+
+        /**
+         * Somebody in the call said something to this browser directly.
+         *
+         * The only things that travel this way are the two that cannot be read
+         * off an attribute: a request to go quiet for a room, and a refusal -
+         * see `call-combine`. It arrives from another browser, so it is parsed
+         * and validated exactly as strictly as a request body would be, and
+         * anything that does not fit is dropped without a word.
+         */
+        function onData(payload: Uint8Array, participant?: { identity: string }): void {
+            if (!participant) return;
+            let raw: unknown;
+            try {
+                raw = JSON.parse(new TextDecoder().decode(payload));
+            } catch {
+                return;
+            }
+            const message = combineMessageSchema.safeParse(raw);
+            if (!message.success) return;
+            if (message.data.kind === "combine-ask") {
+                setCombineRequest({ from: participant.identity });
+                return;
+            }
+            // Turned down. Only ever about the person this browser asked, so a
+            // refusal meant for somebody else cannot clear the wrong question.
+            setCombineAsked((current) => (current === participant.identity ? null : current));
         }
 
         /** Somebody muted or unmuted something, ours included. */
@@ -901,6 +1020,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             stopped = true;
             if (beat) clearInterval(beat);
             source?.close();
+            // A scan plays a tone into the room on a timer of its own. Left
+            // running past the call, it would go on doing that for a room
+            // nobody is in.
+            scan.current?.abort();
+            scan.current = null;
             void room.current?.disconnect().catch(() => undefined);
             room.current = null;
             // The filter first: it reads from the microphone, and a graph left
@@ -936,9 +1060,155 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         withVideo
     ]);
 
+    /**
+     * A sound, unless this device is quiet for a room.
+     *
+     * A companion's speakers are the one thing it must not use: whatever it
+     * would have played is already coming out of the speakers next to it, a
+     * moment earlier, and a room full of laptops chiming one after another for
+     * the same arrival is exactly the noise combining was pressed to stop.
+     */
+    const sound = useCallback((name: Parameters<typeof playCallSound>[0]) => {
+        if (roleRef.current === "companion") return;
+        playCallSound(name);
+    }, []);
+
+    /** Say something to one person in the call and to nobody else. Only ever the
+     *  two things that cannot be read off an attribute - see `call-combine`. */
+    const tell = useCallback((participantId: string, message: CombineMessage) => {
+        const local = room.current?.localParticipant;
+        if (!local) return;
+        void local
+            .publishData(new TextEncoder().encode(JSON.stringify(message)), {
+                reliable: true,
+                destinationIdentities: [participantId]
+            })
+            .catch(() => undefined);
+    }, []);
+
+    /**
+     * Go quiet, and listen to this call through the device next to you.
+     *
+     * Needs nobody's permission, which is the point of saying it from this end:
+     * it turns off this microphone and these speakers and touches nothing of
+     * anybody else's. The device pointed at carries on exactly as it was, and
+     * finds out it is carrying a room the same way everybody else does.
+     */
+    const combineWith = useCallback(
+        (participantId: string) => {
+            groupRef.current = participantId;
+            setAudioGroup(participantId);
+            setCombineAsked(null);
+            setCombineRequest(null);
+            say({ [AUDIO_GROUP]: participantId });
+        },
+        [say]
+    );
+
+    /**
+     * Stop being quiet for a room.
+     *
+     * The microphone and the speakers come back to what they were before the
+     * group took them - see the effect below, which is what actually gives them
+     * back. Everybody else finds out by this browser no longer pointing at
+     * anybody.
+     */
+    const leaveCombine = useCallback(() => {
+        groupRef.current = null;
+        setAudioGroup(null);
+        say({ [AUDIO_GROUP]: "" });
+    }, [say]);
+
+    /**
+     * Ask somebody else to go quiet and listen through this device.
+     *
+     * The one thing in here that has to be asked rather than done: it turns off
+     * their microphone and their speakers, and a call where anybody can silence
+     * anybody from a menu is not a call.
+     */
+    const askToCombine = useCallback(
+        (participantId: string) => {
+            setCombineAsked(participantId);
+            tell(participantId, { kind: "combine-ask" });
+        },
+        [tell]
+    );
+
+    /** Answer whoever asked. Yes is this browser pointing at them, which they
+     *  see for themselves; no is the one message that has to be sent, or their
+     *  screen sits on a question that has already been answered. */
+    const answerCombine = useCallback(
+        (accept: boolean) => {
+            const asking = combineRequest?.from;
+            setCombineRequest(null);
+            if (!asking) return;
+            if (accept) combineWith(asking);
+            else tell(asking, { kind: "combine-no" });
+        },
+        [combineRequest, combineWith, tell]
+    );
+
+    /**
+     * Listen for the other devices in this room, and remember who was heard.
+     *
+     * The roster is read from the ref rather than from state, so that a scan
+     * started from a menu rendered a moment ago cannot map the tones it heard
+     * onto the wrong people: the slots are positions in that exact list.
+     */
+    const rescan = useCallback(() => {
+        const roster = seats.current;
+        const seat = me.current;
+        if (!seat || roster.length < 2) return;
+        const mySlot = roster.indexOf(seat);
+        if (mySlot < 0 || mySlot >= NEARBY_SLOTS) return;
+        // Whatever is running was started against a roster that is no longer
+        // this one.
+        scan.current?.abort();
+        const round = new AbortController();
+        scan.current = round;
+        // Through the microphone the call is already using, never one of its
+        // own - see `call-nearby`.
+        void scanNearby({ mySlot, microphone: mic.current, signal: round.signal })
+            .then((found) => {
+                // A scan that could not listen is not evidence of an empty room,
+                // so it leaves whatever the last one heard standing.
+                if (round.signal.aborted || !found.listened) return;
+                setNearby(
+                    new Set(
+                        [...found.heard]
+                            .map((slot) => roster[slot])
+                            .filter((id): id is string => Boolean(id))
+                    )
+                );
+            })
+            .catch(() => {
+                // A room that could not be listened to is one nothing is said
+                // about; combining by hand is still there on somebody's tile.
+            });
+    }, []);
+
+    /** Tell the room this browser is recording it, or that it has stopped. */
+    const setRecording = useCallback(
+        (on: boolean) => {
+            recordingRef.current = on;
+            setRecordingSaid(on);
+            say({ [RECORDING]: on ? "1" : "" });
+        },
+        [say]
+    );
+
     const toggleMic = useCallback(() => {
         const track = mic.current;
         if (!track) return;
+        // Pressing unmute while this device is quiet for a room is somebody
+        // saying they want to be heard, which is a decision to stop sharing the
+        // room's microphone rather than a mute to be argued with. The effect
+        // below is what gives the microphone back.
+        if (!track.enabled && roleRef.current === "companion") {
+            micBeforeGroup.current = true;
+            leaveCombine();
+            return;
+        }
         setVoiceEnabled(!track.enabled);
         setMicOn(track.enabled);
         // Kept for the next room. Only a deliberate press is remembered:
@@ -946,7 +1216,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // muted because you once put your headphones down is not what anybody
         // meant by it.
         setCallMuted(!track.enabled);
-    }, [setVoiceEnabled]);
+    }, [leaveCombine, setVoiceEnabled]);
 
     /**
      * Turn the camera on or off.
@@ -995,7 +1265,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void publish(SCREEN, null);
             publishLocalPreview();
             setSharing(false);
-            playCallSound("shareOff");
+            sound("shareOff");
             return;
         }
         const level = levelNow("screen");
@@ -1016,19 +1286,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     void publish(SCREEN, null);
                     publishLocalPreview();
                     setSharing(false);
-                    playCallSound("shareOff");
+                    sound("shareOff");
                 };
                 screen.current = track;
                 await publish(SCREEN, track);
                 publishLocalPreview();
                 setSharing(true);
-                playCallSound("shareOn");
+                sound("shareOn");
             })
             .catch(() => {
                 // Cancelling the picker is the ordinary way out of this dialog,
                 // not a failure worth a line on the screen.
             });
-    }, [levelNow, publish, publishLocalPreview]);
+    }, [levelNow, publish, publishLocalPreview, sound]);
 
     /**
      * Silence everybody, and yourself with them.
@@ -1042,15 +1312,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const next = !current;
             deafenedRef.current = next;
             if (mic.current) {
-                setVoiceEnabled(!next);
+                // Undeafening gives the microphone back to everybody except a
+                // device that is quiet for a room: that one is silent because
+                // the laptop next to it is carrying the call, and handing it a
+                // live microphone here would put two of them in one room - the
+                // howl this browser went quiet to stop.
+                setVoiceEnabled(!next && roleRef.current !== "companion");
                 setMicOn(mic.current.enabled);
             }
-            void room.current?.localParticipant
-                .setAttributes({ [DEAFENED]: next ? "1" : "" })
-                .catch(() => undefined);
+            say({ [DEAFENED]: next ? "1" : "" });
             return next;
         });
-    }, [setVoiceEnabled]);
+    }, [say, setVoiceEnabled]);
 
     /** Swap one input for another, mid-call. */
     const chooseDevice = useCallback(
@@ -1324,6 +1597,103 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [meetingId, senderHealth, settleLevels]);
 
     /**
+     * Settle what this browser should be doing about audio.
+     *
+     * Everything is worked out from what everybody has said about themselves and
+     * nothing is agreed with anybody - see `audioPlan`, which is where the rules
+     * are. Run on every attribute change, because that is exactly when one of
+     * them becomes untrue: somebody leaving is the group's host leaving, and the
+     * device that has to take over is the one that notices.
+     */
+    useEffect(() => {
+        const seat = participantId;
+        if (!seat) return;
+        // Only while the connection is up. A client that is reconnecting has an
+        // empty room for a moment, which reads exactly like everybody having
+        // left - and a device that took that at face value would promote itself
+        // out of a group whose host is still sitting next to it, putting two
+        // live microphones in one room until somebody pressed something.
+        if (room.current?.state !== CONNECTED) return;
+        const others = [...states].map(([id, state]) => ({ id, group: state.group }));
+        const plan = audioPlan({ id: seat, group: audioGroup }, others);
+
+        roleRef.current = plan.role;
+        setAudioRole(plan.role);
+        setAudioHost(plan.host);
+        // Compared rather than replaced: this runs on every mute, every camera
+        // and every attribute in the call, and a new array each time would
+        // re-render every screen holding one.
+        setAudioMembers((current) =>
+            current.join(" ") === plan.members.join(" ") ? current : plan.members
+        );
+
+        if (plan.correcting === null) return;
+        groupRef.current = plan.correcting || null;
+        setAudioGroup(plan.correcting || null);
+        say({ [AUDIO_GROUP]: plan.correcting });
+    }, [audioGroup, participantId, say, states]);
+
+    /**
+     * Going quiet for a room, and getting your voice back afterwards.
+     *
+     * The microphone is turned off rather than unpublished, so the seat, the
+     * tile and the icons stay exactly as they were - a companion is a person in
+     * the call whose voice is arriving through the laptop next to them, not
+     * somebody who has half left.
+     *
+     * What it took is what it gives back, which is why the state before is
+     * remembered instead of assumed: somebody who was already muted when they
+     * joined a room must not find themselves live when they leave it. Deafening
+     * outranks both, because it is a separate decision that was never made here.
+     */
+    useEffect(() => {
+        if (audioRole === "companion") {
+            if (!quieted.current) {
+                quieted.current = true;
+                micBeforeGroup.current = mic.current?.enabled ?? true;
+            }
+            if (mic.current?.enabled) {
+                setVoiceEnabled(false);
+                setMicOn(false);
+            }
+            return;
+        }
+        if (!quieted.current) return;
+        quieted.current = false;
+        if (micBeforeGroup.current && !deafenedRef.current && mic.current) {
+            setVoiceEnabled(true);
+            setMicOn(true);
+        }
+    }, [audioRole, setVoiceEnabled]);
+
+    /**
+     * Listen for the room whenever the roster changes.
+     *
+     * The roster change is the clock. Every browser in the call is told about it
+     * within the same moment, so every browser starts listening while every
+     * other one is playing its tone - which is the only synchronisation this
+     * needs, and it costs nothing because the frame was already being sent.
+     *
+     * A short wait first, so the browser that caused the change has finished
+     * joining and is playing along with everybody else.
+     */
+    const listening = (meeting?.participants ?? [])
+        .filter((person) => person.admission === "admitted")
+        .map((person) => person.id)
+        .sort()
+        .join(" ");
+    useEffect(() => {
+        seats.current = listening ? listening.split(" ") : [];
+        if (!meetingId || !nearbyEnabled()) return;
+        if (seats.current.length < 2) {
+            setNearby(new Set());
+            return;
+        }
+        const timer = setTimeout(rescan, LISTEN_AFTER_MS);
+        return () => clearTimeout(timer);
+    }, [listening, meetingId, rescan]);
+
+    /**
      * Somebody arrived, or somebody left.
      *
      * Sounded rather than only drawn: whoever is in a call is usually looking at
@@ -1339,9 +1709,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         const before = roster.current;
         roster.current = inside;
         if (before === null) return;
-        if (inside.some((id) => !before.includes(id))) playCallSound("join");
-        else if (before.some((id) => !inside.includes(id))) playCallSound("leave");
-    }, [meeting]);
+        if (inside.some((id) => !before.includes(id))) sound("join");
+        else if (before.some((id) => !inside.includes(id))) sound("leave");
+    }, [meeting, sound]);
 
     return {
         meeting,
@@ -1380,6 +1750,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         toggleDeafen,
         chooseMicrophone,
         chooseCamera,
-        refresh
+        refresh,
+        nearby,
+        audioRole,
+        audioHost,
+        audioMembers,
+        combineAsked,
+        combineRequest,
+        combineWith,
+        askToCombine,
+        answerCombine,
+        leaveCombine,
+        recording,
+        setRecording
     };
 }

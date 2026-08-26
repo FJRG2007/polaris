@@ -21,13 +21,15 @@
 
 import Link from "next/link";
 import { CallAudio } from "./call-audio";
+import { RecordingPanel } from "./recording-panel";
+import { useCallRecorder } from "./call-recorder";
 import { Button, cn } from "@polaris/ui";
 import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
 import { takeRememberedCall } from "./call-resume";
 import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
 
 // The context and the two hooks that read it live in `call-hold`, which has no
@@ -39,13 +41,29 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     const [session, setSession] = useState<CallSession | null>(null);
     const [withVideo, setWithVideo] = useState(false);
     const call = useCall(session?.meetingId ?? null, { video: withVideo });
+    const recording = useCallRecorder(call);
+    /** The recorder as it is now, for the callbacks that have to reach it
+     *  without being rebuilt every time it counts a second. */
+    const recorder = useRef(recording);
+    recorder.current = recording;
 
     const enter = useCallback((next: CallSession, video: boolean) => {
         setWithVideo(video);
         setSession(next);
     }, []);
 
-    const leave = useCallback(() => setSession(null), []);
+    /**
+     * Leaving stops a recording rather than losing it.
+     *
+     * Everything the recording is being drawn from goes away with the call, so
+     * what would carry on being written is a black rectangle and silence.
+     * Stopping keeps what was made, and the panel that offers it is drawn from
+     * here - which is why it survives the room unmounting.
+     */
+    const leave = useCallback(() => {
+        if (recorder.current.running) recorder.current.stop();
+        setSession(null);
+    }, []);
 
     /**
      * The call this tab was on before it reloaded to pick up an update.
@@ -112,8 +130,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     );
 
     const hold = useMemo<CallHold>(
-        () => ({ call, session, viewerId, enter, leave, withVideo }),
-        [call, session, viewerId, enter, leave, withVideo]
+        () => ({ call, recording, session, viewerId, enter, leave, withVideo }),
+        [call, recording, session, viewerId, enter, leave, withVideo]
     );
 
     return (
@@ -122,6 +140,11 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
                 walking out of the conversation shrink a call instead of
                 silencing it: the tiles unmount, the sound does not. */}
             <CallAudio call={call} />
+            {/* What was recorded, once it is stopped. Beside the call for the
+                same reason the sound is: whoever pressed stop may be anywhere
+                in Polaris by then, and a file that only appears on the screen
+                the recording was started from is a file people lose. */}
+            <RecordingPanel recording={recording} channelId={session?.channelId ?? ""} />
             {children}
         </CallHoldContext.Provider>
     );
@@ -146,6 +169,15 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
     const others = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted" && person.id !== call.participantId
     );
+    /**
+     * Whether anybody in the call is writing it down.
+     *
+     * Drawn here as well as in the room, and this is the copy that matters: a
+     * call being recorded is exactly the thing somebody must not be able to
+     * forget by walking to another screen.
+     */
+    const recorded =
+        call.recording || [...call.states.values()].some((state) => state.recording);
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
@@ -167,6 +199,15 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 <span className="shrink-0 text-[11px] text-muted-foreground">
                     {others.length + 1}
                 </span>
+                {recorded && (
+                    <span
+                        title="This call is being recorded"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-danger"
+                    >
+                        <span aria-hidden="true" className="size-1.5 rounded-full bg-danger" />
+                        Rec
+                    </span>
+                )}
 
                 <button
                     type="button"

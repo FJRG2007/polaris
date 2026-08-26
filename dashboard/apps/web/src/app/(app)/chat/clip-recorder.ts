@@ -29,6 +29,7 @@ import { micGain } from "./mic-gain";
 import { filterMic, type FilteredMic } from "./mic-filter";
 import { micCleanup, micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { recordingExtension, recordingType } from "./recording-format";
 
 /**
  * How long one may run.
@@ -50,34 +51,11 @@ const MAX_WIDTH = 1280;
  *  sixty. */
 const FPS = 30;
 
-/**
- * What to record into, best first - and "best" is what the person receiving it
- * can open, not what is smallest.
- *
- * MP4 with H.264 first, wherever the browser will make one. WebM with VP9 is a
- * third smaller for the same picture, and it is the wrong default anyway: a
- * `.webm` will not open in most desktop players, will not go into a video
- * editor, and is a container decision nobody asked to make on behalf of whoever
- * is sent the file. Recording straight into MP4 is also the only honest way to
- * offer it as one - converting a video in a page means shipping a transcoder and
- * an afternoon of somebody's battery.
- *
- * WebM is what is left for a browser that will not record MP4, and it is played
- * back perfectly well by the browser that made it.
- */
-const TYPES = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
-    "video/mp4;codecs=avc1,opus",
-    "video/mp4",
-    "video/webm;codecs=vp9,opus",
-    "video/webm;codecs=vp8,opus",
-    "video/webm"
-];
-
-/** What this browser can record into, or null when it cannot record video. */
+/** What this browser can record into, or null when it cannot record video.
+ *  The list, and the reasoning behind its order, is shared with the call
+ *  recorder - see `recording-format`. */
 export function clipRecordingType(): string | null {
-    if (typeof window === "undefined" || typeof MediaRecorder === "undefined") return null;
-    return TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+    return recordingType();
 }
 
 /**
@@ -97,7 +75,7 @@ export function canRecordClip(): boolean {
 /** The name a clip is sent under. Plain, like a voice message: the message says
  *  when it was made, and a name with a timestamp in it says it again. */
 export function clipFileName(type: string): string {
-    return `screen-clip.${type.startsWith("video/mp4") ? "mp4" : "webm"}`;
+    return `screen-clip.${recordingExtension(type)}`;
 }
 
 /** What to record, as the dialog asks for it. */

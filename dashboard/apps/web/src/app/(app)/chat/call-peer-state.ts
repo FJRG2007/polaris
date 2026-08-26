@@ -27,10 +27,21 @@
  */
 
 import type { PeerState } from "./call-state";
+import { AUDIO_GROUP } from "./call-combine";
 
 /** The keys a browser writes about itself. */
 export const MUTED = "muted";
 export const DEAFENED = "deafened";
+/**
+ * Whether this browser is recording the call.
+ *
+ * The same argument as deafening, and a stronger one. Nothing about a recording
+ * is visible in what somebody publishes - a browser writing the room to a file
+ * sends exactly what one that is not sends - so if it is not said out loud it
+ * cannot be known, and a call that can be recorded without everybody in it being
+ * told is not a call anybody should be in.
+ */
+export const RECORDING = "recording";
 
 /** Only what this needs of a remote participant, so it can be checked without
  *  one. */
@@ -47,6 +58,11 @@ export function peerState(participant: PeerFacts): PeerState {
         // Their own word first, because it is the only one that survives being
         // said before this browser arrived.
         muted: said ? said === "1" : !participant.isMicrophoneEnabled,
-        deafened: participant.attributes?.[DEAFENED] === "1"
+        deafened: participant.attributes?.[DEAFENED] === "1",
+        recording: participant.attributes?.[RECORDING] === "1",
+        // An empty attribute is how a browser takes back something it said, so
+        // it means "listening through nobody" rather than "through the seat
+        // called nothing".
+        group: participant.attributes?.[AUDIO_GROUP] || null
     };
 }

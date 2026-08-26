@@ -31,6 +31,17 @@ import { boostStream, resumeBoost, type Boost } from "./call-boost";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function CallAudio({ call }: { call: CallState }) {
+    /**
+     * Whether this browser plays the call at all.
+     *
+     * Two ways to arrive at silence and they are different decisions. Deafening
+     * is somebody switching the room off; being quiet for a group is this device
+     * standing next to the one that is already playing the room out loud - see
+     * `call-combine`. Both mean nothing comes out of these speakers, and the
+     * second is the whole point of combining: two laptops playing the same voice
+     * a fraction of a second apart is the echo people join a room to escape.
+     */
+    const silent = call.deafened || call.audioRole === "companion";
     // Who is blocked, rather than whether anybody is: a browser can refuse one
     // element and allow the next, and the prompt has to go away when the last
     // one starts rather than when the first does.
@@ -90,7 +101,7 @@ export function CallAudio({ call }: { call: CallState }) {
                     // down holds across calls; their seat where they do not,
                     // which lasts as long as the seat.
                     volumeKey={person.userId ?? person.id}
-                    muted={call.deafened}
+                    muted={silent}
                     onPlayState={report}
                 />
             ))}
@@ -98,7 +109,7 @@ export function CallAudio({ call }: { call: CallState }) {
             {/* A browser is entitled to refuse to start audio, and it refuses
                 silently. A press is all it wants, so this asks for one - once
                 for the room, wherever in Polaris the reader happens to be. */}
-            {blocked.size > 0 && !call.deafened && (
+            {blocked.size > 0 && !silent && (
                 <div className="pointer-events-none fixed inset-x-0 top-14 z-50 flex justify-center px-2">
                     <button
                         type="button"
