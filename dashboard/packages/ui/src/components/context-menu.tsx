@@ -10,7 +10,7 @@ import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
-import { redirectMenuFocus } from "../lib/menu-search-focus";
+import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
 import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
@@ -79,6 +79,9 @@ export const ContextMenuContent = forwardRef<
             // After the spread: the menu must never commit an option on the
             // release of the press that opened it.
             onPointerUpCapture={ignoreOpeningPress}
+            // And once it has it, the pointer does not take it back off it -
+            // see `keepSearchFocus`.
+            onPointerMoveCapture={keepSearchFocus}
         />
     </RadixMenu.Portal>
 ));
@@ -157,6 +160,9 @@ export const ContextMenuSubContent = forwardRef<
                 // After the spread: the menu must never commit an option on the
                 // release of the press that opened it.
                 onPointerUpCapture={ignoreOpeningPress}
+            // And once it has it, the pointer does not take it back off it -
+            // see `keepSearchFocus`.
+            onPointerMoveCapture={keepSearchFocus}
             />
         </RadixMenu.Portal>
     );

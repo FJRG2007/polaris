@@ -22,7 +22,7 @@
  * menu that cannot be walked with the keyboard.
  */
 
-import type { FocusEvent } from "react";
+import type { FocusEvent, PointerEvent } from "react";
 
 /** What a search field marks itself with so the menu around it can find it. */
 export const MENU_SEARCH_ATTRIBUTE = "data-menu-search";
@@ -42,4 +42,34 @@ export function redirectMenuFocus(event: FocusEvent<HTMLElement>): void {
     // Selected as well as focused, so a surface reopened with an old search in
     // it is typed over rather than typed onto.
     if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) field.select();
+}
+
+/**
+ * Keeping the keyboard where the typing is.
+ *
+ * A menu option takes focus when the mouse passes over it - that is how a menu
+ * is meant to work, and how enter commits whatever is under the pointer. In a
+ * menu with a search field at the top it is the whole thing broken: the menu
+ * opens directly under the pointer that just clicked the trigger, the smallest
+ * movement over the list hands focus to an option, and from then on the letters
+ * go to the menu's type-ahead and enter picks the option that happened to be
+ * highlighted. What that looks like from outside is a search box that ignores
+ * enter until you press it twice - and, quietly, an option chosen that nobody
+ * asked for.
+ *
+ * So in a menu that has one of these fields, hovering no longer moves the
+ * focus. Everything else about hovering is untouched: the option still lights up
+ * (that is CSS), still activates on a click, and the arrow keys still walk the
+ * list from the field. A submenu's trigger is left alone, since a submenu that
+ * only opened on a click would be a worse menu than the one this is fixing.
+ */
+export function keepSearchFocus(event: PointerEvent<HTMLElement>): void {
+    const surface = event.currentTarget;
+    if (!surface.querySelector(`[${MENU_SEARCH_ATTRIBUTE}]`)) return;
+    const target = event.target as HTMLElement | null;
+    const item = target?.closest?.("[role='menuitem']");
+    if (!item || item.getAttribute("aria-haspopup") === "menu") return;
+    // Read by the option's own handler, which is what focuses it. Prevented in
+    // the capture phase, so it is already true by the time that runs.
+    event.preventDefault();
 }

@@ -16,9 +16,9 @@
  * becomes the one menu that cannot be walked with the arrow keys.
  */
 
-import type { FocusEvent } from "react";
+import type { FocusEvent, PointerEvent } from "react";
 import { describe, expect, it } from "vitest";
-import { MENU_SEARCH_ATTRIBUTE, redirectMenuFocus } from "../src/lib/menu-search-focus";
+import { keepSearchFocus, MENU_SEARCH_ATTRIBUTE, redirectMenuFocus } from "../src/lib/menu-search-focus";
 
 /** A surface, and the focus event React would hand its `onFocus`. */
 function surface(inner: string): { node: HTMLElement; focused: (target?: HTMLElement) => void } {
@@ -60,6 +60,53 @@ describe("a menu with a field in it", () => {
         option.focus();
         focused(option);
         expect(document.activeElement).toBe(option);
+    });
+});
+
+/** The pointer moving over something inside the surface, as React reports it. */
+function moved(node: HTMLElement, target: HTMLElement): boolean {
+    let prevented = false;
+    keepSearchFocus({
+        currentTarget: node,
+        target,
+        preventDefault: () => {
+            prevented = true;
+        }
+    } as unknown as PointerEvent<HTMLElement>);
+    return prevented;
+}
+
+describe("hovering a menu with a field in it", () => {
+    it("refuses the option the focus it would have taken", () => {
+        // The option focuses itself on the pointer moving over it, unless that
+        // move was already prevented. Everything else about the hover stands.
+        const { node } = surface(
+            `<input ${MENU_SEARCH_ATTRIBUTE} /><div role="menuitem" tabindex="-1">backend</div>`
+        );
+        expect(moved(node, node.querySelector("[role='menuitem']") as HTMLElement)).toBe(true);
+    });
+
+    it("still lets a submenu open on hover", () => {
+        // A submenu that only opened on a click would be a worse menu than the
+        // one this is fixing.
+        const { node } = surface(
+            `<input ${MENU_SEARCH_ATTRIBUTE} /><div role="menuitem" aria-haspopup="menu">More</div>`
+        );
+        expect(moved(node, node.querySelector("[role='menuitem']") as HTMLElement)).toBe(false);
+    });
+
+    it("says nothing about the space between the options", () => {
+        const { node } = surface(`<input ${MENU_SEARCH_ATTRIBUTE} /><div role="menuitem">backend</div>`);
+        expect(moved(node, node)).toBe(false);
+    });
+});
+
+describe("hovering every other menu", () => {
+    it("is left exactly as it was", () => {
+        // Without a field to protect, an option taking focus on hover is how a
+        // menu is supposed to work.
+        const { node } = surface(`<div role="menuitem" tabindex="-1">Delete</div>`);
+        expect(moved(node, node.querySelector("[role='menuitem']") as HTMLElement)).toBe(false);
     });
 });
 
