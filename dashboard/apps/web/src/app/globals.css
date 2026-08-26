@@ -268,6 +268,10 @@ body {
 .pdfViewer {
     --page-margin: 10px auto;
     --page-border: 1px solid hsl(var(--border));
+    /* The horizontal, wrapped and spread layouts pull the pages together by this
+       much, to eat most of the wide transparent border pdf.js draws by default.
+       A 1px visible edge needs that pull reversed, or the pages overlap. */
+    --spreadHorizontalWrapped-margin-LR: 4.5px;
 }
 
 dialog.pdfSlick-dialog {

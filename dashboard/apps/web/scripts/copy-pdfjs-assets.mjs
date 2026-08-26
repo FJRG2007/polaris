@@ -28,6 +28,10 @@ for (const folder of ["cmaps", "standard_fonts", "iccs", "wasm"]) {
 // /images/, a path the viewer component has baked in with nothing to override
 // it. Without them a document with a comment annotation, or a reader reaching
 // for the alt-text button, gets a broken icon.
+//
+// public/images therefore belongs to this script, not to the app: every build
+// empties it first. Anything else that needs a public image wants its own
+// folder, or the next build deletes it.
 const images = join(publicDir, "images");
 rmSync(images, { recursive: true, force: true });
 cpSync(join(pdfjsRoot, "web", "images"), images, { recursive: true });

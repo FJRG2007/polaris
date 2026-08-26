@@ -52,6 +52,12 @@ describe("pageFromInput", () => {
         expect(pageFromInput("11", 10)).toBeNull();
         expect(pageFromInput("last", 10)).toBeNull();
     });
+
+    it("refuses a number with anything else attached to it", () => {
+        expect(pageFromInput("3abc", 10)).toBeNull();
+        expect(pageFromInput("12-14", 20)).toBeNull();
+        expect(pageFromInput("2.5", 10)).toBeNull();
+    });
 });
 
 describe("matchSummary", () => {

@@ -176,11 +176,11 @@ export function usePdfEdits(pdfSlick: PDFSlick | null, documentLoaded: boolean) 
      * happened, so saving straight away would silently drop the last stroke.
      */
     const commitEditing = useCallback(async () => {
-        if (!pdfSlick || pdfSlick.viewer.annotationEditorMode.mode === MODES.none) return;
+        if (!pdfSlick || tool === "none") return;
         pdfSlick.setAnnotationEditorMode(MODES.none);
         setTool("none");
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    }, [pdfSlick]);
+    }, [pdfSlick, tool]);
 
     const exportAs = useCallback(async (): Promise<Blob> => {
         const pdf = pdfSlick?.document;

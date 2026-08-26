@@ -47,8 +47,12 @@ export function zoomChoices(
 
 /** The page a typed value jumps to, or null when it names no page in this document. */
 export function pageFromInput(raw: string, numPages: number): number | null {
-    const page = Number.parseInt(raw.trim(), 10);
-    if (!Number.isInteger(page) || page < 1 || page > numPages) return null;
+    // Whole digits only: parsing stops at the first character that is not one,
+    // so "12-14" would otherwise jump to page 12 rather than being refused.
+    const text = raw.trim();
+    if (!/^\d+$/.test(text)) return null;
+    const page = Number.parseInt(text, 10);
+    if (page < 1 || page > numPages) return null;
     return page;
 }
 

@@ -82,10 +82,17 @@ export default function PdfDocument({
         [target.name, readOnly]
     );
 
-    const { isDocumentLoaded, viewerRef, thumbsRef, usePDFSlickStore, PDFSlickViewer, error } =
-        usePDFSlick(src, options);
+    const { viewerRef, thumbsRef, usePDFSlickStore, PDFSlickViewer, error } = usePDFSlick(
+        src,
+        options
+    );
     const pdfSlick = usePDFSlickStore((state) => state.pdfSlick);
-    const edits = usePdfEdits(readOnly ? null : pdfSlick, isDocumentLoaded);
+    // The hook's own flag turns true even when the document failed to open -
+    // PDFSlick reports the failure through onError and resolves anyway. The
+    // store's flag is written only once pdf.js has the document, which is also
+    // when the annotation editor exists to be switched on.
+    const loaded = usePDFSlickStore((state) => state.isDocumentLoaded);
+    const edits = usePdfEdits(readOnly ? null : pdfSlick, loaded);
 
     // PDFSlick keeps the document (and its worker) alive when the component
     // goes: opening a handful of files would leave a worker running for each.
@@ -130,7 +137,7 @@ export default function PdfDocument({
                 searchOpen={searchOpen}
                 onSearchToggle={() => setSearchOpen((open) => !open)}
                 actions={
-                    readOnly ? null : (
+                    readOnly || !loaded ? null : (
                         <EditorActions
                             target={target}
                             dirty={edits.dirty}
@@ -146,7 +153,7 @@ export default function PdfDocument({
                     onSelect={edits.selectTool}
                     params={edits.params}
                     onParams={edits.updateParams}
-                    disabled={!isDocumentLoaded}
+                    disabled={!loaded}
                 />
             )}
             {searchOpen ? (
@@ -166,7 +173,7 @@ export default function PdfDocument({
                     />
                     <div className="relative min-h-0 flex-1 bg-background">
                         <PDFSlickViewer viewerRef={viewerRef} usePDFSlickStore={usePDFSlickStore} />
-                        {isDocumentLoaded ? null : (
+                        {loaded ? null : (
                             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
                                 <Loader2 className="size-4 animate-spin" />
                                 {progress > 0 && progress < 1

@@ -20,7 +20,13 @@ function statusOf(state: number): FindStatus {
     return "found";
 }
 
-export function PdfSearch({ pdfSlick, onClose }: { pdfSlick: PDFSlick | null; onClose: () => void }) {
+export function PdfSearch({
+    pdfSlick,
+    onClose
+}: {
+    pdfSlick: PDFSlick | null;
+    onClose: () => void;
+}) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [query, setQuery] = useState("");
     const [status, setStatus] = useState<FindStatus>("idle");
@@ -81,15 +87,32 @@ export function PdfSearch({ pdfSlick, onClose }: { pdfSlick: PDFSlick | null; on
         });
     }
 
-    // Every option is part of the query, so changing one re-runs it rather than
-    // waiting for the next keystroke to notice.
+    // Every option that decides what counts as a match is part of the query, so
+    // changing one re-runs it rather than waiting for the next keystroke.
     useEffect(() => {
         find("");
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, caseSensitive, entireWord, highlightAll]);
+    }, [query, caseSensitive, entireWord]);
 
-    const summary = matchSummary(status, matches.current, matches.total);
-    const stepping = status !== "idle" && matches.total > 0;
+    // Highlighting the rest of them does not change the match set, and re-running
+    // the search for it would step the reader on to the next one; pdf.js has its
+    // own message for a repaint that leaves the selection where it is.
+    const mounted = useRef(false);
+    useEffect(() => {
+        if (!mounted.current) {
+            mounted.current = true;
+            return;
+        }
+        find("highlightallchange");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [highlightAll]);
+
+    // pdf.js answers an empty query the way it answers a query with nothing in
+    // the document, so the bar would read "No matches" over a box nobody has
+    // typed in yet. Nothing has been asked, so nothing is being reported.
+    const reported: FindStatus = query ? status : "idle";
+    const summary = matchSummary(reported, matches.current, matches.total);
+    const stepping = reported !== "idle" && matches.total > 0;
 
     return (
         <form
