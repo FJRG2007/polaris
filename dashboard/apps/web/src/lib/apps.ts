@@ -19,6 +19,7 @@ import {
     Cctv,
     ChartColumn,
     CalendarClock,
+    ChartPie,
     Clock,
     Code2,
     Contact,
@@ -118,9 +119,11 @@ export interface AppEntry {
      * (see reachableApps) - an entry with none is always offered.
      */
     requiresApp?: string;
-    /** Extra path prefixes this app owns beyond `href`, so routes that live
-     *  outside the app's own subtree (e.g. legacy top-level admin pages) still
-     *  resolve to it for the switcher highlight and the sidebar. */
+    /** Extra path prefixes this app owns beyond `href`. Only for an app that
+     *  lands on one of its own sections rather than on its root - Apps opens on
+     *  Deploy and still owns the whole `/apps` subtree. A screen of an app
+     *  belongs under that app's path and needs nothing here; see
+     *  `test/navigation/app-paths.test.ts`. */
     match?: string[];
 }
 
@@ -147,10 +150,6 @@ export const POLARIS_APPS: AppEntry[] = [
         description: "Files across every NAS",
         icon: HardDrive,
         href: "/drive",
-        // Two of its sections live at the top level rather than under /drive, so
-        // they are named here: without them the switcher and the rail fall back
-        // to whichever app happens to be first in this list.
-        match: ["/favorites", "/trash"],
         permission: "drive.read"
     },
     {
@@ -236,13 +235,9 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: SlidersHorizontal,
         href: "/admin",
         adminOnly: true,
-        // Admin pages that historically live at the top level, so they still
-        // resolve to the Management app in the switcher and sidebar, plus Inbox,
-        // which is a subject of Management rather than an app beside it.
-        match: ["/inbox", "/integrations", "/settings"],
         guest: {
             permission: "inbox.read",
-            href: "/inbox",
+            href: "/admin/inbox",
             label: "Inbox",
             description: "Customer conversations across every channel"
         }
@@ -342,7 +337,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["usage", "storage"]
         },
         { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] },
-        { label: "Favorites", href: "/favorites", icon: Star, keywords: ["starred"] },
+        { label: "Favorites", href: "/drive/favorites", icon: Star, keywords: ["starred"] },
         { label: "Recent", href: "/drive/recent", icon: Clock },
         {
             label: "Shared links",
@@ -362,7 +357,25 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Inbox,
             keywords: ["file requests", "uploads", "ask for text", "collect"]
         },
-        { label: "Trash", href: "/trash", icon: Trash2, keywords: ["deleted", "bin"] }
+        {
+            label: "Where the room went",
+            href: "/drive/insights",
+            icon: ChartPie,
+            keywords: [
+                "storage",
+                "disk",
+                "space",
+                "usage",
+                "biggest",
+                "largest files",
+                "heaviest folders",
+                "formats",
+                "full",
+                "analyse",
+                "analyzer"
+            ]
+        },
+        { label: "Trash", href: "/drive/trash", icon: Trash2, keywords: ["deleted", "bin"] }
     ],
     vault: [
         {
@@ -908,7 +921,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Inbox",
-            href: "/inbox",
+            href: "/admin/inbox",
             icon: MessagesSquare,
             keywords: [
                 "conversations",
@@ -1042,14 +1055,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Integrations",
-            href: "/integrations",
+            href: "/admin/integrations",
             icon: Blocks,
             keywords: ["github", "cloudflare", "connect"],
             group: ADMIN_PLATFORM_GROUP
         },
         {
             label: "AI providers",
-            href: "/integrations/models",
+            href: "/admin/integrations/models",
             icon: Sparkles,
             keywords: [
                 "models",
@@ -1070,7 +1083,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         {
             label: "Updates & settings",
-            href: "/settings",
+            href: "/admin/settings",
             icon: Settings,
             keywords: ["version", "upgrade"],
             group: ADMIN_PLATFORM_GROUP
@@ -1114,24 +1127,24 @@ export const APP_SUBAPPS: AppSubapp[] = [
         id: "inbox",
         label: "Inbox",
         icon: MessagesSquare,
-        base: "/inbox",
+        base: "/admin/inbox",
         parent: { label: "Management", href: "/admin" },
         parentAppId: "admin",
         sections: [
             {
                 label: "Conversations",
-                href: "/inbox",
+                href: "/admin/inbox",
                 icon: MessagesSquare,
                 keywords: ["chats", "messages"]
             },
-            { label: "Contacts", href: "/inbox/contacts", icon: Contact, keywords: ["people"] },
+            { label: "Contacts", href: "/admin/inbox/contacts", icon: Contact, keywords: ["people"] },
             {
                 label: "Channels",
-                href: "/inbox/channels",
+                href: "/admin/inbox/channels",
                 icon: Radio,
                 keywords: ["whatsapp", "telegram", "slack", "discord"]
             },
-            { label: "Logs", href: "/inbox/logs", icon: ScrollText }
+            { label: "Logs", href: "/admin/inbox/logs", icon: ScrollText }
         ]
     },
     {

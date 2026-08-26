@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Hash, Loader2, MessageCircle, MessagesSquare, Plus, Send, Slack, type LucideIcon } from "lucide-react";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
-import { inboxStateAction } from "@/app/(app)/inbox/actions";
+import { inboxStateAction } from "@/app/(app)/admin/inbox/actions";
 import type { ChannelView } from "@/lib/messaging-service";
 
 /** A neutral glyph + label per platform (no third-party brand logos). */
@@ -60,7 +60,7 @@ export function MessagingBridgePanel() {
                         </p>
                     </div>
                     <Button asChild size="sm">
-                        <Link href="/inbox">
+                        <Link href="/admin/inbox">
                             <Plus className="size-4" /> Connect a channel
                         </Link>
                     </Button>
@@ -77,7 +77,7 @@ export function MessagingBridgePanel() {
                             No channels connected yet. Connect one to start receiving and sending messages from the Inbox.
                         </p>
                         <Button asChild size="sm" variant="secondary">
-                            <Link href="/inbox">Go to the Inbox</Link>
+                            <Link href="/admin/inbox">Go to the Inbox</Link>
                         </Button>
                     </div>
                 ) : (
@@ -101,7 +101,7 @@ export function MessagingBridgePanel() {
                 )}
 
                 {channels && channels.length > 0 && (
-                    <Link href="/inbox" className="text-sm text-primary hover:underline">
+                    <Link href="/admin/inbox" className="text-sm text-primary hover:underline">
                         Open the Inbox
                     </Link>
                 )}

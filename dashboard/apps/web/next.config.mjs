@@ -55,7 +55,18 @@ const nextConfig = {
         // that ever followed it, and this project has already lost one path that
         // way.
         { source: "/house", destination: "/places", permanent: false },
-        { source: "/house/:path*", destination: "/places/:path*", permanent: false }
+        { source: "/house/:path*", destination: "/places/:path*", permanent: false },
+        // Management's screens were spread between /admin and the top level, so
+        // the URL said nothing about which part of Polaris you were in. They are
+        // all under /admin now, and Drive's two stray screens under /drive.
+        { source: "/integrations", destination: "/admin/integrations", permanent: false },
+        { source: "/integrations/:path*", destination: "/admin/integrations/:path*", permanent: false },
+        { source: "/settings", destination: "/admin/settings", permanent: false },
+        { source: "/settings/:path*", destination: "/admin/settings/:path*", permanent: false },
+        { source: "/inbox", destination: "/admin/inbox", permanent: false },
+        { source: "/inbox/:path*", destination: "/admin/inbox/:path*", permanent: false },
+        { source: "/favorites", destination: "/drive/favorites", permanent: false },
+        { source: "/trash", destination: "/drive/trash", permanent: false }
     ],
     /**
      * The vault's Bitwarden-compatible surface.

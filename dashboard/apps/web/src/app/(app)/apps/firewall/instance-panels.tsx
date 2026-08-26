@@ -971,7 +971,7 @@ function IntelPanel() {
                 <p className="text-xs text-muted-foreground">
                     Blocks addresses already known for scanning or attacks. Connect{" "}
                     <Link
-                        href="/integrations"
+                        href="/admin/integrations"
                         className="text-primary underline-offset-2 hover:underline"
                     >
                         Dymo API or Criminal IP

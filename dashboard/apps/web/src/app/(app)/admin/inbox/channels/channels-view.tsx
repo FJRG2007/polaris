@@ -132,7 +132,7 @@ export function ChannelsView({
                     </p>
                 </div>
                 <Button asChild>
-                    <Link href="/inbox/channels/connect">
+                    <Link href="/admin/inbox/channels/connect">
                         <Plus className="size-4" /> Connect a channel
                     </Link>
                 </Button>

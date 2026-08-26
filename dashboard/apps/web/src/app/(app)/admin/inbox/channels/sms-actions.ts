@@ -28,7 +28,7 @@ export async function saveSmsSenderAction(
     const parsed = smsChannelInputSchema.extend({ id: z.string().uuid().optional() }).safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form." };
     const result = await saveSmsSender(user.id, parsed.data);
-    if (!result.error) revalidatePath("/inbox/channels");
+    if (!result.error) revalidatePath("/admin/inbox/channels");
     return result;
 }
 
@@ -37,5 +37,5 @@ export async function deleteSmsSenderAction(id: unknown): Promise<void> {
     const parsed = z.string().uuid().safeParse(id);
     if (!parsed.success) return;
     await deleteSmsSender(user.id, parsed.data);
-    revalidatePath("/inbox/channels");
+    revalidatePath("/admin/inbox/channels");
 }

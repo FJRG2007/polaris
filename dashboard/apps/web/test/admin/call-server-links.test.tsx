@@ -36,7 +36,7 @@ describe("where calls run - container problem links", () => {
         render(<CallServerView />);
 
         const link = await screen.findByRole("link", { name: "Settings" });
-        expect(link.getAttribute("href")).toBe("/settings");
+        expect(link.getAttribute("href")).toBe("/admin/settings");
         expect(screen.getByText(/, Update\.$/)).toBeTruthy();
     });
 

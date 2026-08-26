@@ -67,7 +67,7 @@ export function AccountMailView({
                     {channels.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No email channel has been set up yet. Add one under{" "}
-                            <Link href="/inbox/channels" className="text-primary hover:underline">
+                            <Link href="/admin/inbox/channels" className="text-primary hover:underline">
                                 Inbox &gt; Channels
                             </Link>
                             , then come back and pick it here.

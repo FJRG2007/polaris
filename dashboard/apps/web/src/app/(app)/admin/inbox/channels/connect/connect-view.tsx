@@ -17,9 +17,9 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { EmailChannelDialog } from "../email-channel-dialog";
-import { EMAIL_CHANNEL_MARK } from "@/app/(app)/inbox/platform-meta";
-import { ConnectChannelDialog } from "@/app/(app)/inbox/connect-channel-dialog";
-import { CHANNEL_CATALOG, type ChannelKind } from "@/app/(app)/inbox/channel-catalog";
+import { EMAIL_CHANNEL_MARK } from "@/app/(app)/admin/inbox/platform-meta";
+import { ConnectChannelDialog } from "@/app/(app)/admin/inbox/connect-channel-dialog";
+import { CHANNEL_CATALOG, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
 import { MAIL_PROVIDER_INFO, MAIL_PROVIDERS, type MailProvider } from "@polaris/core";
 
 export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
@@ -35,14 +35,14 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
         setKind(null);
         setProvider(null);
         setAdded(null);
-        router.push("/inbox/channels");
+        router.push("/admin/inbox/channels");
     }
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
             <div className="flex flex-col gap-1">
                 <Link
-                    href="/inbox/channels"
+                    href="/admin/inbox/channels"
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >
                     <ArrowLeft className="size-3" /> Channels

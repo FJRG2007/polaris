@@ -578,7 +578,7 @@ export async function emptyFolderAction(
         metadata: { path, permanent }
     });
     revalidatePath("/drive");
-    if (!permanent) revalidatePath("/trash");
+    if (!permanent) revalidatePath("/drive/trash");
     return {};
 }
 
@@ -641,7 +641,7 @@ export async function moveToTrashAction(
         metadata: { path }
     });
     revalidatePath("/drive");
-    revalidatePath("/trash");
+    revalidatePath("/drive/trash");
     return {};
 }
 
@@ -654,7 +654,7 @@ export async function restoreTrashAction(id: string): Promise<{ error?: string }
         return { error: driveErrorMessage(caught, "That item could not be restored.") };
     }
     revalidatePath("/drive");
-    revalidatePath("/trash");
+    revalidatePath("/drive/trash");
     return {};
 }
 
@@ -666,7 +666,7 @@ export async function deleteTrashForeverAction(id: string): Promise<{ error?: st
     } catch (caught) {
         return { error: driveErrorMessage(caught, "That item could not be deleted.") };
     }
-    revalidatePath("/trash");
+    revalidatePath("/drive/trash");
     return {};
 }
 
@@ -678,7 +678,7 @@ export async function emptyTrashAction(): Promise<{ error?: string }> {
     } catch (caught) {
         return { error: driveErrorMessage(caught, "The bin could not be emptied.") };
     }
-    revalidatePath("/trash");
+    revalidatePath("/drive/trash");
     return {};
 }
 

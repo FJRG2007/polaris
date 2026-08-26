@@ -88,7 +88,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                                 ? `${state.cloudflare.account ?? "Connected"}${state.cloudflare.dnsReady ? " - DNS ready" : " - DNS not ready"}`
                                 : "Give a service a stable public hostname through a tunnel, with DNS handled for you."
                         }
-                        href="/integrations"
+                        href="/admin/integrations"
                     />
                     <IntegrationRow
                         icon={<DockerMark className="size-5" />}

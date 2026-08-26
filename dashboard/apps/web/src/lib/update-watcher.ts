@@ -97,7 +97,7 @@ async function tellOperators(input: {
     level?: NotificationLevel;
     actionRequired?: boolean;
 }): Promise<void> {
-    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/settings" });
+    await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/settings" });
 }
 
 /**

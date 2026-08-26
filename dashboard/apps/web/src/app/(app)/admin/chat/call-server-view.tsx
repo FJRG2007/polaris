@@ -184,7 +184,7 @@ export function CallServerView() {
                                 <>
                                     Its container was never created here, which is why this said it
                                     was starting and never finished. Updating again brings it up -{" "}
-                                    <Link href="/settings" className="text-primary hover:underline">
+                                    <Link href="/admin/settings" className="text-primary hover:underline">
                                         Settings
                                     </Link>
                                     , Update.

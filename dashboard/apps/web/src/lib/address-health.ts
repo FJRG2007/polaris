@@ -252,7 +252,7 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
                 event: "network.address",
                 title: `${address.host} is answering again`,
                 body: `${address.url} is reachable again.`,
-                href: "/settings",
+                href: "/admin/settings",
                 level: "success"
             });
         }
@@ -265,7 +265,7 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
             event: "network.address",
             title: "The tunnel address is gone",
             body: `${address.url} stopped answering and its tunnel is no longer running, so it has been dropped from this deployment's addresses. Share links move to the next address. Settings can raise a new tunnel.`,
-            href: "/settings"
+            href: "/admin/settings"
         });
         return;
     }
@@ -275,7 +275,7 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
         event: "network.address",
         title: `${address.host} is not answering`,
         body: `Nothing answered at ${address.url}${detail ? ` (${detail})` : ""}. It is still listed in Settings, marked unreachable.`,
-        href: "/settings",
+        href: "/admin/settings",
         actionRequired: true
     });
 }

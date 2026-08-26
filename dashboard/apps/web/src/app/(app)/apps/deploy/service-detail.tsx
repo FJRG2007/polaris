@@ -2559,7 +2559,7 @@ function SettingsTab({
                                               : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
                         </p>
                         {duckMissing && (
-                            <a href="/integrations" className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline">
+                            <a href="/admin/integrations" className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline">
                                 Set up DuckDNS <ExternalLink className="size-3" />
                             </a>
                         )}

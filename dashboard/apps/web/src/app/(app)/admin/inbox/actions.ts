@@ -81,7 +81,7 @@ export async function connectChannelAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
         const channel = await connectChannel(user.id, parsed.data);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return { channelId: channel.id, status: channel.status };
     } catch (caught) {
         return {
@@ -109,7 +109,7 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
     const user = await requirePermission("inbox.manage");
     try {
         await deleteChannel(user.id, channelId);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not remove the channel" };
@@ -137,7 +137,7 @@ export async function updateChannelAction(
     if (!patch.name && !patch.token && !patch.config) return { error: "Nothing to update" };
     try {
         const { status } = await updateChannelCredentials(user.id, channelId, patch);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return { status };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not update the channel" };
@@ -152,7 +152,7 @@ export async function reconnectChannelAction(
     const user = await requirePermission("inbox.manage");
     try {
         const { status } = await reconnectChannel(user.id, channelId);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return { status };
     } catch (caught) {
         return {
@@ -206,7 +206,7 @@ export async function deleteConversationAction(
     if (!z.string().uuid().safeParse(conversationId).success) return { error: "Invalid request" };
     try {
         await deleteConversation(user.id, conversationId);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return {};
     } catch (caught) {
         return {
@@ -281,7 +281,7 @@ export async function startConversationAction(
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     try {
         const { conversationId } = await startConversation(user.id, user.id, parsed.data);
-        revalidatePath("/inbox");
+        revalidatePath("/admin/inbox");
         return { conversationId };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not start the chat" };

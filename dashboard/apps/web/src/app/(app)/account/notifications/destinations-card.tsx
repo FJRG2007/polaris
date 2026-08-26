@@ -141,7 +141,7 @@ export function DestinationsCard({
                                 {destination.kind === "sms" && !smsReady ? (
                                     <p className="text-xs text-warning">
                                         Texts will not send until an SMS sender is connected under{" "}
-                                        <Link href="/inbox/channels" className="underline">
+                                        <Link href="/admin/inbox/channels" className="underline">
                                             Channels
                                         </Link>
                                         .

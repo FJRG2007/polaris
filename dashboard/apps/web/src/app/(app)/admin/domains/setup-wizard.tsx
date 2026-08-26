@@ -21,7 +21,7 @@ import { CopyButton } from "@/components/copy-button";
 import type { ServerEnvironment } from "@polaris/core";
 import type { DnsProviderInfo } from "@/lib/dns-provider";
 import type { ZoneDnsProvisionResult, ZoneDnsReport } from "@/lib/domain-dns";
-import { connectCloudflareAccountAction } from "@/app/(app)/integrations/actions";
+import { connectCloudflareAccountAction } from "@/app/(app)/admin/integrations/actions";
 import { CLOUDFLARE_DNS_TOKEN_URL } from "@/lib/integrations/cloudflare-token-link";
 import { FORWARD_RULES, gameForwardRules, type RouterForwardRule } from "@/lib/router-guide";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "@/app/(app)/apps/servers/environment-meta";
@@ -736,7 +736,7 @@ function DomainStep({
                     {meta.summary}
                 </p>
                 {meta.needsDomain ? (
-                    <a href="/integrations" className="w-fit text-xs text-primary hover:underline">
+                    <a href="/admin/integrations" className="w-fit text-xs text-primary hover:underline">
                         Open Integrations
                     </a>
                 ) : (

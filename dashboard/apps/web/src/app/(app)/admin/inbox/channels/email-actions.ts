@@ -67,7 +67,7 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
             targetId: result.channel.id,
             metadata: { provider: result.channel.provider }
         });
-        revalidatePath("/inbox/channels");
+        revalidatePath("/admin/inbox/channels");
     }
     return result;
 }
@@ -86,7 +86,7 @@ export async function updateEmailChannelAction(channelId: unknown, input: unknow
             targetType: "channel",
             targetId: id.data
         });
-        revalidatePath("/inbox/channels");
+        revalidatePath("/admin/inbox/channels");
     }
     return result;
 }
@@ -103,7 +103,7 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
         targetType: "channel",
         targetId: id.data
     });
-    revalidatePath("/inbox/channels");
+    revalidatePath("/admin/inbox/channels");
     return {};
 }
 
@@ -114,7 +114,7 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
     if (!id.success) return { error: "Unknown channel." };
     if (!(await requireOwnedChannel(user.id, id.data))) return { error: "That channel no longer exists." };
     const result = await recheckEmailChannel(id.data);
-    revalidatePath("/inbox/channels");
+    revalidatePath("/admin/inbox/channels");
     return result;
 }
 
@@ -142,6 +142,6 @@ export async function sendTestEmailAction(channelId: unknown, to: unknown): Prom
         subject: "Polaris test message",
         text: "This is a test from Polaris. If it reached you, this channel can send mail."
     });
-    revalidatePath("/inbox/channels");
+    revalidatePath("/admin/inbox/channels");
     return result;
 }

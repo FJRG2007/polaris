@@ -48,7 +48,7 @@ export function UpdateIndicator() {
 
     return (
         <Link
-            href="/settings"
+            href="/admin/settings"
             title={
                 available.behindBy
                     ? `${available.behindBy} commit(s) behind - open settings`

@@ -74,7 +74,7 @@ async function GithubAccess() {
     return (
         <Notice>
             {access?.advice ?? "Connect GitHub before adding runners."}{" "}
-            <Link href="/integrations" className="underline">
+            <Link href="/admin/integrations" className="underline">
                 Open Integrations
             </Link>
         </Notice>

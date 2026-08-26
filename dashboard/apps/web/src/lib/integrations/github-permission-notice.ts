@@ -67,7 +67,7 @@ export async function notifyGithubPermissionGap(): Promise<void> {
             event: "integrations.github.permissions",
             title: "The GitHub App is waiting for permissions",
             body: `${names} has not accepted: ${missing}. Until it does, anything that needs them is refused - runner pools, and any repository the App was just granted more access to.`,
-            href: gap.reviewUrl ?? "/integrations",
+            href: gap.reviewUrl ?? "/admin/integrations",
             level: "warning",
             actionRequired: true
         });

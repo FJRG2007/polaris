@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
     { label: "Architecture", path: "", icon: LayoutGrid, hint: "Services and how they connect" },
     { label: "Observability", path: "/observability", icon: Activity, hint: "Metrics across the environment" },
     { label: "Logs", path: "/logs", icon: ScrollText, hint: "Every service's output in one stream" },
-    { label: "Settings", path: "/settings", icon: Settings, hint: "Project configuration" }
+    { label: "Settings", path: "/admin/settings", icon: Settings, hint: "Project configuration" }
 ];
 
 export function ProjectShell({

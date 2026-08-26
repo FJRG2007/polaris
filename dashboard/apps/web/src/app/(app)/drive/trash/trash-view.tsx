@@ -11,7 +11,7 @@ import { FileText, FolderClosed, RotateCcw, Trash2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
-import { deleteTrashForeverAction, emptyTrashAction, restoreTrashAction } from "../drive/actions";
+import { deleteTrashForeverAction, emptyTrashAction, restoreTrashAction } from "../actions";
 import { RelativeTime } from "@/components/relative-time";
 
 export interface TrashRow {

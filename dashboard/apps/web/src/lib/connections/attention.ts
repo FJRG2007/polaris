@@ -91,7 +91,7 @@ export async function recordConnectionFailure(provider: string, reason: string):
             event: "integration.attention",
             title: `${name} could not complete an authorization`,
             body: `Somebody tried to connect their ${name} account and it was refused. ${name} said: ${reason}`,
-            href: "/integrations",
+            href: "/admin/integrations",
             level: "warning",
             actionRequired: true
         });

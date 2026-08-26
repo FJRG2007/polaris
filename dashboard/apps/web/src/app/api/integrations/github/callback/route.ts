@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  * internal one, which is how a working round trip ended on a page that 404s.
  */
 function backToIntegrations(outcome?: string): NextResponse {
-    const target = outcome ? `/integrations?github=${outcome}` : "/integrations";
+    const target = outcome ? `/admin/integrations?github=${outcome}` : "/admin/integrations";
     return new NextResponse(null, { status: 303, headers: { location: target } });
 }
 

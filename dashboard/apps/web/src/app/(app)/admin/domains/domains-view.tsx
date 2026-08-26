@@ -1007,7 +1007,7 @@ function ExposureGuidance({ status, mode, wildcard }: { status: NetworkStatus; m
         return (
             <GuidanceNote>
                 Public access runs through a Cloudflare/ngrok tunnel - no open ports or public IP needed. Set one up in{" "}
-                <a className="text-primary hover:underline" href="/integrations">
+                <a className="text-primary hover:underline" href="/admin/integrations">
                     Integrations
                 </a>
                 , or use the per-service <b>Public tunnel</b> button. Auto subdomains stay LAN-only.

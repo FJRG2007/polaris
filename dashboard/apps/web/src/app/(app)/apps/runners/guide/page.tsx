@@ -28,7 +28,7 @@ export default async function RunnersGuidePage() {
                 <Step title="1. Connect GitHub, with permission to register runners">
                     <p>
                         Polaris registers a runner on your behalf, which needs more than reading a repository. Under{" "}
-                        <Link href="/integrations" className="underline">
+                        <Link href="/admin/integrations" className="underline">
                             Integrations
                         </Link>
                         , connect GitHub and give it <strong>Administration: read and write</strong> on the

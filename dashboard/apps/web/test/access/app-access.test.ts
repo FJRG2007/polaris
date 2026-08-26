@@ -62,7 +62,7 @@ describe("the Inbox door inside Management", () => {
         expect(apps.map((app) => app.id)).toEqual(["overview", "admin"]);
         const app = apps.find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Inbox");
-        expect(app?.href).toBe("/inbox");
+        expect(app?.href).toBe("/admin/inbox");
     });
 
     it("keeps the member's one door out of the Overview they land on", async () => {
