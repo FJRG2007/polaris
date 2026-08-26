@@ -991,10 +991,19 @@ model ApiKey {
     id                String    @id @default(uuid(7)) @db.Uuid
     userId            String    @db.Uuid
     name              String
+    // Which setup the key was made for: production or development. A label its
+    // owner sorts a long list by - it narrows nothing, because there is one
+    // instance and one set of permissions behind both. See API_KEY_ENVIRONMENTS.
+    environment       String    @default("production")
     // Public, non-secret identifier shown in the UI and carried in the key
     // itself, so a key is recognizable without storing the secret.
     prefix            String    @unique
     keyHash           String    @unique
+    // The last few characters of the secret. Not a secret: four characters of a
+    // random token identify nothing on their own, and they are what lets somebody
+    // tell which of the keys in their password manager is the one in this row.
+    // Null for a key issued before this was kept.
+    tail              String?
     // JSON array of permission keys this key may exercise.
     scopes            String    @default("[]")
     allowedCidrs      String    @default("[]")
@@ -1012,18 +1021,42 @@ model ApiKey {
     // unexpected can be recognised as such rather than only dated.
     lastUsedUserAgent String?
     revokedAt         DateTime?
-    // Set on a token minted from a project's settings: the key still carries its
-    // owner's permissions, but may only act on this project. Null is an ordinary
-    // account key, which reaches everything its scopes allow.
+    // Set on a token minted from a project's settings, which is where it is
+    // listed and revoked. It records where the key came from and does not narrow
+    // what the key can reach - that is still its scopes and its owner's
+    // permissions. Null is an ordinary account key.
     projectId         String?   @db.Uuid
     createdAt         DateTime  @default(now())
 
     user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
     project Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
     groups  ApiKeyAccessGroup[]
+    usage   ApiKeyUsage[]
 
     @@index([userId])
     @@index([projectId])
+}
+
+// How much one key was used on one day.
+//
+// A counter rather than a log. What was done with a key, and to what, is already
+// in the audit trail; the only question this answers is the one a list of keys
+// asks - is this one still in use, and how hard. One row per key per day is a
+// few hundred bytes a year for a key in constant use, and rows past the window
+// the screen can show are removed as the next day's first call arrives.
+//
+// The day is text in UTC rather than a date column: it keeps the row addressable
+// by primary key, so a call costs one upsert and no scan, and it is one less
+// type for the SQLite variant of this schema to translate.
+model ApiKeyUsage {
+    apiKeyId String @db.Uuid
+    /// YYYY-MM-DD, UTC.
+    day      String
+    calls    Int    @default(0)
+
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@id([apiKeyId, day])
 }
 
 // Polaris-owned state for one better-auth session: whether the sign-in has been

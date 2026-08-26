@@ -1,33 +1,52 @@
 "use client";
 
 /**
- * The key list and the two dialogs it needs: one to mint a key, one to show the
- * secret. The secret dialog is separate on purpose - it is the only moment the
- * value exists, so it gets the user's full attention and an explicit copy step
- * rather than being tucked into the bottom of a form.
+ * The keys an account holds, as a table.
+ *
+ * It was a stack of cards, which is the right shape for three keys and the wrong
+ * one for fourteen: every row a different height, the dates in prose, and the
+ * one question people actually open this page with - *is this key still being
+ * used* - answerable only by reading each card in turn. A table puts the same
+ * facts in columns that line up, so a key that expires next week or has not been
+ * touched since April is found by scanning down rather than by reading.
+ *
+ * What each column is for is worth stating, because none of them is decoration:
+ *
+ * - **The key itself** is shown as its two visible halves. The prefix is what
+ *   Polaris looks it up by; the last characters are what somebody matches
+ *   against the value in their password manager. The secret is never shown
+ *   again, so this is the only way to answer "which row is the key my deploy is
+ *   using".
+ * - **Environment** is a label its owner sorts by, and says so plainly rather
+ *   than implying a separate Polaris behind it.
+ * - **App** is where a key came from - a token minted in an app's settings is
+ *   listed and revoked there, and this is so it can be recognised here.
+ * - **Calls today** is the difference between a key that answered one request in
+ *   April and one answering a thousand an hour. Both used to read "last used".
+ * - **Compromised** is not implemented, and says so, because a column that
+ *   silently reads "no" for everything is a promise nobody made.
+ *
+ * The filters run over the rows the page already has - see `api-keys-filter` -
+ * so narrowing the list is instant and asks the server nothing.
  */
 
-import { useState } from "react";
+import { KeyDialog } from "./key-dialog";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ScopePicker } from "./scope-picker";
-import { Copy, KeyRound, Plus } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { useDisplayFormat } from "@/components/display-format";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
-import { createApiKeyAction, deleteApiKeyAction, revokeApiKeyAction } from "./actions";
-import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
+import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
+import { Ban, Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
-    AccessRulesEditor,
-    EMPTY_ACCESS_RULES,
-    type AccessRulesValue
-} from "@/components/access-rules-editor";
-import {
-    API_KEY_EXPIRY_CHOICES,
+    API_KEY_ENVIRONMENTS,
+    API_KEY_ENVIRONMENT_LABELS,
     describeDevice,
-    expandPermissions,
-    type Permission,
-    type UserAgentRules
+    type ApiKeyEnvironment,
+    type Permission
 } from "@polaris/core";
+import * as list from "./api-keys-filter";
 import {
     Badge,
     Button,
@@ -38,58 +57,35 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     Input,
-    Select
+    Select,
+    cn
 } from "@polaris/ui";
 
-/** The Select value that swaps the fixed spans for a date of the user's choosing. */
-const CUSTOM_EXPIRY = "custom";
-
-function expiryLabel(days: number): string {
-    return days === 0 ? "Never expires" : `${days} days`;
-}
-
-/** A picked day expires at the end of it, local time - the day itself still works. */
-function endOfDay(date: string): Date | null {
-    const [year, month, day] = date.split("-").map(Number);
-    if (!year || !month || !day) return null;
-    return new Date(year, month - 1, day, 23, 59, 59, 999);
-}
-
-/** Today, local time, as the earliest day a key may be set to expire on. */
-function earliestExpiryDate(): string {
-    const now = new Date();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    return `${now.getFullYear()}-${month}-${day}`;
-}
-
-/**
- * The one line that says a key is narrower than it looks, or nothing when it is
- * not. A key restricted to an address or a client and showing no sign of it is a
- * key somebody will spend an afternoon debugging.
- */
+/** The one line that says a key is narrower than it looks, or nothing when it is
+ *  not. A key restricted to an address or a client and showing no sign of it is a
+ *  key somebody will spend an afternoon debugging. */
 function describeLimits(key: ApiKeyView): string | null {
     const parts: string[] = [];
     const addresses =
         key.allowedCidrs.length + key.allowedCountries.length + key.allowedContinents.length;
     if (addresses > 0) parts.push(`${addresses} address rule${addresses === 1 ? "" : "s"}`);
     if (key.allowedUserAgents.length > 0) {
-        parts.push(`${key.allowedUserAgents.length} allowed client${key.allowedUserAgents.length === 1 ? "" : "s"}`);
+        parts.push(
+            `${key.allowedUserAgents.length} allowed client${key.allowedUserAgents.length === 1 ? "" : "s"}`
+        );
     }
     if (key.deniedUserAgents.length > 0) {
-        parts.push(`${key.deniedUserAgents.length} blocked client${key.deniedUserAgents.length === 1 ? "" : "s"}`);
+        parts.push(
+            `${key.deniedUserAgents.length} blocked client${key.deniedUserAgents.length === 1 ? "" : "s"}`
+        );
     }
     return parts.length > 0 ? `Limited to ${parts.join(", ")}` : null;
-}
-
-/** What a key's state should read as in the list. */
-function keyStatus(key: ApiKeyView): { label: string; tone: "success" | "neutral" | "danger" } {
-    if (key.revokedAt) return { label: "Revoked", tone: "danger" };
-    if (key.expiresAt && new Date(key.expiresAt).getTime() <= Date.now()) {
-        return { label: "Expired", tone: "neutral" };
-    }
-    return { label: "Active", tone: "success" };
 }
 
 export function ApiKeysView({
@@ -102,10 +98,21 @@ export function ApiKeysView({
     availableScopes: Permission[];
 }) {
     const router = useRouter();
+    const format = useDisplayFormat();
     const [confirm, confirmElement] = useConfirm();
-    const [createOpen, setCreateOpen] = useState(false);
+    const [filters, setFilters] = useState<list.KeyFilters>(list.NO_FILTERS);
+    const [editing, setEditing] = useState<ApiKeyView | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
     const [issued, setIssued] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const apps = useMemo(() => list.appsInKeys(keys), [keys]);
+    const shown = useMemo(() => list.filterKeys(keys, filters), [keys, filters]);
+    const narrowed = shown.length !== keys.length;
+
+    function change<K extends keyof list.KeyFilters>(field: K, value: list.KeyFilters[K]) {
+        setFilters((current) => ({ ...current, [field]: value }));
+    }
 
     async function revoke(key: ApiKeyView) {
         const ok = await confirm({
@@ -139,94 +146,178 @@ export function ApiKeysView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <div>
-                            <h2 className="text-sm font-medium">Your keys</h2>
-                            <p className="text-xs text-muted-foreground">
-                                Each key carries a subset of your own permissions, and can be limited
-                                to an address, a location, or the clients that may present it.
-                            </p>
+                    <div className="flex flex-wrap items-end justify-between gap-2">
+                        <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
+                            <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Search</span>
+                                <Input
+                                    value={filters.search}
+                                    placeholder="Name or key"
+                                    autoComplete="off"
+                                    onChange={(event) => change("search", event.target.value)}
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Environment</span>
+                                <Select
+                                    value={filters.environment}
+                                    onValueChange={(value) => change("environment", value)}
+                                    className="w-40"
+                                    options={[
+                                        { value: "all", label: "All environments" },
+                                        ...API_KEY_ENVIRONMENTS.map((value) => ({
+                                            value,
+                                            label: API_KEY_ENVIRONMENT_LABELS[value]
+                                        }))
+                                    ]}
+                                />
+                            </label>
+                            {/* Offered only where there is something to choose
+                                between: an account with no app-minted keys does
+                                not need a picker whose every option is "all". */}
+                            {apps.length > 0 && (
+                                <label className="flex flex-col gap-1">
+                                    <span className="text-xs text-muted-foreground">App</span>
+                                    <Select
+                                        value={filters.app}
+                                        onValueChange={(value) => change("app", value)}
+                                        className="w-40"
+                                        options={[
+                                            { value: "all", label: "All apps" },
+                                            { value: "none", label: "No app" },
+                                            ...apps.map((app) => ({
+                                                value: app.id,
+                                                label: app.name
+                                            }))
+                                        ]}
+                                    />
+                                </label>
+                            )}
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Expiry</span>
+                                <Select
+                                    value={filters.expiry}
+                                    onValueChange={(value) =>
+                                        change("expiry", value as list.ExpiryFilter)
+                                    }
+                                    className="w-44"
+                                    options={list.EXPIRY_FILTERS.map((value) => ({
+                                        value,
+                                        label: list.EXPIRY_FILTER_LABELS[value]
+                                    }))}
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground">Sort by</span>
+                                <Select
+                                    value={filters.sort}
+                                    onValueChange={(value) => change("sort", value as list.KeySort)}
+                                    className="w-44"
+                                    options={list.KEY_SORTS.map((value) => ({
+                                        value,
+                                        label: list.KEY_SORT_LABELS[value]
+                                    }))}
+                                />
+                            </label>
                         </div>
-                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                setEditing(null);
+                                setDialogOpen(true);
+                            }}
+                        >
                             <Plus className="size-4" />
                             New key
                         </Button>
                     </div>
 
+                    <p className="text-xs text-muted-foreground">
+                        {keys.length === 0
+                            ? "No keys yet."
+                            : narrowed
+                              ? `Showing ${shown.length} of ${keys.length} keys`
+                              : `${keys.length} key${keys.length === 1 ? "" : "s"}`}
+                    </p>
+
                     {keys.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No keys yet.</p>
+                        <p className="text-sm text-muted-foreground">
+                            A key lets a script act as you, with a subset of your own permissions
+                            and only from where you allow.
+                        </p>
+                    ) : shown.length === 0 ? (
+                        <div className="flex flex-col items-start gap-2 py-4">
+                            <p className="text-sm text-muted-foreground">
+                                No key matches those filters.
+                            </p>
+                            <Button size="sm" variant="ghost" onClick={() => setFilters(list.NO_FILTERS)}>
+                                Clear filters
+                            </Button>
+                        </div>
                     ) : (
-                        keys.map((key) => {
-                            const status = keyStatus(key);
-                            return (
-                                <div
-                                    key={key.id}
-                                    className="flex items-start justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
-                                >
-                                    <div className="flex min-w-0 items-start gap-3">
-                                        <KeyRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                        <div className="min-w-0">
-                                            <p className="flex items-center gap-2 text-sm">
-                                                <span className="truncate">{key.name}</span>
-                                                <Badge variant={status.tone}>{status.label}</Badge>
-                                            </p>
-                                            <p className="font-mono text-xs text-muted-foreground">{key.prefix}</p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {key.scopes.length} scope{key.scopes.length === 1 ? "" : "s"}
-                                                {key.expiresAt ? (
-                                                    <>
-                                                        {" - expires "}
-                                                        <RelativeTime iso={key.expiresAt} />
-                                                    </>
-                                                ) : null}
-                                                {key.lastUsedAt ? (
-                                                    <>
-                                                        {" - last used "}
-                                                        <RelativeTime iso={key.lastUsedAt} />
-                                                    </>
-                                                ) : " - never used"}
-                                            </p>
-                                            {describeLimits(key) ? (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {describeLimits(key)}
-                                                </p>
-                                            ) : null}
-                                            {key.lastUsedUserAgent ? (
-                                                <p
-                                                    className="truncate text-xs text-muted-foreground"
-                                                    title={key.lastUsedUserAgent}
-                                                >
-                                                    Last used by {describeDevice(key.lastUsedUserAgent)}
-                                                    {key.lastUsedIp ? ` from ${key.lastUsedIp}` : null}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                    <div className="flex shrink-0 gap-1">
-                                        {key.revokedAt ? null : (
-                                            <Button variant="ghost" size="sm" onClick={() => void revoke(key)}>
-                                                Revoke
-                                            </Button>
-                                        )}
-                                        <Button variant="ghost" size="sm" onClick={() => void remove(key)}>
-                                            Delete
-                                        </Button>
-                                    </div>
-                                </div>
-                            );
-                        })
+                        // Scrolls sideways rather than shrinking: nine columns on
+                        // a phone would be nine unreadable ones.
+                        <div className="-mx-1 overflow-x-auto px-1">
+                            <table className="w-full min-w-[62rem] border-collapse text-sm">
+                                <thead>
+                                    <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        <th scope="col" className="w-full max-w-0 py-2 pr-3 font-medium">
+                                            Name
+                                        </th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Key</th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Environment</th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">App</th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Expires</th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Created</th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Last used</th>
+                                        <th scope="col" className="py-2 pr-3 text-right font-medium">
+                                            Calls today
+                                        </th>
+                                        <th scope="col" className="py-2 pr-3 font-medium">Compromised</th>
+                                        <th scope="col" className="py-2 font-medium">
+                                            <span className="sr-only">Actions</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {shown.map((key) => (
+                                        <KeyRow
+                                            key={key.id}
+                                            entry={key}
+                                            date={(iso) => format.date(iso)}
+                                            onEdit={() => {
+                                                setEditing(key);
+                                                setDialogOpen(true);
+                                            }}
+                                            onRevoke={() => void revoke(key)}
+                                            onDelete={() => void remove(key)}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </CardBody>
             </Card>
 
-            <CreateKeyDialog
-                open={createOpen}
-                onOpenChange={setCreateOpen}
+            <KeyDialog
+                open={dialogOpen}
+                onOpenChange={(open) => {
+                    setDialogOpen(open);
+                    if (!open) setEditing(null);
+                }}
                 groups={groups}
                 availableScopes={availableScopes}
+                editing={editing}
                 onCreated={(secret) => {
-                    setCreateOpen(false);
+                    setDialogOpen(false);
+                    setEditing(null);
                     setIssued(secret);
+                    router.refresh();
+                }}
+                onSaved={() => {
+                    setDialogOpen(false);
+                    setEditing(null);
                     router.refresh();
                 }}
             />
@@ -236,149 +327,133 @@ export function ApiKeysView({
     );
 }
 
-function CreateKeyDialog({
-    open,
-    onOpenChange,
-    groups,
-    availableScopes,
-    onCreated
+function KeyRow({
+    entry,
+    date,
+    onEdit,
+    onRevoke,
+    onDelete
 }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    groups: AccessGroupView[];
-    availableScopes: Permission[];
-    onCreated: (secret: string) => void;
+    entry: ApiKeyView;
+    date: (iso: string) => string;
+    onEdit: () => void;
+    onRevoke: () => void;
+    onDelete: () => void;
 }) {
-    const [name, setName] = useState("");
-    const [scopes, setScopes] = useState<Permission[]>([]);
-    const [expiry, setExpiry] = useState<string>("90");
-    const [expiryDate, setExpiryDate] = useState("");
-    const [rules, setRules] = useState<AccessRulesValue>(EMPTY_ACCESS_RULES);
-    const [clients, setClients] = useState<UserAgentRules>(EMPTY_CLIENT_RULES);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const custom = expiry === CUSTOM_EXPIRY;
-    const chosenDate = custom ? endOfDay(expiryDate) : null;
-    const dateReady = !custom || (chosenDate !== null && chosenDate.getTime() > Date.now());
-
-    function reset() {
-        setName("");
-        setScopes([]);
-        setExpiry("90");
-        setExpiryDate("");
-        setRules(EMPTY_ACCESS_RULES);
-        setClients(EMPTY_CLIENT_RULES);
-        setError(null);
-    }
-
-    async function submit() {
-        setBusy(true);
-        setError(null);
-        const result = await createApiKeyAction({
-            name,
-            scopes: expandPermissions(scopes),
-            expiresInDays: custom ? 0 : Number(expiry),
-            expiresAt: chosenDate?.toISOString(),
-            ...rules,
-            ...clients
-        });
-        setBusy(false);
-        if (result.error || !result.secret) {
-            setError(result.error ?? "Could not create the key.");
-            return;
-        }
-        const secret = result.secret;
-        reset();
-        onCreated(secret);
-    }
+    const state = list.lifecycleOf(entry);
+    const soon = list.expiringSoon(entry);
+    const limits = describeLimits(entry);
 
     return (
-        <Dialog
-            open={open}
-            onOpenChange={(next) => {
-                onOpenChange(next);
-                if (!next) reset();
-            }}
-        >
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>New API key</DialogTitle>
-                    <DialogDescription>
-                        The key is shown once, right after it is created. Store it somewhere safe.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                    <label className="flex flex-col gap-1 text-sm">
-                        Name
-                        <Input
-                            value={name}
-                            placeholder="Backup script"
-                            autoComplete="off"
-                            onChange={(event) => setName(event.target.value)}
-                        />
-                    </label>
-
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">Scopes</span>
-                        <ScopePicker available={availableScopes} selected={scopes} onChange={setScopes} />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                        <label className="flex flex-col gap-1 text-sm">
-                            Expiry
-                            <Select
-                                value={expiry}
-                                onValueChange={setExpiry}
-                                options={[
-                                    ...API_KEY_EXPIRY_CHOICES.map((days) => ({
-                                        value: String(days),
-                                        label: expiryLabel(days)
-                                    })),
-                                    { value: CUSTOM_EXPIRY, label: "Custom date" }
-                                ]}
-                            />
-                        </label>
-                        {custom ? (
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="text-xs text-muted-foreground">
-                                    Works through the end of the chosen day.
-                                </span>
-                                <Input
-                                    type="date"
-                                    value={expiryDate}
-                                    min={earliestExpiryDate()}
-                                    onChange={(event) => setExpiryDate(event.target.value)}
-                                />
-                            </label>
-                        ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">Where the key may be used</span>
-                        <AccessRulesEditor value={rules} groups={groups} onChange={setRules} />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">What may use it</span>
-                        <ClientRulesEditor value={clients} onChange={setClients} />
-                    </div>
-
-                    {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
+        <tr className="border-b border-border/60 last:border-b-0 hover:bg-muted/30">
+            <td className="max-w-0 py-2 pr-3 align-top">
+                <span className="flex min-w-0 items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={onEdit}
+                        className="min-w-0 truncate text-left font-medium hover:underline"
+                        title={`Edit ${entry.name}`}
+                    >
+                        {entry.name}
+                    </button>
+                    {/* Only when it is not what a key normally is. A row that
+                        says "Active" on every line says nothing on any of
+                        them. */}
+                    {state === "revoked" ? (
+                        <Badge variant="danger">Revoked</Badge>
+                    ) : state === "expired" ? (
+                        <Badge variant="neutral">Expired</Badge>
+                    ) : null}
+                </span>
+                <p className="truncate text-xs text-muted-foreground">
+                    {entry.scopes.length} scope{entry.scopes.length === 1 ? "" : "s"}
+                    {limits ? ` - ${limits.toLowerCase()}` : null}
+                </p>
+                {entry.lastUsedUserAgent ? (
+                    <p
+                        className="truncate text-xs text-muted-foreground"
+                        title={entry.lastUsedUserAgent}
+                    >
+                        {describeDevice(entry.lastUsedUserAgent)}
+                        {entry.lastUsedIp ? ` from ${entry.lastUsedIp}` : null}
+                    </p>
+                ) : null}
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top font-mono text-xs text-muted-foreground">
+                {list.maskedKey(entry)}
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top">
+                <Badge variant={entry.environment === "production" ? "primary" : "neutral"}>
+                    {API_KEY_ENVIRONMENT_LABELS[entry.environment as ApiKeyEnvironment] ??
+                        entry.environment}
+                </Badge>
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+                {entry.projectName ?? "None"}
+            </td>
+            <td
+                className={cn(
+                    "whitespace-nowrap py-2 pr-3 align-top",
+                    state === "expired" ? "text-danger" : soon ? "text-warning" : undefined
+                )}
+            >
+                {entry.expiresAt ? (
+                    <span title={date(entry.expiresAt)}>{date(entry.expiresAt)}</span>
+                ) : (
+                    "Never"
+                )}
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+                {date(entry.createdAt)}
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top text-muted-foreground">
+                {entry.lastUsedAt ? <RelativeTime iso={entry.lastUsedAt} /> : "Never"}
+            </td>
+            <td
+                className="whitespace-nowrap py-2 pr-3 text-right align-top tabular-nums"
+                title={`${entry.usedRecently} calls in the last 30 days`}
+            >
+                {entry.usedToday === 0 ? (
+                    <span className="text-muted-foreground">0</span>
+                ) : (
+                    entry.usedToday
+                )}
+            </td>
+            <td className="whitespace-nowrap py-2 pr-3 align-top text-xs text-muted-foreground">
+                Coming soon
+            </td>
+            <td className="py-2 align-top">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                         <Button
-                            onClick={() => void submit()}
-                            disabled={busy || name.trim() === "" || scopes.length === 0 || !dateReady}
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`What to do with ${entry.name}`}
+                            title="More"
                         >
-                            {busy ? "Creating..." : "Create key"}
+                            <MoreHorizontal className="size-4" />
                         </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onSelect={onEdit}>
+                            <Pencil className="size-3.5" />
+                            Edit
+                        </DropdownMenuItem>
+                        {state === "revoked" ? null : (
+                            <DropdownMenuItem onSelect={onRevoke}>
+                                <Ban className="size-3.5" />
+                                Revoke
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={onDelete} className="text-danger">
+                            <Trash2 className="size-3.5" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </td>
+        </tr>
     );
 }
 

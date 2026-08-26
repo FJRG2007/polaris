@@ -291,6 +291,26 @@ export const API_KEY_PREFIX = "plk";
 /** How long a key may live. 0 means it never expires. */
 export const API_KEY_EXPIRY_CHOICES = [0, 7, 30, 90, 180, 365] as const;
 
+/**
+ * Which setup a key was made for.
+ *
+ * A label the owner chooses and nothing else: Polaris has one instance and one
+ * set of permissions, so a development key reaches exactly what a production one
+ * with the same scopes reaches. What it buys is the thing people actually get
+ * wrong - a list of fourteen keys where nobody can tell which two are wired into
+ * something that matters and which twelve were made for an afternoon of trying
+ * something out. Anything stronger than a label would have to be a second
+ * instance, which is a decision about deployment rather than about a key.
+ */
+export const API_KEY_ENVIRONMENTS = ["production", "development"] as const;
+
+export type ApiKeyEnvironment = (typeof API_KEY_ENVIRONMENTS)[number];
+
+export const API_KEY_ENVIRONMENT_LABELS: Record<ApiKeyEnvironment, string> = {
+    production: "Production",
+    development: "Development"
+};
+
 /** How far ahead a hand-picked expiry date may sit. */
 export const API_KEY_MAX_EXPIRY_YEARS = 10;
 
@@ -320,6 +340,8 @@ export const userAgentRulesSchema = z.object({
 export const createApiKeySchema = accessRulesSchema.extend({
     ...userAgentRulesSchema.shape,
     name: z.string().trim().min(1, "Name is required").max(60),
+    /** Which setup it was made for. A label - see `API_KEY_ENVIRONMENTS`. */
+    environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
     /** Permissions the key may exercise; it can only ever narrow its owner's own. */
     scopes: z
         .array(z.enum(PERMISSIONS))
@@ -350,6 +372,54 @@ export const createApiKeySchema = accessRulesSchema.extend({
 });
 
 export type CreateApiKeyInput = z.infer<typeof createApiKeySchema>;
+
+/**
+ * Changing a key that already exists.
+ *
+ * Everything except the secret, which is the one thing that cannot be changed:
+ * it exists for a moment at creation and is stored as a hash afterwards, so a
+ * key whose reach was set wrongly is edited rather than replaced.
+ *
+ * The expiry is the only field that can be left alone rather than restated.
+ * `expiresAt: null` is "never expires", a date is that instant, a span in
+ * `expiresInDays` is measured from now, and sending neither leaves the key
+ * ending exactly when it already did - which is what an edit that only renames
+ * it means.
+ */
+export const updateApiKeySchema = accessRulesSchema.extend({
+    ...userAgentRulesSchema.shape,
+    id: z.string().uuid(),
+    name: z.string().trim().min(1, "Name is required").max(60),
+    environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
+    scopes: z
+        .array(z.enum(PERMISSIONS))
+        .min(1, "Pick at least one scope")
+        .transform((values) => expandPermissions(values)),
+    expiresInDays: z
+        .number()
+        .int()
+        .refine((value) => (API_KEY_EXPIRY_CHOICES as readonly number[]).includes(value), {
+            message: "Unsupported expiry"
+        })
+        .optional(),
+    expiresAt: z
+        .string()
+        .datetime({ offset: true })
+        .nullable()
+        .optional()
+        .refine((value) => !value || new Date(value).getTime() > Date.now(), {
+            message: "Pick a date in the future"
+        })
+        .refine(
+            (value) =>
+                !value ||
+                new Date(value).getTime() <
+                    Date.now() + API_KEY_MAX_EXPIRY_YEARS * 365 * 24 * 60 * 60 * 1000,
+            { message: `Pick a date within ${API_KEY_MAX_EXPIRY_YEARS} years` }
+        )
+});
+
+export type UpdateApiKeyInput = z.infer<typeof updateApiKeySchema>;
 
 // ---------------------------------------------------------------------------
 // Storage helpers

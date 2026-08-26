@@ -156,6 +156,7 @@ export {
     createApiKey,
     listApiKeys,
     revokeApiKey,
+    updateApiKey,
     deleteApiKey,
     verifyApiKey,
     touchApiKey,

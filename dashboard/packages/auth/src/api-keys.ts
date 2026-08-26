@@ -22,9 +22,11 @@ import {
     parseStringList,
     stringifyList,
     unionRules,
+    type ApiKeyEnvironment,
     type CreateApiKeyInput,
     type EffectiveAccessRules,
     type Permission,
+    type UpdateApiKeyInput,
     type UserAgentRules
 } from "@polaris/core";
 
@@ -33,6 +35,12 @@ export interface ApiKeyView {
     id: string;
     name: string;
     prefix: string;
+    /** Which setup it was made for. A label its owner sorts by. */
+    environment: ApiKeyEnvironment;
+    /** The last characters of the secret, or null for a key issued before these
+     *  were kept. What the list shows after the ellipsis, so a row can be
+     *  matched against the value in a password manager. */
+    tail: string | null;
     scopes: string[];
     allowedCidrs: string[];
     allowedCountries: string[];
@@ -47,6 +55,17 @@ export interface ApiKeyView {
     lastUsedUserAgent: string | null;
     revokedAt: string | null;
     createdAt: string;
+    /** The app whose settings minted this key, for one that came from there.
+     *  Where it came from rather than what it may touch - a project token
+     *  carries its owner's permissions like any other key. */
+    projectId: string | null;
+    projectName: string | null;
+    /** Calls answered today, and over the window the counter keeps. Two numbers
+     *  because one of them answers "is this still in use" and the other answers
+     *  "was it ever" - a key used once in April and one answering a call a
+     *  second both read as "last used" and nothing else. */
+    usedToday: number;
+    usedRecently: number;
 }
 
 /** A verified key: who it acts as, what it may do, and where it may be used from. */
@@ -67,6 +86,21 @@ function generatePrefix(): string {
 }
 
 const MINUTES_PER_DAY = 24 * 60;
+
+/** How many characters of the secret are kept for recognising a key. Four of a
+ *  random token identify nothing on their own. */
+const TAIL_LENGTH = 4;
+
+/** How many days of usage counters are kept. A month is what a screen can
+ *  usefully show and what answers "did anything still call this"; older rows are
+ *  removed by the first call of a new day. */
+const USAGE_WINDOW_DAYS = 30;
+
+/** The day a counter belongs to. UTC, so a key used across a midnight is not
+ *  counted twice by two readers in different places. */
+function dayKey(at: Date): string {
+    return at.toISOString().slice(0, 10);
+}
 
 /** How much of a presented user-agent is kept. It is a header, so its length is
  *  the caller's to choose. */
@@ -100,8 +134,10 @@ export async function createApiKey(
         data: {
             userId,
             name: input.name,
+            environment: input.environment,
             prefix,
             keyHash: hashToken(secret),
+            tail: secret.slice(-TAIL_LENGTH),
             scopes: stringifyList(input.scopes),
             allowedCidrs: stringifyList(input.allowedCidrs),
             allowedCountries: stringifyList(input.allowedCountries),
@@ -116,17 +152,32 @@ export async function createApiKey(
     return { id: created.id, prefix, secret };
 }
 
-/** Every key a user owns, newest first. */
+/**
+ * Every key a user owns, newest first.
+ *
+ * The usage counters come back with the rows rather than being asked for per
+ * key: a list of fourteen keys would otherwise be fifteen queries, and the
+ * screen draws all of them at once. Only the window the counter keeps is read,
+ * which is what bounds this - a key in constant use for a year still has thirty
+ * rows.
+ */
 export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
     const rows = await prisma.apiKey.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" },
-        include: { groups: { select: { groupId: true } } }
+        include: {
+            groups: { select: { groupId: true } },
+            project: { select: { name: true } },
+            usage: { select: { day: true, calls: true } }
+        }
     });
+    const today = dayKey(new Date());
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
+        environment: (row.environment as ApiKeyEnvironment) ?? "production",
         prefix: row.prefix,
+        tail: row.tail,
         scopes: parseStringList(row.scopes),
         allowedCidrs: parseStringList(row.allowedCidrs),
         allowedCountries: parseStringList(row.allowedCountries),
@@ -139,8 +190,73 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         lastUsedIp: row.lastUsedIp,
         lastUsedUserAgent: row.lastUsedUserAgent,
         revokedAt: row.revokedAt?.toISOString() ?? null,
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        projectId: row.projectId,
+        projectName: row.project?.name ?? null,
+        usedToday: row.usage.find((day) => day.day === today)?.calls ?? 0,
+        usedRecently: row.usage.reduce((total, day) => total + day.calls, 0)
     }));
+}
+
+/**
+ * Change a key that already exists.
+ *
+ * Everything except the secret, which cannot be changed: it exists for a moment
+ * at creation and is a hash afterwards. So a key whose reach or expiry was set
+ * wrongly is edited here rather than deleted and re-issued, which is what people
+ * otherwise do - and what leaves a script broken until somebody pastes the new
+ * value into it.
+ *
+ * The caller has already narrowed the scopes to what this user actually holds;
+ * this trusts that no more than the create path does, which is to say the
+ * `userId` in the filter is what makes it theirs.
+ */
+export async function updateApiKey(userId: string, input: UpdateApiKeyInput): Promise<void> {
+    const owned = await prisma.apiKey.findFirst({
+        where: { id: input.id, userId },
+        select: { id: true }
+    });
+    if (!owned) return;
+
+    const groups = await prisma.accessGroup.findMany({
+        where: { ownerId: userId, id: { in: input.groupIds } },
+        select: { id: true }
+    });
+
+    await prisma.$transaction([
+        prisma.apiKey.update({
+            where: { id: input.id },
+            data: {
+                name: input.name,
+                environment: input.environment,
+                scopes: stringifyList(input.scopes),
+                allowedCidrs: stringifyList(input.allowedCidrs),
+                allowedCountries: stringifyList(input.allowedCountries),
+                allowedContinents: stringifyList(input.allowedContinents),
+                allowedUserAgents: stringifyList(input.allowedUserAgents),
+                deniedUserAgents: stringifyList(input.deniedUserAgents),
+                // Left exactly as it was when the edit says nothing about it,
+                // which is what renaming a key means - see `updateApiKeySchema`.
+                ...(newExpiry(input) === undefined ? {} : { expiresAt: newExpiry(input) })
+            }
+        }),
+        // Replaced rather than merged: the editor shows the whole set, so what
+        // comes back is the whole answer.
+        prisma.apiKeyAccessGroup.deleteMany({ where: { apiKeyId: input.id } }),
+        prisma.apiKeyAccessGroup.createMany({
+            data: groups.map((group) => ({ apiKeyId: input.id, groupId: group.id }))
+        })
+    ]);
+}
+
+/** When an edited key should stop working: a date, never, or `undefined` for
+ *  "leave it as it is". */
+function newExpiry(input: UpdateApiKeyInput): Date | null | undefined {
+    if (input.expiresAt === null) return null;
+    if (input.expiresAt) return new Date(input.expiresAt);
+    if (input.expiresInDays === undefined) return undefined;
+    if (input.expiresInDays === 0) return null;
+    return new Date(Date.now() + input.expiresInDays * MINUTES_PER_DAY * 60 * 1000);
 }
 
 /** Revoke a key the caller owns. The row is kept so the audit trail survives. */
@@ -211,23 +327,52 @@ export async function scopesAvailableTo(userId: string, isAdmin = false): Promis
     return PERMISSIONS.filter((permission) => granted.has(permission));
 }
 
-/** Record that a key was just used, and by what. Best-effort: never fails the
- *  request. */
+/**
+ * Record that a key was just used, and by what.
+ *
+ * Two writes, and the second is the one that makes a list of keys worth reading:
+ * a stamp alone cannot tell a key answering a call a second from one that was
+ * used once in April, so the day's calls are counted as well. The counter is
+ * addressed by its primary key, so it is an upsert and never a scan, and the
+ * rows that have aged out of the window go with the first call of a new day -
+ * which is the only moment anything here has to walk more than one row.
+ *
+ * Best-effort throughout: none of it is worth failing an authorized call over.
+ */
 export async function touchApiKey(
     id: string,
     ip: string | undefined,
     userAgent?: string
 ): Promise<void> {
+    const now = new Date();
+    const day = dayKey(now);
     try {
         await prisma.apiKey.update({
             where: { id },
             data: {
-                lastUsedAt: new Date(),
+                lastUsedAt: now,
                 lastUsedIp: ip ?? null,
                 lastUsedUserAgent: userAgent?.slice(0, MAX_USER_AGENT) ?? null
             }
         });
     } catch {
         // A usage stamp is not worth failing an authorized call over.
+    }
+    try {
+        const counted = await prisma.apiKeyUsage.upsert({
+            where: { apiKeyId_day: { apiKeyId: id, day } },
+            create: { apiKeyId: id, day, calls: 1 },
+            update: { calls: { increment: 1 } },
+            select: { calls: true }
+        });
+        // The first call of a day is where the window is trimmed. Doing it on
+        // every call would be a delete per request for nothing to delete.
+        if (counted.calls === 1) {
+            const oldest = dayKey(new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+            await prisma.apiKeyUsage.deleteMany({ where: { apiKeyId: id, day: { lt: oldest } } });
+        }
+    } catch {
+        // Same again: a counter is not worth an error the caller can do nothing
+        // about.
     }
 }

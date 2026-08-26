@@ -20,11 +20,15 @@ export default async function ApiKeysPage() {
     ]);
 
     return (
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+        // Wider than the rest of the account screens, because this one is a
+        // table: nine columns squeezed into a reading column is nine columns
+        // nobody can compare.
+        <div className="mx-auto flex max-w-6xl flex-col gap-4">
             <div>
                 <h1 className="text-[17px] font-semibold tracking-tight">API keys</h1>
                 <p className="text-sm text-muted-foreground">
-                    Credentials for scripts and integrations acting as you.
+                    Credentials for scripts and integrations acting as you. Keep them somewhere
+                    safe: anyone holding one can do what it allows, as you.
                 </p>
             </div>
             <ApiKeysView keys={keys} groups={groups} availableScopes={scopes} />

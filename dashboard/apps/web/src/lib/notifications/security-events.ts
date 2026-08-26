@@ -73,6 +73,7 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.email.removed": { title: "An email address was removed from your account", href: "/account" },
     "account.email.primary-changed": { title: "Your main email address changed", href: "/account" },
     "account.api-key.created": { title: "An API key was created", href: "/account/api-keys" },
+    "account.api-key.updated": { title: "An API key was changed", href: "/account/api-keys" },
     "account.api-key.revoked": { title: "An API key was revoked", href: "/account/api-keys" },
     "account.api-key.deleted": { title: "An API key was deleted", href: "/account/api-keys" },
     "account.ai-key.added": { title: "An AI provider key was added", href: "/account/ai-keys" },
