@@ -525,10 +525,13 @@ export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: (
     return (
         <Badge
             variant="neutral"
-            className="gap-1 border-transparent text-[11px]"
+            // A tag is named by whoever needed it, in a hurry, and nothing stops
+            // that name being one long word. Capped at the width of whatever is
+            // showing it rather than allowed out through the side of a card.
+            className="max-w-full gap-1 border-transparent text-[11px]"
             style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
         >
-            {tag.name}
+            <span className="truncate" title={tag.name}>{tag.name}</span>
             {onRemove && (
                 <button type="button" onClick={onRemove} aria-label={`Remove ${tag.name}`} className="opacity-70 hover:opacity-100">
                     <X className="size-3" />

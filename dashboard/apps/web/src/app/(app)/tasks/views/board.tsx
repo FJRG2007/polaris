@@ -374,9 +374,16 @@ export function TaskCard({
                         </span>
                     </div>
 
+                    {/* A name with nowhere to break is broken anyway, and cut off
+                    after three lines. An address pasted in as a task name is one
+                    word a hundred characters long: it ran out through the side of
+                    the card and gave the whole column a horizontal scrollbar. The
+                    full name is on the card's tooltip and in the panel behind it,
+                    so nothing is lost by cutting it here. */}
                     <p
+                        title={task.name}
                         className={cn(
-                            "text-sm leading-snug",
+                            "line-clamp-3 break-words text-sm leading-snug",
                             core.isFinishedStatus(task.statusType) && "text-muted-foreground"
                         )}
                     >

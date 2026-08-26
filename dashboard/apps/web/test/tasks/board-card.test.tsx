@@ -121,6 +121,15 @@ describe("board card", () => {
         expect(markup).not.toContain("line-through");
     });
 
+    it("keeps a name with nowhere to break inside the card", () => {
+        // An address pasted in as a task name is one word a hundred characters
+        // long. Left alone it ran out through the side of the card and gave the
+        // whole column a horizontal scrollbar of its own.
+        const markup = card(taskRow({ name: "https://polarisexamplenamewithnoseparators.example/aaaaaaaaaaaaaaaaaaaaaaaa" }));
+        expect(markup).toContain("break-words");
+        expect(markup).toContain("line-clamp-3");
+    });
+
     it("offers no controls to somebody who cannot edit", () => {
         const markup = card(taskRow(), false);
         expect(markup).not.toContain('aria-label="Priority"');
