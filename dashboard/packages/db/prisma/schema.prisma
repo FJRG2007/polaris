@@ -991,6 +991,10 @@ model ApiKey {
     id                String    @id @default(uuid(7)) @db.Uuid
     userId            String    @db.Uuid
     name              String
+    // What it is for, in the owner's own words. The name is what a list is
+    // scanned by; this is the sentence that says why the key exists at all,
+    // which is the thing nobody remembers a year later.
+    description       String?
     // Which setup the key was made for: production or development. A label its
     // owner sorts a long list by - it narrows nothing, because there is one
     // instance and one set of permissions behind both. See API_KEY_ENVIRONMENTS.

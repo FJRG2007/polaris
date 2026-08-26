@@ -28,23 +28,26 @@
  *
  * The filters run over the rows the page already has - see `api-keys-filter` -
  * so narrowing the list is instant and asks the server nothing.
+ *
+ * Making a key and changing one happen on pages of their own rather than in a
+ * dialog over this one - see `key-form`. What a key may do is too large a
+ * decision for a modal, and an address is something you can go back to.
  */
 
-import { KeyDialog } from "./key-dialog";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
-import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
+import type { ApiKeyView } from "@polaris/auth";
 import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
-import { Ban, Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
     API_KEY_ENVIRONMENTS,
     API_KEY_ENVIRONMENT_LABELS,
     describeDevice,
-    type ApiKeyEnvironment,
-    type Permission
+    type ApiKeyEnvironment
 } from "@polaris/core";
 import * as list from "./api-keys-filter";
 import {
@@ -52,11 +55,6 @@ import {
     Button,
     Card,
     CardBody,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -88,22 +86,11 @@ function describeLimits(key: ApiKeyView): string | null {
     return parts.length > 0 ? `Limited to ${parts.join(", ")}` : null;
 }
 
-export function ApiKeysView({
-    keys,
-    groups,
-    availableScopes
-}: {
-    keys: ApiKeyView[];
-    groups: AccessGroupView[];
-    availableScopes: Permission[];
-}) {
+export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
     const router = useRouter();
     const format = useDisplayFormat();
     const [confirm, confirmElement] = useConfirm();
     const [filters, setFilters] = useState<list.KeyFilters>(list.NO_FILTERS);
-    const [editing, setEditing] = useState<ApiKeyView | null>(null);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [issued, setIssued] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const apps = useMemo(() => list.appsInKeys(keys), [keys]);
@@ -220,15 +207,11 @@ export function ApiKeysView({
                                 />
                             </label>
                         </div>
-                        <Button
-                            size="sm"
-                            onClick={() => {
-                                setEditing(null);
-                                setDialogOpen(true);
-                            }}
-                        >
-                            <Plus className="size-4" />
-                            New key
+                        <Button size="sm" asChild>
+                            <Link href="/account/api-keys/new" className="no-underline">
+                                <Plus className="size-4" />
+                                New key
+                            </Link>
                         </Button>
                     </div>
 
@@ -285,10 +268,6 @@ export function ApiKeysView({
                                             key={key.id}
                                             entry={key}
                                             date={(iso) => format.date(iso)}
-                                            onEdit={() => {
-                                                setEditing(key);
-                                                setDialogOpen(true);
-                                            }}
                                             onRevoke={() => void revoke(key)}
                                             onDelete={() => void remove(key)}
                                         />
@@ -300,28 +279,6 @@ export function ApiKeysView({
                 </CardBody>
             </Card>
 
-            <KeyDialog
-                open={dialogOpen}
-                onOpenChange={(open) => {
-                    setDialogOpen(open);
-                    if (!open) setEditing(null);
-                }}
-                groups={groups}
-                availableScopes={availableScopes}
-                editing={editing}
-                onCreated={(secret) => {
-                    setDialogOpen(false);
-                    setEditing(null);
-                    setIssued(secret);
-                    router.refresh();
-                }}
-                onSaved={() => {
-                    setDialogOpen(false);
-                    setEditing(null);
-                    router.refresh();
-                }}
-            />
-            <IssuedKeyDialog secret={issued} onClose={() => setIssued(null)} />
             {confirmElement}
         </div>
     );
@@ -330,16 +287,15 @@ export function ApiKeysView({
 function KeyRow({
     entry,
     date,
-    onEdit,
     onRevoke,
     onDelete
 }: {
     entry: ApiKeyView;
     date: (iso: string) => string;
-    onEdit: () => void;
     onRevoke: () => void;
     onDelete: () => void;
 }) {
+    const href = `/account/api-keys/${entry.id}`;
     const state = list.lifecycleOf(entry);
     const soon = list.expiringSoon(entry);
     const limits = describeLimits(entry);
@@ -348,14 +304,13 @@ function KeyRow({
         <tr className="border-b border-border/60 last:border-b-0 hover:bg-muted/30">
             <td className="max-w-0 py-2 pr-3 align-top">
                 <span className="flex min-w-0 items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={onEdit}
-                        className="min-w-0 truncate text-left font-medium hover:underline"
+                    <Link
+                        href={href}
+                        className="min-w-0 truncate text-left font-medium no-underline hover:underline"
                         title={`Edit ${entry.name}`}
                     >
                         {entry.name}
-                    </button>
+                    </Link>
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of
                         them. */}
@@ -365,6 +320,11 @@ function KeyRow({
                         <Badge variant="neutral">Expired</Badge>
                     ) : null}
                 </span>
+                {entry.description ? (
+                    <p className="truncate text-xs" title={entry.description}>
+                        {entry.description}
+                    </p>
+                ) : null}
                 <p className="truncate text-xs text-muted-foreground">
                     {entry.scopes.length} scope{entry.scopes.length === 1 ? "" : "s"}
                     {limits ? ` - ${limits.toLowerCase()}` : null}
@@ -435,9 +395,11 @@ function KeyRow({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem onSelect={onEdit}>
-                            <Pencil className="size-3.5" />
-                            Edit
+                        <DropdownMenuItem asChild>
+                            <Link href={href} className="no-underline">
+                                <Pencil className="size-3.5" />
+                                Edit
+                            </Link>
                         </DropdownMenuItem>
                         {state === "revoked" ? null : (
                             <DropdownMenuItem onSelect={onRevoke}>
@@ -446,7 +408,7 @@ function KeyRow({
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={onDelete} className="text-danger">
+                        <DropdownMenuItem onSelect={onDelete} variant="danger">
                             <Trash2 className="size-3.5" />
                             Delete
                         </DropdownMenuItem>
@@ -454,35 +416,5 @@ function KeyRow({
                 </DropdownMenu>
             </td>
         </tr>
-    );
-}
-
-function IssuedKeyDialog({ secret, onClose }: { secret: string | null; onClose: () => void }) {
-    return (
-        <Dialog open={secret !== null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Your new API key</DialogTitle>
-                    <DialogDescription>
-                        Copy it now - Polaris stores only a hash and cannot show it again.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-3">
-                    <code className="break-all rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-sm">
-                        {secret}
-                    </code>
-                    <div className="flex justify-end gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => secret && void navigator.clipboard.writeText(secret)}
-                        >
-                            <Copy className="size-4" />
-                            Copy
-                        </Button>
-                        <Button onClick={onClose}>Done</Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 }

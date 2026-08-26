@@ -352,6 +352,7 @@ export async function createProjectToken(
     const days = TOKEN_LIFETIME_DAYS[input.lifetime];
     const key = await createApiKey(input.ownerId, {
         name: input.name,
+        description: "Minted from this app's settings.",
         // A deploy token is wired into something that runs on its own, which is
         // what "production" means on the key list whatever it is deploying to.
         environment: "production",

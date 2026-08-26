@@ -121,7 +121,8 @@ export function filterKeys(
     const needle = filters.search.trim().toLowerCase();
     const found = keys.filter((key) => {
         if (needle) {
-            const haystack = `${key.name} ${key.prefix} ${key.tail ?? ""}`.toLowerCase();
+            const haystack =
+                `${key.name} ${key.description} ${key.prefix} ${key.tail ?? ""}`.toLowerCase();
             const pasted = needle.startsWith(key.prefix.toLowerCase());
             if (!pasted && !haystack.includes(needle)) return false;
         }

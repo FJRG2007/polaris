@@ -314,6 +314,10 @@ export const API_KEY_ENVIRONMENT_LABELS: Record<ApiKeyEnvironment, string> = {
 /** How far ahead a hand-picked expiry date may sit. */
 export const API_KEY_MAX_EXPIRY_YEARS = 10;
 
+/** How long the line saying what a key is for may be. Long enough for a
+ *  sentence, short enough that it is not a document. */
+export const API_KEY_DESCRIPTION_MAX = 280;
+
 /** How many client patterns one key may carry per list. A handful describes any
  *  real client; a long list is a sign the rule is not doing what was meant. */
 const USER_AGENT_LIST_MAX = 20;
@@ -340,6 +344,8 @@ export const userAgentRulesSchema = z.object({
 export const createApiKeySchema = accessRulesSchema.extend({
     ...userAgentRulesSchema.shape,
     name: z.string().trim().min(1, "Name is required").max(60),
+    /** What the key is for, in the owner's own words. */
+    description: z.string().trim().max(API_KEY_DESCRIPTION_MAX).default(""),
     /** Which setup it was made for. A label - see `API_KEY_ENVIRONMENTS`. */
     environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
     /** Permissions the key may exercise; it can only ever narrow its owner's own. */
@@ -390,6 +396,7 @@ export const updateApiKeySchema = accessRulesSchema.extend({
     ...userAgentRulesSchema.shape,
     id: z.string().uuid(),
     name: z.string().trim().min(1, "Name is required").max(60),
+    description: z.string().trim().max(API_KEY_DESCRIPTION_MAX).default(""),
     environment: z.enum(API_KEY_ENVIRONMENTS).default("production"),
     scopes: z
         .array(z.enum(PERMISSIONS))

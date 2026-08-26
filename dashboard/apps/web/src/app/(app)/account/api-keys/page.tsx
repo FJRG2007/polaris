@@ -5,7 +5,7 @@
  * never be created with more reach than its owner.
  */
 
-import { listAccessGroups, listApiKeys, scopesAvailableTo } from "@polaris/auth";
+import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { ApiKeysView } from "./api-keys-view";
 
@@ -13,11 +13,9 @@ export const dynamic = "force-dynamic";
 
 export default async function ApiKeysPage() {
     const user = await requireUser();
-    const [keys, groups, scopes] = await Promise.all([
-        listApiKeys(user.id),
-        listAccessGroups(user.id),
-        scopesAvailableTo(user.id, user.isAdmin)
-    ]);
+    // Only the keys. What a key may carry is decided on the page that mints or
+    // changes one, which is where the scopes and the address groups are read.
+    const keys = await listApiKeys(user.id);
 
     return (
         // Wider than the rest of the account screens, because this one is a
@@ -31,7 +29,7 @@ export default async function ApiKeysPage() {
                     safe: anyone holding one can do what it allows, as you.
                 </p>
             </div>
-            <ApiKeysView keys={keys} groups={groups} availableScopes={scopes} />
+            <ApiKeysView keys={keys} />
         </div>
     );
 }

@@ -19,6 +19,7 @@ function key(over: Partial<ApiKeyView> = {}): ApiKeyView {
     return {
         id: "00000000-0000-0000-0000-000000000001",
         name: "Backup script",
+        description: "",
         environment: "production",
         prefix: "plk_abc123",
         tail: "9f3c",
@@ -99,6 +100,16 @@ describe("narrowing the list", () => {
             projectName: "Shop"
         })
     ];
+
+    it("searches what the key is for as well as what it is called", () => {
+        const described = [
+            key({ id: "a", name: "CI", description: "Uploads the nightly build" }),
+            key({ id: "b", name: "Laptop" })
+        ];
+        expect(
+            list.filterKeys(described, { ...list.NO_FILTERS, search: "nightly" }, NOW).map((r) => r.id)
+        ).toEqual(["a"]);
+    });
 
     it("searches the name and the visible halves of the key", () => {
         const found = list.filterKeys(keys, { ...list.NO_FILTERS, search: "1234" }, NOW);

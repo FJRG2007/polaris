@@ -34,6 +34,8 @@ import {
 export interface ApiKeyView {
     id: string;
     name: string;
+    /** What it is for, in the owner's words. Empty when they did not say. */
+    description: string;
     prefix: string;
     /** Which setup it was made for. A label its owner sorts by. */
     environment: ApiKeyEnvironment;
@@ -134,6 +136,7 @@ export async function createApiKey(
         data: {
             userId,
             name: input.name,
+            description: input.description || null,
             environment: input.environment,
             prefix,
             keyHash: hashToken(secret),
@@ -175,6 +178,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
+        description: row.description ?? "",
         environment: (row.environment as ApiKeyEnvironment) ?? "production",
         prefix: row.prefix,
         tail: row.tail,
@@ -228,6 +232,7 @@ export async function updateApiKey(userId: string, input: UpdateApiKeyInput): Pr
             where: { id: input.id },
             data: {
                 name: input.name,
+                description: input.description || null,
                 environment: input.environment,
                 scopes: stringifyList(input.scopes),
                 allowedCidrs: stringifyList(input.allowedCidrs),

@@ -17,6 +17,9 @@
 -- AlterTable
 ALTER TABLE "ApiKey" ADD COLUMN "environment" TEXT NOT NULL DEFAULT 'production';
 ALTER TABLE "ApiKey" ADD COLUMN "tail" TEXT;
+-- And a line saying why the key exists, which a name cannot carry and nobody
+-- remembers a year later.
+ALTER TABLE "ApiKey" ADD COLUMN "description" TEXT;
 
 -- CreateTable
 CREATE TABLE "ApiKeyUsage" (
