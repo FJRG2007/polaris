@@ -75,11 +75,21 @@ function stubTheBrowser(reply: () => PictureReply): string[] {
         asked.push(String(input));
         return reply();
     });
-    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
-    vi.stubGlobal("URL", class extends URL {
-        static createObjectURL = () => "blob:x";
-        static revokeObjectURL = () => undefined;
-    });
+    vi.stubGlobal(
+        "ResizeObserver",
+        class {
+            observe() {}
+            unobserve() {}
+            disconnect() {}
+        }
+    );
+    vi.stubGlobal(
+        "URL",
+        class extends URL {
+            static createObjectURL = () => "blob:x";
+            static revokeObjectURL = () => undefined;
+        }
+    );
     return asked;
 }
 

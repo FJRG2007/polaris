@@ -40,7 +40,15 @@ import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
 import { avatarUrl, bannerUrl, orgAvatarUrl } from "@/lib/avatar-url";
-import { Camera, Crop, Image as ImageIcon, Loader2, Trash2, Upload, type LucideIcon } from "lucide-react";
+import {
+    Camera,
+    Crop,
+    Image as ImageIcon,
+    Loader2,
+    Trash2,
+    Upload,
+    type LucideIcon
+} from "lucide-react";
 import {
     BAND_CROP,
     CROP_ACCEPTED,
@@ -117,7 +125,9 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
     };
 
     const upload = (body: Blob) =>
-        run(() => fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body }));
+        run(() =>
+            fetch(endpoint, { method: "POST", headers: { "Content-Type": body.type }, body })
+        );
 
     /**
      * Open the cropper on the picture that is already there.
@@ -385,7 +395,9 @@ export function ProfilePicturesCard({
                                 radius="full"
                             />
                         </div>
-                        <p className="truncate text-sm font-medium" title={name}>{name}</p>
+                        <p className="truncate text-sm font-medium" title={name}>
+                            {name}
+                        </p>
                     </div>
                 </div>
 
@@ -396,7 +408,15 @@ export function ProfilePicturesCard({
 }
 
 /** An organization's face. One picture, and the same handle on it. */
-export function OrgPhotoCard({ orgId, name, hasPhoto }: { orgId: string; name: string; hasPhoto: boolean }) {
+export function OrgPhotoCard({
+    orgId,
+    name,
+    hasPhoto
+}: {
+    orgId: string;
+    name: string;
+    hasPhoto: boolean;
+}) {
     const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), TILE_CROP);
 
     return (
