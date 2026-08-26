@@ -131,6 +131,11 @@ export function PolarisFootprintCard() {
 /** The three numbers the card exists to give, in one line. */
 function Totals({ footprint }: { footprint: PolarisFootprint }) {
     const disk = footprintDiskBytes(footprint);
+    // Optional against the type, on purpose. An update rolls over without going
+    // down, so for a few seconds the container still serving this endpoint can be
+    // the previous one - and this figure is newer than some of those. Reading it
+    // as though it were always there turns a stale answer into a blank screen.
+    const rest = footprint.rest as PolarisFootprint["rest"] | undefined;
     return (
         <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
@@ -148,19 +153,18 @@ function Totals({ footprint }: { footprint: PolarisFootprint }) {
             on disk - {formatBytes(footprint.imageBytes)} of images,{" "}
             {formatBytes(footprint.volumeBytes)} of data, {formatBytes(footprint.writableBytes)}{" "}
             written by the containers themselves.
-            {footprint.rest.containers > 0 ? (
+            {rest && rest.containers > 0 ? (
                 <>
                     {" "}
                     Everything else running here -{" "}
                     <span className="font-medium text-foreground">
-                        {footprint.rest.containers} container{footprint.rest.containers === 1 ? "" : "s"}
+                        {rest.containers} container{rest.containers === 1 ? "" : "s"}
                     </span>{" "}
                     of services and installed apps - is using{" "}
                     <span className="font-medium text-foreground">
-                        {formatBytes(footprint.rest.memUsedBytes)}
+                        {formatBytes(rest.memUsedBytes)}
                     </span>{" "}
-                    and <span className="font-medium text-foreground">{footprint.rest.cpuPercent}%</span>{" "}
-                    CPU.
+                    and <span className="font-medium text-foreground">{rest.cpuPercent}%</span> CPU.
                 </>
             ) : null}
         </p>

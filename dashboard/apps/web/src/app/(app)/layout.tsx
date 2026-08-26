@@ -35,6 +35,7 @@ import { ChatUnreadProvider } from "@/components/chat-unread";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { buildStamp } from "@/lib/build-stamp";
 import { NewBuildBanner } from "@/components/new-build-banner";
+import { SnapshotBuild } from "@/components/snapshot-build";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 
 /**
@@ -79,8 +80,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         ? await unreadTotal({ id: user.id }).catch(() => NO_CHAT_UNREAD)
         : NO_CHAT_UNREAD;
 
+    const build = buildStamp();
+
     return (
         <CapabilityProvider capabilities={capabilities}>
+            {/* First in the tree on purpose: it tells the kept-reads store which
+                build this document is, and the screens below ask that store while
+                they render. A tab that lived across an update still holds the
+                previous build's payloads, and painting one of those into today's
+                component is a crash on the first paint rather than a failed
+                request. */}
+            <SnapshotBuild build={build} />
             <AppUrlProvider baseUrl={baseUrl}>
                 <DisplayFormatProvider preferences={display}>
                     <SessionScopeProvider userId={user.id}>
@@ -117,7 +127,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                                 {/* An update landing under an open tab, said out
                                         loud before a click is refused by a server that
                                         no longer knows this bundle. */}
-                                                <NewBuildBanner served={buildStamp()} />
+                                                <NewBuildBanner served={build} />
                                                 {/* Out here rather than inside Chat: a call you only
                                         hear about while looking at the conversation it
                                         is in is a notice, not a call. Only for somebody
