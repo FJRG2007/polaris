@@ -171,6 +171,17 @@ export interface AppManifest {
      *  real manifest - it is what the install is made from. */
     internal?: boolean;
     /**
+     * The app that creates this one, by catalog id. Only for an `internal`
+     * manifest, and it is what says which app that is.
+     *
+     * Without it every screen that lists installs has to decide for itself that
+     * six Minecraft servers and a camera relay are not six-and-one apps somebody
+     * installed - and each decides differently, or not at all. The category is
+     * not that answer: an app genuinely offered under "Game servers" would be
+     * swept up by it.
+     */
+    ownedBy?: string;
+    /**
      * Superseded, and kept only so installs that already exist still resolve.
      *
      * An app that shipped, was installed by people, and has since been folded into
@@ -244,6 +255,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "minecraft",
         name: "Minecraft (Java)",
         internal: true,
+        ownedBy: "game-servers",
         category: "Game servers",
         icon: Gamepad2,
         summary: "A Java server for PC players, closed and protected by default.",
@@ -528,6 +540,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "minecraft-bedrock",
         name: "Minecraft (Bedrock)",
         internal: true,
+        ownedBy: "game-servers",
         category: "Game servers",
         icon: Gamepad2,
         summary: "A Bedrock server for phones, consoles and Windows.",
@@ -662,6 +675,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "ark",
         name: "ARK: Survival Evolved",
         internal: true,
+        ownedBy: "game-servers",
         category: "Game servers",
         icon: Gamepad2,
         summary: "An ARK server for PC players, closed to everyone you have not added.",
@@ -867,6 +881,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "fivem",
         name: "FiveM",
         internal: true,
+        ownedBy: "game-servers",
         category: "Game servers",
         icon: Gamepad2,
         summary: "A GTA V server of your own, closed to everyone you have not added.",
@@ -949,6 +964,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "camera-hub",
         name: "Camera relay",
         internal: true,
+        ownedBy: "home",
         category: "Home",
         icon: Video,
         summary: "Pulls each camera once and streams it to everybody watching.",
@@ -982,6 +998,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "face-recognizer",
         name: "Face recognition",
         internal: true,
+        ownedBy: "home",
         category: "Home",
         icon: ScanFace,
         summary: "Puts names to the faces you have taught it, on your own hardware.",
@@ -1014,6 +1031,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         id: "vision-worker",
         name: "Vision worker",
         internal: true,
+        ownedBy: "home",
         category: "Home",
         icon: ScanFace,
         summary: "Watches for movement, then looks properly at what it was.",

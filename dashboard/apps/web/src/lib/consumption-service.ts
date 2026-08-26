@@ -26,7 +26,7 @@ import { findApp } from "@/lib/apps/catalog";
 import { visibleProjectIds } from "@/lib/deploy-service";
 import type { Consumption } from "@/app/(app)/admin/consumption/types";
 import { localDockerDriver, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
-import { attribute, subjectHash, type Claim, type ClaimIndex } from "@/lib/consumption";
+import { attribute, subjectHash, type Claim, type ClaimBucket, type ClaimIndex } from "@/lib/consumption";
 import {
     cachedSamples,
     oldestSampleAt,
@@ -140,8 +140,12 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
                 }
             }
         }),
+        // Every install, including the ones that run no container of their own.
+        // Game servers and Places are exactly those: they run nothing, and what
+        // runs is the servers and workers they create. Filtering them out here is
+        // what left those showing as installs of their own.
         prisma.installedApp.findMany({
-            where: { status: { not: "removed" }, applicationId: { not: null } },
+            where: { status: { not: "removed" } },
             select: { id: true, name: true, catalogId: true, applicationId: true, ownerId: true }
         }),
         visibleProjectIds(viewerId)
@@ -194,6 +198,13 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
         });
     }
 
+    // Whose shelf holds an install of what, so an internal one can find the app
+    // that made it. Keyed by both, because two accounts each have their own Game
+    // servers and a server belongs to its owner's.
+    const byOwnerAndCatalog = new Map(
+        installs.map((install) => [`${install.ownerId}:${install.catalogId}`, install])
+    );
+
     // Installs last, and they overwrite the service they are backed by: a
     // marketplace app IS a deployed service with an install record in front of it,
     // and the operator knows it as the app they installed rather than as the
@@ -203,22 +214,63 @@ async function readIndex(viewerId: string): Promise<ClaimIndex> {
             ? byApplication.get(install.applicationId)
             : undefined;
         if (!application) continue;
-        const claim: Claim = {
-            key: `install:${install.id}`,
-            bucket: {
-                id: install.id,
-                name: install.name,
-                detail: findApp(install.catalogId)?.name ?? install.catalogId,
-                owner: owners.get(install.ownerId) ?? null,
-                group: "apps",
-                href: `/apps/installed/${install.id}`
-            }
+        const manifest = findApp(install.catalogId);
+        const kind = manifest?.name ?? install.catalogId;
+        const mine: ClaimBucket = {
+            id: install.id,
+            // The catalog name says what it is, and repeating it under a server
+            // called after it ("Vision worker / Vision worker") says nothing twice.
+            detail: kind === install.name ? "" : kind,
+            name: install.name,
+            owner: owners.get(install.ownerId) ?? null,
+            group: "apps",
+            href: `/apps/installed/${install.id}`
         };
+
+        // An internal install is not something somebody installed: it is what an
+        // app they installed makes. Six Minecraft servers are six servers of one
+        // app, and reading them as six apps is what this fixes. The app is the
+        // row; the server is a part inside it.
+        const ownerApp = manifest?.ownedBy
+            ? byOwnerAndCatalog.get(`${install.ownerId}:${manifest.ownedBy}`)
+            : undefined;
+        const claim: Claim = ownerApp
+            ? {
+                  key: `install:${ownerApp.id}`,
+                  bucket: appBucket(ownerApp, owners.get(ownerApp.ownerId) ?? null),
+                  part: mine
+              }
+            : { key: `install:${install.id}`, bucket: mine };
+
         index.applications.set(subjectHash(application.id), claim);
-        index.installs.set(claim.key, claim);
+        // Under the install's own id whether or not it was folded into an owner:
+        // this is what gives a row to something that is not on this machine, and a
+        // game server placed on another server has to reach its app's row too.
+        index.installs.set(`install:${install.id}`, claim);
     }
 
     return index;
+}
+
+/** How an app that owns other installs reads as a row. It opens at its own screen
+ *  rather than at an install page: an app that runs no container of its own has
+ *  nothing to start or stop there. */
+function appBucket(
+    install: { id: string; name: string; catalogId: string },
+    owner: string | null
+): ClaimBucket {
+    const manifest = findApp(install.catalogId);
+    return {
+        id: install.id,
+        name: manifest?.name ?? install.name,
+        // No second line. What it is is its name, and what it holds is the list
+        // under it - a summary sentence here would be the only thing in the
+        // table that is not a fact about this machine.
+        detail: "",
+        owner,
+        group: "apps",
+        href: manifest?.opensAt ?? `/apps/installed/${install.id}`
+    };
 }
 
 /** What to call each owner. One query for every shelf on the screen. */

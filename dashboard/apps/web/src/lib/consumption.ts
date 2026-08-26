@@ -115,6 +115,18 @@ export interface ClaimBucket {
 export interface Claim {
     readonly key: string;
     readonly bucket: ClaimBucket;
+    /**
+     * Set when the container belongs to something the row owns rather than to the
+     * row itself: a game server, which is the Game servers app's, or a camera
+     * relay, which is Places'.
+     *
+     * Those are installs in the database and nowhere in the marketplace - nobody
+     * installed six Minecraft servers, they installed one app and made six
+     * servers with it - so the row is the app and the server is a part inside it.
+     * The figures land in both: the app's, because that is what it costs, and the
+     * part's, because "which of the six" is the next question.
+     */
+    readonly part?: ClaimBucket;
 }
 
 /** Everything the deployment has, keyed by the hash its compose projects carry. */
@@ -144,6 +156,9 @@ export interface Attributable {
 
 /** One thing being added up, before it becomes a row. */
 interface Bucket extends ClaimBucket {
+    /** What this owns, added up one by one as well as into the total above. Empty
+     *  for everything that owns nothing, which is most things. */
+    parts: Map<string, Bucket>;
     containers: number;
     /** Containers of any kind that are up, which is what the group's count is in
      *  terms of and what a bucket that is nothing but a tunnel reads from. */
@@ -171,38 +186,63 @@ export function attribute(
 
     for (const container of containers) {
         const claim = claimFor(container, index, connectionId);
-        const bucket = buckets.get(claim.key) ?? open(claim.bucket);
-        buckets.set(claim.key, bucket);
-        bucket.containers += 1;
-        const running = container.state === "running";
-        if (running) bucket.running += 1;
-        if (projectSubject(container.composeProject)?.role !== "tunnel") {
-            bucket.self += 1;
-            if (running) bucket.selfRunning += 1;
-        }
-        if (container.cpuPercent !== null) {
-            bucket.cpuPercent = round((bucket.cpuPercent ?? 0) + container.cpuPercent);
-        }
-        if (container.memUsedBytes !== null) {
-            bucket.memUsedBytes = (bucket.memUsedBytes ?? 0) + container.memUsedBytes;
-        }
+        const bucket = reach(buckets, claim);
+        const tunnel = projectSubject(container.composeProject)?.role === "tunnel";
+        for (const target of bucket) add(target, container, tunnel);
     }
 
     // An install whose containers are not on this machine: it runs on a server
     // Polaris deploys to, and the row says so rather than disappearing. A
     // marketplace app that silently left the screen because it was placed
     // elsewhere is the failure worth avoiding.
-    for (const [key, claim] of index.installs) {
-        if (!buckets.has(key)) buckets.set(key, open(claim.bucket));
-    }
+    for (const claim of index.installs.values()) reach(buckets, claim);
 
     const all = [...buckets.values()];
     return GROUPS.map((group) => build(group, all));
 }
 
+/**
+ * The buckets one container counts towards, opening them if this is the first of
+ * them anybody has seen: the row, and the part inside it when it has one.
+ *
+ * Both, not one: a game server's memory is the server's AND the Game servers
+ * app's. Counting it only in the part would leave the app reading as free.
+ */
+function reach(buckets: Map<string, Bucket>, claim: Claim): Bucket[] {
+    let bucket = buckets.get(claim.key);
+    if (!bucket) {
+        bucket = open(claim.bucket);
+        buckets.set(claim.key, bucket);
+    }
+    if (!claim.part) return [bucket];
+    let part = bucket.parts.get(claim.part.id);
+    if (!part) {
+        part = open(claim.part);
+        bucket.parts.set(claim.part.id, part);
+    }
+    return [bucket, part];
+}
+
+function add(bucket: Bucket, container: Attributable, tunnel: boolean): void {
+    bucket.containers += 1;
+    const running = container.state === "running";
+    if (running) bucket.running += 1;
+    if (!tunnel) {
+        bucket.self += 1;
+        if (running) bucket.selfRunning += 1;
+    }
+    if (container.cpuPercent !== null) {
+        bucket.cpuPercent = round((bucket.cpuPercent ?? 0) + container.cpuPercent);
+    }
+    if (container.memUsedBytes !== null) {
+        bucket.memUsedBytes = (bucket.memUsedBytes ?? 0) + container.memUsedBytes;
+    }
+}
+
 function open(bucket: ClaimBucket): Bucket {
     return {
         ...bucket,
+        parts: new Map(),
         containers: 0,
         running: 0,
         self: 0,
@@ -285,7 +325,8 @@ function toRow(bucket: Bucket): ConsumptionRow {
         containers: bucket.containers,
         cpuPercent: bucket.cpuPercent,
         memUsedBytes: bucket.memUsedBytes,
-        href: bucket.href
+        href: bucket.href,
+        parts: [...bucket.parts.values()].map(toRow).sort(byWeight)
     };
 }
 

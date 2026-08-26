@@ -19,7 +19,8 @@
  */
 
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { formatBytes } from "@polaris/core";
 import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
@@ -188,6 +189,17 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
 }
 
 export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
+    // Shut to begin with. An app with nine servers under it would otherwise be
+    // nine rows of a table somebody opened to read four, and the app's own line
+    // already carries what the nine cost between them.
+    const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+    const toggle = (id: string): void =>
+        setOpened((current) => {
+            const next = new Set(current);
+            if (!next.delete(id)) next.add(id);
+            return next;
+        });
+
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -222,7 +234,18 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                             </thead>
                             <tbody>
                                 {group.rows.map((row) => (
-                                    <Row key={row.id} row={row} />
+                                    <Fragment key={row.id}>
+                                        <Row
+                                            row={row}
+                                            open={opened.has(row.id)}
+                                            onToggle={row.parts.length > 0 ? () => toggle(row.id) : undefined}
+                                        />
+                                        {opened.has(row.id)
+                                            ? row.parts.map((part) => (
+                                                  <Row key={part.id} row={part} inside />
+                                              ))
+                                            : null}
+                                    </Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -239,7 +262,19 @@ function emptyLine(id: ConsumptionGroup["id"]): string {
     return "Nothing else is running on this machine.";
 }
 
-function Row({ row }: { row: ConsumptionRow }) {
+function Row({
+    row,
+    open,
+    onToggle,
+    inside = false
+}: {
+    row: ConsumptionRow;
+    open?: boolean;
+    /** Set only on a row that owns something. */
+    onToggle?: () => void;
+    /** One of the things a row above owns, drawn under it. */
+    inside?: boolean;
+}) {
     const name = row.href ? (
         <Link href={row.href} className="font-medium hover:text-primary hover:underline">
             {row.name}
@@ -247,11 +282,27 @@ function Row({ row }: { row: ConsumptionRow }) {
     ) : (
         <span className="font-medium">{row.name}</span>
     );
+    const held = row.parts.length;
 
     return (
-        <tr className="border-t border-border align-top">
-            <td className="w-full max-w-0 py-2 pr-3">
+        <tr className={cn("align-top", inside ? "bg-surface/40" : "border-t border-border")}>
+            <td className={cn("w-full max-w-0 py-2 pr-3", inside && "pl-6")}>
                 <div className="flex items-center gap-2">
+                    {onToggle ? (
+                        <button
+                            type="button"
+                            onClick={onToggle}
+                            aria-expanded={open}
+                            aria-label={`What ${row.name} runs`}
+                            title={`What ${row.name} runs`}
+                            className="-my-1 flex shrink-0 items-center gap-1 rounded px-1 py-1 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                            <ChevronRight
+                                className={cn("size-3.5 transition-transform", open && "rotate-90")}
+                            />
+                            {held}
+                        </button>
+                    ) : null}
                     <span className="truncate" title={row.name}>
                         {name}
                     </span>
@@ -263,7 +314,7 @@ function Row({ row }: { row: ConsumptionRow }) {
                 </div>
                 <div className="truncate text-xs text-muted-foreground" title={row.detail}>
                     {row.detail}
-                    {row.containers > 1 ? ` - ${row.containers} containers` : ""}
+                    {row.containers > 1 ? `${row.detail ? " - " : ""}${row.containers} containers` : ""}
                 </div>
             </td>
             <td className="py-2 pr-3 text-xs text-muted-foreground">{row.owner ?? "-"}</td>

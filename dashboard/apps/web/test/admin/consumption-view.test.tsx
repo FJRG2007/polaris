@@ -10,7 +10,7 @@
  */
 
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type {
     Consumption,
     ConsumptionGroup,
@@ -35,6 +35,7 @@ function row(overrides: Partial<ConsumptionRow> & { id: string; name: string }):
         cpuPercent: 3.5,
         memUsedBytes: GB,
         href: null,
+        parts: [],
         ...overrides
     };
 }
@@ -214,5 +215,51 @@ describe("a group's table", () => {
     it("says a group is empty rather than drawing an empty table", () => {
         render(<ConsumptionGroupTable group={group({ id: "services", rows: [] })} />);
         expect(screen.getByText("Nothing deployed here yet.")).toBeTruthy();
+    });
+});
+
+describe("an app with things inside it", () => {
+    const app = () =>
+        group({
+            id: "apps",
+            rows: [
+                row({
+                    id: "games",
+                    name: "Game servers",
+                    detail: "",
+                    containers: 2,
+                    memUsedBytes: 4 * GB,
+                    parts: [
+                        row({ id: "skyblock", name: "skyblock", detail: "Minecraft (Java)", memUsedBytes: 3 * GB }),
+                        row({ id: "bed-wars", name: "bed-wars", detail: "Minecraft (Java)", memUsedBytes: GB })
+                    ]
+                })
+            ]
+        });
+
+    it("is one row, with what it holds shut behind a count", () => {
+        render(<ConsumptionGroupTable group={app()} />);
+        expect(screen.getByText("Game servers")).toBeTruthy();
+        expect(screen.queryByText("skyblock")).toBeNull();
+        expect(screen.getByRole("button", { name: "What Game servers runs" }).textContent).toContain("2");
+    });
+
+    it("opens to the things it runs, each with its own figures", async () => {
+        render(<ConsumptionGroupTable group={app()} />);
+        fireEvent.click(screen.getByRole("button", { name: "What Game servers runs" }));
+        expect(screen.getByText("skyblock")).toBeTruthy();
+        expect(screen.getByText("bed-wars")).toBeTruthy();
+        expect(screen.getByText("3 GB")).toBeTruthy();
+    });
+
+    it("says nothing twice when the thing is called after what it is", () => {
+        // "Vision worker / Vision worker" - the second line is the catalog name,
+        // and it is left off rather than repeated.
+        const { container } = render(
+            <ConsumptionGroupTable
+                group={group({ id: "apps", rows: [row({ id: "vision", name: "Vision worker", detail: "" })] })}
+            />
+        );
+        expect(container.textContent?.match(/Vision worker/g)).toHaveLength(1);
     });
 });

@@ -25,6 +25,17 @@ export interface ConsumptionRow {
     readonly memUsedBytes: number | null;
     /** Where opening the row goes, when the reader may go there. */
     readonly href: string | null;
+    /**
+     * What this row owns, each with its own figures: the servers made with the
+     * Game servers app, the workers Places runs. Empty for everything that owns
+     * nothing.
+     *
+     * They are inside the row rather than beside it because nobody installed six
+     * Minecraft servers - they installed one app. Their figures are already part
+     * of the row's total; this is the same total broken down, for the next
+     * question, which is which of the six.
+     */
+    readonly parts: readonly ConsumptionRow[];
 }
 
 /** One group of rows and what the group costs between them. */

@@ -95,19 +95,19 @@ function container(overrides: Partial<Attributable> & { name: string }): Attribu
 
 function claim(
     key: string,
-    bucket: Partial<Claim["bucket"]> & { group: Claim["bucket"]["group"] }
+    bucket: Partial<Claim["bucket"]> & { group: Claim["bucket"]["group"] },
+    part?: Partial<Claim["bucket"]> & { id: string }
 ): Claim {
-    return {
-        key,
-        bucket: {
-            id: key,
-            name: key,
-            detail: "",
-            owner: null,
-            href: null,
-            ...bucket
-        }
-    };
+    const shape = (over: Partial<Claim["bucket"]>): Claim["bucket"] => ({
+        id: key,
+        name: key,
+        detail: "",
+        owner: null,
+        href: null,
+        group: bucket.group,
+        ...over
+    });
+    return { key, bucket: shape(bucket), ...(part ? { part: shape(part) } : {}) };
 }
 
 function index(overrides: Partial<Record<keyof ClaimIndex, Map<string, Claim>>> = {}): ClaimIndex {
@@ -366,6 +366,82 @@ describe("adding the machine up", () => {
             "big",
             "middle",
             "small"
+        ]);
+    });
+});
+
+describe("an app that makes other installs", () => {
+    // A game server and a camera worker are installs in the database and nothing
+    // in the marketplace: nobody installed six Minecraft servers, they installed
+    // Game servers and made six. So the app is the row and the servers are inside
+    // it - which is what stops the screen reading as though somebody had gone
+    // shopping nine times.
+    const games = (server: string) =>
+        claim(
+            "install:games",
+            { group: "apps", id: "games", name: "Game servers" },
+            { id: server, name: server }
+        );
+    const held = index({
+        applications: new Map([
+            [subjectHash(APP), games("bed-wars")],
+            [subjectHash(OTHER_APP), games("skyblock")]
+        ]),
+        installs: new Map([
+            ["install:bed-wars", games("bed-wars")],
+            ["install:skyblock", games("skyblock")]
+        ])
+    });
+
+    const both = [
+        container({ name: "bed-wars", composeProject: `polaris-${subjectHash(APP)}`, memUsedBytes: 300 }),
+        container({ name: "skyblock", composeProject: `polaris-${subjectHash(OTHER_APP)}`, memUsedBytes: 700 })
+    ];
+
+    it("is one row, not one per thing it made", () => {
+        const rows = group(attribute(both, held, "local"), "apps").rows;
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({ name: "Game servers", memUsedBytes: 1000, containers: 2 });
+    });
+
+    it("still says what each thing it made is using, which is the next question", () => {
+        const parts = group(attribute(both, held, "local"), "apps").rows[0]?.parts ?? [];
+        // Heaviest first inside the app, the same way the rows above are ordered.
+        expect(parts.map((part) => [part.name, part.memUsedBytes])).toEqual([
+            ["skyblock", 700],
+            ["bed-wars", 300]
+        ]);
+    });
+
+    it("counts what it made once, not once in the part and again in the group", () => {
+        const groups = attribute([both[0]!], held, "local");
+        expect(group(groups, "apps").memUsedBytes).toBe(300);
+        expect(group(groups, "apps").containers).toBe(1);
+    });
+
+    it("gives a stopped server a row inside the app rather than dropping it", () => {
+        const groups = attribute(
+            [container({ name: "bed-wars", composeProject: `polaris-${subjectHash(APP)}`, state: "exited" })],
+            held,
+            "local"
+        );
+        const row = group(groups, "apps").rows[0];
+        expect(row).toMatchObject({ name: "Game servers", state: "stopped" });
+        expect(row?.parts.map((part) => [part.name, part.state])).toEqual([
+            ["bed-wars", "stopped"],
+            ["skyblock", "elsewhere"]
+        ]);
+    });
+
+    it("leaves an install nothing owns as its own row", () => {
+        const alone = claim("install:bridge", { group: "apps", id: "bridge", name: "Messaging bridge" });
+        const groups = attribute(
+            [container({ name: "bridge", composeProject: `polaris-${subjectHash(APP)}`, memUsedBytes: 50 })],
+            index({ applications: new Map([[subjectHash(APP), alone]]) }),
+            "local"
+        );
+        expect(group(groups, "apps").rows).toEqual([
+            expect.objectContaining({ name: "Messaging bridge", parts: [] })
         ]);
     });
 });
