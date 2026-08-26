@@ -10,7 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Row {
     id: string;
-    userId: string;
+    /** Null is the deployment's own key, which has no inbox of its own. */
+    userId: string | null;
     name: string;
     provider: string;
     expiresAt: Date | null;
@@ -19,13 +20,16 @@ interface Row {
 
 const state = {
     rows: [] as Row[],
+    admins: [{ id: "admin-1" }, { id: "admin-2" }],
     sent: [] as Array<{ userId: string; event: string; title: string }>,
     /** Set to fail the next send, to check the phase is not recorded anyway. */
     failSend: false
 };
 
 vi.mock("@polaris/db", () => ({
+    VISIBLE_USER: {},
     prisma: {
+        user: { findMany: vi.fn(async () => state.admins) },
         userModelKey: {
             findMany: vi.fn(async ({ where }: { where: { expiresAt: { lte: Date } } }) =>
                 state.rows.filter((row) => row.expiresAt !== null && row.expiresAt <= where.expiresAt.lte)
@@ -51,10 +55,10 @@ const { sweepExpiringModelKeys } = await import("@/lib/agents/model-key-expiry")
 const now = new Date("2026-08-05T12:00:00.000Z");
 const inDays = (days: number) => new Date(now.getTime() + days * 86_400_000);
 
-function keyEnding(days: number, notice = ""): void {
+function keyEnding(days: number, notice = "", userId: string | null = "user-1"): void {
     state.rows.push({
         id: `k${state.rows.length + 1}`,
-        userId: "user-1",
+        userId,
         name: "prod-main",
         provider: "openai",
         expiresAt: inDays(days),
@@ -64,6 +68,7 @@ function keyEnding(days: number, notice = ""): void {
 
 beforeEach(() => {
     state.rows = [];
+    state.admins = [{ id: "admin-1" }, { id: "admin-2" }];
     state.sent = [];
     state.failSend = false;
 });
@@ -102,6 +107,26 @@ describe("sweepExpiringModelKeys", () => {
         keyEnding(-5, "expired");
         await sweepExpiringModelKeys(now);
         expect(state.sent).toEqual([]);
+    });
+
+    it("tells every administrator about a key the deployment holds", async () => {
+        // It belongs to no account, so there is nobody it is "yours" to. Whoever
+        // opens the dashboard first is the one who can replace it.
+        keyEnding(3, "", null);
+        await sweepExpiringModelKeys(now);
+        expect(state.sent.map((entry) => entry.userId)).toEqual(["admin-1", "admin-2"]);
+        expect(state.sent[0]?.title).toContain("The deployment's");
+        expect(state.rows[0]?.expiryNotice).toBe("soon");
+    });
+
+    it("does not record a warning nobody could be told", async () => {
+        // A deployment with no administrator to find is one where the warning
+        // has not been given yet, whatever the row would otherwise say.
+        state.admins = [];
+        keyEnding(3, "", null);
+        await sweepExpiringModelKeys(now);
+        expect(state.sent).toEqual([]);
+        expect(state.rows[0]?.expiryNotice).toBe("");
     });
 
     it("does not record a warning it failed to send", async () => {

@@ -1,35 +1,36 @@
 "use client";
 
 /**
- * The provider keys this account brought, in the order it wants them tried.
+ * The provider keys an owner brought, in the order they want them tried.
  *
- * A table rather than a card per provider, because the list is now a list: an
- * account can hold several keys for one provider, and the row above another one
- * means something. The order IS the setting, so it is expressed by dragging
- * rather than by a column of numbers somebody has to keep consistent - and by
- * arrow buttons beside it, since an order only a mouse can express is one a
- * screen reader cannot express at all.
+ * One screen serving two owners: the account under /account/ai-keys and the
+ * deployment under /integrations/models. They ask for the same things and behave
+ * the same way, so they are the same component - the caller supplies the writes,
+ * the wording around the table, and whatever belongs under it.
+ *
+ * A table rather than a card per provider, because the list is a list: an owner
+ * can hold several keys for one provider, and the row above another one means
+ * something. The order IS the setting, so it is expressed by dragging rather
+ * than by a column of numbers somebody has to keep consistent - and by arrow
+ * buttons beside it, since an order only a mouse can express is one a screen
+ * reader cannot express at all.
  *
  * A stored key is never shown again. There is nothing to reveal: the field is
  * write-only, and the only thing that proves a key still works is a run.
  */
 
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { useConfirm } from "@/components/confirm-dialog";
+import { useMemo, useState, type ReactNode } from "react";
 import { RelativeTime } from "@/components/relative-time";
-import type { UserModelKeyView } from "@/lib/agents/user-model-keys";
-import { ProviderSelect, type ProviderOption } from "./provider-select";
+import type { ModelKeyView } from "@/lib/agents/model-keys";
+import type { ProviderRow } from "@/lib/agents/model-key-providers";
+import type { KeyActionResult } from "@/lib/agents/model-key-actions";
 import { MODEL_KEY_NAME_HINT, modelKeyNameSchema } from "@polaris/core";
+import { ProviderSelect } from "@/components/model-keys/provider-select";
 import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import {
-    addModelKeyAction,
-    deleteModelKeyAction,
-    reorderModelKeysAction,
-    updateModelKeyAction
-} from "./actions";
 import {
     Badge,
     Button,
@@ -43,17 +44,26 @@ import {
     Input
 } from "@polaris/ui";
 
-/** One provider, as the dialog and the table need it. */
-export interface ProviderRow extends ProviderOption {
-    apiKeyLabel: string;
-    apiKeyHelp: string | null;
-    createUrl: string | null;
-    /** The gateway is not a provider: it needs an endpoint and a model as well as
-     *  a token, and the token is frequently not needed at all. */
-    isGateway: boolean;
-    /** Whether Polaris can ask this provider whether a key is good before storing
-     *  it, so the dialog can say which of the two it is doing. */
-    checkable: boolean;
+/** The four writes, as the screen that owns them exposes them. Each one is a
+ *  server action that has already established who may call it. */
+export interface ModelKeyActions {
+    add: (input: unknown) => Promise<KeyActionResult>;
+    update: (input: unknown) => Promise<KeyActionResult>;
+    remove: (input: unknown) => Promise<KeyActionResult>;
+    reorder: (input: unknown) => Promise<KeyActionResult>;
+}
+
+/** The words that differ between the two owners. Everything else the table says
+ *  is true of both. */
+export interface ModelKeysCopy {
+    /** Heading over the table. */
+    title: string;
+    /** The line under it, saying what the order means. */
+    hint: string;
+    /** What the table says when there is nothing in it. */
+    empty: string;
+    /** The line under the dialog's title when a key is being added. */
+    adding: string;
 }
 
 /** What the gateway needs beyond a key. Numbers stay as typed until the form is
@@ -70,7 +80,7 @@ const EMPTY_GATEWAY: GatewayForm = { baseUrl: "", model: "", context: "", maxOut
 /** The names already spoken for, lowercased, so the dialog can refuse a repeat
  *  while it is being typed. Case-insensitive because two keys called "Prod" and
  *  "prod" are the same name to the person reading the table. */
-function namesTaken(rows: UserModelKeyView[], exceptId: string | null): Set<string> {
+function namesTaken(rows: ModelKeyView[], exceptId: string | null): Set<string> {
     return new Set(rows.filter((row) => row.id !== exceptId).map((row) => row.name.toLowerCase()));
 }
 
@@ -110,23 +120,25 @@ function earliestExpiry(): string {
     return asDateValue(new Date().toISOString());
 }
 
-export function AiKeysView({
+export function ModelKeysView({
     providers,
     keys,
-    instanceProviders,
-    instanceShared
+    actions,
+    copy,
+    footer
 }: {
     providers: ProviderRow[];
-    keys: UserModelKeyView[];
-    /** Provider names the deployment would cover for a provider this account has
-     *  no key of its own for. Empty when it shares none. */
-    instanceProviders: string[];
-    instanceShared: boolean;
+    keys: ModelKeyView[];
+    actions: ModelKeyActions;
+    copy: ModelKeysCopy;
+    /** What sits under the table: what a run falls back to on an account's own
+     *  screen, and who may spend these on the deployment's. */
+    footer?: ReactNode;
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
     const [rows, setRows] = useState(keys);
-    const [editing, setEditing] = useState<UserModelKeyView | null>(null);
+    const [editing, setEditing] = useState<ModelKeyView | null>(null);
     const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -143,13 +155,13 @@ export function AiKeysView({
 
     const byslug = useMemo(() => new Map(providers.map((provider) => [provider.slug, provider])), [providers]);
 
-    const persistOrder = (next: UserModelKeyView[]) => {
+    const persistOrder = (next: ModelKeyView[]) => {
         const previous = rows;
         setRows(next);
         setError(null);
         void (async () => {
             const result = await runAction(
-                () => reorderModelKeysAction({ ids: next.map((row) => row.id) }),
+                () => actions.reorder({ ids: next.map((row) => row.id) }),
                 setError
             );
             // Rolled back rather than left showing an order the server does not
@@ -171,7 +183,7 @@ export function AiKeysView({
         persistOrder(next);
     };
 
-    const remove = async (key: UserModelKeyView) => {
+    const remove = async (key: ModelKeyView) => {
         const provider = byslug.get(key.provider);
         const ok = await confirm({
             title: `Delete "${key.name}"?`,
@@ -183,7 +195,7 @@ export function AiKeysView({
         const previous = rows;
         setRows(rows.filter((row) => row.id !== key.id));
         setError(null);
-        const result = await runAction(() => deleteModelKeyAction({ id: key.id }), setError);
+        const result = await runAction(() => actions.remove({ id: key.id }), setError);
         if (!result || result.error) {
             setRows(previous);
             if (result?.error) setError(result.error);
@@ -208,11 +220,8 @@ export function AiKeysView({
                 <CardBody className="flex flex-col gap-3">
                     <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                            <h2 className="text-sm font-medium">Your provider keys</h2>
-                            <p className="text-muted-foreground text-xs">
-                                Tried from the top. The first key whose provider serves the model is the one a
-                                run uses.
-                            </p>
+                            <h2 className="text-sm font-medium">{copy.title}</h2>
+                            <p className="text-muted-foreground text-xs">{copy.hint}</p>
                         </div>
                         <Button size="sm" onClick={() => setAdding(true)}>
                             <Plus className="size-4 shrink-0" />
@@ -247,9 +256,7 @@ export function AiKeysView({
                                 {rows.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
-                                            {instanceShared && instanceProviders.length > 0
-                                                ? "No keys of your own. Runs use the deployment's."
-                                                : "No keys yet. A run needs one to reach a provider."}
+                                            {copy.empty}
                                         </td>
                                     </tr>
                                 ) : (
@@ -272,31 +279,7 @@ export function AiKeysView({
                 </CardBody>
             </Card>
 
-            <Card>
-                <CardBody className="flex flex-col gap-1">
-                    <h2 className="text-sm font-medium">What a run falls back to</h2>
-                    {instanceShared && instanceProviders.length > 0 ? (
-                        <>
-                            <p className="text-muted-foreground text-xs">
-                                For a provider you have no key of your own for, runs use the deployment&apos;s.
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                                {instanceProviders.map((name) => (
-                                    <Badge key={name} variant="neutral">
-                                        {name}
-                                    </Badge>
-                                ))}
-                            </div>
-                        </>
-                    ) : (
-                        <p className="text-muted-foreground text-xs">
-                            {instanceShared
-                                ? "This deployment holds no provider keys, so a run can only use one you add here."
-                                : "This deployment does not share its own provider keys, so a run can only use one you add here."}
-                        </p>
-                    )}
-                </CardBody>
-            </Card>
+            {footer}
 
             {/* Mounted only while open, so every dialog starts empty. A form that
                 survives being closed is one that offers the last key's name back,
@@ -304,6 +287,8 @@ export function AiKeysView({
             {adding ? (
                 <KeyDialog
                     providers={providers}
+                    actions={actions}
+                    adding={copy.adding}
                     existing={null}
                     takenNames={namesTaken(rows, null)}
                     onClose={() => setAdding(false)}
@@ -318,6 +303,8 @@ export function AiKeysView({
                 <KeyDialog
                     key={editing.id}
                     providers={providers}
+                    actions={actions}
+                    adding={copy.adding}
                     existing={editing}
                     takenNames={namesTaken(rows, editing.id)}
                     onClose={() => setEditing(null)}
@@ -342,7 +329,7 @@ function KeyRow({
     onEdit,
     onRemove
 }: {
-    row: UserModelKeyView;
+    row: ModelKeyView;
     provider: ProviderRow | null;
     index: number;
     total: number;
@@ -471,15 +458,20 @@ function KeyRow({
  */
 function KeyDialog({
     providers,
+    actions,
+    adding,
     existing,
     takenNames,
     onClose,
     onSaved
 }: {
     providers: ProviderRow[];
+    actions: ModelKeyActions;
+    /** What adding a key means on this screen, said under the title. */
+    adding: string;
     /** The key being edited, or null when this is a new one. */
-    existing: UserModelKeyView | null;
-    /** Every name this account already uses, lowercased, minus the row being
+    existing: ModelKeyView | null;
+    /** Every name this owner already uses, lowercased, minus the row being
      *  edited. The server holds the same rule; this is so somebody finds out
      *  while typing rather than after pasting a key and pressing Save. */
     takenNames: Set<string>;
@@ -501,7 +493,7 @@ function KeyDialog({
     const nameError =
         touched && name.length > 0
             ? taken
-                ? "You already have a key by that name."
+                ? "There is already a key by that name."
                 : nameCheck.success
                   ? null
                   : MODEL_KEY_NAME_HINT
@@ -531,7 +523,7 @@ function KeyDialog({
         const result = await runAction(
             () =>
                 existing
-                    ? updateModelKeyAction({
+                    ? actions.update({
                           id: existing.id,
                           name: name.trim(),
                           // Left blank means "leave the stored one alone". The
@@ -540,7 +532,7 @@ function KeyDialog({
                           config,
                           expiresAt: ends
                       })
-                    : addModelKeyAction({
+                    : actions.add({
                           provider,
                           name: name.trim(),
                           // A gateway that wants no token still needs a row, and
@@ -566,9 +558,7 @@ function KeyDialog({
                 <DialogHeader>
                     <DialogTitle>{existing ? "Edit provider key" : "Add provider key"}</DialogTitle>
                     <DialogDescription>
-                        {existing
-                            ? "Rename it, or paste a new key to replace the stored one."
-                            : "The provider account your runs bill to. Polaris adds nothing to that bill."}
+                        {existing ? "Rename it, or paste a new key to replace the stored one." : adding}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -696,8 +686,8 @@ function KeyDialog({
                             onChange={(event) => setExpiry(event.target.value)}
                         />
                         <span className="text-muted-foreground text-xs">
-                            Optional. If you gave the key an end date at {entry?.name ?? "the provider"},
-                            put it here: Polaris warns you a week ahead and stops using the key on the day.
+                            Optional. If the key was given an end date at {entry?.name ?? "the provider"},
+                            put it here: Polaris warns a week ahead and stops using the key on the day.
                         </span>
                         {expiry ? (
                             <button
@@ -743,7 +733,7 @@ function KeyDialog({
 }
 
 /** The gateway settings a stored key carries, as the form's strings. */
-function readGateway(key: UserModelKeyView | null): GatewayForm {
+function readGateway(key: ModelKeyView | null): GatewayForm {
     if (!key) return EMPTY_GATEWAY;
     const config = key.config;
     const text = (value: unknown) => (typeof value === "string" ? value : "");

@@ -1,20 +1,15 @@
 /**
- * The model credentials a run is given.
+ * The providers a run can be given a key for.
  *
- * These are the operator's own provider keys, held as Integration rows like every
- * other credential on the instance, and handed to a run over its authenticated
- * run-context call. They are never written into the repository as an Actions
- * secret: one place to rotate a key, no copy left behind on a repository somebody
- * later turns off, and one less permission on the GitHub App.
+ * The catalogue only: which providers exist, what the agent CLIs read each one's
+ * key from, and which model slugs each one serves. Who holds a key for them, and
+ * whose is spent when both an account and the deployment do, is `model-keys.ts`.
  *
  * The environment variable names are the providers' own, because that is what the
  * agent CLIs read. A gateway (an OpenAI-compatible endpoint in front of several
  * providers) is expressed the same way, as a base URL plus a key, which is how a
  * run reuses an existing agent subscription instead of a raw provider key.
  */
-
-import { readGatewayConfig } from "@/lib/integrations/registry";
-import { getIntegrationSecret, listIntegrationStates } from "@/lib/integration-service";
 
 /** One provider Polaris can hand a run. */
 export interface ModelProvider {
@@ -55,79 +50,4 @@ export const GATEWAY_SLUG = "enigma";
 export function providerForModel(model: string): ModelProvider | null {
     const prefix = model.split("/")[0]?.toLowerCase() ?? "";
     return MODEL_PROVIDERS.find((provider) => provider.modelPrefix === prefix) ?? null;
-}
-
-/**
- * Which providers the DEPLOYMENT can serve a run with.
- *
- * Not the same question as which ones a given person can. Somebody may hold
- * their own key for a provider this has never heard of, and may be barred from
- * spending the deployment's - `providersFor` in `user-model-keys.ts` answers for
- * a person, and is what every screen belonging to one should call. This one is
- * for the places with nobody to resolve for: the setup wizard, and the
- * deployment-wide defaults under /admin.
- *
- * The gateway joins the list on different terms: it holds no provider key, so
- * what makes it usable is an endpoint and a model to ask it for. A token is
- * optional there - plenty of them accept unauthenticated calls from inside the
- * network - so requiring one would hide a gateway that works.
- */
-export async function connectedProviders(): Promise<string[]> {
-    const states = await listIntegrationStates();
-    const connected = MODEL_PROVIDERS.filter((provider) => states.get(provider.slug)?.hasSecret).map(
-        (provider) => provider.slug
-    );
-
-    const gateway = states.get(GATEWAY_SLUG);
-    if (gateway?.enabled) {
-        const config = readGatewayConfig(gateway.config);
-        if (config.baseUrl && config.model) connected.push(GATEWAY_SLUG);
-    }
-    return connected;
-}
-
-/**
- * The environment a run is handed, as variable names to values.
- *
- * Every connected provider is included rather than only the one the configured
- * model needs. A run can fall back to another model when its first choice has no
- * key, and the agent CLIs decide that themselves from what is present; handing
- * over only one key would turn a recoverable substitution into a failed run.
- *
- * Returns null - distinct from an empty object - when the credentials could not
- * be read at all, so the runtime can tell "this operator has stored none" from
- * "the store was briefly unreadable" and not report the second as the first.
- */
-export async function runSecrets(): Promise<Record<string, string> | null> {
-    const secrets: Record<string, string> = {};
-    try {
-        const states = await listIntegrationStates();
-        for (const provider of MODEL_PROVIDERS) {
-            if (!states.get(provider.slug)?.hasSecret) continue;
-            const key = await getIntegrationSecret(provider.slug);
-            if (key) secrets[provider.envVar] = key;
-        }
-
-        // The gateway speaks the OpenAI protocol, so a run uses it by pointing the
-        // OpenAI-compatible client at its base URL. The key is whatever the
-        // gateway asks for, which on a loopback install is frequently nothing.
-        // The model and its two limits ride along because an endpoint publishes
-        // no catalog: without them a run answers in 32000-token slices and never
-        // compacts.
-        const gateway = states.get(GATEWAY_SLUG);
-        if (gateway?.enabled) {
-            const config = readGatewayConfig(gateway.config);
-            if (config.baseUrl) {
-                secrets.OPENAI_COMPATIBLE_BASE_URL = config.baseUrl.replace(/\/+$/, "");
-                const key = gateway.hasSecret ? await getIntegrationSecret(GATEWAY_SLUG) : null;
-                secrets.OPENAI_COMPATIBLE_API_KEY = key ?? "unused";
-                if (config.model) secrets.OPENAI_COMPATIBLE_MODEL = config.model;
-                if (config.context > 0) secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
-                if (config.maxOutput > 0) secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
-            }
-        }
-    } catch {
-        return null;
-    }
-    return secrets;
 }

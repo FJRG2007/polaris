@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { requirePermission } from "@/lib/session";
 import { getGithubStatus } from "@/lib/github-service";
-import { providersFor } from "@/lib/agents/user-model-keys";
+import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
 
@@ -40,7 +40,7 @@ export default async function AgentSetupPage() {
                     done={appReady}
                     title="Connect a GitHub App"
                     body="An App lets the agent comment, review and open pull requests as itself, and lets Polaris hear about issues and pull requests. A personal access token cannot do either. An administrator creates one in a click."
-                    href="/integrations"
+                    href="/admin/integrations"
                     action="Open Integrations"
                 />
                 <Step

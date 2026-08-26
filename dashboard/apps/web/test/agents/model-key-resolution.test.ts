@@ -1,16 +1,16 @@
 /**
- * Whose provider account a run spends, and which of that account's keys.
+ * Whose provider account a run spends, and which of that owner's keys.
  *
- * Two accounts can hold a key for the same provider - the person whose
- * repositories the runs belong to, and the administrator who set the deployment
- * up - and getting the order wrong is not a display bug. A personal key that the
- * deployment's could override would be a setting with no effect; a deployment
- * key spent by somebody an administrator excluded is somebody else's bill.
+ * Two owners can hold a key for the same provider - the person whose
+ * repositories the runs belong to, and the deployment itself - and getting the
+ * order wrong is not a display bug. A personal key that the deployment's could
+ * override would be a setting with no effect; a deployment key spent by somebody
+ * an administrator excluded is somebody else's bill.
  *
- * One person can now hold several keys for one provider, which adds a second
+ * Either owner can now hold several keys for one provider, which adds a second
  * order underneath the first: their own list, top down. The variable the agent
- * CLIs read holds one value, so which of their keys fills it is the whole
- * question these cover.
+ * CLIs read holds one value, so which key fills it is the whole question these
+ * cover.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,11 +25,11 @@ interface FakeKey {
 
 const state = {
     ownKeys: [] as FakeKey[],
+    /** The deployment's own, which are the same rows with no owner. */
+    instanceKeys: [] as FakeKey[],
     /** Ciphertext to plaintext. A row whose id is absent here is one this
      *  deployment can no longer decrypt. */
-    ownSecrets: new Map<string, string>(),
-    instanceStates: new Map<string, { enabled: boolean; hasSecret: boolean; config: Record<string, unknown> }>(),
-    instanceSecrets: new Map<string, string>(),
+    secrets: new Map<string, string>(),
     shared: true,
     touched: [] as string[]
 };
@@ -37,13 +37,13 @@ const state = {
 vi.mock("@polaris/db", () => ({
     prisma: {
         userModelKey: {
-            // The fake ignores `orderBy` and `select`: the array is already in
+            // The fake ignores `orderBy` and `select`: each list is already in
             // priority order, and returning more fields than were asked for is
-            // indistinguishable from returning exactly them. The expiry filter it
-            // does honour, because whether an expired key is handed to a run is
-            // exactly what several of these are about.
-            findMany: vi.fn(async ({ where }: { where?: { OR?: unknown[] } } = {}) =>
-                state.ownKeys
+            // indistinguishable from returning exactly them. The owner it does
+            // honour, because which list a read is against is the question half
+            // of these ask, and so is the expiry filter.
+            findMany: vi.fn(async ({ where }: { where?: { userId?: string | null; OR?: unknown[] } } = {}) =>
+                (where?.userId ? state.ownKeys : state.instanceKeys)
                     .filter((row) => !where?.OR || row.expiresAt === null || row.expiresAt > new Date())
                     .map((row) => ({
                         ...row,
@@ -74,7 +74,7 @@ vi.mock("@polaris/storage", () => ({
     // does when it cannot - which is a throw, not a null.
     encryptSecret: (value: string) => ({ ciphertext: Buffer.from(value), nonce: Buffer.from("n"), keyId: "k" }),
     decryptSecret: (blob: { ciphertext: Buffer }) => {
-        const secret = state.ownSecrets.get(blob.ciphertext.toString());
+        const secret = state.secrets.get(blob.ciphertext.toString());
         if (secret === undefined) throw new FakeDecryptError("wrong master key");
         return secret;
     },
@@ -86,43 +86,45 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async () => undefined
 }));
 
-vi.mock("@/lib/integration-service", () => ({
-    listIntegrationStates: async () => state.instanceStates,
-    getIntegrationSecret: async (slug: string) => state.instanceSecrets.get(slug) ?? null
-}));
-
-const { keySourcesFor, runSecretsFor } = await import("@/lib/agents/user-model-keys");
+const { connectedProviders, keySourcesFor, runSecretsFor } = await import("@/lib/agents/model-keys");
 
 beforeEach(() => {
     state.ownKeys = [];
-    state.ownSecrets = new Map();
-    state.instanceStates = new Map();
-    state.instanceSecrets = new Map();
+    state.instanceKeys = [];
+    state.secrets = new Map();
     state.shared = true;
     state.touched = [];
 });
 
-function instanceHas(slug: string, secret: string): void {
-    state.instanceStates.set(slug, { enabled: true, hasSecret: true, config: {} });
-    state.instanceSecrets.set(slug, secret);
+/** Append a key to a list. `secret` of null is a row this deployment can no
+ *  longer read. */
+function add(
+    rows: FakeKey[],
+    id: string,
+    slug: string,
+    secret: string | null,
+    config: Record<string, unknown> = {},
+    expiresAt: Date | null = null
+): void {
+    rows.push({ id, provider: slug, config: JSON.stringify(config), expiresAt });
+    if (secret !== null) state.secrets.set(id, secret);
 }
 
-/** Append a key to the account's list. `secret` of null is a row this deployment
- *  can no longer read. */
+/** A key the deployment holds. Its id is derived so the tests that check what
+ *  was used can name it without inventing one. */
+function instanceHas(slug: string, secret: string, config: Record<string, unknown> = {}): string {
+    const id = `instance-${slug}`;
+    add(state.instanceKeys, id, slug, secret, config);
+    return id;
+}
+
 function ownHas(id: string, slug: string, secret: string | null, config: Record<string, unknown> = {}): void {
-    state.ownKeys.push({ id, provider: slug, config: JSON.stringify(config), expiresAt: null });
-    if (secret !== null) state.ownSecrets.set(id, secret);
+    add(state.ownKeys, id, slug, secret, config);
 }
 
 /** The same, with an end date. Negative days are already gone. */
 function ownHasUntil(id: string, slug: string, secret: string, days: number): void {
-    state.ownKeys.push({
-        id,
-        provider: slug,
-        config: "{}",
-        expiresAt: new Date(Date.now() + days * 86_400_000)
-    });
-    state.ownSecrets.set(id, secret);
+    add(state.ownKeys, id, slug, secret, {}, new Date(Date.now() + days * 86_400_000));
 }
 
 describe("runSecretsFor", () => {
@@ -171,6 +173,20 @@ describe("runSecretsFor", () => {
         expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-first");
     });
 
+    it("uses the first of the deployment's keys for one provider", async () => {
+        // The administrator's list is a list in the same way: a second key is
+        // the spare, and which one is tried first is the order they set.
+        add(state.instanceKeys, "i1", "openai", "sk-first");
+        add(state.instanceKeys, "i2", "openai", "sk-second");
+        expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-first");
+    });
+
+    it("moves to the deployment's next key of that provider before giving up", async () => {
+        add(state.instanceKeys, "i1", "openai", null);
+        add(state.instanceKeys, "i2", "openai", "sk-second");
+        expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-second");
+    });
+
     it("moves to the account's next key of that provider before the deployment's", async () => {
         // A key this deployment cannot decrypt is one it does not hold - but the
         // account still holds another, and reaching past it to the instance
@@ -181,12 +197,14 @@ describe("runSecretsFor", () => {
         expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-second");
     });
 
-    it("records the key that was used, and only the personal ones", async () => {
+    it("records every key that was used, whoever holds it", async () => {
+        // "Last used" is a column on both screens now, and a key an administrator
+        // pasted and forgot is exactly as invisible as one anybody else did.
         ownHas("k1", "anthropic", "sk-mine");
         ownHas("k2", "anthropic", "sk-spare");
         instanceHas("groq", "gsk-theirs");
         await runSecretsFor("user-1");
-        expect(state.touched).toEqual(["k1"]);
+        expect(state.touched).toEqual(["k1", "instance-groq"]);
     });
 
     it("resolves the deployment's alone when there is no person", async () => {
@@ -221,6 +239,13 @@ describe("runSecretsFor", () => {
         expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-spare");
     });
 
+    it("stops handing over one of the deployment's past its end date", async () => {
+        // The date means the same thing on either list, or an administrator has
+        // entered one that does nothing.
+        add(state.instanceKeys, "i1", "openai", "sk-expired", {}, new Date(Date.now() - 86_400_000));
+        expect(await runSecretsFor("user-1")).toEqual({});
+    });
+
     it("lets the deployment's key take over from an expired one", async () => {
         // The alternative is a provider that looks covered and is not: the whole
         // point of the fallback is that somebody's runs keep working.
@@ -242,6 +267,32 @@ describe("runSecretsFor", () => {
         expect(secrets?.OPENAI_COMPATIBLE_MODEL).toBe("some-model");
         expect(secrets?.OPENAI_COMPATIBLE_CONTEXT).toBe("200000");
         expect(state.touched).toEqual(["k1"]);
+    });
+
+    it("takes the deployment's gateway when the account has none", async () => {
+        instanceHas("enigma", "gw-token", {
+            baseUrl: "https://gateway.example/v1",
+            model: "some-model",
+            context: 200000,
+            maxOutput: 32000
+        });
+        const secrets = await runSecretsFor("user-1");
+        expect(secrets?.OPENAI_COMPATIBLE_BASE_URL).toBe("https://gateway.example/v1");
+        expect(secrets?.OPENAI_COMPATIBLE_MODEL).toBe("some-model");
+    });
+
+    it("still points a run at a gateway that wants no token", async () => {
+        // An endpoint on the operator's own network frequently accepts
+        // unauthenticated calls. The variable is still set, because the runtime
+        // reads it either way, and the row carries no credential at all - which
+        // is how the deployment's gateway arrived from its Integration row.
+        add(state.instanceKeys, "i1", "enigma", "", {
+            baseUrl: "https://gateway.example/v1",
+            model: "some-model"
+        });
+        const secrets = await runSecretsFor("user-1");
+        expect(secrets?.OPENAI_COMPATIBLE_BASE_URL).toBe("https://gateway.example/v1");
+        expect(secrets?.OPENAI_COMPATIBLE_API_KEY).toBe("unused");
     });
 });
 
@@ -283,5 +334,30 @@ describe("keySourcesFor", () => {
         state.shared = false;
         instanceHas("groq", "gsk-theirs");
         expect([...(await keySourcesFor("user-1")).keys()]).toEqual([]);
+    });
+
+    it("does not offer a gateway with no endpoint to ask", async () => {
+        // A gateway is its endpoint. A row without one is a setting somebody
+        // started and left, not a provider anything can reach.
+        ownHas("k1", "enigma", "gw-token", { baseUrl: "", model: "" });
+        expect((await keySourcesFor("user-1")).has("enigma")).toBe(false);
+    });
+});
+
+describe("connectedProviders", () => {
+    it("is what the deployment holds, and nobody's own", async () => {
+        // The admin defaults read this: a provider one account brought a key for
+        // is not a provider the deployment can offer everybody.
+        ownHas("k1", "anthropic", "sk-mine");
+        instanceHas("groq", "gsk-theirs");
+        expect(await connectedProviders()).toEqual(["groq"]);
+    });
+
+    it("ignores the sharing switch, which is about who spends them", async () => {
+        // Turning sharing off does not un-store the keys, and the screen that
+        // lists them is not the screen that shares them.
+        state.shared = false;
+        instanceHas("groq", "gsk-theirs");
+        expect(await connectedProviders()).toEqual(["groq"]);
     });
 });

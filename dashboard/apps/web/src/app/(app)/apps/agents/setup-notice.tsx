@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/session";
-import { providersFor } from "@/lib/agents/user-model-keys";
+import { providersFor } from "@/lib/agents/model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
 
 /**
@@ -22,7 +22,7 @@ export async function SetupNotice() {
         return (
             <Notice>
                 Agents need a GitHub App, which an administrator creates in one click under{" "}
-                <Link href="/integrations" className="underline">
+                <Link href="/admin/integrations" className="underline">
                     Integrations
                 </Link>
                 . A personal access token is not enough: the agent has to comment and open pull requests as itself.
@@ -44,7 +44,7 @@ export async function SetupNotice() {
                         Review them on GitHub
                     </a>
                 ) : (
-                    <Link href="/integrations" className="underline">
+                    <Link href="/admin/integrations" className="underline">
                         Open Integrations
                     </Link>
                 )}

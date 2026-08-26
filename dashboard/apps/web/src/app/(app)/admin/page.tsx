@@ -51,7 +51,7 @@ const SECTIONS = [
     },
     { href: "/admin/activity", icon: Activity, title: "Activity", description: "Audit log of actions across Polaris." },
     {
-        href: "/inbox",
+        href: "/admin/inbox",
         icon: MessagesSquare,
         title: "Inbox",
         description: "Conversations, the channels they arrive on, and who they are with."
@@ -100,19 +100,19 @@ const SECTIONS = [
         description: "Where files attached to work are kept, and how big one may be."
     },
     {
-        href: "/integrations",
+        href: "/admin/integrations",
         icon: Blocks,
         title: "Integrations",
         description: "Third-party services (label printing, file scanning)."
     },
     {
-        href: "/integrations/models",
+        href: "/admin/integrations/models",
         icon: Sparkles,
         title: "AI providers",
-        description: "The model providers agents run on, and your key with each."
+        description: "The model providers agents run on, and the keys this deployment holds."
     },
     {
-        href: "/settings",
+        href: "/admin/settings",
         icon: Settings,
         title: "Updates & settings",
         description: "Version, in-band self-update, and deployment settings."

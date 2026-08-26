@@ -9,57 +9,30 @@
  */
 
 import { requireUser } from "@/lib/session";
-import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
-import { AiKeysView, type ProviderRow } from "./ai-keys-view";
-import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
-import { providerIsCheckable } from "@/lib/agents/provider-key-check";
-import { instanceKeysAreShared, keySourcesFor, listUserModelKeys } from "@/lib/agents/user-model-keys";
+import { Badge, Card, CardBody } from "@polaris/ui";
+import { ModelKeysView } from "@/components/model-keys/model-keys-view";
+import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
+import { instanceKeysAreShared, keySourcesFor, listModelKeys } from "@/lib/agents/model-keys";
+import {
+    addModelKeyAction,
+    deleteModelKeyAction,
+    reorderModelKeysAction,
+    updateModelKeyAction
+} from "./actions";
 
 export const dynamic = "force-dynamic";
-
-/**
- * What somebody types when they are looking for a provider by the thing it
- * serves rather than by the company that serves it. "gemini" is how most people
- * would look for Google AI, and "claude" for Anthropic.
- */
-const PROVIDER_ALIASES: Record<string, string[]> = {
-    anthropic: ["claude"],
-    openai: ["gpt", "chatgpt", "codex"],
-    "google-ai": ["gemini", "ai studio"],
-    xai: ["grok"],
-    deepseek: [],
-    moonshot: ["kimi"],
-    groq: ["gpt oss", "llama"],
-    cerebras: ["glm"],
-    openrouter: ["router"],
-    [GATEWAY_SLUG]: ["gateway", "openai compatible", "endpoint"]
-};
 
 export default async function AiKeysPage() {
     const user = await requireUser();
     const [keys, sources, shared] = await Promise.all([
-        listUserModelKeys(user.id),
+        listModelKeys(user.id),
         keySourcesFor(user.id),
         instanceKeysAreShared()
     ]);
 
-    // Read here rather than in the actions file: everything a "use server" module
-    // exports has to be an action, and this is a constant.
-    const providers: ProviderRow[] = MODEL_INTEGRATIONS.map((entry) => ({
-        slug: entry.slug,
-        name: entry.name,
-        aliases: PROVIDER_ALIASES[entry.slug] ?? [],
-        apiKeyLabel: entry.apiKeyLabel ?? "API key",
-        apiKeyHelp: entry.apiKeyHelp ?? null,
-        createUrl: entry.setupLinks?.[0]?.url ?? null,
-        isGateway: entry.slug === GATEWAY_SLUG,
-        checkable: providerIsCheckable(entry.slug)
-    }));
-
-    const named = new Map(providers.map((provider) => [provider.slug, provider.name]));
-    const instanceProviders = [...sources.entries()]
+    const covered = [...sources.entries()]
         .filter(([, source]) => source === "instance")
-        .map(([slug]) => named.get(slug) ?? slug);
+        .map(([slug]) => modelProviderName(slug));
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -70,12 +43,57 @@ export default async function AiKeysPage() {
                     deployment holds.
                 </p>
             </div>
-            <AiKeysView
-                providers={providers}
+            <ModelKeysView
+                providers={modelProviderRows()}
                 keys={keys}
-                instanceProviders={instanceProviders}
-                instanceShared={shared}
+                actions={{
+                    add: addModelKeyAction,
+                    update: updateModelKeyAction,
+                    remove: deleteModelKeyAction,
+                    reorder: reorderModelKeysAction
+                }}
+                copy={{
+                    title: "Your provider keys",
+                    hint: "Tried from the top. The first key whose provider serves the model is the one a run uses.",
+                    empty:
+                        shared && covered.length > 0
+                            ? "No keys of your own. Runs use the deployment's."
+                            : "No keys yet. A run needs one to reach a provider.",
+                    adding: "The provider account your runs bill to. Polaris adds nothing to that bill."
+                }}
+                footer={<FallbackCard providers={covered} shared={shared} />}
             />
         </div>
+    );
+}
+
+/** What happens for a provider this account has brought no key for. */
+function FallbackCard({ providers, shared }: { providers: string[]; shared: boolean }) {
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-1">
+                <h2 className="text-sm font-medium">What a run falls back to</h2>
+                {shared && providers.length > 0 ? (
+                    <>
+                        <p className="text-muted-foreground text-xs">
+                            For a provider you have no key of your own for, runs use the deployment&apos;s.
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                            {providers.map((name) => (
+                                <Badge key={name} variant="neutral">
+                                    {name}
+                                </Badge>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <p className="text-muted-foreground text-xs">
+                        {shared
+                            ? "This deployment holds no provider keys, so a run can only use one you add here."
+                            : "This deployment does not share its own provider keys, so a run can only use one you add here."}
+                    </p>
+                )}
+            </CardBody>
+        </Card>
     );
 }

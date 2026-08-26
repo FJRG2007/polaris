@@ -6,14 +6,13 @@
 import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
-import { CatalogCard, KeySharingCard } from "./catalog-card";
 import { UsageLimitsCard } from "./usage-limits-card";
+import { CatalogCard, KeySharingCard } from "./catalog-card";
 import { PlatformDefaultsView } from "./platform-defaults-view";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
-import { instanceKeysAreShared } from "@/lib/agents/user-model-keys";
 import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
-import { connectedProviders } from "@/lib/agents/agent-providers";
 import { getPlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
+import { connectedProviders, instanceKeysAreShared } from "@/lib/agents/model-keys";
 
 export const dynamic = "force-dynamic";
 

@@ -5345,7 +5345,7 @@ model AgentUsageLimit {
     @@index([subjectType])
 }
 
-// A provider credential somebody brought themselves.
+// A provider credential, either somebody's own or the deployment's.
 //
 // Model keys used to be instance-wide only, which made every run on the
 // deployment spend one account's money and put the choice of provider in the
@@ -5354,22 +5354,34 @@ model AgentUsageLimit {
 // else, and an administrator should be able to hand out theirs without that
 // being the only way anything runs.
 //
-// Encrypted with the same envelope as every other stored credential, so a
-// database dump yields no usable keys. Deleted with the account: a key nobody
-// owns is a charge nobody can stop.
+// A null `userId` is the deployment's own key, which used to live on the
+// Integration row for the provider - one key each, no name, no end date and no
+// order. There was no reason for the administrator's keys to be the poor
+// relation of everybody else's: the same list, the same fallback order and the
+// same expiry warnings apply to a key an instance holds, so they are the same
+// rows.
 //
-// One account holds as many of these as it likes, including several for the same
+// Encrypted with the same envelope as every other stored credential, so a
+// database dump yields no usable keys. A personal key is deleted with the
+// account: a key nobody owns is a charge nobody can stop. An instance key
+// belongs to no account and outlives every one of them.
+//
+// One owner holds as many of these as it likes, including several for the same
 // provider - a work key and a personal one, or one per spend limit. They are an
 // ordered list rather than a set: `priority` is the order they are tried in, and
 // it is the only place that order is recorded.
 model UserModelKey {
     id              String   @id @default(uuid(7)) @db.Uuid
-    userId          String   @db.Uuid
+    // Whose key it is, or null for the deployment's own.
+    userId          String?  @db.Uuid
     // The provider's integration slug, e.g. `anthropic`, `groq`.
     provider        String
     // What its owner calls it. Unique across the whole account, not per provider:
     // it is how a person names one key in a sentence, and two rows answering to
-    // "prod-main" makes that sentence ambiguous wherever it is read.
+    // "prod-main" makes that sentence ambiguous wherever it is read. The unique
+    // indexes below cover an account's rows; the deployment's own are covered by
+    // partial indexes the migration adds, since Postgres counts two nulls as
+    // distinct and would let the instance hold "prod-main" twice.
     name            String
     // Position in the owner's list, ascending, lowest tried first. Ties break on
     // creation order, so a list that has had rows removed still reads the same.
@@ -5403,7 +5415,7 @@ model UserModelKey {
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([userId, name])
     @@unique([userId, provider, secretFingerprint])

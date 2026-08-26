@@ -15,7 +15,7 @@
  * the default in place.
  */
 
-import { runSecretsFor } from "@/lib/agents/user-model-keys";
+import { runSecretsFor } from "@/lib/agents/model-keys";
 import { EFFORT_ALIASES } from "@polaris/agent-runtime/shared";
 import { ENIGMA_VERSION, gateScript } from "@/lib/agents/agent-gate";
 import { parseAgentTriggers, type AgentGateMode, type AgentTrigger } from "@polaris/core";

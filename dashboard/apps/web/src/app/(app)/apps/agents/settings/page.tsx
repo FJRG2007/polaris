@@ -2,7 +2,7 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { SettingsView } from "./settings-view";
 import { requirePermission } from "@/lib/session";
-import { providersFor } from "@/lib/agents/user-model-keys";
+import { providersFor } from "@/lib/agents/model-keys";
 import { getPlatformAgentDefaults, listAgentDefaults, scopeOf } from "@/lib/agents/agent-defaults-service";
 
 export const dynamic = "force-dynamic";

@@ -11,13 +11,13 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
-import { agentDefaultsSchema, LIMIT_METRICS, LIMIT_PERIODS, LIMIT_SUBJECTS } from "@polaris/core";
 import type { PickerModel } from "@/components/model-picker";
-import { setInstanceKeysShared } from "@/lib/agents/user-model-keys";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
-import { connectedProviders, MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
-import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
+import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
 import { deleteUsageLimit, saveUsageLimit } from "@/lib/agents/agent-usage-limits";
+import { connectedProviders, setInstanceKeysShared } from "@/lib/agents/model-keys";
+import { agentDefaultsSchema, LIMIT_METRICS, LIMIT_PERIODS, LIMIT_SUBJECTS } from "@polaris/core";
+import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
 
 /** The same list the accounts' own screens get, read through the admin gate.
  *  Kept apart rather than imported from the app's actions so /admin never

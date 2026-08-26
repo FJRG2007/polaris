@@ -13,13 +13,10 @@ import { Button, Input } from "@polaris/ui";
 import { Check, Search } from "lucide-react";
 import { IntegrationLogo } from "@/components/logos";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ProviderRow } from "@/lib/agents/model-key-providers";
 
-export interface ProviderOption {
-    slug: string;
-    name: string;
-    /** Extra words somebody might type instead of the name. */
-    aliases: string[];
-}
+/** Only what the list itself needs of a provider. */
+type ProviderOption = Pick<ProviderRow, "slug" | "name" | "aliases">;
 
 export function ProviderSelect({
     options,

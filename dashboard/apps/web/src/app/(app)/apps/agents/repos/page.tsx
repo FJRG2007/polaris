@@ -1,9 +1,9 @@
 import { PageHeader } from "@polaris/ui";
 import { ReposView } from "./repos-view";
 import { requirePermission } from "@/lib/session";
+import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { reconcileRepoWorkflows } from "@/lib/agents/agent-workflow";
-import { providersFor } from "@/lib/agents/user-model-keys";
 
 export const dynamic = "force-dynamic";
 

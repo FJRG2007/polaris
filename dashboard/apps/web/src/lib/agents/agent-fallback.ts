@@ -22,8 +22,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
-import { providersFor } from "@/lib/agents/user-model-keys";
 import { providerForModel } from "@/lib/agents/agent-providers";
 import { inheritedFallback } from "@/lib/agents/agent-defaults-service";
 import { failureIsWorthRetrying, resolveModelChain, type AgentTrigger } from "@polaris/core";
