@@ -282,7 +282,7 @@ export function ListScreen({
      * positions into it would put the best match wherever it used to be.
      */
     const arrangement = `${listId ?? ""}|${sort.field}|${sort.direction}|${needle}`;
-    const { items: visibleFacts, arrange } = useStableOrder(sortedFacts, arrangement);
+    const { items: visibleFacts, arrange, settle } = useStableOrder(sortedFacts, arrangement);
 
     const visible = useMemo(
         () =>
@@ -461,6 +461,19 @@ export function ListScreen({
     };
 
     const move: ViewProps["onMove"] = async ({ taskId, groupKey, position }) => {
+        // Where the drop put it, on screen, now.
+        //
+        // The screen holds its arrangement so that ticking a checkbox does not
+        // throw the row out from under the pointer, and a drag is the one thing
+        // that must go straight through that: the reader has just said where the
+        // row goes. Without this the row sprang back to where it was and stayed
+        // there until a full page reload rebuilt the held order - the write had
+        // landed, the screen was simply refusing to show it.
+        //
+        // Before the write rather than after, because this is what the reader
+        // sees the instant they let go, and the round trip is not something they
+        // should be watching.
+        settle(core.arrangeAround(visibleFacts.map((facts) => facts.id), taskId, position));
         // The column of tasks with no status is keyed by an empty string. Sent
         // as-is it fails validation and the drop silently does nothing, so it
         // becomes an explicit null: "put this back to having no status".

@@ -75,6 +75,18 @@ export interface StableOrder<T> {
      * would have chosen, or the drop lands somewhere nobody was looking.
      */
     readonly arrange: (ids: readonly string[]) => string[];
+    /**
+     * Take this order as the one being held, from now on.
+     *
+     * The one thing the held order must NOT absorb is somebody dragging a row.
+     * Everything else this hook exists for - a priority raised, a status ticked,
+     * a date moved - is a change the reader did not ask the row to move for, and
+     * holding the arrangement through it is the whole point. A drag is the
+     * opposite: it is the reader saying, in as many words, that this row goes
+     * there. Held through unchanged, the screen would show the row exactly where
+     * it was until a full reload rebuilt the hook - which is what it did.
+     */
+    readonly settle: (ids: readonly string[]) => void;
 }
 
 /**
@@ -104,7 +116,17 @@ export function useStableOrder<T extends { readonly id: string }>(
         return order.map((id) => byId.get(id)).filter((item): item is T => item !== undefined);
     }, [items, arrangement]);
 
-    const arrange = useCallback((ids: readonly string[]) => mergeOrder(held.current.order, ids), []);
+    const arrange = useCallback(
+        (ids: readonly string[]) => mergeOrder(held.current.order, ids),
+        []
+    );
 
-    return { items: ordered, arrange };
+    // No state and no render of its own: whatever asks for this is changing
+    // something else in the same breath - the overlay a drag paints - and that
+    // is the render this has to be in place for.
+    const settle = useCallback((ids: readonly string[]) => {
+        held.current = { arrangement: held.current.arrangement, order: [...ids] };
+    }, []);
+
+    return { items: ordered, arrange, settle };
 }
