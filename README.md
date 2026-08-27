@@ -101,11 +101,14 @@ with one thing does not get the rest.
 
 **Files and secrets**
 
-- **Drive** - browse, upload, download and share files across every NAS you own:
-  local disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology,
-  QNAP, TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
-  buffer. Public links with passwords and expiry, drop points for people who have
-  no account, and viewers and editors for documents, spreadsheets, PDFs and media.
+- **Drive** - a private drive for every account from the moment they open it, plus
+  browsing, uploading, downloading and sharing across every NAS you own: local
+  disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology, QNAP,
+  TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
+  buffer. Share a file or folder with a person or group, with a role, a note and
+  an expiry; public links with passwords and expiry; drop points for people who
+  have no account; and viewers and editors for documents, spreadsheets, PDFs and
+  media.
 - **Vault** - a password manager that speaks the Bitwarden client protocol, so
   the apps and extensions you already use point at your own instance. Everything
   is encrypted in the browser; the server never sees a master password.
