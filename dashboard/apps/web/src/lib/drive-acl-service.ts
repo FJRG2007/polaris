@@ -126,7 +126,8 @@ export async function setDriveAcl(input: {
     effect: "allow" | "deny";
     createdById: string;
     /** When it should stop applying. Null is indefinite; absent keeps whatever
-     *  the grant being replaced already had. */
+     *  the grant being replaced already had, unless that date has already passed
+     *  - see below. */
     expiresAt?: Date | null;
     /** A line for the recipient, shown beside the item in their shared list.
      *  Absent keeps the existing one, the way the date does. */
@@ -156,6 +157,14 @@ export async function setDriveAcl(input: {
         },
         select: { id: true, expiresAt: true, note: true }
     });
+    // A date that has already passed is not a promise worth carrying forward: the
+    // row it is on grants nothing, so re-granting to that person from a screen
+    // that never asked about the date would write the lapse straight back and the
+    // access given would do nothing at all. Only a date still ahead is kept.
+    const standing =
+        existing?.expiresAt && existing.expiresAt.getTime() > Date.now()
+            ? existing.expiresAt
+            : null;
     const data = {
         connectionId: input.connectionId,
         path,
@@ -167,7 +176,7 @@ export async function setDriveAcl(input: {
         // Only what the caller actually said. Changing what somebody may do with
         // a folder from a screen that never asked about the date must not turn a
         // share given until Friday into one that never lapses.
-        expiresAt: input.expiresAt === undefined ? (existing?.expiresAt ?? null) : input.expiresAt,
+        expiresAt: input.expiresAt === undefined ? standing : input.expiresAt,
         note: input.note === undefined ? (existing?.note ?? null) : note
     };
     if (existing) {

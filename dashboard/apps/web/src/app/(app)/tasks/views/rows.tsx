@@ -103,6 +103,10 @@ function TaskLine({
                 onDrop={(event) => {
                     if (!onDropAt) return;
                     event.preventDefault();
+                    // The group underneath is where a drop that named no row
+                    // lands - the end of it. This one named a row, so the group
+                    // must not also hear it and overrule the place with its own.
+                    event.stopPropagation();
                     const edge = over ?? dropEdge(event.clientY, event.currentTarget);
                     setOver(null);
                     onDropAt(edge);
@@ -320,7 +324,7 @@ export function ListView(props: ViewProps) {
                                             cursor={cursor.at === task.id}
                                             showStatus={props.groupBy !== "status"}
                                             showLocation={props.showLocation}
-                                            positioned={orderable}
+                                            positioned={orderable && dragging !== task.id}
                                             onPoint={() => cursor.moveTo(task.id)}
                                             onRegister={(element) =>
                                                 cursor.register(task.id, element)
@@ -329,32 +333,36 @@ export function ListView(props: ViewProps) {
                                             onDragStart={() => setDragging(task.id)}
                                             onDropAt={(edge) => {
                                                 if (!dragging) return;
+                                                setDragging(null);
+                                                // Let go on its own row: the place it
+                                                // is already in, and nothing to write.
+                                                if (dragging === task.id) return;
                                                 // Only the group is honoured while a
                                                 // search is on: the row landed on says
                                                 // which one, not where in it.
+                                                const at = orderable
+                                                    ? neighbours(
+                                                          group.tasks,
+                                                          task.id,
+                                                          dragging,
+                                                          edge
+                                                      )
+                                                    : null;
+                                                if (orderable && !at) return;
                                                 const last = group.tasks
                                                     .filter((entry) => entry.id !== dragging)
                                                     .at(-1);
                                                 onMove({
                                                     taskId: dragging,
                                                     groupKey: group.key,
-                                                    position: orderable
-                                                        ? {
-                                                              ...neighbours(
-                                                                  group.tasks,
-                                                                  task.id,
-                                                                  dragging,
-                                                                  edge
-                                                              ),
-                                                              placed: true
-                                                          }
+                                                    position: at
+                                                        ? { ...at, placed: true }
                                                         : {
                                                               beforeId: last?.id ?? null,
                                                               afterId: null,
                                                               placed: false
                                                           }
                                                 });
-                                                setDragging(null);
                                             }}
                                         />
                                     );

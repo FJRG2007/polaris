@@ -16,11 +16,9 @@ const ROWS = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
 
 /** The sequence a drop leaves behind, which is what somebody sees. */
 function landing(dragged: string, target: string, edge: "before" | "after"): string[] {
-    return arrangeAround(
-        ROWS.map((row) => row.id),
-        dragged,
-        neighbours(ROWS, target, dragged, edge)
-    );
+    const at = neighbours(ROWS, target, dragged, edge);
+    const ids = ROWS.map((row) => row.id);
+    return at === null ? ids : arrangeAround(ids, dragged, at);
 }
 
 function box(top: number, height: number): Element {
@@ -68,7 +66,16 @@ describe("where a row dropped on another one lands", () => {
         expect(neighbours(ROWS, "b", "c", "after")).toEqual({ beforeId: "b", afterId: "d" });
     });
 
-    it("says nothing when the row it landed on is not in the list", () => {
-        expect(neighbours(ROWS, "gone", "a", "after")).toEqual({ beforeId: null, afterId: null });
+    it("names no place when the row it landed on is not in the list", () => {
+        expect(neighbours(ROWS, "gone", "a", "after")).toBeNull();
+    });
+
+    it("names no place when a row is let go on itself, which is not the end of the list", () => {
+        // Two empty neighbours would be read as "no position given", and every
+        // server here answers that with the bottom of the container - so a row
+        // dropped back where it was would travel to the end of it.
+        expect(neighbours(ROWS, "b", "b", "before")).toBeNull();
+        expect(neighbours(ROWS, "b", "b", "after")).toBeNull();
+        expect(landing("b", "b", "after")).toEqual(["a", "b", "c", "d"]);
     });
 });

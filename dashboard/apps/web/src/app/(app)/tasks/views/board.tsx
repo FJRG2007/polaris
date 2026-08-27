@@ -63,19 +63,21 @@ import {
  * A card says which half of it the pointer was in, so a card dragged downwards
  * lands under the one it was released over rather than above it. The body of a
  * column says nothing at all, which means the end of that column and promises no
- * place - see `placed`.
+ * place - see `placed`. Null when the card it landed on has since left the
+ * column: no place at all, which is not the same as the end of one.
  */
 function neighbours(
     tasks: readonly TaskRow[],
     target: { id: string; edge: DropEdge } | null,
     dragged: string
-): BoardMove["position"] {
+): BoardMove["position"] | null {
     const without = tasks.filter((task) => task.id !== dragged);
     if (!target) {
         const last = without.at(-1);
         return { beforeId: last?.id ?? null, afterId: null, placed: false };
     }
-    return { ...edgeNeighbours(tasks, target.id, dragged, target.edge), placed: true };
+    const at = edgeNeighbours(tasks, target.id, dragged, target.edge);
+    return at === null ? null : { ...at, placed: true };
 }
 
 /**
@@ -516,15 +518,15 @@ export function BoardView(props: ViewProps) {
         target: { id: string; edge: DropEdge } | null
     ) => {
         if (!dragging) return;
+        setDragging(null);
+        // Let go on its own card: the place it is already in, and nothing to write.
+        if (target?.id === dragging) return;
         // While a search is on, the card the drop landed on says which column was
         // meant and nothing more: the rows are ranked by how well they matched,
         // so a position among them is not one anybody could keep.
-        onMove({
-            taskId: dragging,
-            groupKey,
-            position: neighbours(tasks, orderable ? target : null, dragging)
-        });
-        setDragging(null);
+        const position = neighbours(tasks, orderable ? target : null, dragging);
+        if (!position) return;
+        onMove({ taskId: dragging, groupKey, position });
     };
 
     const columnIds = (key: string) => columnStatusIds(columns, key);
@@ -745,7 +747,7 @@ export function BoardView(props: ViewProps) {
                                         accepting={draggingColumn === null}
                                         selected={selection.has(task.id)}
                                         showLocation={props.showLocation}
-                                        positioned={orderable}
+                                        positioned={orderable && dragging !== task.id}
                                         onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                         onDragStart={() => setDragging(task.id)}
                                         onDropAt={(edge) => drop(group.key, group.tasks, { id: task.id, edge })}

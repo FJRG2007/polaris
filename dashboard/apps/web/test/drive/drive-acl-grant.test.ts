@@ -13,7 +13,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ANA = "11111111-1111-4111-8111-111111111111";
 const BEN = "22222222-2222-4222-8222-222222222222";
+// A fixed instant, because what the grant does next depends on which side of it
+// the stored date falls on - a real clock would decide that differently in a
+// week's time and the run would stop meaning anything.
+const NOW = new Date("2026-08-28T09:00:00Z");
 const FRIDAY = new Date("2026-09-04T00:00:00Z");
+const LAST_MONTH = new Date("2026-07-24T00:00:00Z");
 
 const aclFindFirst = vi.fn(async () => null);
 const aclCreate = vi.fn(async () => ({}));
@@ -57,6 +62,7 @@ function rule(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(Date, "now").mockReturnValue(NOW.getTime());
     aclFindFirst.mockResolvedValue(null);
     userFindUnique.mockResolvedValue({ id: BEN } as never);
     groupFindUnique.mockResolvedValue({ id: "group-7" } as never);
@@ -76,6 +82,23 @@ describe("replacing a rule somebody already holds", () => {
         // Changing what somebody may do from a screen that never asked about the
         // date must not turn a share given until Friday into a permanent one.
         expect(data.expiresAt).toEqual(FRIDAY);
+        expect(data.note).toBe("The quarter's numbers");
+    });
+
+    it("drops a date that has already passed rather than granting nothing", async () => {
+        // The row is still there once its date goes by - nothing sweeps the
+        // table - and granting access again is the one gesture that means "from
+        // now". Carrying the lapse forward would write access nobody has.
+        aclFindFirst.mockResolvedValue({
+            id: "grant-1",
+            expiresAt: LAST_MONTH,
+            note: "The quarter's numbers"
+        } as never);
+
+        await setDriveAcl(rule());
+
+        const { data } = aclUpdate.mock.calls[0][0];
+        expect(data.expiresAt).toBeNull();
         expect(data.note).toBe("The quarter's numbers");
     });
 

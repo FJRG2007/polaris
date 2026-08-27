@@ -74,6 +74,14 @@ function Sortable({
             }}
             onDragLeave={() => setOver(null)}
             onDrop={(event) => {
+                // Let go on its own row. It still takes the drop: underneath is
+                // the list itself, which means the end of it, and a row released
+                // where it already is has not asked to go anywhere.
+                if (dragging === id) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 if (!over) return;
                 event.preventDefault();
                 event.stopPropagation();
@@ -184,6 +192,7 @@ export function SubtaskSection({
     const move = async (targetId: string, edge: DropEdge) => {
         if (!dragging || dragging === targetId) return;
         const position = neighbours(rows, targetId, dragging, edge);
+        if (!position) return;
         const moved = dragging;
         setDragging(null);
         onError("");
@@ -388,6 +397,7 @@ export function ChecklistSection({
     const moveChecklist = async (targetId: string, edge: DropEdge) => {
         if (!draggingList || draggingList === targetId) return;
         const position = neighbours(checklists, targetId, draggingList, edge);
+        if (!position) return;
         const moved = draggingList;
         setDraggingList(null);
         onError("");
@@ -407,6 +417,9 @@ export function ChecklistSection({
             ? neighbours(items, target.id, moved, target.edge)
             : { beforeId: items.filter((item) => item.id !== moved).at(-1)?.id ?? null, afterId: null };
         setDraggingStep(null);
+        // The step it landed on is gone: no place was named, and the end of the
+        // checklist is not a stand-in for one.
+        if (!position) return;
         onError("");
         await runAction(() => actions.moveChecklistItemAction(taskId, moved, { checklistId, ...position }), onError);
         onChanged();

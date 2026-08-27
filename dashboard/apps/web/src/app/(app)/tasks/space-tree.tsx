@@ -196,6 +196,10 @@ interface RowProps {
      *  no siblings there to sit between - so the two are answered separately. */
     readonly acceptsBeside: boolean;
     readonly acceptsInto: boolean;
+    /** Whether this row is the one being dragged. It still swallows the drop -
+     *  letting it through would reach the space underneath, which means "put it
+     *  at the root" - but it promises no line and moves nothing. */
+    readonly dragged?: boolean;
     readonly expander?: React.ReactNode;
     /** The plus, shown next to the row's own quick actions. */
     readonly create?: React.ReactNode;
@@ -222,6 +226,7 @@ function TreeRow({
     onDropAt,
     acceptsBeside,
     acceptsInto,
+    dragged,
     expander,
     create,
     createMenu
@@ -285,6 +290,10 @@ function TreeRow({
                 if (!acceptsBeside && !acceptsInto) return;
                 event.preventDefault();
                 event.stopPropagation();
+                if (dragged) {
+                    setOver(null);
+                    return;
+                }
                 // A row that cannot be nested into is split down the middle, so a
                 // row dragged downwards lands under the one it was released over
                 // rather than above it. A folder keeps its middle for "put it
@@ -300,13 +309,13 @@ function TreeRow({
             }}
             onDragLeave={() => setOver(null)}
             onDrop={(event) => {
-                if (!over) return;
+                if (!acceptsBeside && !acceptsInto) return;
                 event.preventDefault();
                 event.stopPropagation();
                 const where = over;
                 setOver(null);
                 if (where === "into" && onDropInto) onDropInto();
-                else if (where !== "into" && onDropAt) onDropAt(where);
+                else if (where !== null && where !== "into" && onDropAt) onDropAt(where);
             }}
             onKeyDown={(event) => {
                 if (event.key === "F2" && editable) {
@@ -764,9 +773,13 @@ function SpaceSection({
             }}
             acceptsBeside={dragging?.kind === "list" && accepts(list.folderId)}
             acceptsInto={false}
+            dragged={dragging?.kind === "list" && dragging.id === list.id}
             onDragStart={editable ? () => onDragging({ kind: "list", id: list.id, spaceId: space.id }) : undefined}
             onDragEnd={() => onDragging(null)}
-            onDropAt={(edge) => onDrop(space.id, list.folderId, neighbours(siblings, list.id, dragging?.id ?? "", edge))}
+            onDropAt={(edge) => {
+                const at = neighbours(siblings, list.id, dragging?.id ?? "", edge);
+                if (at) onDrop(space.id, list.folderId, at);
+            }}
             actions={
                 editable
                     ? [
@@ -890,12 +903,16 @@ function SpaceSection({
                     }}
                     acceptsBeside={dragging?.kind === "folder" && accepts(folder.parentId)}
                     acceptsInto={accepts(folder.id)}
+                    dragged={dragging?.kind === "folder" && dragging.id === folder.id}
                     onDragStart={
                         canEditHere ? () => onDragging({ kind: "folder", id: folder.id, spaceId: space.id }) : undefined
                     }
                     onDragEnd={() => onDragging(null)}
                     onDropInto={() => onDrop(space.id, folder.id, { beforeId: null, afterId: null })}
-                    onDropAt={(edge) => onDrop(space.id, folder.parentId, neighbours(siblings, folder.id, dragging?.id ?? "", edge))}
+                    onDropAt={(edge) => {
+                        const at = neighbours(siblings, folder.id, dragging?.id ?? "", edge);
+                        if (at) onDrop(space.id, folder.parentId, at);
+                    }}
                     actions={canEditHere ? folderActions(node) : []}
                 />
                 {folderOpen && (

@@ -169,6 +169,13 @@ export function DriveExplorer({
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
     const [opError, setOpError] = useState<string | null>(notice ?? null);
 
+    // The page works the notice out on every render of its own, not only the
+    // first: this component stays mounted while the reader moves between
+    // locations, so seeding the state once would swallow every notice after it.
+    useEffect(() => {
+        if (notice) setOpError(notice);
+    }, [notice]);
+
     /** Run a mutating operation in the background: shows in the operations panel,
      * keeps the dashboard usable (a transition), and refreshes the listing after.
      * A structured or thrown error surfaces in a banner instead of failing silently. */

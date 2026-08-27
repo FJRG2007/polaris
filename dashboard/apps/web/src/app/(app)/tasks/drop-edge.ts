@@ -28,16 +28,23 @@ export function dropEdge(clientY: number, element: Element): DropEdge {
  *
  * The dragged row is taken out of the sequence first: it is leaving the place it
  * is in, so it is not a neighbour of anything.
+ *
+ * Null when the row landed on is not in the sequence - it is the dragged row
+ * itself, or one that somebody else has since removed. That is not a pair of
+ * empty neighbours: every server here reads two nulls as "no position given" and
+ * puts the row at the end of its container, which would send a row released on
+ * its own place to the bottom of the list. A drop that names no place is a drop
+ * that moves nothing.
  */
 export function neighbours(
     siblings: readonly { readonly id: string }[],
     targetId: string,
     dragged: string,
     edge: DropEdge
-): { beforeId: string | null; afterId: string | null } {
+): { beforeId: string | null; afterId: string | null } | null {
     const without = siblings.filter((entry) => entry.id !== dragged);
     const index = without.findIndex((entry) => entry.id === targetId);
-    if (index === -1) return { beforeId: null, afterId: null };
+    if (index === -1) return null;
     return edge === "before"
         ? { beforeId: without[index - 1]?.id ?? null, afterId: targetId }
         : { beforeId: targetId, afterId: without[index + 1]?.id ?? null };

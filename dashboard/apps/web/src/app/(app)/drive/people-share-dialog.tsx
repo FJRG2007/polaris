@@ -112,7 +112,15 @@ export function PeopleShareDialog({
 
     if (!target) return null;
 
-    const alreadyHeld = (holders ?? []).filter((holder) => holder.type === "user").map((h) => h.id);
+    const held = (type: ItemShare["type"]) =>
+        (holders ?? []).filter((holder) => holder.type === type).map((holder) => holder.id);
+    const alreadyHeld = held("user");
+    // A group that already holds the item is left out for the same reason a
+    // person is: sharing to it again is not a second grant but a silent rewrite
+    // of the one it has, down to clearing a date this dialog did not ask about.
+    // Changing what a holder may do is done on their row underneath.
+    const heldGroups = new Set(held("group"));
+    const groupOptions = groups.filter((group) => !heldGroups.has(group.id));
     const nobodyChosen = picked.length === 0 && groupId === "";
 
     async function share() {
@@ -181,14 +189,14 @@ export function PeopleShareDialog({
                         search={findSharePeopleAction}
                     />
 
-                    {groups.length > 0 && (
+                    {groupOptions.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="text-xs text-muted-foreground">Or a group</span>
                             <Select
                                 value={groupId}
                                 onValueChange={setGroupId}
                                 placeholder="No group"
-                                options={groups.map((group) => ({
+                                options={groupOptions.map((group) => ({
                                     value: group.id,
                                     label: group.name
                                 }))}
