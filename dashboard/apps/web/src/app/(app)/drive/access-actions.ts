@@ -40,17 +40,38 @@ async function requireConnectionManager(connectionId: string): Promise<string> {
     return user.id;
 }
 
-/** Load the ACLs, locks, and available principals for a connection's access dialog. */
+/**
+ * Load the ACLs, locks, and the names of whoever already holds a grant.
+ *
+ * It used to return every account on the instance, so the dialog could offer
+ * them in a dropdown. That was a user directory: harmless while only somebody
+ * who had connected a NAS could open this, and no longer so now that everybody
+ * owns their own drive and can. Who may be OFFERED is a search
+ * (`findSharePeopleAction`), which answers nothing to an empty box and leaves
+ * out anybody who has taken themselves out of being found. What comes back here
+ * is only the principals this connection's own rules already name - which
+ * whoever manages it can see anyway, and without which the list of rules would
+ * read as a column of ids.
+ */
 export async function getAccessSettingsAction(connectionId: string): Promise<AccessSettings> {
     await requireConnectionManager(connectionId);
-    const [acls, locks, users, groups] = await Promise.all([
+    const [acls, locks] = await Promise.all([
         listDriveAcls(connectionId),
-        listLocks(connectionId),
-        prisma.user.findMany({
-            select: { id: true, name: true, username: true },
-            orderBy: { name: "asc" }
-        }),
-        prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+        listLocks(connectionId)
+    ]);
+
+    const userIds = acls.filter((acl) => acl.principalType === "user").map((acl) => acl.principalId);
+    const groupIds = acls.filter((acl) => acl.principalType === "group").map((acl) => acl.principalId);
+    const [users, groups] = await Promise.all([
+        userIds.length === 0
+            ? []
+            : prisma.user.findMany({
+                  where: { id: { in: userIds } },
+                  select: { id: true, name: true, username: true }
+              }),
+        groupIds.length === 0
+            ? []
+            : prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true, name: true } })
     ]);
     const principals: AccessPrincipal[] = [
         ...groups.map((group) => ({ type: "group" as const, id: group.id, label: group.name })),

@@ -65,7 +65,10 @@ const LABELS: Record<StorageProviderKind, string> = {
     "unifi-unas": "UniFi UNAS",
     gdrive: "Google Drive",
     onedrive: "OneDrive",
-    dropbox: "Dropbox"
+    dropbox: "Dropbox",
+    // Never offered here - Polaris makes it - but the picker's tables are
+    // exhaustive so that a new provider cannot be added without a name.
+    personal: "My files"
 };
 
 // One-line "what is this" per provider, shown on the picker cards.
@@ -82,7 +85,8 @@ const DESCRIPTIONS: Record<StorageProviderKind, string> = {
     truenas: "TrueNAS via API key.",
     gdrive: "Your Google Drive, through an account you have linked.",
     onedrive: "Your OneDrive, through a Microsoft account you have linked.",
-    dropbox: "Your Dropbox, through an account you have linked."
+    dropbox: "Your Dropbox, through an account you have linked.",
+    personal: "Your own files, on whichever storage this instance keeps them."
 };
 
 // Display order for the picker: UniFi first (the featured quick connect), then
@@ -190,6 +194,9 @@ const port: FieldDef = { name: "port", label: "Port", type: "number", group: "co
 
 const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     local: [{ name: "root", label: "Root path", required: true, group: "config" }],
+    // Nothing to fill in: a personal drive is made by Polaris, on the storage
+    // the instance already keeps files on, and is never offered by this form.
+    personal: [],
     sftp: [
         host,
         { name: "port", label: "Port", type: "number", placeholder: "22 (default)", group: "config" },

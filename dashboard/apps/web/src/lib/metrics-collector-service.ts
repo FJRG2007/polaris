@@ -11,6 +11,7 @@
  * never stops the others or the loop.
  */
 
+import { PERSONAL_KIND } from "@polaris/core";
 import { serviceName } from "@polaris/deploy";
 import { prisma, type Prisma } from "@polaris/db";
 import type { DockerDriver } from "@polaris/docker";
@@ -360,6 +361,10 @@ export function parseSizeLimit(limit: string | null): number | null {
  *  usage for any other backend that reports it. */
 async function collectStorage(ts: Date): Promise<SampleRow[]> {
     const conns = await prisma.storageConnection.findMany({
+        // Not personal drives: each one reports the disk it sits on, so sampling
+        // them would be the same reading once per account, and would open a
+        // connection to that disk once per account to take it.
+        where: { kind: { not: PERSONAL_KIND } },
         select: { id: true, ownerId: true, kind: true }
     });
     const rows: SampleRow[] = [];

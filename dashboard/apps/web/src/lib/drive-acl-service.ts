@@ -36,6 +36,24 @@ export interface DriveAclRow {
     principalId: string;
     actions: DriveAction[];
     effect: "allow" | "deny";
+    /** When it stops applying; null is indefinite. */
+    expiresAt: Date | null;
+    /** What the sender wanted the recipient to know. */
+    note: string | null;
+}
+
+/**
+ * The rows that still apply, for a set of principals.
+ *
+ * A grant with a date on it is over when that date passes: nothing sweeps the
+ * table, so every read has to say so. Written once here because getting it wrong
+ * anywhere means a share that was given until Friday still opens on Monday.
+ */
+export function liveGrants(principals: Array<{ principalType: string; principalId: string }>) {
+    return {
+        OR: principals,
+        AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }]
+    };
 }
 
 /** Decode a stored actions JSON string into known Drive verbs (drops unknowns). */
@@ -56,7 +74,16 @@ export async function listDriveAcls(connectionId: string): Promise<DriveAclRow[]
     const rows = await prisma.driveAcl.findMany({
         where: { connectionId },
         orderBy: { createdAt: "asc" },
-        select: { id: true, path: true, principalType: true, principalId: true, actions: true, effect: true }
+        select: {
+            id: true,
+            path: true,
+            principalType: true,
+            principalId: true,
+            actions: true,
+            effect: true,
+            expiresAt: true,
+            note: true
+        }
     });
     return rows.map((row) => ({
         id: row.id,
@@ -64,7 +91,9 @@ export async function listDriveAcls(connectionId: string): Promise<DriveAclRow[]
         principalType: row.principalType,
         principalId: row.principalId,
         actions: parseActions(row.actions),
-        effect: row.effect === "deny" ? "deny" : "allow"
+        effect: row.effect === "deny" ? "deny" : "allow",
+        expiresAt: row.expiresAt,
+        note: row.note
     }));
 }
 
@@ -77,6 +106,10 @@ export async function setDriveAcl(input: {
     actions: DriveAction[];
     effect: "allow" | "deny";
     createdById: string;
+    /** When it should stop applying. Null (or absent) is indefinite. */
+    expiresAt?: Date | null;
+    /** A line for the recipient, shown beside the item in their shared list. */
+    note?: string | null;
 }): Promise<void> {
     const path = normalizeRelPath(input.path);
     const actions = input.actions.filter((action) => (DRIVE_ACTIONS as readonly string[]).includes(action));
@@ -99,7 +132,9 @@ export async function setDriveAcl(input: {
         principalId: input.principalId,
         actions: JSON.stringify(actions),
         effect: input.effect,
-        createdById: input.createdById
+        createdById: input.createdById,
+        expiresAt: input.expiresAt ?? null,
+        note: input.note?.trim() || null
     };
     if (existing) {
         await prisma.driveAcl.update({ where: { id: existing.id }, data });
@@ -121,7 +156,7 @@ async function aclStatements(userId: string, connectionId: string): Promise<Poli
         ...groupIds.map((id) => ({ principalType: "group", principalId: id }))
     ];
     const rows = await prisma.driveAcl.findMany({
-        where: { connectionId, OR: principals },
+        where: { connectionId, ...liveGrants(principals) },
         select: { path: true, actions: true, effect: true }
     });
     return rows.map((row) => ({
@@ -170,6 +205,34 @@ export async function canAccessDrive(
     return (await resolveDriveDecision(userId, connectionId, path, action)) === "allow";
 }
 
+/**
+ * The shallowest path a user was actually given on a connection, or null.
+ *
+ * What somebody was given is a folder, not a storage: opening its root would
+ * refuse them, and a location in the rail that refuses whoever clicks it is
+ * worse than no location at all. This is where such a location opens.
+ */
+export async function grantedRootPath(
+    userId: string,
+    connectionId: string
+): Promise<string | null> {
+    const groupIds = await getUserGroupIds(userId);
+    const principals = [
+        { principalType: "user", principalId: userId },
+        ...groupIds.map((id) => ({ principalType: "group", principalId: id }))
+    ];
+    const rows = await prisma.driveAcl.findMany({
+        where: { connectionId, effect: "allow", ...liveGrants(principals) },
+        select: { path: true }
+    });
+    if (rows.length === 0) return null;
+    // Shallowest wins: somebody holding both a folder and something inside it
+    // should land on the folder.
+    return rows
+        .map((row) => row.path)
+        .sort((a, b) => a.split("/").length - b.split("/").length || a.length - b.length)[0] ?? null;
+}
+
 /** Connection ids (beyond those they own) a user has an allow ACL on. */
 export async function grantedConnectionIds(userId: string): Promise<string[]> {
     const groupIds = await getUserGroupIds(userId);
@@ -178,7 +241,7 @@ export async function grantedConnectionIds(userId: string): Promise<string[]> {
         ...groupIds.map((id) => ({ principalType: "group", principalId: id }))
     ];
     const rows = await prisma.driveAcl.findMany({
-        where: { effect: "allow", OR: principals },
+        where: { effect: "allow", ...liveGrants(principals) },
         select: { connectionId: true }
     });
     return [...new Set(rows.map((row) => row.connectionId))];

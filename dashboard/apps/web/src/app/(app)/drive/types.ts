@@ -55,8 +55,17 @@ export interface ConnectionSummary {
     webUrl?: string;
     /** True when another user shared this connection with the viewer via an ACL. */
     shared?: boolean;
+    /** Where this location opens, and the shallowest folder in it the viewer may
+     *  reach. Empty for a storage of their own, which opens at its root; a folder
+     *  somebody shared opens at that folder, because everything above it would
+     *  refuse them. */
+    rootPath?: string;
     /** True when the viewer owns the connection and may manage its access settings. */
     canManageAccess?: boolean;
+    /** True when this is a storage somebody connected and can therefore change or
+     *  remove. A personal drive is neither: Polaris made it, its settings are not
+     *  anybody's to edit, and it goes when the account does. */
+    editable?: boolean;
     /** Non-secret connection config (host, port, share, ...) for the edit form. */
     config?: Record<string, unknown>;
     /** True when the stored credentials were encrypted under a previous master

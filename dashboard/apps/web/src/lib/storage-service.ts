@@ -8,11 +8,13 @@
  */
 
 import { prisma } from "@polaris/db";
+import { mkdir } from "node:fs/promises";
+import { isUuid } from "@/lib/uuid";
 import { listSmbShares } from "@/lib/smb-shares";
 import { HostdClient } from "@polaris/hostd-client";
 import { getCapabilities, loadEnv } from "@polaris/config";
-import { canHostMount, requiresHostd } from "@polaris/core";
-import { grantedConnectionIds } from "@/lib/drive-acl-service";
+import { canHostMount, isPersonalKind, LOCAL_TARGET, PERSONAL_KIND, requiresHostd } from "@polaris/core";
+import { grantedConnectionIds, grantedRootPath } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
 import { linkedAccountToken } from "@/lib/connections/storage-token";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
@@ -38,6 +40,7 @@ import {
     encryptCredentials,
     keyFingerprint,
     LocalDriver,
+    ScopedDriver,
     SftpDriver,
     SmbDriver,
     type ConnectionRecord,
@@ -54,6 +57,11 @@ export const HOST_CONNECTION_PREFIX = "host:";
 /** Connection-id prefix for a deployed local container browsed as a Drive folder.
  *  The service is managed in the Deploy app; Drive lists it read-only over hostd. */
 export const CONTAINER_CONNECTION_PREFIX = "container:";
+
+/** The folder under POLARIS_DATA_DIR that holds personal drives kept on this
+ *  server. Only meaningful for a drive whose target is `local`; one on a storage
+ *  connection records its own folder on that storage. */
+export const PERSONAL_LOCAL_FOLDER = "drive";
 
 /** A StorageDriver over a deployed container's filesystem (owner-scoped resolve). */
 async function buildContainerDriver(
@@ -130,6 +138,16 @@ const MOUNT_TRUSTED_MS = 60_000;
 
 /** When each connection's mount was last seen readable from this process. */
 const mountsSeenLive = new Map<string, number>();
+
+/** When each personal drive's folder was last known to be there. */
+const personalRootsSeen = new Map<string, number>();
+
+/** Whether something was seen inside the trust window. In this process only:
+ *  it is a latency shortcut, and a replica working it out again is correct. */
+function seenRecently(seen: Map<string, number>, key: string): boolean {
+    const at = seen.get(key);
+    return at !== undefined && Date.now() - at < MOUNT_TRUSTED_MS;
+}
 
 /**
  * Raised when a UniFi UNAS connection is asked to browse files but has no SMB
@@ -323,6 +341,39 @@ function pooledSmbSession(
 /** Decrypt a row's credentials and build a connected driver for it. */
 async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
     const config = JSON.parse(row.config) as StorageConfig;
+
+    // Somebody's own drive is a folder on a storage that is already connected,
+    // so it has no credentials of its own and never reaches the registry: the
+    // storage it sits on is opened and then confined to that folder.
+    if (isPersonalKind(row.kind)) {
+        const cfg = config as Extract<StorageConfig, { kind: "personal" }>;
+        const inner =
+            cfg.targetId === LOCAL_TARGET
+                ? await localDriveDisk()
+                : await getDriverForConnection(cfg.targetId);
+        const driver = new ScopedDriver({
+            id: row.id,
+            inner,
+            prefix: cfg.root,
+            // Make the folder if it is not there: it is Polaris's to keep, a
+            // drive that has never been written to has nothing on disk yet, and
+            // one whose folder was removed behind Polaris's back repairs itself
+            // rather than becoming a location that will not open.
+            //
+            // Not on every request, though. On a share that is four levels of
+            // mkdir against a NAS before the listing that was actually asked
+            // for, and browsing is many requests - so a folder seen recently is
+            // taken on trust, exactly as a mount is above.
+            createRoot: !seenRecently(personalRootsSeen, row.id)
+        });
+        await driver.connect();
+        // Only once it opened: a connect that failed proves nothing about the
+        // folder, and remembering it as seen would spend the next minute not
+        // making the one thing that was missing.
+        personalRootsSeen.set(row.id, Date.now());
+        return driver;
+    }
+
     const credentials = credentialsOf(row);
 
     // A UniFi UNAS is a metrics connection, but its files are reachable over the
@@ -508,6 +559,17 @@ export async function getDriverForConnection(connectionId: string): Promise<Stor
     return buildDriver(row);
 }
 
+/** The disk this server keeps personal drives on, opened at the folder they
+ *  share. Made on first use: on a fresh install nothing has written there yet,
+ *  and the local driver refuses a root that is not there. */
+async function localDriveDisk(): Promise<StorageDriver> {
+    const root = `${loadEnv().POLARIS_DATA_DIR}/${PERSONAL_LOCAL_FOLDER}`;
+    await mkdir(root, { recursive: true });
+    const driver = new LocalDriver({ id: LOCAL_TARGET, root });
+    await driver.connect();
+    return driver;
+}
+
 /** Native UniFi UNAS metrics for a connection (via the UniFi OS console API). */
 export async function getUnasMetrics(connectionId: string, ownerId: string): Promise<UnasMetrics> {
     const row = await loadConnection(connectionId, ownerId);
@@ -540,6 +602,7 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
 const CONNECTION_SUMMARY_SELECT = {
     id: true,
     name: true,
+    ownerId: true,
     kind: true,
     status: true,
     requiresHostd: true,
@@ -570,14 +633,29 @@ function annotateRekey<T extends { credentialKeyId: string | null }>(
 
 /** All connections owned by a user, without secret material. Each carries a
  *  `needsRekey` flag when its credentials no longer match the master key. */
-export async function listConnections(ownerId: string) {
+export async function listConnections(
+    ownerId: string,
+    options?: { readonly personal?: boolean }
+) {
     const rows = await prisma.storageConnection.findMany({
-        where: { ownerId },
+        // A personal drive is a storage somebody owns and nothing else may use,
+        // so it is absent unless the caller is Drive and asks for it. Left in by
+        // default it would turn up as a volume for a deployed service, a place to
+        // install an app, a destination for a backup - all of which would be one
+        // person's own room being handed to the instance.
+        where: options?.personal ? { ownerId } : { ownerId, kind: { not: PERSONAL_KIND } },
         select: CONNECTION_SUMMARY_SELECT,
         orderBy: { createdAt: "asc" }
     });
     const fingerprint = keyFingerprint(loadEnv().POLARIS_MASTER_KEY);
-    return rows.map((row) => annotateRekey(row, fingerprint));
+    // Your own files come first wherever they appear, the way they do in every
+    // file manager: it is the location you open, and the connected storages are
+    // the ones you go looking for.
+    const ordered = [
+        ...rows.filter((row) => isPersonalKind(row.kind)),
+        ...rows.filter((row) => !isPersonalKind(row.kind))
+    ];
+    return ordered.map((row) => annotateRekey(row, fingerprint));
 }
 
 /**
@@ -588,7 +666,7 @@ export async function listConnections(ownerId: string) {
  */
 export async function listAccessibleConnections(userId: string) {
     const [owned, grantedIds, hosts] = await Promise.all([
-        listConnections(userId),
+        listConnections(userId, { personal: true }),
         grantedConnectionIds(userId),
         listHosts(userId)
     ]);
@@ -625,9 +703,50 @@ export async function listAccessibleConnections(userId: string) {
     }));
     return [
         ...owned.map((row) => ({ ...row, shared: false })),
-        ...shared.map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
+        // Somebody else's own drive is never a location in your sidebar, even
+        // when they have shared a folder out of it: what you were given is that
+        // folder, and listing the drive would open at a root you may not read
+        // and refuse you there. Shared items are reached from the Shared screen,
+        // which knows the path, and the browser resolves the storage from that.
+        ...shared
+            .filter((row) => !isPersonalKind(row.kind))
+            .map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
         ...hostSummaries
     ];
+}
+
+/**
+ * One storage the viewer reaches only through a grant, resolved on demand.
+ *
+ * For opening a shared item: the Shared screen links straight at a path, and the
+ * browser needs the storage it is on even though that storage is deliberately
+ * not in the sidebar. Answers null unless there is a live grant, so a hand-typed
+ * connection id gets nothing - the per-path check still runs afterwards, this is
+ * only what decides whether the location is drawn at all.
+ */
+export async function getSharedConnection(userId: string, connectionId: string) {
+    if (!isUuid(connectionId)) return null;
+    const granted = await grantedConnectionIds(userId);
+    if (!granted.includes(connectionId)) return null;
+
+    const [row, rootPath] = await Promise.all([
+        prisma.storageConnection.findUnique({
+            where: { id: connectionId },
+            select: { ...CONNECTION_SUMMARY_SELECT, owner: { select: { name: true } } }
+        }),
+        grantedRootPath(userId, connectionId)
+    ]);
+    if (!row || row.ownerId === userId) return null;
+    const { owner, ...rest } = row;
+    return {
+        ...annotateRekey(rest, keyFingerprint(loadEnv().POLARIS_MASTER_KEY)),
+        // Where it opens: the folder they were given, not the storage's root.
+        rootPath: rootPath ?? "",
+        // A personal drive is called "My files" by its owner; to anybody else it
+        // is that person's, and saying "My files" would be a lie on their screen.
+        name: isPersonalKind(row.kind) ? `${owner.name}'s files` : row.name,
+        shared: true
+    };
 }
 
 /**
@@ -720,6 +839,13 @@ export async function updateConnection(
     input: { name: string; config: StorageConfig; credentials?: StorageCredentials }
 ) {
     const row = await loadConnection(connectionId, ownerId);
+    // A personal drive has no form and must not acquire one. Its config says
+    // which storage somebody's files are on and which folder they are in, so
+    // editing it would repoint a drive at somebody else's data and strand the
+    // files that are already in it.
+    if (isPersonalKind(row.kind) || isPersonalKind(input.config.kind)) {
+        throw new Error("Your own drive cannot be edited");
+    }
     if (row.kind !== input.config.kind) throw new Error("Cannot change the connection type");
     const env = loadEnv();
     const hasSecret = input.credentials
@@ -749,7 +875,12 @@ export async function updateConnection(
 
 /** Delete a connection owned by the user, and drop its metrics history. */
 export async function deleteConnection(ownerId: string, connectionId: string) {
-    await prisma.storageConnection.deleteMany({ where: { id: connectionId, ownerId } });
+    // Never a personal drive. Removing one would drop every share, note, star
+    // and bin entry pointing into somebody's files and leave the files behind
+    // with nothing that knows where they are. A drive goes when its account does.
+    await prisma.storageConnection.deleteMany({
+        where: { id: connectionId, ownerId, kind: { not: PERSONAL_KIND } }
+    });
     await deleteMetricsForSubject("storage", connectionId);
     forgetConnection(connectionId);
 }

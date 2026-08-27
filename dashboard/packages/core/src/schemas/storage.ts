@@ -22,10 +22,38 @@ export const STORAGE_PROVIDER_KINDS = [
     "unifi-unas",
     "gdrive",
     "onedrive",
-    "dropbox"
+    "dropbox",
+    "personal"
 ] as const;
 
 export type StorageProviderKind = (typeof STORAGE_PROVIDER_KINDS)[number];
+
+/**
+ * The kind a person's own drive has.
+ *
+ * It is a provider like the others because everything Polaris hangs off a
+ * storage - who may open it, what was shared out of it, what is in its bin,
+ * which of its folders somebody starred - is keyed by a connection, and a
+ * personal drive needs all of it. What it is not is something anybody connects:
+ * there is nothing to fill in, Polaris makes it the first time its owner opens
+ * Drive, and it is deliberately absent from the picker and from every list of
+ * storages an administrator can point something else at.
+ */
+export const PERSONAL_KIND = "personal" satisfies StorageProviderKind;
+
+/** Whether a stored connection is somebody's own drive rather than a storage
+ *  that was connected to Polaris. */
+export function isPersonalKind(kind: string): boolean {
+    return kind === PERSONAL_KIND;
+}
+
+/**
+ * The storage target that means "the disk Polaris itself runs on".
+ *
+ * Anywhere a stored choice names where files go it is either a connection's id
+ * or this, so the sentinel is vocabulary rather than one module's constant.
+ */
+export const LOCAL_TARGET = "local";
 
 /**
  * Providers reached with somebody's linked account rather than credentials of
@@ -112,6 +140,16 @@ export const storageConfigSchema = z.discriminatedUnion("kind", [
         // Dropbox addresses by path, not by id. Rooted at the app folder when the
         // operator's app is scoped that way, which is the recommended setup.
         rootPath: z.string().default("/Polaris")
+    }),
+    z.object({
+        kind: z.literal("personal"),
+        // The storage this person's files were put on: another connection's id,
+        // or `local` for the disk Polaris runs on. Recorded when the drive is
+        // made and never re-derived, so pointing new uploads somewhere else
+        // later does not strand what is already here.
+        targetId: z.string().min(1),
+        // The folder inside that storage, relative to its own root.
+        root: z.string().min(1)
     })
 ]);
 
@@ -133,17 +171,27 @@ export const storageCredentialsSchema = z.discriminatedUnion("kind", [
     // Nothing to hold: these authorize through the linked account's own token.
     z.object({ kind: z.literal("gdrive") }),
     z.object({ kind: z.literal("onedrive") }),
-    z.object({ kind: z.literal("dropbox") })
+    z.object({ kind: z.literal("dropbox") }),
+    // Nothing to hold either: a personal drive borrows the storage it sits on.
+    z.object({ kind: z.literal("personal") })
 ]);
 
 export type StorageCredentials = z.infer<typeof storageCredentialsSchema>;
 
 /** Payload the create-connection form/API accepts (config + credentials + name). */
-export const createConnectionSchema = z.object({
-    name: z.string().min(1).max(120),
-    config: storageConfigSchema,
-    credentials: storageCredentialsSchema
-});
+export const createConnectionSchema = z
+    .object({
+        name: z.string().min(1).max(120),
+        config: storageConfigSchema,
+        credentials: storageCredentialsSchema
+    })
+    // A personal drive is made by Polaris for its owner, never submitted: it
+    // would otherwise be a way to hand yourself a connection that every listing
+    // deliberately hides and that nothing lets you edit or remove afterwards.
+    .refine((value) => !isPersonalKind(value.config.kind), {
+        message: "That is not a storage you can connect",
+        path: ["config", "kind"]
+    });
 
 export type CreateConnectionInput = z.infer<typeof createConnectionSchema>;
 

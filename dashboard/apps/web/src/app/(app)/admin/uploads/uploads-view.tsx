@@ -17,6 +17,7 @@ import type { FootageSettings } from "@/lib/home/stills";
 import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
+import type { PersonalDriveSettings } from "@/lib/personal-drive";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
 import {
@@ -24,6 +25,7 @@ import {
     setAvatarSettingsAction,
     setChatStorageTargetAction,
     setFootageTargetAction,
+    setPersonalDriveTargetAction,
     setUploadSettingsAction,
     tidyChatStorageAction,
     type StorageCheck
@@ -388,6 +390,95 @@ function PhotosCard({ settings }: { settings: AvatarSettings }) {
     );
 }
 
+/**
+ * Where people's own drives are kept.
+ *
+ * First on this screen because it is the biggest thing the instance will ever
+ * hold: everything else here is what somebody attached to something, and this is
+ * everything they have. Changing it points the drives made from now on at the
+ * new disk and moves nothing - a drive records where its files actually are when
+ * it is made, so somebody who has been using Polaris for a year keeps opening
+ * theirs where it is.
+ */
+function DrivesCard({ settings }: { settings: PersonalDriveSettings }) {
+    const initial = settings.choice;
+    const [target, setTarget] = useState(initial);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+
+    const dirty = target !== initial;
+    const made = settings.existing.reduce((total, row) => total + row.count, 0);
+    // Only worth saying when it would surprise: drives already sitting somewhere
+    // other than where this setting now points.
+    const elsewhere = settings.existing.filter((row) => row.targetId !== settings.resolved.id);
+
+    const save = async () => {
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(() => setPersonalDriveTargetAction({ target }), setError);
+        setSaving(false);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setSaved(true);
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4 p-4">
+                <div>
+                    <h2 className="text-sm font-medium">People&apos;s own drives</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Everybody gets a private folder of their own in Drive, made the first time
+                        they open it. What it can hold is whatever is free on the disk it is on.
+                    </p>
+                </div>
+
+                <ResolvedTarget
+                    resolved={settings.resolved}
+                    automatic="Worked out from what this instance has connected. Connect a NAS and new drives follow it."
+                />
+
+                <TargetPicker
+                    label="Where to keep them"
+                    hint="Drives that already exist stay on the disk they were made on; this decides where the next ones go."
+                    value={target}
+                    options={settings.options}
+                    resolvedName={settings.resolved.name}
+                    onChange={(value) => {
+                        setTarget(value);
+                        setSaved(false);
+                    }}
+                />
+
+                {made > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                        {made === 1 ? "One drive has been made" : `${made} drives have been made`}
+                        {elsewhere.length > 0
+                            ? `, ${elsewhere.reduce((total, row) => total + row.count, 0)} of them on a different disk from the one above.`
+                            : "."}
+                    </p>
+                )}
+
+                <div>
+                    <CheckButton which="drive" />
+                </div>
+                <SaveRow
+                    dirty={dirty}
+                    valid
+                    saving={saving}
+                    saved={saved}
+                    error={error}
+                    onSave={() => void save()}
+                />
+            </CardBody>
+        </Card>
+    );
+}
+
 function ChatCard({ settings }: { settings: ChatStorageSettings }) {
     const initial = settings.choice;
     const [target, setTarget] = useState(initial);
@@ -533,11 +624,13 @@ export function UploadsView({
     uploads,
     avatars,
     chat,
+    drives,
     footage
 }: {
     uploads: UploadSettings;
     avatars: AvatarSettings;
     chat: ChatStorageSettings;
+    drives: PersonalDriveSettings;
     /** Absent on an instance with no Home installed - there is nothing recording,
      *  so a card about where recordings go would be a setting for a feature that
      *  is not there. */
@@ -545,6 +638,7 @@ export function UploadsView({
 }) {
     return (
         <div className="flex max-w-2xl flex-col gap-4">
+            <DrivesCard settings={drives} />
             <AttachmentsCard settings={uploads} />
             <PhotosCard settings={avatars} />
             <ChatCard settings={chat} />

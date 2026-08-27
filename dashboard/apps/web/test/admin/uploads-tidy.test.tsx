@@ -22,6 +22,7 @@ vi.mock("@/app/(app)/admin/uploads/actions", () => ({
     setAvatarSettingsAction: async () => ({}),
     setChatStorageTargetAction: async () => ({}),
     setFootageTargetAction: async () => ({}),
+    setPersonalDriveTargetAction: async () => ({}),
     setUploadSettingsAction: async () => ({}),
     tidyChatStorageAction: async () => {
         runs += 1;
@@ -43,6 +44,7 @@ function draw() {
             }}
             avatars={{ choice: "auto", resolved: target, options: [] }}
             chat={{ choice: "auto", resolved: target, options: [] }}
+            drives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             footage={null}
         />
     );

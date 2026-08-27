@@ -74,10 +74,10 @@ function render(extra: { onShareFolder?: () => void }): string {
 }
 
 describe("sharing the folder that is open", () => {
-    it("offers a Share action beside Request files", () => {
+    it("offers a link to it beside Request files", () => {
         const markup = render({ onShareFolder: () => {} });
 
-        expect(markup).toContain("Share this folder");
+        expect(markup).toContain("Get a link to this folder");
         // The drop point is still there; it is the other thing, not the only thing.
         expect(markup).toContain("Request files");
     });
@@ -85,6 +85,16 @@ describe("sharing the folder that is open", () => {
     it("leaves it out on a source a link cannot hang off", () => {
         const markup = render({});
 
-        expect(markup).not.toContain("Share this folder");
+        expect(markup).not.toContain("Get a link to this folder");
+    });
+
+    it("offers giving it to somebody separately from minting a link", () => {
+        // Two different questions - who, versus whoever holds this address - and
+        // a source can offer one without the other: a link needs a connection to
+        // hang off, giving it to a colleague needs the viewer to own the storage.
+        const markup = render({ onSharePeopleFolder: () => {} });
+
+        expect(markup).toContain("Share this folder with people");
+        expect(markup).not.toContain("Get a link to this folder");
     });
 });

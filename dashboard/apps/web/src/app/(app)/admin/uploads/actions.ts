@@ -12,6 +12,7 @@ import { chatTarget } from "@/lib/chat/attachments";
 import { avatarSettings } from "@/lib/avatar-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
 import { checkStorageTarget } from "@/lib/storage-target";
+import { personalDriveSettings, setPersonalDriveTarget } from "@/lib/personal-drive";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 import { footageSettings, setFootageTarget } from "@/lib/home/stills";
@@ -154,12 +155,33 @@ export async function tidyChatStorageAction(): Promise<{
     }
 }
 
-/** The three questions this screen answers, and the folder each writes under. */
+export async function setPersonalDriveTargetAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ target }).safeParse(input);
+    if (!parsed.success) return { error: "Check the settings and try again" };
+    try {
+        await setPersonalDriveTarget(parsed.data.target);
+        await recordAudit({
+            actorId: admin.id,
+            action: "settings.drive.personal.update",
+            targetType: "setting",
+            targetId: "drive.personal",
+            metadata: { target: parsed.data.target }
+        });
+        return {};
+    } catch (caught) {
+        console.error(caught);
+        return { error: "Could not save that" };
+    }
+}
+
+/** The questions this screen answers, and the folder each writes under. */
 const CHECKS = {
     tasks: "uploads",
     avatars: "avatars",
     chat: "chat",
-    footage: "home"
+    footage: "home",
+    drive: "drive"
 } as const;
 
 export type StorageCheck = keyof typeof CHECKS;
@@ -182,7 +204,9 @@ export async function checkStorageAction(
     const target =
         which === "chat"
             ? await chatTarget()
-            : which === "avatars"
+            : which === "drive"
+              ? (await personalDriveSettings()).resolved
+              : which === "avatars"
               ? (await avatarSettings()).resolved
               : which === "footage"
                 ? (await footageSettings()).resolved

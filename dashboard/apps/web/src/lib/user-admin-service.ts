@@ -16,6 +16,7 @@
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { discardAvatars } from "@/lib/avatar-service";
+import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
@@ -390,6 +391,10 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     // this a deleted person's photo stays on the disk with nothing left anywhere
     // that knows it is there.
     const leftBehind = await discardAvatars("user", userId);
+    // And their own drive, for the same reason and with the same rule: a storage
+    // that is away is named in the log rather than allowed to refuse a deletion.
+    const driveLeft = await discardPersonalDrive(userId);
+    if (driveLeft) leftBehind.push(driveLeft);
     await prisma.user.delete({ where: { id: userId } });
     await recordAudit({
         actorId,

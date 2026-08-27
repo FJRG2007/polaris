@@ -17,7 +17,7 @@
 import { prisma } from "@polaris/db";
 import { mkdir } from "node:fs/promises";
 import { loadEnv } from "@polaris/config";
-import { withTimeout } from "@polaris/core";
+import { isPersonalKind, LOCAL_TARGET, PERSONAL_KIND, withTimeout } from "@polaris/core";
 import { LocalDriver } from "@polaris/storage";
 import { getSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
@@ -25,8 +25,10 @@ import { getDriverForConnection } from "@/lib/storage-service";
 
 /** Chosen by nobody, so chosen by the rule below. */
 export const AUTOMATIC_TARGET = "auto";
-/** The disk Polaris runs on. */
-export const LOCAL_TARGET = "local";
+/** The disk Polaris runs on. Its name is shared vocabulary, so it is defined
+ *  once in @polaris/core and re-exported here for everything that already
+ *  reaches for it through this module. */
+export { LOCAL_TARGET };
 
 /** The kinds that mean "a box built to hold files", in the order they are
  *  preferred when nobody has chosen. */
@@ -70,9 +72,15 @@ export async function resolveTargetChoice(value: string | null): Promise<UploadT
     if (choice !== AUTOMATIC_TARGET) {
         const chosen = await prisma.storageConnection.findUnique({
             where: { id: choice },
-            select: { id: true, name: true }
+            select: { id: true, name: true, kind: true }
         });
-        if (chosen) return { id: chosen.id, name: chosen.name, automatic: false };
+        // Somebody's own drive is never a destination for what the instance
+        // writes: it is one person's room, and the files Polaris puts away here
+        // belong to everybody. It is kept out of the picker, so a choice that
+        // names one is a stale or hand-set value and falls through to the rule.
+        if (chosen && !isPersonalKind(chosen.kind)) {
+            return { id: chosen.id, name: chosen.name, automatic: false };
+        }
     }
 
     const connections = await prisma.storageConnection.findMany({
@@ -90,6 +98,7 @@ export async function resolveTargetChoice(value: string | null): Promise<UploadT
 /** Everything an administrator may point uploads at, for the settings screen. */
 export function storageTargetOptions(): Promise<TargetOption[]> {
     return prisma.storageConnection.findMany({
+        where: { kind: { not: PERSONAL_KIND } },
         orderBy: { createdAt: "asc" },
         select: { id: true, name: true, kind: true }
     });

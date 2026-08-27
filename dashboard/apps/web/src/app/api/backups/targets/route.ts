@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { PERSONAL_KIND } from "@polaris/core";
 import { requireAdmin } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -16,7 +17,9 @@ export async function GET(): Promise<Response> {
     const user = await requireAdmin();
     const [connections, hosts] = await Promise.all([
         prisma.storageConnection.findMany({
-            where: { ownerId: user.id, status: "active" },
+            // Never somebody's own drive: a backup is the instance's, and a
+            // person's drive is not a disk it may fill.
+            where: { ownerId: user.id, status: "active", kind: { not: PERSONAL_KIND } },
             select: { id: true, name: true },
             orderBy: { name: "asc" }
         }),

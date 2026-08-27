@@ -39,6 +39,7 @@ vi.mock("../../src/app/(app)/drive/files-view", () => ({
     FilesView: () => <div data-testid="files-view" />
 }));
 vi.mock("../../src/app/(app)/drive/share-dialog", () => ({ ShareDialog: () => null }));
+vi.mock("../../src/app/(app)/drive/people-share-dialog", () => ({ PeopleShareDialog: () => null }));
 vi.mock("../../src/app/(app)/drive/request-dialog", () => ({ RequestDialog: () => null }));
 vi.mock("../../src/app/(app)/drive/unifi-console-button", () => ({ UnifiConsoleButton: () => null }));
 vi.mock("../../src/app/(app)/drive/remove-connection-dialog", () => ({ RemoveConnectionDialog: () => null }));

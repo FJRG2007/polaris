@@ -23,7 +23,7 @@ export default async function DropPointsPage() {
     const [requests, textRequests, connections] = await Promise.all([
         listFileRequestsForOwner(user.id),
         listTextRequestsForOwner(user.id),
-        listConnections(user.id)
+        listConnections(user.id, { personal: true })
     ]);
     const rows: DropPointRow[] = requests.map((request) => ({
         id: request.id,

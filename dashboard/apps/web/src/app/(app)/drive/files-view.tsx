@@ -103,6 +103,7 @@ import {
     Info,
     KeyRound,
     LayoutGrid,
+    Link2,
     List,
     Lock,
     Palette,
@@ -116,9 +117,16 @@ import {
     StickyNote,
     Trash2,
     Upload,
+    Users,
     X,
     type LucideIcon
 } from "lucide-react";
+
+/** How many folders deep a path is; 0 for the root. Used to hide the crumbs
+ *  above a folder that was shared, which lead somewhere the viewer is refused. */
+function depthOf(path: string): number {
+    return path === "" ? 0 : path.split("/").length;
+}
 
 type SortKey = "name" | "created" | "modified" | "size";
 type SortDir = "asc" | "desc";
@@ -212,6 +220,7 @@ export function FilesView({
     connectionId,
     path,
     segments,
+    rootPath = "",
     entries,
     loading,
     error,
@@ -226,6 +235,8 @@ export function FilesView({
     onRename,
     onShare,
     onShareFolder,
+    onSharePeople,
+    onSharePeopleFolder,
     onRequestFiles,
     onToggleHidden,
     onSetFavorite,
@@ -243,6 +254,10 @@ export function FilesView({
     connectionId: string;
     path: string;
     segments: string[];
+    /** The shallowest folder the viewer may open here. Empty for a location of
+     *  their own; a folder somebody shared with them opens at that folder and
+     *  everything above it is theirs to see the name of, not to walk into. */
+    rootPath?: string;
     entries: DriveEntry[];
     loading: boolean;
     error: string | null;
@@ -261,6 +276,11 @@ export function FilesView({
     onShare?: (entries: DriveEntry[]) => void;
     /** Share the folder that is open, which is not one of the listed entries. */
     onShareFolder?: () => void;
+    /** Give one item to somebody on this instance. Absent unless the viewer owns
+     *  the storage: only an owner may hand out what is on it. */
+    onSharePeople?: (entry: DriveEntry) => void;
+    /** The same for the folder that is open. */
+    onSharePeopleFolder?: () => void;
     /** Ask somebody to drop files into a folder. Absent for the same reason. */
     onRequestFiles?: (path: string, name: string) => void;
     onToggleHidden: (entry: DriveEntry) => void;
@@ -811,7 +831,7 @@ export function FilesView({
             : "Download";
     // Each selected item gets its own link, so the count is worth saying out loud.
     const shareLabel =
-        selectedEntries.length > 1 ? `Share ${selectedEntries.length} items` : "Share";
+        selectedEntries.length > 1 ? `Get ${selectedEntries.length} links` : "Get a link";
     const searchError = useMemo(() => parseSearch(query).error, [query]);
 
     // Items marked for a cut are shown dimmed until pasted, the way a file
@@ -1060,10 +1080,16 @@ export function FilesView({
                     <ClipboardCopy className="size-4" />
                     {many ? "Copy paths" : "Copy path"}
                 </ContextMenuItem>
+                {onSharePeople && !many ? (
+                    <ContextMenuItem onSelect={() => onSharePeople(entry)}>
+                        <Users className="size-4" />
+                        Share with people
+                    </ContextMenuItem>
+                ) : null}
                 {onShare ? (
                     <ContextMenuItem onSelect={() => onShare(targets)}>
                         <Share2 className="size-4" />
-                        {many ? `Share ${targets.length} items` : "Share"}
+                        {many ? `Get ${targets.length} links` : "Get a link"}
                     </ContextMenuItem>
                 ) : null}
                 <ContextMenuSeparator />
@@ -1416,7 +1442,7 @@ export function FilesView({
                             {onShare ? (
                                 <Button size="sm" variant="ghost" onClick={shareViewerTarget}>
                                     <Share2 className="size-4" />
-                                    Share
+                                    Get a link
                                 </Button>
                             ) : null}
                             <Button asChild size="sm" variant="secondary">
@@ -1445,18 +1471,23 @@ export function FilesView({
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
                         <Link
-                            href={href(connectionId, "")}
-                            {...segmentDropProps("")}
+                            href={href(connectionId, rootPath)}
+                            {...segmentDropProps(rootPath)}
                             className={cn(
                                 "rounded px-1 py-0.5 hover:text-foreground",
-                                dropSegment === "" &&
+                                dropSegment === rootPath &&
                                     "bg-primary/15 text-primary ring-1 ring-primary/40"
                             )}
                         >
-                            Home
+                            {/* A location of your own starts at Home. One somebody
+                                shared starts at what they shared, and calling that
+                                Home would say the folder is the whole storage. */}
+                            {rootPath === "" ? "Home" : (rootPath.split("/").pop() ?? "Home")}
                         </Link>
-                        {segments.map((segment, index) => {
-                            const target = segments.slice(0, index + 1).join("/");
+                        {segments.slice(depthOf(rootPath)).map((segment, index) => {
+                            const target = segments
+                                .slice(0, depthOf(rootPath) + index + 1)
+                                .join("/");
                             return (
                                 <span key={target} className="flex items-center gap-1">
                                     <ChevronRight className="size-3" />
@@ -1494,17 +1525,29 @@ export function FilesView({
                                 </span>
                             </Button>
                         ) : null}
+                        {onSharePeopleFolder ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={onSharePeopleFolder}
+                                disabled={pending}
+                                title="Share this folder with people"
+                                aria-label="Share this folder with people"
+                            >
+                                <Users className="size-4" />
+                                <span className="hidden sm:inline">Share</span>
+                            </Button>
+                        ) : null}
                         {onShareFolder ? (
                             <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={onShareFolder}
                                 disabled={pending}
-                                title="Share this folder"
-                                aria-label="Share this folder"
+                                title="Get a link to this folder"
+                                aria-label="Get a link to this folder"
                             >
-                                <Share2 className="size-4" />
-                                <span className="hidden sm:inline">Share</span>
+                                <Link2 className="size-4" />
                             </Button>
                         ) : null}
                         {onRequestFiles ? (
@@ -2400,10 +2443,16 @@ export function FilesView({
                                 {SHORTCUT_HINTS["upload-folder"]}
                             </span>
                         </ContextMenuItem>
+                        {onSharePeopleFolder ? (
+                            <ContextMenuItem onSelect={onSharePeopleFolder}>
+                                <Users className="size-4" />
+                                Share this folder with people
+                            </ContextMenuItem>
+                        ) : null}
                         {onShareFolder ? (
                             <ContextMenuItem onSelect={onShareFolder}>
                                 <Share2 className="size-4" />
-                                Share this folder
+                                Get a link to this folder
                             </ContextMenuItem>
                         ) : null}
                         {onRequestFiles ? (
@@ -2849,6 +2898,7 @@ export function FilesView({
                             connectionId={connectionId}
                             value={normalizedMoveDest}
                             onChange={setMoveDest}
+                            root={rootPath}
                             className="max-h-72"
                         />
                         <Input

@@ -60,6 +60,7 @@ import {
     SendHorizontal,
     Server,
     Settings,
+    Share2,
     ShieldCheck,
     SlidersHorizontal,
     Sparkles,
@@ -337,6 +338,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["usage", "storage"]
         },
         { label: "Files", href: "/drive", icon: FolderOpen, keywords: ["browse", "folders"] },
+        {
+            label: "Shared",
+            href: "/drive/shared",
+            icon: Share2,
+            keywords: ["shared with me", "people", "sent me", "gave me", "access"]
+        },
         { label: "Favorites", href: "/drive/favorites", icon: Star, keywords: ["starred"] },
         { label: "Recent", href: "/drive/recent", icon: Clock },
         {

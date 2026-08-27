@@ -25,12 +25,20 @@ interface FolderNode {
     locked: boolean;
 }
 
-/** Every ancestor of a path, root first ("a/b/c" -> ["", "a", "a/b"]). */
-function ancestorsOf(path: string): string[] {
-    const segments = path.split("/").filter(Boolean);
-    const out = [""];
+/**
+ * Every ancestor of a path down from `root`, root first
+ * ("a/b/c" from "" -> ["", "a", "a/b"]; the same from "a" -> ["a", "a/b"]).
+ *
+ * The tree does not always start at the storage's root: a folder somebody shared
+ * is all the viewer may see, and asking for the level above it would be refused.
+ */
+function ancestorsOf(path: string, root = ""): string[] {
+    const inside = root === "" ? path : path.slice(root.length + 1);
+    const segments = inside.split("/").filter(Boolean);
+    const out = [root];
     for (let index = 0; index < segments.length - 1; index++) {
-        out.push(segments.slice(0, index + 1).join("/"));
+        const step = segments.slice(0, index + 1).join("/");
+        out.push(root === "" ? step : `${root}/${step}`);
     }
     return out;
 }
@@ -39,13 +47,17 @@ export function FolderTree({
     connectionId,
     value,
     onChange,
-    rootLabel = "Home",
+    root = "",
+    rootLabel,
     className
 }: {
     connectionId: string;
     /** Currently picked folder ("" is the connection root). */
     value: string;
     onChange: (path: string) => void;
+    /** The folder the tree starts at. Empty is the storage's own root; a folder
+     *  somebody shared starts there, because above it is refused. */
+    root?: string;
     rootLabel?: string;
     className?: string;
 }) {
@@ -103,7 +115,7 @@ export function FolderTree({
             } catch {
                 if (controller.signal.aborted) return;
                 setChildren((prev) => ({ ...prev, [path]: [] }));
-                if (path === "") setError("Could not list this connection");
+                if (path === root) setError("Could not list this location");
             } finally {
                 pending.current = pending.current.filter((entry) => entry !== controller);
                 setLoading((prev) => {
@@ -113,7 +125,7 @@ export function FolderTree({
                 });
             }
         },
-        [connectionId, branchOf]
+        [connectionId, root, branchOf]
     );
 
     // Open the tree down to the pre-selected folder so the picker starts where the
@@ -122,7 +134,7 @@ export function FolderTree({
         requested.current = new Set();
         setChildren({});
         setError(null);
-        const ancestors = ancestorsOf(value);
+        const ancestors = ancestorsOf(value || root, root);
         setExpanded(new Set(value ? [...ancestors, value] : ancestors));
         for (const folder of ancestors) void load(folder);
         if (value) void load(value);
@@ -132,7 +144,7 @@ export function FolderTree({
         };
         // Only re-seed when the connection changes; `value` then moves with clicks.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [connectionId, load]);
+    }, [connectionId, root, load]);
 
     function toggle(path: string) {
         setExpanded((prev) => {
@@ -216,32 +228,34 @@ export function FolderTree({
             <div
                 className={cn(
                     "flex items-center gap-1 rounded-md pr-2 transition-colors",
-                    value === "" ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                    value === root ? "bg-primary/10 text-primary" : "hover:bg-muted"
                 )}
             >
                 <button
                     type="button"
-                    onClick={() => toggle("")}
-                    aria-label={expanded.has("") ? "Collapse" : "Expand"}
+                    onClick={() => toggle(root)}
+                    aria-label={expanded.has(root) ? "Collapse" : "Expand"}
                     className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                 >
                     <ChevronRight
                         className={cn(
                             "size-3.5 transition-transform",
-                            expanded.has("") && "rotate-90"
+                            expanded.has(root) && "rotate-90"
                         )}
                     />
                 </button>
                 <button
                     type="button"
-                    onClick={() => onChange("")}
+                    onClick={() => onChange(root)}
                     className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm"
                 >
                     <FolderOpen className="size-4 shrink-0 text-primary" />
-                    <span className="truncate">{rootLabel}</span>
+                    <span className="truncate">
+                        {rootLabel ?? (root === "" ? "Home" : (root.split("/").pop() ?? "Home"))}
+                    </span>
                 </button>
             </div>
-            {renderBranch("", 1)}
+            {renderBranch(root, 1)}
             {error ? <p className="px-2 py-1 text-xs text-danger">{error}</p> : null}
         </div>
     );

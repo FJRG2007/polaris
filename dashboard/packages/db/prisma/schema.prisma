@@ -1246,6 +1246,13 @@ model DriveAcl {
     // JSON array of Drive verbs: read, write, rename, delete, copy, download.
     actions       String
     effect        String   @default("allow")
+    // When the grant stops applying. Null is indefinite, which is what an access
+    // rule an administrator writes normally is; a share somebody hands a
+    // colleague for the week is the case this exists for.
+    expiresAt     DateTime?
+    // What the sender wanted the recipient to know, shown beside the item in
+    // their shared list. Null when nothing was said.
+    note          String?
     createdById   String   @db.Uuid
     createdAt     DateTime @default(now())
 

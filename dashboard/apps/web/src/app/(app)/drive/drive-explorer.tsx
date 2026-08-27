@@ -25,6 +25,7 @@ import * as driveActions from "./actions";
 import { useRouter } from "next/navigation";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
+import { PeopleShareDialog, type PeopleShareTarget } from "./people-share-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
@@ -48,6 +49,7 @@ import {
 import {
     AlertTriangle,
     Folder,
+    FolderHeart,
     HardDrive,
     Info,
     KeyRound,
@@ -158,6 +160,7 @@ export function DriveExplorer({
     const [deleteConn, setDeleteConn] = useState<ConnectionSummary | null>(null);
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
     const [shareTargets, setShareTargets] = useState<ShareTarget[] | null>(null);
+    const [peopleTarget, setPeopleTarget] = useState<PeopleShareTarget | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
     const [opError, setOpError] = useState<string | null>(null);
@@ -468,7 +471,7 @@ export function DriveExplorer({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-medium text-muted-foreground">Connections</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">Locations</h2>
                     <div className="flex items-center gap-1">
                         {anyDown ? (
                             <Button
@@ -506,11 +509,15 @@ export function DriveExplorer({
                                     </span>
                                 ) : (
                                     <Link
-                                        href={href(connection.id, "")}
+                                        href={href(connection.id, connection.rootPath ?? "")}
                                         // The root of a source somebody is reaching
                                         // for, fetched while they are still reaching.
-                                        onPointerEnter={() => prefetchListing(connection.id, "")}
-                                        onFocus={() => prefetchListing(connection.id, "")}
+                                        onPointerEnter={() =>
+                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                        }
+                                        onFocus={() =>
+                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                        }
                                         className={cn(
                                             "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
                                             connection.id === connectionId && "bg-muted font-medium"
@@ -530,7 +537,7 @@ export function DriveExplorer({
                                         <KeyRound className="size-4" />
                                     </button>
                                 ) : null}
-                                {connection.canManageAccess ? (
+                                {connection.editable ? (
                                     <button
                                         type="button"
                                         onClick={() => setEditConn(connection)}
@@ -540,7 +547,7 @@ export function DriveExplorer({
                                         <Pencil className="size-4" />
                                     </button>
                                 ) : null}
-                                {connection.canManageAccess ? (
+                                {connection.editable ? (
                                     <button
                                         type="button"
                                         onClick={() => setDeleteConn(connection)}
@@ -614,6 +621,7 @@ export function DriveExplorer({
                         connectionId={connectionId}
                         path={path}
                         segments={segments}
+                        rootPath={selectedConnection?.rootPath ?? ""}
                         entries={entries}
                         loading={loading}
                         error={error}
@@ -656,6 +664,31 @@ export function DriveExplorer({
                                               isDir: true
                                           }
                                       ])
+                                : undefined
+                        }
+                        onSharePeople={
+                            selectedConnection?.canManageAccess
+                                ? (entry) =>
+                                      setPeopleTarget({
+                                          connectionId,
+                                          path: entry.path,
+                                          name: entry.name,
+                                          isDir: entry.kind === "dir"
+                                      })
+                                : undefined
+                        }
+                        onSharePeopleFolder={
+                            selectedConnection?.canManageAccess
+                                ? () =>
+                                      setPeopleTarget({
+                                          connectionId,
+                                          path,
+                                          name:
+                                              segments[segments.length - 1] ??
+                                              selectedConnection?.name ??
+                                              "This folder",
+                                          isDir: true
+                                      })
                                 : undefined
                         }
                         onRequestFiles={
@@ -748,6 +781,10 @@ export function DriveExplorer({
             <ShareDialog
                 targets={shareTargets}
                 onOpenChange={(open) => !open && setShareTargets(null)}
+            />
+            <PeopleShareDialog
+                target={peopleTarget}
+                onOpenChange={(open) => !open && setPeopleTarget(null)}
             />
             <RequestDialog
                 target={requestTarget}
@@ -964,7 +1001,11 @@ function ConnectionLabel({
 }) {
     return (
         <>
-            <HardDrive className="size-4 text-muted-foreground" />
+            {connection.kind === "personal" ? (
+                <FolderHeart className="size-4 text-muted-foreground" />
+            ) : (
+                <HardDrive className="size-4 text-muted-foreground" />
+            )}
             <span className="flex-1 truncate" title={connection.name}>
                 {connection.name}
             </span>

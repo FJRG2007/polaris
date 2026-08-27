@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { PERSONAL_KIND } from "@polaris/core";
 import { Readable } from "node:stream";
 import type { Prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
@@ -769,7 +770,9 @@ export async function listDestinations(ownerId: string) {
 export async function createDestination(ownerId: string, input: DestinationInput): Promise<{ id: string }> {
     if (input.kind === "connection") {
         const owned = await prisma.storageConnection.findFirst({
-            where: { id: input.connectionId, ownerId },
+            // Their own drive is theirs, not a destination - it is left out of the
+            // picker and refused here too, so a hand-made request cannot use one.
+            where: { id: input.connectionId, ownerId, kind: { not: PERSONAL_KIND } },
             select: { id: true }
         });
         if (!owned) throw new SourceUnavailableError("That storage connection does not exist");

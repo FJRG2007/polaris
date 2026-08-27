@@ -41,6 +41,7 @@ import {
     setDriveAclAction,
     unlockPathAction
 } from "./access-actions";
+import { PrincipalPicker } from "./principal-picker";
 import type { AccessPrincipal, AccessSettings } from "./access-types";
 
 export interface AccessTarget {
@@ -276,17 +277,7 @@ export function AccessDialog({
                             )}
 
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-surface/40 p-3">
-                                <Select
-                                    value={principal}
-                                    onValueChange={setPrincipal}
-                                    placeholder="Add a user or group..."
-                                    options={(settings?.principals ?? []).map((option) => ({
-                                        value: `${option.type}:${option.id}`,
-                                        label: `${option.type === "group" ? "Group: " : ""}${option.label}${
-                                            option.sublabel ? ` (${option.sublabel})` : ""
-                                        }`
-                                    }))}
-                                />
+                                <PrincipalPicker value={principal} onChange={setPrincipal} />
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-xs text-muted-foreground">Level</span>
                                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">

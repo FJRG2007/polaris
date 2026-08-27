@@ -1,9 +1,15 @@
 import { PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
 import { DriveExplorer } from "./drive-explorer";
-import type { StorageProviderKind } from "@polaris/core";
+import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
 import { isSavedConnection, type ConnectionSummary } from "./types";
-import { connectionWebUrl, getContainerConnection, listAccessibleConnections } from "@/lib/storage-service";
+import { ensurePersonalDrive } from "@/lib/personal-drive";
+import {
+    connectionWebUrl,
+    getContainerConnection,
+    getSharedConnection,
+    listAccessibleConnections
+} from "@/lib/storage-service";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +35,13 @@ export default async function DrivePage({
     const user = await requirePermission("drive.read");
     const params = await searchParams;
 
+    // Everybody has their own drive, and this is where it starts existing. It is
+    // one upsert on a row that is already there for everybody who has opened
+    // Drive once, and it is what makes the app useful to an account that has
+    // never connected a storage - which, before this, opened Drive and found
+    // nothing at all.
+    await ensurePersonalDrive(user.id);
+
     // Only the fast, local query runs on the server so the page paints instantly.
     // The actual listing / device metrics load client-side (skeletons + cache),
     // which is what removes the multi-second delay a slow NAS used to add here.
@@ -43,6 +56,11 @@ export default async function DrivePage({
         // shared connection is browse-only from the grantee's side, and a server
         // borrowed from the Servers app is managed there, not here.
         canManageAccess: isSavedConnection(row.id) && (!row.shared || user.isAdmin),
+        // Their own drive is theirs to share out of, and nobody's to reconfigure.
+        editable:
+            isSavedConnection(row.id) &&
+            (!row.shared || user.isAdmin) &&
+            !isPersonalKind(row.kind),
         // Non-secret config for the edit form; parsed defensively.
         config: parseConfig(row.config),
         // Flag connections whose credentials predate the current master key so the
@@ -51,6 +69,27 @@ export default async function DrivePage({
     }));
 
     const requested = pick(params.c);
+    // Something somebody shared. The storage it is on is deliberately absent
+    // from the sidebar (it is not a location of yours), so it is resolved here
+    // and added for this visit, exactly as a container source is.
+    if (requested && isSavedConnection(requested) && !connections.some((row) => row.id === requested)) {
+        const shared = await getSharedConnection(user.id, requested);
+        if (shared) {
+            connections.unshift({
+                id: shared.id,
+                name: shared.name,
+                kind: shared.kind as StorageProviderKind,
+                requiresHostd: shared.requiresHostd,
+                webUrl: undefined,
+                shared: true,
+                rootPath: shared.rootPath,
+                canManageAccess: false,
+                config: parseConfig(shared.config),
+                needsRekey: false
+            });
+        }
+    }
+
     // A deployed app's container is browsed on demand (Deploy -> View in Drive), not
     // kept in the connections list. When one is explicitly requested, resolve just it
     // and add it so the browser can open it without cluttering the saved connections.

@@ -35,7 +35,7 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
     const [submissions, visits, connections] = await Promise.all([
         listSubmissionsForRequest(user.id, id),
         listVisitsForRequest(user.id, id),
-        listConnections(user.id)
+        listConnections(user.id, { personal: true })
     ]);
 
     const userIds = [

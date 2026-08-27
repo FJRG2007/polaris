@@ -22,6 +22,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { PERSONAL_KIND } from "@polaris/core";
 import { deployAndWait } from "@/lib/deploy-service";
 import type { StorageDriver } from "@polaris/storage";
 import { deleteConnection, getDriver } from "@/lib/storage-service";
@@ -52,7 +53,9 @@ export async function getConnectionRemovalPlan(
     connectionId: string
 ): Promise<ConnectionRemovalPlan | null> {
     const connection = await prisma.storageConnection.findFirst({
-        where: { id: connectionId, ownerId },
+        // A personal drive is not a connection anybody removes: it is where
+        // somebody's files live, and it goes when the account does.
+        where: { id: connectionId, ownerId, kind: { not: PERSONAL_KIND } },
         select: { id: true, name: true }
     });
     if (!connection) return null;
@@ -65,7 +68,7 @@ export async function getConnectionRemovalPlan(
         prisma.share.count({ where: { connectionId } }),
         prisma.fileRequest.count({ where: { destinationConnectionId: connectionId } }),
         prisma.storageConnection.findMany({
-            where: { ownerId, id: { not: connectionId } },
+            where: { ownerId, id: { not: connectionId }, kind: { not: PERSONAL_KIND } },
             select: { id: true, name: true },
             orderBy: { name: "asc" }
         })
@@ -119,7 +122,7 @@ export async function removeConnection(
     if (!input.destinationId) return { error: "Choose where the content should go" };
     if (input.destinationId === connectionId) return { error: "That is the connection being removed" };
     const destination = await prisma.storageConnection.findFirst({
-        where: { id: input.destinationId, ownerId },
+        where: { id: input.destinationId, ownerId, kind: { not: PERSONAL_KIND } },
         select: { id: true }
     });
     if (!destination) return { error: "The connection to copy to was not found" };
