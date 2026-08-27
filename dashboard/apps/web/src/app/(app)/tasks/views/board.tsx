@@ -750,7 +750,9 @@ export function BoardView(props: ViewProps) {
                                         positioned={orderable && dragging !== task.id}
                                         onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                         onDragStart={() => setDragging(task.id)}
-                                        onDropAt={(edge) => drop(group.key, group.tasks, { id: task.id, edge })}
+                                        onDropAt={(edge) =>
+                                            drop(group.key, group.tasks, { id: task.id, edge })
+                                        }
                                     />
                                 ))}
                                 {group.tasks.length === 0 && addingTo !== group.key && (

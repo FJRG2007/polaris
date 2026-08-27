@@ -107,9 +107,7 @@ export function ListScreen({
     // the one they open on; a shared view is the list's, and is what everybody
     // else gets. That is also where anything this screen saves for them goes -
     // reshaping what the rest of the team sees is not a thing a drag should do.
-    const ownView = savedViews.find(
-        (view) => view.ownerId === space.currentUserId && !view.shared
-    );
+    const ownView = savedViews.find((view) => view.ownerId === space.currentUserId && !view.shared);
     const initial = ownView ?? savedViews[0];
     const [viewType, setViewType] = useState<core.TaskViewType>(initial?.type ?? "board");
     const [groupBy, setGroupBy] = useState<core.TaskGroupField>(initial?.groupBy ?? "status");
@@ -136,7 +134,10 @@ export function ListScreen({
     // see `useTagCreation`. Everything below reads the space through `context`,
     // which is the one the server sent with those tags folded in.
     const tagBook = useTagCreation(space.spaceId, space.tags);
-    const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
+    const context = useMemo<SpaceContext>(
+        () => ({ ...space, tags: tagBook.tags }),
+        [space, tagBook.tags]
+    );
     // Read at the moment an edit is applied rather than when the menu that applies
     // it was drawn, so a tag created from that menu resolves - see `useLatest`.
     const directory = useLatest(context);
@@ -338,12 +339,17 @@ export function ListScreen({
     const editTask = async (task: TaskRow, change: TaskEdit) => {
         setPending((current) => ({
             ...current,
-            [task.id]: { ...current[task.id], ...taskOverlay(change, withCreatedTags(directory.current)) }
+            [task.id]: {
+                ...current[task.id],
+                ...taskOverlay(change, withCreatedTags(directory.current))
+            }
         }));
 
         // A tag created a moment ago is still carrying this browser's own id, and
         // the write is where it has to be a real one.
-        const written = change.tagIds ? { ...change, tagIds: await settleTagIds(change.tagIds) } : change;
+        const written = change.tagIds
+            ? { ...change, tagIds: await settleTagIds(change.tagIds) }
+            : change;
         const result = await runAction(
             () => actions.updateTaskAction({ taskId: task.id, ...written }),
             setError
@@ -623,13 +629,18 @@ export function ListScreen({
             setPending((current) => {
                 const next = { ...current };
                 for (const task of targets) {
-                    next[task.id] = { ...next[task.id], ...bulkOverlay(task, change, withCreatedTags(directory.current)) };
+                    next[task.id] = {
+                        ...next[task.id],
+                        ...bulkOverlay(task, change, withCreatedTags(directory.current))
+                    };
                 }
                 return next;
             });
         }
 
-        const written = change.addTagIds ? { ...change, addTagIds: await settleTagIds(change.addTagIds) } : change;
+        const written = change.addTagIds
+            ? { ...change, addTagIds: await settleTagIds(change.addTagIds) }
+            : change;
         const result = await runAction(
             () => actions.bulkUpdateAction({ taskIds, ...written }),
             setError
@@ -891,10 +902,7 @@ export function ListScreen({
             </div>
 
             {error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
-                >
+                <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
                     {error}
                 </p>
             )}
@@ -917,7 +925,9 @@ export function ListScreen({
                             <AssigneePicker
                                 people={context.people}
                                 selected={[]}
-                                onChange={(ids) => void applyToTasks(selected, { addAssigneeIds: ids })}
+                                onChange={(ids) =>
+                                    void applyToTasks(selected, { addAssigneeIds: ids })
+                                }
                             />
                             <Button
                                 size="sm"
@@ -951,7 +961,10 @@ export function ListScreen({
             {viewType === "gantt" && <GanttView {...viewProps} />}
 
             {rows.length === 0 && (
-                <EmptyState title="Nothing here yet." description="Add the first task and it appears on every view of this list." />
+                <EmptyState
+                    title="Nothing here yet."
+                    description="Add the first task and it appears on every view of this list."
+                />
             )}
 
             <p className="text-[11px] text-muted-foreground">
