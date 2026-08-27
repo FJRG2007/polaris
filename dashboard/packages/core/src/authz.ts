@@ -21,6 +21,12 @@ export const DRIVE_ACTIONS = ["read", "write", "rename", "delete", "copy", "down
 
 export type DriveAction = (typeof DRIVE_ACTIONS)[number];
 
+/** How long the line somebody sends with a share may be. A sentence about what
+ *  the file is, shown beside it in the recipient's list - so it is capped where
+ *  it is written, where it is stored and where it is offered, rather than only
+ *  in the input somebody could go around. */
+export const DRIVE_GRANT_NOTE_MAX = 200;
+
 /** One allow/deny rule over a set of action and resource patterns. */
 export interface PolicyStatement {
     effect: "allow" | "deny";

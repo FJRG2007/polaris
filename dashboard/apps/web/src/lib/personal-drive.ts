@@ -23,8 +23,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { LOCAL_TARGET, PERSONAL_KIND, type StorageConfig } from "@polaris/core";
 import { getDriverForConnection, PERSONAL_LOCAL_FOLDER } from "@/lib/storage-service";
 import {
@@ -246,9 +246,18 @@ export async function discardPersonalDrive(userId: string): Promise<string | nul
         // Everything inside it, one level in: the drive's own folder is exactly
         // what the driver refuses to remove, and it is left for the storage's
         // owner to sweep up empty.
-        for (const entry of (await driver.list("")).entries) {
-            await driver.delete(entry.path, { recursive: true });
-        }
+        //
+        // To the end of the listing, not the first page of it: a bucket answers
+        // a thousand keys at a time, and stopping there would leave the rest of
+        // somebody's files on the disk while reporting that nothing was left.
+        let cursor: string | undefined;
+        do {
+            const page = await driver.list("", { cursor });
+            for (const entry of page.entries) {
+                await driver.delete(entry.path, { recursive: true });
+            }
+            cursor = page.nextCursor;
+        } while (cursor);
         return null;
     } catch (caught) {
         return `${drive.root}: ${caught instanceof Error ? caught.message : "could not be emptied"}`;

@@ -18,6 +18,8 @@ const aclFindFirst = vi.fn(async () => null);
 const aclCreate = vi.fn(async () => ({}));
 const aclUpdate = vi.fn(async () => ({}));
 const userFindMany = vi.fn(async () => []);
+const userFindUnique = vi.fn();
+const groupFindUnique = vi.fn();
 const groupFindMany = vi.fn(async () => []);
 const getUserGroupIds = vi.fn(async () => [] as string[]);
 
@@ -31,8 +33,8 @@ vi.mock("@polaris/db", () => ({
             update: aclUpdate,
             deleteMany: vi.fn(async () => ({ count: 1 }))
         },
-        user: { findMany: userFindMany },
-        group: { findMany: groupFindMany }
+        user: { findMany: userFindMany, findUnique: userFindUnique },
+        group: { findMany: groupFindMany, findUnique: groupFindUnique }
     }
 }));
 vi.mock("@polaris/auth", () => ({
@@ -49,6 +51,8 @@ beforeEach(() => {
     aclFindFirst.mockResolvedValue(null);
     getUserGroupIds.mockResolvedValue([]);
     userFindMany.mockResolvedValue([]);
+    userFindUnique.mockResolvedValue({ id: BEN } as never);
+    groupFindUnique.mockResolvedValue({ id: "group-7" } as never);
 });
 
 function grant(over: Record<string, unknown> = {}) {
@@ -96,6 +100,25 @@ describe("giving something away", () => {
                 path: "reports",
                 principalType: "user",
                 principalId: ANA,
+                role: "viewer",
+                sharedById: ANA
+            })
+        ).rejects.toThrow();
+        expect(aclCreate).not.toHaveBeenCalled();
+    });
+
+    it("refuses to give it to somebody who is no longer here", async () => {
+        // The id came from the browser. One that names nobody would write a rule
+        // the owner then reads back as "someone who is no longer here", which is
+        // indistinguishable from an account that really was deleted.
+        userFindUnique.mockResolvedValue(null as never);
+
+        await expect(
+            shareWithPerson({
+                connectionId: "conn-1",
+                path: "reports",
+                principalType: "user",
+                principalId: BEN,
                 role: "viewer",
                 sharedById: ANA
             })
@@ -182,9 +205,7 @@ describe("what I have shared", () => {
             grant({ principalId: BEN, connection: { name: "My files", ownerId: ANA } })
         ] as never);
         userFindMany.mockImplementation(async (args: { where: { id: { in: string[] } } }) =>
-            args.where.id.in.includes(BEN)
-                ? [{ id: BEN, name: "Ben" }]
-                : [{ id: ANA, name: "Ana" }]
+            args.where.id.in.includes(BEN) ? [{ id: BEN, name: "Ben" }] : [{ id: ANA, name: "Ana" }]
         );
 
         const [item] = await listSharedByMe(ANA);

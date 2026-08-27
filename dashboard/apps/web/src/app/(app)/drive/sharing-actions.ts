@@ -14,15 +14,16 @@
  * found stays out of it. A Drive screen is not a way around that.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getUserGroupIds } from "@polaris/auth";
 import { findPeople } from "@/lib/people-search";
-import { normalizeRelPath } from "@polaris/core";
+import { DRIVE_GRANT_NOTE_MAX, normalizeRelPath } from "@polaris/core";
+import type { ItemShare } from "./sharing-types";
 import { recordAudit } from "@/lib/audit-service";
 import { listDriveAcls } from "@/lib/drive-acl-service";
-import type { ItemShare } from "./sharing-types";
 import {
     DRIVE_SHARE_ROLES,
     listSharedByMe,
@@ -30,7 +31,6 @@ import {
     shareRoleOf,
     shareWithPerson,
     stopSharing,
-    type DriveShareRole,
     type SharedItem,
     type SharePerson
 } from "@/lib/drive-sharing";
@@ -78,22 +78,36 @@ export async function myShareGroupsAction(): Promise<SharePerson[]> {
     return groups.map((group) => ({ type: "group" as const, id: group.id, name: group.name }));
 }
 
-/** Give somebody an item, or change what they may do with one they already have. */
-export async function shareItemAction(input: {
-    connectionId: string;
-    path: string;
-    principalType: "user" | "group";
-    principalId: string;
-    role: DriveShareRole;
-    note?: string;
+/**
+ * What a share request may say.
+ *
+ * A server action is an endpoint: the shape the browser sends is checked here
+ * rather than trusted from the dialog that usually sends it, so a hand-made call
+ * cannot write a grant naming nobody or a note nothing would ever display.
+ */
+const shareItemSchema = z.object({
+    connectionId: z.string().min(1),
+    path: z.string(),
+    principalType: z.enum(["user", "group"]),
+    principalId: z.string().uuid("Choose who to share it with"),
+    role: z.enum(DRIVE_SHARE_ROLES),
+    note: z.string().trim().max(DRIVE_GRANT_NOTE_MAX, "That note is too long").optional(),
     /** A date, as the browser's date field writes it. Empty means indefinite. */
-    expiresAt?: string;
-}): Promise<{ error?: string }> {
-    const userId = await requireOwner(input.connectionId);
-    if (!input.principalId) return { error: "Choose who to share it with" };
-    if (!DRIVE_SHARE_ROLES.includes(input.role)) return { error: "Choose what they may do" };
+    expiresAt: z.string().optional()
+});
 
-    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
+/** Give somebody an item, or change what they may do with one they already have. */
+export async function shareItemAction(
+    input: z.input<typeof shareItemSchema>
+): Promise<{ error?: string }> {
+    const parsed = shareItemSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "That is not something to share" };
+    }
+    const share = parsed.data;
+    const userId = await requireOwner(share.connectionId);
+
+    const expiresAt = share.expiresAt ? new Date(share.expiresAt) : null;
     if (expiresAt && Number.isNaN(expiresAt.getTime())) return { error: "That date is not a date" };
     if (expiresAt && expiresAt.getTime() <= Date.now()) {
         return { error: "Choose a date in the future" };
@@ -101,12 +115,12 @@ export async function shareItemAction(input: {
 
     try {
         await shareWithPerson({
-            connectionId: input.connectionId,
-            path: input.path,
-            principalType: input.principalType,
-            principalId: input.principalId,
-            role: input.role,
-            note: input.note ?? null,
+            connectionId: share.connectionId,
+            path: share.path,
+            principalType: share.principalType,
+            principalId: share.principalId,
+            role: share.role,
+            note: share.note ?? null,
             expiresAt,
             sharedById: userId
         });
@@ -118,11 +132,11 @@ export async function shareItemAction(input: {
         actorId: userId,
         action: "drive.share.person",
         targetType: "connection",
-        targetId: input.connectionId,
+        targetId: share.connectionId,
         metadata: {
-            path: normalizeRelPath(input.path),
-            principal: `${input.principalType}:${input.principalId}`,
-            role: input.role
+            path: normalizeRelPath(share.path),
+            principal: `${share.principalType}:${share.principalId}`,
+            role: share.role
         }
     });
     revalidatePath("/drive");

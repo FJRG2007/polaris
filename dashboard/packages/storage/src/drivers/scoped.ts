@@ -41,6 +41,12 @@ export interface ScopedDriverOptions {
      *  off when the folder is somebody else's and its absence is an error worth
      *  hearing rather than papering over. */
     readonly createRoot?: boolean;
+    /** The driver being confined is already open, so connecting the scope must
+     *  not open it a second time. A driver built by the registry arrives
+     *  connected, and a second `connect()` on one reading a NAS takes a second
+     *  pooled session while only the last is ever handed back - which pins the
+     *  session open for the life of the process. */
+    readonly innerConnected?: boolean;
 }
 
 export class ScopedDriver implements StorageDriver {
@@ -48,12 +54,14 @@ export class ScopedDriver implements StorageDriver {
     private readonly inner: StorageDriver;
     private readonly prefix: string;
     private readonly createRoot: boolean;
+    private readonly innerConnected: boolean;
 
     public constructor(options: ScopedDriverOptions) {
         this.id = options.id;
         this.inner = options.inner;
         this.prefix = normalizeRelPath(options.prefix);
         this.createRoot = options.createRoot ?? false;
+        this.innerConnected = options.innerConnected ?? false;
     }
 
     /** The backend underneath, so callers that branch on it keep working. */
@@ -89,7 +97,7 @@ export class ScopedDriver implements StorageDriver {
     }
 
     public async connect(): Promise<void> {
-        await this.inner.connect();
+        if (!this.innerConnected) await this.inner.connect();
         if (this.createRoot && this.prefix !== "") {
             // mkdir is create-if-absent on every driver, so this is the whole of
             // "make sure the folder is there" and costs one call on a drive that

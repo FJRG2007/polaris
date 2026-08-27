@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { isPersonalKind } from "@polaris/core";
 import { UnasMetrics } from "../unas-metrics";
 import { HardwarePanel } from "../hardware-panel";
 import type { ConnectionSummary } from "../types";
@@ -18,8 +19,18 @@ import { Button, Card, CardBody, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useDisplayPreferences } from "@/components/display-format";
 import type { UnasMetrics as UnasMetricsData } from "@/lib/unifi-unas";
-import { MetricsHistory, percent, ratioPercent, type MetricSpec } from "@/components/metrics-history";
-import { formatBytes, temperatureSuffix, toDisplayTemperature, type TemperatureUnit } from "@polaris/core";
+import {
+    MetricsHistory,
+    percent,
+    ratioPercent,
+    type MetricSpec
+} from "@/components/metrics-history";
+import {
+    formatBytes,
+    temperatureSuffix,
+    toDisplayTemperature,
+    type TemperatureUnit
+} from "@polaris/core";
 
 /** How often the live panel re-reads the device. Matched to the collector's own
  *  storage cadence: asking faster only re-renders the same numbers. */
@@ -36,11 +47,19 @@ function amountOf(used: number | null, total: number | null): string | null {
  *  is in the unit the reader chose. */
 function unasMetrics(unit: TemperatureUnit): MetricSpec[] {
     return [
-        { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+        {
+            key: "cpu",
+            label: "CPU",
+            value: (point) => point.cpuPercent,
+            format: percent,
+            tone: "primary",
+            max: 100
+        },
         {
             key: "temp",
             label: "CPU temperature",
-            value: (point) => (point.cpuTempC === null ? null : toDisplayTemperature(point.cpuTempC, unit)),
+            value: (point) =>
+                point.cpuTempC === null ? null : toDisplayTemperature(point.cpuTempC, unit),
             format: (value) => `${Math.round(value)} ${temperatureSuffix(unit)}`,
             tone: "warning"
         },
@@ -93,12 +112,14 @@ function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
  * same firmware every time, so only the readings that actually moved re-render.
  */
 function UnasSection({ connection }: { connection: ConnectionSummary }) {
-    const { data, loading, error, stale, refreshing, updatedAt } = useLiveResource<UnasMetricsData>({
-        url: `/api/drive/unas-metrics?c=${encodeURIComponent(connection.id)}`,
-        cacheKey: `unas.${connection.id}`,
-        intervalMs: UNAS_POLL_MS,
-        select: (body) => (body as { metrics: UnasMetricsData }).metrics
-    });
+    const { data, loading, error, stale, refreshing, updatedAt } = useLiveResource<UnasMetricsData>(
+        {
+            url: `/api/drive/unas-metrics?c=${encodeURIComponent(connection.id)}`,
+            cacheKey: `unas.${connection.id}`,
+            intervalMs: UNAS_POLL_MS,
+            select: (body) => (body as { metrics: UnasMetricsData }).metrics
+        }
+    );
 
     if (loading) {
         return (
@@ -117,7 +138,9 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
     }
     if (error) {
         return (
-            <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div>
+            <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                {error}
+            </div>
         );
     }
     return data ? (
@@ -157,7 +180,10 @@ export function OverviewView({ connections }: { connections: ConnectionSummary[]
                     ) : (
                         <HardwarePanel connection={connection} />
                     )}
-                    <DeviceHistory connection={connection} />
+                    {/* Not for a personal drive: the collector deliberately
+                        samples the storages, not the drives that sit on them, so
+                        a history here would be an empty chart for ever. */}
+                    {!isPersonalKind(connection.kind) && <DeviceHistory connection={connection} />}
                 </section>
             ))}
         </div>

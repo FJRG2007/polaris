@@ -7,7 +7,7 @@
  */
 
 import { Database, HardDrive } from "lucide-react";
-import { formatBytes } from "@polaris/core";
+import { formatBytes, isPersonalKind } from "@polaris/core";
 import { Badge, Card, CardBody, CardHeader, CardTitle, RadialGauge, Skeleton } from "@polaris/ui";
 import { useLiveResource } from "@/components/use-live-resource";
 import type { ConnectionSummary } from "./types";
@@ -22,7 +22,8 @@ const KIND_LABELS: Record<string, string> = {
     synology: "Synology DSM",
     qnap: "QNAP QTS",
     truenas: "TrueNAS",
-    "unifi-unas": "UniFi UNAS"
+    "unifi-unas": "UniFi UNAS",
+    personal: "Your own drive"
 };
 
 interface Usage {
@@ -37,12 +38,21 @@ const USAGE_POLL_MS = 60_000;
 export function HardwarePanel({ connection }: { connection: ConnectionSummary }) {
     // Seeded from the last snapshot so revisiting the page paints the gauge at
     // once, then kept current without a reload.
-    const { data: usage, loading, error } = useLiveResource<Usage>({
+    const {
+        data: usage,
+        loading,
+        error
+    } = useLiveResource<Usage>({
         url: `/api/drive/usage?c=${encodeURIComponent(connection.id)}`,
         cacheKey: `usage.${connection.id}`,
         intervalMs: USAGE_POLL_MS,
         select: (body) => body as Usage
     });
+
+    // A personal drive is a folder on one of the storages above, so what the
+    // driver reports is that storage's disk rather than the drive's own share of
+    // it. Said plainly here instead of letting a gauge imply otherwise.
+    const personal = isPersonalKind(connection.kind);
 
     const total = usage?.total ? Number(usage.total) : 0;
     const used = usage?.used ? Number(usage.used) : 0;
@@ -60,7 +70,9 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                         <dt className="text-muted-foreground">Name</dt>
                         <dd className="truncate font-medium">{connection.name}</dd>
                         <dt className="text-muted-foreground">Type</dt>
-                        <dd className="font-medium">{KIND_LABELS[connection.kind] ?? connection.kind}</dd>
+                        <dd className="font-medium">
+                            {KIND_LABELS[connection.kind] ?? connection.kind}
+                        </dd>
                         <dt className="text-muted-foreground">Host access</dt>
                         <dd>
                             {connection.requiresHostd ? (
@@ -78,6 +90,11 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                     <CardTitle>Storage usage</CardTitle>
                 </CardHeader>
                 <CardBody>
+                    {personal && (
+                        <p className="mb-3 text-xs text-muted-foreground">
+                            The disk your files sit on, not what your own drive takes up.
+                        </p>
+                    )}
                     {loading ? (
                         <div className="flex items-center gap-4">
                             <Skeleton className="size-24 rounded-full" />
@@ -87,7 +104,12 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                         <p className="text-sm text-muted-foreground">{error}</p>
                     ) : total > 0 ? (
                         <div className="flex flex-wrap items-center gap-6">
-                            <RadialGauge value={ratio} label={`${Math.round(ratio * 100)}%`} sublabel="used" tone={tone} />
+                            <RadialGauge
+                                value={ratio}
+                                label={`${Math.round(ratio * 100)}%`}
+                                sublabel="used"
+                                tone={tone}
+                            />
                             <div className="flex flex-col gap-1 text-sm">
                                 <span className="flex items-center gap-2">
                                     <Database className="size-4 text-muted-foreground" />
@@ -103,7 +125,9 @@ export function HardwarePanel({ connection }: { connection: ConnectionSummary })
                             </div>
                         </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground">This backend does not report storage usage.</p>
+                        <p className="text-sm text-muted-foreground">
+                            This backend does not report storage usage.
+                        </p>
                     )}
                 </CardBody>
             </Card>

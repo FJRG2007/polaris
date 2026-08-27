@@ -40,39 +40,56 @@ export default async function DrivePage({
     // Drive once, and it is what makes the app useful to an account that has
     // never connected a storage - which, before this, opened Drive and found
     // nothing at all.
-    await ensurePersonalDrive(user.id);
+    //
+    // A drive that cannot be opened does not take Drive with it. The one case
+    // where it refuses - a row under this account's id that is not its drive -
+    // is exactly the one somebody needs the rest of this screen to work out, so
+    // the reason is shown on it rather than replacing it with a server error.
+    let driveNotice: string | undefined;
+    try {
+        await ensurePersonalDrive(user.id);
+    } catch (caught) {
+        driveNotice =
+            caught instanceof Error ? caught.message : "Your own drive could not be opened";
+    }
 
     // Only the fast, local query runs on the server so the page paints instantly.
     // The actual listing / device metrics load client-side (skeletons + cache),
     // which is what removes the multi-second delay a slow NAS used to add here.
-    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id)).map((row) => ({
-        id: row.id,
-        name: row.name,
-        kind: row.kind as StorageProviderKind,
-        requiresHostd: row.requiresHostd,
-        webUrl: connectionWebUrl(row.kind, row.config),
-        shared: row.shared,
-        // Only the owner (or an admin) manages a connection's ACLs and locks; a
-        // shared connection is browse-only from the grantee's side, and a server
-        // borrowed from the Servers app is managed there, not here.
-        canManageAccess: isSavedConnection(row.id) && (!row.shared || user.isAdmin),
-        // Their own drive is theirs to share out of, and nobody's to reconfigure.
-        editable:
-            isSavedConnection(row.id) &&
-            (!row.shared || user.isAdmin) &&
-            !isPersonalKind(row.kind),
-        // Non-secret config for the edit form; parsed defensively.
-        config: parseConfig(row.config),
-        // Flag connections whose credentials predate the current master key so the
-        // UI can offer a re-key instead of a dead "cannot decrypt" error.
-        needsRekey: row.needsRekey
-    }));
+    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id)).map(
+        (row) => ({
+            id: row.id,
+            name: row.name,
+            kind: row.kind as StorageProviderKind,
+            requiresHostd: row.requiresHostd,
+            webUrl: connectionWebUrl(row.kind, row.config),
+            shared: row.shared,
+            // Only the owner (or an admin) manages a connection's ACLs and locks; a
+            // shared connection is browse-only from the grantee's side, and a server
+            // borrowed from the Servers app is managed there, not here.
+            canManageAccess: isSavedConnection(row.id) && (!row.shared || user.isAdmin),
+            // Their own drive is theirs to share out of, and nobody's to reconfigure.
+            editable:
+                isSavedConnection(row.id) &&
+                (!row.shared || user.isAdmin) &&
+                !isPersonalKind(row.kind),
+            // Non-secret config for the edit form; parsed defensively.
+            config: parseConfig(row.config),
+            // Flag connections whose credentials predate the current master key so the
+            // UI can offer a re-key instead of a dead "cannot decrypt" error.
+            needsRekey: row.needsRekey
+        })
+    );
 
     const requested = pick(params.c);
     // Something somebody shared. The storage it is on is deliberately absent
     // from the sidebar (it is not a location of yours), so it is resolved here
     // and added for this visit, exactly as a container source is.
-    if (requested && isSavedConnection(requested) && !connections.some((row) => row.id === requested)) {
+    if (
+        requested &&
+        isSavedConnection(requested) &&
+        !connections.some((row) => row.id === requested)
+    ) {
         const shared = await getSharedConnection(user.id, requested);
         if (shared) {
             connections.unshift({
@@ -120,7 +137,12 @@ export default async function DrivePage({
                 title="Drive"
                 description="Browse and manage files across every connected NAS and cloud."
             />
-            <DriveExplorer connections={connections} connectionId={connectionId} path={path} />
+            <DriveExplorer
+                connections={connections}
+                connectionId={connectionId}
+                path={path}
+                notice={driveNotice}
+            />
         </>
     );
 }

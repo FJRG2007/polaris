@@ -14,7 +14,7 @@ import { StorageError } from "../../src/driver.js";
 import { LocalDriver } from "../../src/drivers/local.js";
 import { ScopedDriver } from "../../src/drivers/scoped.js";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 let root: string;
 
@@ -91,6 +91,43 @@ describe("a driver confined to a folder", () => {
         const driver = new ScopedDriver({ id: "drive", inner, prefix: "people/absent" });
         await driver.connect();
         await expect(driver.list("")).rejects.toThrow();
+        await driver.dispose();
+    });
+
+    it("does not open a driver that is already open", async () => {
+        // The registry hands back a connected driver, and opening one twice over
+        // a pooled protocol borrows a second session that nothing gives back -
+        // which pins the NAS session open for the life of the process.
+        const inner = new LocalDriver({ id: "disk", root });
+        await inner.connect();
+        const connect = vi.spyOn(inner, "connect");
+        const driver = new ScopedDriver({
+            id: "drive",
+            inner,
+            prefix: "people/ana",
+            innerConnected: true
+        });
+
+        await driver.connect();
+
+        expect(connect).not.toHaveBeenCalled();
+        // Still usable: the scope did not need to open it to work.
+        expect((await driver.list("")).entries.length).toBeGreaterThan(0);
+        await driver.dispose();
+    });
+
+    it("still makes its folder when the driver was handed to it open", async () => {
+        const inner = new LocalDriver({ id: "disk", root });
+        await inner.connect();
+        const driver = new ScopedDriver({
+            id: "drive",
+            inner,
+            prefix: "people/opened",
+            createRoot: true,
+            innerConnected: true
+        });
+        await driver.connect();
+        expect((await driver.list("")).entries).toEqual([]);
         await driver.dispose();
     });
 

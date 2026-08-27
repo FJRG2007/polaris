@@ -15,8 +15,11 @@
  * may read, so cross-connection isolation holds by default.
  */
 
+import { prisma } from "@polaris/db";
+import { getUserGroupIds, resolvePrincipalPolicyStatements } from "@polaris/auth";
 import {
     DRIVE_ACTIONS,
+    DRIVE_GRANT_NOTE_MAX,
     driveResource,
     driveResourcePatterns,
     evaluateStatements,
@@ -25,8 +28,6 @@ import {
     type DriveAction,
     type PolicyStatement
 } from "@polaris/core";
-import { getUserGroupIds, resolvePrincipalPolicyStatements } from "@polaris/auth";
-import { prisma } from "@polaris/db";
 
 /** A stored ACL grant, with its verbs decoded. */
 export interface DriveAclRow {
@@ -61,8 +62,9 @@ function parseActions(raw: string): DriveAction[] {
     try {
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        return parsed.filter((value): value is DriveAction =>
-            typeof value === "string" && (DRIVE_ACTIONS as readonly string[]).includes(value)
+        return parsed.filter(
+            (value): value is DriveAction =>
+                typeof value === "string" && (DRIVE_ACTIONS as readonly string[]).includes(value)
         );
     } catch {
         return [];
@@ -97,6 +99,23 @@ export async function listDriveAcls(connectionId: string): Promise<DriveAclRow[]
     }));
 }
 
+/**
+ * Whether the principal a grant names is a real account or group.
+ *
+ * A grant is written from an id the browser sent, and an id that names nobody
+ * makes a row that can never be read back as a person: it shows up in the
+ * owner's own list of who can reach their files as "someone who is no longer
+ * here", which is indistinguishable from an account that was actually deleted.
+ */
+async function principalExists(type: "user" | "group", id: string): Promise<boolean> {
+    if (!id) return false;
+    const found =
+        type === "group"
+            ? await prisma.group.findUnique({ where: { id }, select: { id: true } })
+            : await prisma.user.findUnique({ where: { id }, select: { id: true } });
+    return found !== null;
+}
+
 /** Create or replace a grant for one (path, principal) pair on a connection. */
 export async function setDriveAcl(input: {
     connectionId: string;
@@ -106,14 +125,26 @@ export async function setDriveAcl(input: {
     actions: DriveAction[];
     effect: "allow" | "deny";
     createdById: string;
-    /** When it should stop applying. Null (or absent) is indefinite. */
+    /** When it should stop applying. Null is indefinite; absent keeps whatever
+     *  the grant being replaced already had. */
     expiresAt?: Date | null;
-    /** A line for the recipient, shown beside the item in their shared list. */
+    /** A line for the recipient, shown beside the item in their shared list.
+     *  Absent keeps the existing one, the way the date does. */
     note?: string | null;
 }): Promise<void> {
     const path = normalizeRelPath(input.path);
-    const actions = input.actions.filter((action) => (DRIVE_ACTIONS as readonly string[]).includes(action));
+    const actions = input.actions.filter((action) =>
+        (DRIVE_ACTIONS as readonly string[]).includes(action)
+    );
     if (actions.length === 0) throw new Error("Select at least one action");
+    if (input.principalType !== "user" && input.principalType !== "group") {
+        throw new Error("Choose who to grant access to");
+    }
+    if (!(await principalExists(input.principalType, input.principalId))) {
+        throw new Error("That person or group is no longer here");
+    }
+    const note = input.note?.trim() || null;
+    if (note && note.length > DRIVE_GRANT_NOTE_MAX) throw new Error("That note is too long");
     // One grant per (connection, path, principal): replace any existing row rather
     // than stacking duplicates that would be confusing to reason about.
     const existing = await prisma.driveAcl.findFirst({
@@ -123,7 +154,7 @@ export async function setDriveAcl(input: {
             principalType: input.principalType,
             principalId: input.principalId
         },
-        select: { id: true }
+        select: { id: true, expiresAt: true, note: true }
     });
     const data = {
         connectionId: input.connectionId,
@@ -133,8 +164,11 @@ export async function setDriveAcl(input: {
         actions: JSON.stringify(actions),
         effect: input.effect,
         createdById: input.createdById,
-        expiresAt: input.expiresAt ?? null,
-        note: input.note?.trim() || null
+        // Only what the caller actually said. Changing what somebody may do with
+        // a folder from a screen that never asked about the date must not turn a
+        // share given until Friday into one that never lapses.
+        expiresAt: input.expiresAt === undefined ? (existing?.expiresAt ?? null) : input.expiresAt,
+        note: input.note === undefined ? (existing?.note ?? null) : note
     };
     if (existing) {
         await prisma.driveAcl.update({ where: { id: existing.id }, data });
@@ -179,7 +213,10 @@ export async function resolveDriveDecision(
 ): Promise<AuthzDecision> {
     const [user, connection] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
-        prisma.storageConnection.findUnique({ where: { id: connectionId }, select: { ownerId: true } })
+        prisma.storageConnection.findUnique({
+            where: { id: connectionId },
+            select: { ownerId: true }
+        })
     ]);
     if (!connection) return "implicit-deny";
     if (user?.isAdmin || connection.ownerId === userId) return "allow";
@@ -228,9 +265,12 @@ export async function grantedRootPath(
     if (rows.length === 0) return null;
     // Shallowest wins: somebody holding both a folder and something inside it
     // should land on the folder.
-    return rows
-        .map((row) => row.path)
-        .sort((a, b) => a.split("/").length - b.split("/").length || a.length - b.length)[0] ?? null;
+    return (
+        rows
+            .map((row) => row.path)
+            .sort((a, b) => a.split("/").length - b.split("/").length || a.length - b.length)[0] ??
+        null
+    );
 }
 
 /** Connection ids (beyond those they own) a user has an allow ACL on. */
