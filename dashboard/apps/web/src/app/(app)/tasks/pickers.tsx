@@ -569,6 +569,12 @@ export function TagPicker({
 }) {
     const [query, setQuery] = useState("");
     const [creating, setCreating] = useState(false);
+    // The same guard as `creating`, readable in the tick it is set. State is not:
+    // two enters in one tick - a key held down, an enter that reaches both the
+    // field and the highlighted item - would both see "not creating yet" and make
+    // the tag twice, and the second one comes back refused because the name is
+    // now taken.
+    const busy = useRef(false);
     const needle = query.trim().toLowerCase();
     const matches = tags.filter((tag) => menuSearchMatches(tag.name, query));
     const existing = tags.find((tag) => tag.name.toLowerCase() === needle);
@@ -588,19 +594,24 @@ export function TagPicker({
      */
     const submit = async () => {
         const name = query.trim();
-        if (!name || creating) return;
+        if (!name || busy.current) return;
         if (existing) {
             if (!selected.includes(existing.id)) onChange([...selected, existing.id]);
             setQuery("");
             return;
         }
         if (!onCreate) return;
+        busy.current = true;
         setCreating(true);
-        const id = await onCreate(name);
-        setCreating(false);
-        if (!id) return;
-        onChange([...selected, id]);
-        setQuery("");
+        try {
+            const id = await onCreate(name);
+            if (!id) return;
+            onChange([...selected, id]);
+            setQuery("");
+        } finally {
+            busy.current = false;
+            setCreating(false);
+        }
     };
 
     return (

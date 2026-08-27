@@ -61,6 +61,25 @@ export function isProvisionalTagId(id: string): boolean {
     return id.startsWith(PROVISIONAL);
 }
 
+/**
+ * Whether a tag this browser invented is still good - either on its way to the
+ * server or already there under a real id.
+ *
+ * The question a draft has to ask about a chip it is holding, and the reason it
+ * cannot ask "is this id still in the list of tags I would draw": that list drops
+ * a created tag the moment the server sends the real one back under the same name,
+ * because two entries for one tag in a picker is worse. A draft reading that as
+ * "the tag went away" took the chip off a task somebody had just tagged, and the
+ * only way to get it back was to type the name and press enter a second time -
+ * which worked, because by then the tag really did exist.
+ *
+ * Only a refusal takes an entry out of the store, so this is exactly "was it
+ * refused", asked the way a caller wants it.
+ */
+export function tagCreationLives(id: string): boolean {
+    return made.has(id);
+}
+
 /** Anything drawn against a space's tags: a whole context, or a bare list. */
 interface Tagged {
     readonly spaceId: string;

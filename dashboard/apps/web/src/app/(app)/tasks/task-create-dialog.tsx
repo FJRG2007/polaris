@@ -31,7 +31,13 @@ import { taskOverlay, useLatest } from "./optimistic";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
-import { isProvisionalTagId, settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
+import {
+    isProvisionalTagId,
+    settleTagIds,
+    tagCreationLives,
+    useTagCreation,
+    withCreatedTags
+} from "./tag-creation";
 import {
     Button,
     Dialog,
@@ -174,9 +180,12 @@ export function TaskCreateDialog({
      * created under a tag that does not exist.
      */
     const shown = useMemo(() => {
-        const known = new Set(tagBook.tags.map((tag) => tag.id));
-        const kept = draft.tags.filter((tag) => !isProvisionalTagId(tag.id) || known.has(tag.id));
+        const kept = draft.tags.filter(
+            (tag) => !isProvisionalTagId(tag.id) || tagCreationLives(tag.id)
+        );
         return kept.length === draft.tags.length ? draft : { ...draft, tags: kept };
+        // `tagBook.tags` is not read here any more, but it is what changes when a
+        // creation is answered - so it stays the signal to look again.
     }, [draft, tagBook.tags]);
 
     const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
