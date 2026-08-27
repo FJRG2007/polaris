@@ -29,6 +29,10 @@ describe("a disk with no room left", () => {
             "Error: ENOSPC: no space left on device, write"
         ]) {
             expect(deployFailureReason(raw, STEP)).toContain("ran out of disk space");
+        // And where to undo it. Polaris frees this itself, so a message that
+        // stopped at "free some room" was sending somebody to a terminal for
+        // something a button does.
+        expect(deployFailureReason(raw, STEP)).toContain("Servers > Storage");
         }
     });
 
