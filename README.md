@@ -153,7 +153,8 @@ with one thing does not get the rest.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
 - **Places** - the places you own and the cameras in them: live views, clips,
-  events, detections and alerts that arrive as messages.
+  events, detections and alerts that arrive as messages, plus a notice the
+  moment a camera itself stops answering.
 
 **The account itself**
 
