@@ -74,7 +74,10 @@ const SORT_COLUMNS = {
  * The cursor is the last row's id and the sort always ends on it, so two rows
  * with the same timestamp cannot make a page repeat or skip one.
  */
-export async function listResources(ownerId: string, input: ListResourcesInput): Promise<ResourcePage> {
+export async function listResources(
+    ownerId: string,
+    input: ListResourcesInput
+): Promise<ResourcePage> {
     const where: Prisma.ProtectedResourceWhereInput = {
         ownerId,
         ...(input.kind ? { kind: input.kind } : {}),
@@ -154,7 +157,9 @@ export async function backupSummary(ownerId: string): Promise<{
             _count: { _all: true },
             _sum: { copyCount: true, sizeBytes: true }
         }),
-        prisma.backupJob.count({ where: { ownerId, status: "failed", startedAt: { gte: dayAgo } } }),
+        prisma.backupJob.count({
+            where: { ownerId, status: "failed", startedAt: { gte: dayAgo } }
+        }),
         prisma.backupDestination.count({ where: { ownerId, status: "unreachable" } })
     ]);
     return {
@@ -223,7 +228,10 @@ export async function getResourceDetail(
             plan: {
                 select: {
                     name: true,
-                    destinations: { orderBy: { position: "asc" }, select: { destination: { select: { name: true } } } }
+                    destinations: {
+                        orderBy: { position: "asc" },
+                        select: { destination: { select: { name: true } } }
+                    }
                 }
             },
             points: {
@@ -320,7 +328,10 @@ export async function getResourceDetail(
  * that is already protected rather than making a second row that would take its
  * own copies of the same thing on its own schedule.
  */
-export async function protectResource(ownerId: string, input: ProtectInput): Promise<{ id: string }> {
+export async function protectResource(
+    ownerId: string,
+    input: ProtectInput
+): Promise<{ id: string }> {
     const selector = targetSelector(input.target);
     const kind = input.target.kind;
     const source = sourceFor(kind);
@@ -384,20 +395,33 @@ async function policyOf(planId: string | null): Promise<RetentionPolicy> {
     if (!planId) return readPolicy({});
     const plan = await prisma.backupPlan.findUnique({
         where: { id: planId },
-        select: { every: true, keepLast: true, keepDays: true, maxBytes: true, notifyOnFailure: true }
+        select: {
+            every: true,
+            keepLast: true,
+            keepDays: true,
+            maxBytes: true,
+            notifyOnFailure: true
+        }
     });
     return readPolicy(plan ?? {});
 }
 
 /** Attach, change or detach the plan behind a protected thing. */
-export async function setResourcePlan(ownerId: string, resourceId: string, planId: string | null): Promise<void> {
+export async function setResourcePlan(
+    ownerId: string,
+    resourceId: string,
+    planId: string | null
+): Promise<void> {
     const owned = await prisma.protectedResource.findFirst({
         where: { id: resourceId, ownerId },
         select: { id: true }
     });
     if (!owned) throw new SourceUnavailableError("That protected item no longer exists");
     if (planId) {
-        const plan = await prisma.backupPlan.findFirst({ where: { id: planId, ownerId }, select: { id: true } });
+        const plan = await prisma.backupPlan.findFirst({
+            where: { id: planId, ownerId },
+            select: { id: true }
+        });
         if (!plan) throw new SourceUnavailableError("That plan does not exist");
     }
     await prisma.protectedResource.update({ where: { id: resourceId }, data: { planId } });
@@ -405,7 +429,11 @@ export async function setResourcePlan(ownerId: string, resourceId: string, planI
 }
 
 /** Pause or resume the schedule without giving up the copies. */
-export async function setResourcePaused(ownerId: string, resourceId: string, paused: boolean): Promise<void> {
+export async function setResourcePaused(
+    ownerId: string,
+    resourceId: string,
+    paused: boolean
+): Promise<void> {
     const owned = await prisma.protectedResource.findFirst({
         where: { id: resourceId, ownerId },
         select: { id: true }
@@ -451,13 +479,30 @@ export async function deletePoint(ownerId: string, pointId: string): Promise<voi
         where: { id: pointId, resource: { ownerId } },
         select: {
             id: true,
-            resource: { select: { id: true, ownerId: true, kind: true, selector: true, name: true, config: true, planId: true } },
+            resource: {
+                select: {
+                    id: true,
+                    ownerId: true,
+                    kind: true,
+                    selector: true,
+                    name: true,
+                    config: true,
+                    planId: true
+                }
+            },
             copies: {
                 select: {
                     id: true,
                     path: true,
                     destination: {
-                        select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+                        select: {
+                            id: true,
+                            name: true,
+                            kind: true,
+                            connectionId: true,
+                            hostId: true,
+                            basePath: true
+                        }
                     }
                 }
             }
@@ -506,14 +551,26 @@ function toSourceResource(row: {
     } catch {
         config = {};
     }
-    return { id: row.id, ownerId: row.ownerId, kind: row.kind, selector: row.selector, name: row.name, config };
+    return {
+        id: row.id,
+        ownerId: row.ownerId,
+        kind: row.kind,
+        selector: row.selector,
+        name: row.name,
+        config
+    };
 }
 
 /** Open a copy's bytes, wherever they live. The caller closes nothing else. */
 export async function openCopy(
     ownerId: string,
     copyId: string
-): Promise<{ stream: ReadableStream<Uint8Array>; fileName: string; sizeBytes: number; dispose: () => Promise<void> }> {
+): Promise<{
+    stream: ReadableStream<Uint8Array>;
+    fileName: string;
+    sizeBytes: number;
+    dispose: () => Promise<void>;
+}> {
     const copy = await prisma.recoveryPointCopy.findFirst({
         where: { id: copyId, point: { resource: { ownerId } } },
         select: {
@@ -521,20 +578,35 @@ export async function openCopy(
             sizeBytes: true,
             status: true,
             destination: {
-                select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+                select: {
+                    id: true,
+                    name: true,
+                    kind: true,
+                    connectionId: true,
+                    hostId: true,
+                    basePath: true
+                }
             },
             point: {
                 select: {
                     metadata: true,
                     resource: {
-                        select: { id: true, ownerId: true, kind: true, selector: true, name: true, config: true }
+                        select: {
+                            id: true,
+                            ownerId: true,
+                            kind: true,
+                            selector: true,
+                            name: true,
+                            config: true
+                        }
                     }
                 }
             }
         }
     });
     if (!copy) throw new SourceUnavailableError("That copy does not exist");
-    if (copy.status !== "available") throw new SourceUnavailableError("That copy did not finish being written");
+    if (copy.status !== "available")
+        throw new SourceUnavailableError("That copy did not finish being written");
 
     const fileName = copy.path.split("/").pop() || "backup";
     if (isSourceLocal(copy.destination)) {
@@ -542,7 +614,12 @@ export async function openCopy(
         const source = sourceFor(resource.kind);
         if (!source.readInPlace) throw new SourceUnavailableError("That copy cannot be read back");
         const stream = await source.readInPlace(resource, copy.path);
-        return { stream, fileName, sizeBytes: Number(copy.sizeBytes), dispose: async () => undefined };
+        return {
+            stream,
+            fileName,
+            sizeBytes: Number(copy.sizeBytes),
+            dispose: async () => undefined
+        };
     }
     const handle = await openDestination(copy.destination, ownerId);
     const stream = await handle.get(copy.path);
@@ -572,7 +649,14 @@ export async function restoreCopy(ownerId: string, copyId: string, actorId: stri
                     id: true,
                     metadata: true,
                     resource: {
-                        select: { id: true, ownerId: true, kind: true, selector: true, name: true, config: true }
+                        select: {
+                            id: true,
+                            ownerId: true,
+                            kind: true,
+                            selector: true,
+                            name: true,
+                            config: true
+                        }
                     }
                 }
             }
@@ -615,7 +699,8 @@ export async function restoreCopy(ownerId: string, copyId: string, actorId: stri
         let metadata: Record<string, unknown> = {};
         try {
             const parsed: unknown = JSON.parse(copy.point.metadata);
-            if (typeof parsed === "object" && parsed !== null) metadata = parsed as Record<string, unknown>;
+            if (typeof parsed === "object" && parsed !== null)
+                metadata = parsed as Record<string, unknown>;
         } catch {
             metadata = {};
         }
@@ -673,7 +758,11 @@ export async function listPlans(ownerId: string) {
 }
 
 /** Create a plan, or replace one whole. */
-export async function savePlan(ownerId: string, input: PlanInput, planId?: string): Promise<{ id: string }> {
+export async function savePlan(
+    ownerId: string,
+    input: PlanInput,
+    planId?: string
+): Promise<{ id: string }> {
     const owned = await prisma.backupDestination.count({
         where: { ownerId, id: { in: input.destinationIds } }
     });
@@ -714,7 +803,10 @@ export async function savePlan(ownerId: string, input: PlanInput, planId?: strin
 
 /** Delete a plan. What used it becomes on-demand rather than unprotected. */
 export async function deletePlan(ownerId: string, planId: string): Promise<void> {
-    const owned = await prisma.backupPlan.findFirst({ where: { id: planId, ownerId }, select: { id: true } });
+    const owned = await prisma.backupPlan.findFirst({
+        where: { id: planId, ownerId },
+        select: { id: true }
+    });
     if (!owned) return;
     await prisma.backupPlan.delete({ where: { id: planId } });
     const orphaned = await prisma.protectedResource.findMany({
@@ -748,7 +840,9 @@ export async function listDestinations(ownerId: string) {
         where: { destination: { ownerId }, status: "available" },
         _sum: { sizeBytes: true }
     });
-    const bytesByDestination = new Map(sizes.map((row) => [row.destinationId, Number(row._sum.sizeBytes ?? 0n)]));
+    const bytesByDestination = new Map(
+        sizes.map((row) => [row.destinationId, Number(row._sum.sizeBytes ?? 0n)])
+    );
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -767,7 +861,10 @@ export async function listDestinations(ownerId: string) {
 }
 
 /** Add a destination. */
-export async function createDestination(ownerId: string, input: DestinationInput): Promise<{ id: string }> {
+export async function createDestination(
+    ownerId: string,
+    input: DestinationInput
+): Promise<{ id: string }> {
     if (input.kind === "connection") {
         const owned = await prisma.storageConnection.findFirst({
             // Their own drive is theirs, not a destination - it is left out of the
@@ -778,7 +875,10 @@ export async function createDestination(ownerId: string, input: DestinationInput
         if (!owned) throw new SourceUnavailableError("That storage connection does not exist");
     }
     if (input.kind === "host") {
-        const owned = await prisma.host.findFirst({ where: { id: input.hostId, ownerId }, select: { id: true } });
+        const owned = await prisma.host.findFirst({
+            where: { id: input.hostId, ownerId },
+            select: { id: true }
+        });
         if (!owned) throw new SourceUnavailableError("That server does not exist");
     }
     const created = await prisma.backupDestination.create({
@@ -813,7 +913,9 @@ export async function deleteDestination(ownerId: string, destinationId: string):
         );
     }
     if (row.isDefault) {
-        throw new SourceUnavailableError("That is the default destination. Make another one the default first.");
+        throw new SourceUnavailableError(
+            "That is the default destination. Make another one the default first."
+        );
     }
     await prisma.backupDestination.delete({ where: { id: destinationId } });
 }
@@ -825,7 +927,14 @@ export async function testDestination(
 ): Promise<{ ok: boolean; error?: string; usedBytes?: number; freeBytes?: number }> {
     const row = await prisma.backupDestination.findFirst({
         where: { id: destinationId, ownerId },
-        select: { id: true, name: true, kind: true, connectionId: true, hostId: true, basePath: true }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            connectionId: true,
+            hostId: true,
+            basePath: true
+        }
     });
     if (!row) return { ok: false, error: "That destination does not exist" };
     if (isSourceLocal(row)) {
@@ -857,7 +966,11 @@ export async function testDestination(
 async function markDestination(id: string, ok: boolean, error?: string): Promise<void> {
     await prisma.backupDestination.update({
         where: { id },
-        data: { status: ok ? "active" : "unreachable", lastCheckedAt: new Date(), lastError: ok ? null : (error ?? null) }
+        data: {
+            status: ok ? "active" : "unreachable",
+            lastCheckedAt: new Date(),
+            lastError: ok ? null : (error ?? null)
+        }
     });
 }
 
@@ -882,7 +995,13 @@ export async function listActivity(ownerId: string, limit = 100) {
     const names = new Map(
         (
             await prisma.protectedResource.findMany({
-                where: { id: { in: jobs.map((job) => job.resourceId).filter((id): id is string => Boolean(id)) } },
+                where: {
+                    id: {
+                        in: jobs
+                            .map((job) => job.resourceId)
+                            .filter((id): id is string => Boolean(id))
+                    }
+                },
                 select: { id: true, name: true }
             })
         ).map((row) => [row.id, row.name])
@@ -902,7 +1021,10 @@ export async function listActivity(ownerId: string, limit = 100) {
 }
 
 /** Store an external credential against a protected thing, sealed. */
-export async function sealResourceSecret(resourceId: string, secret: Record<string, unknown>): Promise<void> {
+export async function sealResourceSecret(
+    resourceId: string,
+    secret: Record<string, unknown>
+): Promise<void> {
     const sealed = encryptCredentials(secret, loadEnv().POLARIS_MASTER_KEY);
     await prisma.protectedResource.update({
         where: { id: resourceId },
@@ -956,7 +1078,8 @@ export async function applyWorldSchedule(
         where: { ownerId, kind: "source-local" },
         select: { id: true }
     });
-    if (!sourceLocal) throw new SourceUnavailableError("There is nowhere to keep this server's copies");
+    if (!sourceLocal)
+        throw new SourceUnavailableError("There is nowhere to keep this server's copies");
 
     const name = `${serverName} - world`;
     const existing = await prisma.backupPlan.findUnique({

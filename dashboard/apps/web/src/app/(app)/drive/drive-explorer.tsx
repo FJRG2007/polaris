@@ -517,10 +517,16 @@ export function DriveExplorer({
                                         // The root of a source somebody is reaching
                                         // for, fetched while they are still reaching.
                                         onPointerEnter={() =>
-                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                            prefetchListing(
+                                                connection.id,
+                                                connection.rootPath ?? ""
+                                            )
                                         }
                                         onFocus={() =>
-                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                            prefetchListing(
+                                                connection.id,
+                                                connection.rootPath ?? ""
+                                            )
                                         }
                                         className={cn(
                                             "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",

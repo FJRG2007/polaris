@@ -77,7 +77,11 @@ export function FolderTree({
         (entries: DriveEntry[]): FolderNode[] =>
             entries
                 .filter((entry) => entry.kind === "dir")
-                .map((entry) => ({ name: entry.name, path: entry.path, locked: Boolean(entry.locked) }))
+                .map((entry) => ({
+                    name: entry.name,
+                    path: entry.path,
+                    locked: Boolean(entry.locked)
+                }))
                 .sort((a, b) => a.name.localeCompare(b.name)),
         []
     );

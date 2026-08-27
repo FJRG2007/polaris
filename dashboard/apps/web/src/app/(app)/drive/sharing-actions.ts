@@ -192,10 +192,16 @@ export async function listItemSharesAction(
     const [users, groups] = await Promise.all([
         userIds.length === 0
             ? []
-            : prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }),
+            : prisma.user.findMany({
+                  where: { id: { in: userIds } },
+                  select: { id: true, name: true }
+              }),
         groupIds.length === 0
             ? []
-            : prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true, name: true } })
+            : prisma.group.findMany({
+                  where: { id: { in: groupIds } },
+                  select: { id: true, name: true }
+              })
     ]);
     const names = new Map<string, string>([
         ...users.map((row) => [`user:${row.id}`, row.name] as const),
@@ -207,7 +213,9 @@ export async function listItemSharesAction(
             grantId: grant.id,
             type: grant.principalType === "group" ? "group" : "user",
             id: grant.principalId,
-            name: names.get(`${grant.principalType}:${grant.principalId}`) ?? "Someone who is no longer here",
+            name:
+                names.get(`${grant.principalType}:${grant.principalId}`) ??
+                "Someone who is no longer here",
             role: shareRoleOf(grant.actions),
             expiresAt: grant.expiresAt?.toISOString() ?? null
         }))

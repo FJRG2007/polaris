@@ -141,7 +141,9 @@ const GRANT_SELECT = {
 function decodeActions(raw: string): DriveAction[] {
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? (parsed.filter((v) => typeof v === "string") as DriveAction[]) : [];
+        return Array.isArray(parsed)
+            ? (parsed.filter((v) => typeof v === "string") as DriveAction[])
+            : [];
     } catch {
         return [];
     }
@@ -237,15 +239,21 @@ async function peopleByIds(ids: readonly string[]): Promise<Map<string, SharePer
         where: { id: { in: unique }, ...VISIBLE_USER },
         select: { id: true, name: true }
     });
-    return new Map(rows.map((row) => [row.id, { type: "user" as const, id: row.id, name: row.name }]));
+    return new Map(
+        rows.map((row) => [row.id, { type: "user" as const, id: row.id, name: row.name }])
+    );
 }
 
 /** Names for whoever each grant was written to, people and groups together. */
 async function recipientsOf(
     rows: ReadonlyArray<{ principalType: string; principalId: string }>
 ): Promise<Map<string, SharePerson>> {
-    const userIds = rows.filter((row) => row.principalType === "user").map((row) => row.principalId);
-    const groupIds = rows.filter((row) => row.principalType === "group").map((row) => row.principalId);
+    const userIds = rows
+        .filter((row) => row.principalType === "user")
+        .map((row) => row.principalId);
+    const groupIds = rows
+        .filter((row) => row.principalType === "group")
+        .map((row) => row.principalId);
     const [users, groups] = await Promise.all([
         peopleByIds(userIds),
         groupIds.length === 0

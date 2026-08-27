@@ -55,13 +55,14 @@ async function requireConnectionManager(connectionId: string): Promise<string> {
  */
 export async function getAccessSettingsAction(connectionId: string): Promise<AccessSettings> {
     await requireConnectionManager(connectionId);
-    const [acls, locks] = await Promise.all([
-        listDriveAcls(connectionId),
-        listLocks(connectionId)
-    ]);
+    const [acls, locks] = await Promise.all([listDriveAcls(connectionId), listLocks(connectionId)]);
 
-    const userIds = acls.filter((acl) => acl.principalType === "user").map((acl) => acl.principalId);
-    const groupIds = acls.filter((acl) => acl.principalType === "group").map((acl) => acl.principalId);
+    const userIds = acls
+        .filter((acl) => acl.principalType === "user")
+        .map((acl) => acl.principalId);
+    const groupIds = acls
+        .filter((acl) => acl.principalType === "group")
+        .map((acl) => acl.principalId);
     const [users, groups] = await Promise.all([
         userIds.length === 0
             ? []
@@ -71,7 +72,10 @@ export async function getAccessSettingsAction(connectionId: string): Promise<Acc
               }),
         groupIds.length === 0
             ? []
-            : prisma.group.findMany({ where: { id: { in: groupIds } }, select: { id: true, name: true } })
+            : prisma.group.findMany({
+                  where: { id: { in: groupIds } },
+                  select: { id: true, name: true }
+              })
     ]);
     const principals: AccessPrincipal[] = [
         ...groups.map((group) => ({ type: "group" as const, id: group.id, label: group.name })),

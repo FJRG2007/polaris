@@ -64,7 +64,10 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
 
     const byMachine = new Map<string, typeof apps>();
     for (const app of apps) {
-        const key = app.target.kind === "local" || !app.target.hostId ? "local" : `host:${app.target.hostId}`;
+        const key =
+            app.target.kind === "local" || !app.target.hostId
+                ? "local"
+                : `host:${app.target.hostId}`;
         const group = byMachine.get(key);
         if (group) group.push(app);
         else byMachine.set(key, [app]);
@@ -79,9 +82,15 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
             driver =
                 key === "local"
                     ? localDockerDriver()
-                    : await hostDockerDriver(key.slice("host:".length), first.environment.project.ownerId);
+                    : await hostDockerDriver(
+                          key.slice("host:".length),
+                          first.environment.project.ownerId
+                      );
             const names = new Map(
-                group.map((app) => [app.id, serviceName(app.environment.project.slug, app.slug, app.id)])
+                group.map((app) => [
+                    app.id,
+                    serviceName(app.environment.project.slug, app.slug, app.id)
+                ])
             );
             const samples = await driver.statsMany([...names.values()]);
             for (const app of group) {
@@ -159,7 +168,10 @@ async function localDisk(): Promise<{ used: number; total: number } | null> {
  * begins again at zero, which the reader sees as a single fall followed by
  * ordinary rates rather than as a machine that sent everything at once.
  */
-const traffic = new Map<string, { rx: bigint; tx: bigint; seen: Map<string, { rx: number; tx: number }> }>();
+const traffic = new Map<
+    string,
+    { rx: bigint; tx: bigint; seen: Map<string, { rx: number; tx: number }> }
+>();
 
 function advanceTraffic(
     subjectId: string,
@@ -225,9 +237,12 @@ async function sampleHost(
 ): Promise<{ row: SampleRow; dockerId: string } | null> {
     let driver: DockerDriver | null = null;
     try {
-        driver = ownerId === null ? localDockerDriver() : await hostDockerDriver(subjectId, ownerId);
+        driver =
+            ownerId === null ? localDockerDriver() : await hostDockerDriver(subjectId, ownerId);
         const info = await driver.info();
-        const running = (await driver.listContainers(false)).filter((entry) => entry.state === "running");
+        const running = (await driver.listContainers(false)).filter(
+            (entry) => entry.state === "running"
+        );
 
         // Concurrently: a stats read waits a second on the daemon for its second
         // CPU sample, so a machine with a dozen containers would otherwise spend
@@ -300,7 +315,11 @@ async function collectVolumes(ts: Date): Promise<SampleRow[]> {
         include: {
             target: true,
             application: {
-                include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+                include: {
+                    environment: { include: { project: true } },
+                    target: true,
+                    volumes: { select: { id: true } }
+                }
             }
         }
     });
@@ -376,7 +395,10 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
                     subjectType: "storage",
                     subjectId: conn.id,
                     ts,
-                    cpuPercent: metrics.system.cpuLoad != null ? round2(metrics.system.cpuLoad * 100) : null,
+                    cpuPercent:
+                        metrics.system.cpuLoad != null
+                            ? round2(metrics.system.cpuLoad * 100)
+                            : null,
                     cpuTempC: metrics.system.cpuTemp ?? null,
                     memUsedBytes: bigBytes(metrics.system.memoryUsedBytes),
                     memTotalBytes: bigBytes(metrics.system.memoryTotalBytes),
@@ -516,8 +538,12 @@ async function rollupRecentHours(now: Date, hours = 3): Promise<void> {
 
 /** Drop raw samples and rollups older than their retention windows. */
 async function purgeOldMetrics(now: Date): Promise<void> {
-    await prisma.metricSample.deleteMany({ where: { ts: { lt: new Date(now.getTime() - RAW_RETENTION_MS) } } });
-    await prisma.metricRollup.deleteMany({ where: { bucket: { lt: new Date(now.getTime() - ROLLUP_RETENTION_MS) } } });
+    await prisma.metricSample.deleteMany({
+        where: { ts: { lt: new Date(now.getTime() - RAW_RETENTION_MS) } }
+    });
+    await prisma.metricRollup.deleteMany({
+        where: { bucket: { lt: new Date(now.getTime() - ROLLUP_RETENTION_MS) } }
+    });
 }
 
 // --- loop -------------------------------------------------------------------

@@ -1169,7 +1169,10 @@ export function FilesView({
                             </>
                         ) : null}
                         <ContextMenuSeparator />
-                        <ContextMenuItem variant="danger" onSelect={() => onScheduleDelete(targets)}>
+                        <ContextMenuItem
+                            variant="danger"
+                            onSelect={() => onScheduleDelete(targets)}
+                        >
                             <CalendarClock className="size-4" />
                             Delete later...
                         </ContextMenuItem>
@@ -1935,8 +1938,7 @@ export function FilesView({
                             onKeyDown={onListKeyDown}
                             className={cn(
                                 "relative min-w-0 flex-1 rounded-lg ",
-                                dragUpload &&
-                                    "ring-2 ring-primary ring-offset-2 "
+                                dragUpload && "ring-2 ring-primary ring-offset-2 "
                             )}
                             onDragOver={onUploadDragOver}
                             onDragLeave={() => setDragUpload(false)}

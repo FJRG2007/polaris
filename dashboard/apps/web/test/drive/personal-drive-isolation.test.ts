@@ -91,10 +91,15 @@ describe("taking a storage out", () => {
                 fileRequest: { count: vi.fn(async () => 0) }
             }
         }));
-        vi.doMock("@/lib/storage-service", () => ({ deleteConnection: vi.fn(), getDriver: vi.fn() }));
+        vi.doMock("@/lib/storage-service", () => ({
+            deleteConnection: vi.fn(),
+            getDriver: vi.fn()
+        }));
         vi.doMock("@/lib/deploy-service", () => ({ deployAndWait: vi.fn() }));
 
-        const { getConnectionRemovalPlan } = await import("../../src/lib/connection-removal-service");
+        const { getConnectionRemovalPlan } = await import(
+            "../../src/lib/connection-removal-service"
+        );
         await getConnectionRemovalPlan(OWNER, "some-connection");
 
         // The connection being removed is looked up with the filter on, so a

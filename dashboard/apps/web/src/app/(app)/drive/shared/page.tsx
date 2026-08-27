@@ -19,10 +19,7 @@ export default async function DriveSharedPage() {
     const user = await requirePermission("drive.read");
     // Both are database reads against rows this instance owns - no storage is
     // touched - so the page can render with its answer rather than a skeleton.
-    const [withMe, byMe] = await Promise.all([
-        listSharedWithMe(user.id),
-        listSharedByMe(user.id)
-    ]);
+    const [withMe, byMe] = await Promise.all([listSharedWithMe(user.id), listSharedByMe(user.id)]);
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">

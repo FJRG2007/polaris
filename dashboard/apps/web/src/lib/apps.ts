@@ -1144,7 +1144,12 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 icon: MessagesSquare,
                 keywords: ["chats", "messages"]
             },
-            { label: "Contacts", href: "/admin/inbox/contacts", icon: Contact, keywords: ["people"] },
+            {
+                label: "Contacts",
+                href: "/admin/inbox/contacts",
+                icon: Contact,
+                keywords: ["people"]
+            },
             {
                 label: "Channels",
                 href: "/admin/inbox/channels",

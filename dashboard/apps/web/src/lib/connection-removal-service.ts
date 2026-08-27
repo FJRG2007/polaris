@@ -120,7 +120,8 @@ export async function removeConnection(
     }
 
     if (!input.destinationId) return { error: "Choose where the content should go" };
-    if (input.destinationId === connectionId) return { error: "That is the connection being removed" };
+    if (input.destinationId === connectionId)
+        return { error: "That is the connection being removed" };
     const destination = await prisma.storageConnection.findFirst({
         where: { id: input.destinationId, ownerId, kind: { not: PERSONAL_KIND } },
         select: { id: true }
@@ -133,7 +134,10 @@ export async function removeConnection(
     // The bytes are on the far side under the same paths, so a volume only has to
     // be told which device it lives on now. Done in one statement: a half-repointed
     // set of volumes would deploy services against two different devices.
-    await prisma.volume.updateMany({ where: { connectionId }, data: { connectionId: destination.id } });
+    await prisma.volume.updateMany({
+        where: { connectionId },
+        data: { connectionId: destination.id }
+    });
 
     const redeployed: string[] = [];
     const warnings: string[] = [];
@@ -160,7 +164,11 @@ export async function removeConnection(
  * place deliberately, because the alternative is deleting a half-written
  * destination that may already hold the only good copy of something.
  */
-async function copyEverything(ownerId: string, fromId: string, toId: string): Promise<string | null> {
+async function copyEverything(
+    ownerId: string,
+    fromId: string,
+    toId: string
+): Promise<string | null> {
     let from: StorageDriver | undefined;
     let to: StorageDriver | undefined;
     try {

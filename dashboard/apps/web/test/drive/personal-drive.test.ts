@@ -58,11 +58,13 @@ function created(): { name: string; config: { targetId: string; root: string } }
 
 describe("a person's own drive", () => {
     it("is made on the disk Polaris runs on when nothing is connected", async () => {
-        upsert.mockImplementation(async (args: { create: { id: string; name: string; config: string } }) => ({
-            id: args.create.id,
-            name: args.create.name,
-            config: args.create.config
-        }));
+        upsert.mockImplementation(
+            async (args: { create: { id: string; name: string; config: string } }) => ({
+                id: args.create.id,
+                name: args.create.name,
+                config: args.create.config
+            })
+        );
 
         const drive = await ensurePersonalDrive(ANA);
 

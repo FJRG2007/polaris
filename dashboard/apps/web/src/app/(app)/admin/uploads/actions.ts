@@ -207,10 +207,10 @@ export async function checkStorageAction(
             : which === "drive"
               ? (await personalDriveSettings()).resolved
               : which === "avatars"
-              ? (await avatarSettings()).resolved
-              : which === "footage"
-                ? (await footageSettings()).resolved
-                : (await uploadSettings()).resolved;
+                ? (await avatarSettings()).resolved
+                : which === "footage"
+                  ? (await footageSettings()).resolved
+                  : (await uploadSettings()).resolved;
 
     const result = await checkStorageTarget(target.id, folder);
     return {

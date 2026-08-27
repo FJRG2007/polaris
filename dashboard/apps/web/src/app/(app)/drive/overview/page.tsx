@@ -9,7 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
     const user = await requirePermission("drive.read");
-    const connections: ConnectionSummary[] = (await listConnections(user.id, { personal: true })).map((row) => ({
+    const connections: ConnectionSummary[] = (
+        await listConnections(user.id, { personal: true })
+    ).map((row) => ({
         id: row.id,
         name: row.name,
         kind: row.kind as StorageProviderKind,
@@ -19,7 +21,10 @@ export default async function OverviewPage() {
 
     return (
         <>
-            <PageHeader title="Overview" description="Your connected storage devices and their health." />
+            <PageHeader
+                title="Overview"
+                description="Your connected storage devices and their health."
+            />
             <OverviewView connections={connections} />
         </>
     );

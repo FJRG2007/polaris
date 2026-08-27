@@ -112,7 +112,10 @@ export function storageTargetOptions(): Promise<TargetOption[]> {
  * install it is not there until the first file arrives - so the folder is made
  * here rather than left to whoever installs Polaris.
  */
-export async function driverForTarget(targetId: string, localFolder: string): Promise<StorageDriver> {
+export async function driverForTarget(
+    targetId: string,
+    localFolder: string
+): Promise<StorageDriver> {
     if (targetId === LOCAL_TARGET) {
         const root = `${loadEnv().POLARIS_DATA_DIR}/${localFolder}`;
         await mkdir(root, { recursive: true });
@@ -245,7 +248,9 @@ export async function placeFile(input: {
     // fixing, and not worth losing what somebody just made: the disk Polaris
     // runs on is always reachable, because Polaris is running.
     if (chosen.targetId === LOCAL_TARGET) {
-        throw new StorageRefused(`${chosen.name} could not take the ${input.what}: ${attempt.detail}`);
+        throw new StorageRefused(
+            `${chosen.name} could not take the ${input.what}: ${attempt.detail}`
+        );
     }
     console.warn(
         `storage: ${chosen.name} could not take a ${input.what} (${attempt.detail}); writing it to this server instead.`
@@ -462,7 +467,10 @@ export async function checkStorageTarget(
     // date as of a second ago, so the next upload goes to it rather than waiting
     // out the rest of the minute on the disk next door.
     forgetStorageFailure(targetId);
-    return { ok: true, detail: `Wrote a file, read it back and removed it. ${await keeps(targetId, localFolder)}` };
+    return {
+        ok: true,
+        detail: `Wrote a file, read it back and removed it. ${await keeps(targetId, localFolder)}`
+    };
 }
 
 /**
