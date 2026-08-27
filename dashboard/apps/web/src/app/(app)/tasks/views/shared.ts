@@ -22,7 +22,17 @@ export interface BoardMove {
     /** The group it was dropped into: a status id when grouping by status, the
      *  group key otherwise. */
     readonly groupKey: string;
-    readonly position: { beforeId: string | null; afterId: string | null };
+    readonly position: {
+        beforeId: string | null;
+        afterId: string | null;
+        /**
+         * Whether the drop promised a place. True when it landed on a task, which
+         * is where the insert line is drawn; false for the body of a column or a
+         * group, which means the end of it and nothing more. Only a promised place
+         * is worth writing the whole screen order down for.
+         */
+        placed: boolean;
+    };
 }
 
 /**

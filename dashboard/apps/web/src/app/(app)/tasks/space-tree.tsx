@@ -26,6 +26,7 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { usePathname } from "next/navigation";
 import { FolderAccessDialog } from "./folder-access-dialog";
+import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FolderSummary, ListSummary, SpaceTreeView } from "@/lib/tasks/space-service";
 import { createOptionsFor, TreeCreate, type CreateAt, type CreateKind } from "./tree-create";
@@ -188,11 +189,12 @@ interface RowProps {
     readonly onDragStart?: () => void;
     readonly onDragEnd?: () => void;
     readonly onDropInto?: () => void;
-    readonly onDropBefore?: () => void;
+    /** Ordered against this row, on the side of it the pointer was on. */
+    readonly onDropAt?: (edge: DropEdge) => void;
     /** Whether this row can take what is currently being dragged, and how. A row
      *  only orders against its own kind - a folder dropped between two lists has
      *  no siblings there to sit between - so the two are answered separately. */
-    readonly acceptsBefore: boolean;
+    readonly acceptsBeside: boolean;
     readonly acceptsInto: boolean;
     readonly expander?: React.ReactNode;
     /** The plus, shown next to the row's own quick actions. */
@@ -217,14 +219,14 @@ function TreeRow({
     onDragStart,
     onDragEnd,
     onDropInto,
-    onDropBefore,
-    acceptsBefore,
+    onDropAt,
+    acceptsBeside,
     acceptsInto,
     expander,
     create,
     createMenu
 }: RowProps) {
-    const [over, setOver] = useState<"into" | "before" | null>(null);
+    const [over, setOver] = useState<"into" | DropEdge | null>(null);
     // Renaming is reached from the right-click menu, which is still trapping
     // focus when the field appears; it claims focus once the menu has gone.
     const field = useDeferredFocus<HTMLInputElement>(renaming);
@@ -280,16 +282,21 @@ function TreeRow({
             }}
             onDragEnd={onDragEnd}
             onDragOver={(event) => {
-                if (!acceptsBefore && !acceptsInto) return;
+                if (!acceptsBeside && !acceptsInto) return;
                 event.preventDefault();
                 event.stopPropagation();
-                // The top few pixels mean "put it above this row"; the rest of a
-                // folder means "put it inside". One target, two answers, which is
-                // what a tree needs to express both reordering and nesting.
+                // A row that cannot be nested into is split down the middle, so a
+                // row dragged downwards lands under the one it was released over
+                // rather than above it. A folder keeps its middle for "put it
+                // inside" and answers the few pixels at each end with the side
+                // they are on - one target, three answers, which is what a tree
+                // needs to express both reordering and nesting.
                 const bounds = event.currentTarget.getBoundingClientRect();
-                const nearTop = event.clientY - bounds.top < 6;
-                const wantsBefore = (nearTop || !acceptsInto) && acceptsBefore;
-                setOver(wantsBefore ? "before" : acceptsInto ? "into" : null);
+                const edge = dropEdge(event.clientY, event.currentTarget);
+                const atEnd =
+                    event.clientY - bounds.top < 6 || bounds.bottom - event.clientY < 6;
+                const wantsEdge = (atEnd || !acceptsInto) && acceptsBeside;
+                setOver(wantsEdge ? edge : acceptsInto ? "into" : null);
             }}
             onDragLeave={() => setOver(null)}
             onDrop={(event) => {
@@ -299,7 +306,7 @@ function TreeRow({
                 const where = over;
                 setOver(null);
                 if (where === "into" && onDropInto) onDropInto();
-                else if (where === "before" && onDropBefore) onDropBefore();
+                else if (where !== "into" && onDropAt) onDropAt(where);
             }}
             onKeyDown={(event) => {
                 if (event.key === "F2" && editable) {
@@ -320,8 +327,14 @@ function TreeRow({
                     : undefined
             }
         >
-            {over === "before" && (
-                <span aria-hidden className="absolute -top-px left-0 z-10 h-0.5 w-full rounded bg-primary" />
+            {(over === "before" || over === "after") && (
+                <span
+                    aria-hidden
+                    className={cn(
+                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        over === "before" ? "-top-px" : "-bottom-px"
+                    )}
+                />
             )}
             <ContextMenu>
                 <ContextMenuTrigger asChild>
@@ -709,12 +722,6 @@ function SpaceSection({
     // the menu to let go of focus before taking it.
     const nameField = useDeferredFocus<HTMLInputElement>(renaming === `space:${space.id}`);
 
-    /** The row a drop above `id` should land before, among a given set. */
-    const neighbours = (siblings: readonly { id: string }[], targetId: string) => {
-        const index = siblings.findIndex((entry) => entry.id === targetId);
-        return { beforeId: index > 0 ? (siblings[index - 1]?.id ?? null) : null, afterId: targetId };
-    };
-
     /** Whether what is being dragged may land in this container at all. */
     const accepts = (parentId: string | null) =>
         dragging !== null &&
@@ -755,11 +762,11 @@ function SpaceSection({
                 onRenaming(null);
                 await run(() => actions.renameListAction(list.id, name));
             }}
-            acceptsBefore={dragging?.kind === "list" && accepts(list.folderId)}
+            acceptsBeside={dragging?.kind === "list" && accepts(list.folderId)}
             acceptsInto={false}
             onDragStart={editable ? () => onDragging({ kind: "list", id: list.id, spaceId: space.id }) : undefined}
             onDragEnd={() => onDragging(null)}
-            onDropBefore={() => onDrop(space.id, list.folderId, neighbours(siblings, list.id))}
+            onDropAt={(edge) => onDrop(space.id, list.folderId, neighbours(siblings, list.id, dragging?.id ?? "", edge))}
             actions={
                 editable
                     ? [
@@ -881,14 +888,14 @@ function SpaceSection({
                         onRenaming(null);
                         await run(() => actions.renameFolderAction(folder.id, name));
                     }}
-                    acceptsBefore={dragging?.kind === "folder" && accepts(folder.parentId)}
+                    acceptsBeside={dragging?.kind === "folder" && accepts(folder.parentId)}
                     acceptsInto={accepts(folder.id)}
                     onDragStart={
                         canEditHere ? () => onDragging({ kind: "folder", id: folder.id, spaceId: space.id }) : undefined
                     }
                     onDragEnd={() => onDragging(null)}
                     onDropInto={() => onDrop(space.id, folder.id, { beforeId: null, afterId: null })}
-                    onDropBefore={() => onDrop(space.id, folder.parentId, neighbours(siblings, folder.id))}
+                    onDropAt={(edge) => onDrop(space.id, folder.parentId, neighbours(siblings, folder.id, dragging?.id ?? "", edge))}
                     actions={canEditHere ? folderActions(node) : []}
                 />
                 {folderOpen && (

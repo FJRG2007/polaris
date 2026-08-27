@@ -489,23 +489,25 @@ export function ListScreen({
             setError
         );
         if (result?.error) setError(result.error);
-        // Dropped onto a card - the only drop that promised a place, since that
+        // Dropped onto a task - the only drop that promised a place, since that
         // is where the line appears. Dropping into the space below a column is
         // "put it in this column" and leaves the order to the sort. Under a sort
         // that decides the order, a promised place only survives if the screen's
         // arrangement is written down with it, and only once the move itself
         // went through.
-        else if (result && sort.field !== "manual" && position.afterId) {
+        else if (result && sort.field !== "manual" && position.placed) {
             const dragged = rowById.get(taskId);
-            const landedOn = rowById.get(position.afterId);
-            // A card dropped on itself promised nothing, and a card from another
-            // list is not a place either: the two are ordered against their own
-            // lists, so there is no gap between them to be put in.
+            // A neighbour from another list is not a place: the two are ordered
+            // against their own lists, so there is no gap between them to be put
+            // in. Whichever side of the drop names one has to be in the same list
+            // as what was dragged.
+            const beside = [position.beforeId, position.afterId]
+                .filter((id): id is string => id !== null)
+                .map((id) => rowById.get(id));
             if (
                 dragged &&
-                landedOn &&
-                landedOn.id !== dragged.id &&
-                landedOn.listId === dragged.listId
+                beside.length > 0 &&
+                beside.every((row) => row !== undefined && row.listId === dragged.listId)
             ) {
                 await adoptOrder(dragged, position);
             }

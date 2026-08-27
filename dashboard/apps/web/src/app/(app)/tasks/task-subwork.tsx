@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { settleTagIds, withCreatedTags } from "./tag-creation";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
+import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
@@ -38,7 +39,7 @@ function Sortable({
     dragging,
     onDragStart,
     onDragEnd,
-    onDropBefore,
+    onDropAt,
     disabled,
     className,
     children
@@ -47,12 +48,13 @@ function Sortable({
     dragging: string | null;
     onDragStart: () => void;
     onDragEnd: () => void;
-    onDropBefore: () => void;
+    /** Dropped on this row, on the half of it the pointer was in. */
+    onDropAt: (edge: DropEdge) => void;
     disabled?: boolean;
     className?: string;
     children: React.ReactNode;
 }) {
-    const [over, setOver] = useState(false);
+    const [over, setOver] = useState<DropEdge | null>(null);
 
     return (
         <li
@@ -68,28 +70,30 @@ function Sortable({
                 if (disabled || !dragging || dragging === id) return;
                 event.preventDefault();
                 event.stopPropagation();
-                setOver(true);
+                setOver(dropEdge(event.clientY, event.currentTarget));
             }}
-            onDragLeave={() => setOver(false)}
+            onDragLeave={() => setOver(null)}
             onDrop={(event) => {
                 if (!over) return;
                 event.preventDefault();
                 event.stopPropagation();
-                setOver(false);
-                onDropBefore();
+                setOver(null);
+                onDropAt(over);
             }}
-            className={cn("relative", over && "before:absolute before:-top-px before:h-0.5 before:w-full before:rounded before:bg-primary", className)}
+            className={cn("relative", className)}
         >
+            {over && (
+                <span
+                    aria-hidden
+                    className={cn(
+                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        over === "before" ? "-top-px" : "-bottom-px"
+                    )}
+                />
+            )}
             {children}
         </li>
     );
-}
-
-/** The row a drop above `id` should land between, among a set of siblings. */
-function neighbours(siblings: readonly { id: string }[], targetId: string, dragged: string) {
-    const without = siblings.filter((entry) => entry.id !== dragged);
-    const index = without.findIndex((entry) => entry.id === targetId);
-    return { beforeId: index > 0 ? (without[index - 1]?.id ?? null) : null, afterId: targetId };
 }
 
 /** A short line of text somebody types and presses enter on. Used for every
@@ -177,9 +181,9 @@ export function SubtaskSection({
         onChanged();
     };
 
-    const move = async (targetId: string) => {
+    const move = async (targetId: string, edge: DropEdge) => {
         if (!dragging || dragging === targetId) return;
-        const position = neighbours(rows, targetId, dragging);
+        const position = neighbours(rows, targetId, dragging, edge);
         const moved = dragging;
         setDragging(null);
         onError("");
@@ -273,7 +277,7 @@ export function SubtaskSection({
                         disabled={!canEdit}
                         onDragStart={() => setDragging(subtask.id)}
                         onDragEnd={() => setDragging(null)}
-                        onDropBefore={() => void move(subtask.id)}
+                        onDropAt={(edge) => void move(subtask.id, edge)}
                     >
                         {/* The menu wraps the row's contents rather than the row
                             itself: the list item is what carries the drag, and a
@@ -381,9 +385,9 @@ export function ChecklistSection({
     const [draggingList, setDraggingList] = useState<string | null>(null);
     const [draggingStep, setDraggingStep] = useState<{ id: string; checklistId: string } | null>(null);
 
-    const moveChecklist = async (targetId: string) => {
+    const moveChecklist = async (targetId: string, edge: DropEdge) => {
         if (!draggingList || draggingList === targetId) return;
-        const position = neighbours(checklists, targetId, draggingList);
+        const position = neighbours(checklists, targetId, draggingList, edge);
         const moved = draggingList;
         setDraggingList(null);
         onError("");
@@ -391,12 +395,16 @@ export function ChecklistSection({
         onChanged();
     };
 
-    const moveStep = async (checklistId: string, items: readonly { id: string }[], targetId: string | null) => {
+    const moveStep = async (
+        checklistId: string,
+        items: readonly { id: string }[],
+        target: { id: string; edge: DropEdge } | null
+    ) => {
         if (!draggingStep) return;
         const moved = draggingStep.id;
         // Dropped on the list itself rather than on a step: the end of it.
-        const position = targetId
-            ? neighbours(items, targetId, moved)
+        const position = target
+            ? neighbours(items, target.id, moved, target.edge)
             : { beforeId: items.filter((item) => item.id !== moved).at(-1)?.id ?? null, afterId: null };
         setDraggingStep(null);
         onError("");
@@ -445,7 +453,7 @@ export function ChecklistSection({
                         disabled={!canEdit}
                         onDragStart={() => setDraggingList(checklist.id)}
                         onDragEnd={() => setDraggingList(null)}
-                        onDropBefore={() => void moveChecklist(checklist.id)}
+                        onDropAt={(edge) => void moveChecklist(checklist.id, edge)}
                     >
                     <Card>
                         <CardBody className="flex flex-col gap-2 p-3">
@@ -497,7 +505,7 @@ export function ChecklistSection({
                                         disabled={!canEdit}
                                         onDragStart={() => setDraggingStep({ id: item.id, checklistId: checklist.id })}
                                         onDragEnd={() => setDraggingStep(null)}
-                                        onDropBefore={() => void moveStep(checklist.id, checklist.items, item.id)}
+                                        onDropAt={(edge) => void moveStep(checklist.id, checklist.items, { id: item.id, edge })}
                                         className="group flex items-center gap-2"
                                     >
                                         <Checkbox

@@ -84,7 +84,7 @@ function card(task: TaskRow, canEdit = true): string {
             positioned
             onSelect={() => {}}
             onDragStart={() => {}}
-            onDropBefore={() => {}}
+            onDropAt={() => {}}
         />
     );
 }
