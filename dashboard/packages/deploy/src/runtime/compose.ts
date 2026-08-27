@@ -12,7 +12,7 @@ import { imageTag as toImageTag } from "../naming.js";
 import type { ComposeSpec } from "../compose-spec.js";
 import { mountFailureReason } from "../mount-failure.js";
 import { appComposeSpec, dbComposeSpec } from "../compose-spec.js";
-import { deployFailureReason, isStaleImageLease } from "../deploy-failure.js";
+import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
 import type {
     AppDeployPlan,
     DbDeployPlan,
@@ -99,6 +99,37 @@ async function composeUpRetryingLease(
     }
 }
 
+/**
+ * Pull, and if the machine had no room for it, make some and pull once more.
+ *
+ * The one moment where handing back build cache is unambiguously right whatever
+ * the disk says: something has already failed, and every byte of cache on that
+ * machine is worth less than the deploy that cannot land. What is freed comes
+ * back on the next build or pull; volumes are never in it.
+ *
+ * Only once, and only when the machine actually gave something back. A retry
+ * that frees nothing would fail identically, and a loop that keeps pulling at a
+ * disk with no room is a deploy that never ends and a log nobody can read.
+ */
+async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink): Promise<void> {
+    try {
+        await ctx.ports.pull(image, sink);
+        return;
+    } catch (error) {
+        const said = reasonOf(error, "");
+        if (!isOutOfSpace(said) || !ctx.ports.reclaimSpace) throw error;
+
+        const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+        if (freed <= 0) throw error;
+        ctx.log(
+            Buffer.from(
+                `The machine had no room for that image. Freed ${Math.round(freed / 1_000_000)} MB of build cache and unused layers - no volume was touched - and fetching it again.\n`
+            )
+        );
+        await ctx.ports.pull(image, sink);
+    }
+}
+
 export class ComposeRuntime implements RuntimeDriver {
     public readonly engine = "compose" as const;
 
@@ -122,7 +153,7 @@ export class ComposeRuntime implements RuntimeDriver {
             imageTag = plan.build.imageRef;
             const done = step(`Pulling ${plan.build.imageRef}`);
             try {
-                await ctx.ports.pull(imageTag, sink);
+                await pullWithRoom(imageTag, ctx, sink);
             } catch (error) {
                 // Translated on the way out, for the reason deploy-failure.ts
                 // gives: the image store reports a disk with no room left as a

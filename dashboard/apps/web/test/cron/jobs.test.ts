@@ -69,6 +69,7 @@ describe("the work Polaris runs on a schedule", () => {
             "home-availability",
             "home-recording",
             "home-retention",
+            "host-space",
             "task-reminders"
         ]);
     });

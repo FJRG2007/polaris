@@ -8,6 +8,7 @@
 import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import type { BuildRequest, ComposeSpec, ExecResult, ExecSpec, ExecStream, LogOptions, MountTarget, OutputSink, RuntimePorts } from "@polaris/deploy";
+import { reclaimHostSpace } from "@/lib/deploy/host-space";
 
 export class HostdPorts implements RuntimePorts {
     private readonly client: HostdClient;
@@ -58,6 +59,16 @@ export class HostdPorts implements RuntimePorts {
     public async pull(image: string, onOutput?: OutputSink): Promise<void> {
         const res = await this.client.deployPull(image);
         await drain(res, onOutput);
+    }
+
+    /**
+     * Hand back build cache and layers no tag points at, so a pull that had no
+     * room can be tried once more. Volumes are never in it: the daemon's own
+     * allowlist refuses a volume prune, so this cannot cross that line even by
+     * asking differently.
+     */
+    public async reclaimSpace(): Promise<number> {
+        return (await reclaimHostSpace()) ?? 0;
     }
 
     public async inspectImage(image: string): Promise<number[]> {

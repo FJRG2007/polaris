@@ -74,6 +74,17 @@ export interface RuntimePorts {
     /** Build an image from a tar context; resolves the produced tag. */
     build(request: BuildRequest, onOutput?: OutputSink): Promise<string>;
     pull(image: string, onOutput?: OutputSink): Promise<void>;
+    /**
+     * Hand back the room the image store is holding for nothing - build cache
+     * and layers no tag points at - and resolve the bytes actually freed.
+     *
+     * Volumes are never touched: they hold somebody's data and no automatic
+     * step gets to decide which are spare. Optional, because a target that
+     * cannot be asked (a remote engine, an edition with no daemon) should not
+     * force every caller to guard - the runtime falls through to reporting the
+     * failure exactly as it did before.
+     */
+    reclaimSpace?(): Promise<number>;
     /** A locally present image's declared exposed TCP ports (ascending), so a deploy
      *  can default the container port to what the image actually listens on. Empty
      *  when the image declares none or inspection is unavailable. */
