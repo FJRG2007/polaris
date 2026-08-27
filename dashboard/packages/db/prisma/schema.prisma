@@ -7415,6 +7415,15 @@ model Camera {
     /// no recording. The row stays, so its clips and its settings survive.
     enabled       Boolean @default(true)
 
+    /// The last time this camera answered. Null on one nothing has ever reached,
+    /// which is not the same thing as one that stopped: a camera added five
+    /// minutes ago and never opened has never had the chance to answer.
+    lastSeenAt   DateTime?
+    /// When it stopped answering, and null while it is answering. This is the
+    /// whole of the outage state: the alert is raised once the gap since this
+    /// passes the grace window, and the event is closed when it clears.
+    offlineSince DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 

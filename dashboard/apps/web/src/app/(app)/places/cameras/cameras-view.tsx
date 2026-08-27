@@ -21,6 +21,7 @@ import type { DiscoveredCamera } from "@/lib/home/discovery";
 import { Cctv, Pencil, Plus, Radar, Shapes, Trash2 } from "lucide-react";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
 import { focusAfterMove } from "@/lib/list-selection";
+import { useDisplayFormat } from "@/components/display-format";
 import {
     cn,
     Badge,
@@ -43,6 +44,7 @@ const RECORDING_LABEL: Record<string, string> = {
 };
 
 export function CamerasView({ canManage, openId }: { canManage: boolean; openId: string | null }) {
+    const format = useDisplayFormat();
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
@@ -201,16 +203,25 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                     </span>
                                                     {!camera.enabled ? (
                                                         <Badge variant="neutral">Off</Badge>
+                                                    ) : camera.offlineSince ? (
+                                                        <Badge variant="danger">Quiet</Badge>
                                                     ) : null}
                                                 </div>
+                                                {/* A camera that has stopped
+                                                answering says so where it is
+                                                managed, not only on the wall:
+                                                this is the screen somebody opens
+                                                to do something about it. */}
                                                 <p className="truncate text-[11px] text-foreground-subtle">
-                                                    {[
-                                                        camera.zone,
-                                                        cameraVendor(camera.vendor).label,
-                                                        camera.address
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(" - ")}
+                                                    {camera.enabled && camera.offlineSince
+                                                        ? `Not answering since ${format.dateTime(camera.offlineSince)}`
+                                                        : [
+                                                              camera.zone,
+                                                              cameraVendor(camera.vendor).label,
+                                                              camera.address
+                                                          ]
+                                                              .filter(Boolean)
+                                                              .join(" - ")}
                                                 </p>
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">

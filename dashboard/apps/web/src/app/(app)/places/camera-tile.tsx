@@ -43,6 +43,7 @@ import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
+import { useDisplayFormat } from "@/components/display-format";
 import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
 /**
@@ -145,6 +146,12 @@ export function CameraTile({
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
+    const format = useDisplayFormat();
+    /** When this camera stopped answering, in the reader's own format, or null
+     *  while it is answering. Read off the row rather than from what this tab
+     *  managed to draw, so it survives a reload and says the same thing on every
+     *  screen looking at the house. */
+    const quietSince = camera.offlineSince ? format.dateTime(camera.offlineSince) : null;
 
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
@@ -348,7 +355,10 @@ export function CameraTile({
                               ))
                             : null}
                         {drawn === false && !playing ? (
-                            <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />
+                            <Placeholder
+                                icon={<Camera className="size-5 shrink-0" />}
+                                label={quietSince ? `Not answering since ${quietSince}` : "Not answering"}
+                            />
                         ) : null}
                         {/* Said, not just drawn. A blurred still is ambiguous -
                             it reads as a camera that has gone wrong as easily as
@@ -361,7 +371,7 @@ export function CameraTile({
                         ) : null}
                     </>
                 ) : (
-                    <Unavailable camera={camera} live={live} />
+                    <Unavailable camera={camera} live={live} since={quietSince} />
                 )}
 
                 {/* The whole picture opens it: a transparent button OVER the
@@ -395,6 +405,11 @@ export function CameraTile({
                     ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
+                    {quietSince ? (
+                        <Badge variant="danger" title={`Not answering since ${quietSince}`}>
+                            Quiet
+                        </Badge>
+                    ) : null}
                     {camera.recording !== "off" ? (
                         <Badge variant="danger" title="Recording">
                             REC
@@ -419,9 +434,17 @@ export function CameraTile({
     );
 }
 
-/** Why there is no picture, said specifically enough to act on. */
-function Unavailable({ camera, live }: { camera: CameraView; live: boolean }) {
+/**
+ * Why there is no picture, said specifically enough to act on.
+ *
+ * "Not answering" on its own is the same sentence for a camera that missed one
+ * frame and for one that has been dark since the small hours, and only the
+ * second is worth getting out of bed for. Polaris already knows which this is -
+ * the availability pass writes down when it stopped - so the tile says it.
+ */
+function Unavailable({ camera, live, since }: { camera: CameraView; live: boolean; since: string | null }) {
     if (!camera.enabled) return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />;
+    if (since) return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={`Not answering since ${since}`} />;
     if (!live) return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Starting" />;
     return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />;
 }

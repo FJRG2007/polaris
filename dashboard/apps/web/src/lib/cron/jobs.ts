@@ -18,6 +18,7 @@ import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
+import { sweepCameraReachability } from "@/lib/home/reachability";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -285,6 +286,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // camera and write the same footage to the disk twice.
         leaseMs: 20 * MINUTE,
         run: sweepContinuousRecording
+    },
+    {
+        key: "home-availability",
+        // A minute. A camera that has gone quiet is only useful to know about
+        // quickly, and the pass is one cached frame per camera - which is what
+        // the wall already asks for whenever somebody has it open.
+        everyMs: Number(process.env.POLARIS_HOME_AVAILABILITY_MS) || MINUTE,
+        // Leased: two runners asking the same camera at the same moment would
+        // each decide it was the one to write the outage down, and the house
+        // would be told twice.
+        leaseMs: 5 * MINUTE,
+        run: sweepCameraReachability
     },
     {
         key: "home-retention",

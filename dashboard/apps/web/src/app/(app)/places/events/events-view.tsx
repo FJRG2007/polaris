@@ -50,7 +50,9 @@ const KINDS = [
     { value: "vehicle", label: "Vehicles" },
     { value: "animal", label: "Animals" },
     { value: "package", label: "Parcels" },
-    { value: "motion", label: "Movement" }
+    { value: "motion", label: "Movement" },
+    { value: "tamper", label: "Tampering" },
+    { value: "offline", label: "Cameras going quiet" }
 ];
 
 /** The shape every tile is drawn at. The stills are not all this shape - a

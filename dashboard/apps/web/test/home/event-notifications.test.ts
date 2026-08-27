@@ -19,7 +19,7 @@ import { NOTIFICATION_EVENTS, notificationEvent, resolveRule } from "@polaris/co
 /** Every event id Places hands the dispatcher. An id nothing declares is
  *  refused at the door, so a typo here is an alert that silently never
  *  arrives. */
-const RAISED = ["places.sighting", "places.alert", "places.tamper"];
+const RAISED = ["places.sighting", "places.alert", "places.tamper", "places.offline"];
 
 describe("what a camera can reach somebody with", () => {
     it("declares every event it raises", () => {

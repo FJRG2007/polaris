@@ -50,7 +50,10 @@ describe("the work Polaris runs on a schedule", () => {
         // down who was playing, and two runners open a second visit for everybody
         // already on. The two home passes write and delete footage: one would
         // record the same minutes twice, the other would race itself on a file
-        // one of them had already dropped. The connection sweep announces that a
+        // one of them had already dropped, and the availability pass would have
+        // two runners each decide they were the one to write an outage down, so
+        // the house is told twice that its cameras went dark. The connection
+        // sweep announces that a
         // linked account has stopped working, and two runners would each announce
         // it before either wrote that it had been announced. The rest are written
         // to be re-run and several already are, from the screens that sweep them
@@ -63,6 +66,7 @@ describe("the work Polaris runs on a schedule", () => {
             "connection-health",
             "game-health",
             "game-schedules",
+            "home-availability",
             "home-recording",
             "home-retention",
             "task-reminders"

@@ -370,6 +370,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "places.offline",
+        group: "places",
+        label: "A camera stopped answering",
+        description: "A camera went quiet, or came back after being quiet.",
+        level: "warning",
+        // On, unlike a sighting. Nothing else reports this: a camera that has
+        // stopped looks exactly like a quiet night, so the one place it can be
+        // noticed is here.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "network.router",
         group: "network",
         label: "Network needs attention",

@@ -49,6 +49,13 @@ export interface CameraView {
     /** Whether the camera can be pointed somewhere, which is only true when it
      *  answered ONVIF. */
     readonly ptz: boolean;
+    /** The last time it answered, as ISO. Null on one nothing has reached yet -
+     *  a camera added this morning and never opened has never had the chance. */
+    readonly lastSeenAt: string | null;
+    /** When it stopped answering, as ISO, and null while it is answering. What
+     *  turns a tile that is not drawing into one that says how long it has been
+     *  like that. */
+    readonly offlineSince: string | null;
 }
 
 /** A camera as something that is about to connect to it sees it. */
@@ -106,7 +113,9 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         storageTarget: row.storageTarget ?? "",
         retentionDays: row.retentionDays,
         enabled: row.enabled,
-        ptz: row.onvifPort !== null
+        ptz: row.onvifPort !== null,
+        lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+        offlineSince: row.offlineSince?.toISOString() ?? null
     };
 }
 

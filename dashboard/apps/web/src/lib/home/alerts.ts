@@ -248,7 +248,13 @@ function headline(
                     ? "Something was left"
                     : detection.kind === "tamper"
                       ? "Somebody may have tampered with a camera"
-                      : "Movement";
+                      : detection.kind === "offline"
+                        ? (detection.label ?? "A camera stopped answering")
+                        : "Movement";
+    // An outage already names its camera and its place, and how much of that
+    // place went with it - that count is the whole point of the sentence. Adding
+    // "at Front door, Home" to the end of it says the same thing twice.
+    if (detection.kind === "offline") return { who, where: "" };
     // The area is the useful half of "where" once somebody has drawn one: "at
     // the front door" is a sentence, "at Front camera" is a device name.
     const area = detection.zones?.[0];
@@ -301,7 +307,8 @@ export async function raiseAlerts(
         );
         // With the way back to the moment on the end of it: an alert somebody
         // cannot act on is a line of text.
-        const text = `${who} at **${where}** - [see it](${eventHref(eventId)})`;
+        const said = where ? `${who} at **${where}**` : `**${who}**`;
+        const text = `${said} - [see it](${eventHref(eventId)})`;
 
         for (const rule of rules) {
             const channelId = await conversationFor(rule, rule.recipients[0] ?? null);
@@ -335,7 +342,7 @@ export async function raiseAlerts(
                         notify({
                             userId,
                             event: "places.alert",
-                            title: `${who} at ${where}`,
+                            title: where ? `${who} at ${where}` : who,
                             body: rule.name,
                             href: eventHref(eventId),
                             metadata: { eventId, ruleId: rule.id }
