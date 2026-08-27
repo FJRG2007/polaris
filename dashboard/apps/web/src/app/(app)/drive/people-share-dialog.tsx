@@ -17,9 +17,11 @@
 
 import { Avatar } from "@/components/avatar";
 import type { ItemShare } from "./sharing-types";
+import { DRIVE_GRANT_NOTE_MAX } from "@polaris/core";
 import { Loader2, Trash2, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ExpirySelect } from "@/components/expiry-select";
+import { useDisplayFormat } from "@/components/display-format";
 import type { DriveShareRole, SharePerson } from "@/lib/drive-sharing";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
@@ -70,6 +72,7 @@ export function PeopleShareDialog({
     /** Something changed, so whatever drew the item should look again. */
     onChanged?: () => void;
 }) {
+    const format = useDisplayFormat();
     const [picked, setPicked] = useState<readonly PickedPerson[]>([]);
     const [groups, setGroups] = useState<SharePerson[]>([]);
     const [groupId, setGroupId] = useState("");
@@ -109,7 +112,15 @@ export function PeopleShareDialog({
 
     if (!target) return null;
 
-    const alreadyHeld = (holders ?? []).filter((holder) => holder.type === "user").map((h) => h.id);
+    const held = (type: ItemShare["type"]) =>
+        (holders ?? []).filter((holder) => holder.type === type).map((holder) => holder.id);
+    const alreadyHeld = held("user");
+    // A group that already holds the item is left out for the same reason a
+    // person is: sharing to it again is not a second grant but a silent rewrite
+    // of the one it has, down to clearing a date this dialog did not ask about.
+    // Changing what a holder may do is done on their row underneath.
+    const heldGroups = new Set(held("group"));
+    const groupOptions = groups.filter((group) => !heldGroups.has(group.id));
     const nobodyChosen = picked.length === 0 && groupId === "";
 
     async function share() {
@@ -178,14 +189,14 @@ export function PeopleShareDialog({
                         search={findSharePeopleAction}
                     />
 
-                    {groups.length > 0 && (
+                    {groupOptions.length > 0 && (
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="text-xs text-muted-foreground">Or a group</span>
                             <Select
                                 value={groupId}
                                 onValueChange={setGroupId}
                                 placeholder="No group"
-                                options={groups.map((group) => ({
+                                options={groupOptions.map((group) => ({
                                     value: group.id,
                                     label: group.name
                                 }))}
@@ -214,7 +225,7 @@ export function PeopleShareDialog({
                         </span>
                         <Input
                             value={note}
-                            maxLength={200}
+                            maxLength={DRIVE_GRANT_NOTE_MAX}
                             onChange={(event) => setNote(event.target.value)}
                             placeholder="What this is"
                         />
@@ -236,42 +247,55 @@ export function PeopleShareDialog({
                         {holders === null ? (
                             <p className="text-sm text-muted-foreground">Looking</p>
                         ) : holders.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                Only you, so far.
-                            </p>
+                            <p className="text-sm text-muted-foreground">Only you, so far.</p>
                         ) : (
                             <ul className="flex flex-col gap-1">
-                                {holders.map((holder) => (
-                                    <li
-                                        key={holder.grantId}
-                                        className="flex items-center gap-2 rounded-md px-1 py-1"
-                                    >
-                                        {holder.type === "group" ? (
-                                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
-                                                <Users className="size-3.5" />
-                                            </span>
-                                        ) : (
-                                            <Avatar
-                                                person={{ id: holder.id, name: holder.name }}
-                                                size={24}
-                                            />
-                                        )}
-                                        <span className="min-w-0 flex-1 truncate text-sm">
-                                            {holder.name}
-                                        </span>
-                                        <Badge>{ROLE_LABELS[holder.role]}</Badge>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            disabled={busy}
-                                            title="Stop sharing"
-                                            aria-label={`Stop sharing with ${holder.name}`}
-                                            onClick={() => void stop(holder)}
+                                {holders.map((holder) => {
+                                    // A grant with a date on it stops applying
+                                    // when that date passes, and nothing sweeps
+                                    // the table - so one that has says so rather
+                                    // than sitting here as access somebody has.
+                                    const lapsed =
+                                        holder.expiresAt !== null &&
+                                        new Date(holder.expiresAt).getTime() <= Date.now();
+                                    return (
+                                        <li
+                                            key={holder.grantId}
+                                            className="flex items-center gap-2 rounded-md px-1 py-1"
                                         >
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </li>
-                                ))}
+                                            {holder.type === "group" ? (
+                                                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted">
+                                                    <Users className="size-3.5" />
+                                                </span>
+                                            ) : (
+                                                <Avatar
+                                                    person={{ id: holder.id, name: holder.name }}
+                                                    size={24}
+                                                />
+                                            )}
+                                            <span className="min-w-0 flex-1 truncate text-sm">
+                                                {holder.name}
+                                            </span>
+                                            <Badge>{ROLE_LABELS[holder.role]}</Badge>
+                                            {holder.expiresAt && (
+                                                <Badge variant={lapsed ? "neutral" : "warning"}>
+                                                    {lapsed ? "Lapsed" : "Until"}{" "}
+                                                    {format.date(holder.expiresAt)}
+                                                </Badge>
+                                            )}
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                disabled={busy}
+                                                title="Stop sharing"
+                                                aria-label={`Stop sharing with ${holder.name}`}
+                                                onClick={() => void stop(holder)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </Button>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
                     </div>

@@ -16,7 +16,15 @@ import type { ConnectionSummary } from "./types";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { type ConnectionProviderSlug, type StorageProviderKind } from "@polaris/core";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronRight, Plus, Radar, XCircle } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    CheckCircle2,
+    ChevronRight,
+    Plus,
+    Radar,
+    XCircle
+} from "lucide-react";
 import {
     createConnectionAction,
     detectNasAction,
@@ -154,7 +162,10 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
             value={chosen}
             onValueChange={setChosen}
             aria-label={field.label}
-            options={accounts.map((account) => ({ value: account.accountId, label: account.label }))}
+            options={accounts.map((account) => ({
+                value: account.accountId,
+                label: account.label
+            }))}
         />
     );
 }
@@ -199,11 +210,27 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     personal: [],
     sftp: [
         host,
-        { name: "port", label: "Port", type: "number", placeholder: "22 (default)", group: "config" },
+        {
+            name: "port",
+            label: "Port",
+            type: "number",
+            placeholder: "22 (default)",
+            group: "config"
+        },
         { name: "username", label: "Username", required: true, group: "config" },
         { name: "root", label: "Base path", placeholder: "/", group: "config" },
-        { name: "password", label: "Password (or use a key)", type: "password", group: "credentials" },
-        { name: "privateKey", label: "Private key (optional)", type: "keyfile", group: "credentials" }
+        {
+            name: "password",
+            label: "Password (or use a key)",
+            type: "password",
+            group: "credentials"
+        },
+        {
+            name: "privateKey",
+            label: "Private key (optional)",
+            type: "keyfile",
+            group: "credentials"
+        }
     ],
     webdav: [
         { name: "baseUrl", label: "Base URL", required: true, group: "config" },
@@ -216,7 +243,13 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
         { name: "bucket", label: "Bucket", required: true, group: "config" },
         { name: "forcePathStyle", label: "Force path style", type: "checkbox", group: "config" },
         { name: "accessKeyId", label: "Access key ID", required: true, group: "config" },
-        { name: "secretAccessKey", label: "Secret access key", type: "password", required: true, group: "credentials" }
+        {
+            name: "secretAccessKey",
+            label: "Secret access key",
+            type: "password",
+            required: true,
+            group: "credentials"
+        }
     ],
     smb: [
         host,
@@ -229,14 +262,29 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     synology: [
         host,
         { name: "username", label: "Username", required: true, group: "config" },
-        { name: "password", label: "Password", type: "password", required: true, group: "credentials" }
+        {
+            name: "password",
+            label: "Password",
+            type: "password",
+            required: true,
+            group: "credentials"
+        }
     ],
     qnap: [
         host,
         { name: "username", label: "Username", required: true, group: "config" },
-        { name: "password", label: "Password", type: "password", required: true, group: "credentials" }
+        {
+            name: "password",
+            label: "Password",
+            type: "password",
+            required: true,
+            group: "credentials"
+        }
     ],
-    truenas: [host, { name: "apiKey", label: "API key", type: "password", required: true, group: "credentials" }],
+    truenas: [
+        host,
+        { name: "apiKey", label: "API key", type: "password", required: true, group: "credentials" }
+    ],
     "unifi-unas": [
         host,
         port,
@@ -248,15 +296,36 @@ const FIELDS: Record<StorageProviderKind, FieldDef[]> = {
     // chosen from the ones somebody has already linked, and the token comes from
     // there. All that is left to decide is which folder to live in.
     gdrive: [
-        { name: "accountId", label: "Google account", type: "account", provider: "google", required: true, group: "config" },
+        {
+            name: "accountId",
+            label: "Google account",
+            type: "account",
+            provider: "google",
+            required: true,
+            group: "config"
+        },
         { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
     ],
     onedrive: [
-        { name: "accountId", label: "Microsoft account", type: "account", provider: "microsoft", required: true, group: "config" },
+        {
+            name: "accountId",
+            label: "Microsoft account",
+            type: "account",
+            provider: "microsoft",
+            required: true,
+            group: "config"
+        },
         { name: "rootFolderName", label: "Folder name", placeholder: "Polaris", group: "config" }
     ],
     dropbox: [
-        { name: "accountId", label: "Dropbox account", type: "account", provider: "dropbox", required: true, group: "config" },
+        {
+            name: "accountId",
+            label: "Dropbox account",
+            type: "account",
+            provider: "dropbox",
+            required: true,
+            group: "config"
+        },
         { name: "rootPath", label: "Folder", placeholder: "/Polaris", group: "config" }
     ]
 };
@@ -328,7 +397,9 @@ export function EditConnectionDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{rekey ? `Update ${LABELS[kind]} credentials` : `Edit ${LABELS[kind]}`}</DialogTitle>
+                    <DialogTitle>
+                        {rekey ? `Update ${LABELS[kind]} credentials` : `Edit ${LABELS[kind]}`}
+                    </DialogTitle>
                     <DialogDescription>
                         {rekey
                             ? "Re-enter the password or key to restore access. Your files, shares, and settings are kept."
@@ -339,13 +410,18 @@ export function EditConnectionDialog({
                     <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                         <span>
-                            The saved credentials were encrypted with a different master key and can no longer be read.
-                            Entering them again re-encrypts under the current key - nothing else about this connection
-                            changes.
+                            The saved credentials were encrypted with a different master key and can
+                            no longer be read. Entering them again re-encrypts under the current key
+                            - nothing else about this connection changes.
                         </span>
                     </div>
                 ) : null}
-                <form key={connection.id} onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
+                <form
+                    key={connection.id}
+                    onSubmit={onSubmit}
+                    className="flex flex-col gap-3"
+                    {...formProps}
+                >
                     <label className="flex flex-col gap-1 text-sm">
                         Name
                         <Input name="name" required defaultValue={connection.name} />
@@ -386,7 +462,9 @@ export function EditConnectionDialog({
                                                     : field.placeholder
                                             }
                                             defaultValue={
-                                                field.group === "config" && current !== undefined && current !== null
+                                                field.group === "config" &&
+                                                current !== undefined &&
+                                                current !== null
                                                     ? String(current)
                                                     : undefined
                                             }
@@ -548,12 +626,20 @@ export function ConnectionDialog() {
                                         onChange={(event) => setDetectIp(event.target.value)}
                                     />
                                 </label>
-                                <Button type="button" size="sm" variant="ghost" onClick={onDetect} disabled={detecting}>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={onDetect}
+                                    disabled={detecting}
+                                >
                                     <Radar className="size-4" />
                                     {detecting ? "Scanning..." : "Detect"}
                                 </Button>
                             </div>
-                            {detectMsg ? <p className="mt-1 text-xs text-muted-foreground">{detectMsg}</p> : null}
+                            {detectMsg ? (
+                                <p className="mt-1 text-xs text-muted-foreground">{detectMsg}</p>
+                            ) : null}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
@@ -563,14 +649,18 @@ export function ConnectionDialog() {
                                     type="button"
                                     onClick={() => chooseProvider(value)}
                                     className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors hover:border-primary hover:bg-primary/5 ${
-                                        value === "unifi-unas" ? "border-primary/60 bg-primary/5" : "border-border"
+                                        value === "unifi-unas"
+                                            ? "border-primary/60 bg-primary/5"
+                                            : "border-border"
                                     }`}
                                 >
                                     <span className="flex items-center justify-between text-sm font-medium">
                                         {LABELS[value]}
                                         <ChevronRight className="size-4 text-muted-foreground" />
                                     </span>
-                                    <span className="text-xs text-muted-foreground">{DESCRIPTIONS[value]}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {DESCRIPTIONS[value]}
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -582,10 +672,17 @@ export function ConnectionDialog() {
                             <Input name="name" required placeholder="My NAS" />
                         </label>
                         {FIELDS[kind].map((field) => (
-                            <label key={`${field.name}:${detectedHost}`} className="flex flex-col gap-1 text-sm">
+                            <label
+                                key={`${field.name}:${detectedHost}`}
+                                className="flex flex-col gap-1 text-sm"
+                            >
                                 {field.type === "checkbox" ? (
                                     <span className="flex items-center gap-2">
-                                        <input type="checkbox" name={field.name} className="size-4" />
+                                        <input
+                                            type="checkbox"
+                                            name={field.name}
+                                            className="size-4"
+                                        />
                                         {field.label}
                                     </span>
                                 ) : field.type === "keyfile" ? (
@@ -603,7 +700,9 @@ export function ConnectionDialog() {
                                             type={field.type ?? "text"}
                                             required={field.required}
                                             placeholder={field.placeholder}
-                                            defaultValue={field.name === "host" ? detectedHost : undefined}
+                                            defaultValue={
+                                                field.name === "host" ? detectedHost : undefined
+                                            }
                                         />
                                     </>
                                 )}
@@ -612,8 +711,9 @@ export function ConnectionDialog() {
                         {kind === "unifi-unas" ? (
                             <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-2">
                                 <p className="text-xs text-muted-foreground">
-                                    Use a <strong>local console account</strong> (not a Ubiquiti SSO login with 2FA).
-                                    Polaris reads metrics from the UniFi OS console over HTTPS; SSH stays off.
+                                    Use a <strong>local console account</strong> (not a Ubiquiti SSO
+                                    login with 2FA). Polaris reads metrics from the UniFi OS console
+                                    over HTTPS; SSH stays off.
                                 </p>
                                 <div className="flex items-center gap-2">
                                     <Button
@@ -644,7 +744,11 @@ export function ConnectionDialog() {
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="mt-2 flex items-center justify-between gap-2">
-                            <Button type="button" variant="ghost" onClick={() => setStep("provider")}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setStep("provider")}
+                            >
                                 <ArrowLeft className="size-4" />
                                 Back
                             </Button>

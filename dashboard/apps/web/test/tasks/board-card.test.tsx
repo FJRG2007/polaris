@@ -84,7 +84,7 @@ function card(task: TaskRow, canEdit = true): string {
             positioned
             onSelect={() => {}}
             onDragStart={() => {}}
-            onDropBefore={() => {}}
+            onDropAt={() => {}}
         />
     );
 }
@@ -125,7 +125,11 @@ describe("board card", () => {
         // An address pasted in as a task name is one word a hundred characters
         // long. Left alone it ran out through the side of the card and gave the
         // whole column a horizontal scrollbar of its own.
-        const markup = card(taskRow({ name: "https://polarisexamplenamewithnoseparators.example/aaaaaaaaaaaaaaaaaaaaaaaa" }));
+        const markup = card(
+            taskRow({
+                name: "https://polarisexamplenamewithnoseparators.example/aaaaaaaaaaaaaaaaaaaaaaaa"
+            })
+        );
         expect(markup).toContain("break-words");
         expect(markup).toContain("line-clamp-3");
     });

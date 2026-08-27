@@ -39,20 +39,20 @@ and repairs all happen from the interface.
 The fastest way to say what Polaris is: it is the tools you are already using,
 on hardware you already own, sharing one account and one interface.
 
-| What you use today | What Polaris runs instead |
-| --- | --- |
-| Railway, Render, Fly | Deploy from a repository or an image - onto their servers or onto your own machines |
-| Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips |
-| GitHub Actions | The same workflows on your own runners, so a private repository costs no minutes |
-| CodeRabbit | Reviews and coding agents that run here, on your own model keys |
-| Pterodactyl and a pile of scripts | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules |
-| ClickUp, Jira, Linear | Spaces, lists, boards, sprints, goals, docs and time tracking |
-| Home Assistant, a camera app | Places and cameras: live views, detections, clips, and alerts that arrive in chat |
-| Your NAS vendor's web UI | One file browser across every NAS you own, with sharing and drop points |
-| Bitwarden, 1Password | A vault your existing Bitwarden apps can point at, encrypted in the browser |
-| Cloudflare's dashboard | A firewall of your own: rules, country and network blocks, bot defences, bans |
-| A backup tool and a database GUI | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis |
-| Google Analytics, Plausible | Cookieless analytics for the sites you host |
+| What you use today                 | What Polaris runs instead                                                                     |
+| ---------------------------------- | --------------------------------------------------------------------------------------------- |
+| Railway, Render, Fly               | Deploy from a repository or an image - onto their servers or onto your own machines           |
+| Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips   |
+| GitHub Actions                     | The same workflows on your own runners, so a private repository costs no minutes              |
+| CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                               |
+| Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules |
+| ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking                                 |
+| Home Assistant, a camera app       | Places and cameras: live views, detections, clips, and alerts that arrive in chat             |
+| Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                       |
+| Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                   |
+| Cloudflare's dashboard             | A firewall of your own: rules, country and network blocks, bot defences, bans                 |
+| A backup tool and a database GUI   | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis               |
+| Google Analytics, Plausible        | Cookieless analytics for the sites you host                                                   |
 
 None of it is a fork of any of them. It is the same idea, built once, with the
 half those products cannot give you: it is yours, it is on your hardware, and
@@ -101,11 +101,14 @@ with one thing does not get the rest.
 
 **Files and secrets**
 
-- **Drive** - browse, upload, download and share files across every NAS you own:
-  local disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology,
-  QNAP, TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
-  buffer. Public links with passwords and expiry, drop points for people who have
-  no account, and viewers and editors for documents, spreadsheets, PDFs and media.
+- **Drive** - a private drive for every account from the moment they open it, plus
+  browsing, uploading, downloading and sharing across every NAS you own: local
+  disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology, QNAP,
+  TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
+  buffer. Share a file or folder with a person or group, with a role, a note and
+  an expiry; public links with passwords and expiry; drop points for people who
+  have no account; and viewers and editors for documents, spreadsheets, PDFs and
+  media.
 - **Vault** - a password manager that speaks the Bitwarden client protocol, so
   the apps and extensions you already use point at your own instance. Everything
   is encrypted in the browser; the server never sees a master password.
@@ -150,7 +153,8 @@ with one thing does not get the rest.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
 - **Places** - the places you own and the cameras in them: live views, clips,
-  events, detections and alerts that arrive as messages.
+  events, detections and alerts that arrive as messages, plus a notice the
+  moment a camera itself stops answering.
 
 **The account itself**
 

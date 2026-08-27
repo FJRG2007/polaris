@@ -12,6 +12,7 @@
 import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
+import { dropEdge, neighbours, type DropEdge } from "../drop-edge";
 import { useRowCursor } from "./row-cursor";
 import { cn, EmptyState } from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
@@ -51,7 +52,7 @@ function TaskLine({
     onPoint,
     onRegister,
     onDragStart,
-    onDropBefore
+    onDropAt
 }: {
     commands: TaskCommands;
     depth: number;
@@ -75,10 +76,11 @@ function TaskLine({
     onPoint?: () => void;
     onRegister?: (element: HTMLElement | null) => void;
     onDragStart?: () => void;
-    onDropBefore?: () => void;
+    /** Dropped on this row, on the half of it the pointer was in. */
+    onDropAt?: (edge: DropEdge) => void;
 }) {
     const format = useDisplayFormat();
-    const [over, setOver] = useState(false);
+    const [over, setOver] = useState<DropEdge | null>(null);
     const { task, canEdit, onOpen } = commands;
 
     return (
@@ -93,26 +95,42 @@ function TaskLine({
                     onDragStart?.();
                 }}
                 onDragOver={(event) => {
-                    if (!onDropBefore) return;
+                    if (!onDropAt) return;
                     event.preventDefault();
-                    setOver(true);
+                    setOver(dropEdge(event.clientY, event.currentTarget));
                 }}
-                onDragLeave={() => setOver(false)}
+                onDragLeave={() => setOver(null)}
                 onDrop={(event) => {
-                    if (!onDropBefore) return;
+                    if (!onDropAt) return;
                     event.preventDefault();
-                    setOver(false);
-                    onDropBefore();
+                    // The group underneath is where a drop that named no row
+                    // lands - the end of it. This one named a row, so the group
+                    // must not also hear it and overrule the place with its own.
+                    event.stopPropagation();
+                    const edge = over ?? dropEdge(event.clientY, event.currentTarget);
+                    setOver(null);
+                    onDropAt(edge);
                 }}
                 className={cn(
                     "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-card-hover",
                     selected && "bg-primary/5",
                     cursor &&
-                        "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary",
-                    over && positioned && "border-t-2 border-t-primary"
+                        "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
                 )}
                 style={{ paddingLeft: `${0.5 + depth * 1.25}rem` }}
             >
+                {/* The line the drop would land on, drawn on the edge it would
+                actually use rather than always above: a row dragged downwards
+                goes under the one it was released over. */}
+                {over && positioned && (
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                            over === "before" ? "top-0" : "bottom-0"
+                        )}
+                    />
+                )}
                 <TaskStatusMarker commands={commands} />
                 <div className="flex min-w-0 flex-1 flex-col">
                     <button
@@ -285,7 +303,11 @@ export function ListView(props: ViewProps) {
                                     onMove({
                                         taskId: dragging,
                                         groupKey: group.key,
-                                        position: { beforeId: last?.id ?? null, afterId: null }
+                                        position: {
+                                            beforeId: last?.id ?? null,
+                                            afterId: null,
+                                            placed: false
+                                        }
                                     });
                                     setDragging(null);
                                 }}
@@ -302,35 +324,45 @@ export function ListView(props: ViewProps) {
                                             cursor={cursor.at === task.id}
                                             showStatus={props.groupBy !== "status"}
                                             showLocation={props.showLocation}
-                                            positioned={orderable}
+                                            positioned={orderable && dragging !== task.id}
                                             onPoint={() => cursor.moveTo(task.id)}
                                             onRegister={(element) =>
                                                 cursor.register(task.id, element)
                                             }
                                             onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                             onDragStart={() => setDragging(task.id)}
-                                            onDropBefore={() => {
+                                            onDropAt={(edge) => {
                                                 if (!dragging) return;
-                                                const without = group.tasks.filter(
-                                                    (entry) => entry.id !== dragging
-                                                );
+                                                setDragging(null);
+                                                // Let go on its own row: the place it
+                                                // is already in, and nothing to write.
+                                                if (dragging === task.id) return;
                                                 // Only the group is honoured while a
                                                 // search is on: the row landed on says
                                                 // which one, not where in it.
-                                                const index = orderable
-                                                    ? without.findIndex(
-                                                          (entry) => entry.id === task.id
+                                                const at = orderable
+                                                    ? neighbours(
+                                                          group.tasks,
+                                                          task.id,
+                                                          dragging,
+                                                          edge
                                                       )
-                                                    : without.length;
+                                                    : null;
+                                                if (orderable && !at) return;
+                                                const last = group.tasks
+                                                    .filter((entry) => entry.id !== dragging)
+                                                    .at(-1);
                                                 onMove({
                                                     taskId: dragging,
                                                     groupKey: group.key,
-                                                    position: {
-                                                        beforeId: without[index - 1]?.id ?? null,
-                                                        afterId: orderable ? task.id : null
-                                                    }
+                                                    position: at
+                                                        ? { ...at, placed: true }
+                                                        : {
+                                                              beforeId: last?.id ?? null,
+                                                              afterId: null,
+                                                              placed: false
+                                                          }
                                                 });
-                                                setDragging(null);
                                             }}
                                         />
                                     );

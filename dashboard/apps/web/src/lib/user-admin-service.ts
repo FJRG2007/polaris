@@ -153,7 +153,10 @@ export async function listImposableGroups(adminId: string): Promise<AccessGroupV
 
 /** Refuse a change that would leave the instance with no way back in. */
 async function wouldStrandInstance(userId: string): Promise<boolean> {
-    const target = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    const target = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { isAdmin: true }
+    });
     if (!target?.isAdmin) return false;
     const others = await prisma.user.count({
         where: { isAdmin: true, ...VISIBLE_USER, id: { not: userId } }
@@ -256,13 +259,22 @@ export async function liftExpiredSuspensions(now = new Date()): Promise<number> 
     });
     for (const row of due) {
         // Nobody did this: the clock did, which is what a null actor means.
-        await recordAudit({ actorId: null, action: "user.unsuspend", targetType: "user", targetId: row.id });
+        await recordAudit({
+            actorId: null,
+            action: "user.unsuspend",
+            targetType: "user",
+            targetId: row.id
+        });
     }
     return due.length;
 }
 
 /** Grant or withdraw the administrator gate on operator surfaces. */
-export async function setAdminAccess(actorId: string, userId: string, isAdmin: boolean): Promise<{ error?: string }> {
+export async function setAdminAccess(
+    actorId: string,
+    userId: string,
+    isAdmin: boolean
+): Promise<{ error?: string }> {
     if (!isAdmin) {
         if (userId === actorId) return { error: "You can't remove your own administrator access." };
         if (await wouldStrandInstance(userId)) return { error: "This is the last administrator." };
@@ -282,7 +294,11 @@ export async function setAdminAccess(actorId: string, userId: string, isAdmin: b
  * because that is how invites hand them out; a bespoke set of several is a
  * policy attachment, which lives on its own page.
  */
-export async function setUserRole(actorId: string, userId: string, roleName: string): Promise<{ error?: string }> {
+export async function setUserRole(
+    actorId: string,
+    userId: string,
+    roleName: string
+): Promise<{ error?: string }> {
     const role = await prisma.role.findUnique({ where: { name: roleName }, select: { id: true } });
     if (!role) return { error: "Unknown role." };
     await prisma.$transaction([
@@ -335,12 +351,24 @@ export async function setUserLimits(
 }
 
 /** Sign a user out everywhere. */
-export async function revokeUserSessions(actorId: string, userId: string): Promise<{ error?: string }> {
+export async function revokeUserSessions(
+    actorId: string,
+    userId: string
+): Promise<{ error?: string }> {
     const count = await dropSessions(userId);
-    await recordAudit({ actorId, action: "user.sessions.revoke", targetType: "user", targetId: userId });
+    await recordAudit({
+        actorId,
+        action: "user.sessions.revoke",
+        targetType: "user",
+        targetId: userId
+    });
     // Told to the account it happened to, not to the operator who did it. Being
     // signed out of everything by somebody else is the owner's news.
-    await notifySessionsClosed({ userId, count, reason: "An administrator signed your account out everywhere." });
+    await notifySessionsClosed({
+        userId,
+        count,
+        reason: "An administrator signed your account out everywhere."
+    });
     return {};
 }
 

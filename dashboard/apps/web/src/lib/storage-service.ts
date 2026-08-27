@@ -7,20 +7,26 @@
  * activation step (see enigma marker).
  */
 
+import { isUuid } from "@/lib/uuid";
 import { prisma } from "@polaris/db";
 import { mkdir } from "node:fs/promises";
-import { isUuid } from "@/lib/uuid";
 import { listSmbShares } from "@/lib/smb-shares";
 import { HostdClient } from "@polaris/hostd-client";
 import { getCapabilities, loadEnv } from "@polaris/config";
-import { canHostMount, isPersonalKind, LOCAL_TARGET, PERSONAL_KIND, requiresHostd } from "@polaris/core";
-import { grantedConnectionIds, grantedRootPath } from "@/lib/drive-acl-service";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
 import { linkedAccountToken } from "@/lib/connections/storage-token";
 import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
+import { grantedConnectionIds, grantedRootPath } from "@/lib/drive-acl-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
 import { resolveContainerName, resolveLocalContainer } from "@/lib/container-files-service";
+import {
+    canHostMount,
+    isPersonalKind,
+    LOCAL_TARGET,
+    PERSONAL_KIND,
+    requiresHostd
+} from "@polaris/core";
 import {
     getHostConnection,
     getHostConnectionUnscoped,
@@ -226,7 +232,9 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
     }
     const spec = mountSpecFor(row);
     if (!spec) {
-        console.error(`storage: ${row.id} (${row.kind}) has nothing to mount, reading it over its own protocol`);
+        console.error(
+            `storage: ${row.id} (${row.kind}) has nothing to mount, reading it over its own protocol`
+        );
         return null;
     }
     const seenAt = mountsSeenLive.get(row.id);
@@ -364,7 +372,11 @@ async function buildDriver(row: ConnectionRow): Promise<StorageDriver> {
             // mkdir against a NAS before the listing that was actually asked
             // for, and browsing is many requests - so a folder seen recently is
             // taken on trust, exactly as a mount is above.
-            createRoot: !seenRecently(personalRootsSeen, row.id)
+            createRoot: !seenRecently(personalRootsSeen, row.id),
+            // Both branches above hand back an open driver, and opening one twice
+            // over a pooled protocol borrows a second session that nothing ever
+            // gives back.
+            innerConnected: true
         });
         await driver.connect();
         // Only once it opened: a connect that failed proves nothing about the
@@ -633,10 +645,7 @@ function annotateRekey<T extends { credentialKeyId: string | null }>(
 
 /** All connections owned by a user, without secret material. Each carries a
  *  `needsRekey` flag when its credentials no longer match the master key. */
-export async function listConnections(
-    ownerId: string,
-    options?: { readonly personal?: boolean }
-) {
+export async function listConnections(ownerId: string, options?: { readonly personal?: boolean }) {
     const rows = await prisma.storageConnection.findMany({
         // A personal drive is a storage somebody owns and nothing else may use,
         // so it is absent unless the caller is Drive and asks for it. Left in by

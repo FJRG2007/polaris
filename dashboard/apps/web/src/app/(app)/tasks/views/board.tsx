@@ -23,6 +23,7 @@ import type { TaskRow } from "@/lib/tasks/facts";
 import { useEffect, useMemo, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { clickMode, type BoardMove, type SelectMode, type ViewProps } from "./shared";
+import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
     GripVertical,
@@ -56,20 +57,27 @@ import {
     useDeferredFocus
 } from "@polaris/ui";
 
-/** Where a card was dropped, as neighbours rather than an index. */
+/**
+ * Where a card was dropped, as neighbours rather than an index.
+ *
+ * A card says which half of it the pointer was in, so a card dragged downwards
+ * lands under the one it was released over rather than above it. The body of a
+ * column says nothing at all, which means the end of that column and promises no
+ * place - see `placed`. Null when the card it landed on has since left the
+ * column: no place at all, which is not the same as the end of one.
+ */
 function neighbours(
     tasks: readonly TaskRow[],
-    targetId: string | null,
+    target: { id: string; edge: DropEdge } | null,
     dragged: string
-): BoardMove["position"] {
+): BoardMove["position"] | null {
     const without = tasks.filter((task) => task.id !== dragged);
-    if (!targetId) {
+    if (!target) {
         const last = without.at(-1);
-        return { beforeId: last?.id ?? null, afterId: null };
+        return { beforeId: last?.id ?? null, afterId: null, placed: false };
     }
-    const index = without.findIndex((task) => task.id === targetId);
-    if (index === -1) return { beforeId: null, afterId: null };
-    return { beforeId: without[index - 1]?.id ?? null, afterId: targetId };
+    const at = edgeNeighbours(tasks, target.id, dragged, target.edge);
+    return at === null ? null : { ...at, placed: true };
 }
 
 /**
@@ -234,7 +242,7 @@ export function TaskCard({
     commands,
     accepting = true,
     onDragStart,
-    onDropBefore,
+    onDropAt,
     positioned,
     selected,
     showLocation,
@@ -246,17 +254,18 @@ export function TaskCard({
      *  being swallowed by a card that has nothing to do with it. */
     accepting?: boolean;
     onDragStart: () => void;
-    onDropBefore: () => void;
-    /** Whether dropping here would actually put the card here. False under a
-     *  sort that decides the order itself, where the insert line would be a
-     *  promise the next render breaks. */
+    /** Dropped on this card, on the half of it the pointer was in. */
+    onDropAt: (edge: DropEdge) => void;
+    /** Whether dropping here would actually put the card here. False while a
+     *  search is on, where the rows are ranked by how well they matched and the
+     *  insert line would be a promise the next render breaks. */
     positioned: boolean;
     selected: boolean;
     showLocation?: boolean;
     onSelect: (mode: SelectMode) => void;
 }) {
     const format = useDisplayFormat();
-    const [over, setOver] = useState(false);
+    const [over, setOver] = useState<DropEdge | null>(null);
     const { task, context, canEdit, onOpen } = commands;
     // The bottom line only earns its space when there is something on it.
     const hasMeta =
@@ -283,23 +292,28 @@ export function TaskCard({
                 onDragOver={(event) => {
                     if (!accepting || !canEdit) return;
                     event.preventDefault();
-                    setOver(true);
+                    setOver(dropEdge(event.clientY, event.currentTarget));
                 }}
-                onDragLeave={() => setOver(false)}
+                onDragLeave={() => setOver(null)}
                 onDrop={(event) => {
                     if (!accepting || !canEdit) return;
                     event.preventDefault();
                     event.stopPropagation();
-                    setOver(false);
-                    onDropBefore();
+                    const edge = over ?? dropEdge(event.clientY, event.currentTarget);
+                    setOver(null);
+                    onDropAt(edge);
                 }}
-                className={cn(
-                    "relative",
-                    over &&
-                        positioned &&
-                        "before:absolute before:-top-1 before:h-0.5 before:w-full before:rounded before:bg-primary"
-                )}
+                className="relative"
             >
+                {over && positioned && (
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                            over === "before" ? "-top-1" : "-bottom-1"
+                        )}
+                    />
+                )}
                 <div
                     role="button"
                     tabIndex={0}
@@ -498,14 +512,21 @@ export function BoardView(props: ViewProps) {
         [shown]
     );
 
-    const drop = (groupKey: string, tasks: readonly TaskRow[], targetId: string | null) => {
+    const drop = (
+        groupKey: string,
+        tasks: readonly TaskRow[],
+        target: { id: string; edge: DropEdge } | null
+    ) => {
         if (!dragging) return;
+        setDragging(null);
+        // Let go on its own card: the place it is already in, and nothing to write.
+        if (target?.id === dragging) return;
         // While a search is on, the card the drop landed on says which column was
         // meant and nothing more: the rows are ranked by how well they matched,
         // so a position among them is not one anybody could keep.
-        const target = orderable ? targetId : null;
-        onMove({ taskId: dragging, groupKey, position: neighbours(tasks, target, dragging) });
-        setDragging(null);
+        const position = neighbours(tasks, orderable ? target : null, dragging);
+        if (!position) return;
+        onMove({ taskId: dragging, groupKey, position });
     };
 
     const columnIds = (key: string) => columnStatusIds(columns, key);
@@ -726,10 +747,12 @@ export function BoardView(props: ViewProps) {
                                         accepting={draggingColumn === null}
                                         selected={selection.has(task.id)}
                                         showLocation={props.showLocation}
-                                        positioned={orderable}
+                                        positioned={orderable && dragging !== task.id}
                                         onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                         onDragStart={() => setDragging(task.id)}
-                                        onDropBefore={() => drop(group.key, group.tasks, task.id)}
+                                        onDropAt={(edge) =>
+                                            drop(group.key, group.tasks, { id: task.id, edge })
+                                        }
                                     />
                                 ))}
                                 {group.tasks.length === 0 && addingTo !== group.key && (

@@ -42,6 +42,7 @@ import {
     unlockPathAction
 } from "./access-actions";
 import { PrincipalPicker } from "./principal-picker";
+import { useDisplayFormat } from "@/components/display-format";
 import type { AccessPrincipal, AccessSettings } from "./access-types";
 
 export interface AccessTarget {
@@ -92,6 +93,7 @@ export function AccessDialog({
     onOpenChange: (open: boolean) => void;
     onChanged?: () => void;
 }) {
+    const format = useDisplayFormat();
     const [settings, setSettings] = useState<AccessSettings | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -212,67 +214,93 @@ export function AccessDialog({
                                 </p>
                             ) : (
                                 <ul className="flex flex-col gap-1.5">
-                                    {grants.map((grant) => (
-                                        <li
-                                            key={grant.id}
-                                            className="flex items-start justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
-                                        >
-                                            <div className="flex min-w-0 items-start gap-2">
-                                                {grant.principalType === "group" ? (
-                                                    <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                                ) : (
-                                                    <User className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                                                )}
-                                                <div className="min-w-0">
-                                                    <span className="flex items-center gap-1.5">
-                                                        <span className="truncate font-medium">
-                                                            {principalLabel(
-                                                                grant.principalType,
-                                                                grant.principalId
+                                    {grants.map((grant) => {
+                                        // A grant with a date on it stops applying
+                                        // when that date passes, and nothing sweeps
+                                        // the table - so one that has lapsed must
+                                        // not read as "Allowed" here.
+                                        const lapsed =
+                                            grant.expiresAt !== null &&
+                                            new Date(grant.expiresAt).getTime() <= Date.now();
+                                        return (
+                                            <li
+                                                key={grant.id}
+                                                className="flex items-start justify-between gap-2 rounded-md border border-border px-2.5 py-2 text-sm"
+                                            >
+                                                <div className="flex min-w-0 items-start gap-2">
+                                                    {grant.principalType === "group" ? (
+                                                        <Users className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                                    ) : (
+                                                        <User className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <span className="flex items-center gap-1.5">
+                                                            <span className="truncate font-medium">
+                                                                {principalLabel(
+                                                                    grant.principalType,
+                                                                    grant.principalId
+                                                                )}
+                                                            </span>
+                                                            <Badge
+                                                                variant={
+                                                                    lapsed
+                                                                        ? "neutral"
+                                                                        : grant.effect === "deny"
+                                                                          ? "danger"
+                                                                          : "success"
+                                                                }
+                                                            >
+                                                                {lapsed
+                                                                    ? "Lapsed"
+                                                                    : grant.effect === "deny"
+                                                                      ? "Denied"
+                                                                      : "Allowed"}
+                                                            </Badge>
+                                                            {grant.expiresAt && (
+                                                                <Badge
+                                                                    variant={
+                                                                        lapsed
+                                                                            ? "neutral"
+                                                                            : "warning"
+                                                                    }
+                                                                >
+                                                                    {lapsed ? "Since" : "Until"}{" "}
+                                                                    {format.date(grant.expiresAt)}
+                                                                </Badge>
                                                             )}
                                                         </span>
-                                                        <Badge
-                                                            variant={
-                                                                grant.effect === "deny"
-                                                                    ? "danger"
-                                                                    : "success"
-                                                            }
-                                                        >
-                                                            {grant.effect === "deny"
-                                                                ? "Denied"
-                                                                : "Allowed"}
-                                                        </Badge>
-                                                    </span>
-                                                    <span className="mt-1 flex flex-wrap gap-1">
-                                                        {grant.actions.map((action) => (
-                                                            <span
-                                                                key={action}
-                                                                className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                                                            >
-                                                                {ACTION_LABELS[action] ?? action}
-                                                            </span>
-                                                        ))}
-                                                    </span>
+                                                        <span className="mt-1 flex flex-wrap gap-1">
+                                                            {grant.actions.map((action) => (
+                                                                <span
+                                                                    key={action}
+                                                                    className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                                                                >
+                                                                    {ACTION_LABELS[action] ??
+                                                                        action}
+                                                                </span>
+                                                            ))}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                aria-label="Remove grant"
-                                                disabled={busy}
-                                                onClick={() =>
-                                                    run(() =>
-                                                        removeDriveAclAction(
-                                                            target!.connectionId,
-                                                            grant.id
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    aria-label="Remove grant"
+                                                    disabled={busy}
+                                                    onClick={() =>
+                                                        run(() =>
+                                                            removeDriveAclAction(
+                                                                target!.connectionId,
+                                                                grant.id
+                                                            )
                                                         )
-                                                    )
-                                                }
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        </li>
-                                    ))}
+                                                    }
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             )}
 

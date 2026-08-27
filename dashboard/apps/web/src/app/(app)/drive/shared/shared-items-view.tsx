@@ -26,13 +26,7 @@ const ROLE_LABELS: Record<DriveShareRole | "custom", string> = {
     custom: "Custom access"
 };
 
-export function SharedItemsView({
-    withMe,
-    byMe
-}: {
-    withMe: SharedItem[];
-    byMe: SharedItem[];
-}) {
+export function SharedItemsView({ withMe, byMe }: { withMe: SharedItem[]; byMe: SharedItem[] }) {
     const [given, setGiven] = useState(byMe);
     const [busy, setBusy] = useState<string | null>(null);
     const [confirm, confirmDialog] = useConfirm();
@@ -130,7 +124,10 @@ function ItemRow({
                         <FolderOpen className="size-4 text-muted-foreground" />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <Link href={href} className="block truncate text-sm font-medium hover:underline">
+                        <Link
+                            href={href}
+                            className="block truncate text-sm font-medium hover:underline"
+                        >
                             {item.name}
                         </Link>
                         <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
@@ -140,12 +137,16 @@ function ItemRow({
                             ) : (
                                 <Avatar person={{ id: person.id, name: person.name }} size={16} />
                             )}
-                            <span className="truncate" title={person.name}>{person.name}</span>
+                            <span className="truncate" title={person.name}>
+                                {person.name}
+                            </span>
                             <span aria-hidden>-</span>
                             <span>{format.date(item.sharedAt)}</span>
                         </p>
                         {item.note && (
-                            <p className="truncate text-xs text-muted-foreground" title={item.note}>{item.note}</p>
+                            <p className="truncate text-xs text-muted-foreground" title={item.note}>
+                                {item.note}
+                            </p>
                         )}
                     </div>
                     <Badge>{ROLE_LABELS[item.role]}</Badge>

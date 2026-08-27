@@ -36,7 +36,8 @@ const KINDS = [
     { value: "animal", label: "An animal" },
     { value: "package", label: "A box or bag is left" },
     { value: "motion", label: "Anything moves" },
-    { value: "tamper", label: "A camera is tampered with" }
+    { value: "tamper", label: "A camera is tampered with" },
+    { value: "offline", label: "A camera stops answering" }
 ];
 
 export function AlertDialog({

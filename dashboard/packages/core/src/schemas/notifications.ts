@@ -277,7 +277,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "account.connection.expired",
         group: "security",
         label: "A connected account stopped working",
-        description: "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
+        description:
+            "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
         level: "danger",
         // Mailed by default, and for the same reason the key expiry is: nobody
         // watches the bell for a thing that has not happened yet, and the first
@@ -367,6 +368,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "A camera was interfered with",
         description: "A camera reported being covered, moved or unplugged.",
         level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "places.offline",
+        group: "places",
+        label: "A camera stopped answering",
+        description: "A camera went quiet, or came back after being quiet.",
+        level: "warning",
+        // On, unlike a sighting. Nothing else reports this: a camera that has
+        // stopped looks exactly like a quiet night, so the one place it can be
+        // noticed is here.
         defaults: { inapp: true, email: false }
     },
     {

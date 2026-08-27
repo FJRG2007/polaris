@@ -47,7 +47,8 @@ const KIND_LABEL: Record<string, string> = {
     vehicle: "a vehicle",
     animal: "an animal",
     package: "a box or bag is left",
-    tamper: "tampering"
+    tamper: "tampering",
+    offline: "a camera going quiet"
 };
 
 export function AlertsView({ canManage }: { canManage: boolean }) {

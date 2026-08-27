@@ -23,8 +23,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { LOCAL_TARGET, PERSONAL_KIND, type StorageConfig } from "@polaris/core";
 import { getDriverForConnection, PERSONAL_LOCAL_FOLDER } from "@/lib/storage-service";
 import {
@@ -37,6 +37,17 @@ import {
 
 /** What a personal drive is called wherever storages are listed by name. */
 export const PERSONAL_DRIVE_NAME = "My files";
+
+/**
+ * The one refusal a caller is expected to show somebody.
+ *
+ * A drive is looked up by an id that is an account's, so the only way it can
+ * fail to open other than a broken database is a row under that id that is not
+ * this account's drive. That is worth saying on the screen; everything else that
+ * can go wrong in here is a storage or a query failing, and its message belongs
+ * in the log rather than in front of a reader who cannot act on it.
+ */
+export const PERSONAL_DRIVE_TAKEN = "This account's drive cannot be opened";
 
 /** Where a personal drive made from now on is put. Its own setting, beside the
  *  other upload destinations on /admin/uploads: people's files are the biggest
@@ -125,7 +136,7 @@ export async function ensurePersonalDrive(userId: string): Promise<PersonalDrive
         // and is not something to quietly write over.
         const drive = existing.ownerId === userId ? driveOf(existing) : null;
         if (drive) return drive;
-        throw new Error("This account's drive cannot be opened");
+        throw new Error(PERSONAL_DRIVE_TAKEN);
     }
 
     const target = await resolveStorageTarget(PERSONAL_TARGET_KEY);
@@ -246,9 +257,18 @@ export async function discardPersonalDrive(userId: string): Promise<string | nul
         // Everything inside it, one level in: the drive's own folder is exactly
         // what the driver refuses to remove, and it is left for the storage's
         // owner to sweep up empty.
-        for (const entry of (await driver.list("")).entries) {
-            await driver.delete(entry.path, { recursive: true });
-        }
+        //
+        // To the end of the listing, not the first page of it: a bucket answers
+        // a thousand keys at a time, and stopping there would leave the rest of
+        // somebody's files on the disk while reporting that nothing was left.
+        let cursor: string | undefined;
+        do {
+            const page = await driver.list("", { cursor });
+            for (const entry of page.entries) {
+                await driver.delete(entry.path, { recursive: true });
+            }
+            cursor = page.nextCursor;
+        } while (cursor);
         return null;
     } catch (caught) {
         return `${drive.root}: ${caught instanceof Error ? caught.message : "could not be emptied"}`;

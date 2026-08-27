@@ -66,7 +66,11 @@ export const LOCAL_TARGET = "local";
  * from the linked account when a driver is built. Unlinking the account is then
  * what stops the connection working, which is what somebody unlinking it meant.
  */
-export const LINKED_ACCOUNT_KINDS: readonly StorageProviderKind[] = ["gdrive", "onedrive", "dropbox"];
+export const LINKED_ACCOUNT_KINDS: readonly StorageProviderKind[] = [
+    "gdrive",
+    "onedrive",
+    "dropbox"
+];
 
 /** Whether this kind authorizes through a linked account instead of its own secret. */
 export function usesLinkedAccount(kind: StorageProviderKind): boolean {
@@ -87,8 +91,17 @@ const hostPort = z.object({
 // Non-secret configuration, discriminated by provider kind.
 export const storageConfigSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("local"), root: z.string().min(1) }),
-    z.object({ ...hostPort.shape, kind: z.literal("sftp"), root: z.string().default("/"), username: z.string().min(1) }),
-    z.object({ kind: z.literal("webdav"), baseUrl: z.string().url(), username: z.string().optional() }),
+    z.object({
+        ...hostPort.shape,
+        kind: z.literal("sftp"),
+        root: z.string().default("/"),
+        username: z.string().min(1)
+    }),
+    z.object({
+        kind: z.literal("webdav"),
+        baseUrl: z.string().url(),
+        username: z.string().optional()
+    }),
     z.object({
         kind: z.literal("s3"),
         endpoint: z.string().url().optional(),
@@ -97,10 +110,26 @@ export const storageConfigSchema = z.discriminatedUnion("kind", [
         forcePathStyle: z.boolean().default(false),
         accessKeyId: z.string().min(1)
     }),
-    z.object({ ...hostPort.shape, kind: z.literal("smb"), share: z.string().min(1), domain: z.string().optional(), username: z.string().optional() }),
+    z.object({
+        ...hostPort.shape,
+        kind: z.literal("smb"),
+        share: z.string().min(1),
+        domain: z.string().optional(),
+        username: z.string().optional()
+    }),
     z.object({ ...hostPort.shape, kind: z.literal("nfs"), exportPath: z.string().min(1) }),
-    z.object({ ...hostPort.shape, kind: z.literal("synology"), secure: z.boolean().default(true), username: z.string().min(1) }),
-    z.object({ ...hostPort.shape, kind: z.literal("qnap"), secure: z.boolean().default(true), username: z.string().min(1) }),
+    z.object({
+        ...hostPort.shape,
+        kind: z.literal("synology"),
+        secure: z.boolean().default(true),
+        username: z.string().min(1)
+    }),
+    z.object({
+        ...hostPort.shape,
+        kind: z.literal("qnap"),
+        secure: z.boolean().default(true),
+        username: z.string().min(1)
+    }),
     z.object({ ...hostPort.shape, kind: z.literal("truenas"), secure: z.boolean().default(true) }),
     z.object({
         ...hostPort.shape,
@@ -159,7 +188,12 @@ export type StorageConfig = z.infer<typeof storageConfigSchema>;
 // anonymous or key-file access supplied out of band.
 export const storageCredentialsSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("local") }),
-    z.object({ kind: z.literal("sftp"), password: z.string().optional(), privateKey: z.string().optional(), passphrase: z.string().optional() }),
+    z.object({
+        kind: z.literal("sftp"),
+        password: z.string().optional(),
+        privateKey: z.string().optional(),
+        passphrase: z.string().optional()
+    }),
     z.object({ kind: z.literal("webdav"), password: z.string().optional() }),
     z.object({ kind: z.literal("s3"), secretAccessKey: z.string().min(1) }),
     z.object({ kind: z.literal("smb"), password: z.string().optional() }),
@@ -167,7 +201,11 @@ export const storageCredentialsSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("synology"), password: z.string().min(1) }),
     z.object({ kind: z.literal("qnap"), password: z.string().min(1) }),
     z.object({ kind: z.literal("truenas"), apiKey: z.string().min(1) }),
-    z.object({ kind: z.literal("unifi-unas"), password: z.string().optional(), apiKey: z.string().optional() }),
+    z.object({
+        kind: z.literal("unifi-unas"),
+        password: z.string().optional(),
+        apiKey: z.string().optional()
+    }),
     // Nothing to hold: these authorize through the linked account's own token.
     z.object({ kind: z.literal("gdrive") }),
     z.object({ kind: z.literal("onedrive") }),

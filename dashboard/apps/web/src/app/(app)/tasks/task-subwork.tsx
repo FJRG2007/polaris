@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { settleTagIds, withCreatedTags } from "./tag-creation";
 import type { TaskBulkEdit, TaskEdit } from "./views/shared";
+import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
@@ -38,7 +39,7 @@ function Sortable({
     dragging,
     onDragStart,
     onDragEnd,
-    onDropBefore,
+    onDropAt,
     disabled,
     className,
     children
@@ -47,12 +48,13 @@ function Sortable({
     dragging: string | null;
     onDragStart: () => void;
     onDragEnd: () => void;
-    onDropBefore: () => void;
+    /** Dropped on this row, on the half of it the pointer was in. */
+    onDropAt: (edge: DropEdge) => void;
     disabled?: boolean;
     className?: string;
     children: React.ReactNode;
 }) {
-    const [over, setOver] = useState(false);
+    const [over, setOver] = useState<DropEdge | null>(null);
 
     return (
         <li
@@ -68,28 +70,38 @@ function Sortable({
                 if (disabled || !dragging || dragging === id) return;
                 event.preventDefault();
                 event.stopPropagation();
-                setOver(true);
+                setOver(dropEdge(event.clientY, event.currentTarget));
             }}
-            onDragLeave={() => setOver(false)}
+            onDragLeave={() => setOver(null)}
             onDrop={(event) => {
+                // Let go on its own row. It still takes the drop: underneath is
+                // the list itself, which means the end of it, and a row released
+                // where it already is has not asked to go anywhere.
+                if (dragging === id) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 if (!over) return;
                 event.preventDefault();
                 event.stopPropagation();
-                setOver(false);
-                onDropBefore();
+                setOver(null);
+                onDropAt(over);
             }}
-            className={cn("relative", over && "before:absolute before:-top-px before:h-0.5 before:w-full before:rounded before:bg-primary", className)}
+            className={cn("relative", className)}
         >
+            {over && (
+                <span
+                    aria-hidden
+                    className={cn(
+                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        over === "before" ? "-top-px" : "-bottom-px"
+                    )}
+                />
+            )}
             {children}
         </li>
     );
-}
-
-/** The row a drop above `id` should land between, among a set of siblings. */
-function neighbours(siblings: readonly { id: string }[], targetId: string, dragged: string) {
-    const without = siblings.filter((entry) => entry.id !== dragged);
-    const index = without.findIndex((entry) => entry.id === targetId);
-    return { beforeId: index > 0 ? (without[index - 1]?.id ?? null) : null, afterId: targetId };
 }
 
 /** A short line of text somebody types and presses enter on. Used for every
@@ -127,7 +139,12 @@ function QuickAdd({
                 }}
                 className="h-8 text-sm"
             />
-            <Button size="sm" variant="ghost" disabled={disabled || busy || !value.trim()} onClick={() => void submit()}>
+            <Button
+                size="sm"
+                variant="ghost"
+                disabled={disabled || busy || !value.trim()}
+                onClick={() => void submit()}
+            >
                 Add
             </Button>
         </div>
@@ -177,9 +194,10 @@ export function SubtaskSection({
         onChanged();
     };
 
-    const move = async (targetId: string) => {
+    const move = async (targetId: string, edge: DropEdge) => {
         if (!dragging || dragging === targetId) return;
-        const position = neighbours(rows, targetId, dragging);
+        const position = neighbours(rows, targetId, dragging, edge);
+        if (!position) return;
         const moved = dragging;
         setDragging(null);
         onError("");
@@ -195,8 +213,13 @@ export function SubtaskSection({
         }));
         // A tag created from this row is carrying an id this browser made up until
         // the write, which is where it has to be a real one.
-        const written = change.tagIds ? { ...change, tagIds: await settleTagIds(change.tagIds) } : change;
-        const result = await runAction(() => actions.updateTaskAction({ taskId: subtaskId, ...written }), onError);
+        const written = change.tagIds
+            ? { ...change, tagIds: await settleTagIds(change.tagIds) }
+            : change;
+        const result = await runAction(
+            () => actions.updateTaskAction({ taskId: subtaskId, ...written }),
+            onError
+        );
         if (result?.error) onError(result.error);
         reload();
     };
@@ -209,11 +232,19 @@ export function SubtaskSection({
         if (change.archived === undefined) {
             setPending((current) => ({
                 ...current,
-                [subtask.id]: { ...current[subtask.id], ...bulkOverlay(subtask, change, withCreatedTags(context)) }
+                [subtask.id]: {
+                    ...current[subtask.id],
+                    ...bulkOverlay(subtask, change, withCreatedTags(context))
+                }
             }));
         }
-        const written = change.addTagIds ? { ...change, addTagIds: await settleTagIds(change.addTagIds) } : change;
-        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [subtask.id], ...written }), onError);
+        const written = change.addTagIds
+            ? { ...change, addTagIds: await settleTagIds(change.addTagIds) }
+            : change;
+        const result = await runAction(
+            () => actions.bulkUpdateAction({ taskIds: [subtask.id], ...written }),
+            onError
+        );
         if (result?.error) onError(result.error);
         reload();
     };
@@ -273,7 +304,7 @@ export function SubtaskSection({
                         disabled={!canEdit}
                         onDragStart={() => setDragging(subtask.id)}
                         onDragEnd={() => setDragging(null)}
-                        onDropBefore={() => void move(subtask.id)}
+                        onDropAt={(edge) => void move(subtask.id, edge)}
                     >
                         {/* The menu wraps the row's contents rather than the row
                             itself: the list item is what carries the drag, and a
@@ -303,7 +334,8 @@ export function SubtaskSection({
                                     </span>
                                     <span
                                         className={cn(
-                                            core.isFinishedStatus(subtask.statusType) && "text-muted-foreground"
+                                            core.isFinishedStatus(subtask.statusType) &&
+                                                "text-muted-foreground"
                                         )}
                                     >
                                         {subtask.name}
@@ -347,7 +379,10 @@ export function SubtaskSection({
                 onConfirm={async () => {
                     if (!deleting) return;
                     onError("");
-                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), onError);
+                    const result = await runAction(
+                        () => actions.deleteTaskAction(deleting.id),
+                        onError
+                    );
                     if (result?.error) onError(result.error);
                     setDeleting(null);
                     reload();
@@ -379,11 +414,14 @@ export function ChecklistSection({
     // keeping them apart is what stops a step being dropped onto a checklist
     // header and landing nowhere.
     const [draggingList, setDraggingList] = useState<string | null>(null);
-    const [draggingStep, setDraggingStep] = useState<{ id: string; checklistId: string } | null>(null);
+    const [draggingStep, setDraggingStep] = useState<{ id: string; checklistId: string } | null>(
+        null
+    );
 
-    const moveChecklist = async (targetId: string) => {
+    const moveChecklist = async (targetId: string, edge: DropEdge) => {
         if (!draggingList || draggingList === targetId) return;
-        const position = neighbours(checklists, targetId, draggingList);
+        const position = neighbours(checklists, targetId, draggingList, edge);
+        if (!position) return;
         const moved = draggingList;
         setDraggingList(null);
         onError("");
@@ -391,16 +429,29 @@ export function ChecklistSection({
         onChanged();
     };
 
-    const moveStep = async (checklistId: string, items: readonly { id: string }[], targetId: string | null) => {
+    const moveStep = async (
+        checklistId: string,
+        items: readonly { id: string }[],
+        target: { id: string; edge: DropEdge } | null
+    ) => {
         if (!draggingStep) return;
         const moved = draggingStep.id;
         // Dropped on the list itself rather than on a step: the end of it.
-        const position = targetId
-            ? neighbours(items, targetId, moved)
-            : { beforeId: items.filter((item) => item.id !== moved).at(-1)?.id ?? null, afterId: null };
+        const position = target
+            ? neighbours(items, target.id, moved, target.edge)
+            : {
+                  beforeId: items.filter((item) => item.id !== moved).at(-1)?.id ?? null,
+                  afterId: null
+              };
         setDraggingStep(null);
+        // The step it landed on is gone: no place was named, and the end of the
+        // checklist is not a stand-in for one.
+        if (!position) return;
         onError("");
-        await runAction(() => actions.moveChecklistItemAction(taskId, moved, { checklistId, ...position }), onError);
+        await runAction(
+            () => actions.moveChecklistItemAction(taskId, moved, { checklistId, ...position }),
+            onError
+        );
         onChanged();
     };
 
@@ -420,7 +471,10 @@ export function ChecklistSection({
                     placeholder="Checklist name"
                     onAdd={async (name) => {
                         onError("");
-                        const result = await runAction(() => actions.createChecklistAction(taskId, name), onError);
+                        const result = await runAction(
+                            () => actions.createChecklistAction(taskId, name),
+                            onError
+                        );
                         if (result?.error) onError(result.error);
                         setAdding(false);
                         onChanged();
@@ -435,146 +489,182 @@ export function ChecklistSection({
             )}
 
             <ul className="flex flex-col gap-3">
-            {checklists.map((checklist) => {
-                const done = checklist.items.filter((item) => item.done).length;
-                return (
-                    <Sortable
-                        key={checklist.id}
-                        id={checklist.id}
-                        dragging={draggingList}
-                        disabled={!canEdit}
-                        onDragStart={() => setDraggingList(checklist.id)}
-                        onDragEnd={() => setDraggingList(null)}
-                        onDropBefore={() => void moveChecklist(checklist.id)}
-                    >
-                    <Card>
-                        <CardBody className="flex flex-col gap-2 p-3">
-                            <div className="flex items-center justify-between gap-2">
-                                <h4 className="text-sm font-medium">{checklist.name}</h4>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">
-                                        {done}/{checklist.items.length}
-                                    </span>
-                                    {canEdit && (
-                                        <button
-                                            type="button"
-                                            aria-label={`Remove ${checklist.name}`}
-                                            title="Remove checklist"
-                                            onClick={async () => {
-                                                await runAction(
-                                                    () => actions.deleteChecklistAction(taskId, checklist.id),
-                                                    onError
-                                                );
-                                                onChanged();
-                                            }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            {checklist.items.length > 0 && (
-                                <ProgressBar percent={Math.round((done / checklist.items.length) * 100)} />
-                            )}
-
-                            <ul
-                                className="flex flex-col gap-1"
-                                onDragOver={(event) => {
-                                    if (draggingStep) event.preventDefault();
-                                }}
-                                onDrop={(event) => {
-                                    if (!draggingStep) return;
-                                    event.preventDefault();
-                                    void moveStep(checklist.id, checklist.items, null);
-                                }}
-                            >
-                                {checklist.items.map((item) => (
-                                    <Sortable
-                                        key={item.id}
-                                        id={item.id}
-                                        dragging={draggingStep?.id ?? null}
-                                        disabled={!canEdit}
-                                        onDragStart={() => setDraggingStep({ id: item.id, checklistId: checklist.id })}
-                                        onDragEnd={() => setDraggingStep(null)}
-                                        onDropBefore={() => void moveStep(checklist.id, checklist.items, item.id)}
-                                        className="group flex items-center gap-2"
-                                    >
-                                        <Checkbox
-                                            checked={item.done}
-                                            aria-label={item.name}
-                                            onChange={async (event) => {
-                                                await runAction(
-                                                    () =>
-                                                        actions.setChecklistItemDoneAction(
-                                                            taskId,
-                                                            item.id,
-                                                            event.target.checked
-                                                        ),
-                                                    onError
-                                                );
-                                                onChanged();
-                                            }}
-                                        />
-                                        <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground")}>
-                                            {item.name}
-                                        </span>
-                                        {canEdit && (
-                                            <span className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                {checklists.map((checklist) => {
+                    const done = checklist.items.filter((item) => item.done).length;
+                    return (
+                        <Sortable
+                            key={checklist.id}
+                            id={checklist.id}
+                            dragging={draggingList}
+                            disabled={!canEdit}
+                            onDragStart={() => setDraggingList(checklist.id)}
+                            onDragEnd={() => setDraggingList(null)}
+                            onDropAt={(edge) => void moveChecklist(checklist.id, edge)}
+                        >
+                            <Card>
+                                <CardBody className="flex flex-col gap-2 p-3">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h4 className="text-sm font-medium">{checklist.name}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-muted-foreground">
+                                                {done}/{checklist.items.length}
+                                            </span>
+                                            {canEdit && (
                                                 <button
                                                     type="button"
-                                                    aria-label={`Turn ${item.name} into a task`}
-                                                    title="Turn into a task"
+                                                    aria-label={`Remove ${checklist.name}`}
+                                                    title="Remove checklist"
                                                     onClick={async () => {
                                                         await runAction(
-                                                            () => actions.promoteChecklistItemAction(taskId, item.id),
-                                                            onError
-                                                        );
-                                                        onChanged();
-                                                    }}
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                >
-                                                    <ArrowUpRight className="size-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Remove ${item.name}`}
-                                                    title="Remove step"
-                                                    onClick={async () => {
-                                                        await runAction(
-                                                            () => actions.deleteChecklistItemAction(taskId, item.id),
+                                                            () =>
+                                                                actions.deleteChecklistAction(
+                                                                    taskId,
+                                                                    checklist.id
+                                                                ),
                                                             onError
                                                         );
                                                         onChanged();
                                                     }}
                                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
                                                 >
-                                                    <X className="size-3.5" />
+                                                    <Trash2 className="size-3.5" />
                                                 </button>
-                                            </span>
-                                        )}
-                                    </Sortable>
-                                ))}
-                            </ul>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {checklist.items.length > 0 && (
+                                        <ProgressBar
+                                            percent={Math.round(
+                                                (done / checklist.items.length) * 100
+                                            )}
+                                        />
+                                    )}
 
-                            {canEdit && (
-                                <QuickAdd
-                                    placeholder="Add a step"
-                                    onAdd={async (name) => {
-                                        const result = await runAction(
-                                            () => actions.addChecklistItemAction(taskId, checklist.id, name),
-                                            onError
-                                        );
-                                        if (result?.error) onError(result.error);
-                                        onChanged();
-                                    }}
-                                />
-                            )}
-                        </CardBody>
-                    </Card>
-                    </Sortable>
-                );
-            })}
+                                    <ul
+                                        className="flex flex-col gap-1"
+                                        onDragOver={(event) => {
+                                            if (draggingStep) event.preventDefault();
+                                        }}
+                                        onDrop={(event) => {
+                                            if (!draggingStep) return;
+                                            event.preventDefault();
+                                            void moveStep(checklist.id, checklist.items, null);
+                                        }}
+                                    >
+                                        {checklist.items.map((item) => (
+                                            <Sortable
+                                                key={item.id}
+                                                id={item.id}
+                                                dragging={draggingStep?.id ?? null}
+                                                disabled={!canEdit}
+                                                onDragStart={() =>
+                                                    setDraggingStep({
+                                                        id: item.id,
+                                                        checklistId: checklist.id
+                                                    })
+                                                }
+                                                onDragEnd={() => setDraggingStep(null)}
+                                                onDropAt={(edge) =>
+                                                    void moveStep(checklist.id, checklist.items, {
+                                                        id: item.id,
+                                                        edge
+                                                    })
+                                                }
+                                                className="group flex items-center gap-2"
+                                            >
+                                                <Checkbox
+                                                    checked={item.done}
+                                                    aria-label={item.name}
+                                                    onChange={async (event) => {
+                                                        await runAction(
+                                                            () =>
+                                                                actions.setChecklistItemDoneAction(
+                                                                    taskId,
+                                                                    item.id,
+                                                                    event.target.checked
+                                                                ),
+                                                            onError
+                                                        );
+                                                        onChanged();
+                                                    }}
+                                                />
+                                                <span
+                                                    className={cn(
+                                                        "flex-1 text-sm",
+                                                        item.done && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    {item.name}
+                                                </span>
+                                                {canEdit && (
+                                                    <span className="flex items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Turn ${item.name} into a task`}
+                                                            title="Turn into a task"
+                                                            onClick={async () => {
+                                                                await runAction(
+                                                                    () =>
+                                                                        actions.promoteChecklistItemAction(
+                                                                            taskId,
+                                                                            item.id
+                                                                        ),
+                                                                    onError
+                                                                );
+                                                                onChanged();
+                                                            }}
+                                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            <ArrowUpRight className="size-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            aria-label={`Remove ${item.name}`}
+                                                            title="Remove step"
+                                                            onClick={async () => {
+                                                                await runAction(
+                                                                    () =>
+                                                                        actions.deleteChecklistItemAction(
+                                                                            taskId,
+                                                                            item.id
+                                                                        ),
+                                                                    onError
+                                                                );
+                                                                onChanged();
+                                                            }}
+                                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
+                                                        >
+                                                            <X className="size-3.5" />
+                                                        </button>
+                                                    </span>
+                                                )}
+                                            </Sortable>
+                                        ))}
+                                    </ul>
+
+                                    {canEdit && (
+                                        <QuickAdd
+                                            placeholder="Add a step"
+                                            onAdd={async (name) => {
+                                                const result = await runAction(
+                                                    () =>
+                                                        actions.addChecklistItemAction(
+                                                            taskId,
+                                                            checklist.id,
+                                                            name
+                                                        ),
+                                                    onError
+                                                );
+                                                if (result?.error) onError(result.error);
+                                                onChanged();
+                                            }}
+                                        />
+                                    )}
+                                </CardBody>
+                            </Card>
+                        </Sortable>
+                    );
+                })}
             </ul>
         </section>
     );
@@ -626,8 +716,14 @@ export function DependencySection({
             ) : (
                 <Ban className="size-3.5 shrink-0 text-amber-500" />
             )}
-            <button type="button" onClick={() => onOpen(edge.taskId)} className="flex-1 truncate text-left text-sm hover:underline">
-                <span className="mr-2 font-mono text-[11px] text-muted-foreground">{edge.reference}</span>
+            <button
+                type="button"
+                onClick={() => onOpen(edge.taskId)}
+                className="flex-1 truncate text-left text-sm hover:underline"
+            >
+                <span className="mr-2 font-mono text-[11px] text-muted-foreground">
+                    {edge.reference}
+                </span>
                 {edge.name}
             </button>
             <StatusDot color={edge.statusColor} />
@@ -637,7 +733,10 @@ export function DependencySection({
                     aria-label={`Unlink ${edge.name}`}
                     title="Remove link"
                     onClick={async () => {
-                        await runAction(() => actions.removeDependencyAction(taskId, edge.id), onError);
+                        await runAction(
+                            () => actions.removeDependencyAction(taskId, edge.id),
+                            onError
+                        );
                         onChanged();
                     }}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"
@@ -654,20 +753,25 @@ export function DependencySection({
 
             {dependencies.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                    Link work that has to happen in order. A task waiting on something unfinished is marked on the board.
+                    Link work that has to happen in order. A task waiting on something unfinished is
+                    marked on the board.
                 </p>
             )}
 
             {waitingOn.length > 0 && (
                 <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Waiting on</p>
-                    <ul className="divide-y divide-border rounded-md border border-border">{waitingOn.map(row)}</ul>
+                    <ul className="divide-y divide-border rounded-md border border-border">
+                        {waitingOn.map(row)}
+                    </ul>
                 </div>
             )}
             {blocking.length > 0 && (
                 <div>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">Blocking</p>
-                    <ul className="divide-y divide-border rounded-md border border-border">{blocking.map(row)}</ul>
+                    <ul className="divide-y divide-border rounded-md border border-border">
+                        {blocking.map(row)}
+                    </ul>
                 </div>
             )}
 
@@ -676,7 +780,9 @@ export function DependencySection({
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setDirection(direction === "waitingOn" ? "blocking" : "waitingOn")}
+                            onClick={() =>
+                                setDirection(direction === "waitingOn" ? "blocking" : "waitingOn")
+                            }
                             className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             {direction === "waitingOn" ? "This waits on" : "This blocks"}
@@ -713,7 +819,9 @@ export function DependencySection({
                                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
                                     >
                                         <Link2 className="size-3.5 text-muted-foreground" />
-                                        <span className="font-mono text-[11px] text-muted-foreground">{candidate.reference}</span>
+                                        <span className="font-mono text-[11px] text-muted-foreground">
+                                            {candidate.reference}
+                                        </span>
                                         <span className="truncate">{candidate.name}</span>
                                     </button>
                                 </li>

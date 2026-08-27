@@ -26,6 +26,7 @@ import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { usePathname } from "next/navigation";
 import { FolderAccessDialog } from "./folder-access-dialog";
+import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FolderSummary, ListSummary, SpaceTreeView } from "@/lib/tasks/space-service";
 import { createOptionsFor, TreeCreate, type CreateAt, type CreateKind } from "./tree-create";
@@ -130,7 +131,11 @@ function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind)
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44" onCloseAutoFocus={keepFocusOnClose}>
                 {options.map((option) => (
-                    <DropdownMenuItem key={option.kind} onSelect={() => onPick(option.kind)} className="gap-2">
+                    <DropdownMenuItem
+                        key={option.kind}
+                        onSelect={() => onPick(option.kind)}
+                        className="gap-2"
+                    >
                         <option.Icon className="size-3.5" />
                         {option.label}
                     </DropdownMenuItem>
@@ -149,7 +154,11 @@ function CreateSubmenu({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind
             </ContextMenuSubTrigger>
             <ContextMenuSubContent className="w-44">
                 {createOptionsFor(at).map((option) => (
-                    <ContextMenuItem key={option.kind} onSelect={() => onPick(option.kind)} className="gap-2">
+                    <ContextMenuItem
+                        key={option.kind}
+                        onSelect={() => onPick(option.kind)}
+                        className="gap-2"
+                    >
                         <option.Icon className="size-3.5" />
                         {option.label}
                     </ContextMenuItem>
@@ -188,12 +197,17 @@ interface RowProps {
     readonly onDragStart?: () => void;
     readonly onDragEnd?: () => void;
     readonly onDropInto?: () => void;
-    readonly onDropBefore?: () => void;
+    /** Ordered against this row, on the side of it the pointer was on. */
+    readonly onDropAt?: (edge: DropEdge) => void;
     /** Whether this row can take what is currently being dragged, and how. A row
      *  only orders against its own kind - a folder dropped between two lists has
      *  no siblings there to sit between - so the two are answered separately. */
-    readonly acceptsBefore: boolean;
+    readonly acceptsBeside: boolean;
     readonly acceptsInto: boolean;
+    /** Whether this row is the one being dragged. It still swallows the drop -
+     *  letting it through would reach the space underneath, which means "put it
+     *  at the root" - but it promises no line and moves nothing. */
+    readonly dragged?: boolean;
     readonly expander?: React.ReactNode;
     /** The plus, shown next to the row's own quick actions. */
     readonly create?: React.ReactNode;
@@ -217,14 +231,15 @@ function TreeRow({
     onDragStart,
     onDragEnd,
     onDropInto,
-    onDropBefore,
-    acceptsBefore,
+    onDropAt,
+    acceptsBeside,
     acceptsInto,
+    dragged,
     expander,
     create,
     createMenu
 }: RowProps) {
-    const [over, setOver] = useState<"into" | "before" | null>(null);
+    const [over, setOver] = useState<"into" | DropEdge | null>(null);
     // Renaming is reached from the right-click menu, which is still trapping
     // focus when the field appears; it claims focus once the menu has gone.
     const field = useDeferredFocus<HTMLInputElement>(renaming);
@@ -280,26 +295,34 @@ function TreeRow({
             }}
             onDragEnd={onDragEnd}
             onDragOver={(event) => {
-                if (!acceptsBefore && !acceptsInto) return;
+                if (!acceptsBeside && !acceptsInto) return;
                 event.preventDefault();
                 event.stopPropagation();
-                // The top few pixels mean "put it above this row"; the rest of a
-                // folder means "put it inside". One target, two answers, which is
-                // what a tree needs to express both reordering and nesting.
+                if (dragged) {
+                    setOver(null);
+                    return;
+                }
+                // A row that cannot be nested into is split down the middle, so a
+                // row dragged downwards lands under the one it was released over
+                // rather than above it. A folder keeps its middle for "put it
+                // inside" and answers the few pixels at each end with the side
+                // they are on - one target, three answers, which is what a tree
+                // needs to express both reordering and nesting.
                 const bounds = event.currentTarget.getBoundingClientRect();
-                const nearTop = event.clientY - bounds.top < 6;
-                const wantsBefore = (nearTop || !acceptsInto) && acceptsBefore;
-                setOver(wantsBefore ? "before" : acceptsInto ? "into" : null);
+                const edge = dropEdge(event.clientY, event.currentTarget);
+                const atEnd = event.clientY - bounds.top < 6 || bounds.bottom - event.clientY < 6;
+                const wantsEdge = (atEnd || !acceptsInto) && acceptsBeside;
+                setOver(wantsEdge ? edge : acceptsInto ? "into" : null);
             }}
             onDragLeave={() => setOver(null)}
             onDrop={(event) => {
-                if (!over) return;
+                if (!acceptsBeside && !acceptsInto) return;
                 event.preventDefault();
                 event.stopPropagation();
                 const where = over;
                 setOver(null);
                 if (where === "into" && onDropInto) onDropInto();
-                else if (where === "before" && onDropBefore) onDropBefore();
+                else if (where !== null && where !== "into" && onDropAt) onDropAt(where);
             }}
             onKeyDown={(event) => {
                 if (event.key === "F2" && editable) {
@@ -320,8 +343,14 @@ function TreeRow({
                     : undefined
             }
         >
-            {over === "before" && (
-                <span aria-hidden className="absolute -top-px left-0 z-10 h-0.5 w-full rounded bg-primary" />
+            {(over === "before" || over === "after") && (
+                <span
+                    aria-hidden
+                    className={cn(
+                        "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                        over === "before" ? "-top-px" : "-bottom-px"
+                    )}
+                />
             )}
             <ContextMenu>
                 <ContextMenuTrigger asChild>
@@ -504,18 +533,28 @@ export function SpaceTree({
         setCreate({ kind, at });
     };
 
-    const dropFolder = (spaceId: string, parentId: string | null, position: { beforeId: string | null; afterId: string | null }) => {
+    const dropFolder = (
+        spaceId: string,
+        parentId: string | null,
+        position: { beforeId: string | null; afterId: string | null }
+    ) => {
         if (!dragging || dragging.spaceId !== spaceId) return;
         const move = { parentId, ...position };
         const { kind, id } = dragging;
         setDragging(null);
-        void run(() => (kind === "folder" ? actions.moveFolderAction(id, move) : actions.moveListAction(id, move)));
+        void run(() =>
+            kind === "folder"
+                ? actions.moveFolderAction(id, move)
+                : actions.moveListAction(id, move)
+        );
     };
 
     return (
         <nav aria-label="Spaces" className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
             <div className="flex items-center justify-between">
-                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Spaces</h2>
+                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Spaces
+                </h2>
                 {canManage && canCreate && (
                     <button
                         type="button"
@@ -526,7 +565,10 @@ export function SpaceTree({
                             setNewSpace(opening);
                             if (!opening) return;
                             void (async () => {
-                                const result = await runAction(() => actions.spaceOwnerOptionsAction(), setError);
+                                const result = await runAction(
+                                    () => actions.spaceOwnerOptionsAction(),
+                                    setError
+                                );
                                 setSpaceOrgs(result?.orgs ?? []);
                             })();
                         }}
@@ -617,14 +659,23 @@ export function SpaceTree({
                 />
             ))}
 
-            <TreeCreate request={create} onClose={closeCreate} onDone={closeCreate} onError={setError} />
+            <TreeCreate
+                request={create}
+                onClose={closeCreate}
+                onDone={closeCreate}
+                onError={setError}
+            />
 
             <FolderAccessDialog
                 folderId={accessFolderId}
-                canManage={canManage && canAdmin(
-                    spaces.flatMap((space) => space.folders).find((folder) => folder.id === accessFolderId)?.role ??
-                        "guest"
-                )}
+                canManage={
+                    canManage &&
+                    canAdmin(
+                        spaces
+                            .flatMap((space) => space.folders)
+                            .find((folder) => folder.id === accessFolderId)?.role ?? "guest"
+                    )
+                }
                 onClose={() => setAccessFolderId(null)}
             />
 
@@ -709,12 +760,6 @@ function SpaceSection({
     // the menu to let go of focus before taking it.
     const nameField = useDeferredFocus<HTMLInputElement>(renaming === `space:${space.id}`);
 
-    /** The row a drop above `id` should land before, among a given set. */
-    const neighbours = (siblings: readonly { id: string }[], targetId: string) => {
-        const index = siblings.findIndex((entry) => entry.id === targetId);
-        return { beforeId: index > 0 ? (siblings[index - 1]?.id ?? null) : null, afterId: targetId };
-    };
-
     /** Whether what is being dragged may land in this container at all. */
     const accepts = (parentId: string | null) =>
         dragging !== null &&
@@ -741,8 +786,22 @@ function SpaceSection({
             key={list.id}
             label={list.name}
             depth={depth}
-            create={editable ? <CreateButton at={listAt(list)} onPick={(kind) => onCreate(kind, listAt(list))} /> : undefined}
-            createMenu={editable ? <CreateSubmenu at={listAt(list)} onPick={(kind) => onCreate(kind, listAt(list))} /> : undefined}
+            create={
+                editable ? (
+                    <CreateButton
+                        at={listAt(list)}
+                        onPick={(kind) => onCreate(kind, listAt(list))}
+                    />
+                ) : undefined
+            }
+            createMenu={
+                editable ? (
+                    <CreateSubmenu
+                        at={listAt(list)}
+                        onPick={(kind) => onCreate(kind, listAt(list))}
+                    />
+                ) : undefined
+            }
             href={`/tasks/l/${list.id}`}
             active={pathname === `/tasks/l/${list.id}`}
             badge={list.openCount > 0 ? String(list.openCount) : undefined}
@@ -755,11 +814,19 @@ function SpaceSection({
                 onRenaming(null);
                 await run(() => actions.renameListAction(list.id, name));
             }}
-            acceptsBefore={dragging?.kind === "list" && accepts(list.folderId)}
+            acceptsBeside={dragging?.kind === "list" && accepts(list.folderId)}
             acceptsInto={false}
-            onDragStart={editable ? () => onDragging({ kind: "list", id: list.id, spaceId: space.id }) : undefined}
+            dragged={dragging?.kind === "list" && dragging.id === list.id}
+            onDragStart={
+                editable
+                    ? () => onDragging({ kind: "list", id: list.id, spaceId: space.id })
+                    : undefined
+            }
             onDragEnd={() => onDragging(null)}
-            onDropBefore={() => onDrop(space.id, list.folderId, neighbours(siblings, list.id))}
+            onDropAt={(edge) => {
+                const at = neighbours(siblings, list.id, dragging?.id ?? "", edge);
+                if (at) onDrop(space.id, list.folderId, at);
+            }}
             actions={
                 editable
                     ? [
@@ -807,9 +874,21 @@ function SpaceSection({
         const folder = node.folder;
         return [
             ...(canAdmin(folder.role)
-                ? [{ label: "Who can reach this", Icon: Users, quick: true, onSelect: () => onAccess(folder.id) }]
+                ? [
+                      {
+                          label: "Who can reach this",
+                          Icon: Users,
+                          quick: true,
+                          onSelect: () => onAccess(folder.id)
+                      }
+                  ]
                 : []),
-            { label: "Rename (F2)", Icon: Pencil, quick: true, onSelect: () => onRenaming(`folder:${folder.id}`) },
+            {
+                label: "Rename (F2)",
+                Icon: Pencil,
+                quick: true,
+                onSelect: () => onRenaming(`folder:${folder.id}`)
+            },
             ...(canAdmin(folder.role)
                 ? [
                       {
@@ -845,12 +924,18 @@ function SpaceSection({
                     depth={depth}
                     create={
                         canEditHere ? (
-                            <CreateButton at={folderAt(node)} onPick={(kind) => onCreate(kind, folderAt(node))} />
+                            <CreateButton
+                                at={folderAt(node)}
+                                onPick={(kind) => onCreate(kind, folderAt(node))}
+                            />
                         ) : undefined
                     }
                     createMenu={
                         canEditHere ? (
-                            <CreateSubmenu at={folderAt(node)} onPick={(kind) => onCreate(kind, folderAt(node))} />
+                            <CreateSubmenu
+                                at={folderAt(node)}
+                                onPick={(kind) => onCreate(kind, folderAt(node))}
+                            />
                         ) : undefined
                     }
                     icon={
@@ -863,14 +948,20 @@ function SpaceSection({
                     expander={
                         <button
                             type="button"
-                            aria-label={folderOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
+                            aria-label={
+                                folderOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`
+                            }
                             onClick={(event) => {
                                 event.preventDefault();
                                 onToggle(folder.id);
                             }}
                             className="-ml-1 rounded p-0.5 text-muted-foreground hover:text-foreground"
                         >
-                            {folderOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                            {folderOpen ? (
+                                <ChevronDown className="size-3.5" />
+                            ) : (
+                                <ChevronRight className="size-3.5" />
+                            )}
                         </button>
                     }
                     editable={canEditHere}
@@ -881,19 +972,33 @@ function SpaceSection({
                         onRenaming(null);
                         await run(() => actions.renameFolderAction(folder.id, name));
                     }}
-                    acceptsBefore={dragging?.kind === "folder" && accepts(folder.parentId)}
+                    acceptsBeside={dragging?.kind === "folder" && accepts(folder.parentId)}
                     acceptsInto={accepts(folder.id)}
+                    dragged={dragging?.kind === "folder" && dragging.id === folder.id}
                     onDragStart={
-                        canEditHere ? () => onDragging({ kind: "folder", id: folder.id, spaceId: space.id }) : undefined
+                        canEditHere
+                            ? () => onDragging({ kind: "folder", id: folder.id, spaceId: space.id })
+                            : undefined
                     }
                     onDragEnd={() => onDragging(null)}
-                    onDropInto={() => onDrop(space.id, folder.id, { beforeId: null, afterId: null })}
-                    onDropBefore={() => onDrop(space.id, folder.parentId, neighbours(siblings, folder.id))}
+                    onDropInto={() =>
+                        onDrop(space.id, folder.id, { beforeId: null, afterId: null })
+                    }
+                    onDropAt={(edge) => {
+                        const at = neighbours(siblings, folder.id, dragging?.id ?? "", edge);
+                        if (at) onDrop(space.id, folder.parentId, at);
+                    }}
                     actions={canEditHere ? folderActions(node) : []}
                 />
                 {folderOpen && (
                     <div>
-                        {node.children.map((child) => renderFolder(child, depth + 1, node.children.map((entry) => entry.folder)))}
+                        {node.children.map((child) =>
+                            renderFolder(
+                                child,
+                                depth + 1,
+                                node.children.map((entry) => entry.folder)
+                            )
+                        )}
                         {folder.lists.map((list) => renderList(list, depth + 1, children))}
                         {draft?.parentId === folder.id && (
                             <DraftRow
@@ -942,7 +1047,11 @@ function SpaceSection({
                             aria-label={open ? `Collapse ${space.name}` : `Expand ${space.name}`}
                             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                            {open ? (
+                                <ChevronDown className="size-3.5" />
+                            ) : (
+                                <ChevronRight className="size-3.5" />
+                            )}
                         </button>
                         <span
                             aria-hidden
@@ -976,7 +1085,9 @@ function SpaceSection({
                                 {space.name}
                             </Link>
                         )}
-                        <span className="font-mono text-[10px] text-muted-foreground">{space.prefix}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">
+                            {space.prefix}
+                        </span>
                         {editable && !space.partial && (
                             <CreateButton at={spaceAt} onPick={(kind) => onCreate(kind, spaceAt)} />
                         )}
@@ -1030,7 +1141,12 @@ function SpaceSection({
                     {space.lists.map((list) => renderList(list, 0, space.lists))}
 
                     {draft?.spaceId === space.id && draft.parentId === null && (
-                        <DraftRow draft={draft} depth={0} onCancel={() => onDraft(null)} run={run} />
+                        <DraftRow
+                            draft={draft}
+                            depth={0}
+                            onCancel={() => onDraft(null)}
+                            run={run}
+                        />
                     )}
 
                     {editable && !space.partial && (
@@ -1092,8 +1208,16 @@ function DraftRow({
         if (!name) return;
         await run(() =>
             draft.kind === "folder"
-                ? actions.createFolderAction({ spaceId: draft.spaceId, parentId: draft.parentId, name })
-                : actions.createListAction({ spaceId: draft.spaceId, folderId: draft.parentId, name })
+                ? actions.createFolderAction({
+                      spaceId: draft.spaceId,
+                      parentId: draft.parentId,
+                      name
+                  })
+                : actions.createListAction({
+                      spaceId: draft.spaceId,
+                      folderId: draft.parentId,
+                      name
+                  })
         );
     };
 
@@ -1103,7 +1227,9 @@ function DraftRow({
                 ref={field}
                 value={value}
                 aria-label={draft.kind === "folder" ? "Folder name" : "List name"}
-                placeholder={draft.kind === "folder" ? "Folder name, then enter" : "List name, then enter"}
+                placeholder={
+                    draft.kind === "folder" ? "Folder name, then enter" : "List name, then enter"
+                }
                 onChange={(event) => setValue(event.target.value)}
                 onBlur={() => void commit()}
                 onKeyDown={(event) => {

@@ -126,11 +126,15 @@ function listingsEqual(a: DriveEntry[], b: DriveEntry[]): boolean {
 export function DriveExplorer({
     connections,
     connectionId,
-    path
+    path,
+    notice
 }: {
     connections: ConnectionSummary[];
     connectionId: string | null;
     path: string;
+    /** Something the page worked out before this rendered and could not act on -
+     *  shown in the same corner a failed operation is, and dismissed the same way. */
+    notice?: string;
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -163,7 +167,14 @@ export function DriveExplorer({
     const [peopleTarget, setPeopleTarget] = useState<PeopleShareTarget | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
-    const [opError, setOpError] = useState<string | null>(null);
+    const [opError, setOpError] = useState<string | null>(notice ?? null);
+
+    // The page works the notice out on every render of its own, not only the
+    // first: this component stays mounted while the reader moves between
+    // locations, so seeding the state once would swallow every notice after it.
+    useEffect(() => {
+        if (notice) setOpError(notice);
+    }, [notice]);
 
     /** Run a mutating operation in the background: shows in the operations panel,
      * keeps the dashboard usable (a transition), and refreshes the listing after.
@@ -513,10 +524,16 @@ export function DriveExplorer({
                                         // The root of a source somebody is reaching
                                         // for, fetched while they are still reaching.
                                         onPointerEnter={() =>
-                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                            prefetchListing(
+                                                connection.id,
+                                                connection.rootPath ?? ""
+                                            )
                                         }
                                         onFocus={() =>
-                                            prefetchListing(connection.id, connection.rootPath ?? "")
+                                            prefetchListing(
+                                                connection.id,
+                                                connection.rootPath ?? ""
+                                            )
                                         }
                                         className={cn(
                                             "flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
@@ -785,6 +802,7 @@ export function DriveExplorer({
             <PeopleShareDialog
                 target={peopleTarget}
                 onOpenChange={(open) => !open && setPeopleTarget(null)}
+                onChanged={() => void load()}
             />
             <RequestDialog
                 target={requestTarget}

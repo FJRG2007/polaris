@@ -25,6 +25,7 @@ const findMany = vi.fn(async () => []);
 const findFirst = vi.fn();
 const deleteMany = vi.fn(async () => ({ count: 0 }));
 const getSetting = vi.fn(async () => null);
+const getDriverForConnection = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -34,11 +35,13 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/setting-store", () => ({ getSetting, setSetting: vi.fn() }));
 vi.mock("@/lib/storage-service", () => ({
     PERSONAL_LOCAL_FOLDER: "drive",
-    getDriverForConnection: vi.fn()
+    getDriverForConnection
 }));
 vi.mock("@/lib/drive-folder-size", () => ({ getCachedFolderSizes: vi.fn(async () => new Map()) }));
 
-const { ensurePersonalDrive, personalDriveId } = await import("../../src/lib/personal-drive");
+const { discardPersonalDrive, ensurePersonalDrive, personalDriveId } = await import(
+    "../../src/lib/personal-drive"
+);
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -55,11 +58,13 @@ function created(): { name: string; config: { targetId: string; root: string } }
 
 describe("a person's own drive", () => {
     it("is made on the disk Polaris runs on when nothing is connected", async () => {
-        upsert.mockImplementation(async (args: { create: { id: string; name: string; config: string } }) => ({
-            id: args.create.id,
-            name: args.create.name,
-            config: args.create.config
-        }));
+        upsert.mockImplementation(
+            async (args: { create: { id: string; name: string; config: string } }) => ({
+                id: args.create.id,
+                name: args.create.name,
+                config: args.create.config
+            })
+        );
 
         const drive = await ensurePersonalDrive(ANA);
 
@@ -129,5 +134,49 @@ describe("a person's own drive", () => {
 
         await expect(ensurePersonalDrive(ANA)).rejects.toThrow();
         expect(upsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("taking somebody's files with their account", () => {
+    /** A drive whose root answers in pages, the way a bucket does. */
+    function drive(pages: Array<{ entries: Array<{ path: string }>; nextCursor?: string }>) {
+        const list = vi.fn(async () => pages.shift() ?? { entries: [] });
+        return {
+            list,
+            delete: vi.fn(async () => undefined),
+            dispose: vi.fn(async () => undefined)
+        };
+    }
+
+    beforeEach(() => {
+        findFirst.mockResolvedValue({
+            id: ANA,
+            name: "My files",
+            config: JSON.stringify({ kind: "personal", targetId: "local", root: `people/${ANA}` })
+        });
+    });
+
+    it("empties a root that does not fit in one listing", async () => {
+        // A bucket answers a thousand keys at a time. Stopping at the first page
+        // would leave the rest of a deleted person's files on the disk while
+        // reporting that nothing was left behind.
+        const driver = drive([
+            { entries: [{ path: "taxes" }], nextCursor: "page-2" },
+            { entries: [{ path: "photos" }] }
+        ]);
+        getDriverForConnection.mockResolvedValue(driver);
+
+        expect(await discardPersonalDrive(ANA)).toBeNull();
+        expect(driver.delete.mock.calls.map((call) => call[0])).toEqual(["taxes", "photos"]);
+        expect(driver.list.mock.calls[1][1]).toEqual({ cursor: "page-2" });
+    });
+
+    it("names what it could not take rather than blocking the deletion", async () => {
+        getDriverForConnection.mockRejectedValue(new Error("The disk is away"));
+
+        const left = await discardPersonalDrive(ANA);
+
+        expect(left).toContain(`people/${ANA}`);
+        expect(left).toContain("The disk is away");
     });
 });

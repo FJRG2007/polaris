@@ -200,7 +200,8 @@ export const ALERT_KINDS = [
     "vehicle",
     "animal",
     "package",
-    "tamper"
+    "tamper",
+    "offline"
 ] as const;
 
 /**
