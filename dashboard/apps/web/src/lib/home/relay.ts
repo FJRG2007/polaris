@@ -49,7 +49,10 @@ export function streamName(cameraId: string, quality: "main" | "sub"): string {
 
 /** The account the relay was installed with, read back from the app's own
  *  environment - see install-secret for why it is not kept twice. */
-async function relayCredentials(applicationId: string, ownerId: string): Promise<{ username: string; password: string } | null> {
+async function relayCredentials(
+    applicationId: string,
+    ownerId: string
+): Promise<{ username: string; password: string } | null> {
     const [username, password] = await Promise.all([
         installEnvValue(applicationId, ownerId, "RELAY_USERNAME", "polaris"),
         installEnvSecret(applicationId, ownerId, "RELAY_PASSWORD")
@@ -77,7 +80,11 @@ export async function relayEndpoint(serverId: string): Promise<RelayEndpoint | n
  * `relayEndpoint` and shows a camera as "starting" instead of holding the page
  * open on a container pull.
  */
-export async function ensureRelay(ownerId: string, actorId: string, serverId: string): Promise<RelayEndpoint> {
+export async function ensureRelay(
+    ownerId: string,
+    actorId: string,
+    serverId: string
+): Promise<RelayEndpoint> {
     const existing = await relayEndpoint(serverId);
     if (existing) return existing;
 
@@ -148,7 +155,11 @@ async function relayFetch(
  * something asks to consume it and drops it when the last consumer leaves, which
  * is the behavior that makes "added but never opened" cost nothing.
  */
-export async function publishCamera(endpoint: RelayEndpoint, camera: CameraTarget, vendor: string): Promise<void> {
+export async function publishCamera(
+    endpoint: RelayEndpoint,
+    camera: CameraTarget,
+    vendor: string
+): Promise<void> {
     const auth = { username: camera.username, password: camera.password };
     const shape = {
         vendor,
@@ -160,7 +171,9 @@ export async function publishCamera(endpoint: RelayEndpoint, camera: CameraTarge
     for (const quality of ["main", "sub"] as const) {
         const source = relaySource(shape, quality, auth);
         const query = new URLSearchParams({ name: streamName(camera.id, quality), src: source });
-        const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, { method: "PUT" });
+        const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, {
+            method: "PUT"
+        });
         // The relay validates the source and refuses one it cannot parse. Its
         // reason is about a URL that carries a password, so it is not passed on.
         if (!response.ok) throw new HomeError("The relay would not accept that camera");
@@ -171,9 +184,13 @@ export async function publishCamera(endpoint: RelayEndpoint, camera: CameraTarge
  *  forgotten it is the state we were asking for. */
 export async function unpublishCamera(endpoint: RelayEndpoint, cameraId: string): Promise<void> {
     for (const quality of ["main", "sub"] as const) {
-        await relayFetch(endpoint, `/api/streams?src=${encodeURIComponent(streamName(cameraId, quality))}`, {
-            method: "DELETE"
-        }).catch(() => null);
+        await relayFetch(
+            endpoint,
+            `/api/streams?src=${encodeURIComponent(streamName(cameraId, quality))}`,
+            {
+                method: "DELETE"
+            }
+        ).catch(() => null);
     }
 }
 
@@ -188,7 +205,9 @@ export async function unpublishCamera(endpoint: RelayEndpoint, cameraId: string)
  * truth - every camera on it has just become unwatchable.
  */
 export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[] | null> {
-    const response = await relayFetch(endpoint, "/api/streams", { timeoutMs: 3000 }).catch(() => null);
+    const response = await relayFetch(endpoint, "/api/streams", { timeoutMs: 3000 }).catch(
+        () => null
+    );
     if (!response?.ok) return null;
     const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     return body ? Object.keys(body) : [];
@@ -233,7 +252,11 @@ export async function snapshot(
 
 /** Where a viewer's player connects, as a path on the relay. The browser never
  *  sees this - it is what the authenticated proxy route dials. */
-export function streamPath(cameraId: string, kind: "mp4" | "webrtc" | "ws", quality: "main" | "sub" = "main"): string {
+export function streamPath(
+    cameraId: string,
+    kind: "mp4" | "webrtc" | "ws",
+    quality: "main" | "sub" = "main"
+): string {
     const src = encodeURIComponent(streamName(cameraId, quality));
     if (kind === "mp4") return `/api/stream.mp4?src=${src}`;
     if (kind === "webrtc") return `/api/webrtc?src=${src}`;
@@ -247,7 +270,13 @@ export function streamPath(cameraId: string, kind: "mp4" | "webrtc" | "ws", qual
  * pastes whatever it was given onto a relay's address is a proxy that can be
  * pointed at the rest of that relay's API.
  */
-export const HLS_FILES = ["stream.m3u8", "playlist.m3u8", "init.mp4", "segment.m4s", "segment.ts"] as const;
+export const HLS_FILES = [
+    "stream.m3u8",
+    "playlist.m3u8",
+    "init.mp4",
+    "segment.m4s",
+    "segment.ts"
+] as const;
 export type HlsFile = (typeof HLS_FILES)[number];
 
 export function isHlsFile(value: string): value is HlsFile {
@@ -267,7 +296,11 @@ export function hlsMasterPath(cameraId: string, quality: "main" | "sub"): string
 
 /** Everything the player fetches afterwards. The relay finds the stream from its
  *  own session id, so these carry no camera and no quality. */
-export function hlsAssetPath(file: Exclude<HlsFile, "stream.m3u8">, session: string, sequence: string | null): string {
+export function hlsAssetPath(
+    file: Exclude<HlsFile, "stream.m3u8">,
+    session: string,
+    sequence: string | null
+): string {
     const query = new URLSearchParams({ id: session });
     if (sequence) query.set("n", sequence);
     return `/api/hls/${file}?${query.toString()}`;

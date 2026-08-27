@@ -412,7 +412,11 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
         // than when the camera was saved, for the same reason as the relay: it is
         // a deploy, and a form should not wait on one.
         if (needsSomewhereToRun(camera.detector as Detector)) {
-            await ensureVisionWorker(install.ownerId, user.id, camera.detectorTargetId ?? LOCAL_MACHINE);
+            await ensureVisionWorker(
+                install.ownerId,
+                user.id,
+                camera.detectorTargetId ?? LOCAL_MACHINE
+            );
         }
     });
     if (result.error) return { error: result.error };

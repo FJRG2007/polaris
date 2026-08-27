@@ -45,7 +45,13 @@ import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
 import { quietSince } from "@/lib/home/availability";
 import { useDisplayFormat } from "@/components/display-format";
-import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
+import {
+    otherTransport,
+    preferredTransport,
+    stillSrc,
+    streamSrc,
+    type Transport
+} from "@/lib/home/player";
 
 /**
  * How soon after one frame arrives the next is asked for.
@@ -281,7 +287,10 @@ export function CameraTile({
     }, [idle, showing]);
 
     return (
-        <div ref={frame} className="group relative overflow-hidden rounded-lg border border-border bg-card">
+        <div
+            ref={frame}
+            className="group relative overflow-hidden rounded-lg border border-border bg-card"
+        >
             <div className="relative aspect-video bg-background">
                 {showing ? (
                     <>
@@ -405,7 +414,12 @@ export function CameraTile({
                         {camera.name}
                     </button>
                     {camera.zone ? (
-                        <p className="truncate text-[11px] text-foreground-subtle" title={camera.zone}>{camera.zone}</p>
+                        <p
+                            className="truncate text-[11px] text-foreground-subtle"
+                            title={camera.zone}
+                        >
+                            {camera.zone}
+                        </p>
                     ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -450,10 +464,26 @@ export function CameraTile({
  * second is worth getting out of bed for. Polaris already knows which this is -
  * the availability pass writes down when it stopped - so the tile says it.
  */
-function Unavailable({ camera, live, since }: { camera: CameraView; live: boolean; since: string | null }) {
-    if (!camera.enabled) return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />;
-    if (since) return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={`Not answering since ${since}`} />;
-    if (!live) return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Starting" />;
+function Unavailable({
+    camera,
+    live,
+    since
+}: {
+    camera: CameraView;
+    live: boolean;
+    since: string | null;
+}) {
+    if (!camera.enabled)
+        return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label="Switched off" />;
+    if (since)
+        return (
+            <Placeholder
+                icon={<Camera className="size-5 shrink-0" />}
+                label={`Not answering since ${since}`}
+            />
+        );
+    if (!live)
+        return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Starting" />;
     return <Placeholder icon={<Camera className="size-5 shrink-0" />} label="Not answering" />;
 }
 

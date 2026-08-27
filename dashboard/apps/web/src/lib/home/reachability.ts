@@ -140,7 +140,8 @@ export function outageHeadline(
 ): string {
     const where = placeName ? ` at ${placeName}` : "";
     if (total > 1 && down >= total) return `Every camera${where} stopped answering`;
-    if (total > 1 && down === 1) return `${cameraName} stopped answering - the only one of ${total}${where}`;
+    if (total > 1 && down === 1)
+        return `${cameraName} stopped answering - the only one of ${total}${where}`;
     if (total > 1) return `${cameraName} stopped answering - ${down} of ${total}${where} have`;
     return `${cameraName} stopped answering`;
 }

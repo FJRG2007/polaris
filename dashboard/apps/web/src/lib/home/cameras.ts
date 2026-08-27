@@ -127,7 +127,10 @@ function toView(row: NonNullable<CameraRow>): CameraView {
  * this app is about one building. Passing no place answers for all of them,
  * which is what the sweeps and the workers want.
  */
-export async function listCameras(installedAppId: string, placeId?: string | null): Promise<CameraView[]> {
+export async function listCameras(
+    installedAppId: string,
+    placeId?: string | null
+): Promise<CameraView[]> {
     const rows = await prisma.camera.findMany({
         where: { installedAppId, ...(placeId ? { placeId } : {}) },
         orderBy: [{ zone: "asc" }, { name: "asc" }]
@@ -178,7 +181,10 @@ function secretColumns(password: string | undefined) {
     return { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId };
 }
 
-export async function createCamera(installedAppId: string, input: CameraInput): Promise<CameraView> {
+export async function createCamera(
+    installedAppId: string,
+    input: CameraInput
+): Promise<CameraView> {
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
     const row = await prisma.camera.create({
@@ -215,7 +221,10 @@ export async function updateCamera(
     id: string,
     input: CameraInput
 ): Promise<CameraView> {
-    const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    const existing = await prisma.camera.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!existing) throw new HomeError("Camera not found");
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
@@ -253,7 +262,10 @@ export async function updateCamera(
  *  wrote are dropped by the retention sweep, which is the one thing that knows
  *  how to reach the storage they went to. */
 export async function deleteCamera(installedAppId: string, id: string): Promise<void> {
-    const existing = await prisma.camera.findFirst({ where: { id, installedAppId }, select: { id: true } });
+    const existing = await prisma.camera.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!existing) throw new HomeError("Camera not found");
     await prisma.camera.delete({ where: { id } });
 }
@@ -282,7 +294,10 @@ async function cameraPassword(row: NonNullable<CameraRow>): Promise<string | nul
  * and for the ONVIF client, both of which run on the server and both of which
  * need the password to say anything to the camera at all.
  */
-export async function cameraTarget(installedAppId: string, id: string): Promise<CameraTarget | null> {
+export async function cameraTarget(
+    installedAppId: string,
+    id: string
+): Promise<CameraTarget | null> {
     const row = await prisma.camera.findFirst({ where: { id, installedAppId } });
     if (!row) return null;
     const password = await cameraPassword(row);

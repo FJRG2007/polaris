@@ -277,7 +277,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "account.connection.expired",
         group: "security",
         label: "A connected account stopped working",
-        description: "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
+        description:
+            "A token you linked ran out or was withdrawn, and what it was doing has stopped.",
         level: "danger",
         // Mailed by default, and for the same reason the key expiry is: nobody
         // watches the bell for a thing that has not happened yet, and the first
