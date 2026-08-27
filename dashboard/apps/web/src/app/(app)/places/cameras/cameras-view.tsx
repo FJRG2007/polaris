@@ -21,6 +21,7 @@ import type { DiscoveredCamera } from "@/lib/home/discovery";
 import { Cctv, Pencil, Plus, Radar, Shapes, Trash2 } from "lucide-react";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
 import { focusAfterMove } from "@/lib/list-selection";
+import { quietSince } from "@/lib/home/availability";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     cn,
@@ -37,6 +38,30 @@ import {
     ConfirmDeleteDialog
 } from "@polaris/ui";
 
+/** How long a camera has been quiet, for a row that has to say so. A camera that
+ *  is switched off is not quiet, it is off, and the row says that instead. */
+function quietFor(camera: CameraView): Date | null {
+    return camera.enabled ? quietSince(camera.offlineSince) : null;
+}
+
+/** The line under a camera's name. A camera that has stopped answering says so
+ *  where it is managed, not only on the wall: this is the screen somebody opens
+ *  to do something about it, and where it is plugged in matters less than the
+ *  fact that it is not there. */
+function Subtitle({ camera }: { camera: CameraView }) {
+    const format = useDisplayFormat();
+    const quiet = quietFor(camera);
+    return (
+        <p className="truncate text-[11px] text-foreground-subtle">
+            {quiet
+                ? `Not answering since ${format.dateTime(quiet.toISOString())}`
+                : [camera.zone, cameraVendor(camera.vendor).label, camera.address]
+                      .filter(Boolean)
+                      .join(" - ")}
+        </p>
+    );
+}
+
 const RECORDING_LABEL: Record<string, string> = {
     off: "Nothing kept",
     motion: "Kept on movement",
@@ -44,7 +69,6 @@ const RECORDING_LABEL: Record<string, string> = {
 };
 
 export function CamerasView({ canManage, openId }: { canManage: boolean; openId: string | null }) {
-    const format = useDisplayFormat();
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
     const [storage, setStorage] = useState<{ id: string; label: string }[]>([]);
@@ -203,26 +227,11 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                     </span>
                                                     {!camera.enabled ? (
                                                         <Badge variant="neutral">Off</Badge>
-                                                    ) : camera.offlineSince ? (
+                                                    ) : quietFor(camera) ? (
                                                         <Badge variant="danger">Quiet</Badge>
                                                     ) : null}
                                                 </div>
-                                                {/* A camera that has stopped
-                                                answering says so where it is
-                                                managed, not only on the wall:
-                                                this is the screen somebody opens
-                                                to do something about it. */}
-                                                <p className="truncate text-[11px] text-foreground-subtle">
-                                                    {camera.enabled && camera.offlineSince
-                                                        ? `Not answering since ${format.dateTime(camera.offlineSince)}`
-                                                        : [
-                                                              camera.zone,
-                                                              cameraVendor(camera.vendor).label,
-                                                              camera.address
-                                                          ]
-                                                              .filter(Boolean)
-                                                              .join(" - ")}
-                                                </p>
+                                                <Subtitle camera={camera} />
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                                                 {DETECTOR_META[camera.detector as Detector]

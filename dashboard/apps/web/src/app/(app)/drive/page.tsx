@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/session";
 import { DriveExplorer } from "./drive-explorer";
 import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
 import { isSavedConnection, type ConnectionSummary } from "./types";
-import { ensurePersonalDrive } from "@/lib/personal-drive";
+import { ensurePersonalDrive, PERSONAL_DRIVE_TAKEN } from "@/lib/personal-drive";
 import {
     connectionWebUrl,
     getContainerConnection,
@@ -45,12 +45,20 @@ export default async function DrivePage({
     // where it refuses - a row under this account's id that is not its drive -
     // is exactly the one somebody needs the rest of this screen to work out, so
     // the reason is shown on it rather than replacing it with a server error.
+    //
+    // Only that refusal is passed on. Anything else that fails in there is a
+    // storage or a query, and its message names tables and paths - it goes to
+    // the log, and the reader is told the one thing that is true and useful.
     let driveNotice: string | undefined;
     try {
         await ensurePersonalDrive(user.id);
     } catch (caught) {
-        driveNotice =
-            caught instanceof Error ? caught.message : "Your own drive could not be opened";
+        if (caught instanceof Error && caught.message === PERSONAL_DRIVE_TAKEN) {
+            driveNotice = PERSONAL_DRIVE_TAKEN;
+        } else {
+            console.error("polaris: a personal drive could not be opened:", caught);
+            driveNotice = "Your own drive could not be opened";
+        }
     }
 
     // Only the fast, local query runs on the server so the page paints instantly.

@@ -916,7 +916,7 @@ export async function liveCamerasAction(): Promise<{ live?: string[]; error?: st
         const names = await Promise.all(
             servers.map(async (server) => {
                 const endpoint = await relay.relayEndpoint(server);
-                return endpoint ? relay.publishedStreams(endpoint) : [];
+                return endpoint ? ((await relay.publishedStreams(endpoint)) ?? []) : [];
             })
         );
         const published = new Set(names.flat());

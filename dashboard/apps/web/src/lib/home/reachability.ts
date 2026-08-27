@@ -26,27 +26,28 @@
 import { prisma } from "@polaris/db";
 
 import { isMuted } from "@polaris/core";
-import { raiseAlerts } from "@/lib/home/alerts";
+import { raiseAlerts, type Said } from "@/lib/home/alerts";
 import { notify } from "@/lib/notifications/dispatch";
 import { ruleFor } from "@/lib/notifications/preferences";
-import { relayEndpoint, relayServerFor, snapshot, type RelayEndpoint } from "@/lib/home/relay";
-
-/**
- * How long a camera has to stay quiet before anybody is told.
- *
- * One missed frame is not an outage. Cameras reboot for a firmware check, a
- * wireless one loses a second of signal, and the relay drops a source it is
- * about to redial - reporting any of those would train whoever gets the alert to
- * ignore it, which costs more than the feature is worth. Two minutes is long
- * enough that everything ordinary has resolved and short enough to still be a
- * useful thing to be told at three in the morning.
- */
-export const OFFLINE_GRACE_MS = 2 * 60 * 1000;
+import { OFFLINE_GRACE_MS } from "@/lib/home/availability";
+import {
+    publishedStreams,
+    relayEndpoint,
+    relayServerFor,
+    snapshot,
+    streamName,
+    type RelayEndpoint
+} from "@/lib/home/relay";
 
 /** How long to wait on a camera before calling it quiet. Longer than an ordinary
  *  still, because a camera that has been asleep takes a moment to wake and there
  *  is nobody waiting on this. */
 const PROBE_TIMEOUT_MS = 10_000;
+
+/** Which of a camera's two streams is asked for a frame. The small one: nothing
+ *  looks at this picture. It is also the one the gate below checks the relay is
+ *  holding, so what is asked for and what is required to exist are the same. */
+const PROBE_QUALITY = "sub" as const;
 
 /** One camera, as this pass needs it. */
 interface Watched {
@@ -78,7 +79,7 @@ export interface ReachabilitySweep {
  * arrived.
  */
 async function answers(endpoint: RelayEndpoint, cameraId: string): Promise<boolean> {
-    const frame = await snapshot(endpoint, cameraId, "sub", {
+    const frame = await snapshot(endpoint, cameraId, PROBE_QUALITY, {
         // Whatever the wall was just shown is proof enough that the camera is
         // answering, and it saves a decode on a house somebody is watching.
         cacheMs: 5000
@@ -86,21 +87,39 @@ async function answers(endpoint: RelayEndpoint, cameraId: string): Promise<boole
     return frame !== null && frame.length > 0;
 }
 
+/** One relay, and what it is currently serving. */
+interface Relay {
+    readonly endpoint: RelayEndpoint;
+    /**
+     * The stream names it holds, or null when it could not be asked.
+     *
+     * Null is deliberately NOT an empty set. A relay that is down answers
+     * nothing, and reading that as "no camera was ever published here" would
+     * silence the pass at the exact moment every camera behind it went
+     * unwatchable - so an unanswering relay falls through to probing, and its
+     * cameras are reported the way they would be if each had gone on its own.
+     */
+    readonly serving: ReadonlySet<string> | null;
+}
+
 /**
- * The relay for each server that holds one of these cameras, resolved once.
+ * The relay for each server that holds one of these cameras, resolved once,
+ * along with the streams it is currently serving.
  *
  * A house with no relay yet has never had a camera opened, so there is nothing
  * to ask and nothing has stopped: those cameras are left out of the pass rather
  * than reported as down. Installing one from here would be a deploy nobody
  * asked for, on a timer.
  */
-async function endpointsFor(cameras: readonly Watched[]): Promise<Map<string, RelayEndpoint>> {
+async function relaysFor(cameras: readonly Watched[]): Promise<Map<string, Relay>> {
     const servers = [...new Set(cameras.map((camera) => relayServerFor(camera.reachVia)))];
-    const found = new Map<string, RelayEndpoint>();
+    const found = new Map<string, Relay>();
     await Promise.all(
         servers.map(async (server) => {
             const endpoint = await relayEndpoint(server).catch(() => null);
-            if (endpoint) found.set(server, endpoint);
+            if (!endpoint) return;
+            const streams = await publishedStreams(endpoint).catch(() => null);
+            found.set(server, { endpoint, serving: streams ? new Set(streams) : null });
         })
     );
     return found;
@@ -158,13 +177,20 @@ async function alreadyReported(cameraId: string, since: Date): Promise<boolean> 
  * The event is written first and never conditionally: the log is the record, and
  * it has to stand whether or not a message could be delivered. `endedAt` is left
  * open, which is what makes the row mean "still down" until the camera answers.
+ *
+ * The row is per camera and the message is not. Four cameras behind one switch
+ * losing power is four rows in the log, which is what happened, and one sentence
+ * to read, because the sentence they would each carry is the same one - the
+ * count in it is already the whole of what a place-wide outage has to say. Four
+ * copies of it is the alert fatigue the grace window exists to prevent.
  */
 async function reportOutage(
     camera: Watched,
     since: Date,
     placeName: string,
     down: number,
-    total: number
+    total: number,
+    said: Said
 ): Promise<void> {
     const headline = outageHeadline(camera.name, placeName, down, total);
     const event = await prisma.cameraEvent.create({
@@ -182,14 +208,20 @@ async function reportOutage(
     // picture, so a rule that names areas can never match one - which the rule
     // matcher already handles and which is the right answer: that rule asked a
     // question a camera which is not answering cannot answer.
-    void raiseAlerts(
+    //
+    // Awaited rather than left running: the batch is what stops a rule matching
+    // every camera at a place from posting the same line once per camera, and it
+    // can only do that if the calls take their turn.
+    await raiseAlerts(
         camera.installedAppId,
         { cameraId: camera.id, kind: "offline", label: headline },
         event.id,
-        { id: camera.id, name: camera.name, placeId: camera.placeId }
+        { id: camera.id, name: camera.name, placeId: camera.placeId },
+        undefined,
+        said
     );
 
-    await tell(camera.installedAppId, headline, "A camera is not answering", event.id);
+    await tell(camera.installedAppId, headline, "A camera is not answering", event.id, said);
 }
 
 /**
@@ -200,7 +232,7 @@ async function reportOutage(
  * whether it is still dark. The open event is closed rather than a second one
  * written, so the log has one line per outage with a length on it.
  */
-async function reportRecovery(camera: Watched, since: Date, now: Date): Promise<void> {
+async function reportRecovery(camera: Watched, since: Date, now: Date, said: Said): Promise<void> {
     const open = await prisma.cameraEvent.findFirst({
         where: { cameraId: camera.id, kind: "offline", endedAt: null, at: { gte: since } },
         select: { id: true },
@@ -215,7 +247,8 @@ async function reportRecovery(camera: Watched, since: Date, now: Date): Promise<
         camera.installedAppId,
         `${camera.name} is answering again`,
         `It was quiet for ${outageLength(since, now)}`,
-        open.id
+        open.id,
+        said
     );
 }
 
@@ -226,8 +259,15 @@ async function tell(
     installedAppId: string,
     title: string,
     body: string,
-    eventId: string
+    eventId: string,
+    said: Said
 ): Promise<void> {
+    // One line per sentence per pass. The dispatcher does not deduplicate, so a
+    // place that went dark all at once would otherwise leave one bell entry per
+    // camera, every one of them reading "Every camera at Home stopped answering".
+    const line = `${installedAppId}:${title}`;
+    if (said.has(line)) return;
+    said.add(line);
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId },
         select: { ownerId: true }
@@ -268,7 +308,7 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
     });
     if (cameras.length === 0) return { probed: 0, reported: 0, recovered: 0 };
 
-    const endpoints = await endpointsFor(cameras);
+    const relays = await relaysFor(cameras);
     const now = new Date();
 
     // Asked in parallel: a house of twelve cameras where three are down would
@@ -276,11 +316,19 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
     // another, and the pass runs every minute.
     const results = await Promise.all(
         cameras.map(async (camera) => {
-            const endpoint = endpoints.get(relayServerFor(camera.reachVia));
+            const relay = relays.get(relayServerFor(camera.reachVia));
             // No relay for this camera's network yet, so nothing here has ever
             // reached it and its silence says nothing.
-            if (!endpoint) return { camera, reachable: null as boolean | null };
-            const reachable = await withTimeout(answers(endpoint, camera.id));
+            if (!relay) return { camera, reachable: null as boolean | null };
+            // Nor has anything reached a camera the relay was never given. A
+            // camera saved with the wrong password fails to start and no stream
+            // is ever made for it, so the relay answers "no such source" for the
+            // same reason it would for a camera that had gone dark - and telling
+            // somebody a camera they have never seen a picture from has "stopped
+            // answering" is both wrong and the thing they can least act on.
+            if (relay.serving && !relay.serving.has(streamName(camera.id, PROBE_QUALITY)))
+                return { camera, reachable: null as boolean | null };
+            const reachable = await withTimeout(answers(relay.endpoint, camera.id));
             return { camera, reachable };
         })
     );
@@ -301,17 +349,25 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
 
     let reported = 0;
     let recovered = 0;
+    // What this pass has already said, so a place that went dark all at once is
+    // one sentence rather than one per camera.
+    const said: Said = new Set();
     for (const { camera, reachable } of asked) {
         try {
             if (reachable) {
+                // Closed before the column that says it is open is cleared. The
+                // other order loses the outage for good if this throws: the next
+                // pass reads `offlineSince` as null, never tries again, and the
+                // row keeps `endedAt: null` forever - an outage that reads as
+                // still in progress on a camera that came back hours ago.
+                if (camera.offlineSince) {
+                    await reportRecovery(camera, camera.offlineSince, now, said);
+                    recovered += 1;
+                }
                 await prisma.camera.update({
                     where: { id: camera.id },
                     data: { lastSeenAt: now, offlineSince: null }
                 });
-                if (camera.offlineSince) {
-                    await reportRecovery(camera, camera.offlineSince, now);
-                    recovered += 1;
-                }
                 continue;
             }
 
@@ -333,7 +389,8 @@ export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
                 camera.offlineSince,
                 placeNames.get(key) ?? "",
                 downAt.get(key) ?? 1,
-                totalAt.get(key) ?? 1
+                totalAt.get(key) ?? 1,
+                said
             );
             reported += 1;
         } catch (error) {

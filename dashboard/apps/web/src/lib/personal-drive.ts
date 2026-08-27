@@ -38,6 +38,17 @@ import {
 /** What a personal drive is called wherever storages are listed by name. */
 export const PERSONAL_DRIVE_NAME = "My files";
 
+/**
+ * The one refusal a caller is expected to show somebody.
+ *
+ * A drive is looked up by an id that is an account's, so the only way it can
+ * fail to open other than a broken database is a row under that id that is not
+ * this account's drive. That is worth saying on the screen; everything else that
+ * can go wrong in here is a storage or a query failing, and its message belongs
+ * in the log rather than in front of a reader who cannot act on it.
+ */
+export const PERSONAL_DRIVE_TAKEN = "This account's drive cannot be opened";
+
 /** Where a personal drive made from now on is put. Its own setting, beside the
  *  other upload destinations on /admin/uploads: people's files are the biggest
  *  thing this instance will ever hold, and the disk that suits them is not
@@ -125,7 +136,7 @@ export async function ensurePersonalDrive(userId: string): Promise<PersonalDrive
         // and is not something to quietly write over.
         const drive = existing.ownerId === userId ? driveOf(existing) : null;
         if (drive) return drive;
-        throw new Error("This account's drive cannot be opened");
+        throw new Error(PERSONAL_DRIVE_TAKEN);
     }
 
     const target = await resolveStorageTarget(PERSONAL_TARGET_KEY);

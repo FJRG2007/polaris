@@ -267,6 +267,21 @@ function eventHref(eventId: string): string {
 }
 
 /**
+ * What has already been said, across a run of events that belong together.
+ *
+ * One thing happening can be several events: a place whose power went writes an
+ * outage per camera, and each of them raises the alerts on its own. Without
+ * this, a rule covering that place posts the same sentence once per camera into
+ * the same conversation - four lines saying "Every camera at Home stopped
+ * answering", which is the alert fatigue an alert exists to avoid.
+ *
+ * Held by the caller rather than in here because only the caller knows where one
+ * batch stops. A caller that passes nothing gets the old behaviour, which is
+ * right for a detection: two people at the door are two arrivals.
+ */
+export type Said = Set<string>;
+
+/**
  * Deliver an alert for one detection, if any rule asked for it.
  *
  * Never throws: an event that was recorded must not be reported as a failure
@@ -281,7 +296,10 @@ export async function raiseAlerts(
     /** The areas this event has entered since it was opened. Set only on the
      *  second and later looks, and it narrows the rules considered to the ones
      *  that named one of them. */
-    onlyZones?: readonly string[]
+    onlyZones?: readonly string[],
+    /** What the batch this event belongs to has already delivered, so no rule
+     *  says the same sentence twice for one thing that happened. */
+    alreadySaid?: Said
 ): Promise<void> {
     try {
         const rules = (await listAlertRules(installedAppId)).filter((rule) =>
@@ -311,6 +329,13 @@ export async function raiseAlerts(
         const text = `${said} - [see it](${eventHref(eventId)})`;
 
         for (const rule of rules) {
+            // Per rule rather than per batch: a rule that names one camera and a
+            // rule that covers the place are two different people asking, and
+            // both are still told. It is the second copy of the sentence inside
+            // one conversation that nobody needs.
+            const line = `${rule.id}:${said}`;
+            if (alreadySaid?.has(line)) continue;
+            alreadySaid?.add(line);
             const channelId = await conversationFor(rule, rule.recipients[0] ?? null);
             await prisma.chatMessage.create({
                 data: { channelId, kind: "system", authorId: null, body: text }

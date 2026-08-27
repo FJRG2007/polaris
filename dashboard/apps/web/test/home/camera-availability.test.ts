@@ -18,7 +18,8 @@
 import { describe, expect, it } from "vitest";
 import { notificationEvent, resolveRule } from "@polaris/core";
 import { ALERT_KINDS, alertRuleInputSchema } from "@/lib/home/schemas";
-import { OFFLINE_GRACE_MS, outageHeadline, outageLength } from "@/lib/home/reachability";
+import { OFFLINE_GRACE_MS, quietSince } from "@/lib/home/availability";
+import { outageHeadline, outageLength } from "@/lib/home/reachability";
 
 describe("how an outage is worded", () => {
     it("names the building when everything there went at once", () => {
@@ -69,9 +70,25 @@ describe("how long it was gone", () => {
 });
 
 describe("how long a camera has to be quiet first", () => {
+    const at = (ms: number) => new Date(1_800_000_000_000 + ms).toISOString();
+
     it("waits longer than a reboot and less than a night", () => {
         expect(OFFLINE_GRACE_MS).toBeGreaterThanOrEqual(60_000);
         expect(OFFLINE_GRACE_MS).toBeLessThanOrEqual(10 * 60_000);
+    });
+
+    it("says nothing about a camera that has only just missed a frame", () => {
+        // The column is written on the first miss, which is a moment earlier
+        // than anything a reader should be shown: a camera rebooting for a
+        // firmware check must not turn a tile red on its way back.
+        const now = 1_800_000_000_000 + OFFLINE_GRACE_MS;
+        expect(quietSince(at(1), now)).toBeNull();
+        expect(quietSince(at(0), now)?.getTime()).toBe(1_800_000_000_000);
+    });
+
+    it("says nothing at all about a camera that is answering", () => {
+        expect(quietSince(null)).toBeNull();
+        expect(quietSince("not a date")).toBeNull();
     });
 });
 

@@ -177,11 +177,19 @@ export async function unpublishCamera(endpoint: RelayEndpoint, cameraId: string)
     }
 }
 
-/** Which streams a relay currently holds. Used to reconcile after a restart, and
- *  to tell "not published yet" from "published and the camera is down". */
-export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[]> {
+/**
+ * Which streams a relay currently holds. Used to reconcile after a restart, and
+ * to tell "not published yet" from "published and the camera is down".
+ *
+ * Null when the relay could not be asked, which is not the same answer as an
+ * empty list and must not be read as one: a relay that is down holds no streams
+ * as far as this call can see, and anything that concluded "nothing was ever
+ * published here" from that would be drawing the opposite conclusion from the
+ * truth - every camera on it has just become unwatchable.
+ */
+export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[] | null> {
     const response = await relayFetch(endpoint, "/api/streams", { timeoutMs: 3000 }).catch(() => null);
-    if (!response?.ok) return [];
+    if (!response?.ok) return null;
     const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
     return body ? Object.keys(body) : [];
 }

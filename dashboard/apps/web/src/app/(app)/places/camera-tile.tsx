@@ -43,6 +43,7 @@ import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
+import { quietSince } from "@/lib/home/availability";
 import { useDisplayFormat } from "@/components/display-format";
 import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
@@ -150,8 +151,11 @@ export function CameraTile({
     /** When this camera stopped answering, in the reader's own format, or null
      *  while it is answering. Read off the row rather than from what this tab
      *  managed to draw, so it survives a reload and says the same thing on every
-     *  screen looking at the house. */
-    const quietSince = camera.offlineSince ? format.dateTime(camera.offlineSince) : null;
+     *  screen looking at the house - and only once the silence has outlasted the
+     *  grace window, so a camera rebooting for a firmware check does not turn a
+     *  tile red for the one pass it takes to come back. */
+    const quiet = quietSince(camera.offlineSince);
+    const since = quiet ? format.dateTime(quiet.toISOString()) : null;
 
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
@@ -357,7 +361,7 @@ export function CameraTile({
                         {drawn === false && !playing ? (
                             <Placeholder
                                 icon={<Camera className="size-5 shrink-0" />}
-                                label={quietSince ? `Not answering since ${quietSince}` : "Not answering"}
+                                label={since ? `Not answering since ${since}` : "Not answering"}
                             />
                         ) : null}
                         {/* Said, not just drawn. A blurred still is ambiguous -
@@ -371,7 +375,7 @@ export function CameraTile({
                         ) : null}
                     </>
                 ) : (
-                    <Unavailable camera={camera} live={live} since={quietSince} />
+                    <Unavailable camera={camera} live={live} since={since} />
                 )}
 
                 {/* The whole picture opens it: a transparent button OVER the
@@ -405,8 +409,12 @@ export function CameraTile({
                     ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                    {quietSince ? (
-                        <Badge variant="danger" title={`Not answering since ${quietSince}`}>
+                    {/* Only over a tile that is not drawing. A frame arriving is
+                        the camera answering, whatever the row still says - the
+                        pass has not run since - and a red badge over a moving
+                        picture reads as a bug. */}
+                    {since && drawn !== true && !playing ? (
+                        <Badge variant="danger" title={`Not answering since ${since}`}>
                             Quiet
                         </Badge>
                     ) : null}
