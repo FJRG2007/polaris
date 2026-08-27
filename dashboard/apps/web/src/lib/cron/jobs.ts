@@ -19,6 +19,7 @@ import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepCameraReachability } from "@/lib/home/reachability";
+import { sweepHostSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -310,6 +311,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // beside it.
         leaseMs: 30 * MINUTE,
         run: sweepHomeRetention
+    },
+    {
+        key: "host-space",
+        // Six hours. What this cleans up accumulates over weeks, not minutes,
+        // and the cache it hands back is cache the next build would have reused
+        // - so running it often costs every build to save nothing.
+        everyMs: Number(process.env.POLARIS_HOST_SPACE_MS) || 6 * 60 * MINUTE,
+        // Leased for longer than the gap between passes, like every other job
+        // here: two runners pruning the same store race each other onto the same
+        // records, and one of them fails on what the other already took.
+        leaseMs: 7 * 60 * MINUTE,
+        run: sweepHostSpace
     },
     {
         key: "suspensions",

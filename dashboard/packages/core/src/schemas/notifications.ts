@@ -382,6 +382,18 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "server.space",
+        group: "deploy",
+        label: "A server is running out of room",
+        description: "Polaris freed everything nothing was using and the disk is still nearly full.",
+        level: "warning",
+        // On, and it means it. By the time this is raised the automatic
+        // housekeeping has already run and not been enough, so what is left is
+        // data only a person can decide about - and the next thing that happens
+        // is a deploy or a recording failing.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "network.router",
         group: "network",
         label: "Network needs attention",
