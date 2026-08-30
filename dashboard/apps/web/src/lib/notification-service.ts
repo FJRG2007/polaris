@@ -238,8 +238,15 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
  */
 export async function markNotificationsReadByType(types: readonly string[]): Promise<void> {
     await prisma.notification.updateMany({
-        where: { type: { in: [...types] }, readAt: null },
-        data: { readAt: new Date() }
+        // Either half is worth clearing on its own: one that was read but still
+        // says "Action needed" is a chore the reader cannot get rid of, and one
+        // still unread is a count on the bell for something already done.
+        where: { type: { in: [...types] }, OR: [{ readAt: null }, { actionRequired: true }] },
+        // Read AND no longer waiting on anybody. These are answered by something
+        // that happened - an update installed, a permission granted - rather than
+        // by being looked at, and "Action needed" left standing after the action
+        // was taken is the alert nobody can clear because nothing is wrong.
+        data: { readAt: new Date(), actionRequired: false }
     });
 }
 

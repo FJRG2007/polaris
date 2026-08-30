@@ -98,6 +98,20 @@ function available(latest: string | null = SHA): UpdateStatus {
     };
 }
 
+/** The one write the watcher makes against notifications: answering its own
+ *  alerts, by type, for everybody at once. */
+interface MarkRead {
+    where: { type: { in: string[] } };
+}
+
+/** Every clearing write that named this event. `system.update` alone is the
+ *  watcher superseding its own standing alert; the pair is a build landing. */
+function cleared(event: string): MarkRead[] {
+    return notificationUpdateMany.mock.calls
+        .map(([input]) => input as unknown as MarkRead)
+        .filter((call) => call.where.type.in.includes(event));
+}
+
 /** Every alert raised so far, by event id. */
 function raised(event: string): { title: string; body: string; }[] {
     return notify.mock.calls
@@ -137,6 +151,39 @@ describe("announcing a build", () => {
         expect(raised("system.update")).toHaveLength(4);
     });
 
+    it("puts down the alert it supersedes, so the bell holds the latest and not the pile", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        status = available("def5678");
+        await checkForUpdate();
+
+        // Only the alert that says one is ready. Installing goes to the newest
+        // build, never to the one the older alert named, so leaving it standing
+        // is one instruction and one that is wrong.
+        const cleared = notificationUpdateMany.mock.calls.map(([input]) => input as unknown as MarkRead);
+        expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
+        // And never the ones that report what happened: a failure swept away by
+        // the next build's announcement is a deployment that quietly stopped
+        // updating and told nobody twice.
+        expect(cleared.every((call) => !call.where.type.in.includes("system.updated"))).toBe(true);
+    });
+
+    it("clears the standing alert once there is nothing left to install", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        notificationUpdateMany.mockClear();
+
+        // The case the "did the build we announced land" check misses: somebody
+        // installed while a newer build had already been announced, so what is
+        // being served is not what was last announced - and they were left with
+        // an "Action needed" for work they had done.
+        status = { ...available(null), phase: "up-to-date", latest: null, upToDate: true, behindBy: 0 };
+        await checkForUpdate();
+
+        const cleared = notificationUpdateMany.mock.calls.map(([input]) => input as unknown as MarkRead);
+        expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
+    });
+
     it("says nothing while there is nothing to install", async () => {
         status = { ...available(), phase: "building" };
         await checkForUpdate();
@@ -163,14 +210,14 @@ describe("putting the alerts down once the build lands", () => {
         status = landed(SHA);
         await checkForUpdate();
 
-        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
-        expect(notificationUpdateMany.mock.calls[0]?.[0]).toMatchObject({
-            where: { type: { in: ["system.update", "system.updated"] }, readAt: null }
+        expect(cleared("system.updated")).toHaveLength(1);
+        expect(notificationUpdateMany.mock.calls.at(-1)?.[0]).toMatchObject({
+            data: { readAt: expect.any(Date), actionRequired: false }
         });
         // The claims went with them, so nothing is left to retire twice.
         expect(rows.has("updates.announced")).toBe(false);
         await checkForUpdate();
-        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+        expect(cleared("system.updated")).toHaveLength(1);
     });
 
     it("leaves the alerts alone while the announced build is still not the one serving", async () => {
@@ -178,7 +225,10 @@ describe("putting the alerts down once the build lands", () => {
         await checkForUpdate();
         status = { ...available(), current: "0000000" };
         await checkForUpdate();
-        expect(notificationUpdateMany).not.toHaveBeenCalled();
+        // Nothing has landed, so nothing that reports what happened is put down.
+        // The standing "one is ready" alert is a different matter - announcing
+        // the next build supersedes it, which is the test above this block.
+        expect(cleared("system.updated")).toHaveLength(0);
     });
 
     it("clears an install that failed and was later installed another way", async () => {
@@ -191,7 +241,7 @@ describe("putting the alerts down once the build lands", () => {
         // The host was updated by hand, so the build that failed here is serving.
         status = landed(SHA);
         await checkForUpdate();
-        expect(notificationUpdateMany).toHaveBeenCalledTimes(1);
+        expect(cleared("system.updated")).toHaveLength(1);
         expect(rows.has("updates.installed")).toBe(false);
     });
 });

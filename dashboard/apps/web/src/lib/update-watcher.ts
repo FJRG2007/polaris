@@ -46,6 +46,22 @@ const UPDATE_PERMISSION: Permission = "system.manage";
  *  they are about is the one being served. */
 const UPDATE_EVENTS = ["system.update", "system.updated"] as const;
 
+/**
+ * The alert that says an update is waiting, on its own.
+ *
+ * Superseded rather than accumulated. Only the newest of these is worth
+ * anything: installing takes the deployment to the latest build, never to the
+ * one an older alert happened to name, so a bell holding five of them is one
+ * instruction and four that are wrong. It is answered by the install as well,
+ * whichever build was named.
+ *
+ * Kept apart from `system.updated`, which reports what happened - an install
+ * that started, or one that failed. Those have to outlive the next
+ * announcement: a failure swept away by the following build's alert is a
+ * deployment that quietly stopped updating and told nobody twice.
+ */
+const READY_EVENT = "system.update";
+
 const POLICY_KEY = "updates.auto";
 const ANNOUNCED_KEY = "updates.announced";
 const INSTALLED_KEY = "updates.installed";
@@ -108,6 +124,11 @@ async function tellOperators(input: {
 async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
     const now = new Date();
     if (await claim(ANNOUNCED_KEY, sha, `${sha} ${now.toISOString()}`)) {
+        // Before raising this one, put down the ones it replaces - they name
+        // builds this announcement supersedes. Done here rather than in the
+        // reader so what reaches a phone or a chat webhook is superseded too,
+        // and so the bell holds the latest rather than the pile.
+        await markNotificationsReadByType([READY_EVENT]);
         const plan =
             policy.mode === "daily"
                 ? `It installs itself at ${policy.at}, or install it now from Settings.`
@@ -228,6 +249,12 @@ export async function checkForUpdate(): Promise<void> {
     // Before anything else: the build this deployment was told about may be the
     // one it is now serving, in which case what it was told is answered.
     await retireLandedNotices(status.current);
+    // And whatever build they named, an alert saying an update is ready to
+    // install is answered the moment there is nothing left to install. That is
+    // the case the check above misses: it only recognises the build it last
+    // announced, so an operator who installed while a newer one was already
+    // announced kept an "Action needed" for work they had done.
+    if (status.upToDate) await markNotificationsReadByType([READY_EVENT]);
     // Only a published image that this deployment can actually move to. Anything
     // else - up to date, still building, a commit that failed its checks - is
     // nothing to announce and nothing to install.
