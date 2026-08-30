@@ -25,7 +25,7 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { usePathname } from "next/navigation";
-import { FolderAccessDialog } from "./folder-access-dialog";
+import { AccessDialog, type AccessTarget } from "./access-dialog";
 import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FolderSummary, ListSummary, SpaceTreeView } from "@/lib/tasks/space-service";
@@ -456,7 +456,7 @@ export function SpaceTree({
     const [renaming, setRenaming] = useState<string | null>(null);
     const [dragging, setDragging] = useState<Dragged | null>(null);
     const [confirm, setConfirm] = useState<Pending>(null);
-    const [accessFolderId, setAccessFolderId] = useState<string | null>(null);
+    const [access, setAccess] = useState<AccessTarget | null>(null);
     const [create, setCreate] = useState<{ kind: CreateKind; at: CreateAt } | null>(null);
     const [newSpace, setNewSpace] = useState(false);
     const [spaceName, setSpaceName] = useState("");
@@ -653,7 +653,7 @@ export function SpaceTree({
                     onDragging={setDragging}
                     onDrop={dropFolder}
                     onConfirm={setConfirm}
-                    onAccess={setAccessFolderId}
+                    onAccess={setAccess}
                     onCreate={pickCreate}
                     run={run}
                 />
@@ -666,18 +666,7 @@ export function SpaceTree({
                 onError={setError}
             />
 
-            <FolderAccessDialog
-                folderId={accessFolderId}
-                canManage={
-                    canManage &&
-                    canAdmin(
-                        spaces
-                            .flatMap((space) => space.folders)
-                            .find((folder) => folder.id === accessFolderId)?.role ?? "guest"
-                    )
-                }
-                onClose={() => setAccessFolderId(null)}
-            />
+            <AccessDialog target={access} onClose={() => setAccess(null)} />
 
             <ConfirmDeleteDialog
                 open={confirm !== null}
@@ -730,7 +719,7 @@ interface SectionProps {
         position: { beforeId: string | null; afterId: string | null }
     ) => void;
     readonly onConfirm: (pending: Pending) => void;
-    readonly onAccess: (folderId: string) => void;
+    readonly onAccess: (target: AccessTarget) => void;
     readonly onCreate: (kind: CreateKind, at: CreateAt) => void;
     readonly run: (call: () => Promise<{ error?: string }>) => Promise<void>;
 }
@@ -781,6 +770,18 @@ function SpaceSection({
         name: list.name
     });
 
+    /** Where a list's access comes from: the folder it sits in, or the space when
+     *  it sits in none. A list has no grants of its own, so this is the level a
+     *  menu entry on it has to open and the role that decides whether it may. */
+    const listGovernedBy = (list: ListSummary): { scope: AccessTarget["scope"]; role: string } => {
+        const folder = list.folderId
+            ? space.folders.find((entry) => entry.id === list.folderId)
+            : undefined;
+        return folder
+            ? { scope: { kind: "folder", id: folder.id }, role: folder.role }
+            : { scope: { kind: "space", id: space.id }, role: space.role };
+    };
+
     const renderList = (list: ListSummary, depth: number, siblings: readonly { id: string }[]) => (
         <TreeRow
             key={list.id}
@@ -830,6 +831,19 @@ function SpaceSection({
             actions={
                 editable
                     ? [
+                          ...(canAdmin(listGovernedBy(list).role)
+                              ? [
+                                    {
+                                        label: "Who can reach this",
+                                        Icon: Users,
+                                        onSelect: () =>
+                                            onAccess({
+                                                scope: listGovernedBy(list).scope,
+                                                asked: { kind: "list" as const, name: list.name }
+                                            })
+                                    }
+                                ]
+                              : []),
                           {
                               label: "Rename (F2)",
                               Icon: Pencil,
@@ -879,7 +893,7 @@ function SpaceSection({
                           label: "Who can reach this",
                           Icon: Users,
                           quick: true,
-                          onSelect: () => onAccess(folder.id)
+                          onSelect: () => onAccess({ scope: { kind: "folder", id: folder.id } })
                       }
                   ]
                 : []),
@@ -1109,6 +1123,14 @@ function SpaceSection({
                         {spaceManageable && (
                             <>
                                 <ContextMenuSeparator />
+                                <ContextMenuItem
+                                    onSelect={() =>
+                                        onAccess({ scope: { kind: "space", id: space.id } })
+                                    }
+                                >
+                                    <Users className="size-3.5" />
+                                    Who can reach this
+                                </ContextMenuItem>
                                 <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
                                     <Pencil className="size-3.5" />
                                     Rename (F2)

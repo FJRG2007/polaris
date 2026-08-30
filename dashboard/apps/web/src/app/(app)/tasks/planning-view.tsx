@@ -16,9 +16,10 @@ import * as core from "@polaris/core";
 import { ProgressBar } from "./pickers";
 import { runAction } from "@/lib/run-action";
 import { useDisplayFormat } from "@/components/display-format";
-import { CalendarRange, Plus, Target, Trash2 } from "lucide-react";
+import { CalendarRange, Plus, Target, Trash2, Users } from "lucide-react";
 import { Button, Card, CardBody, EmptyState, Input, Select, cn } from "@polaris/ui";
 import type { GoalView, SprintView } from "@/lib/tasks/planning-service";
+import { AccessDialog, type AccessTarget } from "./access-dialog";
 
 // ---------------------------------------------------------------------------
 // Sprints
@@ -46,9 +47,11 @@ export function SprintsView({
     const [start, setStart] = useState("");
     const [end, setEnd] = useState("");
     const [error, setError] = useState("");
+    const [access, setAccess] = useState<AccessTarget | null>(null);
 
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
+            <AccessDialog target={access} onClose={() => setAccess(null)} />
             <header className="flex flex-wrap items-center gap-3">
                 <div>
                     <h1 className="text-[17px] font-semibold tracking-tight">Sprints</h1>
@@ -193,6 +196,24 @@ export function SprintsView({
                                             aria-label={`Status of ${sprint.name}`}
                                             className="h-8 w-32 text-xs"
                                         />
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                aria-label={`Who can reach ${sprint.name}`}
+                                                title="Who can reach this"
+                                                onClick={() =>
+                                                    setAccess({
+                                                        scope: sprint.folderId
+                                                            ? { kind: "folder", id: sprint.folderId }
+                                                            : { kind: "space", id: sprint.spaceId },
+                                                        asked: { kind: "sprint", name: sprint.name }
+                                                    })
+                                                }
+                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                            >
+                                                <Users className="size-3.5" />
+                                            </button>
+                                        )}
                                         {canEdit && <button
                                             type="button"
                                             aria-label={`Delete ${sprint.name}`}

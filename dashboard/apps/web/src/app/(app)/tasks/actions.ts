@@ -150,6 +150,37 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
     }
 }
 
+/**
+ * Who is on a space, for the dialog that opens on a right-click.
+ *
+ * The settings screen reads this on the server, where it is already holding the
+ * space. The dialog cannot: it is opened from a tree that has only a name and an
+ * id, and it opens for whichever row was clicked.
+ *
+ * Reading it is `guest`, the same as the folder one: seeing who else is here is
+ * part of being here, and hiding the list from the people in it only means they
+ * ask in chat instead. Changing it still takes `admin`.
+ */
+export async function listSpaceMembersAction(spaceId: string): Promise<{
+    space?: { id: string; name: string };
+    members?: spaces.SpaceMemberView[];
+    canManage?: boolean;
+    error?: string;
+}> {
+    const caller = await actor("tasks.read");
+    try {
+        const role = await access.requireSpace(caller, spaceId, "guest");
+        const [space, members] = await Promise.all([
+            spaces.getSpace(spaceId),
+            spaces.listSpaceMembers(spaceId, caller)
+        ]);
+        const canManage = role === "owner" || role === "admin";
+        return space ? { space, members, canManage } : { error: "That space no longer exists" };
+    } catch (caught) {
+        return failure(caught, "Could not read who has access");
+    }
+}
+
 export async function addSpaceMemberAction(
     spaceId: string,
     identifier: string,
@@ -293,16 +324,18 @@ export async function moveListAction(listId: string, move: unknown): Promise<{ e
 export async function listFolderMembersAction(folderId: string): Promise<{
     folder?: spaces.FolderDetail;
     members?: spaces.FolderMemberView[];
+    canManage?: boolean;
     error?: string;
 }> {
     const caller = await actor("tasks.read");
     try {
-        await access.requireFolder(caller, folderId, "guest");
+        const { role } = await access.requireFolder(caller, folderId, "guest");
         const [folder, members] = await Promise.all([
             spaces.getFolder(folderId),
             spaces.listFolderMembers(folderId, caller)
         ]);
-        return folder ? { folder, members } : { error: "That folder no longer exists" };
+        const canManage = role === "owner" || role === "admin";
+        return folder ? { folder, members, canManage } : { error: "That folder no longer exists" };
     } catch (caught) {
         return failure(caught, "Could not read who has access");
     }

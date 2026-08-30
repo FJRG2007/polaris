@@ -331,6 +331,13 @@ export interface SpaceMemberView {
     readonly role: core.SpaceRole | "owner";
 }
 
+/** A space's own name and id, for a dialog opened from a tree that has neither
+ *  in a shape it can trust - the row's label is whatever was last typed into it,
+ *  and a rename in another tab does not reach it. */
+export async function getSpace(spaceId: string): Promise<{ id: string; name: string } | null> {
+    return prisma.taskSpace.findUnique({ where: { id: spaceId }, select: { id: true, name: true } });
+}
+
 export async function listSpaceMembers(
     spaceId: string,
     viewer: { id: string; isAdmin: boolean }
