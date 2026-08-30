@@ -26,17 +26,17 @@ import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { useStableOrder } from "./stable-order";
-import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { ListView, TableView } from "./views/rows";
-import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { AssigneePicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { holdSelection, shortfallMessage } from "./views/shared";
+import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Button, ConfirmDeleteDialog, EmptyState, Select, cn } from "@polaris/ui";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
+import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
+import { Button, ConfirmDeleteDialog, EmptyState, Select, cn } from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
 import type {
@@ -259,17 +259,19 @@ export function ListScreen({
         [rows, needle]
     );
 
+    const hidesClosed = core.hidesClosedWork(groupBy, showClosed);
+
     const sortedFacts = useMemo(() => {
         const now = new Date();
         const matched = index ? index.search(needle).map((hit) => hit.item) : rows;
         const working = matched
-            .filter((task) => showClosed || task.statusType !== "closed")
+            .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
         // A search is already ranked by how well each row matched; re-sorting it
         // by due date would throw that away.
         return index ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, needle, filter, showClosed, sort, statusOrder, format.weekStartsOn]);
+    }, [rows, index, needle, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
 
     /**
      * What the reader asked to see, as opposed to what the data happens to be.
@@ -877,14 +879,19 @@ export function ListScreen({
                     {sort.direction === "asc" ? "Ascending" : "Descending"}
                 </button>
 
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <input
-                        type="checkbox"
-                        checked={showClosed}
-                        onChange={(event) => setShowClosed(event.target.checked)}
-                    />
-                    Show closed
-                </label>
+                {/* Not offered while grouping by status, where closed work is in
+                    a column of its own and the box would change nothing. A
+                    control that does nothing is read as a broken one. */}
+                {groupBy === "status" ? null : (
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <input
+                            type="checkbox"
+                            checked={showClosed}
+                            onChange={(event) => setShowClosed(event.target.checked)}
+                        />
+                        Show closed
+                    </label>
+                )}
 
                 <div className="relative">
                     <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />

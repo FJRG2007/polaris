@@ -366,6 +366,26 @@ export const TASK_GROUP_LABELS: Record<TaskGroupField, string> = {
     none: "No grouping"
 };
 
+/**
+ * Whether closed work is hidden from a view arranged this way.
+ *
+ * Hiding it is right for a flat list and for every other way of grouping: nobody
+ * triaging by assignee wants six months of cancelled work in the pile. It is
+ * wrong for exactly one arrangement - grouped by status, where a closed status
+ * is a column of its own and the only thing that column can ever hold. Hidden
+ * there, the column is drawn empty while holding work, and a card dragged into
+ * it disappears the moment it is let go: the move saved, the status changed, and
+ * nothing on the screen said where the task went. "Cancelled" is that column on
+ * every space, since it is one of the statuses a new space starts with.
+ *
+ * So the filter stands down when closed work has somewhere of its own to be.
+ * Grouped by status a task can only land in the group of its own status, so
+ * letting it through cannot put a cancelled task anywhere except Cancelled.
+ */
+export function hidesClosedWork(groupBy: TaskGroupField, showClosed: boolean): boolean {
+    return !showClosed && groupBy !== "status";
+}
+
 export const TASK_SORT_FIELDS = [
     "manual",
     "name",
