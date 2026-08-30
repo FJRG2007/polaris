@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/session";
 import { providersFor } from "@/lib/agents/model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
+import { ACCEPT_STEP, CLEARS_ITSELF, permissionList } from "@/lib/integrations/github-permission-copy";
 
 /**
  * The one thing standing between here and a working agent, when there is one.
@@ -34,20 +35,34 @@ export async function SetupNotice() {
     // installed on until the owner accepts. Every dispatch fails with an opaque
     // 403 until then, so this is worth saying before anybody enables a repository.
     if (gap.installations.length > 0) {
-        const names = gap.installations.map((row) => row.login).join(", ");
         return (
             <Notice>
-                The GitHub App is waiting for new permissions on {names}. Until they are accepted, runs there will be
-                refused.{" "}
-                {gap.reviewUrl ? (
-                    <a href={gap.reviewUrl} target="_blank" rel="noreferrer" className="underline">
-                        Review them on GitHub
-                    </a>
-                ) : (
-                    <Link href="/admin/integrations" className="underline">
-                        Open Integrations
-                    </Link>
-                )}
+                <p>
+                    GitHub is holding a permission request, and until its owner accepts it, runs on these accounts are
+                    refused. Only they can accept it - GitHub offers nobody else a way, so this is one of the few
+                    things Polaris cannot do for you.
+                </p>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                    {gap.installations.map((row) => (
+                        <li key={row.login}>
+                            <span className="font-medium">{row.login}</span> has not granted{" "}
+                            {permissionList(row.missing)}.{" "}
+                            {row.reviewUrl ? (
+                                <a href={row.reviewUrl} target="_blank" rel="noreferrer" className="underline">
+                                    Open its installation on GitHub
+                                </a>
+                            ) : (
+                                // No link only where the account type was never
+                                // recorded, so neither of GitHub's two paths is
+                                // known to apply. Naming the page is still better
+                                // than a link that 404s.
+                                <span>Open it under Settings, Applications, on GitHub</span>
+                            )}
+                            , then {ACCEPT_STEP.charAt(0).toLowerCase() + ACCEPT_STEP.slice(1)}
+                        </li>
+                    ))}
+                </ul>
+                <p className="mt-2 opacity-80">{CLEARS_ITSELF}</p>
             </Notice>
         );
     }

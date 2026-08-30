@@ -548,8 +548,10 @@ export async function listGithubInstallations(): Promise<
 
 export interface GithubPermissionGap {
     /** Installations that have not accepted everything the App now asks for,
-     *  each with the page its owner accepts them on. */
-    installations: Array<{ login: string; missing: string[]; reviewUrl: string }>;
+     *  each with the page its owner accepts them on - null where the account
+     *  type was never recorded and neither of GitHub's two paths is known to
+     *  apply. The gap is still reported; only the link is missing. */
+    installations: Array<{ login: string; missing: string[]; reviewUrl: string | null }>;
     /** Where to send somebody when there is no single installation to point at.
      *  Re-running the install prompts for the current permission set, which is
      *  the same acceptance by another route. */
@@ -598,11 +600,12 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
             missing: missingAppPermissions(install.permissions ?? {}),
             reviewUrl: installationSettingsUrl(install, htmlUrl)
         }))
-        .filter((row) => row.missing.length > 0 && row.reviewUrl !== null) as Array<{
-        login: string;
-        missing: string[];
-        reviewUrl: string;
-    }>;
+        // Only the gap decides whether a row belongs here. It used to have to
+        // carry a link as well, so an installation recorded before the account
+        // type was - the one case with no derivable URL - was dropped from the
+        // gap and its refusals went unexplained. A row with nowhere to point is
+        // still a row somebody has to be told about.
+        .filter((row) => row.missing.length > 0);
 
     return {
         installations: gaps,
@@ -610,8 +613,8 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
         // the install flow stands in - it prompts for the current permission set,
         // which accepts the same request.
         reviewUrl:
-            gaps.length === 1
-                ? (gaps[0] as { reviewUrl: string }).reviewUrl
+            gaps.length === 1 && gaps[0]?.reviewUrl
+                ? gaps[0].reviewUrl
                 : htmlUrl
                   ? `${htmlUrl}/installations/new`
                   : null

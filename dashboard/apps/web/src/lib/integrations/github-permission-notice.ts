@@ -17,6 +17,7 @@
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { githubPermissionGap, refreshInstallations } from "@/lib/github-service";
+import { ACCEPT_STEP, permissionList } from "@/lib/integrations/github-permission-copy";
 
 /** What was last announced, so the same gap is not announced twice. */
 const SEEN_KEY = "integrations.github.permission-gap";
@@ -59,14 +60,17 @@ export async function notifyGithubPermissionGap(): Promise<void> {
         // Only people who could act on it. Somebody without the permission to
         // manage integrations cannot accept anything on GitHub's side either, and
         // an alert they can only read is noise.
+        // Named the way GitHub names them, because the person reading this is
+        // about to go looking for these rows on a page of GitHub's - and the API
+        // keys the gap is expressed in appear nowhere on it.
         const names = gap.installations.map((row) => row.login).join(", ");
-        const missing = [...new Set(gap.installations.flatMap((row) => row.missing))].sort().join(", ");
+        const missing = permissionList([...new Set(gap.installations.flatMap((row) => row.missing))]);
 
         await notifyOperators({
             permission: "system.manage",
             event: "integrations.github.permissions",
-            title: "The GitHub App is waiting for permissions",
-            body: `${names} has not accepted: ${missing}. Until it does, anything that needs them is refused - runner pools, and any repository the App was just granted more access to.`,
+            title: "GitHub is waiting for you to accept a permission",
+            body: `${names} has not granted ${missing}. Open the installation on GitHub and ${ACCEPT_STEP.charAt(0).toLowerCase() + ACCEPT_STEP.slice(1)} Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.`,
             href: gap.reviewUrl ?? "/admin/integrations",
             level: "warning",
             actionRequired: true
