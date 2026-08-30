@@ -90,12 +90,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
 
 # Everything the worker uses beyond that addon, including the pure Polaris logic
 # it shares with the dashboard, is in the one built file.
-COPY services/vision/package.json ./package.json
-COPY --from=deps /deps/node_modules ./node_modules
+# Owned by the runtime user as they are copied, never by a `chown -R` afterwards.
+# That command is not free: it rewrites the metadata of every file it walks, so
+# the whole of node_modules is copied up into a second layer, and the image
+# carries two of everything. Worse than the size is what it does to this
+# particular tree - onnxruntime ships its shared object as a symlink, and
+# extracting a duplicated copy of it is where a pull failed on overlayfs with
+# "failed to Lchown ... no such file or directory" against a path that is right
+# there in the layer before it. `--chown` sets the ownership as the file lands.
+COPY --chown=node:node services/vision/package.json ./package.json
+COPY --from=deps --chown=node:node /deps/node_modules ./node_modules
 
-COPY --from=builder /build/services/vision/dist/index.js ./index.js
-COPY --from=model /detector.onnx ./model/detector.onnx
-RUN chown -R node:node /app
+COPY --from=builder --chown=node:node /build/services/vision/dist/index.js ./index.js
+COPY --from=model --chown=node:node /detector.onnx ./model/detector.onnx
 
 # Nothing here needs root, and it spawns processes on somebody's home network.
 USER node

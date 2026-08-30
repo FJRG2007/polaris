@@ -55,6 +55,9 @@ COPY --from=builder /build/services/messaging-bridge/dist/index.js ./index.js
 RUN echo '{"type":"module"}' > package.json && \
     npm install --omit=dev discord.js@14.16.3 whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
     mkdir -p /app/.sessions && chown -R node:node /app
+# That chown shares its RUN with the install that created the tree, so it costs
+# nothing: one layer either way. On its own it would be the mistake the vision
+# and dashboard images used to make - a second copy of every file in the image.
 
 USER node
 EXPOSE 8787

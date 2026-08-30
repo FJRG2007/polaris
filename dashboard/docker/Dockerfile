@@ -123,26 +123,26 @@ WORKDIR /app
 #   apps/web/.next/standalone/apps/web/server.js   <- entry
 #   apps/web/.next/standalone/node_modules         <- traced deps
 # Copying the standalone root to /app preserves that structure.
-COPY --from=builder /build/apps/web/.next/standalone ./
+COPY --from=builder --chown=node:node /build/apps/web/.next/standalone ./
 # Static assets and public/ are not part of the traced standalone bundle.
-COPY --from=builder /build/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /build/apps/web/public ./apps/web/public
+COPY --from=builder --chown=node:node /build/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=node:node /build/apps/web/public ./apps/web/public
 
 # The deploy terminal sidecar, bundled into a single self-contained CJS file in
 # the builder stage. server.js does not import it, so Next's output tracing omits
 # it; the bundle inlines every dependency, so no node_modules copy is needed.
-COPY --from=builder /build/apps/web/ws-server.bundle.cjs ./apps/web/ws-server.bundle.cjs
+COPY --from=builder --chown=node:node /build/apps/web/ws-server.bundle.cjs ./apps/web/ws-server.bundle.cjs
 
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
-COPY --from=builder /build/packages/db/prisma ./packages/db/prisma
+COPY --from=builder --chown=node:node /build/packages/db/prisma ./packages/db/prisma
 
 # Prisma's client gets bundled INTO the Next server output, so at runtime it
 # looks for its query engine next to the bundle, under apps/web - not in
 # node_modules. It searches apps/web/generated/client and apps/web/.next/server
 # (confirmed from the "engine-not-found" error). Place the generated client and
 # its .node engine in both, or every database query 500s.
-COPY --from=builder /build/packages/db/generated ./apps/web/generated
-COPY --from=builder /build/packages/db/generated/client/*.node ./apps/web/.next/server/
+COPY --from=builder --chown=node:node /build/packages/db/generated ./apps/web/generated
+COPY --from=builder --chown=node:node /build/packages/db/generated/client/*.node ./apps/web/.next/server/
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
@@ -174,8 +174,11 @@ RUN mkdir -p /run/polaris-host && chown -R node:node /run/polaris-host
 # whichever container mounts it first.
 RUN mkdir -p /edge-intel && chown -R node:node /edge-intel
 
-# Run as the unprivileged `node` user shipped with the base image.
-RUN chown -R node:node /app
+# Run as the unprivileged `node` user shipped with the base image. Everything
+# under /app arrived owned by it (`COPY --chown` above) rather than being walked
+# afterwards: `chown -R` rewrites the metadata of every file it touches, which
+# copies the whole tree up into a second layer and ships two of everything. The
+# vision image failed to pull on overlayfs over exactly that duplicate.
 USER node
 
 EXPOSE 3000
