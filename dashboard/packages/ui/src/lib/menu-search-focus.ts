@@ -45,6 +45,27 @@ export function redirectMenuFocus(event: FocusEvent<HTMLElement>): void {
 }
 
 /**
+ * Putting the keyboard back in the search field after an option was picked.
+ *
+ * For the menus that stay open because more than one thing can be picked. The
+ * next thing somebody does there is type the next name, and focus left sitting
+ * on the option they just chose sends those letters to the menu's type-ahead
+ * instead of into the field - so the second tag of two is the one that has to
+ * be clicked.
+ *
+ * A tick later, because picking is also what empties the field, and the list
+ * redraws around that first.
+ */
+export function refocusMenuSearch(from: EventTarget | null): void {
+    const origin = from instanceof HTMLElement ? from : null;
+    const field = origin
+        ?.closest("[data-radix-menu-content]")
+        ?.querySelector<HTMLElement>(`[${MENU_SEARCH_ATTRIBUTE}]`);
+    if (!field) return;
+    window.setTimeout(() => field.focus(), 0);
+}
+
+/**
  * Keeping the keyboard where the typing is.
  *
  * A menu option takes focus when the mouse passes over it - that is how a menu

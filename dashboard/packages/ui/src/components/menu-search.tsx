@@ -17,10 +17,14 @@
  * opening. What the field then does is keep its own typing - and its own enter -
  * to itself.
  *
- * What still belongs to the menu is handed back: escape closes it, tab is
- * refused there as it is anywhere in a menu, and the arrows step into the
- * options - a step this has to make itself, since a menu only moves focus for a
- * key pressed on the surface rather than in something drawn on it.
+ * What still belongs to the menu is handed back: escape closes it, and the
+ * arrows step into the options - a step this has to make itself, since a menu
+ * only moves focus for a key pressed on the surface rather than in something
+ * drawn on it. Tab steps into them too, which is the one place this field
+ * departs from how a menu behaves everywhere else: a menu refuses tab, and in a
+ * menu whose whole point is the list under the field, refusing it means the key
+ * people press after typing half a name closes the thing instead of reaching
+ * what they were typing towards.
  */
 
 import { cn } from "../lib/cn";
@@ -93,6 +97,18 @@ export function MenuSearch({
             event.stopPropagation();
             if (onSubmit) onSubmit();
             else options()[0]?.click();
+            return;
+        }
+
+        // Into the list rather than out of the menu. Nothing to step into is
+        // left to the menu, which is where tab closing it is the right answer.
+        if (event.key === "Tab") {
+            const list = options();
+            const next = event.shiftKey ? list[list.length - 1] : list[0];
+            if (!next) return;
+            event.preventDefault();
+            event.stopPropagation();
+            next.focus();
             return;
         }
 

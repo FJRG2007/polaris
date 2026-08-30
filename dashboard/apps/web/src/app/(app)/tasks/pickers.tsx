@@ -13,11 +13,11 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
+import { PriorityMark } from "@/components/priority-mark";
 import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
-import { PriorityMark } from "@/components/priority-mark";
 import { Ban, CalendarPlus, Check, ChevronDown, Plus, Settings2, UserPlus, X } from "lucide-react";
 import {
     Badge,
@@ -29,7 +29,8 @@ import {
     DropdownMenuTrigger,
     Input,
     MenuSearch,
-    menuSearchMatches
+    menuSearchMatches,
+    refocusMenuSearch
 } from "@polaris/ui";
 
 // ---------------------------------------------------------------------------
@@ -64,8 +65,14 @@ export function AssigneePicker({
         [people, query]
     );
 
-    const toggle = (id: string) =>
+    /** Picking somebody empties the field and gives it the keyboard back, so a
+     *  second name is typed straight after the first instead of the menu having
+     *  to be re-aimed by hand between the two. */
+    const toggle = (id: string, from: EventTarget | null) => {
         onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+        setQuery("");
+        refocusMenuSearch(from);
+    };
 
     return (
         // The faces are asked for as the menu opens rather than as it draws, so
@@ -99,7 +106,7 @@ export function AssigneePicker({
                             key={person.id}
                             onSelect={(event) => {
                                 event.preventDefault();
-                                toggle(person.id);
+                                toggle(person.id, event.currentTarget);
                             }}
                             className="gap-2"
                         >
@@ -579,8 +586,13 @@ export function TagPicker({
     const matches = tags.filter((tag) => menuSearchMatches(tag.name, query));
     const existing = tags.find((tag) => tag.name.toLowerCase() === needle);
 
-    const toggle = (id: string) =>
+    /** As the assignee picker does: the field is emptied and handed the keyboard
+     *  back, so the tag after this one is typed rather than aimed at. */
+    const toggle = (id: string, from: EventTarget | null) => {
         onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+        setQuery("");
+        refocusMenuSearch(from);
+    };
 
     /**
      * Type a name, press enter, get that tag: it is put on the task if it
@@ -643,7 +655,7 @@ export function TagPicker({
                             key={tag.id}
                             onSelect={(event) => {
                                 event.preventDefault();
-                                toggle(tag.id);
+                                toggle(tag.id, event.currentTarget);
                             }}
                             className="gap-2"
                         >

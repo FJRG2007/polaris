@@ -29,7 +29,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 afterEach(cleanup);
 
-function Picker({ onSubmit, onOuterKey }: { onSubmit: (value: string) => void; onOuterKey?: () => void }) {
+function Picker({
+    onSubmit,
+    onOuterKey,
+    onPick
+}: {
+    onSubmit: (value: string) => void;
+    onOuterKey?: () => void;
+    onPick?: () => void;
+}) {
     const [value, setValue] = useState("");
     return (
         // The screen around the menu. A menu is portalled out of the page, but a
@@ -48,7 +56,14 @@ function Picker({ onSubmit, onOuterKey }: { onSubmit: (value: string) => void; o
                         onSubmit={() => onSubmit(value)}
                         placeholder="Find or create a tag"
                     />
-                    <DropdownMenuItem onSelect={(event) => event.preventDefault()}>backend</DropdownMenuItem>
+                    <DropdownMenuItem
+                        onSelect={(event) => {
+                            event.preventDefault();
+                            onPick?.();
+                        }}
+                    >
+                        backend
+                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
@@ -86,6 +101,17 @@ describe("enter", () => {
 
         await user.keyboard("release{Enter}");
         expect(submit).toHaveBeenCalledWith("release");
+    });
+
+    it("commits the option tab stepped onto", async () => {
+        const user = userEvent.setup();
+        const picked = vi.fn();
+        render(<Picker onSubmit={() => undefined} onPick={picked} />);
+        await user.click(screen.getByRole("button", { name: "Tag" }));
+        await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Find or create a tag")));
+
+        await user.keyboard("back{Tab}{Enter}");
+        expect(picked).toHaveBeenCalledTimes(1);
     });
 
     it("does not reach the screen around the menu", async () => {
