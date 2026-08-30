@@ -5,10 +5,12 @@
  */
 
 import { cn } from "@polaris/ui";
+import { tintFor } from "./avatar";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
 import type { ComponentType } from "react";
+import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import {
     AnthropicMark,
     CerebrasMark,
@@ -97,16 +99,59 @@ const SERVICE_IMAGES: Record<string, string> = {
     criminalip: "/logos/criminalip.webp"
 };
 
+/**
+ * The initials a provider with no mark here is drawn as.
+ *
+ * Deliberately a monogram rather than something drawn to look like the vendor's
+ * logo. There are sixty model providers and most of them publish only a
+ * full-colour mark, or none that is anybody's to redistribute; a shape invented
+ * for one of them would be a trademark nobody recognises, which is worse than an
+ * honest set of letters. The tile is tinted from the slug by the same function
+ * that colours a face with no photo, so two of them in a list are tellable apart
+ * before the letters are read.
+ *
+ * The first letters of the first two words, or the first two letters when there
+ * is only one word. Punctuation is not a word: "Z.AI" is ZA, not Z-dot.
+ */
+export function providerInitials(name: string): string {
+    const words = name.split(/[^A-Za-z0-9]+/).filter(Boolean);
+    const letters = words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : (words[0] ?? "").slice(0, 2);
+    return letters.toUpperCase() || "??";
+}
+
+function ProviderMonogram({ slug, name, className }: { slug: string; name: string; className?: string }) {
+    return (
+        <span
+            aria-hidden="true"
+            style={{ backgroundColor: tintFor(slug) }}
+            // The size class is both the minimum and the maximum, as it is for
+            // every mark beside it: a flex row short of room may not take the
+            // space off the icon. text-[0.5em] keeps the letters inside the tile
+            // at whatever size the caller asked for.
+            className={cn(
+                "inline-flex shrink-0 items-center justify-center rounded-[0.25em] text-[0.5em] font-semibold leading-none text-white",
+                className
+            )}
+        >
+            {providerInitials(name)}
+        </span>
+    );
+}
+
 /** Whether this slug has a logo of its own, which is what the catalogue test
- *  asks so a new integration cannot ship drawing the generic block. */
+ *  asks so a new integration cannot ship drawing the generic block. A model
+ *  provider from the seeded table counts: it is drawn as its own monogram. */
 export function hasIntegrationLogo(slug: string): boolean {
     return (
         slug === "virustotal" ||
         slug in SERVICE_IMAGES ||
         slug in SERVICE_MARKS ||
-        slug in MODEL_MARKS
+        slug in MODEL_MARKS ||
+        SEEDED_SLUGS.has(slug)
     );
 }
+
+const SEEDED_SLUGS = new Set(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug));
 
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
@@ -117,5 +162,7 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     if (image) return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
+    const seeded = MODEL_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
+    if (seeded) return <ProviderMonogram slug={slug} name={seeded.name} className={className} />;
     return <Blocks className={className} />;
 }

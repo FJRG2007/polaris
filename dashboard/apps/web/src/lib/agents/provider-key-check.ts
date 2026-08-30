@@ -16,6 +16,7 @@
  */
 
 import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
+import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 
 /** Why a key was not accepted, in the terms a caller can branch on. */
 export type KeyCheckCode = "invalid" | "forbidden" | "rate_limited" | "network" | "unknown" | "unsupported";
@@ -106,7 +107,19 @@ const PROBES: Record<string, Probe> = {
         method: "GET",
         header: "Authorization",
         prefix: "Bearer "
-    }
+    },
+
+    // The long tail, from the table that carries the rest of what a provider is.
+    // Only the ones whose model list is actually refused without a key appear
+    // there, which is why this is thinner than the provider list: a provider
+    // that publishes its catalogue publicly would accept every string pasted at
+    // it, and saying "checked" about that is worse than saying nothing.
+    ...Object.fromEntries(
+        MODEL_PROVIDER_SEEDS.filter((seed) => seed.probe).map((seed) => [
+            seed.slug,
+            { endpoint: seed.probe as string, method: "GET" as const, header: "Authorization", prefix: "Bearer " }
+        ])
+    )
 };
 
 /** Whether this provider can be checked at all, for a screen that says so before

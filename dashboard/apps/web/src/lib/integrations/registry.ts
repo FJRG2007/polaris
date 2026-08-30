@@ -3,7 +3,16 @@
  * knows how to run. This is code, not data - each entry describes how it is
  * configured and what it does, and a matching Integration row records whether an
  * operator has enabled it. New integrations are added here.
+ *
+ * The exception is the long tail of model providers. There are more of those
+ * than of everything else put together and they change every month, so they are
+ * a table in `model-providers.ts` rather than sixty paragraphs here; the nine
+ * most deployments actually reach for keep their own entries below.
  */
+
+import { SEEDED_MODEL_INTEGRATIONS, type FreeTier } from "@/lib/integrations/model-providers";
+
+export type { FreeTier } from "@/lib/integrations/model-providers";
 
 /**
  * What kind of job connecting this one is, which is how the screen is arranged.
@@ -90,6 +99,10 @@ export interface IntegrationCatalogEntry {
      *  One sensible default each, so connecting a key is the whole setup - the
      *  field still accepts any specifier the runtime understands. */
     defaultModel?: { label: string; slug: string };
+    /** Models only: whether a key can be had without paying for one, which is
+     *  the first thing somebody choosing between sixty providers wants to know.
+     *  Absent means the provider bills from the first token. */
+    freeTier?: FreeTier;
 }
 
 /** What to do when a scan integration flags an uploaded file. */
@@ -627,7 +640,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "From AI Studio, not a Google Cloud service account.",
-        defaultModel: { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" }
+        defaultModel: { label: "Gemini (Google)", slug: "google/gemini-3.1-flash-lite" },
+        freeTier: { kind: "free", note: "AI Studio keys carry a free tier, with per-model daily limits." }
     },
     {
         slug: "xai",
@@ -653,7 +667,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://platform.deepseek.com/api_keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        defaultModel: { label: "DeepSeek Pro", slug: "deepseek/deepseek-pro" }
+        defaultModel: { label: "DeepSeek Pro", slug: "deepseek/deepseek-pro" },
+        freeTier: { kind: "trial", note: "A block of tokens on signup, with no card." }
     },
     {
         slug: "moonshot",
@@ -681,7 +696,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://console.groq.com/keys" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        defaultModel: { label: "GPT OSS 120B (Groq)", slug: "groq/openai/gpt-oss-120b" }
+        defaultModel: { label: "GPT OSS 120B (Groq)", slug: "groq/openai/gpt-oss-120b" },
+        freeTier: { kind: "free", note: "A free tier with no card, capped per minute rather than metered." }
     },
     {
         slug: "cerebras",
@@ -694,7 +710,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         setupLinks: [{ label: "Create an API key", url: "https://cloud.cerebras.ai/platform/" }],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        defaultModel: { label: "GLM 4.7 (Cerebras)", slug: "cerebras/zai-glm-4.7" }
+        defaultModel: { label: "GLM 4.7 (Cerebras)", slug: "cerebras/zai-glm-4.7" },
+        freeTier: { kind: "free", note: "A daily token allowance with no card." }
     },
     {
         slug: "openrouter",
@@ -708,7 +725,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "API key",
         apiKeyHelp: "Starts with sk-or-. Set a spend limit on it if you want a ceiling.",
-        defaultModel: { label: "MiniMax M2.5 (OpenRouter)", slug: "openrouter/minimax-m2.5" }
+        defaultModel: { label: "MiniMax M2.5 (OpenRouter)", slug: "openrouter/minimax-m2.5" },
+        freeTier: { kind: "free", note: "The models suffixed :free cost nothing per token, within a request limit." }
     },
     {
         slug: "enigma",
@@ -723,7 +741,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp:
             "Whatever the endpoint expects. Leave it blank if it accepts unauthenticated calls from this network.",
         defaultModel: { label: "Your gateway's model", slug: "openai-compatible/byok" }
-    }
+    },
+
+    // The rest of the model providers, from the table that also decides what a
+    // run is handed and where a pasted key is checked. Last, so the nine above
+    // stay at the top of the picker where they are looked for.
+    ...SEEDED_MODEL_INTEGRATIONS
 ];
 
 /** Look up a catalog entry by slug. */

@@ -3,20 +3,28 @@
 /**
  * Picking the provider a key belongs to.
  *
- * A plain listbox would do for nine of them, but the list is the place somebody
- * arrives knowing the word ("groq", "kimi", "gemini") rather than where it sits,
- * so it filters. The match runs over the name and the slug together, which is
- * how "gemini" finds Google AI and "kimi" finds Moonshot.
+ * A plain listbox would do for nine of them, but there are sixty and the list is
+ * the place somebody arrives knowing the word ("groq", "kimi", "gemini") rather
+ * than where it sits, so it filters. The match runs over the name, the slug and
+ * the words people use instead of either, which is how "gemini" finds Google AI
+ * and "kimi" finds Moonshot.
+ *
+ * "free" and "trial" match too, and are the reason the badge is on the row. At
+ * sixty providers the question is no longer "which one" but "which of these can
+ * I start on today", and the answer was otherwise sixty tabs of pricing pages.
  */
 
-import { Button, Input } from "@polaris/ui";
+import { Badge, Button, Input } from "@polaris/ui";
 import { Check, Search } from "lucide-react";
 import { IntegrationLogo } from "@/components/logos";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
 
 /** Only what the list itself needs of a provider. */
-type ProviderOption = Pick<ProviderRow, "slug" | "name" | "aliases">;
+type ProviderOption = Pick<ProviderRow, "slug" | "name" | "aliases" | "freeTier">;
+
+/** What the badge says, and what typing it finds. */
+const FREE_LABEL = { free: "Free tier", trial: "Free trial" } as const;
 
 export function ProviderSelect({
     options,
@@ -48,9 +56,12 @@ export function ProviderSelect({
         const needle = query.trim().toLowerCase();
         if (!needle) return options;
         return options.filter((option) =>
-            [option.name, option.slug, ...option.aliases].some((term) =>
-                term.toLowerCase().includes(needle)
-            )
+            [
+                option.name,
+                option.slug,
+                ...option.aliases,
+                ...(option.freeTier ? [FREE_LABEL[option.freeTier.kind], option.freeTier.kind] : [])
+            ].some((term) => term.toLowerCase().includes(needle))
         );
     }, [options, query]);
 
@@ -113,6 +124,14 @@ export function ProviderSelect({
                                 <span className="min-w-0 flex-1 truncate" title={option.name}>
                                     {option.name}
                                 </span>
+                                {option.freeTier ? (
+                                    <Badge
+                                        variant={option.freeTier.kind === "free" ? "success" : "neutral"}
+                                        title={option.freeTier.note}
+                                    >
+                                        {FREE_LABEL[option.freeTier.kind]}
+                                    </Badge>
+                                ) : null}
                             </Button>
                         ))}
                         {results.length === 0 ? (

@@ -675,6 +675,15 @@ function KeyDialog({
                         {entry?.apiKeyHelp ? (
                             <span className="text-muted-foreground text-xs">{entry.apiKeyHelp}</span>
                         ) : null}
+                        {/* Said here rather than only on the row in the picker,
+                            because this is the moment somebody is deciding
+                            whether to go and make an account at all. */}
+                        {entry?.freeTier && !existing ? (
+                            <span className="text-success text-xs">
+                                {entry.freeTier.kind === "free" ? "Free tier." : "Free trial."}{" "}
+                                {entry.freeTier.note}
+                            </span>
+                        ) : null}
                     </label>
 
                     <label className="flex flex-col gap-1 text-sm">

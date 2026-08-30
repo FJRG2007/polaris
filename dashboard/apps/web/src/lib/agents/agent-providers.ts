@@ -11,6 +11,8 @@
  * run reuses an existing agent subscription instead of a raw provider key.
  */
 
+import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
+
 /** One provider Polaris can hand a run. */
 export interface ModelProvider {
     /** Integration row this reads. */
@@ -32,7 +34,17 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
     { slug: "moonshot", name: "Moonshot AI", envVar: "MOONSHOT_API_KEY", modelPrefix: "moonshotai" },
     { slug: "groq", name: "Groq", envVar: "GROQ_API_KEY", modelPrefix: "groq" },
     { slug: "cerebras", name: "Cerebras", envVar: "CEREBRAS_API_KEY", modelPrefix: "cerebras" },
-    { slug: "openrouter", name: "OpenRouter", envVar: "OPENROUTER_API_KEY", modelPrefix: "openrouter" }
+    { slug: "openrouter", name: "OpenRouter", envVar: "OPENROUTER_API_KEY", modelPrefix: "openrouter" },
+
+    // The long tail, from the one table that also decides what the marketplace
+    // lists. Their slugs are their ids in the public model index, so the prefix
+    // and the slug are the same word and cannot drift apart.
+    ...MODEL_PROVIDER_SEEDS.map((seed) => ({
+        slug: seed.slug,
+        name: seed.name,
+        envVar: seed.envVar,
+        modelPrefix: seed.slug
+    }))
 ];
 
 /**
