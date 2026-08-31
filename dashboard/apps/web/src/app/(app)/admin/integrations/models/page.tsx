@@ -15,8 +15,10 @@ import Link from "next/link";
 import { Card, CardBody } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
+import { agentSignins } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { instanceKeysAreShared, INSTANCE, listModelKeys } from "@/lib/agents/model-keys";
+import { AgentSigninsCard } from "@/components/model-keys/agent-signins-card";
+import { instanceKeysAreShared, INSTANCE, listAgentSignins, listProviderKeys } from "@/lib/agents/model-keys";
 import {
     addInstanceModelKeyAction,
     deleteInstanceModelKeyAction,
@@ -28,7 +30,14 @@ export const dynamic = "force-dynamic";
 
 export default async function ModelProvidersPage() {
     await requireAdmin();
-    const [keys, shared] = await Promise.all([listModelKeys(INSTANCE), instanceKeysAreShared()]);
+    // Two listings rather than one filtered afterwards: agent sign-ins share this
+    // table and would otherwise appear in the provider list as a credential for a
+    // provider that does not exist.
+    const [keys, signins, shared] = await Promise.all([
+        listProviderKeys(INSTANCE),
+        listAgentSignins(INSTANCE),
+        instanceKeysAreShared()
+    ]);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -55,7 +64,17 @@ export default async function ModelProvidersPage() {
                     empty: "No keys yet. Without one, only people who bring their own can run anything.",
                     adding: "The provider account this deployment's runs bill to."
                 }}
-                footer={<SharingCard shared={shared} />}
+                footer={
+                    <>
+                        <AgentSigninsCard
+                            tier="platform"
+                            signins={agentSignins()}
+                            stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
+                            actions={{ add: addInstanceModelKeyAction, remove: deleteInstanceModelKeyAction }}
+                        />
+                        <SharingCard shared={shared} />
+                    </>
+                }
             />
             <p className="text-muted-foreground text-sm">
                 Everything else Polaris connects to lives under{" "}

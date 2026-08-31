@@ -14,7 +14,14 @@ import { agentSignins } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
 import { AgentSigninsCard } from "@/components/model-keys/agent-signins-card";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
-import { instanceKeysAreShared, keySourcesFor, listAgentSignins, listProviderKeys } from "@/lib/agents/model-keys";
+import {
+    instanceKeysAreShared,
+    keySourcesFor,
+    listAgentSignins,
+    listProviderKeys,
+    signinEnvsFor,
+    INSTANCE
+} from "@/lib/agents/model-keys";
 import {
     addModelKeyAction,
     deleteModelKeyAction,
@@ -29,11 +36,16 @@ export default async function AiKeysPage() {
     // Two listings rather than one filtered afterwards: agent sign-ins live in
     // the same table as provider keys and would otherwise be drawn in the
     // provider table as a credential for a provider that does not exist.
-    const [keys, signins, sources, shared] = await Promise.all([
+    const [keys, signins, sources, shared, fromPlatform] = await Promise.all([
         listProviderKeys(user.id),
         listAgentSignins(user.id),
         keySourcesFor(user.id),
-        instanceKeysAreShared()
+        instanceKeysAreShared(),
+        // What the deployment holds, asked as the deployment rather than as this
+        // person, so a row it covers can say so instead of reading as missing.
+        // Empty when sharing is off - the resolver checks that itself, which is
+        // the same check that decides whether a session would actually get one.
+        signinEnvsFor(INSTANCE)
     ]);
 
     const covered = [...sources.entries()]
@@ -72,6 +84,7 @@ export default async function AiKeysPage() {
                         <AgentSigninsCard
                             signins={agentSignins()}
                             stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
+                            platform={[...fromPlatform]}
                             actions={{ add: addModelKeyAction, remove: deleteModelKeyAction }}
                         />
                         <FallbackCard providers={covered} shared={shared} />

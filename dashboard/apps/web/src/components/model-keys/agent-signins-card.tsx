@@ -42,25 +42,46 @@ interface SigninActions {
     remove: (input: unknown) => Promise<{ error?: string }>;
 }
 
+/**
+ * Whose credentials this card is editing.
+ *
+ * The two tiers are the same two the model keys have, for the same reason: a
+ * deployment holds accounts of its own that an administrator sets once and
+ * everybody runs on, and a person can bring their own instead. Which one is
+ * being edited changes every sentence on the card - and, on the account tier,
+ * whether a row that is already covered still needs anything at all.
+ */
+export type SigninTier = "account" | "platform";
+
 export function AgentSigninsCard({
     signins,
     stored,
+    platform = [],
+    tier = "account",
     actions
 }: {
     signins: AgentSignin[];
     stored: StoredSignin[];
+    /** Variables the deployment provides and shares. Account tier only: it is
+     *  what turns "not linked" into "already covered, and not by you". */
+    platform?: readonly string[];
+    tier?: SigninTier;
     actions: SigninActions;
 }) {
     const [error, setError] = useState<string | null>(null);
+    const covered = new Set(platform);
 
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-sm font-medium">Agent sign-ins</h2>
+                    <h2 className="text-sm font-medium">
+                        {tier === "platform" ? "The deployment's agent sign-ins" : "Agent sign-ins"}
+                    </h2>
                     <p className="text-muted-foreground text-xs">
-                        What a session on this box signs an agent in with. A session on a server you have already
-                        signed the tool in on uses that instead and needs nothing here.
+                        {tier === "platform"
+                            ? "Signs an agent in for anybody whose own account does not. Each account's own is used first, and the bill for these is yours."
+                            : "What a session on this box signs an agent in with. A session on a server you have already signed the tool in on uses that instead and needs nothing here."}
                     </p>
                 </div>
 
@@ -72,6 +93,8 @@ export function AgentSigninsCard({
                             key={signin.slug}
                             signin={signin}
                             held={stored.find((row) => row.provider === signin.slug) ?? null}
+                            fromPlatform={covered.has(signin.env)}
+                            tier={tier}
                             actions={actions}
                             onError={setError}
                         />
@@ -85,11 +108,15 @@ export function AgentSigninsCard({
 function SigninRow({
     signin,
     held,
+    fromPlatform,
+    tier,
     actions,
     onError
 }: {
     signin: AgentSignin;
     held: StoredSignin | null;
+    fromPlatform: boolean;
+    tier: SigninTier;
     actions: SigninActions;
     onError: (message: string | null) => void;
 }) {
@@ -152,8 +179,15 @@ function SigninRow({
                 {held ? (
                     <Badge variant="success">
                         <Check className="size-3 shrink-0" />
-                        Linked
+                        {tier === "platform" ? "Set" : "Yours"}
                     </Badge>
+                ) : fromPlatform ? (
+                    // Held by the deployment and shared. Worth saying rather than
+                    // leaving the row looking empty: nothing is missing, the work
+                    // will run, and whoever is reading is about to go and pay for
+                    // a second credential they do not need. Their own would still
+                    // be used first, which is why the field stays.
+                    <Badge variant="neutral">From this Polaris</Badge>
                 ) : null}
                 {held ? (
                     <Button size="sm" variant="ghost" onClick={() => setRemoving(true)} disabled={busy}>
@@ -163,7 +197,8 @@ function SigninRow({
             </div>
 
             <p className="text-muted-foreground mt-1 text-xs">
-                Signs in {serves}.{signin.howto ? ` ${signin.howto}` : ""}
+                Signs in {serves}.
+                {fromPlatform && !held ? " This deployment already provides one, so nothing here is needed." : ""}
             </p>
 
             {held ? null : (
