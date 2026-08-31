@@ -14,7 +14,9 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 import { Bell, Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
 import { RelativeTime } from "@/components/relative-time";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
@@ -35,12 +37,31 @@ const PREVIEW_COUNT = 8;
 export function NotificationBell() {
     const { items, unread, markAllRead, markRead } = useNotificationFeed();
     const badge = badgeLabel(unread);
+    const [open, setOpen] = useState(false);
+    const router = useRouter();
 
     return (
-        <DropdownMenu>
+        // Controlled and non-modal for the double press below, the same way the
+        // account menu is: a modal menu takes the pointer away from everything
+        // behind it, its own trigger included, so the second press of a double
+        // never reaches the bell it was aimed at.
+        <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
             <DropdownMenuTrigger
                 className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                 aria-label={unread > 0 ? `Notifications (${unread} unread)` : "Notifications"}
+                title={
+                    unread > 0
+                        ? `Notifications (${unread} unread). Press twice to open them.`
+                        : "Notifications. Press twice to open them."
+                }
+                // Straight to the full list, as your own face goes straight to
+                // your own account. The dropdown previews eight; anybody pressing
+                // twice wants the page, and going through a menu to press the
+                // link named after the thing just pressed is a step for nothing.
+                onDoubleClick={() => {
+                    setOpen(false);
+                    router.push("/account/notifications");
+                }}
             >
                 <Bell className="size-4" />
                 {badge ? (

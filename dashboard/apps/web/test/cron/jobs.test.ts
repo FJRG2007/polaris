@@ -67,7 +67,7 @@ describe("the work Polaris runs on a schedule", () => {
             // Two runners tearing the same container down race each other onto
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.
-            "agent-housekeeping",
+            "agent-sessions",
             "backups",
             "chat-scheduled",
             "connection-health",

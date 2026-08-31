@@ -22,7 +22,6 @@ import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps"
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
-import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -253,14 +252,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
     {
         key: "agent-sessions",
         // A session reports through its own hooks, so silence is the only signal
-        // there is that its container was reaped or its server went away. Half an
-        // hour, because the row it leaves behind sorts above real work in the list
-        // and keeps its reporting token live until somebody closes it.
-        everyMs: Number(process.env.POLARIS_SESSION_SWEEP_MS) || 30 * MINUTE,
-        // Unleased: it names the rows it would change and writes the same ending
-        // on each, so a second runner finds nothing left to do.
-        leaseMs: null,
-        run: () => sweepSilentSessions()
+        // there is that its container was reaped or its server went away. Five
+        // minutes rather than thirty, because the other half of this pass is a
+        // sign-in container somebody opened and walked away from, which holds
+        // that account's only slot: the next attempt is refused until this
+        // clears it, and that is a wait a person is sitting through.
+        everyMs: Number(process.env.POLARIS_SESSION_SWEEP_MS) || 5 * MINUTE,
+        // Leased now that it tears containers down. Two runners removing the
+        // same one race each other, and the one that loses fails on a container
+        // the other already took.
+        leaseMs: 10 * MINUTE,
+        run: sweepAgentLeftovers
     },
     {
         key: "task-reminders",
@@ -379,18 +381,6 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
-    },
-    {
-        key: "agent-housekeeping",
-        // Five minutes. Both halves are about a machine still running for
-        // somebody who has gone: a login container somebody opened and walked
-        // away from holds a per-account slot, so the next attempt is refused
-        // until this clears it, and that is a wait a person is sitting through.
-        everyMs: Number(process.env.POLARIS_AGENT_SWEEP_MS) || 5 * MINUTE,
-        // Longer than the gap, like the rest: two runners tearing the same
-        // container down race each other, and one fails on what the other took.
-        leaseMs: 10 * MINUTE,
-        run: sweepAgentLeftovers
     },
     {
         key: "suspensions",

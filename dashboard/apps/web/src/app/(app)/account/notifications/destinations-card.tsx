@@ -186,13 +186,24 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
     const [phone, setPhone] = useState("");
     const [error, setError] = useState<string | null>(null);
 
+    /**
+     * The form, as the schema wants it.
+     *
+     * Built here rather than inside `submit` so one thing decides both whether
+     * the button works and what is sent. It was only built on the press, so an
+     * empty form had a live Add button whose entire behaviour was to turn itself
+     * into a validation error - the reader was told to check a form they had not
+     * filled in yet, about a field the message did not name.
+     */
+    const input =
+        kind === "webhook"
+            ? { kind, label: label.trim(), url: url.trim(), format }
+            : { kind, label: label.trim(), phone: phone.trim() };
+    const checked = destinationInputSchema.safeParse(input);
+
     function submit() {
         setError(null);
-        const input =
-            kind === "webhook"
-                ? { kind, label: label.trim(), url: url.trim(), format }
-                : { kind, label: label.trim(), phone: phone.trim() };
-        const parsed = destinationInputSchema.safeParse(input);
+        const parsed = checked;
         if (!parsed.success) {
             setError(parsed.error.issues[0]?.message ?? "Check the form");
             return;
@@ -283,7 +294,11 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
-                        <Button onClick={submit} disabled={pending}>
+                        {/* Held until the form is one the schema accepts, which is
+                            the same check the press used to make - so the button
+                            says what the press would have said, before it is
+                            pressed. */}
+                        <Button onClick={submit} disabled={pending || !checked.success}>
                             Add
                         </Button>
                     </div>
