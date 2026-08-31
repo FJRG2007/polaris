@@ -10,7 +10,14 @@
  */
 
 import { requireUser } from "@/lib/session";
-import { canAssistSignin, answerSignin, beginSignin, endSignin, signinScreen } from "@/lib/agents/signin-runtime";
+import {
+    canAssistSignin,
+    answerSignin,
+    beginSignin,
+    endSignin,
+    signinScreen,
+    type SigninView
+} from "@/lib/agents/signin-runtime";
 import { agentSigninAnswerSchema, agentSigninEnvSchema, agentSigninIdSchema } from "@polaris/core";
 import {
     addKey,
@@ -77,13 +84,17 @@ export async function beginAgentSigninAction(env: unknown): Promise<{ id?: strin
     }
 }
 
-export async function agentSigninScreenAction(id: unknown): Promise<{ screen?: string; error?: string }> {
+export async function agentSigninScreenAction(
+    id: unknown
+): Promise<{ view?: SigninView; error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninIdSchema.safeParse(id);
     if (!parsed.success) return { error: "That sign-in is no longer open." };
     try {
-        return { screen: await signinScreen(user.id, parsed.data) };
+        return { view: await signinScreen(user.id, parsed.data) };
     } catch {
+        // Includes the minute before the container answers at all, which is not a
+        // failure - the dialog reads a missing view as "still starting".
         return { error: "That sign-in is no longer open." };
     }
 }

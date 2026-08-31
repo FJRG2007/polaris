@@ -41,6 +41,22 @@ export const TMUX_COLS = 200;
 export const TMUX_ROWS = 50;
 
 /**
+ * The terminal a SIGN-IN gets, which is a narrower one on purpose.
+ *
+ * A session's terminal is read by somebody who chose to open a terminal, and
+ * width is what makes a coding agent's tables and diffs legible. A sign-in is
+ * read by somebody who has never wanted to see one: it is four lines of
+ * instructions and a URL, shown inside a dialog. Two hundred columns in there is
+ * a horizontal scrollbar under every line, and every line is mostly empty.
+ *
+ * Eighty is the width every one of these tools is drawn to fall back to, so what
+ * it prints at this size is a layout its vendor tested rather than one nobody
+ * has seen.
+ */
+export const SIGNIN_COLS = 80;
+export const SIGNIN_ROWS = 30;
+
+/**
  * The image a `local` session runs in.
  *
  * The full Node image rather than a slim one for the same reason a run uses it:
@@ -185,6 +201,24 @@ export function captureCommand(lines = 200, session = TMUX_SESSION): string {
     return `tmux capture-pane -p -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))}`;
 }
 
+/**
+ * The same, with lines that wrapped joined back together.
+ *
+ * `-J` is the difference between reading a screen and reading what was written
+ * on it. A terminal breaks a long line at its own width, so an OAuth URL three
+ * hundred characters long arrives as two or three rows with the break in the
+ * middle of a query parameter - and anything trying to find that URL finds a
+ * fragment ending in `scope=user%3`.
+ *
+ * Not the default, because for a session's own transcript the breaks are the
+ * layout: a tool drawing boxes has every row exactly as wide as it meant it,
+ * and joining them turns a table into a paragraph. This is for the one case
+ * that wants the text rather than the picture.
+ */
+export function captureJoinedCommand(lines = 200, session = TMUX_SESSION): string {
+    return `tmux capture-pane -p -J -t ${shellQuote(session)} -S -${Math.max(1, Math.floor(lines))}`;
+}
+
 /** Whether the agent is still running in there. A tmux session outlives the
  *  program it started, so "the container is up" is not the same question. */
 export function aliveCommand(session = TMUX_SESSION): string {
@@ -228,4 +262,27 @@ export function shellArgv(command: string): string[] {
 export function bootArgv(script: string): string[] {
     const encoded = Buffer.from(script, "utf8").toString("base64");
     return ["sh", "-c", `echo ${encoded} | base64 -d | sh`];
+}
+
+/**
+ * The first address printed on a terminal, or null.
+ *
+ * Every one of these tools signs in the same way - it prints a URL and waits for
+ * a code pasted back - and every one of them prints it into a terminal nobody
+ * wanted to be looking at. Finding it is what turns "read this, select it
+ * carefully, do not miss the last character" into a button.
+ *
+ * Deliberately not per-vendor. The rule is "the first http(s) address on the
+ * screen", which is true of every login flow here and stays true of one nobody
+ * has added yet; a pattern per tool would be a list to maintain and would still
+ * be wrong for the eleventh.
+ *
+ * The trailing punctuation is trimmed because a terminal draws a URL inside a
+ * sentence, and a bracket or a full stop swept into the address is a link that
+ * 404s in a way nobody looks twice at.
+ */
+export function firstUrlIn(screen: string): string | null {
+    const match = /https?:\/\/[^\s"'<>`]+/.exec(screen);
+    if (!match) return null;
+    return match[0].replace(/[.,;:!?)\]}]+$/, "") || null;
 }

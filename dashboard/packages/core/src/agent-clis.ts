@@ -133,6 +133,27 @@ export interface AgentCli {
      * warning on the screen rather than a refusal on a server.
      */
     readonly credentials: readonly AgentCredential[];
+    /**
+     * What to add to the command so the tool actually starts working.
+     *
+     * The one per-vendor thing this file carries, and it is here because leaving
+     * it out did not keep the catalogue clean - it produced a session that came
+     * up, sat on its own "do you trust the files in this folder?" menu, and
+     * reported nothing forever. From outside, that is indistinguishable from an
+     * agent thinking hard, which is the worst failure this app can have.
+     *
+     * These menus read a single keystroke, so they eat the prompt as well: a
+     * bracketed paste arriving at one selects an arbitrary option or quits the
+     * session. There is no way to answer them from here and no reason to - the
+     * session is a worktree Polaris made, in a container Polaris started, holding
+     * a checkout of a repository the person picked a moment ago. Nobody is there
+     * to be asked, and the thing being asked about did not exist a minute before.
+     *
+     * Empty where the tool asks nothing on startup, which is most of them.
+     */
+    readonly autonomyArgs: readonly string[];
+    /** The same job where the tool takes a variable rather than a flag. */
+    readonly autonomyEnv: Readonly<Record<string, string>>;
 }
 
 /**
@@ -173,7 +194,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: ["--dangerously-skip-permissions"],
+        autonomyEnv: {}
     },
     {
         id: "codex",
@@ -192,7 +215,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: ["--dangerously-bypass-approvals-and-sandbox"],
+        autonomyEnv: {}
     },
     {
         id: "opencode",
@@ -220,7 +245,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "gemini",
@@ -239,7 +266,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {}
     },
     {
         id: "copilot",
@@ -261,7 +290,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: true
             }
-        ]
+        ],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {}
     },
     {
         id: "cursor",
@@ -280,7 +311,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: ["--yolo"],
+        autonomyEnv: {}
     },
     {
         id: "amp",
@@ -299,7 +332,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "goose",
@@ -325,7 +360,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {"GOOSE_MODE": "auto"}
     },
     {
         id: "aider",
@@ -351,7 +388,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "droid",
@@ -370,7 +409,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "qwen",
@@ -384,7 +425,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // It signs in through its own `/auth`, and which variable it reads for a
         // key was not something the documentation said plainly. Empty rather than
         // guessed: see the field.
-        credentials: []
+        credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "crush",
@@ -410,7 +453,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "cline",
@@ -438,7 +483,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "openhands",
@@ -467,7 +514,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
                 howto: null,
                 subscription: false
             }
-        ]
+        ],
+        autonomyArgs: [],
+        autonomyEnv: {}
     },
     {
         id: "openclaw",
@@ -478,7 +527,9 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".openclaw",
         observe: "output",
         docs: "https://github.com/openclaw/openclaw",
-        credentials: []
+        credentials: [],
+        autonomyArgs: [],
+        autonomyEnv: {}
     }
 ];
 
@@ -501,7 +552,11 @@ export function customAgentCli(command: string): AgentCli {
         docs: "",
         // Nothing is known about a command somebody typed, including what signs
         // it in. Empty means Polaris will not judge it - see the field.
-        credentials: []
+        credentials: [],
+        // Nor what it asks on startup. Whoever typed the command puts whatever
+        // flags it needs into it themselves.
+        autonomyArgs: [],
+        autonomyEnv: {}
     };
 }
 

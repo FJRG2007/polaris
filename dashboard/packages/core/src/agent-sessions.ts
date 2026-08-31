@@ -260,3 +260,23 @@ export function sessionBranchName(sessionId: string, label: string): string {
     const short = sessionId.replace(/-/g, "").slice(0, 8);
     return slug ? `agent/${slug}-${short}` : `agent/${short}`;
 }
+
+/**
+ * What to call a session on a screen, given whether it has ever reported.
+ *
+ * `idle` means "the machine is up and the agent is not mid-turn", and its label
+ * is "Waiting for you" because that is what it means once an agent has actually
+ * been working. Before the first report it means something else entirely - the
+ * container exists and nothing has been heard from inside it - and calling that
+ * "Waiting for you" is the screen telling somebody the agent is done and it is
+ * their turn, about an agent that has not started.
+ *
+ * That is exactly what a session stuck on its tool's own trust menu looked like,
+ * and it is why nobody could tell it apart from a finished turn. The state
+ * machine is right; the word was wrong for one case, so the word is chosen here
+ * rather than the state being bent to fit it.
+ */
+export function sessionStateLabel(state: AgentSessionState, hasReported: boolean): string {
+    if (state === "idle" && !hasReported) return "Starting";
+    return AGENT_SESSION_STATE_LABELS[state];
+}

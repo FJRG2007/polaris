@@ -140,7 +140,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     )}
                                 </span>
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
-                                    {core.AGENT_SESSION_STATE_LABELS[session.state]}
+                                    {core.sessionStateLabel(session.state, session.lastEventAt !== null)}
                                 </span>
                                 {core.isSessionOver(session.state) ? null : (
                                     <Button size="sm" variant="ghost" onClick={() => stop(session)}>

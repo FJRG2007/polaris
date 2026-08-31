@@ -73,6 +73,9 @@ interface Bootstrap {
      *  Empty on a machine where the tool is already signed in, and empty for a
      *  tool Polaris holds no sourced credential for. */
     readonly credentials: Record<string, string>;
+    /** What stops it waiting on a menu, where the tool reads a variable for that
+     *  rather than taking a flag. */
+    readonly autonomyEnv: Record<string, string>;
 }
 
 /**
@@ -92,7 +95,13 @@ function agentCommandFor(session: SessionView): { cli: core.AgentCli; binary: st
     const cli = core.agentCliById(session.cli);
     if (!cli) throw new SessionRefusal(`Polaris no longer knows an agent called ${session.cli}.`);
     const binary = cli.binaries[0] ?? "";
-    return { cli, binary, command: binary, install: cli.install ?? "" };
+    // The startup flags go on, and this is the line that decides whether a
+    // session does anything at all. Without them the tool comes up on its own
+    // "do you trust the files in this folder?" menu and waits - forever, because
+    // the menu reads single keystrokes and the prompt Polaris pastes is not one.
+    // See `autonomyArgs`: there is nobody to ask, and the folder is a checkout
+    // Polaris made a minute ago.
+    return { cli, binary, command: [binary, ...cli.autonomyArgs].join(" "), install: cli.install ?? "" };
 }
 
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
@@ -133,7 +142,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
         githubToken,
-        credentials: credentialsForAgent(agent.cli, available)
+        credentials: credentialsForAgent(agent.cli, available),
+        autonomyEnv: { ...agent.cli.autonomyEnv }
     };
 }
 
@@ -175,6 +185,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
+        ...boot.autonomyEnv,
         ...boot.credentials
     });
 }

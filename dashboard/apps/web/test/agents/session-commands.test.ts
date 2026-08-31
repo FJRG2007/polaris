@@ -210,3 +210,54 @@ describe("hookEventFailed", () => {
         expect(hookEventFailed({})).toBe(false);
     });
 });
+
+describe("finding the address a login printed", () => {
+    it("picks the first http(s) address on the screen", () => {
+        const screen = [
+            " Browser didn't open? Use the url below to sign in (c to copy)",
+            "",
+            "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&scope=user%3Ainference",
+            "",
+            " Paste code here if prompted >"
+        ].join("\n");
+        expect(commands.firstUrlIn(screen)).toBe(
+            "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&scope=user%3Ainference"
+        );
+    });
+
+    it("is a rule rather than a pattern per vendor", () => {
+        // The point of the rule: a tool nobody has added yet prints a URL and
+        // waits for a code, exactly like the ones that have been.
+        expect(commands.firstUrlIn("go to http://localhost:1455/auth to continue")).toBe(
+            "http://localhost:1455/auth"
+        );
+    });
+
+    it("leaves the punctuation a sentence put around it", () => {
+        // A bracket or a full stop swept into the address is a link that 404s in
+        // a way nobody looks at twice.
+        expect(commands.firstUrlIn("open (https://example.com/a/b).")).toBe("https://example.com/a/b");
+        expect(commands.firstUrlIn("see https://example.com/x, then paste")).toBe("https://example.com/x");
+    });
+
+    it("says nothing when there is nothing to say", () => {
+        expect(commands.firstUrlIn("")).toBeNull();
+        expect(commands.firstUrlIn("Installing @anthropic-ai/claude-code")).toBeNull();
+        // Not a scheme anybody should be sent to.
+        expect(commands.firstUrlIn("file:///etc/passwd")).toBeNull();
+    });
+
+    it("reads the joined capture, which is the only one an address survives", () => {
+        // A terminal breaks a line at its own width, so unjoined this arrives in
+        // pieces with the break inside a query parameter.
+        expect(commands.captureJoinedCommand()).toContain("-J");
+        expect(commands.captureCommand()).not.toContain("-J");
+    });
+
+    it("asks for a terminal a dialog can show without a horizontal scrollbar", () => {
+        expect(commands.SIGNIN_COLS).toBeLessThan(commands.TMUX_COLS);
+        // Eighty is what every one of these tools falls back to, so what it draws
+        // at this size is a layout its vendor tested.
+        expect(commands.SIGNIN_COLS).toBe(80);
+    });
+});

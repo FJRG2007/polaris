@@ -202,6 +202,11 @@ function SigninRow({
     onError: (message: string | null) => void;
 }) {
     const [secret, setSecret] = useState("");
+    // Shown as linked the moment the write returns, rather than after the server
+    // component behind this has been re-read. The refresh still happens and is
+    // what makes it true; this is what stops the row reading as untouched in the
+    // second before it lands, which read as the credential not having been saved.
+    const [justLinked, setJustLinked] = useState(false);
     const [signingIn, setSigningIn] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [busy, startTransition] = useTransition();
@@ -228,6 +233,7 @@ function SigninRow({
                     return;
                 }
                 setSecret("");
+                setJustLinked(true);
                 router.refresh();
             });
         });
@@ -245,6 +251,10 @@ function SigninRow({
     };
 
     const serves = signin.serves.map((tool) => tool.label).join(", ");
+    // Either the server says so or this row just did it. The rollback is the
+    // refresh: a write that failed never set it, and one that succeeded is
+    // confirmed by the row that comes back.
+    const linked = held !== null || justLinked;
 
     return (
         <div className="rounded-md border border-border p-3">
@@ -257,7 +267,7 @@ function SigninRow({
                     className="size-4 shrink-0"
                 />
                 <span className="min-w-0 flex-1 truncate text-sm" title={signin.label}>{signin.label}</span>
-                {held ? (
+                {linked ? (
                     <Badge variant="success">
                         <Check className="size-3 shrink-0" />
                         {tier === "platform" ? "Set" : "Yours"}
@@ -279,10 +289,10 @@ function SigninRow({
 
             <p className="text-muted-foreground mt-1 text-xs">
                 Signs in {serves}.
-                {fromPlatform && !held ? " This deployment already provides one, so nothing here is needed." : ""}
+                {fromPlatform && !linked ? " This deployment already provides one, so nothing here is needed." : ""}
             </p>
 
-            {held ? null : (
+            {linked ? null : (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                     {/* The assisted route first, and as the filled button, because
                         it is the one that works for somebody who has never opened
@@ -342,6 +352,7 @@ function SigninRow({
                     onClose={() => setSigningIn(false)}
                     onDone={() => {
                         setSigningIn(false);
+                        setJustLinked(true);
                         router.refresh();
                     }}
                 />

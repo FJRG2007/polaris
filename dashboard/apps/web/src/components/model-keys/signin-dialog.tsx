@@ -28,8 +28,9 @@
 
 import { runAction } from "@/lib/run-action";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
+import type { SigninView } from "@/lib/agents/signin-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CornerDownLeft, Loader2, Terminal } from "lucide-react";
+import { CornerDownLeft, ExternalLink, Loader2, Terminal } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -46,7 +47,7 @@ const POLL_MS = 1500;
 
 export interface SigninDialogActions {
     begin: (env: unknown) => Promise<{ id?: string; error?: string }>;
-    screen: (id: unknown) => Promise<{ screen?: string; error?: string }>;
+    screen: (id: unknown) => Promise<{ view?: SigninView; error?: string }>;
     answer: (input: unknown) => Promise<{ error?: string }>;
     end: (id: unknown) => Promise<{ error?: string }>;
     save: (secret: string) => Promise<{ error?: string }>;
@@ -65,6 +66,8 @@ export function SigninDialog({
 }) {
     const [id, setId] = useState<string | null>(null);
     const [screen, setScreen] = useState("");
+    const [url, setUrl] = useState<string | null>(null);
+    const [ready, setReady] = useState(false);
     const [line, setLine] = useState("");
     const [secret, setSecret] = useState("");
     const [busy, setBusy] = useState(false);
@@ -93,8 +96,12 @@ export function SigninDialog({
         let stopped = false;
         const read = () => {
             void actions.screen(id).then((result) => {
-                if (stopped) return;
-                if (result.screen !== undefined) setScreen(result.screen);
+                if (stopped || !result.view) return;
+                setScreen(result.view.screen);
+                setReady(result.view.ready);
+                // Kept once found. The terminal scrolls, and an address that
+                // scrolled off is one somebody was half way through using.
+                if (result.view.url) setUrl(result.view.url);
             });
         };
         read();
@@ -145,24 +152,57 @@ export function SigninDialog({
 
     return (
         <Dialog open onOpenChange={close}>
-            <DialogContent>
+            {/* Wide enough for the terminal inside it. The default caps at
+                max-w-lg, which put an eighty-column terminal behind a horizontal
+                scrollbar and made every line of the login half-visible. */}
+            <DialogContent className="max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Sign in to {signin.serves[0]?.label ?? signin.label}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
                     <p className="text-muted-foreground text-xs">
-                        Polaris is running the sign-in on a machine of its own. Follow the link it prints, authorise
-                        it in your browser, and paste anything it asks for into the line below the terminal.
+                        Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorise
+                        it in your browser, and paste the code it gives you into the line below the terminal.
                     </p>
 
-                    <pre
-                        ref={view}
-                        className="bg-elevated max-h-64 overflow-auto rounded-md border border-border p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap"
-                    >
-                        {screen ||
-                            (error ? "" : "Starting a machine and installing the tool. This takes a moment.")}
-                    </pre>
+                    {/* The address, lifted out of the terminal. Every one of these
+                        tools signs in by printing a URL and waiting for a code, and
+                        every one of them prints it into a box nobody wanted to be
+                        reading - three hundred characters that have to be selected
+                        without missing the last one. Found by rule rather than per
+                        vendor, so a tool nobody has added yet gets the same button. */}
+                    {url ? (
+                        <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bg-primary/10 border-primary/40 hover:bg-primary/15 flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                        >
+                            <ExternalLink className="size-4 shrink-0" />
+                            <span className="min-w-0 flex-1">Open the sign-in page</span>
+                        </a>
+                    ) : null}
+
+                    {/* Until the machine says anything there is nothing to show, and
+                        that is a minute of installing a package - which as a blank
+                        box read as broken. */}
+                    {ready ? (
+                        <pre
+                            ref={view}
+                            className="bg-elevated h-[26rem] overflow-auto rounded-md border border-border p-3 font-mono text-[11px] leading-snug"
+                        >
+                            {screen}
+                        </pre>
+                    ) : (
+                        <div className="bg-elevated flex h-[26rem] flex-col items-center justify-center gap-2 rounded-md border border-border">
+                            <Loader2 className="text-muted-foreground size-5 shrink-0 animate-spin" />
+                            <p className="text-muted-foreground text-xs">
+                                {id ? "Installing the tool on it." : "Starting a machine."}
+                            </p>
+                            <p className="text-muted-foreground text-xs">This takes a minute the first time.</p>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <Terminal className="text-muted-foreground size-4 shrink-0" />
@@ -177,9 +217,9 @@ export function SigninDialog({
                             }}
                             placeholder="Type into it, then press enter"
                             className="min-w-0 flex-1"
-                            disabled={!id || busy}
+                            disabled={!ready || busy}
                         />
-                        <Button size="sm" variant="ghost" onClick={send} disabled={!id || busy || !line.trim()}>
+                        <Button size="sm" variant="ghost" onClick={send} disabled={!ready || busy || !line.trim()}>
                             <CornerDownLeft className="size-4 shrink-0" />
                         </Button>
                     </div>

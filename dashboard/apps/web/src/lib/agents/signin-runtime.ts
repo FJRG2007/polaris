@@ -143,8 +143,8 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                     image: commands.SESSION_IMAGE,
                     env: {
                         POLARIS_TMUX: TMUX,
-                        POLARIS_COLS: String(commands.TMUX_COLS),
-                        POLARIS_ROWS: String(commands.TMUX_ROWS),
+                        POLARIS_COLS: String(commands.SIGNIN_COLS),
+                        POLARIS_ROWS: String(commands.SIGNIN_ROWS),
                         POLARIS_INSTALL: login.install,
                         POLARIS_LOGIN: login.command
                     },
@@ -185,10 +185,29 @@ async function runIn(userId: string, id: string, command: string): Promise<strin
     return result.output;
 }
 
-/** What the login command's terminal currently shows. Polled by the dialog: this
- *  is a screen somebody is reading, not a transcript. */
-export async function signinScreen(userId: string, id: string): Promise<string> {
-    return runIn(userId, id, commands.captureCommand(60, TMUX));
+/**
+ * What the login command's terminal currently shows, and the address on it.
+ *
+ * Joined rather than raw, which is what makes the address findable at all: a
+ * terminal breaks a line at its own width, and one of these URLs is three
+ * hundred characters, so unjoined it arrives in pieces with the break in the
+ * middle of a query parameter.
+ *
+ * `ready` is what the dialog waits on. A container spends its first minute
+ * installing a package manager's worth of tool, during which the terminal has
+ * nothing on it at all - and a blank box with no explanation is the part of this
+ * that read as broken.
+ */
+export interface SigninView {
+    readonly screen: string;
+    readonly url: string | null;
+    readonly ready: boolean;
+}
+
+export async function signinScreen(userId: string, id: string): Promise<SigninView> {
+    const screen = await runIn(userId, id, commands.captureJoinedCommand(60, TMUX));
+    const trimmed = screen.trim();
+    return { screen, url: commands.firstUrlIn(screen), ready: trimmed.length > 0 };
 }
 
 /**

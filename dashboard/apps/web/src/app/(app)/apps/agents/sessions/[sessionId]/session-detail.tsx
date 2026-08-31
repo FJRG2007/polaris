@@ -127,7 +127,7 @@ export function SessionDetail({ session, events, messages }: Props) {
             <div className="flex flex-wrap items-center gap-3">
                 <CircleDot className={`size-4 shrink-0 ${TONE[session.state]}`} />
                 <span className={`text-sm ${TONE[session.state]}`}>
-                    {core.AGENT_SESSION_STATE_LABELS[session.state]}
+                    {core.sessionStateLabel(session.state, session.lastEventAt !== null)}
                 </span>
                 {session.detail ? (
                     <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={session.detail}>{session.detail}</span>
