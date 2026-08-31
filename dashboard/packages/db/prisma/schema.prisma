@@ -1533,6 +1533,7 @@ model Host {
     runnerPools   RunnerPool[]
     groups        HostGroupMember[]
     backupDestinations BackupDestination[]
+    agentSessions AgentSession[]
 
     @@index([ownerId])
 }
@@ -5351,6 +5352,10 @@ model AgentRepo {
     // off | checks | full - what the Enigma quality gate does once the agent has
     // committed, before anything is pushed. Null inherits, same as above.
     gate          String?
+    // The rest of this repository's Enigma setup, as stringified JSON in the
+    // shape of EnigmaSettings. `gate` above stays its own column because the
+    // dispatch path has always read it there.
+    enigma        String?
     // When the workflow file was last written into the repository. Null for
     // `server` execution, which needs no workflow at all, and for a repository
     // enabled before the write succeeded.
@@ -5365,6 +5370,7 @@ model AgentRepo {
     pool        RunnerPool?       @relation(fields: [poolId], references: [id], onDelete: SetNull)
     automations AgentAutomation[]
     runs        AgentRun[]
+    sessions    AgentSession[]
 
     @@unique([ownerId, repoFullName])
     @@index([repoFullName])
@@ -5566,6 +5572,11 @@ model AgentDefaults {
     issues       Boolean?
     // off | checks | full.
     gate         String?
+    // How Enigma is set up at this tier, as stringified JSON in the shape of
+    // EnigmaSettings in @polaris/core. Null inherits, and so does any field
+    // inside it that is null - a resolved value is never stored, or changing
+    // the instance default would stop reaching what was meant to follow it.
+    enigma       String?
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
@@ -5681,6 +5692,141 @@ model AgentRun {
     @@index([state])
     @@index([githubRunId])
     @@index([parentRunId])
+}
+// A coding agent running right now, in a worktree of its own, on a machine
+// Polaris can reach.
+//
+// The other half of the Agents app. An AgentRun is a job: it is handed a prompt,
+// works alone, and opens a pull request. A session is a conversation: somebody
+// starts it, watches it, answers its questions and sends it the next thing. Both
+// end up as commits, and they are stored apart because almost nothing about them
+// is the same - a run has an execution and a workflow id, a session has a branch,
+// a terminal and a person.
+//
+// Nothing here talks to a model API. The session is the vendor's own command-line
+// tool, started as a real process, authenticated the way it already is on that
+// machine. Polaris never holds the credential and never re-implements the
+// vendor's permission prompts, its sandboxing or its context handling.
+model AgentSession {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    // The repository it works in. What carries the GitHub installation the
+    // checkout uses, and what the session's access is resolved through - a
+    // session may not name a URL to clone, because the credential that would
+    // clone it belongs to the instance rather than to whoever asked.
+    repoId      String    @db.Uuid
+    // Who started it. Not a relation, the same way a run's is not: a session is a
+    // record of work that happened, and it has to survive the account closing.
+    startedById String?   @db.Uuid
+    title       String
+    // A catalogue id from AGENT_CLIS in @polaris/core, or `custom`.
+    cli         String
+    // What starts a `custom` agent, exactly as the operator typed it. Null for a
+    // catalogued one, whose command is the catalogue's business.
+    command     String?
+    // local | host - a container on the Polaris box, or an enrolled server.
+    place       String    @default("local")
+    hostId      String?   @db.Uuid
+    // starting | working | waiting | idle | stopped | failed. Derived from the
+    // events below and stored so a list does not have to replay every session it
+    // renders; `replaySessionState` is what recovers it when a build learns an
+    // event it did not know before.
+    state       String    @default("starting")
+    // The last thing the agent was seen doing, in the words it is shown in - the
+    // tool it is running, the question it asked. Prose, never parsed.
+    detail      String    @default("")
+    // What the worktree branched from, and the branch it works on. The branch is
+    // minted at creation and never changes: it is what a person looks for in the
+    // branch list days later.
+    baseRef     String    @default("")
+    branch      String
+    // Where the worktree lives on the machine that runs it.
+    workdir     String    @default("")
+    // The container a `local` session lives in, so its terminal can be attached
+    // and the session can be stopped.
+    containerId String?
+    // SHA-256 of the token the session reports its events with. The raw value is
+    // handed to the machine once, at start, and never stored - so a database dump
+    // cannot be replayed as a live reporting credential. It stops working the
+    // moment the session is over.
+    tokenHash   String?
+    // This session's own Enigma settings, as stringified JSON in the shape of
+    // EnigmaSettings. Null inherits from the repository, then the owner, then the
+    // instance.
+    enigma      String?
+    // The task this session was started from, by id rather than as a relation. A
+    // session is a record of work that happened and outlives the task; Tasks has
+    // no reason to know the Agents app exists.
+    taskId      String?   @db.Uuid
+    // Why it failed, in the words shown on the session.
+    error       String?
+    // When the machine last reported anything. What separates a session that is
+    // thinking hard from one whose machine went away, which look identical from
+    // here and mean opposite things.
+    lastEventAt DateTime?
+    startedAt   DateTime?
+    finishedAt  DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    repo     AgentRepo             @relation(fields: [repoId], references: [id], onDelete: Cascade)
+    host     Host?                 @relation(fields: [hostId], references: [id], onDelete: SetNull)
+    events   AgentSessionEvent[]
+    messages AgentSessionMessage[]
+
+    @@unique([tokenHash])
+    @@index([repoId, createdAt])
+    @@index([state])
+    @@index([taskId])
+    @@index([hostId])
+}
+
+// One thing a session reported, normalised.
+//
+// Written by the machine the session runs on, through the ingest endpoint, and
+// never by a person. The vocabulary is AGENT_SESSION_EVENTS in @polaris/core, so
+// a screen never branches on which vendor produced the event and a tool that
+// gains lifecycle hooks later changes no consumer.
+model AgentSessionEvent {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    sessionId String   @db.Uuid
+    // One of AGENT_SESSION_EVENTS.
+    kind      String
+    // What the event is about, in one line: the tool being run, the command a
+    // permission prompt is asking about, the question. Text from a program
+    // reading somebody's repository, so it is truncated on the way in and shown
+    // rather than parsed.
+    detail    String   @default("")
+    // The tool or subagent it concerns, where it concerns one.
+    subject   String   @default("")
+    // When Polaris received it, never when the machine says it happened: a clock
+    // on somebody else's machine is not one this instance can order anything by.
+    createdAt DateTime @default(now())
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@index([sessionId, createdAt])
+}
+
+// Something said in a session, by a person or by the agent.
+//
+// Separate from the events because it is the transcript rather than the
+// telemetry: what a person would read to catch up, in the order they would read
+// it. An event says a tool ran; a message is what was asked and what came back.
+model AgentSessionMessage {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    sessionId String   @db.Uuid
+    // user | agent | system - who said it. `system` is Polaris itself explaining
+    // something that happened to the session rather than in it.
+    role      String
+    body      String
+    // Who typed it, for a `user` message sent from the dashboard or the API. Null
+    // for everything the machine produced.
+    authorId  String?  @db.Uuid
+    createdAt DateTime @default(now())
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@index([sessionId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
