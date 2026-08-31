@@ -156,6 +156,36 @@ async function fetchInstallations(appId: string, pem: string): Promise<Installat
     }));
 }
 
+/**
+ * What the App ITSELF currently asks for, as GitHub holds it.
+ *
+ * Not the same question as what an installation was granted, and the difference
+ * is the one this whole area kept getting wrong. `APP_PERMISSIONS` is the set
+ * Polaris wants; it is sent once, in the manifest that creates the App, and
+ * GitHub publishes no way to change it afterwards - not by API, not by any URL
+ * that accepts one. Only the App's owner can, by hand, on the App's own settings
+ * page.
+ *
+ * So an App created before a permission was added to that list does not request
+ * it, no installation is holding a request for it, and there is nothing anywhere
+ * for anybody to accept. Polaris said "so-and-so has not granted Deployments"
+ * and sent people to a page with no Review request on it, every few minutes,
+ * forever. Reading this is what tells the two apart.
+ */
+async function fetchAppPermissions(appId: string, pem: string): Promise<Record<string, string> | null> {
+    try {
+        const res = await fetch(`${API}/app`, { headers: apiHeaders(appJwt(appId, pem)), cache: "no-store" });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { permissions?: Record<string, string> };
+        return body.permissions ?? null;
+    } catch {
+        // Unknown, which every reader below treats as "assume the App asks for
+        // everything" - the state things were in before this existed, and the one
+        // that cannot invent a step for somebody to take.
+        return null;
+    }
+}
+
 /** Where GitHub sends somebody back after they authorize Polaris as themselves.
  *  Registered on the app at creation, because a user authorization with no
  *  callback registered is one GitHub refuses. */
@@ -498,8 +528,20 @@ export async function refreshInstallations(): Promise<void> {
     const secrets = await getAppSecrets();
     if (!secrets) return;
     const installations = await fetchInstallations(secrets.appId, secrets.pem);
+    // Read alongside, on the same schedule and from the same credentials: an App
+    // widened by hand on GitHub has to stop being reported as un-widened here
+    // without anybody pressing anything, exactly as an acceptance does.
+    const appPermissions = await fetchAppPermissions(secrets.appId, secrets.pem);
     const state = await getIntegrationState(PROVIDER);
-    await upsertIntegration(PROVIDER, { config: { ...(state?.config ?? {}), installations } });
+    await upsertIntegration(PROVIDER, {
+        config: {
+            ...(state?.config ?? {}),
+            installations,
+            // Left alone rather than written as null when GitHub could not be
+            // asked: a blink must not read as an App that requests nothing.
+            ...(appPermissions ? { appPermissions } : {})
+        }
+    });
 }
 
 // --- Shared surface ---------------------------------------------------------
@@ -556,6 +598,23 @@ export interface GithubPermissionGap {
      *  Re-running the install prompts for the current permission set, which is
      *  the same acceptance by another route. */
     reviewUrl: string | null;
+    /**
+     * Permissions the APP does not yet ask GitHub for.
+     *
+     * The step before every other one, and the one that was missing. Nothing an
+     * installation's owner does can grant a permission the App does not request:
+     * GitHub shows them no Review request, because there is no request. Until
+     * this is empty, the installation rows below are unreachable and saying
+     * "so-and-so has not granted Deployments" is telling somebody to press a
+     * button that is not on their screen.
+     *
+     * Empty when the App asks for everything, and also when GitHub could not be
+     * asked - an unknown is not a gap.
+     */
+    appMissing: string[];
+    /** Where the App's owner adds them, which is the only place they can be
+     *  added. Null for the PAT method and for an App whose name was not kept. */
+    appPermissionsUrl: string | null;
 }
 
 /**
@@ -576,8 +635,27 @@ function installationSettingsUrl(installation: Installation, htmlUrl: string | n
     }
     // Written before the type was recorded, so which of the two paths applies is
     // unknown. Guessing produces another 404; re-running the install prompts for
-    // the same acceptance and is right either way.
+    // the same acceptance and is right either way. `htmlUrl` is the App's own
+    // page and is derived from its slug where it was never stored, so this only
+    // comes back null for a deployment that has neither - which is a deployment
+    // with no App at all.
     return htmlUrl ? `${htmlUrl}/installations/new` : null;
+}
+
+/**
+ * The App's own page, from whatever the connection recorded.
+ *
+ * Stored as `htmlUrl` since the App was created here, but an older connection
+ * has only the slug - and the slug is enough, because GitHub's address for an
+ * App is its name. Worth deriving rather than giving up on: this is the one
+ * value every fallback link below is built out of, and a row with no link at all
+ * is a row telling somebody to go and find a page it will not name.
+ */
+function appPageUrl(config: Record<string, unknown>): string | null {
+    const htmlUrl = typeof config.htmlUrl === "string" ? config.htmlUrl : "";
+    if (htmlUrl) return htmlUrl.replace(/\/+$/, "");
+    const slug = typeof config.appSlug === "string" ? config.appSlug : "";
+    return slug ? `https://github.com/apps/${slug}` : null;
 }
 
 /**
@@ -591,9 +669,11 @@ function installationSettingsUrl(installation: Installation, htmlUrl: string | n
  */
 export async function githubPermissionGap(): Promise<GithubPermissionGap> {
     const state = await getIntegrationState(PROVIDER);
-    if (state?.config.method !== "app") return { installations: [], reviewUrl: null };
+    if (state?.config.method !== "app") {
+        return { installations: [], reviewUrl: null, appMissing: [], appPermissionsUrl: null };
+    }
     const installs = Array.isArray(state.config.installations) ? (state.config.installations as Installation[]) : [];
-    const htmlUrl = typeof state.config.htmlUrl === "string" ? state.config.htmlUrl : null;
+    const htmlUrl = appPageUrl(state.config);
     const gaps = installs
         .map((install) => ({
             login: install.login,
@@ -607,6 +687,11 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
         // still a row somebody has to be told about.
         .filter((row) => row.missing.length > 0);
 
+    const asked =
+        state.config.appPermissions && typeof state.config.appPermissions === "object"
+            ? (state.config.appPermissions as Record<string, string>)
+            : null;
+
     return {
         installations: gaps,
         // One installation has a page of its own; several have no single page, so
@@ -617,8 +702,19 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
                 ? gaps[0].reviewUrl
                 : htmlUrl
                   ? `${htmlUrl}/installations/new`
-                  : null
+                  : null,
+        // Null means GitHub was never asked, or could not be. Reported as no gap:
+        // an unknown must not put a step in front of somebody.
+        appMissing: asked ? missingAppPermissions(asked) : [],
+        appPermissionsUrl: appPermissionsUrl(state.config)
     };
+}
+
+/** Where the App's own requested permissions are edited. Built from the slug,
+ *  because GitHub's address for an App is its name. */
+function appPermissionsUrl(config: Record<string, unknown>): string | null {
+    const slug = typeof config.appSlug === "string" ? config.appSlug : "";
+    return slug ? `https://github.com/settings/apps/${slug}/permissions` : null;
 }
 
 /**

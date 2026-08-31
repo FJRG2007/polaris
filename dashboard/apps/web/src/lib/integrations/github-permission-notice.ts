@@ -22,13 +22,20 @@ import { ACCEPT_STEP, permissionList } from "@/lib/integrations/github-permissio
 /** What was last announced, so the same gap is not announced twice. */
 const SEEN_KEY = "integrations.github.permission-gap";
 
-/** Stable identity for a gap: which installations are missing what. Sorted, so
- *  the order GitHub happens to report them in cannot look like a change. */
-function fingerprint(gap: Array<{ login: string; missing: readonly string[] }>): string {
-    return gap
+/** Stable identity for a gap: which installations are missing what, and what the
+ *  App itself does not yet ask for. Sorted, so the order GitHub happens to report
+ *  them in cannot look like a change - and carrying both, so widening the App
+ *  announces the acceptance that follows it rather than being counted as the
+ *  same gap already reported. */
+function fingerprint(
+    gap: Array<{ login: string; missing: readonly string[] }>,
+    appMissing: readonly string[]
+): string {
+    const installs = gap
         .map((row) => `${row.login}:${[...row.missing].sort().join(",")}`)
         .sort()
         .join("|");
+    return `app:${[...appMissing].sort().join(",")}||${installs}`;
 }
 
 /**
@@ -47,12 +54,12 @@ export async function notifyGithubPermissionGap(): Promise<void> {
         await refreshInstallations().catch(() => undefined);
 
         const gap = await githubPermissionGap();
-        const current = fingerprint(gap.installations);
+        const current = fingerprint(gap.installations, gap.appMissing);
         const seen = await getSetting(SEEN_KEY);
         if (current === (seen ?? "")) return;
 
         // The gap closed. Forget it, so the next one is announced again.
-        if (current === "") {
+        if (gap.installations.length === 0 && gap.appMissing.length === 0) {
             await setSetting(SEEN_KEY, null);
             return;
         }
@@ -63,15 +70,44 @@ export async function notifyGithubPermissionGap(): Promise<void> {
         // Named the way GitHub names them, because the person reading this is
         // about to go looking for these rows on a page of GitHub's - and the API
         // keys the gap is expressed in appear nowhere on it.
-        const names = gap.installations.map((row) => row.login).join(", ");
-        const missing = permissionList([...new Set(gap.installations.flatMap((row) => row.missing))]);
+        // The App not asking for it comes first, because nothing below is
+        // reachable until it does. GitHub takes the permission set once, in the
+        // manifest that creates the App, and offers no way to change it
+        // afterwards - so this alert used to send people to accept a request
+        // that did not exist, and kept sending them.
+        const alert =
+            gap.appMissing.length > 0
+                ? {
+                      title: "The GitHub App is missing a permission only you can add",
+                      body: `It does not ask for ${permissionList(gap.appMissing)} yet, so nobody can grant it - there is no request to accept. ${
+                          gap.appPermissionsUrl
+                              ? `Set it on ${gap.appPermissionsUrl} and save.`
+                              : "Set it on the App's own permissions page on GitHub and save."
+                      } Each account it is installed on then gets a request to accept. Until then, runner pools and agent runs are refused.`,
+                      href: gap.appPermissionsUrl ?? "/admin/integrations"
+                  }
+                : {
+                      title: "GitHub is waiting for you to accept a permission",
+                      // The address is in the body as well as behind the link,
+                      // because this also goes out by mail and to a webhook,
+                      // where "open the installation" is a sentence with nothing
+                      // to press - and because whoever has to accept it is often
+                      // signed in to GitHub in a different browser from the one
+                      // Polaris is open in.
+                      body: `${gap.installations.map((row) => row.login).join(", ")} has not granted ${permissionList([
+                          ...new Set(gap.installations.flatMap((row) => row.missing))
+                      ])}. ${
+                          gap.reviewUrl ? `Open ${gap.reviewUrl} and ` : "Open the installation on GitHub and "
+                      }${ACCEPT_STEP.charAt(0).toLowerCase() + ACCEPT_STEP.slice(1)} Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.`,
+                      href: gap.reviewUrl ?? "/admin/integrations"
+                  };
 
         await notifyOperators({
             permission: "system.manage",
             event: "integrations.github.permissions",
-            title: "GitHub is waiting for you to accept a permission",
-            body: `${names} has not granted ${missing}. Open the installation on GitHub and ${ACCEPT_STEP.charAt(0).toLowerCase() + ACCEPT_STEP.slice(1)} Until then, runner pools and agent runs on it are refused. Only the account owner can accept it, so this is one Polaris cannot do for you.`,
-            href: gap.reviewUrl ?? "/admin/integrations",
+            title: alert.title,
+            body: alert.body,
+            href: alert.href,
             level: "warning",
             actionRequired: true
         });

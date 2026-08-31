@@ -215,7 +215,12 @@ async function announce(
                 : "You can now see whatever they show their friends.",
         href: FRIENDS_PATH,
         // Only the request is waiting on anybody. Being accepted is news.
-        actionRequired: what === "asked"
+        actionRequired: what === "asked",
+        // Who it is about, so it can be answered by something other than reading
+        // it. Talking to the person is the case that matters - see
+        // `clearFriendNoticeAbout`. The id and nothing else: a notification's
+        // metadata is not a place to keep a copy of somebody's name.
+        metadata: { personId: aboutId }
     }).catch(() => undefined);
 }
 
@@ -307,4 +312,55 @@ export async function removeFriend(userId: string, otherId: string): Promise<voi
             ]
         }
     });
+}
+
+/**
+ * Mark the "so-and-so added you" notice read, because you are talking to them.
+ *
+ * The whole content of that notification is that a person is now connected to
+ * you. Opening a conversation with them tells you that more directly than the
+ * notification does - you are looking at their name, in a thread with them - so
+ * a bell still counting it is a bell counting something you demonstrably know.
+ * It is the same reasoning `notify` already applies when it marks an alert read
+ * because the page it points at is open, one step further out: the thing that
+ * answers this one is not that screen, it is the conversation.
+ *
+ * Only the accepted one. A request still waiting on an answer is not answered by
+ * chatting - it is answered by accepting or declining, and clearing it here
+ * would hide a decision somebody still has to make. It is told apart by
+ * `actionRequired`, which is set for exactly that case and for no other.
+ *
+ * Best effort, and never the reason a message fails to send.
+ */
+export async function clearFriendNoticeAbout(userId: string, personId: string): Promise<void> {
+    try {
+        const unread = await prisma.notification.findMany({
+            where: { userId, type: "account.friend", readAt: null, actionRequired: false },
+            select: { id: true, metadata: true }
+        });
+        const mine = unread.filter((row) => notificationIsAbout(row.metadata, personId)).map((row) => row.id);
+        if (mine.length === 0) return;
+        await prisma.notification.updateMany({ where: { id: { in: mine } }, data: { readAt: new Date() } });
+    } catch {
+        // A tidied bell is not worth failing a conversation over.
+    }
+}
+
+/**
+ * Whether a stored notification is about this person.
+ *
+ * The column is text holding JSON, so it is parsed defensively: a row written by
+ * an older build carries no metadata at all, and one that cannot be read is one
+ * this cannot claim anything about. Neither is an error - both simply mean the
+ * notification stays where it is.
+ */
+export function notificationIsAbout(metadata: string | null, personId: string): boolean {
+    if (!metadata) return false;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        if (!parsed || typeof parsed !== "object") return false;
+        return (parsed as { personId?: unknown }).personId === personId;
+    } catch {
+        return false;
+    }
 }

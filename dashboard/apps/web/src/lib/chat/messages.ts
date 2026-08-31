@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { rulesForChannel } from "./rules";
 import { publishChatChange } from "./live";
 import { blockedBy } from "@/lib/blocks";
+import { clearFriendNoticeAbout } from "@/lib/friends-service";
 import { nicknamesFor } from "@/lib/contact-names";
 import { referenceFromUrl } from "@/components/rich-text/references";
 import {
@@ -1018,6 +1019,18 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
             lastReadAt: message.createdAt
         }
     });
+
+    // A one-to-one is proof you know who the other person is, so the bell stops
+    // holding "so-and-so added you" for them. See `clearFriendNoticeAbout`: it
+    // is the same reasoning that already marks an alert read because the page it
+    // points at is open, one step further out.
+    if (channel.kind === "dm") {
+        const other = await prisma.chatChannelMember.findFirst({
+            where: { channelId: input.channelId, userId: { not: actor.id } },
+            select: { userId: true }
+        });
+        if (other) await clearFriendNoticeAbout(actor.id, other.userId);
+    }
 
     // The moment, on everything this crossed. Bounded by the mark it replaces,
     // so a conversation opened for the tenth time stamps whatever arrived since
