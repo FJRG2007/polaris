@@ -39,7 +39,12 @@ const whoami: McpTool<z.infer<typeof whoamiInput>> = {
             text: `You are acting as ${name}${caller.isAdmin ? " (an administrator)" : ""}. This key may: ${
                 caller.scopes.join(", ") || "nothing"
             }.`,
-            structured: { name, username: user?.username ?? null, isAdmin: caller.isAdmin, scopes: caller.scopes }
+            structured: {
+                name,
+                username: user?.username ?? null,
+                isAdmin: caller.isAdmin,
+                scopes: caller.scopes
+            }
         };
     }
 };

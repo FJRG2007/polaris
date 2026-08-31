@@ -19,7 +19,12 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
-import { interruptSessionAction, promptSessionAction, sessionScreenAction, stopSessionAction } from "../actions";
+import {
+    interruptSessionAction,
+    promptSessionAction,
+    sessionScreenAction,
+    stopSessionAction
+} from "../actions";
 
 /** Fast while something is happening. A session that has finished polls nothing. */
 const REFRESH_MS = 3000;
@@ -86,14 +91,15 @@ export function SessionDetail({ session, events, messages }: Props) {
         // box that stays full reads as a message that did not go.
         setText("");
         startTransition(() => {
-            void runAction(() => promptSessionAction({ sessionId: session.id, text: body }), setError).then(
-                (result) => {
-                    if (result?.error) {
-                        setError(result.error);
-                        setText(body);
-                    }
+            void runAction(
+                () => promptSessionAction({ sessionId: session.id, text: body }),
+                setError
+            ).then((result) => {
+                if (result?.error) {
+                    setError(result.error);
+                    setText(body);
                 }
-            );
+            });
         });
     };
 
@@ -130,7 +136,12 @@ export function SessionDetail({ session, events, messages }: Props) {
                     {core.sessionStateLabel(session.state, session.lastEventAt !== null)}
                 </span>
                 {session.detail ? (
-                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={session.detail}>{session.detail}</span>
+                    <span
+                        className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                        title={session.detail}
+                    >
+                        {session.detail}
+                    </span>
                 ) : (
                     <span className="flex-1" />
                 )}
@@ -143,7 +154,11 @@ export function SessionDetail({ session, events, messages }: Props) {
                 {over ? null : (
                     <>
                         {session.place === "local" ? (
-                            <Button size="sm" variant="ghost" onClick={() => setAttached((open) => !open)}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setAttached((open) => !open)}
+                            >
                                 {attached ? "Detach" : "Take the terminal"}
                             </Button>
                         ) : null}
@@ -178,7 +193,10 @@ export function SessionDetail({ session, events, messages }: Props) {
                         {/* Attached, not a second shell beside it: this is the same
                             terminal the agent is running in, so what is typed here
                             goes to the agent and detaching leaves it working. */}
-                        <TerminalPanel target={{ kind: "agent", sessionId: session.id }} label={session.title} />
+                        <TerminalPanel
+                            target={{ kind: "agent", sessionId: session.id }}
+                            label={session.title}
+                        />
                     </CardBody>
                 </Card>
             ) : null}
@@ -204,7 +222,8 @@ export function SessionDetail({ session, events, messages }: Props) {
                     <CardBody className="space-y-3">
                         {messages.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                Nothing has been said yet. Whatever you send below goes straight into the agent.
+                                Nothing has been said yet. Whatever you send below goes straight
+                                into the agent.
                             </p>
                         ) : (
                             messages.map((message, index) => (
@@ -216,7 +235,9 @@ export function SessionDetail({ session, events, messages }: Props) {
                                               ? "Agent"
                                               : "Polaris"}
                                     </p>
-                                    <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
+                                    <p className="whitespace-pre-wrap break-words text-sm">
+                                        {message.body}
+                                    </p>
                                 </div>
                             ))
                         )}
@@ -231,8 +252,8 @@ export function SessionDetail({ session, events, messages }: Props) {
                     <CardBody>
                         {events.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                The agent has not reported anything yet. It reports through its own hooks, which
-                                take effect once it has started.
+                                The agent has not reported anything yet. It reports through its own
+                                hooks, which take effect once it has started.
                             </p>
                         ) : (
                             <ul className="space-y-1.5">
@@ -241,7 +262,9 @@ export function SessionDetail({ session, events, messages }: Props) {
                                         <span className="text-muted-foreground">
                                             {EVENT_LABELS[event.kind] ?? event.kind}
                                         </span>
-                                        {event.detail ? <span className="ml-1.5">{event.detail}</span> : null}
+                                        {event.detail ? (
+                                            <span className="ml-1.5">{event.detail}</span>
+                                        ) : null}
                                     </li>
                                 ))}
                             </ul>

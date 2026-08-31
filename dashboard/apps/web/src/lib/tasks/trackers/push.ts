@@ -47,7 +47,10 @@ export async function pushTaskStatus(taskId: string): Promise<void> {
     if (!credential) return;
 
     try {
-        await trackerClient(credential).setStatus({ id: link.issueId, key: link.issueKey }, statusName);
+        await trackerClient(credential).setStatus(
+            { id: link.issueId, key: link.issueKey },
+            statusName
+        );
         await prisma.taskTrackerLink.update({
             where: { id: link.id },
             // Both, and for different reasons. `pushedStatus` stops this pushing
@@ -75,7 +78,12 @@ export async function pushTaskStatus(taskId: string): Promise<void> {
 export async function commentOnIssue(taskId: string, body: string): Promise<void> {
     const link = await prisma.taskTrackerLink.findUnique({
         where: { taskId },
-        select: { issueId: true, issueKey: true, trackerId: true, tracker: { select: { enabled: true } } }
+        select: {
+            issueId: true,
+            issueKey: true,
+            trackerId: true,
+            tracker: { select: { enabled: true } }
+        }
     });
     if (!link?.tracker.enabled) return;
     const credential = await credentialFor(link.trackerId);
@@ -94,5 +102,7 @@ export async function issueForTask(
         where: { taskId },
         select: { issueKey: true, issueUrl: true, tracker: { select: { provider: true } } }
     });
-    return link ? { key: link.issueKey, url: link.issueUrl, provider: link.tracker.provider } : null;
+    return link
+        ? { key: link.issueKey, url: link.issueUrl, provider: link.tracker.provider }
+        : null;
 }

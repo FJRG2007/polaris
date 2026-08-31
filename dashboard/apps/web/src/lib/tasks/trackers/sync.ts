@@ -35,13 +35,23 @@ export interface SyncResult {
 export async function syncTracker(trackerId: string): Promise<SyncResult> {
     const tracker = await prisma.taskTracker.findUnique({
         where: { id: trackerId },
-        select: { id: true, ownerId: true, provider: true, spaceId: true, listId: true, enabled: true }
+        select: {
+            id: true,
+            ownerId: true,
+            provider: true,
+            spaceId: true,
+            listId: true,
+            enabled: true
+        }
     });
     if (!tracker) return { added: 0, updated: 0, error: "That connection no longer exists." };
     if (!tracker.enabled) return { added: 0, updated: 0, error: null };
     if (!core.isIssueTracker(tracker.provider)) {
         return { added: 0, updated: 0, error: "This build does not know that tracker." };
     }
+    // The same row with its provider narrowed to one this build knows, which the
+    // guard above has just established and the column's type cannot say.
+    const connection = { ...tracker, provider: tracker.provider };
 
     const credential = await credentialFor(trackerId);
     if (!credential) {
@@ -72,56 +82,122 @@ export async function syncTracker(trackerId: string): Promise<SyncResult> {
 
     let added = 0;
     let updated = 0;
+    let refused = "";
 
     for (const issue of issues) {
-        const statusId = statusFor(statuses, issue);
-        const existing = byKey.get(issue.key);
-
-        if (!existing) {
-            const created = await tasks.createTask(
-                null,
-                tracker.spaceId,
-                core.taskCreateSchema.parse({
-                    listId: tracker.listId,
-                    name: issue.title || issue.key,
-                    description: core.linkedDescription(issue, tracker.provider),
-                    statusId
-                })
+        try {
+            const change = await applyIssue(
+                connection,
+                statuses,
+                byKey.get(issue.key) ?? null,
+                issue
             );
-            await prisma.taskTrackerLink.create({
-                data: {
-                    trackerId,
-                    taskId: created.id,
-                    issueKey: issue.key,
-                    issueId: issue.id,
-                    issueUrl: issue.url,
-                    remoteStatus: issue.status
-                }
-            });
-            added += 1;
-            continue;
+            if (change === "added") added += 1;
+            if (change === "updated") updated += 1;
+        } catch (error) {
+            // One issue is not the pass. A description longer than a task can
+            // hold, a title of control characters, a status that vanished - each
+            // of those is one row of somebody else's data, and letting it throw
+            // would stop this connection and, from the schedule, every connection
+            // behind it. The first one is kept for the connection to show.
+            if (!refused) {
+                refused = `${issue.key}: ${error instanceof Error ? error.message : "Polaris could not mirror it."}`;
+            }
         }
+    }
 
-        // Only what actually moved. A pass that rewrote every task every minute
-        // would fill the activity feed with changes nobody made and would fight
-        // whoever is editing one right now.
-        if (existing.remoteStatus === issue.status) continue;
-        // Acting as whoever connected the tracker. The change did come from
-        // somewhere else, but an activity line has to name an account, and the
-        // honest one is the person whose credential read the issue.
-        await tasks.updateTask(tracker.ownerId, {
-            taskId: existing.taskId,
-            ...(statusId ? { statusId } : {})
-        });
-        await prisma.taskTrackerLink.update({
-            where: { id: existing.id },
-            data: { remoteStatus: issue.status, issueId: issue.id, issueUrl: issue.url, syncedAt: new Date() }
-        });
-        updated += 1;
+    if (refused) {
+        await noteSync(trackerId, refused);
+        return { added, updated, error: refused };
     }
 
     await noteSync(trackerId, null);
     return { added, updated, error: null };
+}
+
+/** What one pass did to one issue. */
+type IssueChange = "added" | "updated" | "unchanged";
+
+/**
+ * Mirror one issue, creating the task or moving the one that already mirrors it.
+ *
+ * Everything a provider hands over is clamped to what a task can hold before it
+ * is parsed: the schema is Polaris's rule about its own rows, not a judgement
+ * anybody can act on about somebody else's issue.
+ */
+async function applyIssue(
+    tracker: {
+        id: string;
+        ownerId: string;
+        provider: core.IssueTracker;
+        spaceId: string;
+        listId: string;
+    },
+    statuses: readonly { id: string; name: string; type: string }[],
+    existing: { id: string; taskId: string; remoteStatus: string } | null,
+    issue: core.TrackerIssue
+): Promise<IssueChange> {
+    const statusId = statusFor(statuses, issue);
+
+    if (!existing) {
+        const created = await tasks.createTask(
+            null,
+            tracker.spaceId,
+            core.taskCreateSchema.parse({
+                listId: tracker.listId,
+                name: core.linkedName(issue),
+                description: core.linkedDescription(issue, tracker.provider),
+                statusId
+            })
+        );
+        await prisma.taskTrackerLink.create({
+            data: {
+                trackerId: tracker.id,
+                taskId: created.id,
+                issueKey: issue.key,
+                issueId: issue.id,
+                issueUrl: issue.url,
+                remoteStatus: issue.status
+            }
+        });
+        return "added";
+    }
+
+    // Only what actually moved. A pass that rewrote every task every minute
+    // would fill the activity feed with changes nobody made and would fight
+    // whoever is editing one right now.
+    if (existing.remoteStatus === issue.status) return "unchanged";
+
+    // Before the write, not after it. `updateTask` pushes a status change back to
+    // the tracker it came from, and this change came FROM there: without this the
+    // pull answers every remote move with a write into somebody else's issue,
+    // which either fails or lands on a different state that the next pull reads
+    // as another remote move.
+    const target = statusId ? statuses.find((status) => status.id === statusId) : null;
+    if (target) {
+        await prisma.taskTrackerLink.update({
+            where: { id: existing.id },
+            data: { pushedStatus: target.name }
+        });
+    }
+
+    // Acting as whoever connected the tracker. The change did come from
+    // somewhere else, but an activity line has to name an account, and the
+    // honest one is the person whose credential read the issue.
+    await tasks.updateTask(tracker.ownerId, {
+        taskId: existing.taskId,
+        ...(statusId ? { statusId } : {})
+    });
+    await prisma.taskTrackerLink.update({
+        where: { id: existing.id },
+        data: {
+            remoteStatus: issue.status,
+            issueId: issue.id,
+            issueUrl: issue.url,
+            syncedAt: new Date()
+        }
+    });
+    return "updated";
 }
 
 /**
@@ -147,6 +223,9 @@ function statusFor(
 /** Every connection due a pass, for the schedule. Disabled ones are skipped here
  *  rather than inside the sync, so a run says how many it actually looked at. */
 export async function trackersToSync(): Promise<string[]> {
-    const rows = await prisma.taskTracker.findMany({ where: { enabled: true }, select: { id: true } });
+    const rows = await prisma.taskTracker.findMany({
+        where: { enabled: true },
+        select: { id: true }
+    });
     return rows.map((row) => row.id);
 }

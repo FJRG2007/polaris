@@ -127,7 +127,9 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     </p>
                                 </div>
                                 <Badge variant="neutral" className="shrink-0">
-                                    {core.agentCliById(session.cli)?.label ?? session.command ?? session.cli}
+                                    {core.agentCliById(session.cli)?.label ??
+                                        session.command ??
+                                        session.cli}
                                 </Badge>
                                 <span className="shrink-0 text-xs text-muted-foreground">
                                     {session.place === "host" ? (
@@ -226,7 +228,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // the picker and disables Start - the server refuses this too, and would say
     // the same thing, but finding out after the click is finding out too late to
     // do anything about it without losing the form.
-    const unlinked = agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
+    const unlinked =
+        agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -237,7 +240,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                 {noRepos ? (
                     <p className="text-sm text-muted-foreground">
-                        A session works in a repository the Agents app already reaches. Connect one under{" "}
+                        A session works in a repository the Agents app already reaches. Connect one
+                        under{" "}
                         <Link href="/apps/agents/repos" className="underline">
                             Repositories
                         </Link>{" "}
@@ -246,7 +250,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                 ) : (
                     <div className="space-y-3">
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">What is it working on</span>
+                            <span className="text-xs text-muted-foreground">
+                                What is it working on
+                            </span>
                             <Input
                                 value={title}
                                 onChange={(event) => setTitle(event.target.value)}
@@ -282,7 +288,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         {cli === core.CUSTOM_AGENT_CLI ? (
                             <label className="block space-y-1">
                                 <span className="text-xs text-muted-foreground">
-                                    The command that starts it. It has to already be installed on the machine.
+                                    The command that starts it. It has to already be installed on
+                                    the machine.
                                 </span>
                                 <Input
                                     value={command}
@@ -321,7 +328,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                                Branch to start from. Leave it empty for the repository&apos;s default.
+                                Branch to start from. Leave it empty for the repository&apos;s
+                                default.
                             </span>
                             <Input
                                 value={baseRef}
@@ -332,7 +340,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                                What to start with. Leave it empty to open the agent and type into it yourself.
+                                What to start with. Leave it empty to open the agent and type into
+                                it yourself.
                             </span>
                             <Textarea
                                 value={prompt}
@@ -346,8 +355,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <div className="min-w-0">
                                 <p className="text-sm">Work to your Enigma standards</p>
                                 <p className="text-xs text-muted-foreground">
-                                    Installs your policies, conventions and guardrails into the session before the
-                                    agent starts. Its own settings come from this repository and from Agents settings.
+                                    Installs your policies, conventions and guardrails into the
+                                    session before the agent starts. Its own settings come from this
+                                    repository and from Agents settings.
                                 </p>
                             </div>
                             <Switch checked={enigma} onChange={setEnigma} />
@@ -361,7 +371,10 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={busy || noRepos || !title || !repoId || unlinked !== null}>
+                    <Button
+                        onClick={submit}
+                        disabled={busy || noRepos || !title || !repoId || unlinked !== null}
+                    >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Start
                     </Button>

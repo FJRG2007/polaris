@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { after } from "next/server";
 import * as core from "@polaris/core";
 import { McpRefusal, type McpTool } from "../protocol";
 import * as runtime from "@/lib/agents/session-runtime";
@@ -59,7 +60,8 @@ const getInput = z.object({ sessionId: z.string().uuid() });
 
 const getSessionTool: McpTool<z.infer<typeof getInput>> = {
     name: "agent_session_get",
-    description: "What one session has been asked, what it has done, and whether it is waiting on anybody.",
+    description:
+        "What one session has been asked, what it has done, and whether it is waiting on anybody.",
     input: getInput,
     scope: "agents.read",
     readOnly: true,
@@ -88,7 +90,12 @@ const getSessionTool: McpTool<z.infer<typeof getInput>> = {
 
 const promptInput = z.object({
     sessionId: z.string().uuid(),
-    text: z.string().trim().min(1).max(20_000).describe("What to say to it. Goes into its prompt as typed.")
+    text: z
+        .string()
+        .trim()
+        .min(1)
+        .max(20_000)
+        .describe("What to say to it. Goes into its prompt as typed.")
 });
 
 const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
@@ -133,7 +140,10 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             where: { ownerId: caller.userId, repoFullName: input.repo, enabled: true },
             select: { id: true }
         });
-        if (!repo) throw new McpRefusal(`${input.repo} is not a repository the Agents app reaches for this key.`);
+        if (!repo)
+            throw new McpRefusal(
+                `${input.repo} is not a repository the Agents app reaches for this key.`
+            );
 
         const { session, token } = await sessions.createSession({
             repoId: repo.id,
@@ -151,9 +161,13 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
         });
         await runtime.startSession(session, token);
         await sessions.addSessionMessage(session.id, "user", input.prompt, caller.userId);
-        await runtime.promptSession(session.id, input.prompt);
+        // After the answer, not before it: the container is still cloning and
+        // installing, and a model held for that would spend its turn waiting on
+        // apt-get. The delivery waits for the agent's terminal and records what
+        // happened on the session either way.
+        after(() => runtime.deliverFirstPrompt(session.id, input.prompt));
         return {
-            text: `Started ${session.id} on ${session.branch}. Check on it with agent_session_get.`,
+            text: `Started ${session.id} on ${session.branch}. It gets the prompt as soon as it is up; check on it with agent_session_get.`,
             structured: { id: session.id, branch: session.branch }
         };
     }

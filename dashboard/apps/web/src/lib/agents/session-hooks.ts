@@ -171,7 +171,8 @@ function clip(value: string, max = 160): string {
  * honest and still worth showing.
  */
 function toolDetail(tool: string, input: Record<string, unknown>): string {
-    const str = (key: string): string => (typeof input[key] === "string" ? (input[key] as string) : "");
+    const str = (key: string): string =>
+        typeof input[key] === "string" ? (input[key] as string) : "";
     switch (tool) {
         case "Bash":
             return clip(str("command"));
@@ -218,10 +219,18 @@ export function normalizeHookEvent(payload: unknown): NormalizedHookEvent | null
         return { kind, detail: detail ? `${tool}: ${detail}` : tool, subject: tool };
     }
     if (kind === "prompt") {
-        return { kind, detail: clip(typeof record.prompt === "string" ? record.prompt : ""), subject: "" };
+        return {
+            kind,
+            detail: clip(typeof record.prompt === "string" ? record.prompt : ""),
+            subject: ""
+        };
     }
     if (kind === "question") {
-        return { kind, detail: clip(typeof record.message === "string" ? record.message : "Waiting for you"), subject: "" };
+        return {
+            kind,
+            detail: clip(typeof record.message === "string" ? record.message : "Waiting for you"),
+            subject: ""
+        };
     }
     return { kind, detail: "", subject: "" };
 }

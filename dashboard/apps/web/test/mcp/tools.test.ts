@@ -46,23 +46,37 @@ describe("the catalogue", () => {
 
 describe("toJsonSchema", () => {
     it("carries the bounds across, so a model is told the limit rather than discovering it", () => {
-        expect(toJsonSchema(z.string().min(2).max(9))).toEqual({ type: "string", minLength: 2, maxLength: 9 });
-        expect(toJsonSchema(z.number().int().min(1).max(100))).toEqual({ type: "integer", minimum: 1, maximum: 100 });
+        expect(toJsonSchema(z.string().min(2).max(9))).toEqual({
+            type: "string",
+            minLength: 2,
+            maxLength: 9
+        });
+        expect(toJsonSchema(z.number().int().min(1).max(100))).toEqual({
+            type: "integer",
+            minimum: 1,
+            maximum: 100
+        });
         expect(toJsonSchema(z.string().uuid())).toEqual({ type: "string", format: "uuid" });
     });
 
     it("treats a field with a default as one the caller need not send", () => {
-        const schema = toJsonSchema(z.object({ a: z.string(), b: z.string().default("x"), c: z.string().optional() }));
+        const schema = toJsonSchema(
+            z.object({ a: z.string(), b: z.string().default("x"), c: z.string().optional() })
+        );
         expect(schema.required).toEqual(["a"]);
         expect(schema.properties?.b?.default).toBe("x");
     });
 
     it("keeps the description, which is the only thing telling a model what a field means", () => {
-        expect(toJsonSchema(z.string().describe("The branch."))).toMatchObject({ description: "The branch." });
+        expect(toJsonSchema(z.string().describe("The branch."))).toMatchObject({
+            description: "The branch."
+        });
     });
 
     it("looks through a refinement to the shape underneath", () => {
-        expect(toJsonSchema(z.object({ a: z.string() }).refine(() => true))).toMatchObject({ type: "object" });
+        expect(toJsonSchema(z.object({ a: z.string() }).refine(() => true))).toMatchObject({
+            type: "object"
+        });
     });
 
     it("refuses loudly rather than handing over an empty schema", () => {

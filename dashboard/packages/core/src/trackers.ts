@@ -13,7 +13,12 @@
  * flattening a provider's rich-text description needs before it is text.
  */
 
-import { TASK_STATUS_TYPES, type TaskStatusType } from "./schemas/tasks.js";
+import {
+    TASK_DESCRIPTION_MAX,
+    TASK_NAME_MAX,
+    TASK_STATUS_TYPES,
+    type TaskStatusType
+} from "./schemas/tasks.js";
 
 /** The trackers Polaris can connect to. */
 export const ISSUE_TRACKERS = ["linear", "jira"] as const;
@@ -33,7 +38,12 @@ export const ISSUE_TRACKER_LABELS: Record<IssueTracker, string> = {
  */
 export const ISSUE_TRACKER_FIELDS: Record<
     IssueTracker,
-    { readonly key: string; readonly label: string; readonly hint: string; readonly secret: boolean }[]
+    {
+        readonly key: string;
+        readonly label: string;
+        readonly hint: string;
+        readonly secret: boolean;
+    }[]
 > = {
     linear: [
         {
@@ -50,7 +60,12 @@ export const ISSUE_TRACKER_FIELDS: Record<
             hint: "The address you use for Jira, such as your-company.atlassian.net.",
             secret: false
         },
-        { key: "email", label: "Account email", hint: "The account the token belongs to.", secret: false },
+        {
+            key: "email",
+            label: "Account email",
+            hint: "The account the token belongs to.",
+            secret: false
+        },
         {
             key: "apiToken",
             label: "API token",
@@ -90,7 +105,11 @@ export interface TrackerIssue {
  * as a fallback, and deliberately loosely - the alternative is every connection
  * needing a mapping table before it does anything at all.
  */
-export function statusTypeFromTracker(tracker: IssueTracker, category: string, name: string): TaskStatusType {
+export function statusTypeFromTracker(
+    tracker: IssueTracker,
+    category: string,
+    name: string
+): TaskStatusType {
     const group = category.toLowerCase();
     if (tracker === "linear") {
         // Linear's own state types.
@@ -118,6 +137,51 @@ export function statusTypeFromName(name: string): TaskStatusType {
     return "open";
 }
 
+/**
+ * A Jira site, reduced to the one form Polaris stores and calls.
+ *
+ * Operators paste what they have: with the scheme, without it, with a trailing
+ * slash. Those are one site, and normalising in one place is what stops the form,
+ * the stored row and the client each having their own idea of which.
+ */
+export function normalizeTrackerSite(value: string): string {
+    return value
+        .trim()
+        .replace(/^https?:\/\//i, "")
+        .replace(/\/+$/, "")
+        .toLowerCase();
+}
+
+/**
+ * Whether a normalised site is an address Polaris will call.
+ *
+ * The only place an operator chooses a host the server itself connects to, so
+ * what it accepts is a hostname and nothing more. Anything carrying credentials,
+ * a path or a query is refused, and so is a loopback name: those are not Jira
+ * sites, they are ways to point a server that holds a credential at something on
+ * its own network and read back the first 400 bytes of whatever answers.
+ *
+ * A port is allowed, because a self-hosted Data Center is often on one. A literal
+ * address is not, in either family - a site is a name.
+ */
+export function isTrackerSite(value: string): boolean {
+    const site = normalizeTrackerSite(value);
+    if (!site || site.length > 255) return false;
+    // One or more dot-separated labels, and nothing else: no scheme survived the
+    // normaliser, and a userinfo, a path or a query never matches at all.
+    const match =
+        /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)(?::([0-9]{1,5}))?$/.exec(
+            site
+        );
+    if (!match) return false;
+    const host = match[1] ?? "";
+    const port = match[2] ? Number(match[2]) : null;
+    if (port !== null && (port < 1 || port > 65_535)) return false;
+    // A dotted number is an address wearing a name's shape.
+    if (/^[0-9.]+$/.test(host)) return false;
+    return !/(^|\.)(localhost|localdomain)$/.test(host);
+}
+
 /** Whether a stored value still names a tracker this build knows. */
 export function isIssueTracker(value: string): value is IssueTracker {
     return (ISSUE_TRACKERS as readonly string[]).includes(value);
@@ -138,14 +202,20 @@ export function isTaskStatusType(value: string): value is TaskStatusType {
  * which is the honest trade, because the alternative is a task whose description
  * is a page of JSON.
  */
-export function flattenRichText(node: unknown): string {
+const MAX_RICH_TEXT_DEPTH = 100;
+
+export function flattenRichText(node: unknown, depth = 0): string {
+    // The tree came out of somebody else's API, so its shape is not ours to
+    // assume. A document nested past this is not a description anybody wrote, and
+    // walking it to the end of the stack would take the sync pass with it.
+    if (depth > MAX_RICH_TEXT_DEPTH) return "";
     if (typeof node === "string") return node;
-    if (Array.isArray(node)) return node.map(flattenRichText).join("");
+    if (Array.isArray(node)) return node.map((child) => flattenRichText(child, depth + 1)).join("");
     if (!node || typeof node !== "object") return "";
 
     const record = node as Record<string, unknown>;
     const type = typeof record.type === "string" ? record.type : "";
-    const content = flattenRichText(record.content);
+    const content = flattenRichText(record.content, depth + 1);
 
     switch (type) {
         case "text": {
@@ -196,5 +266,39 @@ function linkHref(marks: unknown): string {
  */
 export function linkedDescription(issue: TrackerIssue, tracker: IssueTracker): string {
     const origin = `Mirrored from [${issue.key}](${issue.url}) in ${ISSUE_TRACKER_LABELS[tracker]}.`;
-    return issue.description.trim() ? `${issue.description.trim()}\n\n---\n\n${origin}` : origin;
+    const body = issue.description.trim();
+    if (!body) return origin;
+    // Clamped rather than refused. Somebody else's tracker has its own limits, and
+    // an issue longer than a task can hold is not a reason to stop mirroring their
+    // board - but the origin line has to survive, because it is what tells a
+    // reader this is a mirror and where the rest of it is.
+    const room = TASK_DESCRIPTION_MAX - origin.length - TRUNCATED.length - 8;
+    const kept =
+        body.length > room ? `${body.slice(0, Math.max(0, room)).trimEnd()}${TRUNCATED}` : body;
+    return `${kept}\n\n---\n\n${origin}`;
 }
+
+/**
+ * The name a linked task is given.
+ *
+ * The issue's title, or its key when the title says nothing. Clamped and stripped
+ * of control characters for the same reason the description is clamped: what a
+ * task can hold is Polaris's rule, and an issue that breaks it is somebody else's
+ * data rather than a reason to stop syncing their board.
+ */
+export function linkedName(issue: TrackerIssue): string {
+    const title = issue.title
+        .split("")
+        .map((character) =>
+            character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 ? " " : character
+        )
+        .join("")
+        .trim();
+    if (!title) return issue.key;
+    return title.length > TASK_NAME_MAX
+        ? `${title.slice(0, TASK_NAME_MAX - TRUNCATED.length).trimEnd()}${TRUNCATED}`
+        : title;
+}
+
+/** What goes where the rest of somebody's text was. */
+const TRUNCATED = "...";

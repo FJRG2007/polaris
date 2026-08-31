@@ -119,9 +119,12 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
                 host: connection.address,
                 port: connection.port,
                 username: connection.username,
-                privateKey: connection.auth.method === "key" ? connection.auth.privateKey : undefined,
-                password: connection.auth.method === "password" ? connection.auth.password : undefined,
-                passphrase: connection.auth.method === "key" ? connection.auth.passphrase : undefined,
+                privateKey:
+                    connection.auth.method === "key" ? connection.auth.privateKey : undefined,
+                password:
+                    connection.auth.method === "password" ? connection.auth.password : undefined,
+                passphrase:
+                    connection.auth.method === "key" ? connection.auth.passphrase : undefined,
                 hostKey: connection.hostKey
             }
         };
@@ -150,7 +153,11 @@ function resolveMode(value: string): TerminalMode {
  * that opens and then answers every command with a sudo error, which reads as
  * Polaris being broken rather than as a capability that was never granted.
  */
-export async function canOpenHostShell(userId: string, hostId: string, asRoot = false): Promise<boolean> {
+export async function canOpenHostShell(
+    userId: string,
+    hostId: string,
+    asRoot = false
+): Promise<boolean> {
     const row = await prisma.host.findFirst({
         where: { id: hostId, ownerId: userId },
         select: { id: true, sudo: true }

@@ -140,7 +140,11 @@ function ok(id: JsonRpcId, result: unknown): JsonRpcResponse {
 }
 
 function fail(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
-    return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
+    return {
+        jsonrpc: "2.0",
+        id,
+        error: data === undefined ? { code, message } : { code, message, data }
+    };
 }
 
 /**
@@ -190,9 +194,12 @@ export async function handleMcpMessage(
 
     const { method, params } = parsed.data;
     const id = parsed.data.id ?? null;
-    // A message with no id is a notification. The only ones a client sends here
-    // are lifecycle announcements, and none of them needs anything doing.
-    const isNotification = parsed.data.id === undefined;
+    // A message with no id is a notification, and JSON-RPC 2.0 says a notification
+    // gets no response - not even to a method that would otherwise have answered.
+    // The only ones a client sends here are lifecycle announcements, and none of
+    // them needs anything doing; answering one anyway would hand a conformant
+    // client a response with no request to match it to.
+    if (parsed.data.id === undefined) return null;
 
     switch (method) {
         case "initialize": {
@@ -211,7 +218,6 @@ export async function handleMcpMessage(
         case "tools/call":
             return callTool(id, params ?? {}, tools, caller);
         default:
-            if (isNotification) return null;
             return fail(id, RPC_METHOD_NOT_FOUND, `Polaris does not answer ${method}`);
     }
 }
@@ -224,7 +230,8 @@ async function callTool(
 ): Promise<JsonRpcResponse> {
     const name = typeof params.name === "string" ? params.name : "";
     const tool = tools.find((candidate) => candidate.name === name);
-    if (!tool) return fail(id, RPC_INVALID_PARAMS, `There is no tool called ${name || "(unnamed)"}`);
+    if (!tool)
+        return fail(id, RPC_INVALID_PARAMS, `There is no tool called ${name || "(unnamed)"}`);
 
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
@@ -236,7 +243,11 @@ async function callTool(
     if (!args.success) {
         const first = args.error.issues[0];
         const where = first?.path.join(".");
-        return fail(id, RPC_INVALID_PARAMS, where ? `${where}: ${first?.message}` : (first?.message ?? "Bad arguments"));
+        return fail(
+            id,
+            RPC_INVALID_PARAMS,
+            where ? `${where}: ${first?.message}` : (first?.message ?? "Bad arguments")
+        );
     }
 
     try {

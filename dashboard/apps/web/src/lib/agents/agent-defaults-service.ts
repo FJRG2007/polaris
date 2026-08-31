@@ -129,12 +129,19 @@ function toView(row: Row): AgentDefaultsView {
 /** Every tier this owner has set, general first and organizations after it in
  *  name order - the order the settings screen lists them in. */
 export async function listAgentDefaults(ownerId: string): Promise<AgentDefaultsView[]> {
-    const rows = await prisma.agentDefaults.findMany({ where: { ownerId }, select: SELECT, orderBy: { scope: "asc" } });
+    const rows = await prisma.agentDefaults.findMany({
+        where: { ownerId },
+        select: SELECT,
+        orderBy: { scope: "asc" }
+    });
     return rows.map(toView);
 }
 
 /** One tier, or null when nobody has set it. */
-export async function getAgentDefaults(ownerId: string, scope: string): Promise<AgentDefaultsView | null> {
+export async function getAgentDefaults(
+    ownerId: string,
+    scope: string
+): Promise<AgentDefaultsView | null> {
     const row = await prisma.agentDefaults.findUnique({
         where: { ownerId_scope: { ownerId, scope } },
         select: SELECT
@@ -200,7 +207,12 @@ export async function getPlatformAgentDefaults(): Promise<AgentDefaultsView> {
     }
     const result = agentDefaultsSchema.safeParse(parsed);
     const values = result.success ? result.data : agentDefaultsSchema.parse({});
-    return { ...values, scope: GENERAL_SCOPE, poolName: null, enigma: values.enigma ?? core.INHERIT_ENIGMA };
+    return {
+        ...values,
+        scope: GENERAL_SCOPE,
+        poolName: null,
+        enigma: values.enigma ?? core.INHERIT_ENIGMA
+    };
 }
 
 /** Store it, or forget the key when it decides nothing. */
@@ -218,7 +230,9 @@ export async function savePlatformAgentDefaults(input: AgentDefaultsInput): Prom
 
 /** What a tier contributes to the policy, with the columns that are not part of
  *  it left out. */
-function overrideOf(row: AgentDefaultsView | AgentPolicyOverride | null): AgentPolicyOverride | null {
+function overrideOf(
+    row: AgentDefaultsView | AgentPolicyOverride | null
+): AgentPolicyOverride | null {
     if (!row) return null;
     const value = row as AgentDefaultsView;
     return {
@@ -245,7 +259,10 @@ export interface RepoPolicyColumns {
  * the same table and the webhook path asks for this on every event it might act
  * on.
  */
-export async function policyForRepo(ownerId: string, repo: RepoPolicyColumns): Promise<AgentPolicy> {
+export async function policyForRepo(
+    ownerId: string,
+    repo: RepoPolicyColumns
+): Promise<AgentPolicy> {
     const scope = scopeOf(repo.repoFullName);
     const [rows, platform] = await Promise.all([
         prisma.agentDefaults.findMany({
@@ -274,7 +291,10 @@ export async function policyForRepo(ownerId: string, repo: RepoPolicyColumns): P
  * Used by the add dialog, which has to know whether the visibility it is looking
  * at is allowed before it offers to enable anything.
  */
-export async function policyForNewRepo(ownerId: string, repoFullName: string): Promise<AgentPolicy> {
+export async function policyForNewRepo(
+    ownerId: string,
+    repoFullName: string
+): Promise<AgentPolicy> {
     return policyForRepo(ownerId, { repoFullName, pullRequests: null, issues: null, gate: null });
 }
 
@@ -288,7 +308,9 @@ export async function policyForNewRepo(ownerId: string, repoFullName: string): P
 export async function inheritedConfig(
     ownerId: string,
     repoFullName: string
-): Promise<Pick<AgentDefaultsView, "execution" | "poolId" | "model" | "effort" | "push" | "shell">> {
+): Promise<
+    Pick<AgentDefaultsView, "execution" | "poolId" | "model" | "effort" | "push" | "shell">
+> {
     const scope = scopeOf(repoFullName);
     const [rows, platform] = await Promise.all([
         prisma.agentDefaults.findMany({
@@ -299,8 +321,9 @@ export async function inheritedConfig(
     ]);
     const org = rows.find((row) => row.scope === scope);
     const general = rows.find((row) => row.scope === GENERAL_SCOPE);
-    const pick = <K extends "execution" | "poolId" | "model" | "effort" | "push" | "shell">(key: K) =>
-        (org?.[key] ?? general?.[key] ?? platform[key] ?? null) as AgentDefaultsView[K];
+    const pick = <K extends "execution" | "poolId" | "model" | "effort" | "push" | "shell">(
+        key: K
+    ) => (org?.[key] ?? general?.[key] ?? platform[key] ?? null) as AgentDefaultsView[K];
     return {
         execution: pick("execution"),
         poolId: pick("poolId"),
@@ -345,7 +368,9 @@ export function parseFallback(value: string | null | undefined): string[] | null
     if (!value) return null;
     try {
         const parsed: unknown = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : null;
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : null;
     } catch {
         return null;
     }
