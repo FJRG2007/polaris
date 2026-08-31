@@ -22,9 +22,10 @@ import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { useProjectCan } from "./access-context";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
+import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
@@ -93,6 +94,26 @@ import {
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Notes", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
+/**
+ * What each tab takes to open. A tab the reader cannot use is not drawn: the
+ * variables tab in particular has to be absent rather than empty, since the whole
+ * point of withholding it is that the names of the variables are not shown
+ * either.
+ */
+const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
+    Deployments: ["project.read"],
+    Variables: ["variables.read"],
+    Metrics: ["project.read"],
+    Console: ["console.use"],
+    Files: ["files.read"],
+    Volumes: ["project.read"],
+    Notes: ["project.read"],
+    // Settings holds three separate jobs - how the service is built, where it
+    // answers, and removing it - so any one of them is enough to open it, and the
+    // sections inside are gated one by one.
+    Settings: ["service.configure", "domains.manage", "service.delete"]
+};
+
 const LINKED_TABS = [
     { label: "Security", icon: ShieldCheck, href: (id: string) => `/apps/firewall?scope=application&id=${id}` },
     { label: "Analytics", icon: ChartColumn, href: (id: string) => `/apps/analytics?scope=application&id=${id}` }
@@ -114,6 +135,8 @@ export function ServiceDetail({
     const [tab, setTab] = useState<Tab>("Deployments");
     const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
+    const can = useProjectCan();
+    const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -146,7 +169,7 @@ export function ServiceDetail({
                 </div>
 
                 <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
-                    {TABS.map((name) => (
+                    {tabs.map((name) => (
                         <button
                             key={name}
                             type="button"
@@ -187,7 +210,7 @@ export function ServiceDetail({
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
                     {tab === "Console" && (
                         <TerminalPanel
-                            target={{ kind: "container", targetId: app.targetId, containerRef: app.containerRef }}
+                            target={{ kind: "container", applicationId: app.id }}
                             label={app.containerRef}
                         />
                     )}
@@ -315,6 +338,7 @@ function DeploymentMenu({
     /** A redeploy from here starts a NEW deployment; the caller follows it. */
     onDeployStarted: (deploymentId: string) => void;
 }) {
+    const can = useProjectCan();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const isActive = deployment.isCurrent;
@@ -347,6 +371,10 @@ function DeploymentMenu({
             if (result.deploymentId) onDeployStarted(result.deploymentId);
         });
     }
+
+    // Every item in this menu ships or tears down a release, so with no standing
+    // to do that there is no menu - not one that opens onto nothing.
+    if (!can("deploy.run")) return null;
 
     return (
         <DropdownMenu>
@@ -393,6 +421,7 @@ function DeploymentMenu({
 }
 
 function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
+    const can = useProjectCan();
     const format = useDisplayFormat();
     const [items, setItems] = useState<DepSummary[] | null>(null);
     const [logsFor, setLogsFor] = useState<string | null>(null);
@@ -492,9 +521,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     </span>
                     <span>1 Replica</span>
                 </div>
-                <Button size="sm" disabled={busy} onClick={deploy}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
-                </Button>
+                {can("deploy.run") && (
+                    <Button size="sm" disabled={busy} onClick={deploy}>
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
+                    </Button>
+                )}
             </div>
 
             {items === null ? (
@@ -1371,6 +1402,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
 }
 
 function VariablesTab({ app }: { app: ProjectApp }) {
+    const can = useProjectCan();
     const [scope, setScope] = useState<"application" | "environment">("application");
     const scopeId = scope === "application" ? app.id : app.environmentId;
     const [items, setItems] = useState<Awaited<ReturnType<typeof deployActions.listEnvVarsAction>> | null>(null);
@@ -1458,14 +1490,16 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
                     {items && items.length === 1 ? "" : "s"}
                 </span>
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
-                        {"{ } Raw Editor"}
-                    </Button>
-                    <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
-                        <Plus className="size-4" /> New Variable
-                    </Button>
-                </div>
+                {can("variables.write") && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
+                            {"{ } Raw Editor"}
+                        </Button>
+                        <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
+                            <Plus className="size-4" /> New Variable
+                        </Button>
+                    </div>
+                )}
             </div>
             {note && <p className="text-xs text-success">{note}</p>}
             {rawOpen && (
@@ -1538,14 +1572,17 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                 >
                                     {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                                 </button>
-                                <button
-                                    type="button"
-                                    title="Remove"
-                                    onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
-                                    className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                >
-                                    <Trash2 className="size-4" />
-                                </button>
+                                {can("variables.write") && (
+                                    <button
+                                        type="button"
+                                        title="Remove"
+                                        aria-label={`Remove ${item.key}`}
+                                        onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
+                                        className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </button>
+                                )}
                             </li>
                         );
                     })}
@@ -2073,6 +2110,7 @@ function SettingsTab({
     staged: boolean;
     onChanged: () => void;
 }) {
+    const can = useProjectCan();
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
@@ -2347,8 +2385,9 @@ function SettingsTab({
 
     return (
         <div className="flex flex-col gap-5 py-2">
-            <ServerSection app={app} onChanged={onChanged} />
+            {can("service.configure") && <ServerSection app={app} onChanged={onChanged} />}
 
+            {can("service.configure") && (
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Networking</h3>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -2377,7 +2416,9 @@ function SettingsTab({
                     </a>
                 )}
             </section>
+            )}
 
+            {can("domains.manage") && (
             <section className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                     <h3 className="text-sm font-medium">Public access</h3>
@@ -2628,8 +2669,9 @@ function SettingsTab({
                     </div>
                 </MethodBlock>
             </section>
+            )}
 
-            {isGit && (
+            {isGit && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Source</h3>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2668,7 +2710,7 @@ function SettingsTab({
                 </section>
             )}
 
-            {app.sourceType === "nixpacks" && (
+            {app.sourceType === "nixpacks" && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Build</h3>
                     <p className="text-xs text-muted-foreground">
@@ -2714,7 +2756,7 @@ function SettingsTab({
                 </section>
             )}
 
-            {isGit && (
+            {isGit && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Auto-deploy</h3>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
@@ -2751,6 +2793,7 @@ function SettingsTab({
                 </section>
             )}
 
+            {can("service.configure") && (
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Releases</h3>
                 <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
@@ -2765,15 +2808,18 @@ function SettingsTab({
                     <Switch checked={keepReleases} onChange={setKeepReleases} aria-label="Keep previous deployments" />
                 </div>
             </section>
+            )}
 
             {error && <p className="text-sm text-danger">{error}</p>}
+            {can("service.configure") && (
             <div className="flex justify-end">
                 <Button onClick={saveSettings} disabled={pending}>
                     {pending && <Loader2 className="size-4 animate-spin" />} Save settings
                 </Button>
             </div>
+            )}
 
-            <DangerSection app={app} staged={staged} onChanged={onChanged} />
+            {can("service.delete") && <DangerSection app={app} staged={staged} onChanged={onChanged} />}
         </div>
     );
 }
@@ -2843,10 +2889,10 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void deployActions.listDeployServersAction()
+        void deployActions.listDeployServersAction(app.environmentId)
             .then((list) => setServers(list))
             .catch(() => undefined);
-    }, []);
+    }, [app.environmentId]);
 
     const changed = serverId !== app.serverId;
 

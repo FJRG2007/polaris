@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/session";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { listContainerFiles, writeContainerFile } from "@/lib/container-files-service";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ export async function GET(
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path") ?? "/";
     try {
-        const entries = await listContainerFiles(id, user.id, path);
+        const access = await requireApplicationAccess(id, user.id, "files.read");
+        const entries = await listContainerFiles(id, access.ownerId, path);
         return NextResponse.json({ path, entries });
     } catch (caught) {
         return NextResponse.json(
@@ -34,8 +36,9 @@ export async function PUT(
     const path = new URL(request.url).searchParams.get("path");
     if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });
     try {
+        const access = await requireApplicationAccess(id, user.id, "files.write");
         const content = Buffer.from(await request.arrayBuffer());
-        await writeContainerFile(id, user.id, path, content);
+        await writeContainerFile(id, access.ownerId, path, content);
         return NextResponse.json({ ok: true });
     } catch (caught) {
         return NextResponse.json(

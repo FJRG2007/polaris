@@ -21,8 +21,17 @@ import {
     detectWebhookFormat,
     maskWebhookUrl,
     parseProjectFlags,
+    projectRoleFor,
+    parseEnvironmentScope,
+    parseProjectCapabilities,
+    resolveProjectCapabilities,
+    ALL_PROJECT_CAPABILITIES,
+    PROJECT_PRINCIPAL_LABELS,
     TOKEN_LIFETIME_DAYS,
+    type ProjectAccessInput,
+    type ProjectCapability,
     type ProjectFlags,
+    type ProjectPrincipalKind,
     type ProjectRole,
     type ProjectTokenInput,
     type ProjectVisibility,
@@ -170,21 +179,44 @@ export async function getFlagsForEnvironment(environmentId: string): Promise<Pro
 
 export interface ProjectMemberView {
     id: string;
-    userId: string;
+    principal: ProjectPrincipalKind;
+    /** The account, team or organization. Null on the everyone entry. */
+    principalId: string | null;
+    /** Who this is for, in the words the screen shows. */
     name: string;
-    /** Their address if they show it to whoever is looking, their handle
-     *  otherwise - a project's member list is other people's screen. */
+    /** A person's address if they show it to whoever is looking, their handle
+     *  otherwise - a project's member list is other people's screen. Empty for a
+     *  team, an organization, or everyone. */
     contact: string;
-    role: ProjectRole;
+    /** The role the capabilities were taken from, or "custom" when they were not. */
+    role: ProjectRole | "custom";
+    capabilities: ProjectCapability[];
+    /** The environments this reaches, or null for every one. */
+    environmentIds: string[] | null;
+    expiresAt: string | null;
+    /** True once it has lapsed. The row stays on the list, marked, because
+     *  somebody wondering why a colleague lost access is owed the reason. */
+    expired: boolean;
     createdAt: string;
     /** True for the synthetic row standing in for the project's owner. */
     isOwner: boolean;
 }
 
+/** Which principal an entry names, from the one column of the three that is set. */
+function principalOf(row: {
+    userId: string | null;
+    teamId: string | null;
+    orgId: string | null;
+}): ProjectPrincipalKind {
+    if (row.userId) return "user";
+    if (row.teamId) return "team";
+    return row.orgId ? "org" : "everyone";
+}
+
 /**
- * Everyone on the project, owner first. The owner is not a membership row, but
- * a members list that does not show who owns the thing is a list that reads as
- * if nobody does - so they are rendered in, marked, and not removable.
+ * Everyone with access to the project, owner first. The owner is not an entry,
+ * but a list that does not show who owns the thing is a list that reads as if
+ * nobody does - so they are rendered in, marked, and not removable.
  */
 export async function listProjectMembers(
     projectId: string,
@@ -198,90 +230,176 @@ export async function listProjectMembers(
             owner: { select: { id: true, name: true, email: true, username: true } },
             members: {
                 orderBy: { createdAt: "asc" },
-                include: { user: { select: { id: true, name: true, email: true, username: true } } }
+                include: {
+                    user: { select: { id: true, name: true, email: true, username: true } },
+                    team: { select: { id: true, name: true } },
+                    org: { select: { id: true, name: true } }
+                }
             }
         }
     });
     if (!project) throw new Error("Project not found");
-    const contacts = await contactLines(viewer, [
-        project.owner,
-        ...project.members.map((member) => member.user)
-    ]);
+    const people = project.members.map((member) => member.user).filter((user) => user !== null);
+    const contacts = await contactLines(viewer, [project.owner, ...people]);
+    const now = Date.now();
     return [
         {
             id: `owner:${project.ownerId}`,
-            userId: project.ownerId,
+            principal: "user",
+            principalId: project.ownerId,
             name: project.owner.name,
             contact: contacts.get(project.ownerId) ?? "",
             role: "admin",
+            capabilities: [...ALL_PROJECT_CAPABILITIES],
+            environmentIds: null,
+            expiresAt: null,
+            expired: false,
             createdAt: project.createdAt.toISOString(),
             isOwner: true
         },
         ...project.members.map((member) => ({
             id: member.id,
-            userId: member.userId,
-            name: member.user.name,
-            contact: contacts.get(member.userId) ?? "",
-            role: member.role as ProjectRole,
+            principal: principalOf(member),
+            principalId: member.userId ?? member.teamId ?? member.orgId,
+            name:
+                member.user?.name ??
+                (member.team ? `${member.team.name} (team)` : null) ??
+                (member.org ? `${member.org.name} (organization)` : null) ??
+                PROJECT_PRINCIPAL_LABELS.everyone,
+            contact: member.userId ? (contacts.get(member.userId) ?? "") : "",
+            role: (projectRoleFor(parseProjectCapabilities(member.capabilities)) ?? "custom") as
+                | ProjectRole
+                | "custom",
+            capabilities: parseProjectCapabilities(member.capabilities),
+            environmentIds: parseEnvironmentScope(member.environments),
+            expiresAt: member.expiresAt?.toISOString() ?? null,
+            expired: member.expiresAt !== null && member.expiresAt.getTime() <= now,
             createdAt: member.createdAt.toISOString(),
             isOwner: false
         }))
     ];
 }
 
-/**
- * Add somebody by email or username. Adding a person who is already on the
- * project changes their role instead of failing - which is what an operator
- * typing a name they have already added almost always meant.
- */
-export async function addProjectMember(input: {
-    projectId: string;
-    identifier: string;
-    role: ProjectRole;
-    invitedBy: string;
-}): Promise<void> {
-    const identifier = input.identifier.trim();
-    const user = await prisma.user.findFirst({
-        where: {
-            OR: [
-                { email: { equals: identifier.toLowerCase() } },
-                { username: { equals: identifier } },
-                { emails: { some: { email: identifier.toLowerCase() } } }
-            ]
-        },
-        select: { id: true }
-    });
-    if (!user) throw new Error("No account here matches that email or username");
+/** Where an entry's `where` clause points, per principal. Only one of the three
+ *  columns is ever set, which is what makes the unique index per principal work. */
+async function resolvePrincipal(
+    projectId: string,
+    input: ProjectAccessInput
+): Promise<{ userId: string | null; teamId: string | null; orgId: string | null }> {
+    if (input.principal === "everyone") return { userId: null, teamId: null, orgId: null };
+    if (input.principal === "team") {
+        if (!input.principalId) throw new Error("Pick a team");
+        const team = await prisma.team.findUnique({ where: { id: input.principalId }, select: { id: true } });
+        if (!team) throw new Error("That team no longer exists");
+        return { userId: null, teamId: team.id, orgId: null };
+    }
+    if (input.principal === "org") {
+        if (!input.principalId) throw new Error("Pick an organization");
+        const org = await prisma.organization.findUnique({
+            where: { id: input.principalId },
+            select: { id: true }
+        });
+        if (!org) throw new Error("That organization no longer exists");
+        return { userId: null, teamId: null, orgId: org.id };
+    }
 
-    const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: { ownerId: true }
-    });
+    // A person, by id when a picker supplied one and by what was typed otherwise -
+    // an email or a username, because that is what whoever is adding them has in
+    // front of them.
+    const identifier = input.identifier?.trim() ?? "";
+    const user = input.principalId
+        ? await prisma.user.findUnique({ where: { id: input.principalId }, select: { id: true } })
+        : await prisma.user.findFirst({
+              where: {
+                  OR: [
+                      { email: { equals: identifier.toLowerCase() } },
+                      { username: { equals: identifier } },
+                      { emails: { some: { email: identifier.toLowerCase() } } }
+                  ]
+              },
+              select: { id: true }
+          });
+    if (!user) throw new Error("No account here matches that email or username");
+    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { ownerId: true } });
     if (!project) throw new Error("Project not found");
     if (project.ownerId === user.id) throw new Error("That account already owns this project");
-
-    await prisma.projectMember.upsert({
-        where: { projectId_userId: { projectId: input.projectId, userId: user.id } },
-        create: {
-            projectId: input.projectId,
-            userId: user.id,
-            role: input.role,
-            invitedBy: input.invitedBy
-        },
-        update: { role: input.role }
-    });
+    return { userId: user.id, teamId: null, orgId: null };
 }
 
-export async function setProjectMemberRole(
-    projectId: string,
-    memberId: string,
-    role: ProjectRole
-): Promise<void> {
-    await prisma.projectMember.updateMany({ where: { id: memberId, projectId }, data: { role } });
+/**
+ * Write one access entry, replacing whatever that principal already held.
+ *
+ * Replaced rather than stacked, the way every other grant in Polaris treats a
+ * repeated one: two rows for the same person would be two answers to a question
+ * that has one, and the narrower of them would look like it was in force.
+ *
+ * The capabilities are stored expanded and in full rather than as a role name, so
+ * an entry keeps meaning what it meant on the day it was written even if the role
+ * it was picked from changes later.
+ */
+export async function setProjectAccess(input: ProjectAccessInput & { invitedBy: string }): Promise<void> {
+    const principal = await resolvePrincipal(input.projectId, input);
+    const capabilities = resolveProjectCapabilities(input);
+    if (capabilities.length === 0) throw new Error("Choose at least one thing they may do");
+
+    // Only environments of this project, so a typed id cannot name one somewhere
+    // else and quietly widen nothing while looking like it narrowed something.
+    const environmentIds =
+        input.environmentIds.length > 0
+            ? (
+                  await prisma.environment.findMany({
+                      where: { projectId: input.projectId, id: { in: input.environmentIds } },
+                      select: { id: true }
+                  })
+              ).map((environment) => environment.id)
+            : [];
+    if (input.environmentIds.length > 0 && environmentIds.length === 0) {
+        throw new Error("Pick at least one environment in this project");
+    }
+
+    const data = {
+        capabilities: JSON.stringify(capabilities),
+        environments: environmentIds.length > 0 ? JSON.stringify(environmentIds) : null,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        role: projectRoleFor(capabilities) ?? "custom"
+    };
+
+    // The everyone entry has no id to key on - all three principal columns are
+    // null, and nulls do not collide in a unique index - so it is found first.
+    const existing = await prisma.projectMember.findFirst({
+        where: { projectId: input.projectId, ...principal },
+        select: { id: true }
+    });
+    if (existing) {
+        await prisma.projectMember.update({ where: { id: existing.id }, data });
+        return;
+    }
+    await prisma.projectMember.create({
+        data: { projectId: input.projectId, ...principal, ...data, invitedBy: input.invitedBy }
+    });
 }
 
 export async function removeProjectMember(projectId: string, memberId: string): Promise<void> {
     await prisma.projectMember.deleteMany({ where: { id: memberId, projectId } });
+}
+
+/** The teams and organizations an account can hand a project to: the ones it is
+ *  actually on, so the picker never offers a roster the person cannot see. */
+export interface ProjectAccessCandidates {
+    orgs: { id: string; name: string }[];
+    teams: { id: string; name: string; orgName: string }[];
+}
+
+export async function listProjectAccessCandidates(userId: string): Promise<ProjectAccessCandidates> {
+    const orgs = await prisma.organization.findMany({
+        where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, teams: { orderBy: { name: "asc" }, select: { id: true, name: true } } }
+    });
+    return {
+        orgs: orgs.map((org) => ({ id: org.id, name: org.name })),
+        teams: orgs.flatMap((org) => org.teams.map((team) => ({ ...team, orgName: org.name })))
+    };
 }
 
 // ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ export async function GET(
     if (!owner) return Response.json({ error: "Not found" }, { status: 404 });
     if (owner.applicationId) {
         try {
-            await requireApplicationAccess(owner.applicationId, user.id, "viewer");
+            await requireApplicationAccess(owner.applicationId, user.id, "project.read");
         } catch {
             return Response.json({ error: "Not found" }, { status: 404 });
         }

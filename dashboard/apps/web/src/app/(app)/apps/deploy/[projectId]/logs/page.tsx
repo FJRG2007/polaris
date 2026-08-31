@@ -23,7 +23,7 @@ export default async function ProjectLogsPage({
     const user = await requirePermission("deploy.read");
 
     try {
-        await requireProjectAccess(projectId, user.id, "viewer");
+        await requireProjectAccess(projectId, user.id, "logs.read");
     } catch {
         notFound();
     }

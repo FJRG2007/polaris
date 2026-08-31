@@ -26,22 +26,21 @@ import {
     type VolumeDetail
 } from "@/lib/deploy-volume-service";
 import {
-    accessAtLeast,
+    accessCan,
     requireApplicationAccess,
     requireEnvironmentAccess,
     requireProjectAccess
 } from "@/lib/deploy-project-access";
 import {
     environmentNameSchema,
+    projectAccessInputSchema,
     projectFlagsSchema,
     projectGeneralSchema,
-    projectMemberSchema,
     projectTokenInputSchema,
     projectVisibilitySchema,
     projectWebhookInputSchema,
-    PROJECT_ROLES,
+    type ProjectAccessInput,
     type ProjectFlags,
-    type ProjectRole,
     type ProjectTokenInput,
     type ProjectVisibility,
     type ProjectWebhookInput
@@ -87,10 +86,10 @@ export async function projectSettingsAction(
 ): Promise<Result<{ settings: projectService.ProjectSettingsView; canManage: boolean }>> {
     return attempt("Could not load the project settings", async () => {
         const user = await requirePermission("deploy.read");
-        const access = await requireProjectAccess(projectId, user.id, "viewer");
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
         return {
             settings: await projectService.getProjectSettings(projectId),
-            canManage: accessAtLeast(access, "admin")
+            canManage: accessCan(access, "project.settings")
         };
     });
 }
@@ -104,7 +103,7 @@ export async function updateProjectGeneralAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = projectGeneralSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        const access = await requireProjectAccess(parsed.data.projectId, user.id, "admin");
+        const access = await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.updateProjectGeneral({
             projectId: parsed.data.projectId,
             ownerId: access.ownerId,
@@ -130,7 +129,7 @@ export async function setProjectVisibilityAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = projectVisibilitySchema.safeParse(input);
         if (!parsed.success) return { error: "Pick one of the offered visibilities" };
-        await requireProjectAccess(parsed.data.projectId, user.id, "admin");
+        await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.setProjectVisibility(parsed.data.projectId, parsed.data.visibility);
         await recordAudit({
             actorId: user.id,
@@ -152,7 +151,7 @@ export async function setProjectFlagsAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = projectFlagsSchema.safeParse(input.flags);
         if (!parsed.success) return { error: "Those settings could not be read" };
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.setProjectFlags(input.projectId, parsed.data as ProjectFlags);
         refresh(input.projectId);
         return {};
@@ -171,7 +170,7 @@ export async function renameEnvironmentAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentNameSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name" };
-        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "admin");
+        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "project.settings");
         await deployService.renameEnvironment(
             parsed.data.environmentId,
             access.ownerId,
@@ -185,7 +184,7 @@ export async function renameEnvironmentAction(input: {
 export async function setDefaultEnvironmentAction(environmentId: string): Promise<Result> {
     return attempt("Could not set the default environment", async () => {
         const user = await requirePermission("deploy.manage");
-        const access = await requireEnvironmentAccess(environmentId, user.id, "admin");
+        const access = await requireEnvironmentAccess(environmentId, user.id, "project.settings");
         await deployService.setDefaultEnvironment(environmentId, access.ownerId);
         refresh(access.projectId);
         return {};
@@ -201,56 +200,53 @@ export async function listProjectMembersAction(
 ): Promise<Result<{ members: projectService.ProjectMemberView[]; canManage: boolean }>> {
     return attempt("Could not load the members", async () => {
         const user = await requirePermission("deploy.read");
-        const access = await requireProjectAccess(projectId, user.id, "viewer");
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
         return {
             members: await projectService.listProjectMembers(projectId, {
                 id: user.id,
                 isAdmin: user.isAdmin
             }),
-            canManage: accessAtLeast(access, "admin")
+            canManage: accessCan(access, "members.manage")
         };
     });
 }
 
-export async function addProjectMemberAction(input: {
-    projectId: string;
-    identifier: string;
-    role: ProjectRole;
-}): Promise<Result> {
-    return attempt("Could not add the member", async () => {
+/**
+ * Write one access entry - a person, a team, an organization, or everyone with
+ * an account - creating it or replacing what that principal already held.
+ *
+ * One action for adding and for editing, because they are the same write: a
+ * second entry for the same principal would be a second answer to a question
+ * that has one.
+ */
+export async function setProjectAccessAction(input: ProjectAccessInput): Promise<Result> {
+    return attempt("Could not save the access", async () => {
         const user = await requirePermission("deploy.manage");
-        const parsed = projectMemberSchema.safeParse(input);
+        const parsed = projectAccessInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        await requireProjectAccess(parsed.data.projectId, user.id, "admin");
-        await projectService.addProjectMember({
-            projectId: parsed.data.projectId,
-            identifier: parsed.data.identifier,
-            role: parsed.data.role,
-            invitedBy: user.id
-        });
+        await requireProjectAccess(parsed.data.projectId, user.id, "members.manage");
+        await projectService.setProjectAccess({ ...parsed.data, invitedBy: user.id });
         await recordAudit({
             actorId: user.id,
             action: "deploy.project.member.add",
             targetType: "project",
-            targetId: parsed.data.projectId
+            targetId: parsed.data.projectId,
+            metadata: { principal: parsed.data.principal }
         });
         refresh(parsed.data.projectId);
         return {};
     });
 }
 
-export async function setProjectMemberRoleAction(input: {
-    projectId: string;
-    memberId: string;
-    role: ProjectRole;
-}): Promise<Result> {
-    return attempt("Could not change the role", async () => {
-        const user = await requirePermission("deploy.manage");
-        if (!PROJECT_ROLES.includes(input.role)) return { error: "Pick one of the offered roles" };
-        await requireProjectAccess(input.projectId, user.id, "admin");
-        await projectService.setProjectMemberRole(input.projectId, input.memberId, input.role);
-        refresh(input.projectId);
-        return {};
+/** The teams and organizations the person managing access is actually on, so the
+ *  picker never offers a roster they cannot see. */
+export async function projectAccessCandidatesAction(
+    projectId: string
+): Promise<Result<{ candidates: projectService.ProjectAccessCandidates }>> {
+    return attempt("Could not load the teams", async () => {
+        const user = await requirePermission("deploy.read");
+        await requireProjectAccess(projectId, user.id, "members.manage");
+        return { candidates: await projectService.listProjectAccessCandidates(user.id) };
     });
 }
 
@@ -260,7 +256,7 @@ export async function removeProjectMemberAction(input: {
 }): Promise<Result> {
     return attempt("Could not remove the member", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "members.manage");
         await projectService.removeProjectMember(input.projectId, input.memberId);
         await recordAudit({
             actorId: user.id,
@@ -282,7 +278,7 @@ export async function listProjectTokensAction(
 ): Promise<Result<{ tokens: projectService.ProjectTokenView[] }>> {
     return attempt("Could not load the tokens", async () => {
         const user = await requirePermission("deploy.read");
-        await requireProjectAccess(projectId, user.id, "admin");
+        await requireProjectAccess(projectId, user.id, "project.settings");
         return { tokens: await projectService.listProjectTokens(projectId) };
     });
 }
@@ -294,7 +290,7 @@ export async function createProjectTokenAction(
         const user = await requirePermission("deploy.manage");
         const parsed = projectTokenInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        const access = await requireProjectAccess(parsed.data.projectId, user.id, "admin");
+        const access = await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         const created = await projectService.createProjectToken({
             ...parsed.data,
             ownerId: access.ownerId
@@ -316,7 +312,7 @@ export async function revokeProjectTokenAction(input: {
 }): Promise<Result> {
     return attempt("Could not revoke the token", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.revokeProjectToken(input.projectId, input.tokenId);
         await recordAudit({
             actorId: user.id,
@@ -334,7 +330,7 @@ export async function deleteProjectTokenAction(input: {
 }): Promise<Result> {
     return attempt("Could not delete the token", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.deleteProjectToken(input.projectId, input.tokenId);
         return {};
     });
@@ -349,10 +345,10 @@ export async function listProjectWebhooksAction(
 ): Promise<Result<{ webhooks: projectService.ProjectWebhookView[]; canManage: boolean }>> {
     return attempt("Could not load the webhooks", async () => {
         const user = await requirePermission("deploy.read");
-        const access = await requireProjectAccess(projectId, user.id, "viewer");
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
         return {
             webhooks: await projectService.listProjectWebhooks(projectId),
-            canManage: accessAtLeast(access, "admin")
+            canManage: accessCan(access, "project.settings")
         };
     });
 }
@@ -362,7 +358,7 @@ export async function createProjectWebhookAction(input: ProjectWebhookInput): Pr
         const user = await requirePermission("deploy.manage");
         const parsed = projectWebhookInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        await requireProjectAccess(parsed.data.projectId, user.id, "admin");
+        await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
         await projectService.createProjectWebhook(parsed.data);
         await recordAudit({
             actorId: user.id,
@@ -381,7 +377,7 @@ export async function setProjectWebhookEnabledAction(input: {
 }): Promise<Result> {
     return attempt("Could not update the webhook", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.setProjectWebhookEnabled(input.projectId, input.id, input.enabled);
         return {};
     });
@@ -393,7 +389,7 @@ export async function deleteProjectWebhookAction(input: {
 }): Promise<Result> {
     return attempt("Could not remove the webhook", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         await projectService.deleteProjectWebhook(input.projectId, input.id);
         return {};
     });
@@ -405,7 +401,7 @@ export async function testProjectWebhookAction(input: {
 }): Promise<Result> {
     return attempt("Could not reach the endpoint", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "admin");
+        await requireProjectAccess(input.projectId, user.id, "project.settings");
         return projectService.testProjectWebhook(input.projectId, input.id);
     });
 }
@@ -419,7 +415,7 @@ export async function projectUsageAction(
 ): Promise<Result<{ usage: projectService.ProjectUsage }>> {
     return attempt("Could not load the usage", async () => {
         const user = await requirePermission("deploy.read");
-        await requireProjectAccess(projectId, user.id, "viewer");
+        await requireProjectAccess(projectId, user.id, "project.read");
         return { usage: await projectService.getProjectUsage(projectId) };
     });
 }
@@ -429,7 +425,7 @@ export async function exportProjectTemplateAction(
 ): Promise<Result<{ template: string }>> {
     return attempt("Could not build the template", async () => {
         const user = await requirePermission("deploy.read");
-        await requireProjectAccess(projectId, user.id, "admin");
+        await requireProjectAccess(projectId, user.id, "project.settings");
         const template = await projectService.exportProjectTemplate(projectId);
         return { template: JSON.stringify(template, null, 4) };
     });
@@ -444,7 +440,7 @@ export async function listStagedChangesAction(
 ): Promise<Result<{ changes: staged.StagedChangeView[] }>> {
     return attempt("Could not load the pending changes", async () => {
         const user = await requirePermission("deploy.read");
-        await requireProjectAccess(projectId, user.id, "viewer");
+        await requireProjectAccess(projectId, user.id, "project.read");
         return { changes: await staged.listProjectStagedChanges(projectId) };
     });
 }
@@ -459,7 +455,7 @@ export async function stageServiceDeleteAction(input: {
 }): Promise<Result<{ staged: boolean }>> {
     return attempt("Could not remove the service", async () => {
         const user = await requirePermission("deploy.manage");
-        const access = await requireApplicationAccess(input.applicationId, user.id, "developer");
+        const access = await requireApplicationAccess(input.applicationId, user.id, "service.delete");
         const app = await deployService.getApplicationSummary(input.applicationId, access.ownerId);
         if (!app) return { error: "Service not found" };
 
@@ -495,7 +491,7 @@ export async function stageDatabaseDeleteAction(input: {
         const user = await requirePermission("deploy.manage");
         const database = await deployService.getDatabaseSummary(input.databaseId);
         if (!database) return { error: "Database not found" };
-        const access = await requireProjectAccess(database.projectId, user.id, "developer");
+        const access = await requireEnvironmentAccess(database.environmentId, user.id, "databases.manage");
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             const { deleteDatabase } = await import("@/lib/database-service");
@@ -531,7 +527,7 @@ export async function stageVolumeDeleteAction(input: {
         const user = await requirePermission("deploy.manage");
         const volume = await volumeFor(input.volumeId, user.id);
         if (!volume.applicationId) return { error: "This volume is not attached to a service" };
-        const access = await requireApplicationAccess(volume.applicationId, user.id, "developer");
+        const access = await requireApplicationAccess(volume.applicationId, user.id, "volumes.manage");
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deleteVolume(input.volumeId, access.ownerId, { wipe: input.wipe });
@@ -562,7 +558,7 @@ export async function discardStagedChangeAction(input: {
 }): Promise<Result> {
     return attempt("Could not discard the change", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "developer");
+        await requireProjectAccess(input.projectId, user.id, "deploy.run");
         const change = (await staged.listProjectStagedChanges(input.projectId)).find(
             (entry) => entry.id === input.id
         );
@@ -579,7 +575,7 @@ export async function discardAllStagedChangesAction(input: {
 }): Promise<Result> {
     return attempt("Could not discard the changes", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "developer");
+        await requireProjectAccess(input.projectId, user.id, "deploy.run");
         await staged.discardAllStagedChanges(input.environmentId);
         refresh(input.projectId);
         return {};
@@ -597,7 +593,7 @@ export async function applyStagedChangesAction(input: {
 }): Promise<Result<{ applied: number; failures: { targetName: string; error: string }[] }>> {
     return attempt("Could not deploy the changes", async () => {
         const user = await requirePermission("deploy.manage");
-        const access = await requireEnvironmentAccess(input.environmentId, user.id, "developer");
+        const access = await requireEnvironmentAccess(input.environmentId, user.id, "deploy.run");
         if (access.projectId !== input.projectId)
             return { error: "That environment is not in this project" };
         const result = await staged.applyStagedChanges(input.environmentId, access.ownerId);
@@ -623,7 +619,7 @@ async function volumeFor(volumeId: string, userId: string): Promise<VolumeDetail
     const summary = await deployService.getVolumeOwner(volumeId);
     if (!summary) throw new Error("Volume not found");
     if (summary.applicationId) {
-        await requireApplicationAccess(summary.applicationId, userId, "viewer");
+        await requireApplicationAccess(summary.applicationId, userId, "project.read");
     } else if (summary.ownerId !== userId) {
         throw new Error("Volume not found");
     }
@@ -644,9 +640,9 @@ export async function volumeDetailAction(
         const user = await requirePermission("deploy.read");
         const volume = await volumeFor(volumeId, user.id);
         const access = volume.applicationId
-            ? await requireApplicationAccess(volume.applicationId, user.id, "viewer")
+            ? await requireApplicationAccess(volume.applicationId, user.id, "project.read")
             : null;
-        return { volume, canManage: access ? accessAtLeast(access, "developer") : true };
+        return { volume, canManage: access ? accessCan(access, "volumes.manage") : true };
     });
 }
 
@@ -668,7 +664,7 @@ export async function wipeVolumeAction(volumeId: string): Promise<Result> {
         const user = await requirePermission("deploy.manage");
         const volume = await volumeFor(volumeId, user.id);
         if (!volume.applicationId) return { error: "This volume is not attached to a service" };
-        const access = await requireApplicationAccess(volume.applicationId, user.id, "admin");
+        const access = await requireApplicationAccess(volume.applicationId, user.id, "volumes.manage");
         await wipeVolume(volumeId, access.ownerId);
         await recordAudit({
             actorId: user.id,

@@ -20,19 +20,18 @@ import { mkdir, readFile } from "node:fs/promises";
 import { ensureLocalCa } from "./local-ca-service";
 import { getLatestCommit } from "./github-service";
 import type { DomainOwner } from "./owner-domains";
+import { parseGithubRepo } from "./repo-reference";
 import { wipeVolume } from "./deploy-volume-service";
 import { resolveAutoDomain } from "./network-service";
 import { resolveMountTarget } from "./storage-service";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
+import { projectEntryWhere } from "./deploy-project-access";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { deployLogDir, deployLogPath } from "./deploy/log-file";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
-import { parseGithubRepo } from "./repo-reference";
-import { announceDeployFinished, announceDeployQueued, announceDeployStarted } from "./deploy/github-deployment";
-import { githubCloneIdentity, githubCloneProblem, githubRepoReach, githubTokenForOwner } from "./github-access";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
@@ -40,6 +39,8 @@ import { deployHostname, deployZoneHosts, type ZoneMintFailure } from "./domain-
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
+import { githubCloneIdentity, githubCloneProblem, githubRepoReach, githubTokenForOwner } from "./github-access";
+import { announceDeployFinished, announceDeployQueued, announceDeployStarted } from "./deploy/github-deployment";
 import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
 import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
 
@@ -89,14 +90,15 @@ export async function readDeployment(
  * company's services to strangers on a shared instance.
  */
 async function visibleProjectWhere(userId: string) {
-    const [belongsTo, runs] = await Promise.all([
+    const [belongsTo, runs, entries] = await Promise.all([
         memberOrgIds(userId),
-        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage")
+        orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage"),
+        projectEntryWhere(userId)
     ]);
     return {
         OR: [
             { ownerId: userId },
-            { members: { some: { userId } } },
+            { members: entries },
             { visibility: "internal", orgId: null },
             ...(belongsTo.length > 0 ? [{ visibility: "internal", orgId: { in: belongsTo } }] : []),
             ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])
@@ -1908,22 +1910,38 @@ export async function serviceHistory(applicationId: string, ownerId: string): Pr
  * with `deploy.manage` could post onto somebody else's service by guessing an
  * id, which is exactly the hole a generic table opens if it is left to the
  * caller to remember.
+ *
+ * `ownerId` is the project's, which is what the service belongs to; `actorId` is
+ * whoever is writing. They are the same person on a project with one person on
+ * it, and a note by a collaborator has to carry their name rather than the
+ * owner's.
  */
 export async function serviceComments(applicationId: string, ownerId: string): Promise<comments.CommentView[]> {
     await requireOwnedApplication(applicationId, ownerId);
     return comments.thread("app", applicationId);
 }
 
-export async function postServiceComment(applicationId: string, ownerId: string, body: string): Promise<void> {
+export async function postServiceComment(
+    applicationId: string,
+    ownerId: string,
+    actorId: string,
+    body: string
+): Promise<void> {
     await requireOwnedApplication(applicationId, ownerId);
-    await comments.post(ownerId, { subjectType: "app", subjectId: applicationId, body });
+    await comments.post(actorId, { subjectType: "app", subjectId: applicationId, body });
 }
 
-export async function deleteServiceComment(applicationId: string, ownerId: string, commentId: string): Promise<void> {
+export async function deleteServiceComment(
+    applicationId: string,
+    ownerId: string,
+    actorId: string,
+    commentId: string
+): Promise<void> {
     await requireOwnedApplication(applicationId, ownerId);
-    // Only the service's owner gets past the check above, and the owner
-    // moderates their own service's notes - including the ones a rule left.
-    await comments.remove(ownerId, commentId, true);
+    // Whoever got past the check above reaches this service's notes, and the
+    // people who reach a service moderate its notes - including the ones a rule
+    // left.
+    await comments.remove(actorId, commentId, true);
 }
 
 /**
@@ -1931,19 +1949,25 @@ export async function deleteServiceComment(applicationId: string, ownerId: strin
  *
  * The owner is told about a deploy either way; following is for the second
  * person - the one who spent the afternoon on it, or who wants to know when it
- * comes back up.
+ * comes back up. So the service is checked against its owner and the row is
+ * written for the reader.
  */
-export async function isFollowingService(applicationId: string, userId: string): Promise<boolean> {
-    await requireOwnedApplication(applicationId, userId);
+export async function isFollowingService(
+    applicationId: string,
+    ownerId: string,
+    userId: string
+): Promise<boolean> {
+    await requireOwnedApplication(applicationId, ownerId);
     return follow.isFollowing("app", applicationId, userId);
 }
 
 export async function setFollowingService(
     applicationId: string,
+    ownerId: string,
     userId: string,
     following: boolean
 ): Promise<void> {
-    await requireOwnedApplication(applicationId, userId);
+    await requireOwnedApplication(applicationId, ownerId);
     if (following) await follow.follow("app", applicationId, userId);
     else await follow.unfollow("app", applicationId, userId);
 }

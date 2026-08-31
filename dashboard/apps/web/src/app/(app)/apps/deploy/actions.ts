@@ -9,28 +9,28 @@
 import { z } from "zod";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
 import { normalizeRoot } from "@polaris/deploy";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as activity from "@/lib/activity/activity";
-import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
-import { resolveScope, scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { setDomainCertificate } from "@/lib/domain-cert-service";
 import { listConnections, getDriver } from "@/lib/storage-service";
+import { resolveScope, scopeOrgIdFor } from "@/lib/workspace-scope";
 import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
-import { getDomainZones, isBaseZoneKey, listDeployZones, type DeployZoneOption } from "@/lib/domain-zones";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { inspectGithubRepo, type GithubRepo, type RepoInspection } from "@/lib/github-service";
+import { getDomainZones, isBaseZoneKey, listDeployZones, type DeployZoneOption } from "@/lib/domain-zones";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
 import {
     getCloudflareAccountStatus,
@@ -64,6 +64,7 @@ import {
 } from "@/lib/database-service";
 import {
     deleteEnvVar,
+    envVarScope,
     listEnvVars,
     parseDotEnv,
     revealEnvVar,
@@ -80,6 +81,15 @@ import {
     stopNamedTunnel,
     type NamedTunnelStatus
 } from "@/lib/deploy/named-tunnel-service";
+import {
+    requireApplicationAccess,
+    requireDatabaseAccess,
+    requireDeploymentAccess,
+    requireDomainAccess,
+    requireEnvironmentAccess,
+    requireEnvScopeAccess,
+    requireProjectAccess
+} from "@/lib/deploy-project-access";
 import {
     canHostMount,
     subjectCommentSchema,
@@ -169,7 +179,8 @@ export async function createEnvironmentAction(input: { projectId: string; name: 
     const name = input.name?.trim();
     if (!name) return { error: "An environment name is required" };
     try {
-        const environment = await deployService.createEnvironment(input.projectId, user.id, name);
+        const access = await requireProjectAccess(input.projectId, user.id, "project.settings");
+        const environment = await deployService.createEnvironment(input.projectId, access.ownerId, name);
         await recordAudit({ actorId: user.id, action: "deploy.env.create", targetType: "environment", targetId: environment.id });
         revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
         return { id: environment.id };
@@ -181,7 +192,8 @@ export async function createEnvironmentAction(input: { projectId: string; name: 
 export async function saveLayoutAction(input: { environmentId: string; layout: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.saveEnvironmentLayout(input.environmentId, user.id, input.layout);
+        const access = await requireEnvironmentAccess(input.environmentId, user.id, "service.configure");
+        await deployService.saveEnvironmentLayout(input.environmentId, access.ownerId, input.layout);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not save the layout" };
@@ -191,7 +203,8 @@ export async function saveLayoutAction(input: { environmentId: string; layout: s
 export async function deleteEnvironmentAction(input: { environmentId: string; projectId: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.deleteEnvironment(input.environmentId, user.id);
+        const access = await requireEnvironmentAccess(input.environmentId, user.id, "project.settings");
+        await deployService.deleteEnvironment(input.environmentId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.env.delete", targetType: "environment", targetId: input.environmentId });
         revalidatePath(`${DEPLOY_PATH}/${input.projectId}`);
         return {};
@@ -205,9 +218,20 @@ export async function deleteEnvironmentAction(input: { environmentId: string; pr
  * connected SSH hosts. The local option is always present and first, so a
  * single-server setup has an obvious default.
  */
-export async function listDeployServersAction(): Promise<{ id: string; name: string; kind: "local" | "host" }[]> {
+export async function listDeployServersAction(
+    environmentId?: string
+): Promise<{ id: string; name: string; kind: "local" | "host" }[]> {
     const user = await requirePermission("deploy.manage");
-    const hosts = await listHosts(user.id);
+    // The servers a service could run on belong to whoever owns the project, not
+    // to whoever is looking at it: a collaborator's own machines are not this
+    // project's to deploy to, and a target created under them would leave the
+    // project's services on a box its owner cannot reach.
+    // Reading the list is only reading: adding a service and moving one are
+    // separate grants, and both are checked where they happen.
+    const owner = environmentId
+        ? (await requireEnvironmentAccess(environmentId, user.id, "project.read")).ownerId
+        : user.id;
+    const hosts = await listHosts(owner);
     return [
         { id: "local", name: "Local (this server)", kind: "local" },
         ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
@@ -261,22 +285,24 @@ export async function createApplicationAction(input: {
         sourceConfig = { imageRef, ...(port !== undefined ? { port } : {}) };
     }
     try {
+        const access = await requireEnvironmentAccess(input.environmentId, user.id, "service.create");
+        const owner = access.ownerId;
         // Resolve the chosen server: the local host by default, or a connected SSH
         // host adopted as a deploy target on first use.
         let target;
         if (input.serverId && input.serverId !== "local") {
-            const host = (await listHosts(user.id)).find((item) => item.id === input.serverId);
+            const host = (await listHosts(owner)).find((item) => item.id === input.serverId);
             if (!host) return { error: "The selected server was not found" };
-            target = await getOrCreateHostTarget(host.id, user.id, host.name);
+            target = await getOrCreateHostTarget(host.id, owner, host.name);
         } else {
-            target = await getOrCreateLocalTarget(user.id);
+            target = await getOrCreateLocalTarget(owner);
         }
         // Git sources track their branch and auto-deploy on new commits by default,
         // Vercel-style (a poller picks them up even without a public webhook) -
         // unless the project has turned that default off in its flags.
         const flags = await getFlagsForEnvironment(input.environmentId);
         const branch = input.branch?.trim() || undefined;
-        const app = await deployService.createApplication(user.id, {
+        const app = await deployService.createApplication(owner, {
             environmentId: input.environmentId,
             targetId: target.id,
             name,
@@ -295,14 +321,14 @@ export async function createApplicationAction(input: {
         const targetPort = Number.isInteger(input.port) ? Number(input.port) : isGit ? 3000 : 80;
         if (flags.autoSubdomain) {
             try {
-                await deployService.addApplicationDomain(app.id, user.id, { targetPort });
+                await deployService.addApplicationDomain(app.id, owner, { targetPort });
             } catch {
                 // No public IP / free-subdomain base configured; the user can add a domain.
             }
         }
         let deploymentId: string | undefined;
         try {
-            deploymentId = await deployService.deployApplication(app.id, user.id, user.id);
+            deploymentId = await deployService.deployApplication(app.id, owner, user.id);
             await recordAudit({ actorId: user.id, action: "deploy.app.deploy", targetType: "application", targetId: app.id });
         } catch {
             // Surfaced on the app's next manual deploy; creation still succeeds.
@@ -324,7 +350,8 @@ export async function setAutoDeployAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.updateAutoDeploy(input.applicationId, user.id, {
+        const access = await requireApplicationAccess(input.applicationId, user.id, "service.configure");
+        await deployService.updateAutoDeploy(input.applicationId, access.ownerId, {
             autoDeploy: input.autoDeploy,
             deployBranch: input.deployBranch,
             commitFilter: input.commitFilter,
@@ -340,8 +367,9 @@ export async function setAutoDeployAction(input: {
 
 /** Env vars for a scope (application service or shared environment); secrets masked. */
 export async function listEnvVarsAction(scope: EnvScope, scopeId: string): Promise<EnvVarView[]> {
-    const user = await requirePermission("deploy.manage");
-    return listEnvVars(scope, scopeId, user.id);
+    const user = await requirePermission("deploy.read");
+    const access = await requireEnvScopeAccess(scope, scopeId, user.id, "variables.read");
+    return listEnvVars(scope, scopeId, access.ownerId);
 }
 
 export async function saveEnvVarAction(input: {
@@ -353,7 +381,12 @@ export async function saveEnvVarAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setEnvVar(input.scope, input.scopeId, user.id, { key: input.key, value: input.value, isSecret: input.isSecret });
+        const access = await requireEnvScopeAccess(input.scope, input.scopeId, user.id, "variables.write");
+        await setEnvVar(input.scope, input.scopeId, access.ownerId, {
+            key: input.key,
+            value: input.value,
+            isSecret: input.isSecret
+        });
         if (input.scope === "application") {
             await activity.record({
                 subjectType: "app",
@@ -363,7 +396,7 @@ export async function saveEnvVarAction(input: {
                 toValue: input.key
             });
         }
-        void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope(input.scope, input.scopeId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -380,9 +413,10 @@ export async function importEnvVarsAction(input: {
 }): Promise<{ error?: string; count?: number }> {
     const user = await requirePermission("deploy.manage");
     try {
+        const access = await requireEnvScopeAccess(input.scope, input.scopeId, user.id, "variables.write");
         const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.isSecret }));
         if (parsed.length === 0) return { error: "No KEY=value lines found" };
-        const count = await setEnvVars(input.scope, input.scopeId, user.id, parsed);
+        const count = await setEnvVars(input.scope, input.scopeId, access.ownerId, parsed);
         if (input.scope === "application") {
             await activity.record({
                 subjectType: "app",
@@ -392,7 +426,7 @@ export async function importEnvVarsAction(input: {
                 toValue: String(count)
             });
         }
-        void deployService.redeployForEnvScope(input.scope, input.scopeId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope(input.scope, input.scopeId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { count };
     } catch (caught) {
@@ -401,9 +435,12 @@ export async function importEnvVarsAction(input: {
 }
 
 export async function revealEnvVarAction(id: string): Promise<{ value?: string | null; error?: string }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.read");
     try {
-        return { value: await revealEnvVar(id, user.id) };
+        const scope = await envVarScope(id);
+        if (!scope) return { error: "That variable no longer exists" };
+        const access = await requireEnvScopeAccess(scope.scope, scope.scopeId, user.id, "variables.read");
+        return { value: await revealEnvVar(id, access.ownerId) };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not reveal the variable" };
     }
@@ -411,31 +448,44 @@ export async function revealEnvVarAction(id: string): Promise<{ value?: string |
 
 export async function deleteEnvVarAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
-    const scope = await deleteEnvVar(id, user.id);
-    if (scope) void deployService.redeployForEnvScope(scope.scope, scope.scopeId, user.id).catch(() => undefined);
-    if (scope?.scope === "application") {
-        await activity.record({
-            subjectType: "app",
-            subjectId: scope.scopeId,
-            userId: user.id,
-            action: "variable-removed"
-        });
+    try {
+        const located = await envVarScope(id);
+        if (!located) return { error: "That variable no longer exists" };
+        const access = await requireEnvScopeAccess(located.scope, located.scopeId, user.id, "variables.write");
+        const scope = await deleteEnvVar(id, access.ownerId);
+        if (scope) {
+            void deployService
+                .redeployForEnvScope(scope.scope, scope.scopeId, access.ownerId)
+                .catch(() => undefined);
+        }
+        if (scope?.scope === "application") {
+            await activity.record({
+                subjectType: "app",
+                subjectId: scope.scopeId,
+                userId: user.id,
+                action: "variable-removed"
+            });
+        }
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not remove the variable" };
     }
-    revalidatePath(DEPLOY_PATH);
-    return {};
 }
 
 /** An application's deployment history. */
 export async function listDeploymentsAction(applicationId: string): Promise<deployService.DeploymentSummary[]> {
-    const user = await requirePermission("deploy.manage");
-    return deployService.listDeployments(applicationId, user.id);
+    const user = await requirePermission("deploy.read");
+    const access = await requireApplicationAccess(applicationId, user.id, "logs.read");
+    return deployService.listDeployments(applicationId, access.ownerId);
 }
 
 /** What has happened to this service, releases aside. */
 export async function serviceHistoryAction(applicationId: string): Promise<activity.ActivityLine[]> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.read");
     try {
-        return await deployService.serviceHistory(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return await deployService.serviceHistory(applicationId, access.ownerId);
     } catch {
         return [];
     }
@@ -443,9 +493,10 @@ export async function serviceHistoryAction(applicationId: string): Promise<activ
 
 /** Whether the reader hears about this service, and changing that. */
 export async function serviceFollowStateAction(applicationId: string): Promise<{ following: boolean }> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.read");
     try {
-        return { following: await deployService.isFollowingService(applicationId, user.id) };
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return { following: await deployService.isFollowingService(applicationId, access.ownerId, user.id) };
     } catch {
         return { following: false };
     }
@@ -457,7 +508,8 @@ export async function setServiceFollowAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setFollowingService(input.applicationId, user.id, input.following);
+        const access = await requireApplicationAccess(input.applicationId, user.id, "project.read");
+        await deployService.setFollowingService(input.applicationId, access.ownerId, user.id, input.following);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not change that" };
@@ -466,9 +518,10 @@ export async function setServiceFollowAction(input: {
 
 /** The notes people have left on this service. */
 export async function serviceCommentsAction(applicationId: string): Promise<comments.CommentView[]> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.read");
     try {
-        return await deployService.serviceComments(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return await deployService.serviceComments(applicationId, access.ownerId);
     } catch {
         return [];
     }
@@ -482,7 +535,8 @@ export async function postServiceCommentAction(input: {
     const parsed = subjectCommentSchema.safeParse({ subjectId: input.applicationId, body: input.body });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That note cannot be posted" };
     try {
-        await deployService.postServiceComment(parsed.data.subjectId, user.id, parsed.data.body);
+        const access = await requireApplicationAccess(parsed.data.subjectId, user.id, "project.read");
+        await deployService.postServiceComment(parsed.data.subjectId, access.ownerId, user.id, parsed.data.body);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not post the note" };
@@ -495,7 +549,8 @@ export async function deleteServiceCommentAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.deleteServiceComment(input.applicationId, user.id, input.commentId);
+        const access = await requireApplicationAccess(input.applicationId, user.id, "project.read");
+        await deployService.deleteServiceComment(input.applicationId, access.ownerId, user.id, input.commentId);
         return {};
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not delete the note" };
@@ -507,14 +562,15 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
     try {
         // Backfill a free subdomain for apps that never got one (e.g. created before
         // a public IP was known), so redeploying is enough to make it reachable.
+        const access = await requireApplicationAccess(applicationId, user.id, "deploy.run");
         const requestHeaders = await headers();
         await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
         try {
-            await deployService.ensureApplicationDomain(applicationId, user.id);
+            await deployService.ensureApplicationDomain(applicationId, access.ownerId);
         } catch {
             // No public IP / free-subdomain base; the app can still deploy without one.
         }
-        const deploymentId = await deployService.deployApplication(applicationId, user.id, user.id);
+        const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, user.id);
         await recordServiceEvent(user.id, applicationId, "deploy.app.deploy", "deployed");
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
@@ -528,7 +584,8 @@ export async function deployApplicationAction(applicationId: string): Promise<{ 
 export async function cancelDeploymentAction(deploymentId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.cancelDeployment(deploymentId, user.id);
+        const access = await requireDeploymentAccess(deploymentId, user.id, "deploy.run");
+        await deployService.cancelDeployment(deploymentId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.app.cancel", targetType: "deployment", targetId: deploymentId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -540,7 +597,8 @@ export async function cancelDeploymentAction(deploymentId: string): Promise<{ er
 export async function setAppPortAction(applicationId: string, port: number): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setApplicationPort(applicationId, user.id, port);
+        const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
+        await deployService.setApplicationPort(applicationId, access.ownerId, port);
         await activity.record({
             subjectType: "app",
             subjectId: applicationId,
@@ -565,7 +623,8 @@ export async function setAppSourcePathsAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setApplicationSourcePaths(input.applicationId, user.id, {
+        const access = await requireApplicationAccess(input.applicationId, user.id, "service.configure");
+        await deployService.setApplicationSourcePaths(input.applicationId, access.ownerId, {
             rootDirectory: input.rootDirectory,
             dockerfilePath: input.dockerfilePath,
             installCommand: input.installCommand,
@@ -582,7 +641,8 @@ export async function setAppSourcePathsAction(input: {
 export async function setAppServerAction(applicationId: string, serverId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setApplicationServer(applicationId, user.id, serverId);
+        const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
+        await deployService.setApplicationServer(applicationId, access.ownerId, serverId);
         await recordAudit({ actorId: user.id, action: "deploy.app.move", targetType: "application", targetId: applicationId, metadata: { serverId } });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -594,7 +654,8 @@ export async function setAppServerAction(applicationId: string, serverId: string
 export async function restartApplicationAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.restartApplication(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "deploy.run");
+        await deployService.restartApplication(applicationId, access.ownerId);
         await recordServiceEvent(user.id, applicationId, "deploy.app.restart", "restarted");
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -606,7 +667,8 @@ export async function restartApplicationAction(applicationId: string): Promise<{
 export async function setApplicationRunningAction(applicationId: string, running: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setApplicationRunning(applicationId, user.id, running);
+        const access = await requireApplicationAccess(applicationId, user.id, "deploy.run");
+        await deployService.setApplicationRunning(applicationId, access.ownerId, running);
         await recordServiceEvent(
             user.id,
             applicationId,
@@ -623,7 +685,8 @@ export async function setApplicationRunningAction(applicationId: string, running
 export async function removeApplicationDeploymentAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.removeApplicationDeployment(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "deploy.run");
+        await deployService.removeApplicationDeployment(applicationId, access.ownerId);
         await recordServiceEvent(user.id, applicationId, "deploy.app.remove", "torn down");
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -635,7 +698,8 @@ export async function removeApplicationDeploymentAction(applicationId: string): 
 export async function deleteApplicationAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.deleteApplication(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "service.delete");
+        await deployService.deleteApplication(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.app.delete", targetType: "application", targetId: applicationId });
         // The audit row stays - it is the record that somebody deleted this - but
         // the feed and the notes were about a service that no longer exists, so
@@ -654,7 +718,8 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
 export async function duplicateApplicationAction(applicationId: string): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const id = await deployService.duplicateApplication(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "service.create");
+        const id = await deployService.duplicateApplication(applicationId, access.ownerId);
         await recordServiceEvent(user.id, applicationId, "deploy.app.duplicate", "duplicated");
         revalidatePath(DEPLOY_PATH);
         return { id };
@@ -678,7 +743,8 @@ export async function addDomainAction(input: {
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
-        const hostname = await deployService.addApplicationDomain(input.applicationId, user.id, {
+        const access = await requireApplicationAccess(input.applicationId, user.id, "domains.manage");
+        const hostname = await deployService.addApplicationDomain(input.applicationId, access.ownerId, {
             hostname: input.hostname,
             targetPort: port,
             cert: input.cert,
@@ -719,7 +785,8 @@ export async function autoExposeAction(input: {
     const requestHeaders = await headers();
     await ensurePublicIp(requestHeaders.get("x-server-ip") ?? requestHeaders.get("host"));
     try {
-        const hostname = await deployService.addApplicationDomain(input.applicationId, user.id, { targetPort: port });
+        const access = await requireApplicationAccess(input.applicationId, user.id, "domains.manage");
+        const hostname = await deployService.addApplicationDomain(input.applicationId, access.ownerId, { targetPort: port });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         const status = await getNetworkStatus();
         if (status.autoSubdomainsPublic) {
@@ -729,7 +796,7 @@ export async function autoExposeAction(input: {
         // Behind NAT: the LAN name only resolves on the local network, so start a free
         // Cloudflare quick tunnel for public reachability.
         try {
-            const tunnel = await startQuickTunnel(input.applicationId, user.id);
+            const tunnel = await startQuickTunnel(input.applicationId, access.ownerId);
             revalidatePath(DEPLOY_PATH);
             return { hostname, lanOnly: true, tunnelUrl: tunnel.url };
         } catch (caught) {
@@ -797,7 +864,8 @@ export async function zoneSubdomainAction(input: {
     const parsed = zoneSubdomainSchema.safeParse(input);
     if (!parsed.success) return { subdomain: "", hostname: "", available: false, error: "Invalid request" };
     try {
-        const result = await deployService.checkZoneSubdomain(parsed.data.applicationId, user.id, {
+        const access = await requireApplicationAccess(parsed.data.applicationId, user.id, "domains.manage");
+        const result = await deployService.checkZoneSubdomain(parsed.data.applicationId, access.ownerId, {
             zoneLabel: parsed.data.zoneLabel,
             subdomain: parsed.data.subdomain
         });
@@ -823,7 +891,8 @@ export async function setDomainCertificateAction(
 ): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const result = await setDomainCertificate(domainId, user.id, input);
+        const access = await requireDomainAccess(domainId, user.id, "domains.manage");
+        const result = await setDomainCertificate(domainId, access.ownerId, input);
         if (result.error) return result;
         await recordAudit({
             actorId: user.id,
@@ -844,12 +913,14 @@ export async function domainHealthAction(
     applicationId: string
 ): Promise<{ id: string; healthStatus: string | null; healthCode: number | null; healthDetail: string | null }[]> {
     const user = await requirePermission("deploy.read");
-    return deployService.applicationDomainHealth(applicationId, user.id);
+    const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+    return deployService.applicationDomainHealth(applicationId, access.ownerId);
 }
 
 export async function removeDomainAction(domainId: string): Promise<void> {
     const user = await requirePermission("deploy.manage");
-    await deployService.removeApplicationDomain(domainId, user.id);
+    const access = await requireDomainAccess(domainId, user.id, "domains.manage");
+    await deployService.removeApplicationDomain(domainId, access.ownerId);
     revalidatePath(DEPLOY_PATH);
 }
 
@@ -857,7 +928,8 @@ export async function removeDomainAction(domainId: string): Promise<void> {
 export async function setDomainEnabledAction(domainId: string, enabled: boolean): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deployService.setApplicationDomainEnabled(domainId, user.id, enabled);
+        const access = await requireDomainAccess(domainId, user.id, "domains.manage");
+        await deployService.setApplicationDomainEnabled(domainId, access.ownerId, enabled);
         await recordAudit({ actorId: user.id, action: "deploy.domain.toggle", targetType: "domain", targetId: domainId });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -870,7 +942,8 @@ export async function setDomainEnabledAction(domainId: string, enabled: boolean)
 export async function quickTunnelStatusAction(applicationId: string): Promise<QuickTunnelStatus> {
     const user = await requirePermission("deploy.manage");
     try {
-        return await getQuickTunnelStatus(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return await getQuickTunnelStatus(applicationId, access.ownerId);
     } catch {
         return { running: false, url: null, reachable: false };
     }
@@ -880,7 +953,8 @@ export async function quickTunnelStatusAction(applicationId: string): Promise<Qu
 export async function startQuickTunnelAction(applicationId: string): Promise<{ error?: string; url?: string | null }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const status = await startQuickTunnel(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        const status = await startQuickTunnel(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
         return { url: status.url };
     } catch (caught) {
@@ -892,7 +966,8 @@ export async function startQuickTunnelAction(applicationId: string): Promise<{ e
 export async function stopQuickTunnelAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await stopQuickTunnel(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        await stopQuickTunnel(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {
@@ -903,7 +978,8 @@ export async function stopQuickTunnelAction(applicationId: string): Promise<{ er
 export async function ngrokTunnelStatusAction(applicationId: string): Promise<NgrokTunnelStatus> {
     const user = await requirePermission("deploy.manage");
     try {
-        return await getNgrokTunnelStatus(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return await getNgrokTunnelStatus(applicationId, access.ownerId);
     } catch {
         return { running: false, url: null, configured: false };
     }
@@ -913,7 +989,8 @@ export async function ngrokTunnelStatusAction(applicationId: string): Promise<Ng
 export async function startNgrokTunnelAction(applicationId: string): Promise<{ error?: string; url?: string | null }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const status = await startNgrokTunnel(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        const status = await startNgrokTunnel(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.start", targetType: "application", targetId: applicationId });
         return { url: status.url };
     } catch (caught) {
@@ -925,7 +1002,8 @@ export async function startNgrokTunnelAction(applicationId: string): Promise<{ e
 export async function stopNgrokTunnelAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await stopNgrokTunnel(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        await stopNgrokTunnel(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {
@@ -937,7 +1015,8 @@ export async function stopNgrokTunnelAction(applicationId: string): Promise<{ er
 export async function namedTunnelStatusAction(applicationId: string): Promise<NamedTunnelStatus> {
     const user = await requirePermission("deploy.manage");
     try {
-        return await getNamedTunnelStatus(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return await getNamedTunnelStatus(applicationId, access.ownerId);
     } catch {
         return { running: false, hostname: null, configured: false, managed: false, enabled: true };
     }
@@ -950,7 +1029,8 @@ export async function setNamedTunnelEnabledAction(input: {
 }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await setNamedTunnelEnabled(input.applicationId, user.id, input.enabled);
+        const access = await requireApplicationAccess(input.applicationId, user.id, "domains.manage");
+        await setNamedTunnelEnabled(input.applicationId, access.ownerId, input.enabled);
         await recordAudit({
             actorId: user.id,
             action: input.enabled ? "deploy.named-tunnel.start" : "deploy.named-tunnel.stop",
@@ -982,7 +1062,8 @@ export async function provisionNamedTunnelAction(input: {
 }): Promise<{ error?: string; hostname?: string | null }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const status = await provisionNamedTunnel(input.applicationId, user.id, { hostname: input.hostname });
+        const access = await requireApplicationAccess(input.applicationId, user.id, "domains.manage");
+        const status = await provisionNamedTunnel(input.applicationId, access.ownerId, { hostname: input.hostname });
         await recordAudit({
             actorId: user.id,
             action: "deploy.named-tunnel.provision",
@@ -1003,7 +1084,11 @@ export async function startNamedTunnelAction(input: {
 }): Promise<{ error?: string; hostname?: string | null }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const status = await startNamedTunnel(input.applicationId, user.id, { token: input.token, hostname: input.hostname });
+        const access = await requireApplicationAccess(input.applicationId, user.id, "domains.manage");
+        const status = await startNamedTunnel(input.applicationId, access.ownerId, {
+            token: input.token,
+            hostname: input.hostname
+        });
         await recordAudit({ actorId: user.id, action: "deploy.named-tunnel.start", targetType: "application", targetId: input.applicationId });
         return { hostname: status.hostname };
     } catch (caught) {
@@ -1015,7 +1100,8 @@ export async function startNamedTunnelAction(input: {
 export async function stopNamedTunnelAction(applicationId: string): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await stopNamedTunnel(applicationId, user.id);
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        await stopNamedTunnel(applicationId, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.named-tunnel.stop", targetType: "application", targetId: applicationId });
         return {};
     } catch (caught) {
@@ -1029,15 +1115,17 @@ export async function createDatabaseAction(input: DatabaseCreateInput): Promise<
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "That database configuration is not valid" };
     const { serverId, ...settings } = parsed.data;
     try {
+        const access = await requireEnvironmentAccess(settings.environmentId, user.id, "databases.manage");
+        const owner = access.ownerId;
         let target;
         if (serverId && serverId !== "local") {
-            const host = (await listHosts(user.id)).find((item) => item.id === serverId);
+            const host = (await listHosts(owner)).find((item) => item.id === serverId);
             if (!host) return { error: "The selected server was not found" };
-            target = await getOrCreateHostTarget(host.id, user.id, host.name);
+            target = await getOrCreateHostTarget(host.id, owner, host.name);
         } else {
-            target = await getOrCreateLocalTarget(user.id);
+            target = await getOrCreateLocalTarget(owner);
         }
-        const database = await createDatabase(user.id, { ...settings, targetId: target.id });
+        const database = await createDatabase(owner, { ...settings, targetId: target.id });
         await recordAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
         revalidatePath(DEPLOY_PATH);
         return {};
@@ -1054,7 +1142,8 @@ export async function listDatabaseInstancesAction(
 ): Promise<{ id: string; name: string; version: string; status: string; databases: number }[]> {
     const user = await requirePermission("deploy.read");
     if (!DB_ENGINES.includes(engine as DbEngine)) return [];
-    return listDatabaseInstances(environmentId, engine as DbEngine, user.id);
+    const access = await requireEnvironmentAccess(environmentId, user.id, "databases.manage");
+    return listDatabaseInstances(environmentId, engine as DbEngine, access.ownerId);
 }
 
 /** A database's address and credentials. Gated on deploy.manage rather than
@@ -1064,7 +1153,8 @@ export async function databaseConnectionAction(
 ): Promise<{ error?: string; connection?: DatabaseConnection }> {
     const user = await requirePermission("deploy.manage");
     try {
-        return { connection: await databaseConnection(databaseId, user.id) };
+        const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
+        return { connection: await databaseConnection(databaseId, access.ownerId) };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not read the connection details" };
     }
@@ -1073,7 +1163,8 @@ export async function databaseConnectionAction(
 export async function deployDatabaseAction(databaseId: string): Promise<{ error?: string; deploymentId?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const deploymentId = await deployDatabase(databaseId, user.id, user.id);
+        const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
+        const deploymentId = await deployDatabase(databaseId, access.ownerId, user.id);
         await recordAudit({ actorId: user.id, action: "deploy.db.deploy", targetType: "database", targetId: databaseId });
         revalidatePath(DEPLOY_PATH);
         return { deploymentId };
@@ -1129,8 +1220,9 @@ export async function inspectRepoAction(input: {
 }
 
 export async function listVolumesAction(applicationId: string): Promise<VolumeView[]> {
-    const user = await requirePermission("deploy.manage");
-    return listVolumes(applicationId, user.id);
+    const user = await requirePermission("deploy.read");
+    const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+    return listVolumes(applicationId, access.ownerId);
 }
 
 /** Host-mountable storage connections that can back a NAS volume, for the picker.
@@ -1169,11 +1261,12 @@ export async function listNasFoldersAction(
 export async function createVolumeAction(input: DeployVolumeInput): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await createVolume(user.id, input);
+        const access = await requireApplicationAccess(input.applicationId, user.id, "volumes.manage");
+        await createVolume(access.ownerId, input);
         await recordAudit({ actorId: user.id, action: "deploy.volume.add", targetType: "application", targetId: input.applicationId });
         // Apply on the running service (a volume takes effect on container recreate),
         // only if it is currently deployed - same Vercel-style flow as env vars.
-        void deployService.redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", input.applicationId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -1187,9 +1280,10 @@ export async function updateVolumeAction(
     const user = await requirePermission("deploy.manage");
     try {
         const { applicationId, ...patch } = input;
-        await updateVolume(user.id, patch);
+        const access = await requireApplicationAccess(applicationId, user.id, "volumes.manage");
+        await updateVolume(access.ownerId, patch);
         await recordAudit({ actorId: user.id, action: "deploy.volume.update", targetType: "application", targetId: applicationId });
-        void deployService.redeployForEnvScope("application", applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", applicationId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -1200,9 +1294,10 @@ export async function updateVolumeAction(
 export async function deleteVolumeAction(input: { id: string; applicationId: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        await deleteVolume(input.id, user.id);
+        const access = await requireApplicationAccess(input.applicationId, user.id, "volumes.manage");
+        await deleteVolume(input.id, access.ownerId);
         await recordAudit({ actorId: user.id, action: "deploy.volume.remove", targetType: "application", targetId: input.applicationId });
-        void deployService.redeployForEnvScope("application", input.applicationId, user.id).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", input.applicationId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

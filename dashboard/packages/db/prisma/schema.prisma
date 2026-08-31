@@ -3411,24 +3411,48 @@ model Project {
     @@index([orgId])
 }
 
-// Somebody other than the owner who may reach a project. The owner is never a
-// row here - ownership is on Project - so removing every member can never lock
+// Access to a project, held by somebody other than the owner. The owner is never
+// a row here - ownership is on Project - so removing every entry can never lock
 // the project away from the person who made it.
+//
+// One of userId / teamId / orgId is set, or none of the three for the entry that
+// covers everyone with an account. The nulls do not collide in the unique
+// indexes below, so a project still has at most one entry per principal.
 model ProjectMember {
-    id        String   @id @default(uuid(7)) @db.Uuid
-    projectId String   @db.Uuid
-    userId    String   @db.Uuid
+    id           String    @id @default(uuid(7)) @db.Uuid
+    projectId    String    @db.Uuid
+    userId       String?   @db.Uuid
+    teamId       String?   @db.Uuid
+    orgId        String?   @db.Uuid
     // viewer (read) | developer (deploy and configure services) | admin (also
-    // project settings and destructive changes).
-    role      String   @default("viewer")
-    invitedBy String?  @db.Uuid
-    createdAt DateTime @default(now())
+    // project settings and destructive changes), or "custom" when `capabilities`
+    // was assembled by hand. Kept for display; `capabilities` is what is enforced.
+    role         String    @default("viewer")
+    // JSON array of PROJECT_CAPABILITIES, expanded on write exactly as a role's
+    // permissions are. Written out in full rather than derived from `role`, so a
+    // role whose meaning changes later cannot widen access somebody already has.
+    capabilities String    @default("[]")
+    // JSON array of environment ids this entry is limited to, or null for every
+    // environment in the project. This is how somebody works in development and
+    // not in production.
+    environments String?
+    // When it stops applying. Null is indefinite.
+    expiresAt    DateTime?
+    invitedBy    String?   @db.Uuid
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt @default(now())
 
-    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-    user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    project Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    user    User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    team    Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+    org     Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
     @@unique([projectId, userId])
+    @@unique([projectId, teamId])
+    @@unique([projectId, orgId])
     @@index([userId])
+    @@index([teamId])
+    @@index([orgId])
 }
 
 // Where a project reports its deploys, besides the bell. Project-scoped rather
@@ -4100,6 +4124,7 @@ model Organization {
     spaces   TaskSpace[]
     chatSpaces ChatSpace[]
     projects Project[]
+    projectGrants ProjectMember[]
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?
     vault    VaultOrganization?
@@ -4271,10 +4296,11 @@ model Team {
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
 
-    org          Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-    members      TeamMember[]
-    spaceGrants  TaskSpaceTeam[]
-    folderGrants TaskFolderTeam[]
+    org           Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    members       TeamMember[]
+    spaceGrants   TaskSpaceTeam[]
+    folderGrants  TaskFolderTeam[]
+    projectGrants ProjectMember[]
 
     @@unique([orgId, slug])
     @@index([orgId])

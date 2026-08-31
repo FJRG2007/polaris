@@ -41,7 +41,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     },
     { slug: "webhooks", label: "Webhooks", icon: Webhook, hint: "Where this project reports its deploys" },
     { slug: "flags", label: "Feature flags", icon: Flag, hint: "How this project behaves" },
-    { slug: "members", label: "Members", icon: Users, hint: "Who can reach the project" },
+    { slug: "members", label: "Access", icon: Users, hint: "Who can reach the project, and to do what" },
     { slug: "tokens", label: "Tokens", icon: KeyRound, hint: "API access scoped to this project" },
     { slug: "integrations", label: "Integrations", icon: Blocks, hint: "What this project is connected to" },
     { slug: "danger", label: "Danger", icon: TriangleAlert, hint: "Irreversible things" }

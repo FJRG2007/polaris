@@ -21,7 +21,7 @@ import { RotateCw, ShieldAlert } from "lucide-react";
  *  Containers connection, or a registered server - as the Polaris login, or as
  *  root where that server granted it. */
 export type TerminalTarget =
-    | { kind: "container"; targetId: string; containerRef: string }
+    | { kind: "container"; applicationId: string }
     | { kind: "docker"; connectionId: string; containerRef: string }
     | { kind: "host"; hostId: string; asRoot?: boolean };
 
@@ -48,7 +48,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
             ? `host:${target.hostId}:${target.asRoot ? "root" : "login"}`
             : target.kind === "docker"
               ? `docker:${target.connectionId}:${target.containerRef}`
-              : `${target.targetId}:${target.containerRef}`;
+              : `app:${target.applicationId}`;
 
     useEffect(() => {
         let disposed = false;
@@ -80,7 +80,7 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                         ? { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh" }
                         : target.kind === "docker"
                           ? { connectionId: target.connectionId, containerRef: target.containerRef }
-                          : { targetId: target.targetId, containerRef: target.containerRef, mode: "terminal" }
+                          : { applicationId: target.applicationId, mode: "terminal" }
                 )
             });
             if (!res.ok) {

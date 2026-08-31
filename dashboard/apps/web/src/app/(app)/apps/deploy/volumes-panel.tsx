@@ -13,6 +13,7 @@ import { HardDrive, Plus, Server, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
 import { VolumeForm, type EditVolume } from "./volume-form";
+import { useProjectCan } from "./access-context";
 import type { ProjectApp } from "./deploy-view";
 
 type Volume = Awaited<ReturnType<typeof listVolumesAction>>[number];
@@ -27,6 +28,7 @@ function volumeDriveHref(appId: string, volume: Volume): string {
 }
 
 export function VolumesTab({ app }: { app: ProjectApp }) {
+    const can = useProjectCan();
     const [items, setItems] = useState<Volume[] | null>(null);
     const [showAdd, setShowAdd] = useState(false);
     const [editVolume, setEditVolume] = useState<EditVolume | null>(null);
@@ -53,9 +55,11 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                 <span className="text-sm font-medium">
                     {items ? items.length : 0} volume{items && items.length === 1 ? "" : "s"}
                 </span>
-                <Button size="sm" onClick={() => { setEditVolume(null); setShowAdd((open) => !open); }}>
-                    <Plus className="size-4" /> New Volume
-                </Button>
+                {can("volumes.manage") && (
+                    <Button size="sm" onClick={() => { setEditVolume(null); setShowAdd((open) => !open); }}>
+                        <Plus className="size-4" /> New Volume
+                    </Button>
+                )}
             </div>
 
             {showAdd && (
@@ -98,17 +102,34 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                             </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => { setShowAdd(false); setEditVolume(volume); }} title="Volume options">
-                                <Settings2 className="size-4" />
-                            </Button>
+                            {can("volumes.manage") && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => { setShowAdd(false); setEditVolume(volume); }}
+                                    title="Volume options"
+                                    aria-label={`Options for ${volume.name}`}
+                                >
+                                    <Settings2 className="size-4" />
+                                </Button>
+                            )}
                             <Button asChild variant="ghost" size="sm" title="View in Drive">
                                 <Link href={volumeDriveHref(app.id, volume)}>
                                     <HardDrive className="size-4" />
                                 </Link>
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => remove(volume)} disabled={pending} title="Remove">
-                                <Trash2 className="size-4" />
-                            </Button>
+                            {can("volumes.manage") && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => remove(volume)}
+                                    disabled={pending}
+                                    title="Remove"
+                                    aria-label={`Remove ${volume.name}`}
+                                >
+                                    <Trash2 className="size-4" />
+                                </Button>
+                            )}
                         </div>
                     </div>
                 ))}

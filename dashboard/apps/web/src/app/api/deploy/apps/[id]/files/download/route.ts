@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/session";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { readContainerFile } from "@/lib/container-files-service";
 
 export const runtime = "nodejs";
@@ -16,7 +17,8 @@ export async function GET(
     const path = new URL(request.url).searchParams.get("path");
     if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });
     try {
-        const stream = await readContainerFile(id, user.id, path);
+        const access = await requireApplicationAccess(id, user.id, "files.read");
+        const stream = await readContainerFile(id, access.ownerId, path);
         const name = path.split("/").filter(Boolean).pop() ?? "download";
         return new Response(Readable.toWeb(stream) as ReadableStream, {
             headers: {

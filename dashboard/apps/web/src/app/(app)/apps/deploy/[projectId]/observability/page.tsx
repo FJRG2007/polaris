@@ -26,7 +26,7 @@ export default async function ObservabilityPage({
     const user = await requirePermission("deploy.read");
 
     try {
-        await requireProjectAccess(projectId, user.id, "viewer");
+        await requireProjectAccess(projectId, user.id, "project.read");
     } catch {
         notFound();
     }
