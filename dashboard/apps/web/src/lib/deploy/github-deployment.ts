@@ -25,10 +25,10 @@
 
 import { prisma } from "@polaris/db";
 import { appBaseUrl } from "@/lib/domain-service";
+import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
-import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
 
 /** What a deploy needs before it can be announced at all. */
@@ -46,16 +46,35 @@ interface Announceable {
 }
 
 /**
- * The repository, the commit and the credential behind a deployment, or null when
- * any of them is missing - which is every deploy that is not an application built
- * from a GitHub repository at a known commit.
+ * Whether a deploy can be announced, and when it cannot, whether that is worth
+ * saying.
+ *
+ * The distinction is the whole point of this type. A deploy of a Docker image has
+ * no commit and never had anything to announce, so saying so on every build would
+ * be noise. A deploy of a GitHub repository that cannot be announced is a feature
+ * silently not working, and the operator has no way to tell the two apart - which
+ * is exactly how this went unexplained: every reason to skip returned the same
+ * nothing, so the commit stayed empty and no screen ever said why.
  */
-async function announceable(deploymentId: string): Promise<Announceable | null> {
+type AnnounceTarget = { ok: true; info: Announceable } | { ok: false; reason: string | null };
+
+/** Nothing to announce, and nothing to say about it. */
+const NOT_APPLICABLE: AnnounceTarget = { ok: false, reason: null };
+
+/**
+ * The repository, the commit and the credential behind a deployment.
+ *
+ * Resolved in that order deliberately: everything before the repository decides
+ * whether this is a GitHub deploy at all, and everything after it is a GitHub
+ * deploy that will not appear - so the first group stays quiet and the second
+ * group is named.
+ */
+async function announceable(deploymentId: string): Promise<AnnounceTarget> {
     const deployment = await prisma.deployment.findUnique({
         where: { id: deploymentId },
         select: { commitSha: true, deployableType: true, deployableId: true }
     });
-    if (deployment?.deployableType !== "application" || !deployment.commitSha) return null;
+    if (deployment?.deployableType !== "application") return NOT_APPLICABLE;
 
     const app = await prisma.application.findUnique({
         where: { id: deployment.deployableId },
@@ -66,32 +85,50 @@ async function announceable(deploymentId: string): Promise<Announceable | null> 
             environment: { select: { name: true, project: { select: { name: true, ownerId: true } } } }
         }
     });
-    if (!app) return null;
+    if (!app) return NOT_APPLICABLE;
 
     let source: Record<string, unknown>;
     try {
         source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     } catch {
-        return null;
+        return NOT_APPLICABLE;
     }
+    // An image, or a repository somewhere GitHub is not. Neither was ever going to
+    // appear on a GitHub commit, so neither says anything.
     const parsed = parseGithubRepo(typeof source.repoUrl === "string" ? source.repoUrl : "");
-    if (!parsed) return null;
+    if (!parsed) return NOT_APPLICABLE;
+
+    // From here down it IS a GitHub repository, so every way out is spoken.
+    if (!deployment.commitSha) {
+        return {
+            ok: false,
+            reason: `[warn] GitHub will not show this deploy on the commit: the commit being built could not be resolved, so there is nothing to attach it to. Check the service's branch, and that a connected account can read ${parsed.owner}/${parsed.repo}.`
+        };
+    }
 
     const token = await githubTokenForOwner(app.environment.project.ownerId, parsed.owner).catch(() => null);
-    if (!token) return null;
+    if (!token) {
+        return {
+            ok: false,
+            reason: `[warn] GitHub will not show this deploy on the commit: no connected GitHub account speaks for ${parsed.owner}/${parsed.repo}. Link one under Connected accounts, or install the GitHub App on it.`
+        };
+    }
 
     const environmentName = app.environment.name.trim() || "production";
     return {
-        owner: parsed.owner,
-        repo: parsed.repo,
-        commitSha: deployment.commitSha,
-        applicationId: deployment.deployableId,
-        // Qualified by the service, so a repository holding several of them gets a
-        // row each on the commit instead of one they take turns overwriting.
-        environment: `${environmentName}/${app.slug}`,
-        label: `${app.environment.project.name} / ${app.name}`,
-        production: environmentName.toLowerCase() === "production",
-        token
+        ok: true,
+        info: {
+            owner: parsed.owner,
+            repo: parsed.repo,
+            commitSha: deployment.commitSha,
+            applicationId: deployment.deployableId,
+            // Qualified by the service, so a repository holding several of them gets a
+            // row each on the commit instead of one they take turns overwriting.
+            environment: `${environmentName}/${app.slug}`,
+            label: `${app.environment.project.name} / ${app.name}`,
+            production: environmentName.toLowerCase() === "production",
+            token
+        }
     };
 }
 
@@ -178,8 +215,12 @@ export function announceRefusal(status: number, owner: string, repo: string): st
 export async function announceDeployQueued(deploymentId: string): Promise<void> {
     try {
         if (await announced(deploymentId)) return;
-        const info = await announceable(deploymentId);
-        if (!info) return;
+        const target = await announceable(deploymentId);
+        if (!target.ok) {
+            if (target.reason) await noteOnDeploy(deploymentId, target.reason);
+            return;
+        }
+        const info = target.info;
 
         const minted = await createDeployment({
             owner: info.owner,

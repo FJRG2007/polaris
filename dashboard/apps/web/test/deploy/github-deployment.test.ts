@@ -17,8 +17,39 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Declared through `vi.hoisted` because the mock factories below are lifted to
+// the top of the file, above any ordinary const.
+const mocks = vi.hoisted(() => ({
+    deploymentFindUnique: vi.fn(),
+    deploymentUpdate: vi.fn(),
+    applicationFindUnique: vi.fn(),
+    noteOnDeploy: vi.fn(),
+    githubTokenForOwner: vi.fn()
+}));
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        deployment: { findUnique: mocks.deploymentFindUnique, update: mocks.deploymentUpdate },
+        application: { findUnique: mocks.applicationFindUnique },
+        domain: { findMany: async () => [] }
+    }
+}));
+
+vi.mock("@/lib/deploy/log-file", () => ({
+    noteOnDeploy: mocks.noteOnDeploy,
+    deployLogDir: () => "/tmp/polaris/deploy-logs",
+    deployLogPath: (id: string) => `/tmp/polaris/deploy-logs/${id}.log`
+}));
+
+vi.mock("@/lib/github-access", () => ({ githubTokenForOwner: mocks.githubTokenForOwner }));
+
+// The deploy's own panel link. Absent here, which is what a Polaris nobody can
+// reach from outside answers anyway.
+vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => null }));
+
 import { createDeployment, setDeploymentState } from "@/lib/github-service";
-import { announceRefusal } from "@/lib/deploy/github-deployment";
+import { announceDeployQueued, announceRefusal } from "@/lib/deploy/github-deployment";
 
 const SHA = "9f2c1b0a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90";
 const CALL = { owner: "acme", repo: "widgets", token: "gho_test" };
@@ -170,5 +201,88 @@ describe("what the deploy log is told when GitHub refuses", () => {
 
     it("says the status rather than guessing at anything else", () => {
         expect(announceRefusal(422, "acme", "widgets")).toContain("422");
+    });
+});
+
+/**
+ * Why nothing appeared on the commit.
+ *
+ * Every reason to skip the announcement used to return the same nothing, so a
+ * repository deployed from here and a repository that could not be announced
+ * looked identical: an empty deployment box and no screen saying why. The rule
+ * now is that anything which was never a GitHub deploy stays quiet, and anything
+ * which IS one and still will not appear says so where its operator is already
+ * looking.
+ */
+describe("why a deploy was not announced at all", () => {
+    /** The rows behind one deploy, with whatever the case under test leaves out. */
+    function deployOf(options: { repoUrl?: string; commitSha?: string | null }): void {
+        mocks.deploymentFindUnique.mockResolvedValue({
+            commitSha: options.commitSha === undefined ? "9f2c1b0" : options.commitSha,
+            deployableType: "application",
+            deployableId: "app-1",
+            githubRepo: null,
+            githubDeploymentId: null,
+            error: null
+        });
+        mocks.applicationFindUnique.mockResolvedValue({
+            name: "api",
+            slug: "api",
+            sourceConfig: JSON.stringify(options.repoUrl ? { repoUrl: options.repoUrl } : { imageRef: "nginx" }),
+            environment: { name: "production", project: { name: "Acme", ownerId: "owner-1" } }
+        });
+    }
+
+    beforeEach(() => {
+        mocks.deploymentFindUnique.mockReset();
+        mocks.deploymentUpdate.mockReset();
+        mocks.applicationFindUnique.mockReset();
+        mocks.noteOnDeploy.mockReset();
+        mocks.githubTokenForOwner.mockReset();
+        mocks.githubTokenForOwner.mockResolvedValue("gho_test");
+    });
+
+    it("says nothing about an image, which was never going on a commit", async () => {
+        deployOf({});
+        await announceDeployQueued("dep-1");
+        expect(mocks.noteOnDeploy).not.toHaveBeenCalled();
+    });
+
+    it("says nothing about a repository that is not on GitHub", async () => {
+        deployOf({ repoUrl: "https://gitlab.com/acme/widgets.git" });
+        await announceDeployQueued("dep-1");
+        expect(mocks.noteOnDeploy).not.toHaveBeenCalled();
+    });
+
+    it("says so when the commit could not be resolved", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git", commitSha: null });
+        await announceDeployQueued("dep-1");
+
+        const said = String(mocks.noteOnDeploy.mock.calls[0]?.[1]);
+        expect(said).toContain("acme/widgets");
+        expect(said).toContain("branch");
+    });
+
+    it("says so when no connected account speaks for the repository", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubTokenForOwner.mockResolvedValue(null);
+        await announceDeployQueued("dep-1");
+
+        const said = String(mocks.noteOnDeploy.mock.calls[0]?.[1]);
+        expect(said).toContain("acme/widgets");
+        expect(said).toContain("Connected accounts");
+    });
+
+    it("stays quiet, and records the id, when it does reach GitHub", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        githubAnswers(201, { id: 4212 });
+        await announceDeployQueued("dep-1");
+
+        expect(mocks.noteOnDeploy).not.toHaveBeenCalled();
+        expect(mocks.deploymentUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { githubRepo: "acme/widgets", githubDeploymentId: "4212" }
+            })
+        );
     });
 });
