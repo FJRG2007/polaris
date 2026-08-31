@@ -20,7 +20,9 @@ import * as orgs from "@/lib/orgs/org-service";
 import * as docs from "@/lib/tasks/doc-service";
 import * as time from "@/lib/tasks/time-service";
 import { recordAudit } from "@/lib/audit-service";
-import { requirePermission } from "@/lib/session";
+import { prisma } from "@polaris/db";
+import { requirePermission, sessionCan } from "@/lib/session";
+import { startSessionAction } from "@/app/(app)/apps/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
 import * as forms from "@/lib/tasks/form-service";
@@ -2010,4 +2012,43 @@ export async function deleteFormAction(
     } catch (caught) {
         return failure(caught, "Could not remove the form");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Handing work to an agent
+// ---------------------------------------------------------------------------
+
+/**
+ * The two questions the handoff dialog has to ask, answered from Tasks.
+ *
+ * Here rather than reached for across in the Agents app, and not for tidiness: a
+ * client component in Tasks that imports another app's server actions drags that
+ * whole app's server graph into every screen - and into every test that renders
+ * one. Tasks talks to Tasks.
+ */
+export async function agentHandoffChoicesAction(): Promise<{
+    repos: { id: string; name: string }[];
+    agents: { id: string; label: string }[];
+}> {
+    const user = await requirePermission("tasks.read");
+    // An account with no standing in the Agents app is offered nothing rather
+    // than being refused: the button is beside every task, and most people who
+    // press it once are finding out what it does.
+    const allowed = await sessionCan(user, "agents.manage");
+    if (!allowed) return { repos: [], agents: [] };
+    const repos = await prisma.agentRepo.findMany({
+        where: { ownerId: user.id, enabled: true },
+        select: { id: true, repoFullName: true },
+        orderBy: { repoFullName: "asc" }
+    });
+    return {
+        repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
+        agents: core.AGENT_CLIS.map((cli) => ({ id: cli.id, label: cli.label }))
+    };
+}
+
+/** Start a session on a task. The Agents app owns what that means; this is the
+ *  door to it from a task, and it is the same door the sessions screen uses. */
+export async function handTaskToAgentAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    return startSessionAction(input);
 }

@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
-import { sessionChoicesAction, startSessionAction } from "../apps/agents/sessions/actions";
+import { agentHandoffChoicesAction, handTaskToAgentAction } from "./actions";
 import {
     Button,
     Dialog,
@@ -84,9 +84,9 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
     const router = useRouter();
 
     useEffect(() => {
-        void sessionChoicesAction().then((choices) => {
+        void agentHandoffChoicesAction().then((choices) => {
             setRepos(choices.repos);
-            setAgents(choices.agents.map((agent) => ({ id: agent.id, label: agent.label })));
+            setAgents(choices.agents);
             setRepoId((current) => current || (choices.repos[0]?.id ?? ""));
         });
     }, []);
@@ -95,7 +95,7 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
         startTransition(() => {
             void runAction(
                 () =>
-                    startSessionAction({
+                    handTaskToAgentAction({
                         repoId,
                         title: `${reference} ${name}`.slice(0, 80),
                         cli,
