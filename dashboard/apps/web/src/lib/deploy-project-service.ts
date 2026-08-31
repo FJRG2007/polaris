@@ -280,26 +280,38 @@ export async function listProjectMembers(
     ];
 }
 
-/** Where an entry's `where` clause points, per principal. Only one of the three
- *  columns is ever set, which is what makes the unique index per principal work. */
+/**
+ * Where an entry's `where` clause points, per principal. Only one of the three
+ * columns is ever set, which is what makes the unique index per principal work.
+ *
+ * A team or an organization is resolved against the ones the granter is on, the
+ * same rosters the picker offers - an id that arrives without one being open on
+ * screen names a group they cannot see the members of, and handing a project to
+ * a roster you cannot read is not a grant anybody meant to make.
+ */
 async function resolvePrincipal(
     projectId: string,
-    input: ProjectAccessInput
+    input: ProjectAccessInput,
+    granterId: string
 ): Promise<{ userId: string | null; teamId: string | null; orgId: string | null }> {
+    const onRoster = { OR: [{ ownerId: granterId }, { members: { some: { userId: granterId } } }] };
     if (input.principal === "everyone") return { userId: null, teamId: null, orgId: null };
     if (input.principal === "team") {
         if (!input.principalId) throw new Error("Pick a team");
-        const team = await prisma.team.findUnique({ where: { id: input.principalId }, select: { id: true } });
-        if (!team) throw new Error("That team no longer exists");
+        const team = await prisma.team.findFirst({
+            where: { id: input.principalId, org: onRoster },
+            select: { id: true }
+        });
+        if (!team) throw new Error("Pick one of the teams you are on");
         return { userId: null, teamId: team.id, orgId: null };
     }
     if (input.principal === "org") {
         if (!input.principalId) throw new Error("Pick an organization");
-        const org = await prisma.organization.findUnique({
-            where: { id: input.principalId },
+        const org = await prisma.organization.findFirst({
+            where: { id: input.principalId, ...onRoster },
             select: { id: true }
         });
-        if (!org) throw new Error("That organization no longer exists");
+        if (!org) throw new Error("Pick one of the organizations you are in");
         return { userId: null, teamId: null, orgId: org.id };
     }
 
@@ -326,6 +338,15 @@ async function resolvePrincipal(
     return { userId: user.id, teamId: null, orgId: null };
 }
 
+/** Whoever is writing an entry, and what they hold on the project themselves.
+ *  Resolved by the caller through deploy-project-access, exactly as `ownerId` is. */
+export interface ProjectAccessGranter {
+    readonly id: string;
+    readonly capabilities: readonly ProjectCapability[];
+    /** The environments they reach, or null for every one. */
+    readonly environmentIds: readonly string[] | null;
+}
+
 /**
  * Write one access entry, replacing whatever that principal already held.
  *
@@ -336,11 +357,23 @@ async function resolvePrincipal(
  * The capabilities are stored expanded and in full rather than as a role name, so
  * an entry keeps meaning what it meant on the day it was written even if the role
  * it was picked from changes later.
+ *
+ * An entry never reaches further than the person writing it: managing access is a
+ * capability like any other, so an entry written to administer the roster while
+ * staying out of the variables would otherwise be one click away from granting
+ * itself the variables. The ceiling is checked here, where the stored set is
+ * assembled, rather than at the call site - there is no second way to write a row.
  */
-export async function setProjectAccess(input: ProjectAccessInput & { invitedBy: string }): Promise<void> {
-    const principal = await resolvePrincipal(input.projectId, input);
+export async function setProjectAccess(
+    input: ProjectAccessInput & { granter: ProjectAccessGranter }
+): Promise<void> {
+    const principal = await resolvePrincipal(input.projectId, input, input.granter.id);
     const capabilities = resolveProjectCapabilities(input);
     if (capabilities.length === 0) throw new Error("Choose at least one thing they may do");
+    const held = new Set(input.granter.capabilities);
+    if (capabilities.some((capability) => !held.has(capability))) {
+        throw new Error("You can only give away what you can do on this project yourself");
+    }
 
     // Only environments of this project, so a typed id cannot name one somewhere
     // else and quietly widen nothing while looking like it narrowed something.
@@ -355,6 +388,12 @@ export async function setProjectAccess(input: ProjectAccessInput & { invitedBy: 
             : [];
     if (input.environmentIds.length > 0 && environmentIds.length === 0) {
         throw new Error("Pick at least one environment in this project");
+    }
+    // The same ceiling for where the entry reaches: an empty list means every
+    // environment, which somebody limited to one of them cannot hand out.
+    const reaches = input.granter.environmentIds;
+    if (reaches !== null && (environmentIds.length === 0 || environmentIds.some((id) => !reaches.includes(id)))) {
+        throw new Error("You can only give access to the environments you reach yourself");
     }
 
     const data = {
@@ -375,7 +414,7 @@ export async function setProjectAccess(input: ProjectAccessInput & { invitedBy: 
         return;
     }
     await prisma.projectMember.create({
-        data: { projectId: input.projectId, ...principal, ...data, invitedBy: input.invitedBy }
+        data: { projectId: input.projectId, ...principal, ...data, invitedBy: input.granter.id }
     });
 }
 

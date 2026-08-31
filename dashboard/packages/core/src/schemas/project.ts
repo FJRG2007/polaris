@@ -24,9 +24,12 @@ export const PROJECT_VISIBILITIES = ["private", "internal"] as const;
 export type ProjectVisibility = (typeof PROJECT_VISIBILITIES)[number];
 
 /**
- * What a member may do. Ordered least to most, and compared by index rather than
- * by name so a check reads as "at least a developer" instead of listing roles.
- * The owner is never a member row and always outranks every one of these.
+ * The roles an access entry can be written from, least reaching first.
+ *
+ * A name for a set of capabilities rather than a rank: what an entry may do is
+ * PROJECT_ROLE_CAPABILITIES, and nothing compares two roles - "at least a
+ * developer" is not a question that has an answer once an entry can hold any set
+ * of capabilities. The owner is never a member row and holds all of them.
  */
 export const PROJECT_ROLES = ["viewer", "developer", "admin"] as const;
 export type ProjectRole = (typeof PROJECT_ROLES)[number];
@@ -42,11 +45,6 @@ export const PROJECT_ROLE_HINTS: Record<ProjectRole, string> = {
     developer: "Deploy and configure services, variables, and domains.",
     admin: "Everything a developer can do, plus project settings and deletions."
 };
-
-/** True when `role` is at least `minimum`. */
-export function roleAtLeast(role: ProjectRole, minimum: ProjectRole): boolean {
-    return PROJECT_ROLES.indexOf(role) >= PROJECT_ROLES.indexOf(minimum);
-}
 
 // ---------------------------------------------------------------------------
 // Feature flags

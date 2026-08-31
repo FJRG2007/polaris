@@ -90,7 +90,11 @@ export const PROJECT_CAPABILITY_META: Readonly<Record<ProjectCapability, Project
     "files.read": { area: "Access", label: "Browse and download service files" },
     "files.write": { area: "Access", label: "Upload, edit and delete service files" },
     "domains.manage": { area: "Networking", label: "Add and remove domains and tunnels" },
-    "volumes.manage": { area: "Storage", label: "Add, resize and detach volumes" },
+    "volumes.manage": {
+        area: "Storage",
+        label: "Add, resize and detach volumes",
+        hint: "Detaching a volume can erase what it holds, and that cannot be undone."
+    },
     "databases.manage": { area: "Storage", label: "Create databases and read their connection details" },
     "project.settings": {
         area: "Project",

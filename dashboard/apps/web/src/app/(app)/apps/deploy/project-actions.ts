@@ -27,6 +27,7 @@ import {
 } from "@/lib/deploy-volume-service";
 import {
     accessCan,
+    accessInEnvironment,
     requireApplicationAccess,
     requireEnvironmentAccess,
     requireProjectAccess
@@ -40,6 +41,7 @@ import {
     projectVisibilitySchema,
     projectWebhookInputSchema,
     type ProjectAccessInput,
+    type ProjectCapability,
     type ProjectFlags,
     type ProjectTokenInput,
     type ProjectVisibility,
@@ -195,9 +197,16 @@ export async function setDefaultEnvironmentAction(environmentId: string): Promis
 // Members
 // ---------------------------------------------------------------------------
 
-export async function listProjectMembersAction(
-    projectId: string
-): Promise<Result<{ members: projectService.ProjectMemberView[]; canManage: boolean }>> {
+export async function listProjectMembersAction(projectId: string): Promise<
+    Result<{
+        members: projectService.ProjectMemberView[];
+        canManage: boolean;
+        /** What the reader may hand on: an entry never reaches further than the
+         *  person writing it, so the editor offers exactly this and no more. */
+        grantable: ProjectCapability[];
+        grantableEnvironmentIds: string[] | null;
+    }>
+> {
     return attempt("Could not load the members", async () => {
         const user = await requirePermission("deploy.read");
         const access = await requireProjectAccess(projectId, user.id, "project.read");
@@ -206,7 +215,9 @@ export async function listProjectMembersAction(
                 id: user.id,
                 isAdmin: user.isAdmin
             }),
-            canManage: accessCan(access, "members.manage")
+            canManage: accessCan(access, "members.manage"),
+            grantable: [...access.capabilities],
+            grantableEnvironmentIds: access.environmentIds ? [...access.environmentIds] : null
         };
     });
 }
@@ -224,8 +235,15 @@ export async function setProjectAccessAction(input: ProjectAccessInput): Promise
         const user = await requirePermission("deploy.manage");
         const parsed = projectAccessInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        await requireProjectAccess(parsed.data.projectId, user.id, "members.manage");
-        await projectService.setProjectAccess({ ...parsed.data, invitedBy: user.id });
+        const access = await requireProjectAccess(parsed.data.projectId, user.id, "members.manage");
+        await projectService.setProjectAccess({
+            ...parsed.data,
+            granter: {
+                id: user.id,
+                capabilities: access.capabilities,
+                environmentIds: access.environmentIds
+            }
+        });
         await recordAudit({
             actorId: user.id,
             action: "deploy.project.member.add",
@@ -440,8 +458,9 @@ export async function listStagedChangesAction(
 ): Promise<Result<{ changes: staged.StagedChangeView[] }>> {
     return attempt("Could not load the pending changes", async () => {
         const user = await requirePermission("deploy.read");
-        await requireProjectAccess(projectId, user.id, "project.read");
-        return { changes: await staged.listProjectStagedChanges(projectId) };
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
+        const changes = await staged.listProjectStagedChanges(projectId);
+        return { changes: changes.filter((change) => accessInEnvironment(access, change.environmentId)) };
     });
 }
 
@@ -558,11 +577,14 @@ export async function discardStagedChangeAction(input: {
 }): Promise<Result> {
     return attempt("Could not discard the change", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "deploy.run");
+        const access = await requireProjectAccess(input.projectId, user.id, "deploy.run");
         const change = (await staged.listProjectStagedChanges(input.projectId)).find(
             (entry) => entry.id === input.id
         );
-        if (!change) return { error: "That change is no longer pending" };
+        // A change staged in an environment this entry does not reach is not one
+        // it may discard, and saying so would name it.
+        if (!change || !accessInEnvironment(access, change.environmentId))
+            return { error: "That change is no longer pending" };
         await staged.discardStagedChange(input.id, change.environmentId);
         refresh(input.projectId);
         return {};
@@ -575,7 +597,12 @@ export async function discardAllStagedChangesAction(input: {
 }): Promise<Result> {
     return attempt("Could not discard the changes", async () => {
         const user = await requirePermission("deploy.manage");
-        await requireProjectAccess(input.projectId, user.id, "deploy.run");
+        // Through the environment, not the project: the capability is only half
+        // the question once an entry names environments, and a changeset staged
+        // in production is not something an entry limited to development discards.
+        const access = await requireEnvironmentAccess(input.environmentId, user.id, "deploy.run");
+        if (access.projectId !== input.projectId)
+            return { error: "That environment is not in this project" };
         await staged.discardAllStagedChanges(input.environmentId);
         refresh(input.projectId);
         return {};

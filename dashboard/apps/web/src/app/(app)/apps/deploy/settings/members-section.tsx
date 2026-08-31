@@ -51,11 +51,20 @@ import {
     type ProjectRole
 } from "@polaris/core";
 
-/** The role picker, plus the answer for access a role cannot describe. */
-const ROLE_OPTIONS = [
-    ...PROJECT_ROLES.map((value) => ({ value, label: PROJECT_ROLE_LABELS[value] })),
-    { value: "custom", label: "Custom" }
-];
+/** The role picker, plus the answer for access a role cannot describe. A role
+ *  reaching past what the reader holds themselves is not offered: an entry never
+ *  grants more than the person writing it can do, so the server would refuse it. */
+function roleOptions(grantable: readonly ProjectCapability[]): { value: string; label: string }[] {
+    const held = new Set(grantable);
+    return [
+        ...PROJECT_ROLES.filter((role) =>
+            expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES[role]).every((capability) =>
+                held.has(capability)
+            )
+        ).map((value) => ({ value, label: PROJECT_ROLE_LABELS[value] })),
+        { value: "custom", label: "Custom" }
+    ];
+}
 
 const PRINCIPAL_OPTIONS = PROJECT_PRINCIPALS.map((value) => ({
     value,
@@ -98,14 +107,20 @@ interface Draft {
     expiry: string;
 }
 
-function emptyDraft(): Draft {
+function emptyDraft(grantable: readonly ProjectCapability[]): Draft {
+    const held = new Set(grantable);
+    const role = expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer).every((capability) =>
+        held.has(capability)
+    )
+        ? "developer"
+        : "viewer";
     return {
         entryId: null,
         principal: "user",
         principalId: "",
         identifier: "",
-        role: "developer",
-        capabilities: expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer),
+        role,
+        capabilities: expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES[role]),
         environmentIds: [],
         expiry: "never"
     };
@@ -141,6 +156,9 @@ export function MembersSection({ projectId }: { projectId: string }) {
     const [environments, setEnvironments] = useState<Environment[]>([]);
     const [candidates, setCandidates] = useState<ProjectAccessCandidates>({ orgs: [], teams: [] });
     const [canManage, setCanManage] = useState(false);
+    /** What the reader may hand on, and where. The editor offers exactly this. */
+    const [grantable, setGrantable] = useState<ProjectCapability[]>([]);
+    const [grantableEnvironmentIds, setGrantableEnvironmentIds] = useState<string[] | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [removing, setRemoving] = useState<ProjectMemberView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -156,6 +174,8 @@ export function MembersSection({ projectId }: { projectId: string }) {
             }
             setMembers(result.members ?? []);
             setCanManage(result.canManage ?? false);
+            setGrantable(result.grantable ?? []);
+            setGrantableEnvironmentIds(result.grantableEnvironmentIds ?? null);
             if (result.canManage) {
                 void projectAccessCandidatesAction(projectId).then((answer) => {
                     if (answer.candidates) setCandidates(answer.candidates);
@@ -299,7 +319,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
                             variant="outline"
                             onClick={() => {
                                 setFormError(null);
-                                setDraft(emptyDraft());
+                                setDraft(emptyDraft(grantable));
                             }}
                         >
                             <UserPlus className="size-4" />
@@ -321,7 +341,13 @@ export function MembersSection({ projectId }: { projectId: string }) {
             {draft && (
                 <AccessDialog
                     draft={draft}
-                    environments={environments}
+                    environments={environments.filter(
+                        (environment) =>
+                            grantableEnvironmentIds === null ||
+                            grantableEnvironmentIds.includes(environment.id)
+                    )}
+                    grantable={grantable}
+                    everyEnvironment={grantableEnvironmentIds === null}
                     candidates={candidates}
                     error={formError}
                     pending={pending}
@@ -351,6 +377,8 @@ export function MembersSection({ projectId }: { projectId: string }) {
 function AccessDialog({
     draft,
     environments,
+    grantable,
+    everyEnvironment,
     candidates,
     error,
     pending,
@@ -359,7 +387,13 @@ function AccessDialog({
     onSave
 }: {
     draft: Draft;
+    /** Only the ones the reader reaches themselves - an entry cannot be given an
+     *  environment its author cannot open. */
     environments: Environment[];
+    grantable: readonly ProjectCapability[];
+    /** False when the reader is themselves limited to some environments, in which
+     *  case an entry has to name the ones it covers. */
+    everyEnvironment: boolean;
     candidates: ProjectAccessCandidates;
     error: string | null;
     pending: boolean;
@@ -402,10 +436,11 @@ function AccessDialog({
         label: `${team.orgName} / ${team.name}`
     }));
     const orgOptions = candidates.orgs.map((org) => ({ value: org.id, label: org.name }));
-    const ready =
+    const named =
         draft.principal === "everyone" ||
         Boolean(draft.principalId) ||
         (draft.principal === "user" && draft.identifier.trim().length > 0);
+    const ready = named && (everyEnvironment || draft.environmentIds.length > 0);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -496,18 +531,24 @@ function AccessDialog({
                         <Select
                             value={draft.role}
                             onValueChange={pickRole}
-                            options={ROLE_OPTIONS}
+                            options={roleOptions(grantable)}
                             aria-label="What they may do"
                         />
                     </label>
 
                     {draft.role === "custom" && (
                         <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
-                            {PROJECT_CAPABILITY_AREAS.map((area) => (
+                            {PROJECT_CAPABILITY_AREAS.filter((area) =>
+                                grantable.some(
+                                    (capability) => PROJECT_CAPABILITY_META[capability].area === area
+                                )
+                            ).map((area) => (
                                 <div key={area} className="flex flex-col gap-1.5">
                                     <p className="text-xs font-medium">{area}</p>
                                     {PROJECT_CAPABILITIES.filter(
-                                        (capability) => PROJECT_CAPABILITY_META[capability].area === area
+                                        (capability) =>
+                                            PROJECT_CAPABILITY_META[capability].area === area &&
+                                            grantable.includes(capability)
                                     ).map((capability) => (
                                         <label key={capability} className="flex items-start gap-2 text-xs">
                                             <Checkbox
@@ -533,24 +574,26 @@ function AccessDialog({
 
                     <div className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium text-muted-foreground">Environments</span>
-                        <label className="flex items-center gap-2 text-xs">
-                            <Checkbox
-                                checked={draft.environmentIds.length === 0}
-                                onChange={(event) =>
-                                    patch({
-                                        environmentIds: event.target.checked
-                                            ? []
-                                            : environments.slice(0, 1).map((entry) => entry.id)
-                                    })
-                                }
-                            />
-                            Every environment
-                        </label>
-                        {draft.environmentIds.length > 0 &&
+                        {everyEnvironment && (
+                            <label className="flex items-center gap-2 text-xs">
+                                <Checkbox
+                                    checked={draft.environmentIds.length === 0}
+                                    onChange={(event) =>
+                                        patch({
+                                            environmentIds: event.target.checked
+                                                ? []
+                                                : environments.slice(0, 1).map((entry) => entry.id)
+                                        })
+                                    }
+                                />
+                                Every environment
+                            </label>
+                        )}
+                        {(!everyEnvironment || draft.environmentIds.length > 0) &&
                             environments.map((environment) => (
                                 <label
                                     key={environment.id}
-                                    className="flex items-center gap-2 pl-5 text-xs"
+                                    className={`flex items-center gap-2 text-xs${everyEnvironment ? " pl-5" : ""}`}
                                 >
                                     <Checkbox
                                         checked={draft.environmentIds.includes(environment.id)}

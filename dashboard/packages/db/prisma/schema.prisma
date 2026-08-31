@@ -3690,7 +3690,9 @@ model Domain {
     applicationId String   @db.Uuid
     hostname      String   @unique
     // auto (free sslip.io/traefik.me, or a zone name derived from the service) |
-    // random (an unguessable name minted in a zone) | lan | custom | duckdns |
+    // random (an unguessable name minted in a zone) | base (a name straight on the
+    // operator's base domain, standing on its own record rather than a wildcard) |
+    // lan | custom | duckdns |
     // release (one build's own hostname, alongside the service's own address)
     kind          String   @default("auto")
     // Set only on a "release" hostname: the deployment it serves, so it keeps

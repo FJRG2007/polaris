@@ -35,7 +35,7 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
-import { deployHostname, deployZoneHosts, type ZoneMintFailure } from "./domain-zones";
+import { deployHostname, deployZoneHosts, isBaseZoneKey, type ZoneMintFailure } from "./domain-zones";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
 import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
@@ -684,7 +684,12 @@ export async function addApplicationDomain(
         hostname = minted.hostname;
         // Marked distinctly so the next random request finds exactly this row, and
         // never a name derived from the service (which must keep its own hostname).
-        kind = opts.random ? "random" : "auto";
+        // A name straight on the base domain gets a kind of its own: it rides no
+        // wildcard, so its record was written for this exact hostname and nothing
+        // may derive another name from it - a per-release variant would be a
+        // hostname that resolves nowhere and an ACME order that cannot complete,
+        // once per build.
+        kind = opts.random ? "random" : isBaseZoneKey(opts.zoneLabel) ? "base" : "auto";
         if (!opts.cert) certResolver = "le";
     }
     if (!hostname) {
