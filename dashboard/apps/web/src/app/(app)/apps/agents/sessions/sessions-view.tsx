@@ -16,6 +16,8 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import type { SessionView } from "@/lib/agents/session-service";
+import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import { AgentSelect, CUSTOM_CHOICE, SignInNotice } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { sessionChoicesAction, startSessionAction, stopSessionAction } from "./actions";
 import {
@@ -62,7 +64,7 @@ const ORDER: Record<core.AgentSessionState, number> = {
 };
 
 interface Choices {
-    agents: { id: string; label: string; vendor: string; install: string | null; docs: string }[];
+    agents: AgentChoice[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
 }
@@ -219,6 +221,12 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     };
 
     const noRepos = choices !== null && choices.repos.length === 0;
+    const agents = [...(choices?.agents ?? []), CUSTOM_CHOICE];
+    // The chosen tool, when nothing here can sign it in. Drives the notice under
+    // the picker and disables Start - the server refuses this too, and would say
+    // the same thing, but finding out after the click is finding out too late to
+    // do anything about it without losing the form.
+    const unlinked = agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -261,18 +269,15 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">Agent</span>
-                            <Select
+                            <AgentSelect
+                                options={agents}
                                 value={cli}
-                                onValueChange={setCli}
-                                options={[
-                                    ...(choices?.agents ?? []).map((agent) => ({
-                                        value: agent.id,
-                                        label: agent.label
-                                    })),
-                                    { value: core.CUSTOM_AGENT_CLI, label: "Something else" }
-                                ]}
+                                onChange={setCli}
+                                disabled={choices === null}
                             />
                         </label>
+
+                        {unlinked ? <SignInNotice agent={unlinked} /> : null}
 
                         {cli === core.CUSTOM_AGENT_CLI ? (
                             <label className="block space-y-1">
@@ -356,7 +361,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={busy || noRepos || !title || !repoId}>
+                    <Button onClick={submit} disabled={busy || noRepos || !title || !repoId || unlinked !== null}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Start
                     </Button>

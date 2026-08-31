@@ -37,6 +37,17 @@ describe("the boot script", () => {
         expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(boot.indexOf("tmux new-session"));
     });
 
+    it("decodes the files it writes rather than carrying them raw", () => {
+        // The bug this replaced: all three of these are files, every file has
+        // newlines, and the host daemon refuses any environment value carrying a
+        // control character - so every session on this box was refused before it
+        // started, with a message naming a variable nobody had ever seen. They
+        // travel base64 now, which that rule has nothing to object to.
+        for (const name of ["POLARIS_HOOK_SCRIPT", "POLARIS_HOOK_SETTINGS", "POLARIS_MCP_CONFIG"]) {
+            expect(commands.SESSION_BOOT).toContain(`printf %s "$${name}" | base64 -d`);
+        }
+    });
+
     it("writes the hooks into the worktree, never into the machine's own home", () => {
         expect(commands.SESSION_BOOT).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
         expect(commands.SESSION_BOOT).not.toContain('"$HOME/.claude');

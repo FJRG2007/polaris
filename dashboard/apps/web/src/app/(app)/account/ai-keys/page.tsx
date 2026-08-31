@@ -10,9 +10,11 @@
 
 import { requireUser } from "@/lib/session";
 import { Badge, Card, CardBody } from "@polaris/ui";
+import { agentSignins } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
+import { AgentSigninsCard } from "@/components/model-keys/agent-signins-card";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
-import { instanceKeysAreShared, keySourcesFor, listModelKeys } from "@/lib/agents/model-keys";
+import { instanceKeysAreShared, keySourcesFor, listAgentSignins, listProviderKeys } from "@/lib/agents/model-keys";
 import {
     addModelKeyAction,
     deleteModelKeyAction,
@@ -24,8 +26,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AiKeysPage() {
     const user = await requireUser();
-    const [keys, sources, shared] = await Promise.all([
-        listModelKeys(user.id),
+    // Two listings rather than one filtered afterwards: agent sign-ins live in
+    // the same table as provider keys and would otherwise be drawn in the
+    // provider table as a credential for a provider that does not exist.
+    const [keys, signins, sources, shared] = await Promise.all([
+        listProviderKeys(user.id),
+        listAgentSignins(user.id),
         keySourcesFor(user.id),
         instanceKeysAreShared()
     ]);
@@ -61,7 +67,16 @@ export default async function AiKeysPage() {
                             : "No keys yet. A run needs one to reach a provider.",
                     adding: "The provider account your runs bill to. Polaris adds nothing to that bill."
                 }}
-                footer={<FallbackCard providers={covered} shared={shared} />}
+                footer={
+                    <>
+                        <AgentSigninsCard
+                            signins={agentSignins()}
+                            stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
+                            actions={{ add: addModelKeyAction, remove: deleteModelKeyAction }}
+                        />
+                        <FallbackCard providers={covered} shared={shared} />
+                    </>
+                }
             />
         </div>
     );

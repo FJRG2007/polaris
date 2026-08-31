@@ -18,14 +18,20 @@ import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as taskAccess from "@/lib/tasks/access";
 import { addComment } from "@/lib/tasks/task-detail-service";
+import { agentChoicesFor, type AgentChoice } from "@/lib/agents/agent-readiness";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
 
-/** The agents Polaris can offer, and where a session could run. Read by the
- *  start dialog, which cannot import the catalogue's detection itself: probing a
- *  machine is a server's job. */
+/**
+ * The agents Polaris can offer, and where a session could run.
+ *
+ * Each agent arrives knowing whether this account can actually sign it in, which
+ * is the question the dialog was not asking. It is answered here rather than in
+ * the dialog because it is a question about stored credentials, and nothing in a
+ * browser is ever told which ones exist - only whether one does.
+ */
 export async function sessionChoicesAction(): Promise<{
-    agents: { id: string; label: string; vendor: string; install: string | null; docs: string }[];
+    agents: AgentChoice[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
 }> {
@@ -43,13 +49,7 @@ export async function sessionChoicesAction(): Promise<{
         })
     ]);
     return {
-        agents: core.AGENT_CLIS.map((cli) => ({
-            id: cli.id,
-            label: cli.label,
-            vendor: cli.vendor,
-            install: cli.install,
-            docs: cli.docs
-        })),
+        agents: await agentChoicesFor(user.id),
         repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
         hosts
     };
@@ -105,6 +105,25 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         if (!host) return { error: "That server is not one of yours." };
     }
 
+    // Before a row exists, because a session that could never have signed in is
+    // not a record of an attempt - it is a dead row somebody has to notice and
+    // clear. Only `missing` refuses: `unknown` is a tool Polaris holds no sourced
+    // credential for, and refusing on that would be inventing a problem. A session
+    // on a server the person already signed the tool in on is `missing` too, which
+    // is why the message says so rather than insisting.
+    const blocked = (await agentChoicesFor(user.id)).find(
+        (agent) => agent.id === value.cli && agent.readiness === "missing"
+    );
+    if (blocked) {
+        const ways = blocked.missing.map((credential) => credential.label).join(" or ");
+        return {
+            error:
+                value.place === "host"
+                    ? `Nothing here signs ${blocked.label} in. Either sign it in on that server yourself, or add ${ways} under AI keys.`
+                    : `Nothing here signs ${blocked.label} in, so it would start and sit at its own login prompt. Add ${ways} under AI keys.`
+        };
+    }
+
     const { session, token } = await sessions.createSession({
         repoId: value.repoId,
         startedById: user.id,
@@ -130,7 +149,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         await runtime.startSession(session, token);
     } catch (error) {
         revalidatePath(SESSIONS_PATH);
-        return { id: session.id, error: error instanceof Error ? error.message : "It would not start" };
+        return { id: session.id, error: sessions.readableFailure(error, `starting ${session.id}`) };
     }
 
     if (value.prompt) {
@@ -142,7 +161,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
             await sessions.addSessionMessage(
                 session.id,
                 "system",
-                `Polaris could not send the first prompt: ${error instanceof Error ? error.message : "unknown"}`
+                sessions.readableFailure(error, `first prompt for ${session.id}`)
             );
         });
     }
@@ -192,7 +211,7 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     try {
         await runtime.promptSession(session.id, parsed.data.text);
     } catch (error) {
-        return { error: error instanceof Error ? error.message : "It did not go through" };
+        return { error: sessions.readableFailure(error, `prompting ${session.id}`) };
     }
     revalidatePath(`${SESSIONS_PATH}/${session.id}`);
     return {};
@@ -205,7 +224,7 @@ export async function interruptSessionAction(sessionId: string): Promise<{ error
     try {
         await runtime.interruptSession(sessionId);
     } catch (error) {
-        return { error: error instanceof Error ? error.message : "It did not go through" };
+        return { error: sessions.readableFailure(error, `interrupting ${sessionId}`) };
     }
     revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};

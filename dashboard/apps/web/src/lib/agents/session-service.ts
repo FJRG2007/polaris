@@ -15,9 +15,49 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 
+/**
+ * A failure whose message is meant for whoever is reading the screen.
+ *
+ * The distinction this draws is the whole reason it exists. A session that will
+ * not start fails somewhere down a stack of things a person has never heard of -
+ * a daemon rejecting an environment value, a socket that refused, an SSH host key
+ * - and the message from any of those is worse than useless on a screen: it names
+ * internals, it suggests nothing to do, and where it quotes an address or a path
+ * it hands out something nobody asked to publish.
+ *
+ * So only what is thrown as one of these is shown. Everything else is logged and
+ * reported as a sentence that says what happened without pretending to explain
+ * it. A message here has to pass the test every message in Polaris passes: it
+ * says what is wrong in terms the reader can see, and where there is something to
+ * press, it says what.
+ */
+export class SessionRefusal extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "SessionRefusal";
+    }
+}
+
+/**
+ * What to put on a session that would not start.
+ *
+ * The general sentence is deliberately not an apology and not a stack trace: it
+ * says the session is the thing to look at, which is true, and the events on it
+ * are what a person can actually read.
+ */
+export function readableFailure(error: unknown, context: string): string {
+    if (error instanceof SessionRefusal) return error.message;
+    console.error(`[agent-session] ${context}:`, error);
+    return "Polaris could not start this session. Nothing was left running.";
+}
+
 export interface SessionView {
     readonly id: string;
     readonly title: string;
+    /** Whose credentials this session runs on. Whoever started it: a session
+     *  spends the account of the person who asked for it, never the
+     *  repository's, and null on one started before this was recorded. */
+    readonly ownerId: string | null;
     readonly repoId: string;
     readonly repoFullName: string;
     readonly cli: string;
@@ -40,6 +80,7 @@ export interface SessionView {
 const VIEW_SELECT = {
     id: true,
     title: true,
+    startedById: true,
     repoId: true,
     cli: true,
     command: true,
@@ -64,6 +105,7 @@ type SessionRecord = {
 } & {
     id: string;
     title: string;
+    startedById: string | null;
     repoId: string;
     cli: string;
     command: string | null;
@@ -96,6 +138,7 @@ function toView(record: SessionRecord): SessionView {
     return {
         id: record.id,
         title: record.title,
+        ownerId: record.startedById,
         repoId: record.repoId,
         repoFullName: record.repo.repoFullName,
         cli: record.cli,

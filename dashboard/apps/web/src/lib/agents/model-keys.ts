@@ -32,6 +32,7 @@ import { loadEnv } from "@polaris/config";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { agentSignins, isSigninRow, isSigninSlug, signinSlug } from "@/lib/agents/agent-signins";
 import { encryptSecret, decryptSecret, secretFingerprint, CredentialDecryptError } from "@polaris/storage";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
@@ -50,7 +51,11 @@ const SHARE_KEY = "agents.keys.shareInstance";
 const STORABLE = new Set<string>([...MODEL_PROVIDERS.map((provider) => provider.slug), GATEWAY_SLUG]);
 
 export function isStorableProvider(slug: string): boolean {
-    return STORABLE.has(slug);
+    // Agent sign-ins live in this table too, under their own prefix. Asked
+    // separately rather than folded into the set above because that set is
+    // built once at module load and the sign-ins are derived from a catalogue -
+    // a set frozen at import would go stale the moment one was added.
+    return STORABLE.has(slug) || isSigninSlug(slug);
 }
 
 export async function instanceKeysAreShared(): Promise<boolean> {
@@ -589,4 +594,76 @@ function writeGateway(
     if (config.model) secrets.OPENAI_COMPATIBLE_MODEL = config.model;
     if (config.context > 0) secrets.OPENAI_COMPATIBLE_CONTEXT = String(config.context);
     if (config.maxOutput > 0) secrets.OPENAI_COMPATIBLE_MAX_OUTPUT = String(config.maxOutput);
+}
+
+// ---------------------------------------------------------------------------
+// Agent sign-ins
+// ---------------------------------------------------------------------------
+
+/**
+ * The credentials a SESSION is handed: the model provider keys a run gets, plus
+ * the sign-ins that no provider serves.
+ *
+ * One function rather than two calls at every site, because a session that got
+ * one and not the other is a session that starts and then sits at a login prompt
+ * - which looks from every screen exactly like an agent thinking hard.
+ *
+ * Null, as with a run's, means the store could not be read at all. An empty
+ * object means it was read and holds nothing, and those two must not be reported
+ * as each other: the first is a fault here, the second is somebody who has not
+ * linked an account yet and can be told so.
+ */
+export async function sessionSecretsFor(userId: string | null): Promise<Record<string, string> | null> {
+    const secrets = await runSecretsFor(userId);
+    if (secrets === null) return null;
+    try {
+        const shared = await instanceKeysAreShared();
+        const own = userId ? await storedKeys(userId) : [];
+        const instance = shared ? await storedKeys(INSTANCE) : [];
+        const used: string[] = [];
+        for (const signin of agentSignins()) {
+            const picked = firstUsable(own, signin.slug) ?? firstUsable(instance, signin.slug);
+            if (!picked || !picked.secret) continue;
+            secrets[signin.env] = picked.secret;
+            used.push(picked.row.id);
+        }
+        await noteUsed(used);
+        return secrets;
+    } catch {
+        return null;
+    }
+}
+
+/** The sign-in rows this owner holds, as the screen that lists them needs them.
+ *  Separate from `listModelKeys` so neither screen has to know the other's rows
+ *  are in the same table. */
+export async function listAgentSignins(owner: KeyOwner): Promise<ModelKeyView[]> {
+    const rows = await listModelKeys(owner);
+    return rows.filter((row) => isSigninRow(row.provider));
+}
+
+/** The model provider keys this owner holds - everything `listModelKeys` returns
+ *  that is not a sign-in. What the providers table on the keys screen shows. */
+export async function listProviderKeys(owner: KeyOwner): Promise<ModelKeyView[]> {
+    const rows = await listModelKeys(owner);
+    return rows.filter((row) => !isSigninRow(row.provider));
+}
+
+/** Which sign-ins this person can actually spend - their own, and the
+ *  deployment's where it shares them. By variable, which is what readiness is
+ *  asked in. */
+export async function signinEnvsFor(userId: string | null): Promise<Set<string>> {
+    const found = new Set<string>();
+    try {
+        const shared = await instanceKeysAreShared();
+        const own = userId ? await storedKeys(userId) : [];
+        const instance = shared ? await storedKeys(INSTANCE) : [];
+        for (const signin of agentSignins()) {
+            const slug = signinSlug(signin.env);
+            if (firstUsable(own, slug) ?? firstUsable(instance, slug)) found.add(signin.env);
+        }
+    } catch {
+        return found;
+    }
+    return found;
 }

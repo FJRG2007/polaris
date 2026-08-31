@@ -96,13 +96,21 @@ export const SESSION_BOOT = [
     // that wrote its hooks there would be hijacking every agent that person ever
     // starts. A project-local settings file applies to this worktree and to
     // nothing else, and is excluded from git so the agent cannot commit it.
+    //
+    // Base64, and not for tidiness. The host daemon refuses any environment value
+    // holding a control character - a deliberate rule, because these values are
+    // rendered into a compose file and a newline in one of them writes YAML. All
+    // three of these are files, every file has newlines, and so every session on
+    // this box was refused before it started with a message about a variable name
+    // nobody had ever seen. Base64 has no character that rule objects to, so the
+    // rule keeps doing its job and the files still arrive.
     'mkdir -p "$POLARIS_WORKDIR/.claude"',
-    'printf %s "$POLARIS_HOOK_SCRIPT" > "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
+    'printf %s "$POLARIS_HOOK_SCRIPT" | base64 -d > "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
     'chmod +x "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
-    'printf %s "$POLARIS_HOOK_SETTINGS" > "$POLARIS_WORKDIR/.claude/settings.local.json"',
+    'printf %s "$POLARIS_HOOK_SETTINGS" | base64 -d > "$POLARIS_WORKDIR/.claude/settings.local.json"',
     // The Polaris tools, registered in the worktree so the agent has them on its
     // first turn without anybody configuring anything.
-    'printf %s "$POLARIS_MCP_CONFIG" > "$POLARIS_WORKDIR/.mcp.json"',
+    'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_WORKDIR/.mcp.json"',
     'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
     // Enigma, when the resolved settings asked for it. Best effort: a session
     // without it works to weaker standards, and failing the whole thing over a

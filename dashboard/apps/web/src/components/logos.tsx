@@ -166,3 +166,30 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     if (seeded) return <ProviderMonogram slug={slug} name={seeded.name} className={className} />;
     return <Blocks className={className} />;
 }
+
+/**
+ * The vendors behind the coding agents, where Polaris already carries their mark.
+ *
+ * Only the four that are genuinely already here. The others - OpenCode, Cursor,
+ * Amp, Goose, Aider, Droid, OpenClaw - publish marks that are not ours to
+ * redraw, and a shape invented for one of them would be a trademark nobody
+ * recognises. They get the same monogram a model provider with no mark gets:
+ * tinted from the id, so two of them in a list are tellable apart before the
+ * letters are read.
+ */
+const AGENT_MARKS: Record<string, ComponentType<{ className?: string }>> = {
+    claude: AnthropicMark,
+    codex: OpenAiMark,
+    gemini: GeminiMark,
+    copilot: brand.GitHubMark
+};
+
+/** The logo for a coding agent, by its catalogue id. `custom` is a tool Polaris
+ *  knows nothing about, including what it looks like, so it draws the same
+ *  neutral block an unknown integration does. */
+export function AgentLogo({ id, label, className }: { id: string; label: string; className?: string }) {
+    const Mark = AGENT_MARKS[id];
+    if (Mark) return <Mark className={className} />;
+    if (id === "custom") return <Blocks className={className} />;
+    return <ProviderMonogram slug={id} name={label} className={className} />;
+}

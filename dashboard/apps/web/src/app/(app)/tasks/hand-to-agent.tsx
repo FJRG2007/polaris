@@ -20,6 +20,8 @@ import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import { agentHandoffChoicesAction, handTaskToAgentAction } from "./actions";
+import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import { AgentSelect, SignInNotice } from "@/components/agents/agent-select";
 import {
     Button,
     Dialog,
@@ -68,7 +70,7 @@ export function HandToAgent({ taskId, reference, name, description }: Props) {
 
 function HandOffDialog({ taskId, reference, name, description, onClose }: Props & { onClose: () => void }) {
     const [repos, setRepos] = useState<{ id: string; name: string }[] | null>(null);
-    const [agents, setAgents] = useState<{ id: string; label: string }[]>([]);
+    const [agents, setAgents] = useState<AgentChoice[]>([]);
     const [repoId, setRepoId] = useState("");
     const [cli, setCli] = useState("claude");
     // Seeded from the task and then editable. What a task says is usually the
@@ -115,6 +117,10 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
     };
 
     const noRepos = repos !== null && repos.length === 0;
+    // The chosen tool, when nothing here can sign it in. A handoff is always a
+    // session on this box, so there is no "already signed in on that server"
+    // case to leave room for: it would come up at a login prompt, full stop.
+    const unlinked = agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -140,12 +146,14 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
                         </label>
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">Agent</span>
-                            <Select
+                            <AgentSelect
+                                options={agents}
                                 value={cli}
-                                onValueChange={setCli}
-                                options={agents.map((agent) => ({ value: agent.id, label: agent.label }))}
+                                onChange={setCli}
+                                disabled={agents.length === 0}
                             />
                         </label>
+                        {unlinked ? <SignInNotice agent={unlinked} /> : null}
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">What it is being asked</span>
                             <Textarea
@@ -162,7 +170,7 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={busy || noRepos || !repoId || !prompt.trim()}>
+                    <Button onClick={submit} disabled={busy || noRepos || !repoId || !prompt.trim() || unlinked !== null}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Start
                     </Button>

@@ -27,10 +27,14 @@ import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
 import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
+import { sessionSecretsFor } from "@/lib/agents/model-keys";
+import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import {
     finishSession,
     markSessionStarted,
+    readableFailure,
     resolveSessionEnigma,
+    SessionRefusal,
     sessionPlacement,
     type SessionView
 } from "./session-service";
@@ -65,6 +69,10 @@ interface Bootstrap {
     readonly mcpConfig: string;
     readonly cloneHeader: string;
     readonly githubToken: string;
+    /** What signs the agent in, narrowed to the variables its own tool reads.
+     *  Empty on a machine where the tool is already signed in, and empty for a
+     *  tool Polaris holds no sourced credential for. */
+    readonly credentials: Record<string, string>;
 }
 
 /**
@@ -75,22 +83,25 @@ interface Bootstrap {
  * agent the way a person would, so the flags are the agent's business and stay
  * out of a list here that would rot in a month.
  */
-function agentCommandFor(session: SessionView): { binary: string; command: string; install: string } {
+function agentCommandFor(session: SessionView): { cli: core.AgentCli; binary: string; command: string; install: string } {
     if (session.cli === core.CUSTOM_AGENT_CLI) {
         const command = (session.command ?? "").trim();
-        return { binary: core.customAgentCli(command).binaries[0] ?? "", command, install: "" };
+        const cli = core.customAgentCli(command);
+        return { cli, binary: cli.binaries[0] ?? "", command, install: "" };
     }
     const cli = core.agentCliById(session.cli);
-    if (!cli) throw new Error(`Polaris no longer knows an agent called ${session.cli}.`);
+    if (!cli) throw new SessionRefusal(`Polaris no longer knows an agent called ${session.cli}.`);
     const binary = cli.binaries[0] ?? "";
-    return { binary, command: binary, install: cli.install ?? "" };
+    return { cli, binary, command: binary, install: cli.install ?? "" };
 }
 
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
     const owner = session.repoFullName.split("/")[0] ?? "";
     const githubToken = await githubAppInstallationToken(owner);
     if (!githubToken) {
-        throw new Error(`Polaris has no GitHub App installation for ${owner}, so it cannot check the repository out.`);
+        throw new SessionRefusal(
+            `Polaris has no GitHub App installation for ${owner}, so it cannot check the repository out. Connect it again under Agents settings.`
+        );
     }
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
@@ -98,6 +109,15 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const mcp = `${base}/api/mcp`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session);
+
+    // Null is the store failing to answer, and it is not the same as an account
+    // holding nothing. A session started on a blank environment because the
+    // store blinked would come up at a login prompt and look, from every screen,
+    // exactly like an agent thinking.
+    const available = await sessionSecretsFor(session.ownerId);
+    if (available === null) {
+        throw new SessionRefusal("Polaris could not read the stored credentials just now. Try again in a moment.");
+    }
 
     return {
         repoFullName: session.repoFullName,
@@ -112,14 +132,34 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         hookSettings: JSON.stringify(claudeHookSettings(`${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`)),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
-        githubToken
+        githubToken,
+        credentials: credentialsForAgent(agent.cli, available)
     };
 }
 
-/** The environment the boot script reads. One place, so the container and the
- *  server are handed the same names for the same things. */
+/**
+ * A file's contents, as an environment value.
+ *
+ * The host daemon refuses any environment value carrying a control character,
+ * and it is right to: these are rendered into a compose file, and a newline in
+ * one of them writes YAML of its own. Every value below that is a FILE has
+ * newlines by definition, so each one travels base64-encoded and the boot script
+ * decodes it. See the note beside the decode in `session-commands.ts`.
+ */
+function asFile(contents: string): string {
+    return Buffer.from(contents, "utf8").toString("base64");
+}
+
+/**
+ * The environment the boot script reads. One place, so the container and the
+ * server are handed the same names for the same things.
+ *
+ * The agent's own credential goes in last and is allowed to be absent: a machine
+ * where the tool is already signed in needs nothing, and a tool Polaris holds no
+ * sourced credential for gets nothing rather than a guess.
+ */
 function bootEnv(boot: Bootstrap): Record<string, string> {
-    return {
+    return guardEnv({
         GITHUB_REPOSITORY: boot.repoFullName,
         GIT_AUTH_HEADER: boot.cloneHeader,
         GH_TOKEN: boot.githubToken,
@@ -132,10 +172,32 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_ENIGMA_ARGV: boot.enigmaArgv,
-        POLARIS_HOOK_SCRIPT: boot.hookScript,
-        POLARIS_HOOK_SETTINGS: boot.hookSettings,
-        POLARIS_MCP_CONFIG: boot.mcpConfig
-    };
+        POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
+        POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
+        POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
+        ...boot.credentials
+    });
+}
+
+/**
+ * Catch a value the daemon would refuse, here, where it can be said in a
+ * sentence.
+ *
+ * The daemon's rejection names the variable, which is a name nobody outside this
+ * file has ever seen, and it arrives as the reason a session failed. The three
+ * file-shaped values above are encoded and cannot trip it; what remains is a
+ * branch, a repository name or a command somebody typed, and if one of those
+ * ever carries a newline the honest thing to say is which of them and that it is
+ * a Polaris fault rather than something the reader can fix.
+ */
+function guardEnv(env: Record<string, string>): Record<string, string> {
+    for (const [key, value] of Object.entries(env)) {
+        // eslint-disable-next-line no-control-regex
+        if (/[\u0000-\u001f\u007f]/.test(value)) {
+            throw new Error(`Polaris built an unusable value for ${key} and stopped rather than start a broken session.`);
+        }
+    }
+    return env;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +222,9 @@ export async function startSession(session: SessionView, token: string): Promise
             await markSessionStarted(session.id, commands.sessionContainerName(session.id), boot.workdir);
         }
     } catch (error) {
-        await finishSession(session.id, "failed", error instanceof Error ? error.message : "It would not start");
+        // What lands on the session is what somebody will read on it, so the
+        // internals of a daemon or an SSH failure stop here. See `readableFailure`.
+        await finishSession(session.id, "failed", readableFailure(error, `starting ${session.id}`));
         throw error;
     }
 }
@@ -236,7 +300,20 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
             onStderr: keep
         });
         if (result.code !== 0) {
-            throw new Error(said.trim().slice(-400) || "The server refused to start the session.");
+            // What the machine printed goes to the log, not to the screen: it is
+            // a shell's stderr, and the one thing it reliably contains is paths.
+            // The exception is the boot script's own refusals, which were written
+            // to be read - they are the lines that begin `polaris:`.
+            console.error(`[agent-session] ${session.id} would not start:`, said.trim().slice(-2000));
+            const spoken = said
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line.startsWith("polaris: "))
+                .map((line) => line.slice("polaris: ".length))
+                .at(-1);
+            throw new SessionRefusal(
+                spoken ? spoken.charAt(0).toUpperCase() + spoken.slice(1) : "The server refused to start the session."
+            );
         }
     } finally {
         lease.release();

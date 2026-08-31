@@ -13,9 +13,11 @@
  * back, and the person watching can interrupt, answer a question, or take the
  * terminal over. Nothing here talks to a model API. That is the point:
  *
- *   - The agent authenticates the way it already does on that machine. A Claude
- *     subscription, a Codex login, a key in the tool's own configuration - none
- *     of it has to be re-entered into Polaris, and Polaris never holds it.
+ *   - The agent authenticates as itself. On a machine somebody already signed the
+ *     tool in on, that is the login already sitting in its own configuration and
+ *     Polaris neither reads nor replaces it. In a container Polaris made, nothing
+ *     is signed in to anything, so a session there is handed the credential its
+ *     owner linked - see `credentials` below, and `agent-signins.ts`.
  *   - Whatever the vendor ships - its permission prompts, its sandboxing, its own
  *     tool allowlist, its context management - keeps working, because it is the
  *     vendor's binary doing the work rather than a re-implementation of it.
@@ -53,6 +55,37 @@ export const AGENT_OBSERVATION_NOTES: Record<AgentObservation, string> = {
 };
 
 /**
+ * One way of signing an agent in.
+ *
+ * Every one of these is an environment variable, because that is what all of
+ * these tools read and it is the only shape that works in a container nobody has
+ * ever sat in front of. A tool signed in on the machine already needs none of
+ * this: the variable is simply absent and its own configuration answers.
+ */
+export interface AgentCredential {
+    /** The variable the tool reads it from. Its own name, never one of ours. */
+    readonly env: string;
+    /** What it is, in the words its vendor uses. Goes on the field that asks. */
+    readonly label: string;
+    /** Where somebody goes to get one. */
+    readonly url: string;
+    /**
+     * How it is obtained, when that is not "copy it off the page above".
+     *
+     * A subscription token is the case that needs saying: it is minted by a
+     * command the person runs where they are already signed in, and a screen that
+     * only linked a page would be sending them somewhere with no field on it.
+     */
+    readonly howto: string | null;
+    /**
+     * True when this signs in an existing subscription rather than billing a key
+     * per token. Worth telling apart on a screen: it is the difference between
+     * "the plan you already pay for" and "a meter starts now".
+     */
+    readonly subscription: boolean;
+}
+
+/**
  * One command-line agent.
  *
  * Every field is something Polaris can act on. There is no marketing copy here
@@ -85,6 +118,21 @@ export interface AgentCli {
     readonly observe: AgentObservation;
     /** The tool's own documentation, for the screen that could not find it. */
     readonly docs: string;
+    /**
+     * What signs this tool in, best first, and an empty list where Polaris does
+     * not know.
+     *
+     * Empty is a real answer and it is load-bearing: it means nothing here has
+     * been sourced from the vendor, so Polaris must not claim the tool is
+     * unusable and must not block a session on it. A guessed variable name would
+     * be worse than no answer at all - it reads as a fact, and the session it
+     * refuses to start would be refused for a reason nobody can check.
+     *
+     * A machine that already has the tool signed in satisfies all of these
+     * without any of them being set, which is why a missing credential is a
+     * warning on the screen rather than a refusal on a server.
+     */
+    readonly credentials: readonly AgentCredential[];
 }
 
 /**
@@ -105,7 +153,27 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g @anthropic-ai/claude-code",
         home: ".claude",
         observe: "hooks",
-        docs: "https://docs.claude.com/en/docs/claude-code"
+        docs: "https://docs.claude.com/en/docs/claude-code",
+        credentials: [
+            // The subscription first, deliberately. Most people running Claude
+            // Code are running it on a plan rather than on metered credits, and a
+            // screen that offered the API key first would be asking them to start
+            // paying twice for the same work.
+            {
+                env: "CLAUDE_CODE_OAUTH_TOKEN",
+                label: "Claude subscription token",
+                url: "https://docs.claude.com/en/docs/claude-code",
+                howto: "Run `claude setup-token` wherever you are already signed in to Claude Code, and paste what it prints.",
+                subscription: true
+            },
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "codex",
@@ -115,7 +183,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g @openai/codex",
         home: ".codex",
         observe: "output",
-        docs: "https://github.com/openai/codex"
+        docs: "https://github.com/openai/codex",
+        credentials: [
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "opencode",
@@ -125,7 +202,25 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g opencode-ai",
         home: ".config/opencode",
         observe: "output",
-        docs: "https://opencode.ai/docs"
+        docs: "https://opencode.ai/docs",
+        credentials: [
+            // Multi-provider: it reads whichever provider variables are set, so
+            // either of these on its own is enough to get it started.
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "gemini",
@@ -135,7 +230,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g @google/gemini-cli",
         home: ".gemini",
         observe: "output",
-        docs: "https://github.com/google-gemini/gemini-cli"
+        docs: "https://github.com/google-gemini/gemini-cli",
+        credentials: [
+            {
+                env: "GEMINI_API_KEY",
+                label: "Google AI API key",
+                url: "https://aistudio.google.com/apikey",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "copilot",
@@ -145,7 +249,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g @github/copilot",
         home: ".copilot",
         observe: "output",
-        docs: "https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli"
+        docs: "https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli",
+        credentials: [
+            // Already satisfied in every session Polaris starts: the repository
+            // is checked out with a GitHub App token that is exported under this
+            // name, so this one never asks anybody for anything.
+            {
+                env: "GH_TOKEN",
+                label: "GitHub token",
+                url: "https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli",
+                howto: null,
+                subscription: true
+            }
+        ]
     },
     {
         id: "cursor",
@@ -155,7 +271,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: null,
         home: ".cursor",
         observe: "output",
-        docs: "https://cursor.com/docs/cli/overview"
+        docs: "https://cursor.com/docs/cli/overview",
+        credentials: [
+            {
+                env: "CURSOR_API_KEY",
+                label: "Cursor API key",
+                url: "https://cursor.com/docs/cli/overview",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "amp",
@@ -165,7 +290,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "npm install -g @sourcegraph/amp",
         home: ".config/amp",
         observe: "output",
-        docs: "https://ampcode.com/manual"
+        docs: "https://ampcode.com/manual",
+        credentials: [
+            {
+                env: "AMP_API_KEY",
+                label: "Amp API key",
+                url: "https://ampcode.com/settings",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "goose",
@@ -175,7 +309,23 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: null,
         home: ".config/goose",
         observe: "output",
-        docs: "https://block.github.io/goose/docs/quickstart"
+        docs: "https://block.github.io/goose/docs/quickstart",
+        credentials: [
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "aider",
@@ -185,7 +335,23 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: "python -m pip install aider-install && aider-install",
         home: ".aider",
         observe: "output",
-        docs: "https://aider.chat/docs"
+        docs: "https://aider.chat/docs",
+        credentials: [
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "droid",
@@ -195,7 +361,16 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: null,
         home: ".factory",
         observe: "output",
-        docs: "https://docs.factory.ai/cli/getting-started/quickstart"
+        docs: "https://docs.factory.ai/cli/getting-started/quickstart",
+        credentials: [
+            {
+                env: "FACTORY_API_KEY",
+                label: "Factory API key",
+                url: "https://docs.factory.ai/cli/getting-started/quickstart",
+                howto: null,
+                subscription: false
+            }
+        ]
     },
     {
         id: "openclaw",
@@ -205,7 +380,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         install: null,
         home: ".openclaw",
         observe: "output",
-        docs: "https://github.com/openclaw/openclaw"
+        docs: "https://github.com/openclaw/openclaw",
+        credentials: []
     }
 ];
 
@@ -225,8 +401,39 @@ export function customAgentCli(command: string): AgentCli {
         install: null,
         home: null,
         observe: "output",
-        docs: ""
+        docs: "",
+        // Nothing is known about a command somebody typed, including what signs
+        // it in. Empty means Polaris will not judge it - see the field.
+        credentials: []
     };
+}
+
+/**
+ * Which of a tool's credentials is actually in place, or null.
+ *
+ * The first one that answers, in the catalogue's own order, which is why the
+ * order there is not alphabetical: a subscription is listed before the metered
+ * key of the same vendor so a person holding both is reported as running on the
+ * plan they already pay for.
+ */
+export function credentialInPlace(cli: AgentCli, present: (env: string) => boolean): AgentCredential | null {
+    return cli.credentials.find((credential) => present(credential.env)) ?? null;
+}
+
+/**
+ * Whether a session can be expected to get anywhere, and what to say if not.
+ *
+ * Three answers rather than two, and the third is the one that matters. "ready"
+ * and "missing" are the obvious pair; "unknown" is a tool Polaris has no sourced
+ * credential for, and it must read as neither - a screen that showed it as
+ * missing would be inventing a problem, and one that showed it as ready would be
+ * promising something nobody checked.
+ */
+export type AgentReadiness = "ready" | "missing" | "unknown";
+
+export function agentReadiness(cli: AgentCli, present: (env: string) => boolean): AgentReadiness {
+    if (cli.credentials.length === 0) return "unknown";
+    return credentialInPlace(cli, present) ? "ready" : "missing";
 }
 
 /** The catalogued tool with this id, or null. `custom` is deliberately not one:

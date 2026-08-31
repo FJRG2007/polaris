@@ -22,6 +22,7 @@ import * as time from "@/lib/tasks/time-service";
 import { recordAudit } from "@/lib/audit-service";
 import { prisma } from "@polaris/db";
 import { requirePermission, sessionCan } from "@/lib/session";
+import { agentChoicesFor, type AgentChoice } from "@/lib/agents/agent-readiness";
 import { startSessionAction } from "@/app/(app)/apps/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
 import * as views from "@/lib/tasks/view-service";
@@ -2028,7 +2029,7 @@ export async function deleteFormAction(
  */
 export async function agentHandoffChoicesAction(): Promise<{
     repos: { id: string; name: string }[];
-    agents: { id: string; label: string }[];
+    agents: AgentChoice[];
 }> {
     const user = await requirePermission("tasks.read");
     // An account with no standing in the Agents app is offered nothing rather
@@ -2043,7 +2044,10 @@ export async function agentHandoffChoicesAction(): Promise<{
     });
     return {
         repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
-        agents: core.AGENT_CLIS.map((cli) => ({ id: cli.id, label: cli.label }))
+        // With whether this account can sign each one in, for the same reason the
+        // sessions screen carries it: a task handed to an agent nobody can sign
+        // in is a task that goes quiet, and the board never learns why.
+        agents: await agentChoicesFor(user.id)
     };
 }
 
