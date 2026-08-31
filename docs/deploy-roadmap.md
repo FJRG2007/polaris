@@ -161,7 +161,7 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) — gi
 | Deploy from a template repo | ⬜ | P1 | |
 | Notifications (deploy success/fail) | 🟡 | P1 | in-app bell exists; wire deploy events |
 | Slack/Discord/email/webhook notifications | ⬜ | P1 | |
-| Team/RBAC on projects | 🟡 | P1 | perms exist; per-project sharing todo |
+| Team/RBAC on projects | ✅ | P1 | per-project access entries: capability sets, roles, person/team/org/everyone, per-environment scope, expiry |
 | Usage/cost estimates | ⬜ | P2 | |
 | API + CLI to manage deploys | ⬜ | P1 | |
 | Terraform/provider | ⬜ | P2 | |
