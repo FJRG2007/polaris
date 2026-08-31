@@ -135,3 +135,39 @@ export function isStaleImageLease(raw: string): boolean {
     const lowered = raw.toLowerCase();
     return lowered.includes("unable to lease content") || lowered.includes("lease does not exist");
 }
+
+/**
+ * How much room a prune actually handed back, read from what it printed.
+ *
+ * The daemon's HTTP API answers this as a number; a machine reached over SSH is
+ * driven with the command-line client, which prints "Total reclaimed space:
+ * 1.271GB" and nothing machine-readable. Parsing prose is not nice, and the
+ * alternative is a sweep that cannot say whether it helped - which is the
+ * difference between "freed 3 GB, try again" and "something happened, good luck".
+ *
+ * Docker prints one such line per prune, so a run of several is summed. Anything
+ * it cannot read contributes nothing rather than guessing: reporting zero freed
+ * when a prune worked costs a retry, and reporting gigabytes that were never
+ * freed costs the operator their afternoon.
+ */
+export function parseReclaimedBytes(output: string): number {
+    const units: Record<string, number> = {
+        b: 1,
+        kb: 1000,
+        mb: 1000 ** 2,
+        gb: 1000 ** 3,
+        tb: 1000 ** 4,
+        kib: 1024,
+        mib: 1024 ** 2,
+        gib: 1024 ** 3,
+        tib: 1024 ** 4
+    };
+    let total = 0;
+    const pattern = /total reclaimed space:\s*([\d.]+)\s*([a-z]+)/gi;
+    for (const match of output.matchAll(pattern)) {
+        const size = Number(match[1]);
+        const unit = units[(match[2] ?? "").toLowerCase()];
+        if (Number.isFinite(size) && unit) total += Math.round(size * unit);
+    }
+    return total;
+}

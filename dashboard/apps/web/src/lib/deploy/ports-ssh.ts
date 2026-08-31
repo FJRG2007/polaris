@@ -9,7 +9,7 @@
 import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
-import { quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { parseReclaimedBytes, quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -118,6 +118,37 @@ export class SshPorts implements RuntimePorts {
             return [];
         }
         return parseExposedTcpPorts(out);
+    }
+
+    /**
+     * Hand back the room nothing is using on this machine.
+     *
+     * The reason this exists at all: without it, a deploy to an enrolled server
+     * that runs out of disk is simply refused. The runtime asks the ports to free
+     * space before giving up, the local daemon answers, and a server had no such
+     * method - so `!ctx.ports.reclaimSpace` was true and the failure was rethrown
+     * with a message telling the operator to go and tidy the machine themselves.
+     * Every time. On the one kind of machine Polaris never prunes on a timer.
+     *
+     * Build cache and untagged images only, exactly like the local sweep, and for
+     * the same reason: both come back on the next build or pull at the cost of
+     * time, and everything else on that disk is somebody's data. `-a` on the image
+     * prune is deliberate - it takes images no container is on, which is what a
+     * machine full of superseded `:latest` layers is holding.
+     *
+     * Both prunes run even if the first frees nothing: they hold different things.
+     * A prune that fails contributes nothing rather than failing the reclaim -
+     * this is already the recovery path, and a machine that cannot prune is a
+     * machine the caller should hear "nothing freed" about, not an exception.
+     */
+    public async reclaimSpace(): Promise<number> {
+        let said = "";
+        const keep = (chunk: Buffer): void => {
+            said += chunk.toString("utf8");
+        };
+        await this.run("docker builder prune -f", keep).catch(() => undefined);
+        await this.run("docker image prune -af", keep).catch(() => undefined);
+        return parseReclaimedBytes(said);
     }
 
     public async login(registry: string, username: string, password: string): Promise<void> {

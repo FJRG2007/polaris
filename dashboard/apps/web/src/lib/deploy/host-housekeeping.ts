@@ -34,6 +34,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { diskFullness, localDisk } from "@/lib/deploy/local-disk";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
+import { reclaimServerSpace, serverDiskFullness, serversWithDeployments } from "@/lib/deploy/server-space";
 
 /** What was last reported, so a disk that is tight for a month is one message
  *  rather than a hundred and twenty. */
@@ -119,6 +120,35 @@ export async function sweepHostSpace(): Promise<HousekeepingSweep> {
     if (after !== null && after >= STILL_TIGHT) await warn(after, freed);
     else await clearWarning();
     return { before, after, freed, reclaimed: true };
+}
+
+/**
+ * The same pass over every server Polaris deploys to.
+ *
+ * Added late, and that is the bug it fixes: the sweep above has only ever looked
+ * at the box Polaris runs on, because every call it makes goes to the local
+ * daemon. A machine somebody enrolled and deploys to was pruned by nothing -
+ * not on a timer, and not even when a deploy to it failed for room, because the
+ * SSH ports had no way to prune either. So it filled, quietly, over releases,
+ * and then refused a pull with a message about a rename in a content store.
+ *
+ * One server failing does not stop the others: a machine that is off, or that
+ * will not prune, is not a reason for the rest to go another six hours.
+ *
+ * Returns what each machine gave back, for the screen and for the log.
+ */
+export async function sweepServerSpace(): Promise<{ id: string; name: string; freed: number }[]> {
+    const servers = await serversWithDeployments();
+    const swept: { id: string; name: string; freed: number }[] = [];
+    for (const server of servers) {
+        const fullness = await serverDiskFullness(server.id);
+        // Null is "could not ask", never "there is room". A machine that is down
+        // is not a machine with a healthy disk, and pruning is not what fixes it.
+        if (fullness === null || fullness < HIGH_WATER) continue;
+        const freed = await reclaimServerSpace(server.id);
+        swept.push({ id: server.id, name: server.name, freed: freed ?? 0 });
+    }
+    return swept;
 }
 
 /**

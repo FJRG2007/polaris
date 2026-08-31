@@ -33,6 +33,21 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 /** The build these were last brought to. */
 const BUILD_KEY = "home.services.build";
 
+/** The build the last attempt was for, written whether or not it worked.
+ *
+ * `BUILD_KEY` says "they are on this build" and is only written when every one of
+ * them came up. That is right, and on its own it made a failure repeat forever:
+ * a deploy that could not land left the build unrecorded, so the next restart
+ * tried the whole set again - pulling several hundred megabytes onto the machine
+ * that had just run out of room to hold them, and doing it again on the restart
+ * after that.
+ *
+ * So the ATTEMPT is recorded separately. One try per build of Polaris, which is
+ * what "once per build" was always meant to mean; a failure now waits for the
+ * next release or for somebody to deploy it themselves, rather than making the
+ * disk it filled worse on a loop. */
+const ATTEMPT_KEY = "home.services.attemptedBuild";
+
 /**
  * The containers that are Polaris' rather than somebody's.
  *
@@ -57,6 +72,10 @@ export async function upgradeHomeServices(): Promise<void> {
     // and redeploying on every `next dev` restart would be its own bug.
     if (!build) return;
     if ((await getSetting(BUILD_KEY)) === build) return;
+    // Tried already for this build and something did not come up. Retrying costs
+    // the pull again, on a machine that may have failed for want of room.
+    if ((await getSetting(ATTEMPT_KEY)) === build) return;
+    await setSetting(ATTEMPT_KEY, build);
 
     const installs = await prisma.installedApp.findMany({
         where: {

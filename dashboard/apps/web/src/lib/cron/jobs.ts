@@ -19,7 +19,7 @@ import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepCameraReachability } from "@/lib/home/reachability";
-import { sweepHostSpace } from "@/lib/deploy/host-housekeeping";
+import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
@@ -45,6 +45,22 @@ async function syncTrackers(): Promise<number> {
     const ids = await trackersToSync();
     for (const id of ids) await syncTracker(id);
     return ids.length;
+}
+
+/**
+ * Both disks Polaris is responsible for: its own box, and every server it
+ * deploys to.
+ *
+ * One job rather than two because they are one question - "is anything Polaris
+ * put on a disk still there for no reason" - and because a second entry would be
+ * a second thing to notice was missing. The server pass runs even when the local
+ * one found nothing to do: they fill at completely different rates, and the local
+ * box is usually the one with room.
+ */
+async function sweepEveryDisk(): Promise<{ local: number; servers: number }> {
+    const local = await sweepHostSpace();
+    const servers = await sweepServerSpace().catch(() => []);
+    return { local: local.freed, servers: servers.reduce((total, one) => total + one.freed, 0) };
 }
 
 export interface ScheduledJob {
@@ -344,7 +360,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // here: two runners pruning the same store race each other onto the same
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
-        run: sweepHostSpace
+        run: sweepEveryDisk
     },
     {
         key: "suspensions",
