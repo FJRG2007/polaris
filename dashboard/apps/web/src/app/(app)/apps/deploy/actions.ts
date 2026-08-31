@@ -1274,16 +1274,33 @@ export async function createVolumeAction(input: DeployVolumeInput): Promise<{ er
     }
 }
 
+/**
+ * The standing that decides a write to one volume, taken from the service the
+ * volume is actually on rather than from the id the caller sent beside it.
+ *
+ * `updateVolume` and `deleteVolume` match on the project owner, who owns every
+ * project they created - so authorizing against a service the caller names would
+ * let a volume in one of the owner's projects be changed from another.
+ */
+async function volumeWriteAccess(
+    volumeId: string,
+    userId: string
+): Promise<{ ownerId: string; applicationId: string }> {
+    const summary = await deployService.getVolumeOwner(volumeId);
+    if (!summary?.applicationId) throw new Error("Volume not found");
+    const access = await requireApplicationAccess(summary.applicationId, userId, "volumes.manage");
+    return { ownerId: access.ownerId, applicationId: summary.applicationId };
+}
+
 export async function updateVolumeAction(
     input: DeployVolumeUpdateInput & { applicationId: string }
 ): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const { applicationId, ...patch } = input;
-        const access = await requireApplicationAccess(applicationId, user.id, "volumes.manage");
-        await updateVolume(access.ownerId, patch);
+        const { ownerId, applicationId } = await volumeWriteAccess(input.id, user.id);
+        await updateVolume(ownerId, input);
         await recordAudit({ actorId: user.id, action: "deploy.volume.update", targetType: "application", targetId: applicationId });
-        void deployService.redeployForEnvScope("application", applicationId, access.ownerId).catch(() => undefined);
+        void deployService.redeployForEnvScope("application", applicationId, ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -1294,10 +1311,10 @@ export async function updateVolumeAction(
 export async function deleteVolumeAction(input: { id: string; applicationId: string }): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
-        const access = await requireApplicationAccess(input.applicationId, user.id, "volumes.manage");
-        await deleteVolume(input.id, access.ownerId);
-        await recordAudit({ actorId: user.id, action: "deploy.volume.remove", targetType: "application", targetId: input.applicationId });
-        void deployService.redeployForEnvScope("application", input.applicationId, access.ownerId).catch(() => undefined);
+        const { ownerId, applicationId } = await volumeWriteAccess(input.id, user.id);
+        await deleteVolume(input.id, ownerId);
+        await recordAudit({ actorId: user.id, action: "deploy.volume.remove", targetType: "application", targetId: applicationId });
+        void deployService.redeployForEnvScope("application", applicationId, ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
