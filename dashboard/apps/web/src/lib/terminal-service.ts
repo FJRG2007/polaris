@@ -25,10 +25,12 @@ const TICKET_TTL_MS = 60_000;
 
 /** What a ticket authorizes. `ssh` is a shell on a registered server as the Polaris
  *  login; `ssh-root` is one as root, which only a server whose enrollment granted
- *  sudo can offer. Kept as separate modes rather than a flag on the ticket because
- *  the mode is what the sidecar turns into a command, and the client never gets to
+ *  sudo can offer. `agent` attaches to the terminal a coding-agent session is
+ *  running in, which is the same container mechanism pointed at a different
+ *  command. Kept as separate modes rather than a flag on the ticket because the
+ *  mode is what the sidecar turns into a command, and the client never gets to
  *  name that command. */
-export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker";
+export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker" | "agent";
 
 export interface MintTicketInput {
     targetId: string;

@@ -38,7 +38,7 @@ wss.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`)
 wss.on("connection", async (ws, req) => {
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
-    const interactive = ["terminal", "ssh", "ssh-root", "docker"];
+    const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent"];
     if (!ticket || !interactive.includes(ticket.mode)) {
         console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
         ws.close(4001, "invalid ticket");
@@ -50,7 +50,7 @@ wss.on("connection", async (ws, req) => {
             ? await openSshSession(ticket, ws)
             : ticket.mode === "docker"
               ? await openDockerSession(ticket, ws)
-              : await openContainerSession(ticket, ws);
+              : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
 
     session.stream.on("data", (chunk) => {
@@ -79,11 +79,21 @@ wss.on("connection", async (ws, req) => {
     ws.on("close", () => session.close());
 });
 
-/** A container terminal, opened through the host daemon on the local box. */
-async function openContainerSession(ticket, ws) {
+/**
+ * A container terminal, opened through the host daemon on the local box.
+ *
+ * `agent` attaches to the tmux session a coding agent is running in rather than
+ * opening a shell beside it. That is the whole difference between watching the
+ * agent and standing in the same container as it: attaching shows what it is
+ * doing right now and lets somebody type at it, and detaching leaves it running.
+ * The name is fixed by Polaris when the session starts, so it is not something a
+ * client gets to name.
+ */
+async function openContainerSession(ticket, ws, attachToAgent = false) {
     const client = new HostdClient();
     try {
-        const execId = await client.execCreate({ container: ticket.containerRef, cmd: ["/bin/sh"], tty: true });
+        const cmd = attachToAgent ? ["tmux", "attach-session", "-t", "polaris-agent"] : ["/bin/sh"];
+        const execId = await client.execCreate({ container: ticket.containerRef, cmd, tty: true });
         const stream = await client.execStart(execId);
         console.error(`polaris ws: terminal open for ${ticket.containerRef}`);
         return {

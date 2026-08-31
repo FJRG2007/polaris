@@ -58,7 +58,10 @@ describe("the work Polaris runs on a schedule", () => {
         // it before either wrote that it had been announced. The rest are written
         // to be re-run and several already are, from the screens that sweep them
         // lazily. A scheduled message is the plainest case of all: two runners
-        // would send it twice, into a room, under somebody's name.
+        // would send it twice, into a room, under somebody's name. A tracker pull
+        // writes the link that stops an issue arriving twice AFTER it creates the
+        // task, so two passes over one connection produce two of everything it
+        // had not seen before.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
         expect(leased.sort()).toEqual([
             "backups",
@@ -70,7 +73,8 @@ describe("the work Polaris runs on a schedule", () => {
             "home-recording",
             "home-retention",
             "host-space",
-            "task-reminders"
+            "task-reminders",
+            "task-trackers"
         ]);
     });
 

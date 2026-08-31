@@ -14,6 +14,7 @@
  * opening the one above it to find out what a choice means.
  */
 
+import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
@@ -45,6 +46,13 @@ import {
  *  setting, so it can never be mistaken for one. */
 export const INHERIT = "__inherit__";
 
+/** A three-state choice rendered by a Select, because a switch has two states and
+ *  "inherit" is the third one every tier here needs. */
+function enigmaChoice(enabled: boolean | null): string {
+    if (enabled === null) return INHERIT;
+    return enabled ? "on" : "off";
+}
+
 /** A tier that decides nothing, which is what one nobody has configured looks
  *  like. */
 export function emptyTier(scope: string): AgentDefaultsView {
@@ -53,6 +61,7 @@ export function emptyTier(scope: string): AgentDefaultsView {
         execution: null,
         poolId: null,
         poolName: null,
+        enigma: core.INHERIT_ENIGMA,
         model: null,
         fallback: null,
         effort: null,
@@ -111,6 +120,13 @@ export function AgentDefaultsCard({
         onChange({ ...tier, [key]: value });
     };
 
+    /** One field of the Enigma block, leaving the rest of it alone - it is stored
+     *  as one value, so setting a field means rewriting the whole thing. */
+    const setEnigma = <K extends keyof core.EnigmaSettings>(key: K, value: core.EnigmaSettings[K]) => {
+        setSaved(false);
+        onChange({ ...tier, enigma: { ...tier.enigma, [key]: value } });
+    };
+
     const save = () => {
         onError(null);
         startTransition(() => {
@@ -123,6 +139,7 @@ export function AgentDefaultsCard({
                             poolId: tier.poolId,
                             model: tier.model,
                             fallback: tier.fallback,
+                            enigma: tier.enigma,
                             effort: tier.effort,
                             push: tier.push,
                             shell: tier.shell,
@@ -207,6 +224,44 @@ export function AgentDefaultsCard({
                         ]}
                     />
                 </Field>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    {/* The rest of Enigma. The gate above is the field with a
+                        minutes-per-run cost on it and keeps its own place; these
+                        two are what an operator changes when they are debugging
+                        Enigma itself or want a session to start faster. */}
+                    <Field
+                        label="Enigma"
+                        hint="Installs your policies, conventions and guardrails into every agent before it starts."
+                    >
+                        <Select
+                            value={enigmaChoice(tier.enigma.enabled)}
+                            onValueChange={(next) =>
+                                setEnigma("enabled", next === INHERIT ? null : next === "on")
+                            }
+                            options={[
+                                { value: INHERIT, label: "Inherit" },
+                                { value: "on", label: "On" },
+                                { value: "off", label: "Off" }
+                            ]}
+                        />
+                    </Field>
+                    <Field label="How much of it" hint={core.ENIGMA_SCOPE_NOTES[tier.enigma.scope ?? "all"]}>
+                        <Select
+                            value={tier.enigma.scope ?? INHERIT}
+                            onValueChange={(next) =>
+                                setEnigma("scope", next === INHERIT ? null : (next as core.EnigmaScope))
+                            }
+                            options={[
+                                { value: INHERIT, label: "Inherit" },
+                                ...core.ENIGMA_SCOPES.map((value) => ({
+                                    value,
+                                    label: core.ENIGMA_SCOPE_LABELS[value]
+                                }))
+                            ]}
+                        />
+                    </Field>
+                </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Runs on">

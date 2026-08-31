@@ -17,6 +17,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     agentDefaultsSchema,
@@ -57,6 +58,7 @@ export interface AgentDefaultsView {
     pullRequests: boolean | null;
     issues: boolean | null;
     gate: AgentGateMode | null;
+    enigma: core.EnigmaSettings;
 }
 
 /** The GitHub account a repository belongs to, which is the scope key its
@@ -80,6 +82,7 @@ const SELECT = {
     pullRequests: true,
     issues: true,
     gate: true,
+    enigma: true,
     pool: { select: { name: true } }
 } as const;
 
@@ -97,6 +100,7 @@ type Row = {
     pullRequests: boolean | null;
     issues: boolean | null;
     gate: string | null;
+    enigma: string | null;
     pool: { name: string } | null;
 };
 
@@ -115,7 +119,10 @@ function toView(row: Row): AgentDefaultsView {
         privateRepos: row.privateRepos,
         pullRequests: row.pullRequests,
         issues: row.issues,
-        gate: row.gate as AgentGateMode | null
+        gate: row.gate as AgentGateMode | null,
+        // Read through the parser rather than handed over raw: a column written by
+        // a newer build can name a scope this one does not have.
+        enigma: core.parseEnigmaSettings(row.enigma)
     };
 }
 
@@ -155,7 +162,14 @@ export async function saveAgentDefaults(ownerId: string, input: AgentDefaultsInp
     // The chain is a list everywhere except in the column, which is text - the
     // schema carries no scalar arrays, so every JSON value here is stored as a
     // string and read back through `parseFallback`.
-    const data = { ...values, poolId, fallback: values.fallback === null ? null : JSON.stringify(values.fallback) };
+    const data = {
+        ...values,
+        poolId,
+        fallback: values.fallback === null ? null : JSON.stringify(values.fallback),
+        // Null clears the tier rather than storing an empty object, so "nothing
+        // set here" and "everything set here to its default" stay different.
+        enigma: values.enigma ? JSON.stringify(values.enigma) : null
+    };
     await prisma.agentDefaults.upsert({
         where: { ownerId_scope: { ownerId, scope } },
         create: { ownerId, scope, ...data },
@@ -186,7 +200,7 @@ export async function getPlatformAgentDefaults(): Promise<AgentDefaultsView> {
     }
     const result = agentDefaultsSchema.safeParse(parsed);
     const values = result.success ? result.data : agentDefaultsSchema.parse({});
-    return { ...values, scope: GENERAL_SCOPE, poolName: null };
+    return { ...values, scope: GENERAL_SCOPE, poolName: null, enigma: values.enigma ?? core.INHERIT_ENIGMA };
 }
 
 /** Store it, or forget the key when it decides nothing. */

@@ -26,6 +26,7 @@ import { notifyMentions } from "@/lib/rich-text/mention-notify";
 import { listCommits, type CommitLink } from "./commit-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
 import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
+import { pushTaskStatus } from "./trackers/push";
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -753,6 +754,11 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
 
     if (movedTo !== null && movedTo !== before.statusId) {
         await runAutomations({ trigger: "task.statusChanged", taskId: input.taskId, actorId });
+        // A task that mirrors an issue somewhere else moves it too, if its
+        // connection was told to. Here rather than at a call site because every
+        // way a status changes - a drag, a bulk edit, an agent over MCP - comes
+        // through this one function.
+        await pushTaskStatus(input.taskId);
         if (finished) {
             await runAutomations({ trigger: "task.completed", taskId: input.taskId, actorId });
             await rescheduleIfRecurring(input.taskId, actorId);

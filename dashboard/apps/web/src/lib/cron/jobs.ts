@@ -30,12 +30,22 @@ import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
+import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
 import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
+
+/** Every connected tracker, one pass each. One that fails leaves the reason on
+ *  itself and does not stop the others: a Jira that is down is not a reason for
+ *  a Linear to go stale. */
+async function syncTrackers(): Promise<number> {
+    const ids = await trackersToSync();
+    for (const id of ids) await syncTracker(id);
+    return ids.length;
+}
 
 export interface ScheduledJob {
     /** Names the job everywhere: the route that triggers it, the lease it takes,
@@ -205,6 +215,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // Leased, because sending twice is the one thing this must not do.
         leaseMs: 5 * MINUTE,
         run: sweepDueScheduledMessages
+    },
+    {
+        key: "task-trackers",
+        // A connected Linear or Jira is read on a timer rather than pushed to:
+        // both can push, and neither can push to a Polaris that is not on the
+        // public internet - which most of them are not. Two minutes is as far
+        // behind somebody else's board as anybody notices.
+        everyMs: Number(process.env.POLARIS_TRACKER_SYNC_MS) || 2 * MINUTE,
+        // Leased, because two passes over one connection would create the same
+        // issue as two tasks: the link that stops that is written after the task.
+        leaseMs: 10 * MINUTE,
+        run: syncTrackers
     },
     {
         key: "task-reminders",

@@ -691,6 +691,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/tasks/reports",
             icon: ChartColumn,
             keywords: ["dashboard", "workload", "metrics"]
+        },
+        {
+            label: "Connected trackers",
+            href: "/tasks/trackers",
+            icon: Link2,
+            keywords: ["linear", "jira", "import", "sync", "issues", "two-way"]
         }
     ],
     notes: [
@@ -1197,6 +1203,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
                     "pull request",
                     "review",
                     "ci failed"
+                ]
+            },
+            {
+                label: "Sessions",
+                href: "/apps/agents/sessions",
+                icon: MessagesSquare,
+                keywords: [
+                    "live",
+                    "claude code",
+                    "codex",
+                    "terminal",
+                    "worktree",
+                    "steer",
+                    "interactive",
+                    "talk to"
                 ]
             },
             {
