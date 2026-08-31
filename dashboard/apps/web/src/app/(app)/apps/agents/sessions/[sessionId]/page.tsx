@@ -6,13 +6,20 @@ import { getSession, sessionEvents, sessionMessages } from "@/lib/agents/session
 
 export const dynamic = "force-dynamic";
 
-export default async function AgentSessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
+export default async function AgentSessionPage({
+    params
+}: {
+    params: Promise<{ sessionId: string }>;
+}) {
     const { sessionId } = await params;
     const user = await requirePermission("agents.read");
     const session = await getSession(sessionId, user.id);
     if (!session) notFound();
 
-    const [events, messages] = await Promise.all([sessionEvents(sessionId), sessionMessages(sessionId)]);
+    const [events, messages] = await Promise.all([
+        sessionEvents(sessionId),
+        sessionMessages(sessionId)
+    ]);
 
     return (
         <>

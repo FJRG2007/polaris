@@ -223,9 +223,50 @@ Tasks (work management):
       a roster, teams inside it, and a team granted a whole space or one folder
       of it; an administrator can turn organizations off, restrict who may start
       one, and cap organizations per account, members and teams
+- [x] Connected trackers: Linear and Jira linked to a space with the person's
+      own credential, polled rather than pushed, mirroring title, description
+      and status in - statuses mapped by the provider's own category first and
+      its name as a fallback - and pushing a task's status back out when the
+      connection is told to. Not the assignees or the comments, deliberately:
+      guessing which Polaris account matches which tracker account misassigns
+      work, and a conversation copied in both directions duplicates itself
+- [x] Handing a task to an agent from its panel: a session opens on a branch of
+      its own, seeded with the task's own title and description, and the agent
+      reads and moves the task itself as it works - see Agents below
+- [ ] Live poll against a real Linear or Jira account (built + unit-tested; not
+      called from this machine)
 - [ ] Attachments on a task (Drive file picker)
 - [ ] Whiteboards, mind maps, clips, AI, email-in, proofing, map and workload
       views, portfolios - out of scope for this pillar
+
+Agents (coding sessions):
+
+- [x] A catalogue of the CLI agents Polaris can be helpful about (Claude Code,
+      Codex, OpenCode, Gemini CLI, GitHub Copilot CLI, Cursor CLI, Amp, Goose,
+      Aider, Droid, OpenClaw), detected on a machine by probing for their
+      binary; a tool Polaris was never told about still runs, as a custom entry
+- [x] A session runs the vendor's own binary as a real process - in a tmux
+      session in a container on the box or on an enrolled server, in a git
+      worktree of its own - so it authenticates the way it already does on that
+      machine and nothing is re-entered into or held by Polaris
+- [x] What a session is doing is read from its own lifecycle hooks where the
+      tool supports them (written into the worktree rather than the machine's
+      home directory), and from its terminal output otherwise; steering it is a
+      bracketed paste and a newline into that terminal
+- [x] Sessions list sorted by what needs a person, a session page with the
+      transcript, the activity and the prompt box, and a terminal that attaches
+      to the agent's own tmux rather than opening a shell beside it
+- [x] Polaris answers MCP at `/api/mcp`: stateless JSON-RPC 2.0 with tools for
+      Tasks and for sessions, authorized by an API key or by a session's own
+      reporting token, so an agent Polaris started has the tools from its first
+      turn with nothing configured
+- [x] Enigma - the operator's policy skills, operating contract, slash commands
+      and post-edit guardrails - installed into every session by default,
+      resolved as one setting down instance/account/repository/session tiers
+      where null means inherit and only a fully resolved value is ever used
+- [ ] Live end-to-end run against a real container or enrolled server (built +
+      unit-tested; this dev machine has no Docker, so the container and SSH
+      runtime paths are exercised only through their pure parts)
 
 Notes (personal writing):
 
@@ -411,6 +452,22 @@ Code (pull requests and issues):
   leak past it. Read receipts stay the one reciprocal setting: hiding that
   you read a message also hides whether yours was read, because a one-way
   version is not a privacy setting, it is a mirror.
+- MCP's stateless `/api/mcp` accepts two credentials and treats them
+  differently: an API key acts with whatever scopes and admin standing its
+  owner holds, but a session's own reporting token - handed to the agent
+  Polaris started before it ran, so nothing has to be configured by hand -
+  resolves to a fixed, non-admin scope covering only tasks and reading agents.
+  An agent that can start more agents is one bad turn from starting them in a
+  loop with nobody watching; that reach is only ever an API key somebody chose
+  to hand over.
+- Enigma resolves down four tiers - session, repository, account, instance -
+  nearest wins for every field except its escape-hatch `config` map, which
+  merges far-to-near instead: an instance-wide key an operator set is a
+  different setting from a per-session one, not a competing answer to it, so
+  setting anything at all on a session must never silently drop the
+  instance-wide policy underneath it. A resolved value is never the one
+  stored - only null ("inherit") and explicit choices are, so raising the
+  instance default keeps reaching every tier that never overrode it.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct

@@ -30,12 +30,17 @@ function hasControlChar(value: string): boolean {
     return false;
 }
 
+/** What a name and a body can hold. Named because they are also what anything
+ *  mirroring somebody else's system has to clamp to before it gets here. */
+export const TASK_NAME_MAX = 255;
+export const TASK_DESCRIPTION_MAX = 20000;
+
 /** A name shown in a nav, a card or a cell: printable, trimmed, never blank. */
 export const taskName = z
     .string()
     .trim()
     .min(1, "A name is required")
-    .max(255, "Keep the name under 255 characters")
+    .max(TASK_NAME_MAX, "Keep the name under 255 characters")
     .refine((value) => !hasControlChar(value), "The name must not contain control characters");
 
 /** A shorter name for the containers a person scans down a sidebar. */
@@ -48,7 +53,10 @@ export const containerName = z
 
 /** An optional free-text body. An empty string clears it rather than leaving the
  *  previous value behind, which is what a cleared editor should mean. */
-export const taskDescription = z.string().trim().max(20000, "Keep the description under 20,000 characters");
+export const taskDescription = z
+    .string()
+    .trim()
+    .max(TASK_DESCRIPTION_MAX, "Keep the description under 20,000 characters");
 
 /** Hex colours are stored, not class names, so a colour picked once renders the
  *  same in a chart, a badge and an exported view. */
@@ -119,7 +127,8 @@ export const TASK_STATUS_TYPE_LABELS: Record<TaskStatusType, string> = {
 export const TASK_STATUS_TYPE_HINTS: Record<TaskStatusType, string> = {
     open: "Work that has not been picked up yet.",
     active: "Work in progress. Counts as started but not finished.",
-    blocked: "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
+    blocked:
+        "Work that cannot move. Marked as held up wherever it appears, without anybody having to say why.",
     done: "Finished work. Completing a task moves it to the first status of this kind.",
     closed: "Filed away without being completed: cancelled, duplicate, or won't do."
 };
@@ -166,7 +175,11 @@ export const UNFINISHED_STATUS_TYPES = TASK_STATUS_TYPES.filter((type) => !isFin
  * reason. The stage and those three are the same state reached four ways, not
  * two ideas that happen to share a word.
  */
-export const DEFAULT_TASK_STATUSES: readonly { name: string; type: TaskStatusType; color: string }[] = [
+export const DEFAULT_TASK_STATUSES: readonly {
+    name: string;
+    type: TaskStatusType;
+    color: string;
+}[] = [
     { name: "To do", type: "open", color: "#64748b" },
     { name: "In progress", type: "active", color: "#3b82f6" },
     { name: "Blocked", type: "blocked", color: "#ef4444" },
@@ -765,7 +778,15 @@ export type AutomationInput = z.infer<typeof automationSchema>;
 // Intake forms
 // ---------------------------------------------------------------------------
 
-export const FORM_FIELD_TYPES = ["text", "longText", "email", "number", "date", "dropdown", "checkbox"] as const;
+export const FORM_FIELD_TYPES = [
+    "text",
+    "longText",
+    "email",
+    "number",
+    "date",
+    "dropdown",
+    "checkbox"
+] as const;
 export type FormFieldType = (typeof FORM_FIELD_TYPES)[number];
 
 export const FORM_FIELD_LABELS: Record<FormFieldType, string> = {
@@ -1002,7 +1023,13 @@ export const taskCreateSchema = z.object({
     /** Whether the dates carry a time of day, or are all-day. */
     timed: z.boolean().default(false),
     /** Minutes. Entered as "2h 30m" and parsed before it reaches here. */
-    timeEstimate: z.number().int().min(0).max(60 * 24 * 365).nullable().default(null),
+    timeEstimate: z
+        .number()
+        .int()
+        .min(0)
+        .max(60 * 24 * 365)
+        .nullable()
+        .default(null),
     points: z.number().int().min(0).max(1000).nullable().default(null),
     sprintId: uuid.nullable().default(null),
     milestone: z.boolean().default(false),
@@ -1028,7 +1055,13 @@ export const taskUpdateSchema = z.object({
     startDate: isoDate.optional(),
     dueDate: isoDate.optional(),
     timed: z.boolean().optional(),
-    timeEstimate: z.number().int().min(0).max(60 * 24 * 365).nullable().optional(),
+    timeEstimate: z
+        .number()
+        .int()
+        .min(0)
+        .max(60 * 24 * 365)
+        .nullable()
+        .optional(),
     points: z.number().int().min(0).max(1000).nullable().optional(),
     sprintId: uuid.nullable().optional(),
     parentId: uuid.nullable().optional(),
@@ -1151,7 +1184,11 @@ export const checklistItemSchema = z.object({
 export const timeEntrySchema = z.object({
     taskId: uuid,
     /** Seconds. Entered as "1h 30m" and parsed before it reaches here. */
-    duration: z.number().int().min(1).max(24 * 3600 * 31),
+    duration: z
+        .number()
+        .int()
+        .min(1)
+        .max(24 * 3600 * 31),
     startedAt: z.string().datetime({ offset: true }).optional(),
     note: z.string().trim().max(500).default(""),
     billable: z.boolean().default(false)

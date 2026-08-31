@@ -14,7 +14,10 @@ import {
     ISSUE_TRACKER_FIELDS,
     flattenRichText,
     isIssueTracker,
+    isTrackerSite,
     linkedDescription,
+    linkedName,
+    normalizeTrackerSite,
     statusTypeFromName,
     statusTypeFromTracker,
     type TrackerIssue
@@ -70,11 +73,22 @@ describe("flattenRichText", () => {
         const doc = {
             type: "doc",
             content: [
-                { type: "paragraph", content: [{ type: "text", text: "The login redirect loops." }] },
+                {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "The login redirect loops." }]
+                },
                 {
                     type: "bulletList",
                     content: [
-                        { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Safari only" }] }] }
+                        {
+                            type: "listItem",
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    content: [{ type: "text", text: "Safari only" }]
+                                }
+                            ]
+                        }
                     ]
                 }
             ]
@@ -94,7 +108,9 @@ describe("flattenRichText", () => {
     });
 
     it("survives a shape it has never seen instead of throwing on somebody's issue", () => {
-        expect(flattenRichText({ type: "mediaGroup", content: [{ type: "text", text: "caption" }] })).toBe("caption");
+        expect(
+            flattenRichText({ type: "mediaGroup", content: [{ type: "text", text: "caption" }] })
+        ).toBe("caption");
         expect(flattenRichText(null)).toBe("");
         expect(flattenRichText(42)).toBe("");
     });
@@ -119,6 +135,74 @@ describe("linkedDescription", () => {
     });
 
     it("still says it on an issue with no description at all", () => {
-        expect(linkedDescription({ ...issue, description: "" }, "linear")).toContain("Mirrored from");
+        expect(linkedDescription({ ...issue, description: "" }, "linear")).toContain(
+            "Mirrored from"
+        );
+    });
+});
+
+describe("isTrackerSite", () => {
+    it("takes a site however somebody pasted it", () => {
+        expect(normalizeTrackerSite("https://Acme.atlassian.net/")).toBe("acme.atlassian.net");
+        expect(isTrackerSite("https://acme.atlassian.net/")).toBe(true);
+        expect(isTrackerSite("jira.acme.co.uk:8443")).toBe(true);
+    });
+
+    it("refuses the addresses that are not a site but a way onto the server's own network", () => {
+        expect(isTrackerSite("127.0.0.1:9200")).toBe(false);
+        expect(isTrackerSite("169.254.169.254")).toBe(false);
+        expect(isTrackerSite("localhost:8080")).toBe(false);
+        expect(isTrackerSite("acme.example/@internal-host")).toBe(false);
+        expect(isTrackerSite("user:pass@acme.example")).toBe(false);
+        expect(isTrackerSite("acme.example?x=1")).toBe(false);
+        expect(isTrackerSite("intranet")).toBe(false);
+        expect(isTrackerSite("")).toBe(false);
+    });
+});
+
+describe("what a mirrored issue becomes", () => {
+    const issue = (over: Partial<TrackerIssue>): TrackerIssue => ({
+        id: "1",
+        key: "ENG-42",
+        title: "A title",
+        description: "",
+        url: "https://acme.atlassian.net/browse/ENG-42",
+        status: "In Progress",
+        statusType: "active",
+        assignee: "",
+        updatedAt: "",
+        ...over
+    });
+
+    it("clamps a title to what a name can hold rather than refusing the issue", () => {
+        const name = linkedName(issue({ title: "x".repeat(400) }));
+        expect(name.length).toBeLessThanOrEqual(255);
+        expect(name.endsWith("...")).toBe(true);
+    });
+
+    it("takes the control characters out of a title, which a name refuses", () => {
+        expect(linkedName(issue({ title: `bad${String.fromCharCode(7)}title` }))).toBe("bad title");
+        expect(linkedName(issue({ title: "   " }))).toBe("ENG-42");
+    });
+
+    it("clamps a description and keeps the line saying where it came from", () => {
+        const description = linkedDescription(issue({ description: "y".repeat(30_000) }), "jira");
+        expect(description.length).toBeLessThanOrEqual(20_000);
+        expect(description).toContain("Mirrored from [ENG-42]");
+    });
+
+    it("leaves an ordinary description alone", () => {
+        expect(linkedDescription(issue({ description: "Short." }), "jira")).toContain(
+            "Short.\n\n---"
+        );
+    });
+});
+
+describe("flattenRichText", () => {
+    it("stops rather than walking a document nested past anything anybody wrote", () => {
+        let node: unknown = { type: "text", text: "deep" };
+        for (let level = 0; level < 500; level += 1) node = { type: "paragraph", content: [node] };
+        expect(() => flattenRichText(node)).not.toThrow();
+        expect(flattenRichText(node)).not.toContain("deep");
     });
 });

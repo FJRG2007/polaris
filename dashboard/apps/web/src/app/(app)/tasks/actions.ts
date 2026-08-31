@@ -2053,6 +2053,8 @@ export async function agentHandoffChoicesAction(): Promise<{
 
 /** Start a session on a task. The Agents app owns what that means; this is the
  *  door to it from a task, and it is the same door the sessions screen uses. */
-export async function handTaskToAgentAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function handTaskToAgentAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
     return startSessionAction(input);
 }

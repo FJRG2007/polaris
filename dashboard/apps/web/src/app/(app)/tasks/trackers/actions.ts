@@ -23,7 +23,9 @@ const saveSchema = z.object({
     id: z.string().uuid().nullable().default(null),
     provider: z.enum(core.ISSUE_TRACKERS),
     label: z.string().trim().min(1, "Give it a name").max(60),
-    spaceId: z.string().uuid(),
+    /** No space id: which space a connection writes into is the list's answer,
+     *  not the caller's. Taking one from the form would let somebody who may
+     *  admin one list have issues mirrored into any space on the instance. */
     listId: z.string().uuid(),
     /** A Linear team key, or a JQL string. Bounded, and otherwise the provider's
      *  business - Polaris does not parse somebody else's query language. */
@@ -45,7 +47,11 @@ export async function trackerTargetsAction(): Promise<{
         select: {
             id: true,
             name: true,
-            lists: { where: { archived: false }, select: { id: true, name: true }, orderBy: { order: "asc" } }
+            lists: {
+                where: { archived: false },
+                select: { id: true, name: true },
+                orderBy: { order: "asc" }
+            }
         },
         orderBy: { order: "asc" }
     });
@@ -64,8 +70,14 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     const value = parsed.data;
 
     // Reaching a space is not permission to fill it with somebody else's issues.
+    let spaceId: string;
     try {
-        await access.requireList({ id: user.id, isAdmin: Boolean(user.isAdmin) }, value.listId, "admin");
+        const list = await access.requireList(
+            { id: user.id, isAdmin: Boolean(user.isAdmin) },
+            value.listId,
+            "admin"
+        );
+        spaceId = list.spaceId;
     } catch {
         return { error: "You cannot add work to that list." };
     }
@@ -80,8 +92,21 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
         if (!value.config[field.key]?.trim()) return { error: `${field.label} is required.` };
     }
 
+    const config = { ...value.config };
+    // The one field that becomes an address this server calls. Normalised to the
+    // single form everything below stores and reads, then checked: a site is a
+    // hostname, and anything else is a way to point Polaris at its own network.
+    if (value.provider === "jira") {
+        config.site = core.normalizeTrackerSite(config.site ?? "");
+        if (!core.isTrackerSite(config.site)) {
+            return {
+                error: "That is not a Jira address. It should look like your-company.atlassian.net."
+            };
+        }
+    }
+
     try {
-        await trackers.saveTracker(user.id, { ...value });
+        await trackers.saveTracker(user.id, { ...value, spaceId, config });
     } catch (error) {
         return { error: error instanceof Error ? error.message : "It could not be saved." };
     }
@@ -89,12 +114,16 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     return {};
 }
 
-export async function checkTrackerAction(trackerId: string): Promise<{ ok: boolean; detail: string }> {
+export async function checkTrackerAction(
+    trackerId: string
+): Promise<{ ok: boolean; detail: string }> {
     const user = await requirePermission("tasks.manage");
     return trackers.checkTracker(user.id, trackerId);
 }
 
-export async function syncTrackerAction(trackerId: string): Promise<{ added?: number; updated?: number; error?: string }> {
+export async function syncTrackerAction(
+    trackerId: string
+): Promise<{ added?: number; updated?: number; error?: string }> {
     const user = await requirePermission("tasks.manage");
     const owned = await prisma.taskTracker.findFirst({
         where: { id: trackerId, ownerId: user.id },
@@ -103,10 +132,17 @@ export async function syncTrackerAction(trackerId: string): Promise<{ added?: nu
     if (!owned) return { error: "That connection is not one of yours." };
     const result = await syncTracker(trackerId);
     revalidatePath(TRACKERS_PATH);
-    return { added: result.added, updated: result.updated, ...(result.error ? { error: result.error } : {}) };
+    return {
+        added: result.added,
+        updated: result.updated,
+        ...(result.error ? { error: result.error } : {})
+    };
 }
 
-export async function setTrackerEnabledAction(trackerId: string, enabled: boolean): Promise<{ error?: string }> {
+export async function setTrackerEnabledAction(
+    trackerId: string,
+    enabled: boolean
+): Promise<{ error?: string }> {
     const user = await requirePermission("tasks.manage");
     await trackers.setTrackerEnabled(user.id, trackerId, enabled);
     revalidatePath(TRACKERS_PATH);

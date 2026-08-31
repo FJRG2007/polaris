@@ -64,7 +64,9 @@ function numberSchema(node: AnyDef): JsonSchema {
 }
 
 function isInt(node: AnyDef): boolean {
-    return ((node.checks as { kind: string }[] | undefined) ?? []).some((check) => check.kind === "int");
+    return ((node.checks as { kind: string }[] | undefined) ?? []).some(
+        (check) => check.kind === "int"
+    );
 }
 
 /**
@@ -125,7 +127,9 @@ export function toJsonSchema(schema: z.ZodTypeAny): JsonSchema {
         case "ZodEffects":
             return described(toJsonSchema(node.schema as z.ZodTypeAny));
         default:
-            throw new Error(`No JSON Schema for ${node.typeName}. Add it, or use a shape the tools already use.`);
+            throw new Error(
+                `No JSON Schema for ${node.typeName}. Add it, or use a shape the tools already use.`
+            );
     }
 }
 

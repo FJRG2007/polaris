@@ -46,7 +46,7 @@ on hardware you already own, sharing one account and one interface.
 | GitHub Actions                     | The same workflows on your own runners, so a private repository costs no minutes              |
 | CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                               |
 | Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules |
-| ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking                                 |
+| ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking - or connect your existing Linear or Jira and keep its issues mirrored in, with status pushed back |
 | Home Assistant, a camera app       | Places and cameras: live views, detections, clips, and alerts that arrive in chat             |
 | Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                       |
 | Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                   |
@@ -127,8 +127,12 @@ with one thing does not get the rest.
   resources, players, schedules and crash detection).
 - **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
   policy and budgets.
-- **Agents** - coding agents that work in a repository, open pull requests and
-  answer reviews, with your own model keys.
+- **Agents** - coding agents that work in a repository: headless runs that open
+  pull requests and answer reviews with your own model keys, and live sessions
+  that run the vendor's own CLI (Claude Code, Codex and others) in a real
+  terminal you can watch and steer from anywhere. A task can be handed straight
+  to one from its panel, and the agent reads and moves it back through
+  Polaris's own MCP server.
 - **Code** - the pull requests and issues you have open on GitHub, read as you.
 - **Databases** - Postgres, MySQL, MariaDB, MongoDB and Redis: browse, query and
   back up what you deployed.

@@ -13,7 +13,9 @@ import {
     DEFAULT_ENIGMA,
     INHERIT_ENIGMA,
     enigmaConfigArgv,
+    enigmaGateArgv,
     enigmaInstallArgv,
+    enigmaPackageSpec,
     parseEnigmaSettings,
     resolveEnigma
 } from "../src/enigma.js";
@@ -34,9 +36,12 @@ describe("resolveEnigma", () => {
     });
 
     it("honours a deliberate refusal rather than reading it as unset", () => {
-        expect(resolveEnigma({ ...INHERIT_ENIGMA, enabled: false }, { ...INHERIT_ENIGMA, enabled: true }).enabled).toBe(
-            false
-        );
+        expect(
+            resolveEnigma(
+                { ...INHERIT_ENIGMA, enabled: false },
+                { ...INHERIT_ENIGMA, enabled: true }
+            ).enabled
+        ).toBe(false);
     });
 
     it("merges the config from the far tier inwards, so a session keeps the instance policy", () => {
@@ -55,7 +60,9 @@ describe("enigmaInstallArgv", () => {
 
     it("takes whatever ships when no version is pinned, and the pin when one is", () => {
         expect(enigmaInstallArgv(DEFAULT_ENIGMA)).toContain("enigma-cli");
-        expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain("enigma-cli@1.4.0");
+        expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain(
+            "enigma-cli@1.4.0"
+        );
     });
 
     it("installs less when asked for policies only", () => {
@@ -80,12 +87,43 @@ describe("enigmaConfigArgv", () => {
     });
 });
 
+describe("enigmaGateArgv", () => {
+    it("carries the resolved gate to the machine as the setting the CLI has for it", () => {
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "off" })).toEqual([
+            "config",
+            "gate",
+            "off"
+        ]);
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "checks" })).toEqual([
+            "config",
+            "gate",
+            "on"
+        ]);
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "full" })).toEqual([
+            "config",
+            "gate",
+            "on"
+        ]);
+    });
+});
+
+describe("enigmaPackageSpec", () => {
+    it("is the same spec the install uses, so the settings reach the version that was installed", () => {
+        expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain(
+            enigmaPackageSpec({ ...DEFAULT_ENIGMA, version: "1.4.0" })
+        );
+        expect(enigmaPackageSpec(DEFAULT_ENIGMA)).toBe("enigma-cli");
+    });
+});
+
 describe("parseEnigmaSettings", () => {
     it("reads back what was stored", () => {
-        expect(parseEnigmaSettings(JSON.stringify({ enabled: false, gate: "full" }))).toMatchObject({
-            enabled: false,
-            gate: "full"
-        });
+        expect(parseEnigmaSettings(JSON.stringify({ enabled: false, gate: "full" }))).toMatchObject(
+            {
+                enabled: false,
+                gate: "full"
+            }
+        );
     });
 
     it("treats a value it cannot read as inherit rather than answering for the operator", () => {

@@ -52,6 +52,14 @@ function summarize(row: TaskRow): Record<string, unknown> {
     };
 }
 
+/** What the id column actually holds. A reference that is not one is a string
+ *  Prisma refuses to compare rather than a row that does not exist. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** And what the number column holds. A reference quoting more than this is not a
+ *  task, whatever else it might be. */
+const INT_MAX = 2_147_483_647;
+
 /** Both ways a task gets named. A reference is what a person quotes and what an
  *  agent is most likely to have been handed; an id is what a previous tool call
  *  returned. */
@@ -71,15 +79,31 @@ const taskRef = z
  * able to enumerate an instance's task numbers by watching which ones say
  * something different.
  */
-async function resolveTask(caller: McpCaller, ref: string): Promise<{ id: string; spaceId: string }> {
+async function resolveTask(
+    caller: McpCaller,
+    ref: string
+): Promise<{ id: string; spaceId: string }> {
     const scope = await access.visibleScope(await actorFor(caller));
     const reachable = access.scopeTaskWhere(scope);
     const trimmed = ref.trim();
     const match = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(trimmed);
+    // Neither branch reaches the database with something the column cannot hold.
+    // A reference whose number is past what an Int holds, and an id that is not a
+    // UUID, both make Prisma throw rather than answer - and a thrown query is
+    // reported to the model as "Polaris has logged why", which is no help at all
+    // to something that has simply quoted a title instead of a reference. This is
+    // the mistake the sentence below exists for, so it has to be the answer.
+    const number = match ? Number(match[2]) : 0;
+    if (match && (!Number.isSafeInteger(number) || number > INT_MAX)) {
+        throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
+    }
+    if (!match && !UUID.test(trimmed)) {
+        throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
+    }
     const task = match
         ? await prisma.task.findFirst({
               where: {
-                  AND: [reachable, { number: Number(match[2]), space: { prefix: match[1]!.toUpperCase() } }]
+                  AND: [reachable, { number, space: { prefix: match[1]!.toUpperCase() } }]
               },
               select: { id: true, spaceId: true }
           })
@@ -118,10 +142,21 @@ function text(body: string, structured?: unknown): McpToolResult {
 // ---------------------------------------------------------------------------
 
 const listInput = z.object({
-    query: z.string().trim().max(200).default("").describe("Match against the name or the reference."),
+    query: z
+        .string()
+        .trim()
+        .max(200)
+        .default("")
+        .describe("Match against the name or the reference."),
     space: z.string().trim().max(80).default("").describe("Limit to one space, by name or id."),
-    mine: z.boolean().default(false).describe("Only tasks assigned to the account this key belongs to."),
-    openOnly: z.boolean().default(true).describe("Leave out anything whose status counts as finished."),
+    mine: z
+        .boolean()
+        .default(false)
+        .describe("Only tasks assigned to the account this key belongs to."),
+    openOnly: z
+        .boolean()
+        .default(true)
+        .describe("Leave out anything whose status counts as finished."),
     limit: z.number().int().min(1).max(100).default(25)
 });
 
@@ -140,16 +175,24 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
             const space = await prisma.taskSpace.findFirst({
                 where: {
                     id: { in: spaceIds },
-                    OR: [{ id: input.space }, { name: { equals: input.space, mode: "insensitive" } }]
+                    OR: [
+                        { id: input.space },
+                        { name: { equals: input.space, mode: "insensitive" } }
+                    ]
                 },
                 select: { id: true }
             });
-            if (!space) throw new McpRefusal(`No space called "${input.space}" that this key can reach.`);
+            if (!space)
+                throw new McpRefusal(`No space called "${input.space}" that this key can reach.`);
             wanted = [space.id];
         }
 
         const rows = await tasks.listTasks(
-            { spaceIds: wanted, listIds: scope.listIds, ...(input.mine ? { assigneeId: caller.userId } : {}) },
+            {
+                spaceIds: wanted,
+                listIds: scope.listIds,
+                ...(input.mine ? { assigneeId: caller.userId } : {})
+            },
             { openOnly: input.openOnly, limit: 500 }
         );
         const needle = input.query.toLowerCase();
@@ -157,7 +200,8 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
             needle
                 ? rows.filter(
                       (row) =>
-                          row.name.toLowerCase().includes(needle) || row.reference.toLowerCase().includes(needle)
+                          row.name.toLowerCase().includes(needle) ||
+                          row.reference.toLowerCase().includes(needle)
                   )
                 : rows
         ).slice(0, input.limit);
@@ -175,7 +219,8 @@ const getInput = z.object({ task: taskRef });
 
 const getTaskTool: McpTool<z.infer<typeof getInput>> = {
     name: "tasks_get",
-    description: "Read one task in full: its description, status, assignees, subtasks and comments.",
+    description:
+        "Read one task in full: its description, status, assignees, subtasks and comments.",
     input: getInput,
     scope: "tasks.read",
     readOnly: true,
@@ -194,7 +239,9 @@ const getTaskTool: McpTool<z.infer<typeof getInput>> = {
             "",
             detail.task.description || "(no description)",
             detail.comments.length > 0 ? `\nComments (${detail.comments.length}):` : "",
-            ...detail.comments.map((comment) => `- ${comment.author?.name ?? "someone"}: ${comment.body}`)
+            ...detail.comments.map(
+                (comment) => `- ${comment.author?.name ?? "someone"}: ${comment.body}`
+            )
         ]
             .filter((line) => line !== "")
             .join("\n");
@@ -246,13 +293,21 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
                 assigneeIds: input.assignToMe ? [caller.userId] : []
             })
         });
-        return text(`Created ${created.reference}.`, { id: created.id, reference: created.reference });
+        return text(`Created ${created.reference}.`, {
+            id: created.id,
+            reference: created.reference
+        });
     }
 };
 
 const updateInput = z.object({
     task: taskRef,
-    status: z.string().trim().max(80).optional().describe('The status to move it to, by name ("In Progress").'),
+    status: z
+        .string()
+        .trim()
+        .max(80)
+        .optional()
+        .describe('The status to move it to, by name ("In Progress").'),
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().max(20_000).optional(),
     priority: z.enum(core.TASK_PRIORITIES).optional(),
@@ -273,9 +328,12 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
 
         const statusId = input.status ? (await resolveStatus(spaceId, input.status)).id : undefined;
         const assignees = input.assignToMe
-            ? (await prisma.taskAssignee.findMany({ where: { taskId: id }, select: { userId: true } })).map(
-                  (row) => row.userId
-              )
+            ? (
+                  await prisma.taskAssignee.findMany({
+                      where: { taskId: id },
+                      select: { userId: true }
+                  })
+              ).map((row) => row.userId)
             : undefined;
         if (assignees && !assignees.includes(caller.userId)) assignees.push(caller.userId);
 
@@ -307,7 +365,12 @@ const commentTaskTool: McpTool<z.infer<typeof commentInput>> = {
         const actor = await actorFor(caller);
         const { id } = await resolveTask(caller, input.task);
         await access.requireTask(actor, id, "guest");
-        await addComment(caller.userId, { taskId: id, body: input.body, parentId: null, assignedToId: null });
+        await addComment(caller.userId, {
+            taskId: id,
+            body: input.body,
+            parentId: null,
+            assignedToId: null
+        });
         return text("Posted.");
     }
 };

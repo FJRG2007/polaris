@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf } from "./agent-defaults-service";
 
 /**
  * A failure whose message is meant for whoever is reading the screen.
@@ -166,9 +167,10 @@ function toView(record: SessionRecord): SessionView {
 }
 
 /** Every session in the repositories this account holds, newest first. */
-export async function listSessions(ownerId: string, options: { repoId?: string; live?: boolean } = {}): Promise<
-    SessionView[]
-> {
+export async function listSessions(
+    ownerId: string,
+    options: { repoId?: string; live?: boolean } = {}
+): Promise<SessionView[]> {
     const records = await prisma.agentSession.findMany({
         where: {
             repo: { ownerId },
@@ -215,7 +217,9 @@ export interface SessionCreateInput {
  * session exists: it is what a person looks for in the branch list a week later,
  * and a session that failed to start still has one worth naming.
  */
-export async function createSession(input: SessionCreateInput): Promise<{ session: SessionView; token: string }> {
+export async function createSession(
+    input: SessionCreateInput
+): Promise<{ session: SessionView; token: string }> {
     const token = generateToken();
     const id = crypto.randomUUID();
     const record = await prisma.agentSession.create({
@@ -286,7 +290,10 @@ export async function recordSessionEvents(
     events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
 ): Promise<core.AgentSessionState | null> {
     if (events.length === 0) return null;
-    const current = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { state: true } });
+    const current = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { state: true }
+    });
     if (!current) return null;
 
     const state = core.replaySessionState(events, readState(current.state));
@@ -366,10 +373,20 @@ export async function sessionMessages(
 }
 
 /** Note that the machine got as far as having a process. */
-export async function markSessionStarted(sessionId: string, containerId: string, workdir: string): Promise<void> {
+export async function markSessionStarted(
+    sessionId: string,
+    containerId: string,
+    workdir: string
+): Promise<void> {
     await prisma.agentSession.update({
         where: { id: sessionId },
-        data: { containerId, workdir, state: "idle", startedAt: new Date(), lastEventAt: new Date() }
+        data: {
+            containerId,
+            workdir,
+            state: "idle",
+            startedAt: new Date(),
+            lastEventAt: new Date()
+        }
     });
 }
 
@@ -403,7 +420,14 @@ export async function sessionPlacement(sessionId: string): Promise<{
 } | null> {
     const record = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { id: true, place: true, hostId: true, containerId: true, workdir: true, state: true }
+        select: {
+            id: true,
+            place: true,
+            hostId: true,
+            containerId: true,
+            workdir: true,
+            state: true
+        }
     });
     if (!record) return null;
     return {
@@ -426,16 +450,25 @@ export async function sessionPlacement(sessionId: string): Promise<{
 export async function resolveSessionEnigma(sessionId: string): Promise<core.ResolvedEnigma> {
     const session = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { enigma: true, repo: { select: { enigma: true, gate: true, ownerId: true, repoFullName: true } } }
+        select: {
+            enigma: true,
+            repo: { select: { enigma: true, gate: true, ownerId: true, repoFullName: true } }
+        }
     });
     if (!session) return core.resolveEnigma();
 
     const owner = session.repo.ownerId;
-    const account = session.repo.repoFullName.split("/")[0] ?? "";
-    const tiers = await prisma.agentDefaults.findMany({
-        where: { ownerId: owner, scope: { in: [account, ""] } },
-        select: { scope: true, enigma: true, gate: true }
-    });
+    // Through the same helper the defaults screens use: organization tiers are
+    // stored under a lowercased login, and a row looked up by the repository's own
+    // casing is a tier that silently decides nothing.
+    const account = scopeOf(session.repo.repoFullName);
+    const [tiers, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId: owner, scope: { in: [account, GENERAL_SCOPE] } },
+            select: { scope: true, enigma: true, gate: true }
+        }),
+        getPlatformAgentDefaults()
+    ]);
     const byScope = (scope: string): core.EnigmaSettings => {
         const row = tiers.find((tier) => tier.scope === scope);
         if (!row) return core.INHERIT_ENIGMA;
@@ -453,5 +486,20 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
             ? { ...repoSettings, gate: session.repo.gate }
             : repoSettings;
 
-    return core.resolveEnigma(core.parseEnigmaSettings(session.enigma), repoTier, byScope(account), byScope(""));
+    // The instance tier last, and from the setting store rather than from a row:
+    // it is an administrator's answer for the whole deployment, so it has no owner
+    // to key a row on. Its own `gate` column is folded in the same way the others
+    // are, so an administrator who set only that still reaches a session.
+    const platformEnigma: core.EnigmaSettings =
+        platform.enigma.gate === null && platform.gate && core.isEnigmaGateMode(platform.gate)
+            ? { ...platform.enigma, gate: platform.gate }
+            : platform.enigma;
+
+    return core.resolveEnigma(
+        core.parseEnigmaSettings(session.enigma),
+        repoTier,
+        byScope(account),
+        byScope(GENERAL_SCOPE),
+        platformEnigma
+    );
 }

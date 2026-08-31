@@ -176,7 +176,9 @@ export async function POST(request: Request): Promise<Response> {
  */
 export async function GET(): Promise<Response> {
     return Response.json(
-        { error: "This MCP server answers requests, and has no stream to open. POST your JSON-RPC here." },
+        {
+            error: "This MCP server answers requests, and has no stream to open. POST your JSON-RPC here."
+        },
         { status: 405, headers: { Allow: "POST", "MCP-Protocol-Version": MCP_PROTOCOL_VERSION } }
     );
 }

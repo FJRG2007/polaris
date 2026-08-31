@@ -68,7 +68,13 @@ export function HandToAgent({ taskId, reference, name, description }: Props) {
     );
 }
 
-function HandOffDialog({ taskId, reference, name, description, onClose }: Props & { onClose: () => void }) {
+function HandOffDialog({
+    taskId,
+    reference,
+    name,
+    description,
+    onClose
+}: Props & { onClose: () => void }) {
     const [repos, setRepos] = useState<{ id: string; name: string }[] | null>(null);
     const [agents, setAgents] = useState<AgentChoice[]>([]);
     const [repoId, setRepoId] = useState("");
@@ -120,7 +126,8 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
     // The chosen tool, when nothing here can sign it in. A handoff is always a
     // session on this box, so there is no "already signed in on that server"
     // case to leave room for: it would come up at a login prompt, full stop.
-    const unlinked = agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
+    const unlinked =
+        agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -131,7 +138,8 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
 
                 {noRepos ? (
                     <p className="text-sm text-muted-foreground">
-                        An agent works in a repository the Agents app already reaches, and none is connected yet.
+                        An agent works in a repository the Agents app already reaches, and none is
+                        connected yet.
                     </p>
                 ) : (
                     <div className="space-y-3">
@@ -140,7 +148,10 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
                             <Select
                                 value={repoId}
                                 onValueChange={setRepoId}
-                                options={(repos ?? []).map((repo) => ({ value: repo.id, label: repo.name }))}
+                                options={(repos ?? []).map((repo) => ({
+                                    value: repo.id,
+                                    label: repo.name
+                                }))}
                                 placeholder="Pick a repository"
                             />
                         </label>
@@ -155,7 +166,9 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
                         </label>
                         {unlinked ? <SignInNotice agent={unlinked} /> : null}
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">What it is being asked</span>
+                            <span className="text-xs text-muted-foreground">
+                                What it is being asked
+                            </span>
                             <Textarea
                                 value={prompt}
                                 onChange={(event) => setPrompt(event.target.value)}
@@ -170,7 +183,10 @@ function HandOffDialog({ taskId, reference, name, description, onClose }: Props 
                     <Button variant="ghost" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={submit} disabled={busy || noRepos || !repoId || !prompt.trim() || unlinked !== null}>
+                    <Button
+                        onClick={submit}
+                        disabled={busy || noRepos || !repoId || !prompt.trim() || unlinked !== null}
+                    >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Start
                     </Button>

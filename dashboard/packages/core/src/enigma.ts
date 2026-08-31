@@ -48,7 +48,8 @@ export const ENIGMA_SCOPE_LABELS: Record<EnigmaScope, string> = {
 
 export const ENIGMA_SCOPE_NOTES: Record<EnigmaScope, string> = {
     all: "Skills, the operating contract, the slash commands and the post-edit guardrails.",
-    policies: "The skills and the operating contract. Faster to install, and enough to change how the work is done."
+    policies:
+        "The skills and the operating contract. Faster to install, and enough to change how the work is done."
 };
 
 /**
@@ -111,12 +112,17 @@ export type ResolvedEnigma = typeof DEFAULT_ENIGMA;
  * nearest would silently drop the operator's instance-wide policy the moment
  * somebody set anything at all on a session.
  */
-export function resolveEnigma(...tiers: readonly (EnigmaSettings | null | undefined)[]): ResolvedEnigma {
+export function resolveEnigma(
+    ...tiers: readonly (EnigmaSettings | null | undefined)[]
+): ResolvedEnigma {
     const present = tiers.filter((tier): tier is EnigmaSettings => Boolean(tier));
-    const first = <K extends keyof EnigmaSettings>(key: K): NonNullable<EnigmaSettings[K]> | null => {
+    const first = <K extends keyof EnigmaSettings>(
+        key: K
+    ): NonNullable<EnigmaSettings[K]> | null => {
         for (const tier of present) {
             const value = tier[key];
-            if (value !== null && value !== undefined) return value as NonNullable<EnigmaSettings[K]>;
+            if (value !== null && value !== undefined)
+                return value as NonNullable<EnigmaSettings[K]>;
         }
         return null;
     };
@@ -142,9 +148,14 @@ export function resolveEnigma(...tiers: readonly (EnigmaSettings | null | undefi
  * rather than passed as a flag because that is how npx selects a version.
  */
 export function enigmaInstallArgv(settings: ResolvedEnigma): string[] {
-    const spec = settings.version ? `enigma-cli@${settings.version}` : "enigma-cli";
     const parts = settings.scope === "all" ? ["--all"] : ["--policies"];
-    return ["-y", spec, "install", ...parts, "--yes"];
+    return ["-y", enigmaPackageSpec(settings), "install", ...parts, "--yes"];
+}
+
+/** The npm spec a resolved setup names, pinned or not. One place, so an install
+ *  and the config calls that follow it can never reach two different versions. */
+export function enigmaPackageSpec(settings: ResolvedEnigma): string {
+    return settings.version ? `enigma-cli@${settings.version}` : "enigma-cli";
 }
 
 /**
@@ -162,6 +173,18 @@ export function enigmaConfigArgv(settings: ResolvedEnigma): string[][] {
     return Object.entries(settings.config)
         .filter(([key, value]) => safeKey.test(key) && safeValue.test(value))
         .map(([key, value]) => ["config", key, value]);
+}
+
+/**
+ * The `enigma config` call that puts the resolved gate mode on the machine.
+ *
+ * The gate is a first-class field here and a plain on/off to the CLI, so a mode
+ * of `off` refuses it and every other mode asks for it. Emitted after the config
+ * map so this setting, which has a screen of its own, wins over a stale key
+ * somebody left in the escape hatch.
+ */
+export function enigmaGateArgv(settings: ResolvedEnigma): string[] {
+    return ["config", "gate", settings.gate === "off" ? "off" : "on"];
 }
 
 /** Whether a gate mode is one this build knows. A stored column is not a type,
@@ -196,11 +219,15 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
     return {
         enabled: typeof record.enabled === "boolean" ? record.enabled : null,
         scope:
-            typeof record.scope === "string" && (ENIGMA_SCOPES as readonly string[]).includes(record.scope)
+            typeof record.scope === "string" &&
+            (ENIGMA_SCOPES as readonly string[]).includes(record.scope)
                 ? (record.scope as EnigmaScope)
                 : null,
         gate: typeof record.gate === "string" && isEnigmaGateMode(record.gate) ? record.gate : null,
-        version: typeof record.version === "string" && record.version.trim() ? record.version.trim() : null,
+        version:
+            typeof record.version === "string" && record.version.trim()
+                ? record.version.trim()
+                : null,
         config: Object.keys(config).length > 0 ? config : null
     };
 }

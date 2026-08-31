@@ -35,7 +35,14 @@
  * only state that should ever interrupt anybody. `idle` is a finished turn, which
  * is a session you may come back to whenever you like.
  */
-export const AGENT_SESSION_STATES = ["starting", "working", "waiting", "idle", "stopped", "failed"] as const;
+export const AGENT_SESSION_STATES = [
+    "starting",
+    "working",
+    "waiting",
+    "idle",
+    "stopped",
+    "failed"
+] as const;
 export type AgentSessionState = (typeof AGENT_SESSION_STATES)[number];
 
 export const AGENT_SESSION_STATE_LABELS: Record<AgentSessionState, string> = {

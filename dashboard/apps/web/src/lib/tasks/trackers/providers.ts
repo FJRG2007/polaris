@@ -20,9 +20,16 @@ import * as core from "@polaris/core";
  *  Jira, short enough that a sync cannot hang a request forever. */
 const TIMEOUT_MS = 20_000;
 
-/** How many issues one pull takes. A first sync of a large tracker is meant to
- *  take several passes rather than one enormous one. */
+/** How many issues one request asks for. */
 const PAGE = 100;
+
+/** How many of those one pass will make. Paged rather than one request, because
+ *  a connection with more issues than a page never sees the rest of them - both
+ *  providers answer a page-sized ask with the same page every time. Bounded,
+ *  because a tracker with fifty thousand issues in it is not a board anybody
+ *  meant to mirror, and both providers answer newest-first so the pass that stops
+ *  at the bound stops on the oldest. */
+const MAX_PAGES = 10;
 
 export interface TrackerCredential {
     readonly provider: core.IssueTracker;
@@ -56,7 +63,9 @@ async function call(url: string, init: RequestInit): Promise<Response> {
     const response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (response.ok) return response;
     const said = (await response.text().catch(() => "")).slice(0, 400);
-    throw new TrackerError(`${response.status} from ${new URL(url).host}${said ? `: ${said}` : ""}`);
+    throw new TrackerError(
+        `${response.status} from ${new URL(url).host}${said ? `: ${said}` : ""}`
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -86,13 +95,19 @@ function linearClient(credential: TrackerCredential): TrackerClient {
         ? `Bearer ${credential.secret}`
         : credential.secret;
 
-    const graphql = async (query: string, variables: Record<string, unknown> = {}): Promise<unknown> => {
+    const graphql = async (
+        query: string,
+        variables: Record<string, unknown> = {}
+    ): Promise<unknown> => {
         const response = await call(LINEAR_API, {
             method: "POST",
             headers: { Authorization: authorization, "Content-Type": "application/json" },
             body: JSON.stringify({ query, variables })
         });
-        const payload = (await response.json()) as { data?: unknown; errors?: { message?: string }[] };
+        const payload = (await response.json()) as {
+            data?: unknown;
+            errors?: { message?: string }[];
+        };
         if (payload.errors?.length) {
             throw new TrackerError(payload.errors[0]?.message ?? "Linear refused the request");
         }
@@ -111,29 +126,60 @@ function linearClient(credential: TrackerCredential): TrackerClient {
                 const data = (await graphql("query { viewer { name } }")) as {
                     viewer?: { name?: string };
                 };
-                return { ok: true, detail: `Connected as ${data.viewer?.name ?? "your Linear account"}.` };
+                return {
+                    ok: true,
+                    detail: `Connected as ${data.viewer?.name ?? "your Linear account"}.`
+                };
             } catch (error) {
-                return { ok: false, detail: error instanceof Error ? error.message : "Linear did not answer." };
+                return {
+                    ok: false,
+                    detail: error instanceof Error ? error.message : "Linear did not answer."
+                };
             }
         },
 
         async issues() {
-            const data = (await graphql(
-                `query($first: Int!, $filter: IssueFilter) {
-                    issues(first: $first, filter: $filter) { nodes { ${LINEAR_ISSUE_FIELDS} } }
-                }`,
-                { first: PAGE, filter }
-            )) as { issues?: { nodes?: unknown[] } };
-            return (data.issues?.nodes ?? []).map(readLinearIssue).filter((issue): issue is core.TrackerIssue =>
-                Boolean(issue)
-            );
+            const found: core.TrackerIssue[] = [];
+            let after: string | null = null;
+            for (let page = 0; page < MAX_PAGES; page += 1) {
+                const data = (await graphql(
+                    `query($first: Int!, $after: String, $filter: IssueFilter) {
+                        issues(first: $first, after: $after, filter: $filter) {
+                            nodes { ${LINEAR_ISSUE_FIELDS} }
+                            pageInfo { hasNextPage endCursor }
+                        }
+                    }`,
+                    { first: PAGE, after, filter }
+                )) as {
+                    issues?: {
+                        nodes?: unknown[];
+                        pageInfo?: { hasNextPage?: boolean; endCursor?: string };
+                    };
+                };
+                for (const node of data.issues?.nodes ?? []) {
+                    const issue = readLinearIssue(node);
+                    if (issue) found.push(issue);
+                }
+                const info = data.issues?.pageInfo;
+                if (!info?.hasNextPage || !info.endCursor) break;
+                after = info.endCursor;
+            }
+            return found;
         },
 
         async setStatus(issue, statusName) {
             const data = (await graphql(
-                `query($filter: WorkflowStateFilter) {
-                    workflowStates(first: 100, filter: $filter) { nodes { id name type } }
-                }`,
+                `
+                    query ($filter: WorkflowStateFilter) {
+                        workflowStates(first: 100, filter: $filter) {
+                            nodes {
+                                id
+                                name
+                                type
+                            }
+                        }
+                    }
+                `,
                 { filter: filter ? { team: { key: { eq: credential.query.trim() } } } : undefined }
             )) as { workflowStates?: { nodes?: { id: string; name: string }[] } };
 
@@ -188,9 +234,18 @@ function readLinearIssue(node: unknown): core.TrackerIssue | null {
 // ---------------------------------------------------------------------------
 
 function jiraClient(credential: TrackerCredential): TrackerClient {
-    const site = (credential.config.site ?? "").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    const site = core.normalizeTrackerSite(credential.config.site ?? "");
     const email = (credential.config.email ?? "").trim();
     if (!site) throw new TrackerError("This Jira connection has no site on it.");
+    // Checked here as well as at the form, because a row written by an older
+    // build was never asked. Everything below interpolates this into a URL the
+    // server itself calls, so an address that is not a Jira site is not one this
+    // will connect to.
+    if (!core.isTrackerSite(site)) {
+        throw new TrackerError(
+            `"${site}" is not a Jira address. It should look like your-company.atlassian.net.`
+        );
+    }
 
     const base = `https://${site}/rest/api/3`;
     const authorization = `Basic ${Buffer.from(`${email}:${credential.secret}`).toString("base64")}`;
@@ -216,26 +271,56 @@ function jiraClient(credential: TrackerCredential): TrackerClient {
                 const data = (await get("/myself")) as { displayName?: string };
                 return { ok: true, detail: `Connected as ${data.displayName ?? email}.` };
             } catch (error) {
-                return { ok: false, detail: error instanceof Error ? error.message : "Jira did not answer." };
+                return {
+                    ok: false,
+                    detail: error instanceof Error ? error.message : "Jira did not answer."
+                };
             }
         },
 
         async issues() {
             const search = `?jql=${encodeURIComponent(jql)}&maxResults=${PAGE}&fields=${fields}`;
+            const found: core.TrackerIssue[] = [];
             // Jira replaced its search endpoint and kept the old one working for a
             // while. Both are tried rather than picking one, because which of them
             // a site answers on depends on the site: Cloud has moved, and a
-            // self-hosted Data Center has not.
-            let data: unknown;
-            try {
-                data = await get(`/search/jql${search}`);
-            } catch {
-                data = await get(`/search${search}`);
+            // self-hosted Data Center has not. They page differently too - a token
+            // on the new one, an offset on the old - so which answered is
+            // remembered rather than asked again for every page.
+            let legacy = false;
+            let token = "";
+            let startAt = 0;
+            for (let page = 0; page < MAX_PAGES; page += 1) {
+                let data: unknown;
+                if (!legacy) {
+                    try {
+                        const next = token ? `&nextPageToken=${encodeURIComponent(token)}` : "";
+                        data = await get(`/search/jql${search}${next}`);
+                    } catch (error) {
+                        // Only the first page may fall back. Later on, a failure is
+                        // the site refusing a page rather than the endpoint being
+                        // the wrong one, and starting the walk again would mirror
+                        // the same issues twice.
+                        if (page > 0) throw error;
+                        legacy = true;
+                    }
+                }
+                if (legacy) data = await get(`/search${search}&startAt=${startAt}`);
+
+                const batch = (data as { issues?: unknown[] }).issues ?? [];
+                for (const node of batch) {
+                    const issue = readJiraIssue(node, site);
+                    if (issue) found.push(issue);
+                }
+                if (batch.length < PAGE) break;
+                if (legacy) {
+                    startAt += batch.length;
+                    continue;
+                }
+                token = str((data as { nextPageToken?: unknown }).nextPageToken);
+                if (!token) break;
             }
-            const issues = (data as { issues?: unknown[] }).issues ?? [];
-            return issues
-                .map((issue) => readJiraIssue(issue, site))
-                .filter((issue): issue is core.TrackerIssue => Boolean(issue));
+            return found;
         },
 
         async setStatus(issue, statusName) {

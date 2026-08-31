@@ -90,7 +90,9 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
     if (!session) return NextResponse.json({ error: "session not found" }, { status: 404 });
     if (session.place !== "local" || !session.containerId) {
         return NextResponse.json(
-            { error: "That session runs on one of your servers. Open a shell on the server instead." },
+            {
+                error: "That session runs on one of your servers. Open a shell on the server instead."
+            },
             { status: 409 }
         );
     }

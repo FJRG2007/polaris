@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
@@ -131,6 +132,17 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         };
     }
 
+    // A session names the task it was started for, and that association is what
+    // puts a note on somebody else's board. Checked here rather than only when
+    // the note is written, where a refusal is swallowed and the id stays stored.
+    if (value.taskId) {
+        try {
+            await taskAccess.requireTask({ id: user.id, isAdmin: false }, value.taskId, "guest");
+        } catch {
+            return { error: "That task is not one you can reach." };
+        }
+    }
+
     const { session, token } = await sessions.createSession({
         repoId: value.repoId,
         startedById: user.id,
@@ -162,16 +174,14 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
 
     if (value.prompt) {
         await sessions.addSessionMessage(session.id, "user", value.prompt, user.id);
-        // Best effort: the agent may still be installing itself. A prompt that did
-        // not land is worth reporting on the session rather than failing the start
-        // that otherwise worked.
-        await runtime.promptSession(session.id, value.prompt).catch(async (error: unknown) => {
-            await sessions.addSessionMessage(
-                session.id,
-                "system",
-                sessions.readableFailure(error, `first prompt for ${session.id}`)
-            );
-        });
+        // After the response rather than before it, because the agent does not
+        // exist yet: the container is still cloning the repository and installing
+        // the tool. Holding the click open for that would tie a start to a minute
+        // of somebody else's network, and sending the prompt now would send it to
+        // a terminal that is not there. The delivery waits, and writes into the
+        // transcript if it never gets a terminal to type into.
+        const prompt = value.prompt;
+        after(() => runtime.deliverFirstPrompt(session.id, prompt));
     }
 
     await noteOnTask(session, user.id);
@@ -194,6 +204,8 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
 async function noteOnTask(session: sessions.SessionView, userId: string): Promise<void> {
     if (!session.taskId) return;
     try {
+        // Asked again rather than assumed: the start settled it, and a comment on
+        // somebody's board is not a write to make on the strength of that alone.
         await taskAccess.requireTask({ id: userId, isAdmin: false }, session.taskId, "guest");
         await addComment(userId, {
             taskId: session.taskId,
@@ -249,7 +261,9 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
 
 /** What the agent's terminal shows right now, for the panel that would rather
  *  show the last few lines than open a full terminal to every session. */
-export async function sessionScreenAction(sessionId: string): Promise<{ screen?: string; error?: string }> {
+export async function sessionScreenAction(
+    sessionId: string
+): Promise<{ screen?: string; error?: string }> {
     const user = await requirePermission("agents.read");
     const session = await sessions.getSession(sessionId, user.id);
     if (!session) return { error: "That session no longer exists." };
