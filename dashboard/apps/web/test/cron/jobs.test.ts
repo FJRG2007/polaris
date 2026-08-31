@@ -64,6 +64,10 @@ describe("the work Polaris runs on a schedule", () => {
         // had not seen before.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
         expect(leased.sort()).toEqual([
+            // Two runners tearing the same container down race each other onto
+            // the same daemon call, and the one that loses fails on a container
+            // the other already removed.
+            "agent-housekeeping",
             "backups",
             "chat-scheduled",
             "connection-health",

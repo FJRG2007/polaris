@@ -7925,3 +7925,29 @@ model TaskTrackerLink {
     @@unique([taskId])
     @@index([trackerId])
 }
+
+// One attempt at signing an agent in through Polaris rather than by hand.
+//
+// A row, and not because the attempt is worth keeping: it is what bounds them.
+// This is the only place a person who is not an administrator causes a container
+// to start, so there has to be something to count, and something a sweep can find
+// after somebody opened a login and walked away - which is how most of them end.
+//
+// It never holds the credential. What the login prints is read off the screen by
+// whoever is looking at it and stored as an ordinary sign-in; this row knows only
+// that an attempt happened and when it stopped.
+model AgentSigninAttempt {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    // Whose attempt. Not a relation: the bound is per account, and the row is
+    // swept on a timer that must not care whether the account still exists.
+    userId    String    @db.Uuid
+    // The environment variable being signed in, e.g. CLAUDE_CODE_OAUTH_TOKEN.
+    env       String
+    startedAt DateTime  @default(now())
+    // Set when the container went, however it went: copied out, cancelled, or
+    // swept. Null is the only state that counts against the per-account bound.
+    endedAt   DateTime?
+
+    @@index([userId, endedAt])
+    @@index([endedAt, startedAt])
+}

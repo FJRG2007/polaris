@@ -24,7 +24,11 @@ import {
 } from "@/lib/agents/model-keys";
 import {
     addModelKeyAction,
+    agentSigninScreenAction,
+    answerAgentSigninAction,
+    beginAgentSigninAction,
     deleteModelKeyAction,
+    endAgentSigninAction,
     reorderModelKeysAction,
     updateModelKeyAction
 } from "./actions";
@@ -85,7 +89,20 @@ export default async function AiKeysPage() {
                             signins={agentSignins()}
                             stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
                             platform={[...fromPlatform]}
-                            actions={{ add: addModelKeyAction, remove: deleteModelKeyAction }}
+                            actions={{
+                                add: addModelKeyAction,
+                                remove: deleteModelKeyAction,
+                                // Only here. On the deployment's own screen an
+                                // administrator would be asked to authorise a
+                                // subscription that is not theirs, in their own
+                                // browser, which is the wrong person entirely.
+                                assist: {
+                                    begin: beginAgentSigninAction,
+                                    screen: agentSigninScreenAction,
+                                    answer: answerAgentSigninAction,
+                                    end: endAgentSigninAction
+                                }
+                            }}
                         />
                         <FallbackCard providers={covered} shared={shared} />
                     </>

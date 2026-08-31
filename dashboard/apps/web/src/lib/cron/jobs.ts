@@ -21,6 +21,8 @@ import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps"
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
+import { sweepSilentSessions } from "@/lib/agents/session-runtime";
+import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepExpiredSends } from "@/lib/vault/sends";
@@ -363,6 +365,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: sweepEveryDisk
     },
     {
+        key: "agent-housekeeping",
+        // Five minutes. Both halves are about a machine still running for
+        // somebody who has gone: a login container somebody opened and walked
+        // away from holds a per-account slot, so the next attempt is refused
+        // until this clears it, and that is a wait a person is sitting through.
+        everyMs: Number(process.env.POLARIS_AGENT_SWEEP_MS) || 5 * MINUTE,
+        // Longer than the gap, like the rest: two runners tearing the same
+        // container down race each other, and one fails on what the other took.
+        leaseMs: 10 * MINUTE,
+        run: sweepAgentLeftovers
+    },
+    {
         key: "suspensions",
         // A minute, because the thing waiting on it is a person being told they
         // are still shut out of an account that is due back.
@@ -379,4 +393,22 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
 export async function runJobBody(job: ScheduledJob): Promise<unknown> {
     if (job.leaseMs === null) return job.run();
     return withLease(job.key, job.leaseMs, job.run);
+}
+
+/**
+ * The machines an agent left behind.
+ *
+ * Two sweeps rather than one job each, because they are the same fact from two
+ * directions: something Polaris started for a person is still running and the
+ * person is not coming back. A session whose machine stopped reporting has no
+ * one watching it, and a sign-in container is abandoned far more often than it
+ * is finished - somebody opens it, reads what it wants, and goes to find the
+ * browser they are signed in on.
+ *
+ * Neither failing may stop the other: they touch different machines, and a
+ * daemon that will not answer about one has nothing to do with the other.
+ */
+async function sweepAgentLeftovers(): Promise<void> {
+    await sweepSilentSessions().catch(() => 0);
+    await sweepExpiredSignins().catch(() => 0);
 }

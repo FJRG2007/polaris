@@ -292,3 +292,41 @@ export const agentRunFilterSchema = z.object({
 });
 
 export type AgentRunFilterInput = z.infer<typeof agentRunFilterSchema>;
+
+// ---------------------------------------------------------------------------
+// Signing an agent in, with Polaris supplying the machine
+// ---------------------------------------------------------------------------
+
+/**
+ * The variable being signed in.
+ *
+ * Shaped like an environment variable and nothing else, because it is one: it
+ * goes on to name a row in a catalogue, and a value shaped like a path or a flag
+ * is a value that had no business arriving here. Which variables are real is
+ * settled by the catalogue, not by this - it only rules out the shapes that
+ * never are.
+ */
+export const agentSigninEnvSchema = z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .regex(/^[A-Z][A-Z0-9_]*$/, "Pick a sign-in");
+
+/** An attempt's id. A uuid, since that is what the row is keyed by, and it names
+ *  a container - so anything else must not reach the daemon. */
+export const agentSigninIdSchema = z.string().uuid("That sign-in is no longer open.");
+
+/**
+ * A line typed into a login's terminal.
+ *
+ * Bounded because it is pasted into a terminal that a person is watching: what
+ * belongs here is a code copied out of a browser, and something the length of a
+ * document is either a mistake or somebody trying to write a script into
+ * somebody else's shell. The control characters are stripped further down, where
+ * every prompt Polaris sends to a terminal is.
+ */
+export const agentSigninAnswerSchema = z.object({
+    id: agentSigninIdSchema,
+    text: z.string().trim().min(1, "Type something").max(4000, "That is longer than a code")
+});

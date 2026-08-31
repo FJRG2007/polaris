@@ -27,7 +27,8 @@ import { runAction } from "@/lib/run-action";
 import { AgentLogo } from "@/components/logos";
 import { useState, useTransition } from "react";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
-import { Check, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Loader2, Trash2, Wand2 } from "lucide-react";
+import { SigninDialog, type SigninDialogActions } from "./signin-dialog";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Input } from "@polaris/ui";
 
 /** A stored one, as the card needs it. Never the credential - only that there is
@@ -40,6 +41,11 @@ export interface StoredSignin {
 interface SigninActions {
     add: (input: unknown) => Promise<{ error?: string }>;
     remove: (input: unknown) => Promise<{ error?: string }>;
+    /** The assisted flow, where Polaris supplies the machine and runs the
+     *  vendor's own login on it. Absent on a screen that only takes a paste -
+     *  the deployment's own, where an administrator is signing in an account
+     *  that is not theirs to authorise in a browser. */
+    assist?: Omit<SigninDialogActions, "save">;
 }
 
 /**
@@ -52,6 +58,21 @@ interface SigninActions {
  * whether a row that is already covered still needs anything at all.
  */
 export type SigninTier = "account" | "platform";
+
+/**
+ * Which credentials Polaris can run the login for.
+ *
+ * Mirrors `LOGIN_COMMANDS` in the sign-in runtime, and is a set rather than a
+ * flag on the catalogue because it is a property of what Polaris can DO rather
+ * than of the credential: a vendor whose login command nobody has sourced still
+ * has a perfectly good credential, it just cannot be walked through. A row that
+ * is not here shows the field on its own, which is the screen that existed
+ * before any of this.
+ */
+const ASSISTED = new Set(["CLAUDE_CODE_OAUTH_TOKEN"]);
+
+/** What the paste field says when the button beside it is the better route. */
+const PASTE = "Or paste a ";
 
 export function AgentSigninsCard({
     signins,
@@ -96,6 +117,7 @@ export function AgentSigninsCard({
                             fromPlatform={covered.has(signin.env)}
                             tier={tier}
                             actions={actions}
+                            assisted={Boolean(actions.assist) && ASSISTED.has(signin.env)}
                             onError={setError}
                         />
                     ))}
@@ -111,6 +133,7 @@ function SigninRow({
     fromPlatform,
     tier,
     actions,
+    assisted,
     onError
 }: {
     signin: AgentSignin;
@@ -118,9 +141,11 @@ function SigninRow({
     fromPlatform: boolean;
     tier: SigninTier;
     actions: SigninActions;
+    assisted: boolean;
     onError: (message: string | null) => void;
 }) {
     const [secret, setSecret] = useState("");
+    const [signingIn, setSigningIn] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
@@ -203,14 +228,30 @@ function SigninRow({
 
             {held ? null : (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {/* The assisted route first, and as the filled button, because
+                        it is the one that works for somebody who has never opened
+                        a terminal. The field stays beside it: an administrator
+                        pasting a credential they already hold should not have to
+                        sit through a login to do it. */}
+                    {assisted ? (
+                        <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
+                            <Wand2 className="size-4 shrink-0" />
+                            Sign in here
+                        </Button>
+                    ) : null}
                     <Input
                         type="password"
                         value={secret}
                         onChange={(event) => setSecret(event.target.value)}
-                        placeholder={signin.label}
+                        placeholder={assisted ? PASTE + signin.label.toLowerCase() : signin.label}
                         className="min-w-0 flex-1"
                     />
-                    <Button size="sm" onClick={save} disabled={busy || secret.trim().length === 0}>
+                    <Button
+                        size="sm"
+                        variant={assisted ? "ghost" : "primary"}
+                        onClick={save}
+                        disabled={busy || secret.trim().length === 0}
+                    >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Link
                     </Button>
@@ -225,6 +266,30 @@ function SigninRow({
                     </a>
                 </div>
             )}
+
+            {signingIn && actions.assist ? (
+                <SigninDialog
+                    signin={signin}
+                    actions={{
+                        ...actions.assist,
+                        // Stored through the same write as the field beside it, so
+                        // a credential that arrived by either route is checked
+                        // exactly as carefully.
+                        save: (value: string) =>
+                            actions.add({
+                                provider: signin.slug,
+                                name: signin.env.toLowerCase().replace(/_/g, "-").slice(0, 20),
+                                secret: value,
+                                expiresAt: null
+                            })
+                    }}
+                    onClose={() => setSigningIn(false)}
+                    onDone={() => {
+                        setSigningIn(false);
+                        router.refresh();
+                    }}
+                />
+            ) : null}
 
             {/* No typing to confirm: this is one credential of several on a
                 screen, and it can be linked again in a minute from the same row.

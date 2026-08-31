@@ -18,7 +18,7 @@
 import { Badge, Button, Input } from "@polaris/ui";
 import { AgentLogo } from "@/components/logos";
 import Link from "next/link";
-import { Check, ExternalLink, Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentChoice } from "@/lib/agents/agent-readiness";
 
@@ -185,29 +185,15 @@ export function SignInNotice({ agent }: { agent: AgentChoice }) {
         <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3">
             <p className="text-sm">Nothing here signs {agent.label} in.</p>
             <p className="text-xs text-muted-foreground">
-                On this box it would start and sit at its own login prompt, where nobody would ever answer it. Add one
-                of these under AI keys, or run it on a server you have already signed it in on.
+                On this box it would start and sit at its own login prompt, where nobody would ever answer it. Sign it
+                in under AI keys - Polaris runs the sign-in for you and supplies the machine - or run it on a server
+                you have already signed it in on.
             </p>
-            <ul className="space-y-1">
-                {agent.missing.map((credential) => (
-                    <li key={credential.env} className="text-xs">
-                        <a
-                            href={credential.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 underline"
-                        >
-                            {credential.label}
-                            <ExternalLink className="size-3 shrink-0" />
-                        </a>
-                        {credential.howto ? (
-                            <span className="text-muted-foreground"> - {credential.howto}</span>
-                        ) : null}
-                    </li>
-                ))}
-            </ul>
+            <p className="text-xs text-muted-foreground">
+                It takes {agent.missing.map((credential) => credential.label.toLowerCase()).join(" or ")}.
+            </p>
             <Link href="/account/ai-keys" className="inline-block text-xs underline">
-                Add it under AI keys
+                Sign in under AI keys
             </Link>
         </div>
     );
