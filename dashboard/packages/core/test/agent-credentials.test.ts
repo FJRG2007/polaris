@@ -16,6 +16,7 @@ import {
     AGENT_CLIS,
     agentCliById,
     agentReadiness,
+    agentRunsUnattended,
     credentialInPlace,
     customAgentCli
 } from "../src/agent-clis.js";
@@ -107,5 +108,49 @@ describe("agentReadiness", () => {
         // Every session exports the installation token that checked the
         // repository out, so this one is signed in before anybody links anything.
         expect(agentReadiness(agentCliById("copilot")!, holding("GH_TOKEN"))).toBe("ready");
+    });
+});
+
+describe("agentRunsUnattended", () => {
+    it("lets a container work, because a container is a sandbox", () => {
+        // A clone of one repository, no credential in it but the one that clone
+        // needed, removed when the session ends. Refusing here would mean every
+        // session waiting on a person who is not watching a container.
+        expect(agentRunsUnattended("local", null)).toBe(true);
+    });
+
+    it("does not do the same on somebody's own server", () => {
+        // The agent runs as the account Polaris enrolled, beside its SSH keys and
+        // its Docker socket. Nobody chose that by picking a repository from a
+        // list, so it is not chosen for them.
+        expect(agentRunsUnattended("host", null)).toBe(false);
+    });
+
+    it("takes an answer over the default, in both directions", () => {
+        expect(agentRunsUnattended("host", true)).toBe(true);
+        expect(agentRunsUnattended("local", false)).toBe(false);
+    });
+
+    it("only ever applies flags a vendor documents for this", () => {
+        // The flags are named "dangerously" by their vendors and that is the
+        // point: they are only reachable through the decision above, never from
+        // a tool being picked.
+        const claude = agentCliById("claude")!;
+        expect(claude.autonomyArgs).toContain("--dangerously-skip-permissions");
+        const custom = customAgentCli("my-agent");
+        // Nothing is known about a command somebody typed, so nothing is added
+        // to it - whoever wrote it puts its flags in themselves.
+        expect(custom.autonomyArgs).toEqual([]);
+        expect(custom.autonomyEnv).toEqual({});
+    });
+
+    it("carries a flag or a variable for every tool, and never invents one", () => {
+        for (const cli of AGENT_CLIS) {
+            expect(Array.isArray(cli.autonomyArgs), cli.id).toBe(true);
+            for (const arg of cli.autonomyArgs) expect(arg, cli.id).toMatch(/^--/);
+            for (const value of Object.values(cli.autonomyEnv)) {
+                expect(typeof value, cli.id).toBe("string");
+            }
+        }
     });
 });

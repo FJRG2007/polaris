@@ -178,6 +178,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     const [baseRef, setBaseRef] = useState("");
     const [prompt, setPrompt] = useState("");
     const [enigma, setEnigma] = useState(true);
+    // Null until somebody moves it, so a session records that nobody chose
+    // rather than recording the default as a decision.
+    const [unattended, setUnattended] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
@@ -203,6 +206,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         baseRef,
                         prompt,
                         taskId: null,
+                        unattended,
                         // Only what was decided here. Everything else stays null so it
                         // keeps following the repository and the instance.
                         enigma: { enabled: enigma }
@@ -341,6 +345,27 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                                 placeholder="Read the failing test in auth.test.ts and fix what it is telling you."
                             />
                         </label>
+
+                        {/* The one control on this form that changes what the
+                            agent may do to a machine, so it says which machine.
+                            In a container it is the difference between working
+                            and sitting on a permission prompt nobody will answer;
+                            on somebody's server it is the difference between a
+                            tool that asks and a tool that does not. */}
+                        <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                            <div className="min-w-0">
+                                <p className="text-sm">Let it work without asking</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {place === "host"
+                                        ? "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it."
+                                        : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={core.agentRunsUnattended(place, unattended)}
+                                onChange={setUnattended}
+                            />
+                        </div>
 
                         <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                             <div className="min-w-0">

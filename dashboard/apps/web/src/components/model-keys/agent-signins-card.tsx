@@ -369,7 +369,12 @@ function SigninRow({
                 kind="sign-in"
                 requireTyping={false}
                 title={`Remove the ${signin.label}?`}
-                description="Sessions on this box will stop being able to sign that agent in. Nothing already running is stopped."
+                // Says what removing does NOT do, which is the part that matters.
+                // A token minted by one of these lives a year at the vendor and
+                // Polaris cannot revoke it - forgetting a credential here and
+                // believing it dead is how one stays valid on somebody's account
+                // long after they thought they had taken it back.
+                description="Sessions on this box will stop being able to sign that agent in. Nothing already running is stopped, and the credential itself keeps working: Polaris can forget it, but only the vendor can revoke it, on your account settings with them."
                 confirmLabel="Remove"
                 onConfirm={remove}
             />

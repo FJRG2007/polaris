@@ -95,13 +95,19 @@ function agentCommandFor(session: SessionView): { cli: core.AgentCli; binary: st
     const cli = core.agentCliById(session.cli);
     if (!cli) throw new SessionRefusal(`Polaris no longer knows an agent called ${session.cli}.`);
     const binary = cli.binaries[0] ?? "";
-    // The startup flags go on, and this is the line that decides whether a
-    // session does anything at all. Without them the tool comes up on its own
-    // "do you trust the files in this folder?" menu and waits - forever, because
-    // the menu reads single keystrokes and the prompt Polaris pastes is not one.
-    // See `autonomyArgs`: there is nobody to ask, and the folder is a checkout
-    // Polaris made a minute ago.
-    return { cli, binary, command: [binary, ...cli.autonomyArgs].join(" "), install: cli.install ?? "" };
+    // The startup flags decide whether a session does anything at all: without
+    // them the tool comes up on its own "do you trust the files in this folder?"
+    // menu and waits forever, because the menu reads single keystrokes and the
+    // prompt Polaris pastes is not one.
+    //
+    // But they are also the flags named "dangerously", and where that matters is
+    // decided by WHERE this runs rather than by which tool it is. A container
+    // Polaris made is a sandbox; somebody's own server is their machine, beside
+    // their keys and their Docker socket. `agentRunsUnattended` is that rule, and
+    // on a server it says no unless somebody said otherwise on purpose.
+    const unattended = core.agentRunsUnattended(session.place, session.unattended);
+    const args = unattended ? cli.autonomyArgs : [];
+    return { cli, binary, command: [binary, ...args].join(" "), install: cli.install ?? "" };
 }
 
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
@@ -143,7 +149,11 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
         githubToken,
         credentials: credentialsForAgent(agent.cli, available),
-        autonomyEnv: { ...agent.cli.autonomyEnv }
+        // The same decision, for the tools that take a variable rather than a
+        // flag. Held to the same rule so the two halves cannot disagree.
+        autonomyEnv: core.agentRunsUnattended(session.place, session.unattended)
+            ? { ...agent.cli.autonomyEnv }
+            : {}
     };
 }
 

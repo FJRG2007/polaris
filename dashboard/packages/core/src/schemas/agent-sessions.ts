@@ -95,6 +95,14 @@ export const startAgentSessionSchema = z
         prompt: z.string().trim().max(20_000).default(""),
         /** The task this session is doing, when it was started from one. */
         taskId: z.string().uuid().nullable().default(null),
+        /**
+         * Whether the agent may run commands without asking.
+         *
+         * Null means "nobody said", and what that resolves to depends on where
+         * the session runs - a container Polaris made is a sandbox, somebody's
+         * own server is their machine. See `agentRunsUnattended`.
+         */
+        unattended: z.boolean().nullable().default(null),
         enigma: enigmaSettingsSchema.optional()
     })
     .refine((value) => value.cli !== CUSTOM_AGENT_CLI || Boolean(value.command), {

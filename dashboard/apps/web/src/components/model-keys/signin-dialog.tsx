@@ -165,6 +165,19 @@ export function SigninDialog({
                         Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorise
                         it in your browser, and paste the code it gives you into the line below the terminal.
                     </p>
+                    {/* Worth saying before rather than after. This is a login on
+                        a machine with nothing signed in to it, so it cannot
+                        disturb the tool on your own computer - but the vendor may
+                        well retire whatever it minted last time, and finding that
+                        out from a session that stopped working is finding it out
+                        in the worst place. */}
+                    {signin.subscription ? (
+                        <p className="text-muted-foreground text-xs">
+                            This runs on a machine with nothing signed in to it, so it leaves the tool on your own
+                            computer alone. It may retire a credential you linked here before, though - some vendors
+                            allow one at a time.
+                        </p>
+                    ) : null}
 
                     {/* The address, lifted out of the terminal. Every one of these
                         tools signs in by printing a URL and waiting for a code, and

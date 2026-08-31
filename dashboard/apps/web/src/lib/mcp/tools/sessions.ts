@@ -141,6 +141,10 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             title: input.title,
             cli: input.agent,
             command: null,
+            // Not the agent's to choose. A session started over MCP runs in a
+            // container, where the default already applies; letting a tool call
+            // ask for more would be an agent widening its own permissions.
+            unattended: null,
             // Always on the Polaris box. A session started by a model is not the
             // moment to be choosing somebody's server for them.
             place: "local",

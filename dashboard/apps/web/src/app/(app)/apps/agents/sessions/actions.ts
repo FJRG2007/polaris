@@ -138,6 +138,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         cli: value.cli,
         command: value.cli === core.CUSTOM_AGENT_CLI ? (value.command ?? null) : null,
         place: value.place,
+        unattended: value.unattended,
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,

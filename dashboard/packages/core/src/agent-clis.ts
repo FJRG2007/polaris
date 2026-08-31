@@ -661,3 +661,32 @@ export function parseAgentCliVersion(output: string): string | null {
     const match = /\b\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?\b/.exec(output);
     return match ? match[0] : null;
 }
+
+/**
+ * Whether a session may run its agent past the tool's own permission prompts.
+ *
+ * The flags in `autonomyArgs` are what stop a session sitting on a trust menu
+ * forever, and they are also the flags whose names say "dangerously". Both are
+ * true, and which one matters depends entirely on WHERE the agent is running -
+ * which is why this is a function of the place rather than a property of the
+ * tool.
+ *
+ * In a container Polaris made, it is a sandbox: a clone of one repository, no
+ * credential in it but the one that clone needed, and the whole thing removed
+ * when the session ends. An agent that can run commands there without asking is
+ * an agent working in a box built for it to work in, and refusing to would mean
+ * every session waiting on a person who is not watching.
+ *
+ * On somebody's own server it is their machine. The agent runs as the account
+ * Polaris enrolled, beside their SSH keys, their Docker socket and everything
+ * else that account can reach, and a tool free to run any command there is a
+ * different proposition entirely - one nobody chose by picking a repository from
+ * a list. So the default there is off, and turning it on is a decision somebody
+ * makes on purpose, in a sentence that says what it means.
+ *
+ * Null is "nobody said", which is the only value a session created before this
+ * existed can have.
+ */
+export function agentRunsUnattended(place: "local" | "host", chosen: boolean | null): boolean {
+    return chosen ?? place === "local";
+}

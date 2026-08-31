@@ -5727,6 +5727,11 @@ model AgentSession {
     command     String?
     // local | host - a container on the Polaris box, or an enrolled server.
     place       String    @default("local")
+    // Whether the agent may run commands without asking. Null is "nobody said",
+    // which resolves by place: a container Polaris made is a sandbox and a
+    // server is somebody's machine. Nullable rather than defaulted so a session
+    // started before this existed is not recorded as having chosen anything.
+    unattended  Boolean?
     hostId      String?   @db.Uuid
     // starting | working | waiting | idle | stopped | failed. Derived from the
     // events below and stored so a list does not have to replay every session it
