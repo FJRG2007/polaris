@@ -25,7 +25,7 @@ import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
-import { claudeHookSettings, hookScript, shellQuote } from "./session-hooks";
+import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
 import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
 import {
     finishSession,
@@ -62,6 +62,7 @@ interface Bootstrap {
     readonly enigmaArgv: string;
     readonly hookScript: string;
     readonly hookSettings: string;
+    readonly mcpConfig: string;
     readonly cloneHeader: string;
     readonly githubToken: string;
 }
@@ -94,6 +95,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
+    const mcp = `${base}/api/mcp`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session);
 
@@ -108,6 +110,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         enigmaArgv: enigma.enabled ? core.enigmaInstallArgv(enigma).join(" ") : "",
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(claudeHookSettings(`${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`)),
+        mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
         githubToken
     };
@@ -130,7 +133,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_ENIGMA_ARGV: boot.enigmaArgv,
         POLARIS_HOOK_SCRIPT: boot.hookScript,
-        POLARIS_HOOK_SETTINGS: boot.hookSettings
+        POLARIS_HOOK_SETTINGS: boot.hookSettings,
+        POLARIS_MCP_CONFIG: boot.mcpConfig
     };
 }
 

@@ -100,7 +100,10 @@ export const SESSION_BOOT = [
     'printf %s "$POLARIS_HOOK_SCRIPT" > "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
     'chmod +x "$POLARIS_WORKDIR/.claude/polaris-hook.sh"',
     'printf %s "$POLARIS_HOOK_SETTINGS" > "$POLARIS_WORKDIR/.claude/settings.local.json"',
-    'printf "%s\n" ".claude/" >> "$POLARIS_WORKDIR/.git/info/exclude"',
+    // The Polaris tools, registered in the worktree so the agent has them on its
+    // first turn without anybody configuring anything.
+    'printf %s "$POLARIS_MCP_CONFIG" > "$POLARIS_WORKDIR/.mcp.json"',
+    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
     // Enigma, when the resolved settings asked for it. Best effort: a session
     // without it works to weaker standards, and failing the whole thing over a
     // network blip would be worse than that.
@@ -112,7 +115,7 @@ export const SESSION_BOOT = [
     // starts and can read its own environment. The token the agent's own git and
     // GitHub tools need stays.
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG",
     'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" -c "$POLARIS_WORKDIR" "$POLARIS_AGENT_COMMAND"',
     // Park. See above: the container outlives the agent inside it.
     "exec tail -f /dev/null"

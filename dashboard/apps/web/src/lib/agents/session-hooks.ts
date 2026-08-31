@@ -64,7 +64,37 @@ export function claudeHookSettings(scriptPath: string): Record<string, unknown> 
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
         hooks[event] = [matcher ? { matcher, hooks: [hook] } : { hooks: [hook] }];
     }
-    return { hooks };
+    // The tools below are registered in the worktree, and a project's MCP servers
+    // normally wait for somebody to approve them. Nobody is there: this is a
+    // worktree Polaris made, in a container Polaris started, holding one server
+    // Polaris wrote. Waiting for an approval that cannot arrive is just an agent
+    // that never gets its tools.
+    return { hooks, enableAllProjectMcpServers: true };
+}
+
+/**
+ * The MCP registration a session is given.
+ *
+ * This is what stops "connect your agent to Polaris" being a setup step. An agent
+ * in a session can read the task it was given, move it on and comment on it from
+ * its first turn, because the server was already in its project configuration
+ * when it started.
+ *
+ * The credential is the session's own reporting token rather than an API key.
+ * Nobody has to mint one, it dies with the session, and it carries less than a
+ * key would: enough to work the board it was pointed at, and not enough to start
+ * more sessions.
+ */
+export function mcpConfig(url: string, token: string): Record<string, unknown> {
+    return {
+        mcpServers: {
+            polaris: {
+                type: "http",
+                url,
+                headers: { Authorization: `Bearer ${token}` }
+            }
+        }
+    };
 }
 
 /**

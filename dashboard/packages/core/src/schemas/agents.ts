@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { enigmaSettingsSchema } from "./agent-sessions.js";
 import { githubLoginSchema, githubRepoSchema } from "./runners.js";
 import {
     AGENT_EXECUTIONS,
@@ -128,7 +129,12 @@ export const agentDefaultsSchema = z.object({
     privateRepos: z.boolean().nullable().default(null),
     pullRequests: z.boolean().nullable().default(null),
     issues: z.boolean().nullable().default(null),
-    gate: agentGateModeSchema.nullable().default(null)
+    gate: agentGateModeSchema.nullable().default(null),
+    /** The rest of Enigma at this tier - whether it runs at all, how much of it
+     *  is installed, which version, and any of its own settings the operator
+     *  wants set. `gate` stays its own field above because the dispatch path has
+     *  always read it there. */
+    enigma: enigmaSettingsSchema.nullable().default(null)
 });
 
 export type AgentDefaultsInput = z.infer<typeof agentDefaultsSchema>;

@@ -50,17 +50,17 @@ export const customAgentCommandSchema = z
  * nullable on purpose: absent is "leave what was there", null is "inherit".
  */
 export const enigmaSettingsSchema = z.object({
-    enabled: z.boolean().nullable().optional(),
-    scope: z.enum(ENIGMA_SCOPES).nullable().optional(),
-    gate: z.enum(AGENT_GATE_MODES).nullable().optional(),
-    version: z.string().trim().max(40).nullable().optional(),
+    enabled: z.boolean().nullable().default(null),
+    scope: z.enum(ENIGMA_SCOPES).nullable().default(null),
+    gate: z.enum(AGENT_GATE_MODES).nullable().default(null),
+    version: z.string().trim().max(40).nullable().default(null),
     /** Bounded on both sides. These become a command line on a machine, and a
      *  thousand of them would be a thousand processes before the agent starts. */
     config: z
         .record(z.string().trim().min(1).max(60), z.string().trim().max(200))
         .refine((value) => Object.keys(value).length <= 40, "Too many settings")
         .nullable()
-        .optional()
+        .default(null)
 });
 
 /**

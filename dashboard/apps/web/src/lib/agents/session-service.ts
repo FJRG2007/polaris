@@ -211,6 +211,17 @@ export async function sessionForToken(
     return { id: record.id, state, taskId: record.taskId };
 }
 
+/** Whose work a session is doing: the account that owns the repository it runs
+ *  in. What the tools it is given act as, so a session can never reach past the
+ *  person who started it. */
+export async function sessionOwner(sessionId: string): Promise<string | null> {
+    const record = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { repo: { select: { ownerId: true } } }
+    });
+    return record?.repo.ownerId ?? null;
+}
+
 /**
  * Record what a session reported.
  *

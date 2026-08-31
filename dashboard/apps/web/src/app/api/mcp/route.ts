@@ -19,8 +19,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { Permission } from "@polaris/core";
 import { MCP_TOOLS } from "@/lib/mcp/tools";
 import { authenticateApiKey } from "@/lib/api-key-auth";
+import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_REQUEST,
@@ -59,17 +61,47 @@ function jsonRpcError(code: number, message: string, status: number): Response {
     return Response.json({ jsonrpc: "2.0", id: null, error: { code, message } }, { status });
 }
 
-/** Resolve the caller from their key, including whether they administer the
- *  instance - which the task layer needs and the key itself does not carry. */
+/**
+ * What a running session may do with these tools.
+ *
+ * Enough to work the board it was pointed at, and not enough to start more
+ * sessions: an agent that can start agents is one bad turn away from starting
+ * them in a loop, on somebody else's hardware, with nobody watching. A person who
+ * wants that hands over an API key, which is a decision rather than a default.
+ */
+const SESSION_SCOPES: Permission[] = ["tasks.read", "tasks.manage", "agents.read"];
+
+/**
+ * Resolve the caller from whatever they presented.
+ *
+ * Two credentials, and the second is what makes this usable at all. An API key is
+ * a person deliberately connecting their own client. A session's reporting token
+ * is the agent Polaris started, which was handed these tools in its own
+ * configuration before it ran - so "connect your agent to Polaris" is not a setup
+ * step anybody has to know about, and nothing has to be minted for it.
+ */
 async function callerFor(request: Request): Promise<McpCaller | null> {
     const principal = await authenticateApiKey(request);
-    if (!principal) return null;
-    const user = await prisma.user.findUnique({
-        where: { id: principal.userId },
-        select: { isAdmin: true }
-    });
-    if (!user) return null;
-    return { userId: principal.userId, isAdmin: user.isAdmin, scopes: principal.scopes };
+    if (principal) {
+        const user = await prisma.user.findUnique({
+            where: { id: principal.userId },
+            select: { isAdmin: true }
+        });
+        if (!user) return null;
+        return { userId: principal.userId, isAdmin: user.isAdmin, scopes: principal.scopes };
+    }
+
+    const header = request.headers.get("authorization") ?? "";
+    const [scheme, ...rest] = header.trim().split(/\s+/);
+    if (scheme?.toLowerCase() !== "bearer") return null;
+    const session = await sessionForToken(rest.join(""));
+    if (!session) return null;
+    const owner = await sessionOwner(session.id);
+    if (!owner) return null;
+    // Never an administrator, whoever started it. A session acts inside one
+    // person's work; the instance-wide reach an admin has is not something an
+    // agent should inherit by being started by one.
+    return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES };
 }
 
 export async function POST(request: Request): Promise<Response> {
