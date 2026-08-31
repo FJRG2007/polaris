@@ -105,12 +105,6 @@ describe("AgentSelect", () => {
         );
         await userEvent.click(screen.getByRole("button", { name: /claude code/i }));
 
-        const fs = await import("node:fs");
-        const dir =
-            "C:\\Users\\admin\\AppData\\Local\\Temp\\enigma-gate-evidence\\01M1CEM62Q4V7JHQ3RH95H407Z";
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(`${dir}\\agent-select-open.html`, container.innerHTML, "utf8");
-
         expect(screen.getByRole("listbox")).not.toBeNull();
     });
 });
@@ -118,13 +112,16 @@ describe("AgentSelect", () => {
 describe("SignInNotice", () => {
     it("names the credential in the vendor's own words and links to where it is linked", () => {
         const codex = choicesFor(new Set()).find((agent) => agent.id === "codex")!;
-        render(<SignInNotice agent={codex} />);
+        const { container } = render(<SignInNotice agent={codex} />);
 
         expect(screen.getByText(/Nothing here signs Codex in/i)).not.toBeNull();
-        const link = screen.getByRole("link", { name: /add it under ai keys/i });
+        const link = screen.getByRole("link", { name: /sign in under ai keys/i });
         expect(link.getAttribute("href")).toBe("/account/ai-keys");
-        // The credential's own label from the catalogue, not a name invented here.
+        // The credential's own label from the catalogue, not a name invented
+        // here. Read out of the sentence rather than as its own node: it is
+        // named in a line of prose now, since the notice sends people to the
+        // button that signs it in rather than listing places to go and get one.
         expect(codex.missing.length).toBeGreaterThan(0);
-        expect(screen.getByText(codex.missing[0]!.label)).not.toBeNull();
+        expect(container.textContent?.toLowerCase()).toContain(codex.missing[0]!.label.toLowerCase());
     });
 });
