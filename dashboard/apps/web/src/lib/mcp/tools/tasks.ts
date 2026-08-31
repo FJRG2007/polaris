@@ -79,7 +79,10 @@ const taskRef = z
  * able to enumerate an instance's task numbers by watching which ones say
  * something different.
  */
-async function resolveTask(caller: McpCaller, ref: string): Promise<{ id: string; spaceId: string }> {
+async function resolveTask(
+    caller: McpCaller,
+    ref: string
+): Promise<{ id: string; spaceId: string }> {
     const scope = await access.visibleScope(await actorFor(caller));
     const reachable = access.scopeTaskWhere(scope);
     const trimmed = ref.trim();
@@ -139,10 +142,21 @@ function text(body: string, structured?: unknown): McpToolResult {
 // ---------------------------------------------------------------------------
 
 const listInput = z.object({
-    query: z.string().trim().max(200).default("").describe("Match against the name or the reference."),
+    query: z
+        .string()
+        .trim()
+        .max(200)
+        .default("")
+        .describe("Match against the name or the reference."),
     space: z.string().trim().max(80).default("").describe("Limit to one space, by name or id."),
-    mine: z.boolean().default(false).describe("Only tasks assigned to the account this key belongs to."),
-    openOnly: z.boolean().default(true).describe("Leave out anything whose status counts as finished."),
+    mine: z
+        .boolean()
+        .default(false)
+        .describe("Only tasks assigned to the account this key belongs to."),
+    openOnly: z
+        .boolean()
+        .default(true)
+        .describe("Leave out anything whose status counts as finished."),
     limit: z.number().int().min(1).max(100).default(25)
 });
 
@@ -161,16 +175,24 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
             const space = await prisma.taskSpace.findFirst({
                 where: {
                     id: { in: spaceIds },
-                    OR: [{ id: input.space }, { name: { equals: input.space, mode: "insensitive" } }]
+                    OR: [
+                        { id: input.space },
+                        { name: { equals: input.space, mode: "insensitive" } }
+                    ]
                 },
                 select: { id: true }
             });
-            if (!space) throw new McpRefusal(`No space called "${input.space}" that this key can reach.`);
+            if (!space)
+                throw new McpRefusal(`No space called "${input.space}" that this key can reach.`);
             wanted = [space.id];
         }
 
         const rows = await tasks.listTasks(
-            { spaceIds: wanted, listIds: scope.listIds, ...(input.mine ? { assigneeId: caller.userId } : {}) },
+            {
+                spaceIds: wanted,
+                listIds: scope.listIds,
+                ...(input.mine ? { assigneeId: caller.userId } : {})
+            },
             { openOnly: input.openOnly, limit: 500 }
         );
         const needle = input.query.toLowerCase();
@@ -178,7 +200,8 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
             needle
                 ? rows.filter(
                       (row) =>
-                          row.name.toLowerCase().includes(needle) || row.reference.toLowerCase().includes(needle)
+                          row.name.toLowerCase().includes(needle) ||
+                          row.reference.toLowerCase().includes(needle)
                   )
                 : rows
         ).slice(0, input.limit);
@@ -196,7 +219,8 @@ const getInput = z.object({ task: taskRef });
 
 const getTaskTool: McpTool<z.infer<typeof getInput>> = {
     name: "tasks_get",
-    description: "Read one task in full: its description, status, assignees, subtasks and comments.",
+    description:
+        "Read one task in full: its description, status, assignees, subtasks and comments.",
     input: getInput,
     scope: "tasks.read",
     readOnly: true,
@@ -215,7 +239,9 @@ const getTaskTool: McpTool<z.infer<typeof getInput>> = {
             "",
             detail.task.description || "(no description)",
             detail.comments.length > 0 ? `\nComments (${detail.comments.length}):` : "",
-            ...detail.comments.map((comment) => `- ${comment.author?.name ?? "someone"}: ${comment.body}`)
+            ...detail.comments.map(
+                (comment) => `- ${comment.author?.name ?? "someone"}: ${comment.body}`
+            )
         ]
             .filter((line) => line !== "")
             .join("\n");
@@ -267,13 +293,21 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
                 assigneeIds: input.assignToMe ? [caller.userId] : []
             })
         });
-        return text(`Created ${created.reference}.`, { id: created.id, reference: created.reference });
+        return text(`Created ${created.reference}.`, {
+            id: created.id,
+            reference: created.reference
+        });
     }
 };
 
 const updateInput = z.object({
     task: taskRef,
-    status: z.string().trim().max(80).optional().describe('The status to move it to, by name ("In Progress").'),
+    status: z
+        .string()
+        .trim()
+        .max(80)
+        .optional()
+        .describe('The status to move it to, by name ("In Progress").'),
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().max(20_000).optional(),
     priority: z.enum(core.TASK_PRIORITIES).optional(),
@@ -294,9 +328,12 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
 
         const statusId = input.status ? (await resolveStatus(spaceId, input.status)).id : undefined;
         const assignees = input.assignToMe
-            ? (await prisma.taskAssignee.findMany({ where: { taskId: id }, select: { userId: true } })).map(
-                  (row) => row.userId
-              )
+            ? (
+                  await prisma.taskAssignee.findMany({
+                      where: { taskId: id },
+                      select: { userId: true }
+                  })
+              ).map((row) => row.userId)
             : undefined;
         if (assignees && !assignees.includes(caller.userId)) assignees.push(caller.userId);
 
@@ -328,7 +365,12 @@ const commentTaskTool: McpTool<z.infer<typeof commentInput>> = {
         const actor = await actorFor(caller);
         const { id } = await resolveTask(caller, input.task);
         await access.requireTask(actor, id, "guest");
-        await addComment(caller.userId, { taskId: id, body: input.body, parentId: null, assignedToId: null });
+        await addComment(caller.userId, {
+            taskId: id,
+            body: input.body,
+            parentId: null,
+            assignedToId: null
+        });
         return text("Posted.");
     }
 };

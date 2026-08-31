@@ -119,7 +119,11 @@ export async function saveTracker(ownerId: string, input: SaveTrackerInput): Pro
         config: JSON.stringify(input.config),
         pushStatus: input.pushStatus,
         ...(sealed
-            ? { encryptedSecret: sealed.ciphertext, secretNonce: sealed.nonce, secretKeyId: sealed.keyId }
+            ? {
+                  encryptedSecret: sealed.ciphertext,
+                  secretNonce: sealed.nonce,
+                  secretKeyId: sealed.keyId
+              }
             : {})
     };
 
@@ -144,7 +148,11 @@ export async function deleteTracker(ownerId: string, trackerId: string): Promise
     await prisma.taskTracker.deleteMany({ where: { id: trackerId, ownerId } });
 }
 
-export async function setTrackerEnabled(ownerId: string, trackerId: string, enabled: boolean): Promise<void> {
+export async function setTrackerEnabled(
+    ownerId: string,
+    trackerId: string,
+    enabled: boolean
+): Promise<void> {
     await prisma.taskTracker.updateMany({ where: { id: trackerId, ownerId }, data: { enabled } });
 }
 
@@ -182,7 +190,10 @@ export async function credentialFor(trackerId: string): Promise<TrackerCredentia
 }
 
 /** Ask the tracker whether the credential works, without changing anything. */
-export async function checkTracker(ownerId: string, trackerId: string): Promise<{ ok: boolean; detail: string }> {
+export async function checkTracker(
+    ownerId: string,
+    trackerId: string
+): Promise<{ ok: boolean; detail: string }> {
     const owned = await prisma.taskTracker.findFirst({
         where: { id: trackerId, ownerId },
         select: { id: true }

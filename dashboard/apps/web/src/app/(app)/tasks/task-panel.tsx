@@ -95,7 +95,10 @@ export function TaskPanel({
     // panel has to be able to draw it before the space's list has been read again -
     // see `useTagCreation`. `context` below is the space with those tags in it.
     const tagBook = useTagCreation(space.spaceId, space.tags);
-    const context = useMemo<SpaceContext>(() => ({ ...space, tags: tagBook.tags }), [space, tagBook.tags]);
+    const context = useMemo<SpaceContext>(
+        () => ({ ...space, tags: tagBook.tags }),
+        [space, tagBook.tags]
+    );
     // Read when the edit is applied, not when the picker was drawn - see `useLatest`.
     const directory = useLatest(context);
     const [openId, setOpenId] = useState<string | null>(taskId);

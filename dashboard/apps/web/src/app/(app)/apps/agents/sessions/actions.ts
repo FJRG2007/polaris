@@ -253,7 +253,9 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
 
 /** What the agent's terminal shows right now, for the panel that would rather
  *  show the last few lines than open a full terminal to every session. */
-export async function sessionScreenAction(sessionId: string): Promise<{ screen?: string; error?: string }> {
+export async function sessionScreenAction(
+    sessionId: string
+): Promise<{ screen?: string; error?: string }> {
     const user = await requirePermission("agents.read");
     const session = await sessions.getSession(sessionId, user.id);
     if (!session) return { error: "That session no longer exists." };

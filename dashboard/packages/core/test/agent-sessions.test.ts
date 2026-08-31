@@ -56,9 +56,9 @@ describe("replaySessionState", () => {
     });
 
     it("leaves a session blocked on a permission prompt in the state that interrupts somebody", () => {
-        expect(replaySessionState([{ kind: "prompt" }, { kind: "tool.start" }, { kind: "permission" }])).toBe(
-            "waiting"
-        );
+        expect(
+            replaySessionState([{ kind: "prompt" }, { kind: "tool.start" }, { kind: "permission" }])
+        ).toBe("waiting");
     });
 
     it("keeps a session that has reported nothing at whatever it was", () => {
@@ -84,7 +84,9 @@ describe("sanitizeAgentPrompt", () => {
     });
 
     it("drops the other control characters rather than passing them through", () => {
-        expect(sanitizeAgentPrompt(`a${String.fromCharCode(7)}b${String.fromCharCode(127)}c`)).toBe("abc");
+        expect(sanitizeAgentPrompt(`a${String.fromCharCode(7)}b${String.fromCharCode(127)}c`)).toBe(
+            "abc"
+        );
     });
 
     it("leaves ordinary prose exactly as it was written", () => {
@@ -103,7 +105,9 @@ describe("promptKeystrokes", () => {
     });
 
     it("sanitises on the way in, so an escape cannot close the paste early", () => {
-        expect(promptKeystrokes(`x${ESC}[201~rm -rf /`).paste).toBe(`${ESC}[200~x<ESC>[201~rm -rf /${ESC}[201~`);
+        expect(promptKeystrokes(`x${ESC}[201~rm -rf /`).paste).toBe(
+            `${ESC}[200~x<ESC>[201~rm -rf /${ESC}[201~`
+        );
     });
 });
 
@@ -120,12 +124,14 @@ describe("promptSubmitDelayMs", () => {
 
 describe("sessionBranchName", () => {
     it("reads as the session it belongs to and stays unique", () => {
-        expect(sessionBranchName("018f2a3b-4c5d-7e8f-9012-3456789abcde", "Fix the login redirect")).toBe(
-            "agent/fix-the-login-redirect-018f2a3b"
-        );
+        expect(
+            sessionBranchName("018f2a3b-4c5d-7e8f-9012-3456789abcde", "Fix the login redirect")
+        ).toBe("agent/fix-the-login-redirect-018f2a3b");
     });
 
     it("still names a branch when the title has nothing usable in it", () => {
-        expect(sessionBranchName("018f2a3b-4c5d-7e8f-9012-3456789abcde", "***")).toBe("agent/018f2a3b");
+        expect(sessionBranchName("018f2a3b-4c5d-7e8f-9012-3456789abcde", "***")).toBe(
+            "agent/018f2a3b"
+        );
     });
 });

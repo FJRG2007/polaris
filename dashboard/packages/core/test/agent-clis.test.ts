@@ -63,8 +63,12 @@ describe("detectAgentClis", () => {
     });
 
     it("reports what a machine has, stamped with the entry it satisfied", async () => {
-        const found = await detectAgentClis(async (binary) => (binary === "claude" ? present(binary) : null));
-        expect(found).toEqual([{ id: "claude", binary: "claude", path: "/usr/local/bin/claude", version: "1.0.0" }]);
+        const found = await detectAgentClis(async (binary) =>
+            binary === "claude" ? present(binary) : null
+        );
+        expect(found).toEqual([
+            { id: "claude", binary: "claude", path: "/usr/local/bin/claude", version: "1.0.0" }
+        ]);
     });
 
     it("keeps scanning when the machine cannot answer about one of them", async () => {

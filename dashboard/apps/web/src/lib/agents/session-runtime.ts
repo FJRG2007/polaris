@@ -86,7 +86,12 @@ interface Bootstrap {
  * agent the way a person would, so the flags are the agent's business and stay
  * out of a list here that would rot in a month.
  */
-function agentCommandFor(session: SessionView): { cli: core.AgentCli; binary: string; command: string; install: string } {
+function agentCommandFor(session: SessionView): {
+    cli: core.AgentCli;
+    binary: string;
+    command: string;
+    install: string;
+} {
     if (session.cli === core.CUSTOM_AGENT_CLI) {
         const command = (session.command ?? "").trim();
         const cli = core.customAgentCli(command);
@@ -119,7 +124,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // exactly like an agent thinking.
     const available = await sessionSecretsFor(session.ownerId);
     if (available === null) {
-        throw new SessionRefusal("Polaris could not read the stored credentials just now. Try again in a moment.");
+        throw new SessionRefusal(
+            "Polaris could not read the stored credentials just now. Try again in a moment."
+        );
     }
 
     return {
@@ -134,7 +141,11 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         enigmaArgv: enigma.enabled ? core.enigmaInstallArgv(enigma).join(" ") : "",
         enigmaConfig: enigma.enabled ? enigmaConfigScript(enigma) : "",
         hookScript: hookScript(ingest, token),
-        hookSettings: JSON.stringify(claudeHookSettings(`${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`)),
+        hookSettings: JSON.stringify(
+            claudeHookSettings(
+                `${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`
+            )
+        ),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
         githubToken,
@@ -220,7 +231,9 @@ function guardEnv(env: Record<string, string>): Record<string, string> {
     for (const [key, value] of Object.entries(env)) {
         // eslint-disable-next-line no-control-regex
         if (/[\u0000-\u001f\u007f]/.test(value)) {
-            throw new Error(`Polaris built an unusable value for ${key} and stopped rather than start a broken session.`);
+            throw new Error(
+                `Polaris built an unusable value for ${key} and stopped rather than start a broken session.`
+            );
         }
     }
     return env;
@@ -245,7 +258,11 @@ export async function startSession(session: SessionView, token: string): Promise
             await markSessionStarted(session.id, "", boot.workdir);
         } else {
             await startLocally(session, boot);
-            await markSessionStarted(session.id, commands.sessionContainerName(session.id), boot.workdir);
+            await markSessionStarted(
+                session.id,
+                commands.sessionContainerName(session.id),
+                boot.workdir
+            );
         }
     } catch (error) {
         // What lands on the session is what somebody will read on it, so the
@@ -330,7 +347,10 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
             // a shell's stderr, and the one thing it reliably contains is paths.
             // The exception is the boot script's own refusals, which were written
             // to be read - they are the lines that begin `polaris:`.
-            console.error(`[agent-session] ${session.id} would not start:`, said.trim().slice(-2000));
+            console.error(
+                `[agent-session] ${session.id} would not start:`,
+                said.trim().slice(-2000)
+            );
             const spoken = said
                 .split("\n")
                 .map((line) => line.trim())
@@ -338,7 +358,9 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
                 .map((line) => line.slice("polaris: ".length))
                 .at(-1);
             throw new SessionRefusal(
-                spoken ? spoken.charAt(0).toUpperCase() + spoken.slice(1) : "The server refused to start the session."
+                spoken
+                    ? spoken.charAt(0).toUpperCase() + spoken.slice(1)
+                    : "The server refused to start the session."
             );
         }
     } finally {
@@ -351,7 +373,10 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
 // ---------------------------------------------------------------------------
 
 /** Run one of the built commands wherever the session lives. */
-async function runInSession(sessionId: string, command: string): Promise<{ code: number; output: string }> {
+async function runInSession(
+    sessionId: string,
+    command: string
+): Promise<{ code: number; output: string }> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
     if (core.isSessionOver(placement.state)) throw new Error("That session has ended.");
@@ -380,7 +405,8 @@ async function runInSession(sessionId: string, command: string): Promise<{ code:
         }
     }
 
-    if (!placement.containerId) throw new Error("That session never got as far as having a container.");
+    if (!placement.containerId)
+        throw new Error("That session never got as far as having a container.");
     const result = await new HostdPorts().runIn(placement.containerId, commands.shellArgv(command));
     return { code: result.code, output: result.output };
 }
@@ -416,7 +442,10 @@ const AGENT_READY_POLL_MS = 5000;
  * so the paste fails and the prompt is simply lost. This is what a person does
  * instead - wait for the window to open, then type.
  */
-async function waitForAgent(sessionId: string, timeoutMs = AGENT_READY_TIMEOUT_MS): Promise<boolean> {
+async function waitForAgent(
+    sessionId: string,
+    timeoutMs = AGENT_READY_TIMEOUT_MS
+): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
         // A session that ended while this was waiting stops it, rather than
@@ -442,7 +471,11 @@ async function waitForAgent(sessionId: string, timeoutMs = AGENT_READY_TIMEOUT_M
  * first, so what somebody asked for survives even if the machine has gone away.
  */
 export async function promptSession(sessionId: string, text: string): Promise<void> {
-    await steer(sessionId, commands.pastePromptCommand(text), "The agent's terminal did not take the prompt");
+    await steer(
+        sessionId,
+        commands.pastePromptCommand(text),
+        "The agent's terminal did not take the prompt"
+    );
     await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(text)));
     await steer(sessionId, commands.submitCommand(), "The prompt was pasted but not submitted");
 }
@@ -474,7 +507,11 @@ export async function deliverFirstPrompt(sessionId: string, text: string): Promi
 
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
-    await steer(sessionId, commands.interruptCommand(), "The agent's terminal did not take the interrupt");
+    await steer(
+        sessionId,
+        commands.interruptCommand(),
+        "The agent's terminal did not take the interrupt"
+    );
 }
 
 /** What the agent's terminal currently shows. */
@@ -495,9 +532,10 @@ export async function stopSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) return;
     if (placement.place === "host") {
-        await runInSession(sessionId, `tmux kill-session -t ${shellQuote(commands.TMUX_SESSION)} || true`).catch(
-            () => undefined
-        );
+        await runInSession(
+            sessionId,
+            `tmux kill-session -t ${shellQuote(commands.TMUX_SESSION)} || true`
+        ).catch(() => undefined);
     } else if (placement.containerId) {
         await new HostdPorts().composeDown(placement.containerId).catch(() => undefined);
     }
@@ -522,7 +560,11 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
         select: { id: true }
     });
     for (const session of stale) {
-        await finishSession(session.id, "failed", "The machine running this session stopped reporting.");
+        await finishSession(
+            session.id,
+            "failed",
+            "The machine running this session stopped reporting."
+        );
     }
     return stale.length;
 }

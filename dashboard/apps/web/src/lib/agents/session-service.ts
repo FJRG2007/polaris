@@ -161,9 +161,10 @@ function toView(record: SessionRecord): SessionView {
 }
 
 /** Every session in the repositories this account holds, newest first. */
-export async function listSessions(ownerId: string, options: { repoId?: string; live?: boolean } = {}): Promise<
-    SessionView[]
-> {
+export async function listSessions(
+    ownerId: string,
+    options: { repoId?: string; live?: boolean } = {}
+): Promise<SessionView[]> {
     const records = await prisma.agentSession.findMany({
         where: {
             repo: { ownerId },
@@ -209,7 +210,9 @@ export interface SessionCreateInput {
  * session exists: it is what a person looks for in the branch list a week later,
  * and a session that failed to start still has one worth naming.
  */
-export async function createSession(input: SessionCreateInput): Promise<{ session: SessionView; token: string }> {
+export async function createSession(
+    input: SessionCreateInput
+): Promise<{ session: SessionView; token: string }> {
     const token = generateToken();
     const id = crypto.randomUUID();
     const record = await prisma.agentSession.create({
@@ -279,7 +282,10 @@ export async function recordSessionEvents(
     events: readonly { kind: core.AgentSessionEventKind; detail: string; subject: string }[]
 ): Promise<core.AgentSessionState | null> {
     if (events.length === 0) return null;
-    const current = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { state: true } });
+    const current = await prisma.agentSession.findUnique({
+        where: { id: sessionId },
+        select: { state: true }
+    });
     if (!current) return null;
 
     const state = core.replaySessionState(events, readState(current.state));
@@ -359,10 +365,20 @@ export async function sessionMessages(
 }
 
 /** Note that the machine got as far as having a process. */
-export async function markSessionStarted(sessionId: string, containerId: string, workdir: string): Promise<void> {
+export async function markSessionStarted(
+    sessionId: string,
+    containerId: string,
+    workdir: string
+): Promise<void> {
     await prisma.agentSession.update({
         where: { id: sessionId },
-        data: { containerId, workdir, state: "idle", startedAt: new Date(), lastEventAt: new Date() }
+        data: {
+            containerId,
+            workdir,
+            state: "idle",
+            startedAt: new Date(),
+            lastEventAt: new Date()
+        }
     });
 }
 
@@ -396,7 +412,14 @@ export async function sessionPlacement(sessionId: string): Promise<{
 } | null> {
     const record = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { id: true, place: true, hostId: true, containerId: true, workdir: true, state: true }
+        select: {
+            id: true,
+            place: true,
+            hostId: true,
+            containerId: true,
+            workdir: true,
+            state: true
+        }
     });
     if (!record) return null;
     return {
@@ -419,7 +442,10 @@ export async function sessionPlacement(sessionId: string): Promise<{
 export async function resolveSessionEnigma(sessionId: string): Promise<core.ResolvedEnigma> {
     const session = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { enigma: true, repo: { select: { enigma: true, gate: true, ownerId: true, repoFullName: true } } }
+        select: {
+            enigma: true,
+            repo: { select: { enigma: true, gate: true, ownerId: true, repoFullName: true } }
+        }
     });
     if (!session) return core.resolveEnigma();
 

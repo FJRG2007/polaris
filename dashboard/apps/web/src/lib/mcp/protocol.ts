@@ -140,7 +140,11 @@ function ok(id: JsonRpcId, result: unknown): JsonRpcResponse {
 }
 
 function fail(id: JsonRpcId, code: number, message: string, data?: unknown): JsonRpcResponse {
-    return { jsonrpc: "2.0", id, error: data === undefined ? { code, message } : { code, message, data } };
+    return {
+        jsonrpc: "2.0",
+        id,
+        error: data === undefined ? { code, message } : { code, message, data }
+    };
 }
 
 /**
@@ -226,7 +230,8 @@ async function callTool(
 ): Promise<JsonRpcResponse> {
     const name = typeof params.name === "string" ? params.name : "";
     const tool = tools.find((candidate) => candidate.name === name);
-    if (!tool) return fail(id, RPC_INVALID_PARAMS, `There is no tool called ${name || "(unnamed)"}`);
+    if (!tool)
+        return fail(id, RPC_INVALID_PARAMS, `There is no tool called ${name || "(unnamed)"}`);
 
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
@@ -238,7 +243,11 @@ async function callTool(
     if (!args.success) {
         const first = args.error.issues[0];
         const where = first?.path.join(".");
-        return fail(id, RPC_INVALID_PARAMS, where ? `${where}: ${first?.message}` : (first?.message ?? "Bad arguments"));
+        return fail(
+            id,
+            RPC_INVALID_PARAMS,
+            where ? `${where}: ${first?.message}` : (first?.message ?? "Bad arguments")
+        );
     }
 
     try {

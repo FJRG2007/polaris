@@ -10,7 +10,13 @@
 
 import { describe, expect, it } from "vitest";
 import * as commands from "@/lib/agents/session-commands";
-import { claudeHookSettings, hookEventFailed, hookScript, normalizeHookEvent, shellQuote } from "@/lib/agents/session-hooks";
+import {
+    claudeHookSettings,
+    hookEventFailed,
+    hookScript,
+    normalizeHookEvent,
+    shellQuote
+} from "@/lib/agents/session-hooks";
 
 const ESC = String.fromCharCode(27);
 
@@ -34,7 +40,9 @@ describe("the boot script", () => {
 
     it("drops the clone credential before the agent can read its own environment", () => {
         const boot = commands.SESSION_BOOT;
-        expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(boot.indexOf("tmux new-session"));
+        expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(
+            boot.indexOf("tmux new-session")
+        );
     });
 
     it("decodes the files it writes rather than carrying them raw", () => {
@@ -59,9 +67,11 @@ describe("the boot script", () => {
 
     it("starts the branch from the ref that was asked for, and from the default when none was", () => {
         expect(commands.SESSION_BOOT).toContain("$POLARIS_BASE_REF");
-        expect(commands.SESSION_BOOT).toContain('git clone --depth 50 --branch "$POLARIS_BASE_REF"');
+        expect(commands.SESSION_BOOT).toContain(
+            'git clone --depth 50 --branch "$POLARIS_BASE_REF"'
+        );
         // The other arm of the same `if`: no ref, no --branch.
-        expect(commands.SESSION_BOOT).toContain('  git clone --depth 50 -c http.extraHeader');
+        expect(commands.SESSION_BOOT).toContain("  git clone --depth 50 -c http.extraHeader");
     });
 
     it("puts the resolved Enigma settings on the machine, not only the install", () => {
@@ -130,7 +140,9 @@ describe("steering a session", () => {
         expect(commands.submitCommand()).toContain("send-keys");
         expect(commands.submitCommand()).toContain("Enter");
         expect(commands.submitDelayMs("x")).toBeGreaterThanOrEqual(500);
-        expect(commands.submitDelayMs("x".repeat(40_960))).toBeGreaterThan(commands.submitDelayMs("x"));
+        expect(commands.submitDelayMs("x".repeat(40_960))).toBeGreaterThan(
+            commands.submitDelayMs("x")
+        );
     });
 
     it("asks whether there is a terminal to type into before deciding one is missing", () => {
@@ -146,7 +158,10 @@ describe("steering a session", () => {
 
 describe("the hook script", () => {
     it("never puts the token on a command line an argument list would expose", () => {
-        const script = hookScript("https://polaris.example/api/agents/sessions/s1/events", "tok_abc");
+        const script = hookScript(
+            "https://polaris.example/api/agents/sessions/s1/events",
+            "tok_abc"
+        );
         expect(script).toContain("'Authorization: Bearer tok_abc'");
         expect(script).toContain("--data-binary @-");
     });
@@ -190,13 +205,19 @@ describe("normalizeHookEvent", () => {
 
     it("falls back to the tool's name for one it does not know the shape of", () => {
         expect(
-            normalizeHookEvent({ hook_event_name: "PreToolUse", tool_name: "SomeNewTool", tool_input: { a: 1 } })
+            normalizeHookEvent({
+                hook_event_name: "PreToolUse",
+                tool_name: "SomeNewTool",
+                tool_input: { a: 1 }
+            })
         ).toEqual({ kind: "tool.start", detail: "SomeNewTool", subject: "SomeNewTool" });
     });
 
     it("maps the end of a turn and the moment it needs somebody to different states", () => {
         expect(normalizeHookEvent({ hook_event_name: "Stop" })?.kind).toBe("turn.end");
-        expect(normalizeHookEvent({ hook_event_name: "Notification", message: "Needs permission" })).toEqual({
+        expect(
+            normalizeHookEvent({ hook_event_name: "Notification", message: "Needs permission" })
+        ).toEqual({
             kind: "question",
             detail: "Needs permission",
             subject: ""

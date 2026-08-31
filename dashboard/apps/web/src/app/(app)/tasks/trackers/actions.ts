@@ -47,7 +47,11 @@ export async function trackerTargetsAction(): Promise<{
         select: {
             id: true,
             name: true,
-            lists: { where: { archived: false }, select: { id: true, name: true }, orderBy: { order: "asc" } }
+            lists: {
+                where: { archived: false },
+                select: { id: true, name: true },
+                orderBy: { order: "asc" }
+            }
         },
         orderBy: { order: "asc" }
     });
@@ -68,7 +72,11 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     // Reaching a space is not permission to fill it with somebody else's issues.
     let spaceId: string;
     try {
-        const list = await access.requireList({ id: user.id, isAdmin: Boolean(user.isAdmin) }, value.listId, "admin");
+        const list = await access.requireList(
+            { id: user.id, isAdmin: Boolean(user.isAdmin) },
+            value.listId,
+            "admin"
+        );
         spaceId = list.spaceId;
     } catch {
         return { error: "You cannot add work to that list." };
@@ -91,7 +99,9 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     if (value.provider === "jira") {
         config.site = core.normalizeTrackerSite(config.site ?? "");
         if (!core.isTrackerSite(config.site)) {
-            return { error: "That is not a Jira address. It should look like your-company.atlassian.net." };
+            return {
+                error: "That is not a Jira address. It should look like your-company.atlassian.net."
+            };
         }
     }
 
@@ -104,12 +114,16 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     return {};
 }
 
-export async function checkTrackerAction(trackerId: string): Promise<{ ok: boolean; detail: string }> {
+export async function checkTrackerAction(
+    trackerId: string
+): Promise<{ ok: boolean; detail: string }> {
     const user = await requirePermission("tasks.manage");
     return trackers.checkTracker(user.id, trackerId);
 }
 
-export async function syncTrackerAction(trackerId: string): Promise<{ added?: number; updated?: number; error?: string }> {
+export async function syncTrackerAction(
+    trackerId: string
+): Promise<{ added?: number; updated?: number; error?: string }> {
     const user = await requirePermission("tasks.manage");
     const owned = await prisma.taskTracker.findFirst({
         where: { id: trackerId, ownerId: user.id },
@@ -118,10 +132,17 @@ export async function syncTrackerAction(trackerId: string): Promise<{ added?: nu
     if (!owned) return { error: "That connection is not one of yours." };
     const result = await syncTracker(trackerId);
     revalidatePath(TRACKERS_PATH);
-    return { added: result.added, updated: result.updated, ...(result.error ? { error: result.error } : {}) };
+    return {
+        added: result.added,
+        updated: result.updated,
+        ...(result.error ? { error: result.error } : {})
+    };
 }
 
-export async function setTrackerEnabledAction(trackerId: string, enabled: boolean): Promise<{ error?: string }> {
+export async function setTrackerEnabledAction(
+    trackerId: string,
+    enabled: boolean
+): Promise<{ error?: string }> {
     const user = await requirePermission("tasks.manage");
     await trackers.setTrackerEnabled(user.id, trackerId, enabled);
     revalidatePath(TRACKERS_PATH);

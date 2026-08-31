@@ -35,7 +35,14 @@ export interface SyncResult {
 export async function syncTracker(trackerId: string): Promise<SyncResult> {
     const tracker = await prisma.taskTracker.findUnique({
         where: { id: trackerId },
-        select: { id: true, ownerId: true, provider: true, spaceId: true, listId: true, enabled: true }
+        select: {
+            id: true,
+            ownerId: true,
+            provider: true,
+            spaceId: true,
+            listId: true,
+            enabled: true
+        }
     });
     if (!tracker) return { added: 0, updated: 0, error: "That connection no longer exists." };
     if (!tracker.enabled) return { added: 0, updated: 0, error: null };
@@ -79,7 +86,12 @@ export async function syncTracker(trackerId: string): Promise<SyncResult> {
 
     for (const issue of issues) {
         try {
-            const change = await applyIssue(connection, statuses, byKey.get(issue.key) ?? null, issue);
+            const change = await applyIssue(
+                connection,
+                statuses,
+                byKey.get(issue.key) ?? null,
+                issue
+            );
             if (change === "added") added += 1;
             if (change === "updated") updated += 1;
         } catch (error) {
@@ -114,7 +126,13 @@ type IssueChange = "added" | "updated" | "unchanged";
  * anybody can act on about somebody else's issue.
  */
 async function applyIssue(
-    tracker: { id: string; ownerId: string; provider: core.IssueTracker; spaceId: string; listId: string },
+    tracker: {
+        id: string;
+        ownerId: string;
+        provider: core.IssueTracker;
+        spaceId: string;
+        listId: string;
+    },
     statuses: readonly { id: string; name: string; type: string }[],
     existing: { id: string; taskId: string; remoteStatus: string } | null,
     issue: core.TrackerIssue
@@ -172,7 +190,12 @@ async function applyIssue(
     });
     await prisma.taskTrackerLink.update({
         where: { id: existing.id },
-        data: { remoteStatus: issue.status, issueId: issue.id, issueUrl: issue.url, syncedAt: new Date() }
+        data: {
+            remoteStatus: issue.status,
+            issueId: issue.id,
+            issueUrl: issue.url,
+            syncedAt: new Date()
+        }
     });
     return "updated";
 }
@@ -200,6 +223,9 @@ function statusFor(
 /** Every connection due a pass, for the schedule. Disabled ones are skipped here
  *  rather than inside the sync, so a run says how many it actually looked at. */
 export async function trackersToSync(): Promise<string[]> {
-    const rows = await prisma.taskTracker.findMany({ where: { enabled: true }, select: { id: true } });
+    const rows = await prisma.taskTracker.findMany({
+        where: { enabled: true },
+        select: { id: true }
+    });
     return rows.map((row) => row.id);
 }

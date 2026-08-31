@@ -20,7 +20,13 @@
 import { WebSocketServer } from "ws";
 import { HostdClient } from "@polaris/hostd-client";
 import { clampDim, openRootShell, openShell, openSshClient } from "@polaris/ssh";
-import { DockerDriver, socketTransport, sshTransport, streamRpc, tcpTransport } from "@polaris/docker";
+import {
+    DockerDriver,
+    socketTransport,
+    sshTransport,
+    streamRpc,
+    tcpTransport
+} from "@polaris/docker";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -40,7 +46,9 @@ wss.on("connection", async (ws, req) => {
     const ticket = token ? await redeem(token) : null;
     const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent"];
     if (!ticket || !interactive.includes(ticket.mode)) {
-        console.error(`polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`);
+        console.error(
+            `polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`
+        );
         ws.close(4001, "invalid ticket");
         return;
     }
@@ -102,7 +110,10 @@ async function openContainerSession(ticket, ws, attachToAgent = false) {
             close: () => stream.destroy()
         };
     } catch (error) {
-        console.error(`polaris ws: exec failed for ${ticket.containerRef}:`, error?.message ?? error);
+        console.error(
+            `polaris ws: exec failed for ${ticket.containerRef}:`,
+            error?.message ?? error
+        );
         ws.close(4002, "could not open terminal");
         return null;
     }
@@ -141,7 +152,10 @@ async function openDockerSession(ticket, ws) {
             }
         };
     } catch (error) {
-        console.error(`polaris ws: docker exec failed for ${ticket.containerRef}:`, error?.message ?? error);
+        console.error(
+            `polaris ws: docker exec failed for ${ticket.containerRef}:`,
+            error?.message ?? error
+        );
         void driver?.dispose();
         ws.close(4002, "could not open terminal");
         return null;
@@ -204,7 +218,8 @@ async function openSshSession(ticket, ws) {
         );
         return {
             stream: channel,
-            resize: (cols, rows) => channel.setWindow(clampDim(rows, 24, 300), clampDim(cols, 80, 500), 0, 0),
+            resize: (cols, rows) =>
+                channel.setWindow(clampDim(rows, 24, 300), clampDim(cols, 80, 500), 0, 0),
             close: () => {
                 channel.end();
                 client.end();

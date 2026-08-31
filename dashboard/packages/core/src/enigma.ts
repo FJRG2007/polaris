@@ -48,7 +48,8 @@ export const ENIGMA_SCOPE_LABELS: Record<EnigmaScope, string> = {
 
 export const ENIGMA_SCOPE_NOTES: Record<EnigmaScope, string> = {
     all: "Skills, the operating contract, the slash commands and the post-edit guardrails.",
-    policies: "The skills and the operating contract. Faster to install, and enough to change how the work is done."
+    policies:
+        "The skills and the operating contract. Faster to install, and enough to change how the work is done."
 };
 
 /**
@@ -111,12 +112,17 @@ export type ResolvedEnigma = typeof DEFAULT_ENIGMA;
  * nearest would silently drop the operator's instance-wide policy the moment
  * somebody set anything at all on a session.
  */
-export function resolveEnigma(...tiers: readonly (EnigmaSettings | null | undefined)[]): ResolvedEnigma {
+export function resolveEnigma(
+    ...tiers: readonly (EnigmaSettings | null | undefined)[]
+): ResolvedEnigma {
     const present = tiers.filter((tier): tier is EnigmaSettings => Boolean(tier));
-    const first = <K extends keyof EnigmaSettings>(key: K): NonNullable<EnigmaSettings[K]> | null => {
+    const first = <K extends keyof EnigmaSettings>(
+        key: K
+    ): NonNullable<EnigmaSettings[K]> | null => {
         for (const tier of present) {
             const value = tier[key];
-            if (value !== null && value !== undefined) return value as NonNullable<EnigmaSettings[K]>;
+            if (value !== null && value !== undefined)
+                return value as NonNullable<EnigmaSettings[K]>;
         }
         return null;
     };
@@ -213,11 +219,15 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
     return {
         enabled: typeof record.enabled === "boolean" ? record.enabled : null,
         scope:
-            typeof record.scope === "string" && (ENIGMA_SCOPES as readonly string[]).includes(record.scope)
+            typeof record.scope === "string" &&
+            (ENIGMA_SCOPES as readonly string[]).includes(record.scope)
                 ? (record.scope as EnigmaScope)
                 : null,
         gate: typeof record.gate === "string" && isEnigmaGateMode(record.gate) ? record.gate : null,
-        version: typeof record.version === "string" && record.version.trim() ? record.version.trim() : null,
+        version:
+            typeof record.version === "string" && record.version.trim()
+                ? record.version.trim()
+                : null,
         config: Object.keys(config).length > 0 ? config : null
     };
 }

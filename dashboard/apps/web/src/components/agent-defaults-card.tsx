@@ -122,7 +122,10 @@ export function AgentDefaultsCard({
 
     /** One field of the Enigma block, leaving the rest of it alone - it is stored
      *  as one value, so setting a field means rewriting the whole thing. */
-    const setEnigma = <K extends keyof core.EnigmaSettings>(key: K, value: core.EnigmaSettings[K]) => {
+    const setEnigma = <K extends keyof core.EnigmaSettings>(
+        key: K,
+        value: core.EnigmaSettings[K]
+    ) => {
         setSaved(false);
         onChange({ ...tier, enigma: { ...tier.enigma, [key]: value } });
     };
@@ -177,7 +180,8 @@ export function AgentDefaultsCard({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                    Anything left on Inherit comes from {inheritedFrom}. A repository can still override any of it.
+                    Anything left on Inherit comes from {inheritedFrom}. A repository can still
+                    override any of it.
                 </p>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -214,13 +218,24 @@ export function AgentDefaultsCard({
                     </Field>
                 </div>
 
-                <Field label="Quality gate" hint={AGENT_GATE_MODE_NOTES[tier.gate ?? inherited.gate]}>
+                <Field
+                    label="Quality gate"
+                    hint={AGENT_GATE_MODE_NOTES[tier.gate ?? inherited.gate]}
+                >
                     <Select
                         value={tier.gate ?? INHERIT}
-                        onValueChange={(next) => set("gate", next === INHERIT ? null : (next as AgentGateMode))}
+                        onValueChange={(next) =>
+                            set("gate", next === INHERIT ? null : (next as AgentGateMode))
+                        }
                         options={[
-                            { value: INHERIT, label: `Inherit (${AGENT_GATE_MODE_LABELS[inherited.gate]})` },
-                            ...AGENT_GATE_MODES.map((value) => ({ value, label: AGENT_GATE_MODE_LABELS[value] }))
+                            {
+                                value: INHERIT,
+                                label: `Inherit (${AGENT_GATE_MODE_LABELS[inherited.gate]})`
+                            },
+                            ...AGENT_GATE_MODES.map((value) => ({
+                                value,
+                                label: AGENT_GATE_MODE_LABELS[value]
+                            }))
                         ]}
                     />
                 </Field>
@@ -246,11 +261,17 @@ export function AgentDefaultsCard({
                             ]}
                         />
                     </Field>
-                    <Field label="How much of it" hint={core.ENIGMA_SCOPE_NOTES[tier.enigma.scope ?? "all"]}>
+                    <Field
+                        label="How much of it"
+                        hint={core.ENIGMA_SCOPE_NOTES[tier.enigma.scope ?? "all"]}
+                    >
                         <Select
                             value={tier.enigma.scope ?? INHERIT}
                             onValueChange={(next) =>
-                                setEnigma("scope", next === INHERIT ? null : (next as core.EnigmaScope))
+                                setEnigma(
+                                    "scope",
+                                    next === INHERIT ? null : (next as core.EnigmaScope)
+                                )
                             }
                             options={[
                                 { value: INHERIT, label: "Inherit" },
@@ -267,7 +288,9 @@ export function AgentDefaultsCard({
                     <Field label="Runs on">
                         <Select
                             value={tier.execution ?? INHERIT}
-                            onValueChange={(next) => set("execution", next === INHERIT ? null : (next as AgentExecution))}
+                            onValueChange={(next) =>
+                                set("execution", next === INHERIT ? null : (next as AgentExecution))
+                            }
                             options={[
                                 { value: INHERIT, label: "Inherit" },
                                 ...AGENT_EXECUTIONS.map((value) => ({
@@ -280,19 +303,30 @@ export function AgentDefaultsCard({
                     {tier.execution === "runners" ? (
                         <Field
                             label="Runner pool"
-                            hint={pools.length === 0 ? "You have no pools yet. Create one under Apps > Runners." : undefined}
+                            hint={
+                                pools.length === 0
+                                    ? "You have no pools yet. Create one under Apps > Runners."
+                                    : undefined
+                            }
                         >
                             <Select
                                 value={tier.poolId ?? ""}
                                 onValueChange={(next) => set("poolId", next || null)}
                                 placeholder="Pick a runner pool"
-                                options={pools.map((pool) => ({ value: pool.id, label: pool.name }))}
+                                options={pools.map((pool) => ({
+                                    value: pool.id,
+                                    label: pool.name
+                                }))}
                             />
                         </Field>
                     ) : null}
                     <Field
                         label="Model"
-                        hint={providers.length === 0 ? "Connect a model provider under Integrations first." : undefined}
+                        hint={
+                            providers.length === 0
+                                ? "Connect a model provider under Integrations first."
+                                : undefined
+                        }
                     >
                         <ModelPicker
                             value={tier.model}
@@ -315,7 +349,9 @@ export function AgentDefaultsCard({
                     <Field label="Reasoning effort">
                         <Select
                             value={tier.effort ?? INHERIT}
-                            onValueChange={(next) => set("effort", next === INHERIT ? null : (next as AgentEffort))}
+                            onValueChange={(next) =>
+                                set("effort", next === INHERIT ? null : (next as AgentEffort))
+                            }
                             options={[
                                 { value: INHERIT, label: "Inherit" },
                                 ...AGENT_EFFORTS.map((value) => ({ value, label: value }))
@@ -325,7 +361,9 @@ export function AgentDefaultsCard({
                     <Field label="Git access">
                         <Select
                             value={tier.push ?? INHERIT}
-                            onValueChange={(next) => set("push", next === INHERIT ? null : (next as AgentPushPolicy))}
+                            onValueChange={(next) =>
+                                set("push", next === INHERIT ? null : (next as AgentPushPolicy))
+                            }
                             options={[
                                 { value: INHERIT, label: "Inherit" },
                                 ...AGENT_PUSH_POLICIES.map((value) => ({
@@ -338,7 +376,9 @@ export function AgentDefaultsCard({
                     <Field label="Shell">
                         <Select
                             value={tier.shell ?? INHERIT}
-                            onValueChange={(next) => set("shell", next === INHERIT ? null : (next as AgentShellPolicy))}
+                            onValueChange={(next) =>
+                                set("shell", next === INHERIT ? null : (next as AgentShellPolicy))
+                            }
                             options={[
                                 { value: INHERIT, label: "Inherit" },
                                 ...AGENT_SHELL_POLICIES.map((value) => ({

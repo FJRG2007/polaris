@@ -60,7 +60,8 @@ const getInput = z.object({ sessionId: z.string().uuid() });
 
 const getSessionTool: McpTool<z.infer<typeof getInput>> = {
     name: "agent_session_get",
-    description: "What one session has been asked, what it has done, and whether it is waiting on anybody.",
+    description:
+        "What one session has been asked, what it has done, and whether it is waiting on anybody.",
     input: getInput,
     scope: "agents.read",
     readOnly: true,
@@ -89,7 +90,12 @@ const getSessionTool: McpTool<z.infer<typeof getInput>> = {
 
 const promptInput = z.object({
     sessionId: z.string().uuid(),
-    text: z.string().trim().min(1).max(20_000).describe("What to say to it. Goes into its prompt as typed.")
+    text: z
+        .string()
+        .trim()
+        .min(1)
+        .max(20_000)
+        .describe("What to say to it. Goes into its prompt as typed.")
 });
 
 const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
@@ -134,7 +140,10 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             where: { ownerId: caller.userId, repoFullName: input.repo, enabled: true },
             select: { id: true }
         });
-        if (!repo) throw new McpRefusal(`${input.repo} is not a repository the Agents app reaches for this key.`);
+        if (!repo)
+            throw new McpRefusal(
+                `${input.repo} is not a repository the Agents app reaches for this key.`
+            );
 
         const { session, token } = await sessions.createSession({
             repoId: repo.id,

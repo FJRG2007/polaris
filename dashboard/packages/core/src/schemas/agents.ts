@@ -53,7 +53,10 @@ export const repoFullNameSchema = z
         (value) => {
             const [owner, repo, ...rest] = value.split("/");
             if (rest.length > 0 || !owner || !repo) return false;
-            return githubLoginSchema.safeParse(owner).success && githubRepoSchema.safeParse(repo).success;
+            return (
+                githubLoginSchema.safeParse(owner).success &&
+                githubRepoSchema.safeParse(repo).success
+            );
         },
         { message: "Not a repository name" }
     );
@@ -252,7 +255,9 @@ export const gatewayKeyConfigSchema = z.object({
 export const modelKeyExpirySchema = z
     .string()
     .datetime({ message: "Not a date" })
-    .refine((value) => new Date(value).getTime() > Date.now(), { message: "Pick a date in the future" })
+    .refine((value) => new Date(value).getTime() > Date.now(), {
+        message: "Pick a date in the future"
+    })
     .nullable()
     .default(null);
 

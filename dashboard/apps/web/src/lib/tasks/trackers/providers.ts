@@ -63,7 +63,9 @@ async function call(url: string, init: RequestInit): Promise<Response> {
     const response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (response.ok) return response;
     const said = (await response.text().catch(() => "")).slice(0, 400);
-    throw new TrackerError(`${response.status} from ${new URL(url).host}${said ? `: ${said}` : ""}`);
+    throw new TrackerError(
+        `${response.status} from ${new URL(url).host}${said ? `: ${said}` : ""}`
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -93,13 +95,19 @@ function linearClient(credential: TrackerCredential): TrackerClient {
         ? `Bearer ${credential.secret}`
         : credential.secret;
 
-    const graphql = async (query: string, variables: Record<string, unknown> = {}): Promise<unknown> => {
+    const graphql = async (
+        query: string,
+        variables: Record<string, unknown> = {}
+    ): Promise<unknown> => {
         const response = await call(LINEAR_API, {
             method: "POST",
             headers: { Authorization: authorization, "Content-Type": "application/json" },
             body: JSON.stringify({ query, variables })
         });
-        const payload = (await response.json()) as { data?: unknown; errors?: { message?: string }[] };
+        const payload = (await response.json()) as {
+            data?: unknown;
+            errors?: { message?: string }[];
+        };
         if (payload.errors?.length) {
             throw new TrackerError(payload.errors[0]?.message ?? "Linear refused the request");
         }
@@ -118,9 +126,15 @@ function linearClient(credential: TrackerCredential): TrackerClient {
                 const data = (await graphql("query { viewer { name } }")) as {
                     viewer?: { name?: string };
                 };
-                return { ok: true, detail: `Connected as ${data.viewer?.name ?? "your Linear account"}.` };
+                return {
+                    ok: true,
+                    detail: `Connected as ${data.viewer?.name ?? "your Linear account"}.`
+                };
             } catch (error) {
-                return { ok: false, detail: error instanceof Error ? error.message : "Linear did not answer." };
+                return {
+                    ok: false,
+                    detail: error instanceof Error ? error.message : "Linear did not answer."
+                };
             }
         },
 
@@ -137,7 +151,10 @@ function linearClient(credential: TrackerCredential): TrackerClient {
                     }`,
                     { first: PAGE, after, filter }
                 )) as {
-                    issues?: { nodes?: unknown[]; pageInfo?: { hasNextPage?: boolean; endCursor?: string } };
+                    issues?: {
+                        nodes?: unknown[];
+                        pageInfo?: { hasNextPage?: boolean; endCursor?: string };
+                    };
                 };
                 for (const node of data.issues?.nodes ?? []) {
                     const issue = readLinearIssue(node);
@@ -152,9 +169,17 @@ function linearClient(credential: TrackerCredential): TrackerClient {
 
         async setStatus(issue, statusName) {
             const data = (await graphql(
-                `query($filter: WorkflowStateFilter) {
-                    workflowStates(first: 100, filter: $filter) { nodes { id name type } }
-                }`,
+                `
+                    query ($filter: WorkflowStateFilter) {
+                        workflowStates(first: 100, filter: $filter) {
+                            nodes {
+                                id
+                                name
+                                type
+                            }
+                        }
+                    }
+                `,
                 { filter: filter ? { team: { key: { eq: credential.query.trim() } } } : undefined }
             )) as { workflowStates?: { nodes?: { id: string; name: string }[] } };
 
@@ -217,7 +242,9 @@ function jiraClient(credential: TrackerCredential): TrackerClient {
     // server itself calls, so an address that is not a Jira site is not one this
     // will connect to.
     if (!core.isTrackerSite(site)) {
-        throw new TrackerError(`"${site}" is not a Jira address. It should look like your-company.atlassian.net.`);
+        throw new TrackerError(
+            `"${site}" is not a Jira address. It should look like your-company.atlassian.net.`
+        );
     }
 
     const base = `https://${site}/rest/api/3`;
@@ -244,7 +271,10 @@ function jiraClient(credential: TrackerCredential): TrackerClient {
                 const data = (await get("/myself")) as { displayName?: string };
                 return { ok: true, detail: `Connected as ${data.displayName ?? email}.` };
             } catch (error) {
-                return { ok: false, detail: error instanceof Error ? error.message : "Jira did not answer." };
+                return {
+                    ok: false,
+                    detail: error instanceof Error ? error.message : "Jira did not answer."
+                };
             }
         },
 

@@ -105,12 +105,19 @@ type TaskRecord = Prisma.TaskGetPayload<{ select: typeof ROW_SELECT }>;
  * are columns on the task itself. `toRow` folds all four into the one answer a
  * card draws.
  */
-async function decorate(
-    ids: string[]
-): Promise<{ tracked: Map<string, number>; blocked: Set<string>; commentCounts: Map<string, number> }> {
-    if (ids.length === 0) return { tracked: new Map(), blocked: new Set(), commentCounts: new Map() };
+async function decorate(ids: string[]): Promise<{
+    tracked: Map<string, number>;
+    blocked: Set<string>;
+    commentCounts: Map<string, number>;
+}> {
+    if (ids.length === 0)
+        return { tracked: new Map(), blocked: new Set(), commentCounts: new Map() };
     const [entries, dependencies, discussion] = await Promise.all([
-        prisma.taskTimeEntry.groupBy({ by: ["taskId"], where: { taskId: { in: ids } }, _sum: { seconds: true } }),
+        prisma.taskTimeEntry.groupBy({
+            by: ["taskId"],
+            where: { taskId: { in: ids } },
+            _sum: { seconds: true }
+        }),
         prisma.taskDependency.findMany({
             where: { blockedId: { in: ids }, type: "blocks" },
             select: { blockedId: true, blocker: { select: { status: { select: { type: true } } } } }
@@ -128,7 +135,9 @@ async function decorate(
     const commentCounts = new Map(discussion.map((row) => [row.subjectId, row._count._all]));
     const blocked = new Set(
         dependencies
-            .filter((edge) => core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined))
+            .filter((edge) =>
+                core.blockerHolds(edge.blocker.status?.type as core.TaskStatusType | undefined)
+            )
             .map((edge) => edge.blockedId)
     );
     return { tracked, blocked, commentCounts };
@@ -187,13 +196,18 @@ function toRow(
             new Date()
         ),
         recurring: record.recurrence !== null,
-        customValues: Object.fromEntries(record.fieldValues.map((value) => [value.fieldId, value.value]))
+        customValues: Object.fromEntries(
+            record.fieldValues.map((value) => [value.fieldId, value.value])
+        )
     };
 }
 
 /** The tasks a screen asked for, ordered by manual position. Views re-sort and
  *  re-group in the browser, so this never has to know about the saved sort. */
-export async function listTasks(scope: TaskScope, options: TaskQueryOptions = {}): Promise<TaskRow[]> {
+export async function listTasks(
+    scope: TaskScope,
+    options: TaskQueryOptions = {}
+): Promise<TaskRow[]> {
     const records = await prisma.task.findMany({
         where: {
             ...(scope.listId ? { listId: scope.listId } : {}),
@@ -314,78 +328,95 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
         attachments,
         commits
     ] = await Promise.all([
-            decorate([taskId]),
-            listTasks({ parentId: taskId }, { includeArchived: true }),
-            prisma.follow.findMany({
-                where: { subjectType: "task", subjectId: taskId },
-                select: { user: { select: { id: true, name: true, image: true } } }
-            }),
-            prisma.taskChecklist.findMany({
-                where: { taskId },
-                orderBy: { order: "asc" },
-                select: {
-                    id: true,
-                    name: true,
-                    items: {
-                        orderBy: { order: "asc" },
-                        select: { id: true, name: true, done: true, assigneeId: true }
-                    }
+        decorate([taskId]),
+        listTasks({ parentId: taskId }, { includeArchived: true }),
+        prisma.follow.findMany({
+            where: { subjectType: "task", subjectId: taskId },
+            select: { user: { select: { id: true, name: true, image: true } } }
+        }),
+        prisma.taskChecklist.findMany({
+            where: { taskId },
+            orderBy: { order: "asc" },
+            select: {
+                id: true,
+                name: true,
+                items: {
+                    orderBy: { order: "asc" },
+                    select: { id: true, name: true, done: true, assigneeId: true }
                 }
-            }),
-            prisma.comment.findMany({
-                where: { subjectType: "task", subjectId: taskId },
-                orderBy: { createdAt: "asc" },
-                select: {
-                    id: true,
-                    body: true,
-                    parentId: true,
-                    assignedToId: true,
-                    resolvedAt: true,
-                    createdAt: true,
-                    user: { select: { id: true, name: true, image: true } }
-                }
-            }),
-            prisma.taskDependency.findMany({
-                where: { blockerId: taskId },
-                select: { id: true, type: true, blocked: { select: DEPENDENCY_SELECT } }
-            }),
-            prisma.taskDependency.findMany({
-                where: { blockedId: taskId },
-                select: { id: true, type: true, blocker: { select: DEPENDENCY_SELECT } }
-            }),
-            prisma.activity.findMany({
-                where: { subjectType: "task", subjectId: taskId },
-                orderBy: { createdAt: "desc" },
-                take: 100,
-                select: { id: true, action: true, fromValue: true, toValue: true, userId: true, createdAt: true }
-            }),
-            prisma.taskTimeEntry.findMany({
-                where: { taskId },
-                orderBy: { startedAt: "desc" },
-                select: {
-                    id: true,
-                    userId: true,
-                    seconds: true,
-                    note: true,
-                    billable: true,
-                    startedAt: true,
-                    endedAt: true,
-                    user: { select: { name: true } }
-                }
-            }),
-            record.parentId
-                ? prisma.task.findUnique({
-                      where: { id: record.parentId },
-                      select: { id: true, name: true, number: true, space: { select: { prefix: true } } }
-                  })
-                : Promise.resolve(null),
-            listAttachments(taskId),
-            listCommits(taskId)
-        ]);
+            }
+        }),
+        prisma.comment.findMany({
+            where: { subjectType: "task", subjectId: taskId },
+            orderBy: { createdAt: "asc" },
+            select: {
+                id: true,
+                body: true,
+                parentId: true,
+                assignedToId: true,
+                resolvedAt: true,
+                createdAt: true,
+                user: { select: { id: true, name: true, image: true } }
+            }
+        }),
+        prisma.taskDependency.findMany({
+            where: { blockerId: taskId },
+            select: { id: true, type: true, blocked: { select: DEPENDENCY_SELECT } }
+        }),
+        prisma.taskDependency.findMany({
+            where: { blockedId: taskId },
+            select: { id: true, type: true, blocker: { select: DEPENDENCY_SELECT } }
+        }),
+        prisma.activity.findMany({
+            where: { subjectType: "task", subjectId: taskId },
+            orderBy: { createdAt: "desc" },
+            take: 100,
+            select: {
+                id: true,
+                action: true,
+                fromValue: true,
+                toValue: true,
+                userId: true,
+                createdAt: true
+            }
+        }),
+        prisma.taskTimeEntry.findMany({
+            where: { taskId },
+            orderBy: { startedAt: "desc" },
+            select: {
+                id: true,
+                userId: true,
+                seconds: true,
+                note: true,
+                billable: true,
+                startedAt: true,
+                endedAt: true,
+                user: { select: { name: true } }
+            }
+        }),
+        record.parentId
+            ? prisma.task.findUnique({
+                  where: { id: record.parentId },
+                  select: {
+                      id: true,
+                      name: true,
+                      number: true,
+                      space: { select: { prefix: true } }
+                  }
+              })
+            : Promise.resolve(null),
+        listAttachments(taskId),
+        listCommits(taskId)
+    ]);
 
-    const authorIds = [...new Set(activity.map((line) => line.userId).filter((id): id is string => id !== null))];
+    const authorIds = [
+        ...new Set(activity.map((line) => line.userId).filter((id): id is string => id !== null))
+    ];
     const authors = authorIds.length
-        ? await prisma.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: authorIds } },
+              select: { id: true, name: true }
+          })
         : [];
     const authorName = new Map(authors.map((author) => [author.id, author.name]));
 
@@ -429,7 +460,11 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
         commits,
         recurrence: core.parseRecurrence(record.recurrence),
         parent: parent
-            ? { id: parent.id, reference: core.taskReference(parent.space.prefix, parent.number), name: parent.name }
+            ? {
+                  id: parent.id,
+                  reference: core.taskReference(parent.space.prefix, parent.number),
+                  name: parent.name
+              }
             : null
     };
 }
@@ -463,7 +498,9 @@ function toDependency(
         name: other.name,
         statusName: other.status?.name ?? "No status",
         statusColor: other.status?.color ?? "#64748b",
-        finished: other.status ? core.isFinishedStatus(other.status.type as core.TaskStatusType) : false
+        finished: other.status
+            ? core.isFinishedStatus(other.status.type as core.TaskStatusType)
+            : false
     };
 }
 
@@ -480,7 +517,14 @@ async function logActivity(
     fromValue?: string | null,
     toValue?: string | null
 ): Promise<void> {
-    await activity.record({ subjectType: "task", subjectId: taskId, userId, action, fromValue, toValue });
+    await activity.record({
+        subjectType: "task",
+        subjectId: taskId,
+        userId,
+        action,
+        fromValue,
+        toValue
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +554,10 @@ async function defaultStatusId(spaceId: string): Promise<string | null> {
  * Throws when the space has nothing by that name: silently leaving the status
  * unchanged after a drop looks exactly like the board rejecting the drag.
  */
-async function statusInSpace(spaceId: string, statusId: string): Promise<{ id: string; type: string }> {
+async function statusInSpace(
+    spaceId: string,
+    statusId: string
+): Promise<{ id: string; type: string }> {
     const given = await prisma.taskStatus.findUnique({
         where: { id: statusId },
         select: { id: true, name: true, type: true, spaceId: true }
@@ -521,7 +568,10 @@ async function statusInSpace(spaceId: string, statusId: string): Promise<{ id: s
     // Matched in memory rather than in the query: a space holds a handful of
     // statuses, and Prisma's case-insensitive filter is Postgres-only while this
     // schema has to keep working on SQLite.
-    const owned = await prisma.taskStatus.findMany({ where: { spaceId }, select: { id: true, name: true, type: true } });
+    const owned = await prisma.taskStatus.findMany({
+        where: { spaceId },
+        select: { id: true, name: true, type: true }
+    });
     const needle = given.name.trim().toLowerCase();
     const sameName = owned.find((status) => status.name.trim().toLowerCase() === needle);
     if (!sameName) throw new Error(`This task's space has no status called "${given.name}"`);
@@ -619,7 +669,10 @@ async function announceAssignment(
 /** The names a history line needs, resolved once per update. */
 async function statusName(statusId: string | null | undefined): Promise<string | null> {
     if (!statusId) return null;
-    const status = await prisma.taskStatus.findUnique({ where: { id: statusId }, select: { name: true } });
+    const status = await prisma.taskStatus.findUnique({
+        where: { id: statusId },
+        select: { name: true }
+    });
     return status?.name ?? null;
 }
 
@@ -655,7 +708,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.priority !== undefined) data.priority = input.priority;
-    if (input.startDate !== undefined) data.startDate = input.startDate ? new Date(input.startDate) : null;
+    if (input.startDate !== undefined)
+        data.startDate = input.startDate ? new Date(input.startDate) : null;
     if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
     if (input.timed !== undefined) data.timed = input.timed;
     if (input.timeEstimate !== undefined) data.timeEstimate = input.timeEstimate;
@@ -698,7 +752,12 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     }
 
     if (input.assigneeIds !== undefined) {
-        await setAssignees(actorId, input.taskId, input.assigneeIds, before.assignees.map((entry) => entry.userId));
+        await setAssignees(
+            actorId,
+            input.taskId,
+            input.assigneeIds,
+            before.assignees.map((entry) => entry.userId)
+        );
     }
     // Which tags this write is actually putting on the task, read from what it
     // held rather than from what was sent: the whole set arrives every time, so
@@ -709,14 +768,22 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
         tagsAdded = input.tagIds.some((tagId) => !held.has(tagId));
         await prisma.$transaction([
             prisma.taskTagLink.deleteMany({ where: { taskId: input.taskId } }),
-            prisma.taskTagLink.createMany({ data: input.tagIds.map((tagId) => ({ taskId: input.taskId, tagId })) })
+            prisma.taskTagLink.createMany({
+                data: input.tagIds.map((tagId) => ({ taskId: input.taskId, tagId }))
+            })
         ]);
     }
 
     // History, then rules: a rule that changes the task should read a task that
     // already reflects what the person did.
     if (movedTo !== null && movedTo !== before.statusId) {
-        await logActivity(input.taskId, actorId, "status", await statusName(before.statusId), await statusName(movedTo));
+        await logActivity(
+            input.taskId,
+            actorId,
+            "status",
+            await statusName(before.statusId),
+            await statusName(movedTo)
+        );
     }
     if (input.priority !== undefined && input.priority !== before.priority) {
         await logActivity(
@@ -744,7 +811,10 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
         // Read from what the task ends up holding, not from what was sent:
         // clearing the date while a written reason stands is still blocked, and
         // logging it as cleared would put the wrong sentence in the history.
-        const until = input.blockedUntil !== undefined ? input.blockedUntil : (before.blockedUntil?.toISOString() ?? null);
+        const until =
+            input.blockedUntil !== undefined
+                ? input.blockedUntil
+                : (before.blockedUntil?.toISOString() ?? null);
         const note = input.blockedNote !== undefined ? input.blockedNote : before.blockedNote;
         const held = Boolean(until) || note !== "";
         const wasHeld = before.blockedUntil !== null || before.blockedNote !== "";
@@ -771,7 +841,8 @@ export async function updateTask(actorId: string, input: core.TaskUpdateInput): 
     if (input.dueDate && new Date(input.dueDate).getTime() !== before.dueDate?.getTime()) {
         await runAutomations({ trigger: "task.dueDateSet", taskId: input.taskId, actorId });
     }
-    if (tagsAdded) await runAutomations({ trigger: "task.tagAdded", taskId: input.taskId, actorId });
+    if (tagsAdded)
+        await runAutomations({ trigger: "task.tagAdded", taskId: input.taskId, actorId });
 }
 
 /**
@@ -798,7 +869,8 @@ async function rescheduleIfRecurring(taskId: string, actorId: string): Promise<v
     if (!nextDue) return;
 
     // Keep the gap between start and due, so a three-day job stays three days.
-    const shift = task.startDate && task.dueDate ? task.dueDate.getTime() - task.startDate.getTime() : null;
+    const shift =
+        task.startDate && task.dueDate ? task.dueDate.getTime() - task.startDate.getTime() : null;
     const openStatus = await prisma.taskStatus.findFirst({
         where: { spaceId: task.spaceId, type: "open" },
         orderBy: [{ order: "asc" }],
@@ -836,7 +908,10 @@ export async function setAssignees(
 
     const added = assigneeIds.filter((id) => !before.includes(id));
     if (added.length > 0) {
-        const task = await prisma.task.findUnique({ where: { id: taskId }, select: { name: true } });
+        const task = await prisma.task.findUnique({
+            where: { id: taskId },
+            select: { name: true }
+        });
         await logActivity(taskId, actorId, "assignee", null, String(added.length));
         await announceAssignment(taskId, task?.name ?? "A task", added, actorId);
         await runAutomations({ trigger: "task.assigneeAdded", taskId, actorId });
@@ -871,7 +946,10 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
         order: core.orderBetween(before?.order ?? null, after?.order ?? null)
     };
     if (input.listId && input.listId !== current.listId) {
-        const target = await prisma.taskList.findUnique({ where: { id: input.listId }, select: { spaceId: true } });
+        const target = await prisma.taskList.findUnique({
+            where: { id: input.listId },
+            select: { spaceId: true }
+        });
         if (!target || target.spaceId !== current.spaceId) {
             throw new Error("A task can only move between lists in the same space");
         }
@@ -885,7 +963,9 @@ export async function moveTask(actorId: string, input: core.TaskMoveInput): Prom
         } else {
             const status = await statusInSpace(current.spaceId, input.statusId);
             data.statusId = status.id;
-            data.completedAt = core.isFinishedStatus(status.type as core.TaskStatusType) ? new Date() : null;
+            data.completedAt = core.isFinishedStatus(status.type as core.TaskStatusType)
+                ? new Date()
+                : null;
         }
     }
 
@@ -919,7 +999,9 @@ async function rebalanceList(listId: string): Promise<void> {
     });
     const orders = core.rebalanceOrders(tasks.length);
     await prisma.$transaction(
-        tasks.map((task, index) => prisma.task.update({ where: { id: task.id }, data: { order: orders[index] } }))
+        tasks.map((task, index) =>
+            prisma.task.update({ where: { id: task.id }, data: { order: orders[index] } })
+        )
     );
 }
 
@@ -955,7 +1037,9 @@ export async function arrangeTasks(taskIds: readonly string[]): Promise<number> 
     if (changed.length === 0) return 0;
 
     await prisma.$transaction(
-        changed.map((row) => prisma.task.update({ where: { id: row.id }, data: { order: row.order } }))
+        changed.map((row) =>
+            prisma.task.update({ where: { id: row.id }, data: { order: row.order } })
+        )
     );
     return changed.length;
 }
@@ -1057,7 +1141,9 @@ export async function bulkUpdate(
                 }
             });
             if (status.finished) {
-                const unstamped = scoped.filter((task) => task.completedAt === null).map((task) => task.id);
+                const unstamped = scoped
+                    .filter((task) => task.completedAt === null)
+                    .map((task) => task.id);
                 if (unstamped.length > 0) {
                     await prisma.task.updateMany({
                         where: { id: { in: unstamped } },
@@ -1084,7 +1170,9 @@ export async function bulkUpdate(
             select: { taskId: true, userId: true }
         });
         const held = new Set(already.map((entry) => `${entry.taskId}:${entry.userId}`));
-        await prisma.taskAssignee.deleteMany({ where: { taskId: { in: ids }, userId: { in: userIds } } });
+        await prisma.taskAssignee.deleteMany({
+            where: { taskId: { in: ids }, userId: { in: userIds } }
+        });
         await prisma.taskAssignee.createMany({
             data: ids.flatMap((taskId) => userIds.map((userId) => ({ taskId, userId })))
         });
@@ -1115,7 +1203,9 @@ export async function bulkUpdate(
             select: { taskId: true, tagId: true }
         });
         const held = new Set(already.map((entry) => `${entry.taskId}:${entry.tagId}`));
-        await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: tagIds } } });
+        await prisma.taskTagLink.deleteMany({
+            where: { taskId: { in: ids }, tagId: { in: tagIds } }
+        });
         await prisma.taskTagLink.createMany({
             data: ids.flatMap((taskId) => tagIds.map((tagId) => ({ taskId, tagId })))
         });
@@ -1124,7 +1214,9 @@ export async function bulkUpdate(
         }
     }
     if (input.removeTagIds?.length) {
-        await prisma.taskTagLink.deleteMany({ where: { taskId: { in: ids }, tagId: { in: input.removeTagIds } } });
+        await prisma.taskTagLink.deleteMany({
+            where: { taskId: { in: ids }, tagId: { in: input.removeTagIds } }
+        });
     }
 
     // The names a status line needs, for every status either end of the move
@@ -1151,8 +1243,19 @@ export async function bulkUpdate(
     for (const task of before) {
         const status = statusPerSpace.get(task.spaceId);
         const movedTo = status && status.id !== task.statusId ? status : null;
-        const line = (action: string, fromValue: string | null = null, toValue: string | null = null) =>
-            lines.push({ subjectType: "task", subjectId: task.id, userId: actorId, action, fromValue, toValue });
+        const line = (
+            action: string,
+            fromValue: string | null = null,
+            toValue: string | null = null
+        ) =>
+            lines.push({
+                subjectType: "task",
+                subjectId: task.id,
+                userId: actorId,
+                action,
+                fromValue,
+                toValue
+            });
         const written = lines.length;
 
         if (movedTo) {
@@ -1186,7 +1289,8 @@ export async function bulkUpdate(
             line("moved");
         }
         if (input.archived === true) line("archived");
-        if (handedTo.has(task.id)) line("assignee", null, String(handedTo.get(task.id)?.length ?? 0));
+        if (handedTo.has(task.id))
+            line("assignee", null, String(handedTo.get(task.id)?.length ?? 0));
         else if (takenFrom.has(task.id)) line("assignee");
         // A change with no line of its own - a sprint, a tag - still leaves a
         // mark, which is what this stream is for.
@@ -1221,7 +1325,9 @@ export async function bulkUpdate(
 
     // A recurring job that was just finished does not stay finished, whether it
     // was ticked on its own row or with thirty others.
-    const recurring = new Set(before.filter((task) => task.recurrence !== null).map((task) => task.id));
+    const recurring = new Set(
+        before.filter((task) => task.recurrence !== null).map((task) => task.id)
+    );
     for (const taskId of completed) {
         if (recurring.has(taskId)) await rescheduleIfRecurring(taskId, actorId);
     }
@@ -1330,7 +1436,9 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
             blockedNote: true,
             assignees: { select: { userId: true } },
             tags: { select: { tagId: true } },
-            checklists: { select: { name: true, order: true, items: { select: { name: true, order: true } } } },
+            checklists: {
+                select: { name: true, order: true, items: { select: { name: true, order: true } } }
+            },
             subtasks: { select: { name: true, description: true, statusId: true, priority: true } }
         }
     });
@@ -1365,7 +1473,9 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
                 taskId: created.id,
                 name: checklist.name,
                 order: checklist.order,
-                items: { create: checklist.items.map((item) => ({ name: item.name, order: item.order })) }
+                items: {
+                    create: checklist.items.map((item) => ({ name: item.name, order: item.order }))
+                }
             }
         });
     }

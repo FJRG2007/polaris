@@ -40,12 +40,16 @@ function acknowledged(): Response {
     return Response.json({}, { status: 200 });
 }
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await params;
     const session = await sessionForToken(bearer(request));
     // The token names a session; the URL names one too. They have to be the same
     // one, or a token would be a way to write into any session on the instance.
-    if (!session || session.id !== id) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session || session.id !== id)
+        return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.text();
     if (body.length > MAX_BODY) return acknowledged();

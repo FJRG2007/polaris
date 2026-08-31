@@ -13,7 +13,12 @@
  * flattening a provider's rich-text description needs before it is text.
  */
 
-import { TASK_DESCRIPTION_MAX, TASK_NAME_MAX, TASK_STATUS_TYPES, type TaskStatusType } from "./schemas/tasks.js";
+import {
+    TASK_DESCRIPTION_MAX,
+    TASK_NAME_MAX,
+    TASK_STATUS_TYPES,
+    type TaskStatusType
+} from "./schemas/tasks.js";
 
 /** The trackers Polaris can connect to. */
 export const ISSUE_TRACKERS = ["linear", "jira"] as const;
@@ -33,7 +38,12 @@ export const ISSUE_TRACKER_LABELS: Record<IssueTracker, string> = {
  */
 export const ISSUE_TRACKER_FIELDS: Record<
     IssueTracker,
-    { readonly key: string; readonly label: string; readonly hint: string; readonly secret: boolean }[]
+    {
+        readonly key: string;
+        readonly label: string;
+        readonly hint: string;
+        readonly secret: boolean;
+    }[]
 > = {
     linear: [
         {
@@ -50,7 +60,12 @@ export const ISSUE_TRACKER_FIELDS: Record<
             hint: "The address you use for Jira, such as your-company.atlassian.net.",
             secret: false
         },
-        { key: "email", label: "Account email", hint: "The account the token belongs to.", secret: false },
+        {
+            key: "email",
+            label: "Account email",
+            hint: "The account the token belongs to.",
+            secret: false
+        },
         {
             key: "apiToken",
             label: "API token",
@@ -90,7 +105,11 @@ export interface TrackerIssue {
  * as a fallback, and deliberately loosely - the alternative is every connection
  * needing a mapping table before it does anything at all.
  */
-export function statusTypeFromTracker(tracker: IssueTracker, category: string, name: string): TaskStatusType {
+export function statusTypeFromTracker(
+    tracker: IssueTracker,
+    category: string,
+    name: string
+): TaskStatusType {
     const group = category.toLowerCase();
     if (tracker === "linear") {
         // Linear's own state types.
@@ -150,9 +169,10 @@ export function isTrackerSite(value: string): boolean {
     if (!site || site.length > 255) return false;
     // One or more dot-separated labels, and nothing else: no scheme survived the
     // normaliser, and a userinfo, a path or a query never matches at all.
-    const match = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)(?::([0-9]{1,5}))?$/.exec(
-        site
-    );
+    const match =
+        /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)(?::([0-9]{1,5}))?$/.exec(
+            site
+        );
     if (!match) return false;
     const host = match[1] ?? "";
     const port = match[2] ? Number(match[2]) : null;
@@ -253,7 +273,8 @@ export function linkedDescription(issue: TrackerIssue, tracker: IssueTracker): s
     // board - but the origin line has to survive, because it is what tells a
     // reader this is a mirror and where the rest of it is.
     const room = TASK_DESCRIPTION_MAX - origin.length - TRUNCATED.length - 8;
-    const kept = body.length > room ? `${body.slice(0, Math.max(0, room)).trimEnd()}${TRUNCATED}` : body;
+    const kept =
+        body.length > room ? `${body.slice(0, Math.max(0, room)).trimEnd()}${TRUNCATED}` : body;
     return `${kept}\n\n---\n\n${origin}`;
 }
 
@@ -268,7 +289,9 @@ export function linkedDescription(issue: TrackerIssue, tracker: IssueTracker): s
 export function linkedName(issue: TrackerIssue): string {
     const title = issue.title
         .split("")
-        .map((character) => (character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 ? " " : character))
+        .map((character) =>
+            character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 ? " " : character
+        )
         .join("")
         .trim();
     if (!title) return issue.key;

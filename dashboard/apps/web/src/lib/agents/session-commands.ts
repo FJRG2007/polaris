@@ -131,7 +131,9 @@ const INSTALL_ENIGMA = [
 
 /** The agent itself, where Polaris owns the machine. Best effort - the check that
  *  follows is what decides. */
-const INSTALL_AGENT = ['[ -n "$POLARIS_AGENT_INSTALL" ] && sh -c "$POLARIS_AGENT_INSTALL" >/dev/null 2>&1 || true'];
+const INSTALL_AGENT = [
+    '[ -n "$POLARIS_AGENT_INSTALL" ] && sh -c "$POLARIS_AGENT_INSTALL" >/dev/null 2>&1 || true'
+];
 
 const REQUIRE_AGENT = [
     'command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1 || { echo "polaris: $POLARIS_AGENT_BINARY is not installed and could not be installed here"; exit 1; }'

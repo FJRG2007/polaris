@@ -73,11 +73,22 @@ describe("flattenRichText", () => {
         const doc = {
             type: "doc",
             content: [
-                { type: "paragraph", content: [{ type: "text", text: "The login redirect loops." }] },
+                {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "The login redirect loops." }]
+                },
                 {
                     type: "bulletList",
                     content: [
-                        { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Safari only" }] }] }
+                        {
+                            type: "listItem",
+                            content: [
+                                {
+                                    type: "paragraph",
+                                    content: [{ type: "text", text: "Safari only" }]
+                                }
+                            ]
+                        }
                     ]
                 }
             ]
@@ -97,7 +108,9 @@ describe("flattenRichText", () => {
     });
 
     it("survives a shape it has never seen instead of throwing on somebody's issue", () => {
-        expect(flattenRichText({ type: "mediaGroup", content: [{ type: "text", text: "caption" }] })).toBe("caption");
+        expect(
+            flattenRichText({ type: "mediaGroup", content: [{ type: "text", text: "caption" }] })
+        ).toBe("caption");
         expect(flattenRichText(null)).toBe("");
         expect(flattenRichText(42)).toBe("");
     });
@@ -122,7 +135,9 @@ describe("linkedDescription", () => {
     });
 
     it("still says it on an issue with no description at all", () => {
-        expect(linkedDescription({ ...issue, description: "" }, "linear")).toContain("Mirrored from");
+        expect(linkedDescription({ ...issue, description: "" }, "linear")).toContain(
+            "Mirrored from"
+        );
     });
 });
 
@@ -177,7 +192,9 @@ describe("what a mirrored issue becomes", () => {
     });
 
     it("leaves an ordinary description alone", () => {
-        expect(linkedDescription(issue({ description: "Short." }), "jira")).toContain("Short.\n\n---");
+        expect(linkedDescription(issue({ description: "Short." }), "jira")).toContain(
+            "Short.\n\n---"
+        );
     });
 });
 

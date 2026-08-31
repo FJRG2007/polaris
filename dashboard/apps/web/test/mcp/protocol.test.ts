@@ -65,17 +65,30 @@ const send = (message: unknown) => handleMcpMessage(message, TOOLS, caller, SERV
 
 describe("initialize", () => {
     it("answers in the version the client asked for, when it is one we speak", async () => {
-        const answer = await send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05" } });
+        const answer = await send({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: { protocolVersion: "2024-11-05" }
+        });
         expect((answer?.result as { protocolVersion: string }).protocolVersion).toBe("2024-11-05");
     });
 
     it("answers in ours when it asked for something we do not", async () => {
-        const answer = await send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "1999-01-01" } });
-        expect((answer?.result as { protocolVersion: string }).protocolVersion).toBe(MCP_PROTOCOL_VERSION);
+        const answer = await send({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: { protocolVersion: "1999-01-01" }
+        });
+        expect((answer?.result as { protocolVersion: string }).protocolVersion).toBe(
+            MCP_PROTOCOL_VERSION
+        );
     });
 
     it("advertises tools and says what the server is", async () => {
-        const result = (await send({ jsonrpc: "2.0", id: 1, method: "initialize" }))?.result as Record<string, unknown>;
+        const result = (await send({ jsonrpc: "2.0", id: 1, method: "initialize" }))
+            ?.result as Record<string, unknown>;
         expect(result.capabilities).toEqual({ tools: { listChanged: false } });
         expect(result.serverInfo).toEqual({ name: "polaris", version: "1" });
         expect(result.instructions).toBe("Do the thing.");
@@ -102,7 +115,10 @@ describe("notifications", () => {
 describe("tools/list", () => {
     it("describes each tool with a schema derived from its validator", async () => {
         const { tools } = (await send({ jsonrpc: "2.0", id: 1, method: "tools/list" }))?.result as {
-            tools: { name: string; inputSchema: { properties: Record<string, unknown>; required?: string[] } }[];
+            tools: {
+                name: string;
+                inputSchema: { properties: Record<string, unknown>; required?: string[] };
+            }[];
         };
         expect(tools.map((tool) => tool.name)).toEqual(["echo", "forbidden", "explodes"]);
         expect(tools[0]?.inputSchema.properties.what).toEqual({ type: "string", minLength: 1 });
@@ -113,21 +129,33 @@ describe("tools/list", () => {
         const { tools } = (await send({ jsonrpc: "2.0", id: 1, method: "tools/list" }))?.result as {
             tools: { name: string; annotations: { readOnlyHint: boolean } }[];
         };
-        expect(tools.find((tool) => tool.name === "forbidden")?.annotations.readOnlyHint).toBe(false);
+        expect(tools.find((tool) => tool.name === "forbidden")?.annotations.readOnlyHint).toBe(
+            false
+        );
     });
 });
 
 describe("tools/call", () => {
     it("returns the text and the structured answer together", async () => {
         const result = (
-            await send({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "echo", arguments: { what: "hi" } } })
+            await send({
+                jsonrpc: "2.0",
+                id: 2,
+                method: "tools/call",
+                params: { name: "echo", arguments: { what: "hi" } }
+            })
         )?.result as { content: { text: string }[]; structuredContent: unknown };
         expect(result.content[0]?.text).toBe("hi");
         expect(result.structuredContent).toEqual({ what: "hi" });
     });
 
     it("reports a missing scope to the model rather than to the client alone", async () => {
-        const answer = await send({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "forbidden" } });
+        const answer = await send({
+            jsonrpc: "2.0",
+            id: 3,
+            method: "tools/call",
+            params: { name: "forbidden" }
+        });
         expect(answer?.error).toBeUndefined();
         const result = answer?.result as { isError: boolean; content: { text: string }[] };
         expect(result.isError).toBe(true);
@@ -156,12 +184,22 @@ describe("tools/call", () => {
     });
 
     it("refuses a tool nobody has", async () => {
-        const answer = await send({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "nope" } });
+        const answer = await send({
+            jsonrpc: "2.0",
+            id: 6,
+            method: "tools/call",
+            params: { name: "nope" }
+        });
         expect(answer?.error?.code).toBe(RPC_INVALID_PARAMS);
     });
 
     it("turns a thrown error into a refusal and does not repeat what it said", async () => {
-        const answer = await send({ jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "explodes" } });
+        const answer = await send({
+            jsonrpc: "2.0",
+            id: 8,
+            method: "tools/call",
+            params: { name: "explodes" }
+        });
         const result = answer?.result as { isError: boolean; content: { text: string }[] };
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).not.toContain("10.0.0.4");

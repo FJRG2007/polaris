@@ -101,10 +101,16 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                         <Card key={tracker.id}>
                             <CardBody className="flex flex-wrap items-center gap-3">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={tracker.label}>{tracker.label}</p>
+                                    <p
+                                        className="truncate text-sm font-medium"
+                                        title={tracker.label}
+                                    >
+                                        {tracker.label}
+                                    </p>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {core.ISSUE_TRACKER_LABELS[tracker.provider]} into {tracker.spaceName} /{" "}
-                                        {tracker.listName} - {tracker.linked} linked
+                                        {core.ISSUE_TRACKER_LABELS[tracker.provider]} into{" "}
+                                        {tracker.spaceName} / {tracker.listName} - {tracker.linked}{" "}
+                                        linked
                                         {tracker.syncedAt ? "" : ", never pulled"}
                                     </p>
                                     {tracker.error ? (
@@ -119,19 +125,40 @@ export function TrackersView({ trackers }: { trackers: TrackerView[] }) {
                                         Two-way
                                     </Badge>
                                 ) : null}
-                                <Switch checked={tracker.enabled} onChange={() => toggle(tracker)} />
-                                <Button size="sm" variant="ghost" onClick={() => check(tracker)} disabled={busy}>
+                                <Switch
+                                    checked={tracker.enabled}
+                                    onChange={() => toggle(tracker)}
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => check(tracker)}
+                                    disabled={busy}
+                                >
                                     <Check className="size-4 shrink-0" />
                                     Test
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => sync(tracker)} disabled={busy}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => sync(tracker)}
+                                    disabled={busy}
+                                >
                                     <RefreshCw className="size-4 shrink-0" />
                                     Pull now
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditing(tracker)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setEditing(tracker)}
+                                >
                                     Edit
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setRemoving(tracker)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setRemoving(tracker)}
+                                >
                                     <Trash2 className="size-4 shrink-0" />
                                 </Button>
                             </CardBody>
@@ -222,7 +249,9 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
         <Dialog open onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{tracker ? `Edit ${tracker.label}` : "Connect a tracker"}</DialogTitle>
+                    <DialogTitle>
+                        {tracker ? `Edit ${tracker.label}` : "Connect a tracker"}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
@@ -278,7 +307,11 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                         <Input
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder={provider === "linear" ? "ENG" : "project = ENG AND statusCategory != Done"}
+                            placeholder={
+                                provider === "linear"
+                                    ? "ENG"
+                                    : "project = ENG AND statusCategory != Done"
+                            }
                         />
                     </label>
 
@@ -287,7 +320,10 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                         <Select
                             value={spaceId}
                             onValueChange={setSpaceId}
-                            options={(spaces ?? []).map((space) => ({ value: space.id, label: space.name }))}
+                            options={(spaces ?? []).map((space) => ({
+                                value: space.id,
+                                label: space.name
+                            }))}
                             placeholder="Pick a space"
                         />
                     </label>
@@ -306,8 +342,9 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                         <div className="min-w-0">
                             <p className="text-sm">Send status changes back</p>
                             <p className="text-xs text-muted-foreground">
-                                Moving a task here moves the issue there. Off by default: writing into somebody
-                                else&apos;s tracker is a decision, not a side effect of connecting one.
+                                Moving a task here moves the issue there. Off by default: writing
+                                into somebody else&apos;s tracker is a decision, not a side effect
+                                of connecting one.
                             </p>
                         </div>
                         <Switch checked={pushStatus} onChange={setPushStatus} />
