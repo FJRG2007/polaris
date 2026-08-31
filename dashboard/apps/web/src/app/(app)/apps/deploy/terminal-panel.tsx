@@ -18,12 +18,14 @@ import { useEffect, useRef, useState } from "react";
 import { RotateCw, ShieldAlert } from "lucide-react";
 
 /** What to attach to: a container on a deploy target, a container on a
- *  Containers connection, or a registered server - as the Polaris login, or as
- *  root where that server granted it. */
+ *  Containers connection, a registered server - as the Polaris login, or as root
+ *  where that server granted it - or the terminal a coding-agent session is
+ *  running in. */
 export type TerminalTarget =
     | { kind: "container"; applicationId: string }
     | { kind: "docker"; connectionId: string; containerRef: string }
-    | { kind: "host"; hostId: string; asRoot?: boolean };
+    | { kind: "host"; hostId: string; asRoot?: boolean }
+    | { kind: "agent"; sessionId: string };
 
 /**
  * Why a session ended before it ever started. `unreachable` is the one that used
@@ -48,7 +50,9 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
             ? `host:${target.hostId}:${target.asRoot ? "root" : "login"}`
             : target.kind === "docker"
               ? `docker:${target.connectionId}:${target.containerRef}`
-              : `app:${target.applicationId}`;
+              : target.kind === "agent"
+                ? `agent:${target.sessionId}`
+                : `app:${target.applicationId}`;
 
     useEffect(() => {
         let disposed = false;
@@ -80,7 +84,9 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                         ? { hostId: target.hostId, mode: target.asRoot ? "ssh-root" : "ssh" }
                         : target.kind === "docker"
                           ? { connectionId: target.connectionId, containerRef: target.containerRef }
-                          : { applicationId: target.applicationId, mode: "terminal" }
+                          : target.kind === "agent"
+                            ? { sessionId: target.sessionId }
+                            : { applicationId: target.applicationId, mode: "terminal" }
                 )
             });
             if (!res.ok) {

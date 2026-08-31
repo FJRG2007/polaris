@@ -17,6 +17,7 @@ import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
+import { TerminalPanel } from "../../../deploy/terminal-panel";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
 import { interruptSessionAction, promptSessionAction, sessionScreenAction, stopSessionAction } from "../actions";
 
@@ -61,6 +62,7 @@ export function SessionDetail({ session, events, messages }: Props) {
     const [text, setText] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [screen, setScreen] = useState<string | null>(null);
+    const [attached, setAttached] = useState(false);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
     const bottom = useRef<HTMLDivElement>(null);
@@ -140,6 +142,11 @@ export function SessionDetail({ session, events, messages }: Props) {
                 </Badge>
                 {over ? null : (
                     <>
+                        {session.place === "local" ? (
+                            <Button size="sm" variant="ghost" onClick={() => setAttached((open) => !open)}>
+                                {attached ? "Detach" : "Take the terminal"}
+                            </Button>
+                        ) : null}
                         <Button size="sm" variant="ghost" onClick={look} disabled={busy}>
                             See its screen
                         </Button>
@@ -161,6 +168,20 @@ export function SessionDetail({ session, events, messages }: Props) {
                 </div>
             ) : null}
             {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
+            {attached ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>The agent&apos;s terminal</CardTitle>
+                    </CardHeader>
+                    <CardBody>
+                        {/* Attached, not a second shell beside it: this is the same
+                            terminal the agent is running in, so what is typed here
+                            goes to the agent and detaching leaves it working. */}
+                        <TerminalPanel target={{ kind: "agent", sessionId: session.id }} label={session.title} />
+                    </CardBody>
+                </Card>
+            ) : null}
 
             {screen !== null ? (
                 <Card>

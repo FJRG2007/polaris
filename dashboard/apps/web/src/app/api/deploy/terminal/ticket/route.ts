@@ -24,6 +24,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => null)) as {
         applicationId?: string;
+        sessionId?: string;
         hostId?: string;
         connectionId?: string;
         containerRef?: string;
@@ -31,6 +32,10 @@ export async function POST(request: Request): Promise<Response> {
     } | null;
 
     if (body?.connectionId) return mintContainersTicket(body.connectionId, body.containerRef ?? "");
+
+    // A session terminal is the Agents app's, not Deploy's, so it is authorised
+    // before the deploy permission below is asked for at all.
+    if (body?.sessionId) return mintSessionTicket(body.sessionId);
 
     const user = await requirePermission("deploy.manage");
 
@@ -54,6 +59,43 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     return NextResponse.json({ error: "applicationId, hostId or connectionId is required" }, { status: 400 });
+}
+
+/**
+ * A terminal on a live coding-agent session.
+ *
+ * Attaching to somebody's agent is watching them work and being able to type at
+ * it, so it wants the permission that manages agents rather than the one that
+ * reads them. The container is resolved here from the session row: the caller
+ * names a session and never a container, which is what stops a ticket being
+ * asked for one they have no standing on.
+ *
+ * Only a `local` session has one. A session on an enrolled server lives in a tmux
+ * on that machine, and the way to that terminal is the server's own shell -
+ * offering a second door to it here would be a second thing to get wrong.
+ */
+async function mintSessionTicket(sessionId: string): Promise<Response> {
+    const user = await requirePermission("agents.manage");
+    const session = await prisma.agentSession.findFirst({
+        where: { id: sessionId, repo: { ownerId: user.id } },
+        select: { containerId: true, place: true, state: true }
+    });
+    if (!session) return NextResponse.json({ error: "session not found" }, { status: 404 });
+    if (session.place !== "local" || !session.containerId) {
+        return NextResponse.json(
+            { error: "That session runs on one of your servers. Open a shell on the server instead." },
+            { status: 409 }
+        );
+    }
+    if (session.state === "stopped" || session.state === "failed") {
+        return NextResponse.json({ error: "That session has ended." }, { status: 409 });
+    }
+    const token = await mintTerminalTicket(user.id, {
+        targetId: sessionId,
+        containerRef: session.containerId,
+        mode: "agent"
+    });
+    return NextResponse.json({ token });
 }
 
 /**
