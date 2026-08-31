@@ -10,6 +10,8 @@ import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
 import type { ComponentType } from "react";
+import { AGENT_CLIS } from "@polaris/core";
+import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import {
     AnthropicMark,
@@ -156,6 +158,11 @@ const SEEDED_SLUGS = new Set(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug));
 /** The logo for a marketplace integration slug (a neutral fallback otherwise). */
 export function IntegrationLogo({ slug, className }: { slug: string; className?: string }) {
     if (slug === "virustotal") return <VirusTotalLogo className={className} brand />;
+    // An agent sign-in listed in the keys table. Drawn as the tool it signs in,
+    // which is the thing anybody scanning the column recognises - the credential's
+    // own name is a variable nobody has a picture of.
+    const agent = AGENT_SIGNIN_MARKS[slug];
+    if (agent) return <AgentLogo id={agent.id} label={agent.label} className={className} />;
     const image = SERVICE_IMAGES[slug];
     // object-contain: these are the vendors' own files, and they are not all
     // square. A logo stretched to fill a box is a logo nobody signed off on.
@@ -193,3 +200,19 @@ export function AgentLogo({ id, label, className }: { id: string; label: string;
     if (id === "custom") return <Blocks className={className} />;
     return <ProviderMonogram slug={id} name={label} className={className} />;
 }
+
+/**
+ * The sign-in slugs the keys table lists, and which agent each one is drawn as.
+ *
+ * Built from the catalogue rather than written out, so a credential added there
+ * is drawn here without anybody remembering to. Keyed by the stored slug, which
+ * is what the table has.
+ */
+const AGENT_SIGNIN_MARKS: Record<string, { id: string; label: string }> = Object.fromEntries(
+    AGENT_CLIS.flatMap((cli) =>
+        cli.credentials.map((credential) => [
+            SIGNIN_PREFIX + credential.env.toLowerCase().replace(/_/g, "-"),
+            { id: cli.id, label: cli.label }
+        ])
+    )
+);

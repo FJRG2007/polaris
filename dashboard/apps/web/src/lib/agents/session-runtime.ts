@@ -65,8 +65,9 @@ interface Bootstrap {
     readonly agentBinary: string;
     readonly agentCommand: string;
     readonly agentInstall: string;
-    readonly enigmaArgv: string;
-    readonly enigmaConfig: string;
+    /** The whole of what installing Enigma means, base64 so it survives the
+     *  daemon's rule about control characters. Empty when Enigma is off. */
+    readonly enigmaSetup: string;
     readonly hookScript: string;
     readonly hookSettings: string;
     readonly mcpConfig: string;
@@ -161,8 +162,12 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentCommand: agent.command,
         agentInstall: agent.install,
         // Empty when Enigma is off, which is what the boot script tests for.
-        enigmaArgv: enigma.enabled ? core.enigmaInstallArgv(enigma).join(" ") : "",
-        enigmaConfig: enigma.enabled ? enigmaConfigScript(enigma) : "",
+        // One script rather than an argv and a second script: it installs the
+        // package globally so the agent can invoke `enigma`, then makes the
+        // config calls the resolution actually landed on. Neither used to happen
+        // - npx threw the download away and every config line after it failed on
+        // a command that was not there.
+        enigmaSetup: enigma.enabled ? asFile(core.enigmaSetupScript(enigma)) : "",
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(
             claudeHookSettings(
@@ -195,25 +200,6 @@ function asFile(contents: string): string {
 }
 
 /**
- * The `enigma config` calls a resolved setup means, as one shell command.
- *
- * Settings rather than an install: the gate mode the tiers resolved to, and
- * whatever the operator put in the escape hatch. Every part is quoted on the way
- * out even though the keys and values were filtered first - this becomes a
- * command line on somebody else's machine, and one of those checks being enough
- * is not a reason to have only one.
- *
- * `npx` rather than a bare `enigma`, and against the same pinned spec the install
- * used, because an install through npx leaves nothing on the PATH to call.
- */
-function enigmaConfigScript(enigma: core.ResolvedEnigma): string {
-    const spec = core.enigmaPackageSpec(enigma);
-    return [...core.enigmaConfigArgv(enigma), core.enigmaGateArgv(enigma)]
-        .map((argv) => ["npx", "-y", spec, ...argv].map(shellQuote).join(" "))
-        .join(" ; ");
-}
-
-/**
  * The environment the boot script reads. One place, so the container and the
  * server are handed the same names for the same things.
  *
@@ -235,8 +221,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_BINARY: boot.agentBinary,
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
-        POLARIS_ENIGMA_ARGV: boot.enigmaArgv,
-        POLARIS_ENIGMA_CONFIG: boot.enigmaConfig,
+        POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),

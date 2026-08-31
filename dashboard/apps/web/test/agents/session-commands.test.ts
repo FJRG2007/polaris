@@ -22,7 +22,7 @@ const ESC = String.fromCharCode(27);
 
 describe("the boot script", () => {
     it("interpolates nothing, so no repository name or prompt ever reaches a shell through it", () => {
-        expect(commands.SESSION_BOOT).not.toMatch(/\$\{/);
+        expect(commands.SESSION_SETUP).not.toMatch(/\$\{/);
     });
 
     it("reads every value it needs from the environment", () => {
@@ -34,14 +34,17 @@ describe("the boot script", () => {
             "POLARIS_AGENT_COMMAND",
             "POLARIS_HOOK_SETTINGS"
         ]) {
-            expect(commands.SESSION_BOOT).toContain(`$${name}`);
+            expect(commands.SESSION_SETUP).toContain(`$${name}`);
         }
     });
 
     it("drops the clone credential before the agent can read its own environment", () => {
-        const boot = commands.SESSION_BOOT;
+        const boot = commands.SESSION_SETUP;
+        // Against the exec rather than a `tmux new-session`: the agent takes
+        // over the window the setup ran in, so there is no second session to
+        // order against any more.
         expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(
-            boot.indexOf("tmux new-session")
+            boot.indexOf("exec $POLARIS_AGENT_COMMAND")
         );
     });
 
@@ -52,7 +55,7 @@ describe("the boot script", () => {
         // started, with a message naming a variable nobody had ever seen. They
         // travel base64 now, which that rule has nothing to object to.
         for (const name of ["POLARIS_HOOK_SCRIPT", "POLARIS_HOOK_SETTINGS", "POLARIS_MCP_CONFIG"]) {
-            expect(commands.SESSION_BOOT).toContain(`printf %s "$${name}" | base64 -d`);
+            expect(commands.SESSION_SETUP).toContain(`printf %s "$${name}" | base64 -d`);
         }
     });
 
@@ -90,8 +93,8 @@ describe("the boot script", () => {
     });
 
     it("writes the hooks into the worktree, never into the machine's own home", () => {
-        expect(commands.SESSION_BOOT).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
-        expect(commands.SESSION_BOOT).not.toContain('"$HOME/.claude');
+        expect(commands.SESSION_SETUP).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
+        expect(commands.SESSION_SETUP).not.toContain('"$HOME/.claude');
     });
 
     it("keeps the container alive after the agent inside it exits", () => {
@@ -99,22 +102,25 @@ describe("the boot script", () => {
     });
 
     it("starts the branch from the ref that was asked for, and from the default when none was", () => {
-        expect(commands.SESSION_BOOT).toContain("$POLARIS_BASE_REF");
-        expect(commands.SESSION_BOOT).toContain(
+        expect(commands.SESSION_SETUP).toContain("$POLARIS_BASE_REF");
+        expect(commands.SESSION_SETUP).toContain(
             'git clone --depth 50 --branch "$POLARIS_BASE_REF"'
         );
         // The other arm of the same `if`: no ref, no --branch.
-        expect(commands.SESSION_BOOT).toContain("  git clone --depth 50 -c http.extraHeader");
+        expect(commands.SESSION_SETUP).toContain("  git clone --depth 50 -c http.extraHeader");
     });
 
     it("puts the resolved Enigma settings on the machine, not only the install", () => {
-        expect(commands.SESSION_BOOT).toContain("$POLARIS_ENIGMA_ARGV");
-        expect(commands.SESSION_BOOT).toContain("$POLARIS_ENIGMA_CONFIG");
+        // One variable rather than two: installing Enigma and applying the
+        // settings it resolved to are the same step, and splitting them is how
+        // the config half came to run against a command the install had not left
+        // on the PATH.
+        expect(commands.SESSION_SETUP).toContain("$POLARIS_ENIGMA_SETUP");
     });
 });
 
 describe("the boot script for an enrolled server", () => {
-    const host = commands.SESSION_BOOT_FOR_HOST;
+    const host = commands.SESSION_SETUP;
 
     it("closes every conditional it opens, which filtering one script into another did not", () => {
         const lines = host.split("\n").map((line) => line.trim());
@@ -125,18 +131,22 @@ describe("the boot script for an enrolled server", () => {
     });
 
     it("installs nothing on somebody else's machine", () => {
-        expect(host).not.toContain("apt-get");
-        expect(host).not.toContain("$POLARIS_AGENT_INSTALL");
+        // The setup is shared, so what differs is the boot around it: the
+        // container installs tmux, the server is told when it is missing.
+        expect(commands.SESSION_BOOT_FOR_HOST).not.toContain("apt-get");
+        expect(commands.SESSION_BOOT).toContain("apt-get");
     });
 
     it("says what is missing rather than reaching for a package manager", () => {
-        expect(host).toContain("this machine has no tmux");
-        expect(host).toContain("is not installed and could not be installed here");
+        expect(commands.SESSION_BOOT_FOR_HOST).toContain("this machine has no tmux");
+        expect(commands.SESSION_SETUP).toContain("is not installed and could not be installed here");
     });
 
     it("does not park a foreground process on it, and still leaves the agent running", () => {
-        expect(host).not.toContain("exec tail -f");
-        expect(host).toContain("tmux new-session -d");
+        expect(commands.SESSION_BOOT_FOR_HOST).not.toContain("exec tail -f");
+        // Detached, so the session outlives the SSH connection that started it -
+        // which is the whole reason this shape works over SSH at all.
+        expect(commands.SESSION_BOOT_FOR_HOST).toContain("tmux new-session -d");
     });
 
     it("clones and writes the hooks exactly as the container does", () => {

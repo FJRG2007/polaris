@@ -231,3 +231,41 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
         config: Object.keys(config).length > 0 ? config : null
     };
 }
+
+/**
+ * The whole of what putting Enigma on a machine means, as one shell script.
+ *
+ * Three things, and only the first was ever happening. `npx enigma-cli install`
+ * downloads the package, runs its installer and throws the download away - so
+ * the policies landed, `enigma` was not on the PATH afterwards, and the agent
+ * that went looking for the command could not find it. And the `enigma config`
+ * calls a resolved setup means were computed and never run at all, so an
+ * account's gate mode and its own settings reached nothing.
+ *
+ * Installed globally rather than run through npx for exactly that reason: the
+ * agent is meant to be able to invoke it, which is most of the point of putting
+ * it there.
+ *
+ * Returns an empty string when Enigma is off, which is what the boot script
+ * tests for. Every line is built from values this module owns - a version is a
+ * package spec, and the config keys and values were filtered by
+ * `enigmaConfigArgv` before they got here - so nothing an operator typed reaches
+ * a shell unchecked.
+ */
+export function enigmaSetupScript(settings: ResolvedEnigma): string {
+    if (!settings.enabled) return "";
+    const spec = enigmaPackageSpec(settings);
+    const lines = [
+        "set -e",
+        `echo "polaris: installing Enigma (${spec})"`,
+        `npm install -g ${spec}`,
+        `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes`
+    ];
+    for (const argv of enigmaConfigArgv(settings)) {
+        lines.push(`enigma ${argv.join(" ")}`);
+    }
+    const gate = enigmaGateArgv(settings);
+    if (gate.length > 0) lines.push(`enigma ${gate.join(" ")}`);
+    lines.push('echo "polaris: Enigma ready"');
+    return lines.join("\n");
+}

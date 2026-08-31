@@ -91,6 +91,7 @@ const REQUIRE_TMUX = [
 
 /** The worktree, and everything Polaris writes into it. */
 const PREPARE_WORKTREE = [
+    'echo "polaris: fetching $GITHUB_REPOSITORY"',
     // The credential goes to git as a config value read from the environment,
     // never as part of the URL - which would put it in the reflog and in every
     // error message git prints.
@@ -141,18 +142,22 @@ const PREPARE_WORKTREE = [
  * standards, and failing the whole thing over a network blip would be worse.
  */
 const INSTALL_ENIGMA = [
-    '[ -n "$POLARIS_ENIGMA_ARGV" ] && npx $POLARIS_ENIGMA_ARGV >/dev/null 2>&1 || true',
-    '[ -n "$POLARIS_ENIGMA_CONFIG" ] && sh -c "$POLARIS_ENIGMA_CONFIG" >/dev/null 2>&1 || true'
+    // Globally, not through npx. npx downloads the package, runs its installer
+    // and throws the download away - so the policies landed and `enigma` was not
+    // on the PATH afterwards, which is what the agent went looking for and could
+    // not find. Every `enigma config` line after it failed for the same reason,
+    // silently, so an account's gate mode and its own settings reached nothing.
+    '[ -n "$POLARIS_ENIGMA_SETUP" ] && { echo "polaris: installing Enigma"; printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d | sh; }'
 ];
 
 /** The agent itself, where Polaris owns the machine. Best effort - the check that
  *  follows is what decides. */
 const INSTALL_AGENT = [
-    '[ -n "$POLARIS_AGENT_INSTALL" ] && sh -c "$POLARIS_AGENT_INSTALL" >/dev/null 2>&1 || true'
+    '[ -n "$POLARIS_AGENT_INSTALL" ] && { echo "polaris: installing $POLARIS_AGENT_BINARY"; sh -c "$POLARIS_AGENT_INSTALL"; }'
 ];
 
 const REQUIRE_AGENT = [
-    'command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1 || { echo "polaris: $POLARIS_AGENT_BINARY is not installed and could not be installed here"; exit 1; }'
+    'command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1 || { echo "polaris: $POLARIS_AGENT_BINARY is not installed and could not be installed here"; exec sh; }'
 ];
 
 /** The clone is done, so the credential that did it goes before the agent starts
@@ -160,9 +165,42 @@ const REQUIRE_AGENT = [
  *  tools need stays. */
 const START_AGENT = [
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_CONFIG",
-    'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" -c "$POLARIS_WORKDIR" "$POLARIS_AGENT_COMMAND"'
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP",
+    'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
+    // Takes the window over rather than opening a second one, so the terminal
+    // that showed the clone and the installs is the terminal the agent runs in.
+    'cd "$POLARIS_WORKDIR"',
+    "exec $POLARIS_AGENT_COMMAND"
 ];
+
+/**
+ * Everything the session's terminal runs, from the first second.
+ *
+ * The whole of the setup lives inside the tmux window rather than in front of
+ * it, and that is the fix for what people actually saw. It used to run BEFORE
+ * tmux existed, silently, with every line sent to /dev/null - so for the two to
+ * five minutes it spends cloning a repository and installing a package manager's
+ * worth of tool, the session said it was waiting for you and anybody who took
+ * the terminal got an empty box. If it then failed, nothing anywhere said so.
+ *
+ * Now the same window shows the clone, the installs and whatever they print, and
+ * the agent takes it over when they are done. "Take the terminal" answers "what
+ * is it doing" at every moment, including the moments when the answer is
+ * "failing".
+ */
+export const SESSION_SETUP = [
+    "set -e",
+    ...PREPARE_WORKTREE,
+    ...INSTALL_ENIGMA,
+    ...INSTALL_AGENT,
+    ...REQUIRE_AGENT,
+    ...START_AGENT
+].join("\n");
+
+/** The setup as one argument tmux can be handed. Encoded for the reason every
+ *  script here is: a command argument may not carry a control character, and a
+ *  script is a line per statement. */
+const SETUP_COMMAND = `sh -c 'echo ${Buffer.from(SESSION_SETUP, "utf8").toString("base64")} | base64 -d | sh'`;
 
 /**
  * What a `local` session's container does when it starts.
@@ -181,11 +219,9 @@ export const SESSION_BOOT = [
     "set -eu",
     ...INSTALL_TMUX,
     ...REQUIRE_TMUX,
-    ...PREPARE_WORKTREE,
-    ...INSTALL_ENIGMA,
-    ...INSTALL_AGENT,
-    ...REQUIRE_AGENT,
-    ...START_AGENT,
+    'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
+    // Everything else happens in there, where it can be watched.
+    `tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" ${SETUP_COMMAND}`,
     // Park. See above: the container outlives the agent inside it.
     "exec tail -f /dev/null"
 ].join("\n");
@@ -207,10 +243,12 @@ export const SESSION_BOOT = [
 export const SESSION_BOOT_FOR_HOST = [
     "set -eu",
     ...REQUIRE_TMUX,
-    ...PREPARE_WORKTREE,
-    ...INSTALL_ENIGMA,
-    ...REQUIRE_AGENT,
-    ...START_AGENT
+    'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
+    // Same shape as the container's, and for the same reason: a terminal
+    // somebody opens has to show the setup rather than nothing until it
+    // finishes. Polaris installs no agent here - a server is somebody's machine
+    // - so the setup inside says what is missing instead.
+    `tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" ${SETUP_COMMAND}`
 ].join("\n");
 
 // ---------------------------------------------------------------------------

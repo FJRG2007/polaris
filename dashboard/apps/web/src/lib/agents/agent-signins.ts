@@ -174,3 +174,41 @@ export function agentSubscriptions(): AgentSignin[] {
 export function agentApiKeys(): AgentSignin[] {
     return agentSignins().filter((signin) => !signin.subscription);
 }
+
+/**
+ * The sign-ins as the keys table needs them.
+ *
+ * So they are listed the way the provider keys are listed, in the same table,
+ * with the same renaming, reordering, expiry and last-used - rather than in a
+ * card of their own that would have had to grow every one of those separately
+ * and would still have looked like a different feature.
+ *
+ * `checkable` is false throughout: none of these has an endpoint that refuses an
+ * unknown credential, and a check that accepts anything is worse than no check,
+ * because the dialog would report it as verified.
+ */
+export function signinProviderRows(): Array<{
+    slug: string;
+    name: string;
+    aliases: string[];
+    apiKeyLabel: string;
+    apiKeyHelp: string | null;
+    createUrl: string | null;
+    isGateway: boolean;
+    checkable: boolean;
+    freeTier: null;
+}> {
+    return agentSignins().map((signin) => ({
+        slug: signin.slug,
+        name: signin.label,
+        // What somebody types looking for it is the tool's name, not the
+        // credential's: "claude" finds the Claude subscription token.
+        aliases: signin.serves.map((tool) => tool.label),
+        apiKeyLabel: signin.label,
+        apiKeyHelp: `Signs in ${signin.serves.map((tool) => tool.label).join(", ")}.`,
+        createUrl: signin.url,
+        isGateway: false,
+        checkable: false,
+        freeTier: null
+    }));
+}
