@@ -17,7 +17,7 @@ import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
-import { TerminalPanel } from "../../../deploy/terminal-panel";
+import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
 import { interruptSessionAction, promptSessionAction, sessionScreenAction, stopSessionAction } from "../actions";
 

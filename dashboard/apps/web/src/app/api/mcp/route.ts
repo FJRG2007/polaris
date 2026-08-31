@@ -18,6 +18,7 @@
  * trade here.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import type { Permission } from "@polaris/core";
 import { MCP_TOOLS } from "@/lib/mcp/tools";
@@ -60,6 +61,26 @@ const SERVER: McpServerInfo = {
 function jsonRpcError(code: number, message: string, status: number): Response {
     return Response.json({ jsonrpc: "2.0", id: null, error: { code, message } }, { status });
 }
+
+/** How many messages one request may carry. JSON-RPC puts no limit on a batch,
+ *  and an unbounded one is a way to make a single request do a thousand tool
+ *  calls - each of which reaches the database and, for some of them, somebody
+ *  else's tracker. */
+const BATCH_MAX = 20;
+
+/**
+ * The envelope, before anything looks at what is inside it.
+ *
+ * One message or a batch of them, and nothing else: a body that is a string, a
+ * number or null is refused here rather than reaching the handler, which would
+ * have had to answer for it one message at a time. What each message IS stays the
+ * handler's business - it owns the JSON-RPC shape and the version negotiation -
+ * so this checks the container and its size and stops.
+ */
+const envelopeSchema = z.union([
+    z.record(z.unknown()),
+    z.array(z.record(z.unknown())).min(1, "An empty batch asks nothing").max(BATCH_MAX)
+]);
 
 /**
  * What a running session may do with these tools.
@@ -111,12 +132,19 @@ export async function POST(request: Request): Promise<Response> {
     // rather than reporting a tool failure to the model.
     if (!caller) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    let payload: unknown;
+    let body: unknown;
     try {
-        payload = await request.json();
+        body = await request.json();
     } catch {
         return jsonRpcError(RPC_PARSE_ERROR, "That was not JSON", 400);
     }
+
+    const envelope = envelopeSchema.safeParse(body);
+    if (!envelope.success) {
+        const said = envelope.error.issues[0]?.message ?? "That is not a JSON-RPC request";
+        return jsonRpcError(RPC_INVALID_REQUEST, said, 400);
+    }
+    const payload = envelope.data;
 
     const headers = { "MCP-Protocol-Version": MCP_PROTOCOL_VERSION };
 
@@ -124,7 +152,6 @@ export async function POST(request: Request): Promise<Response> {
     // the notifications among them contribute nothing to the reply - which is
     // what makes a batch of only notifications correctly answer with no body.
     if (Array.isArray(payload)) {
-        if (payload.length === 0) return jsonRpcError(RPC_INVALID_REQUEST, "An empty batch asks nothing", 400);
         const answers: JsonRpcResponse[] = [];
         for (const message of payload) {
             const answer = await handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
