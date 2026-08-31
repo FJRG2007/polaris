@@ -207,3 +207,25 @@ export function attachArgv(session = TMUX_SESSION): string[] {
 export function shellArgv(command: string): string[] {
     return ["sh", "-c", command];
 }
+
+/**
+ * A whole script, as one argument the host daemon will accept.
+ *
+ * The daemon refuses any command argument carrying a control character, exactly
+ * as it refuses an environment value carrying one, and for the same reason: both
+ * are rendered into a compose file where a newline writes YAML. A boot script is
+ * a program with a line per statement, so handing one over as `sh -c <script>`
+ * is handing over an argument full of newlines - which is why every container
+ * started that way was refused before it ran, with a message about control
+ * characters in a command nobody wrote by hand.
+ *
+ * Base64 has no character that rule objects to, and none the shell reads either:
+ * its alphabet is letters, digits, `+`, `/` and `=`. So the script travels
+ * encoded inside a one-line command that decodes it and runs it, the daemon's
+ * rule keeps doing its job, and the script stays readable in this file rather
+ * than being flattened into semicolons.
+ */
+export function bootArgv(script: string): string[] {
+    const encoded = Buffer.from(script, "utf8").toString("base64");
+    return ["sh", "-c", `echo ${encoded} | base64 -d | sh`];
+}

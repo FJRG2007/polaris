@@ -151,7 +151,7 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                     ports: [],
                     volumes: [],
                     labels: { [LABEL_KEY]: attempt.id },
-                    command: ["sh", "-c", SIGNIN_BOOT],
+                    command: commands.bootArgv(SIGNIN_BOOT),
                     networks: [],
                     // Never restarted. A login that died is a login to start
                     // again, not one to resume half way through an OAuth round

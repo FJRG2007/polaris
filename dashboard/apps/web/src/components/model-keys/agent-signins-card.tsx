@@ -97,7 +97,7 @@ export function AgentSigninsCard({
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">
-                        {tier === "platform" ? "The deployment's agent sign-ins" : "Agent sign-ins"}
+                        {tier === "platform" ? "The deployment's agent accounts" : "Agent accounts"}
                     </h2>
                     <p className="text-muted-foreground text-xs">
                         {tier === "platform"
@@ -108,22 +108,79 @@ export function AgentSigninsCard({
 
                 {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
-                <div className="flex flex-col gap-2">
-                    {signins.map((signin) => (
-                        <SigninRow
-                            key={signin.slug}
-                            signin={signin}
-                            held={stored.find((row) => row.provider === signin.slug) ?? null}
-                            fromPlatform={covered.has(signin.env)}
-                            tier={tier}
-                            actions={actions}
-                            assisted={Boolean(actions.assist) && ASSISTED.has(signin.env)}
-                            onError={setError}
-                        />
-                    ))}
-                </div>
+                {/* Two groups, and the order is the recommendation. A coding agent
+                    reads a repository and writes to it all day, so the metered
+                    route is the expensive one by a wide margin - listing the two
+                    together as interchangeable ways to fill one slot is how
+                    somebody ends up paying per token for work a plan they already
+                    hold would have covered. */}
+                <Group
+                    title="Subscriptions"
+                    hint="A plan you already pay a flat rate for. Signing one in costs nothing extra, and Polaris can do it for you."
+                    rows={signins.filter((signin) => signin.subscription)}
+                    stored={stored}
+                    covered={covered}
+                    tier={tier}
+                    actions={actions}
+                    onError={setError}
+                />
+                <Group
+                    title="API keys"
+                    hint="Metered from the first token. Use one where the vendor offers no subscription, or where you would rather bill per run."
+                    rows={signins.filter((signin) => !signin.subscription)}
+                    stored={stored}
+                    covered={covered}
+                    tier={tier}
+                    actions={actions}
+                    onError={setError}
+                />
             </CardBody>
         </Card>
+    );
+}
+
+/** One heading and its rows, or nothing at all when there are none of that kind
+ *  - an empty heading is a section somebody reads twice looking for what is
+ *  under it. */
+function Group({
+    title,
+    hint,
+    rows,
+    stored,
+    covered,
+    tier,
+    actions,
+    onError
+}: {
+    title: string;
+    hint: string;
+    rows: AgentSignin[];
+    stored: StoredSignin[];
+    covered: Set<string>;
+    tier: SigninTier;
+    actions: SigninActions;
+    onError: (message: string | null) => void;
+}) {
+    if (rows.length === 0) return null;
+    return (
+        <div className="flex flex-col gap-2">
+            <div>
+                <h3 className="text-xs font-medium">{title}</h3>
+                <p className="text-muted-foreground text-xs">{hint}</p>
+            </div>
+            {rows.map((signin) => (
+                <SigninRow
+                    key={signin.slug}
+                    signin={signin}
+                    held={stored.find((row) => row.provider === signin.slug) ?? null}
+                    fromPlatform={covered.has(signin.env)}
+                    tier={tier}
+                    actions={actions}
+                    assisted={Boolean(actions.assist) && ASSISTED.has(signin.env)}
+                    onError={onError}
+                />
+            ))}
+        </div>
     );
 }
 
@@ -200,7 +257,6 @@ function SigninRow({
                     className="size-4 shrink-0"
                 />
                 <span className="min-w-0 flex-1 truncate text-sm" title={signin.label}>{signin.label}</span>
-                {signin.subscription ? <Badge variant="neutral">Subscription</Badge> : null}
                 {held ? (
                     <Badge variant="success">
                         <Check className="size-3 shrink-0" />

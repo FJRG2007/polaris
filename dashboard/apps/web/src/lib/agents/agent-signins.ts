@@ -152,3 +152,25 @@ export function isSigninRow(slug: string): boolean {
 export function signinLabel(slug: string): string {
     return agentSignins().find((signin) => signin.slug === slug)?.label ?? slug;
 }
+
+/**
+ * The two kinds, told apart, because they are not the same offer.
+ *
+ * A subscription is a plan somebody already pays a flat rate for, and signing it
+ * in costs nothing extra. An API key is a meter that starts on the first token -
+ * and for a coding agent, which reads a repository and writes to it all day,
+ * that is the expensive way round by a wide margin. Presenting them in one list
+ * as interchangeable ways to fill the same slot is how somebody ends up paying
+ * per token for work their plan already covers.
+ *
+ * So the screens group them and say which is which, and the assisted sign-in is
+ * only ever offered for the first: there is a login to walk somebody through
+ * because there is an account to log into. An API key is copied off a page.
+ */
+export function agentSubscriptions(): AgentSignin[] {
+    return agentSignins().filter((signin) => signin.subscription);
+}
+
+export function agentApiKeys(): AgentSignin[] {
+    return agentSignins().filter((signin) => !signin.subscription);
+}

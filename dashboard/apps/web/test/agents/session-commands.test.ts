@@ -48,6 +48,39 @@ describe("the boot script", () => {
         }
     });
 
+    it("goes to the daemon as one argument with nothing in it the daemon refuses", () => {
+        // The second half of the same bug, and the one that was still live after
+        // the first was fixed. The host daemon refuses a control character in a
+        // command ARGUMENT exactly as it refuses one in an environment value, and
+        // a boot script is a program with a line per statement - so `sh -c
+        // <script>` was an argument full of newlines, and every container started
+        // that way was refused before it ran.
+        for (const script of [commands.SESSION_BOOT, "set -eu\necho hello\n"]) {
+            const argv = commands.bootArgv(script);
+            expect(argv[0]).toBe("sh");
+            expect(argv[1]).toBe("-c");
+            for (const arg of argv) {
+                // eslint-disable-next-line no-control-regex
+                expect(/[\u0000-\u001f\u007f]/.test(arg), arg).toBe(false);
+            }
+        }
+    });
+
+    it("hands the script over unchanged, whatever was in it", () => {
+        const argv = commands.bootArgv(commands.SESSION_BOOT);
+        const encoded = /echo ([A-Za-z0-9+/=]+) \| base64 -d/.exec(argv[2] ?? "");
+        expect(encoded).not.toBeNull();
+        expect(Buffer.from(encoded![1]!, "base64").toString("utf8")).toBe(commands.SESSION_BOOT);
+    });
+
+    it("encodes to an alphabet the shell reads as plain text", () => {
+        // No quoting is applied around it, so the encoding has to be the reason
+        // that is safe rather than an oversight: base64 is letters, digits, plus,
+        // slash and equals, and the shell reads none of those as syntax.
+        const argv = commands.bootArgv(commands.SESSION_BOOT);
+        expect(argv[2]).toMatch(/^echo [A-Za-z0-9+/=]+ \| base64 -d \| sh$/);
+    });
+
     it("writes the hooks into the worktree, never into the machine's own home", () => {
         expect(commands.SESSION_BOOT).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
         expect(commands.SESSION_BOOT).not.toContain('"$HOME/.claude');

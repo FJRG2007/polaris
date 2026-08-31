@@ -373,6 +373,103 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ]
     },
     {
+        id: "qwen",
+        label: "Qwen Code",
+        vendor: "Alibaba",
+        binaries: ["qwen"],
+        install: "npm install -g @qwen-code/qwen-code",
+        home: ".qwen",
+        observe: "output",
+        docs: "https://github.com/QwenLM/qwen-code",
+        // It signs in through its own `/auth`, and which variable it reads for a
+        // key was not something the documentation said plainly. Empty rather than
+        // guessed: see the field.
+        credentials: []
+    },
+    {
+        id: "crush",
+        label: "Crush",
+        vendor: "Charm",
+        binaries: ["crush"],
+        install: "npm install -g @charmland/crush",
+        home: ".config/crush",
+        observe: "output",
+        docs: "https://github.com/charmbracelet/crush",
+        credentials: [
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
+    },
+    {
+        id: "cline",
+        label: "Cline",
+        vendor: "Cline",
+        binaries: ["cline"],
+        install: "npm install -g cline",
+        // Not sourced. A wrong one shows up as a tool Polaris cannot configure on
+        // a machine that has it, which is worse than admitting it is unknown.
+        home: null,
+        observe: "output",
+        docs: "https://github.com/cline/cline",
+        credentials: [
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
+    },
+    {
+        id: "openhands",
+        label: "OpenHands",
+        vendor: "All Hands AI",
+        binaries: ["openhands"],
+        // Python rather than npm, which is why it is spelled out: the machine has
+        // to have uv, and a machine that does not gets the "could not be
+        // installed" refusal rather than a session that starts without it.
+        install: "pip install openhands",
+        home: null,
+        observe: "output",
+        docs: "https://docs.all-hands.dev",
+        credentials: [
+            {
+                env: "ANTHROPIC_API_KEY",
+                label: "Anthropic API key",
+                url: "https://console.anthropic.com/settings/keys",
+                howto: null,
+                subscription: false
+            },
+            {
+                env: "OPENAI_API_KEY",
+                label: "OpenAI API key",
+                url: "https://platform.openai.com/api-keys",
+                howto: null,
+                subscription: false
+            }
+        ]
+    },
+    {
         id: "openclaw",
         label: "OpenClaw",
         vendor: "OpenClaw",

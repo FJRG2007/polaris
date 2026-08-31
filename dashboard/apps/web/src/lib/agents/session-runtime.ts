@@ -241,7 +241,7 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                 ports: [],
                 volumes: [],
                 labels: { [LABEL_KEY]: session.id },
-                command: ["sh", "-c", commands.SESSION_BOOT],
+                command: commands.bootArgv(commands.SESSION_BOOT),
                 networks: [],
                 // Never restarted. A session that came back would re-clone over its
                 // own worktree and lose whatever the agent had not committed.
