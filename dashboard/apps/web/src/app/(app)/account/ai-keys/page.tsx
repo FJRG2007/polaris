@@ -10,9 +10,10 @@
 
 import { requireUser } from "@/lib/session";
 import { Badge, Card, CardBody } from "@polaris/ui";
-import { agentSignins } from "@/lib/agents/agent-signins";
+import { assistedSignins } from "@/lib/agents/signin-runtime";
+import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { AgentSigninsCard } from "@/components/model-keys/agent-signins-card";
+import { AssistedSigninCard } from "@/components/model-keys/assisted-signin-card";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
 import {
     instanceKeysAreShared,
@@ -84,36 +85,46 @@ export default async function AiKeysPage() {
                             : "No keys yet. A run needs one to reach a provider.",
                     adding: "The provider account your runs bill to. Polaris adds nothing to that bill."
                 }}
+                footer={<FallbackCard providers={covered} shared={shared} />}
+            />
+
+            {/* The same table, for the accounts an agent signs in with. A second
+                one rather than a section of the first: they are a different
+                question - which account works, not which provider bills - and
+                mixing them put a subscription in a list about metered keys.
+                Everything else about them is a key, so everything else about them
+                is the table: named, reordered, renamed, given an end date, shown
+                with its last use. */}
+            <ModelKeysView
+                providers={signinProviderRows()}
+                keys={signins}
+                actions={{
+                    add: addModelKeyAction,
+                    update: updateModelKeyAction,
+                    remove: deleteModelKeyAction,
+                    reorder: reorderModelKeysAction
+                }}
+                copy={{
+                    title: "Your agent accounts",
+                    hint: "Tried from the top. The first that signs the agent in is the one a session on this box uses.",
+                    empty:
+                        fromPlatform.size > 0
+                            ? "None of your own. Sessions use the ones this deployment provides."
+                            : "None yet. A session on this box needs one to sign an agent in.",
+                    adding: "The account a session signs an agent in with. A subscription costs nothing extra; an API key is metered."
+                }}
                 footer={
-                    <>
-                        <AgentSigninsCard
-                            signins={agentSignins()}
-                            stored={signins.map((row) => ({
-                                id: row.id,
-                                provider: row.provider,
-                                name: row.name,
-                                config: row.config,
-                                lastUsedAt: row.lastUsedAt
-                            }))}
-                            platform={[...fromPlatform]}
-                            actions={{
-                                add: addModelKeyAction,
-                                remove: deleteModelKeyAction,
-                                // Only here. On the deployment's own screen an
-                                // administrator would be asked to authorise a
-                                // subscription that is not theirs, in their own
-                                // browser, which is the wrong person entirely.
-                                assist: {
-                                    begin: beginAgentSigninAction,
-                                    screen: agentSigninScreenAction,
-                                    answer: answerAgentSigninAction,
-                                    identity: agentSigninIdentityAction,
-                                    end: endAgentSigninAction
-                                }
-                            }}
-                        />
-                        <FallbackCard providers={covered} shared={shared} />
-                    </>
+                    <AssistedSigninCard
+                        signins={assistedSignins()}
+                        actions={{
+                            begin: beginAgentSigninAction,
+                            screen: agentSigninScreenAction,
+                            answer: answerAgentSigninAction,
+                            identity: agentSigninIdentityAction,
+                            end: endAgentSigninAction,
+                            save: addModelKeyAction
+                        }}
+                    />
                 }
             />
         </div>

@@ -15,9 +15,8 @@ import Link from "next/link";
 import { Card, CardBody } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
-import { agentSignins } from "@/lib/agents/agent-signins";
+import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { AgentSigninsCard } from "@/components/model-keys/agent-signins-card";
 import { instanceKeysAreShared, INSTANCE, listAgentSignins, listProviderKeys } from "@/lib/agents/model-keys";
 import {
     addInstanceModelKeyAction,
@@ -64,23 +63,31 @@ export default async function ModelProvidersPage() {
                     empty: "No keys yet. Without one, only people who bring their own can run anything.",
                     adding: "The provider account this deployment's runs bill to."
                 }}
-                footer={
-                    <>
-                        <AgentSigninsCard
-                            tier="platform"
-                            signins={agentSignins()}
-                            stored={signins.map((row) => ({
-                                id: row.id,
-                                provider: row.provider,
-                                name: row.name,
-                                config: row.config,
-                                lastUsedAt: row.lastUsedAt
-                            }))}
-                            actions={{ add: addInstanceModelKeyAction, remove: deleteInstanceModelKeyAction }}
-                        />
-                        <SharingCard shared={shared} />
-                    </>
-                }
+                footer={<SharingCard shared={shared} />}
+            />
+
+            {/* The deployment's own agent accounts, in the same table and for the
+                same reason the provider keys are in one: everything about them is
+                a key - named, reordered, renamed, given an end date, shown with
+                its last use - and a card of its own would have had to grow every
+                one of those separately and still look like a different feature.
+                No assisted sign-in here: an administrator would be asked to
+                authorise a subscription that is not theirs, in their own browser. */}
+            <ModelKeysView
+                providers={signinProviderRows()}
+                keys={signins}
+                actions={{
+                    add: addInstanceModelKeyAction,
+                    update: updateInstanceModelKeyAction,
+                    remove: deleteInstanceModelKeyAction,
+                    reorder: reorderInstanceModelKeysAction
+                }}
+                copy={{
+                    title: "The deployment's agent accounts",
+                    hint: "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
+                    empty: "None yet. Without one, only people who bring their own can start a session here.",
+                    adding: "The account this deployment's sessions sign an agent in with."
+                }}
             />
             <p className="text-muted-foreground text-sm">
                 Everything else Polaris connects to lives under{" "}
