@@ -49,9 +49,15 @@ describe("the roles", () => {
     });
 
     it("are recognised back from the set they produce", () => {
-        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer))).toBe("viewer");
-        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer))).toBe("developer");
-        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.admin))).toBe("admin");
+        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer))).toBe(
+            "viewer"
+        );
+        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer))).toBe(
+            "developer"
+        );
+        expect(projectRoleFor(expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.admin))).toBe(
+            "admin"
+        );
     });
 
     it("are not claimed for a set nobody picked from one", () => {
@@ -68,13 +74,18 @@ describe("resolveProjectCapabilities", () => {
     });
 
     it("falls back to the role, expanded", () => {
-        expect(resolveProjectCapabilities({ role: "viewer" })).toEqual(["project.read", "logs.read"]);
+        expect(resolveProjectCapabilities({ role: "viewer" })).toEqual([
+            "project.read",
+            "logs.read"
+        ]);
     });
 });
 
 describe("reading stored values", () => {
     it("drops a key this version does not know rather than the whole row", () => {
-        expect(parseProjectCapabilities('["project.read","invented.key"]')).toEqual(["project.read"]);
+        expect(parseProjectCapabilities('["project.read","invented.key"]')).toEqual([
+            "project.read"
+        ]);
     });
 
     it("reads an unparseable set as nothing, never as everything", () => {

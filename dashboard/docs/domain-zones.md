@@ -7,10 +7,10 @@ per preview. Zones make that a one-time DNS job instead of a per-hostname one.
 
 A **zone** is a DNS label under a base domain the operator controls:
 
-| Zone     | Scope   | Hostname            | Wildcard record       |
-| -------- | ------- | ------------------- | --------------------- |
-| `polaris`| polaris | `polaris.example.com` | `*.polaris.example.com` |
-| `plr`    | deploy  | `plr.example.com`     | `*.plr.example.com`     |
+| Zone      | Scope   | Hostname              | Wildcard record         |
+| --------- | ------- | --------------------- | ----------------------- |
+| `polaris` | polaris | `polaris.example.com` | `*.polaris.example.com` |
+| `plr`     | deploy  | `plr.example.com`     | `*.plr.example.com`     |
 
 - `scope: "polaris"` - Polaris itself (dashboard, share links, drop points).
 - `scope: "deploy"` - services deployed through Deploy. Several are allowed; one is
@@ -21,7 +21,7 @@ A **zone** is a DNS label under a base domain the operator controls:
   Polaris instances.
 - Two scopes may share a label - a Polaris zone and a deploy zone both on the base
   domain is exactly the layout above - because one wildcard record answers for both.
-  Two zones of the *same* scope on one label are a duplicate and the second is
+  Two zones of the _same_ scope on one label are a duplicate and the second is
   dropped.
 
 Each zone needs exactly two A records - the host and its wildcard - both pointed at
@@ -85,8 +85,9 @@ writes nothing.
 
 They are checked but never counted towards `domain.zones.verified`. That flag gates
 deploy hostname minting, and a game wildcard is not part of what makes the domain work
+
 - folding it in would mean installing a game silently stopped a working instance from
-minting hostnames.
+  minting hostnames.
 
 ### One port for every Java server
 
@@ -201,11 +202,11 @@ A hint, never a gate: the lookup is debounced, bounded to a single try with a sh
 timeout, and a domain that resolves nowhere yet - the normal case while typing - simply
 produces none. What it decides is what the setup offers:
 
-| Detected | Offered |
-| -------- | ------- |
-| Cloudflare | Polaris creates the records itself |
+| Detected               | Offered                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Cloudflare             | Polaris creates the records itself                                                                               |
 | Another known provider | The provider is named, plus a link straight to where that zone's records are edited wherever it has a stable URL |
-| Nothing recognized | The nameservers that answered, which is usually enough to recognize who the domain is with |
+| Nothing recognized     | The nameservers that answered, which is usually enough to recognize who the domain is with                       |
 
 An undetected provider keeps the Cloudflare offer open: a lookup that failed is not
 evidence the domain is not on Cloudflare. A domain served by someone else does not get
@@ -217,13 +218,13 @@ The check runs on save, whenever the setup is opened while the layout is still
 unproven, and on the DNS step. It records **two** separate facts, because they gate
 different things and only one of them can be established reliably from this side:
 
-| Flag | Proven by | Gates |
-| ---- | --------- | ----- |
-| `verified` | The zone host *and* a random name under it resolve to this server | Minting hostnames: `getNetworkStatus()` reporting `wildcard`, `deployHostname`, the zone picker |
-| `reachable` | An HTTP request to the zone host is answered at all | Handing links to other people: `sharingBaseUrl`, moving the dashboard's URL, standing the fallback tunnel down |
+| Flag        | Proven by                                                         | Gates                                                                                                          |
+| ----------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `verified`  | The zone host _and_ a random name under it resolve to this server | Minting hostnames: `getNetworkStatus()` reporting `wildcard`, `deployHostname`, the zone picker                |
+| `reachable` | An HTTP request to the zone host is answered at all               | Handing links to other people: `sharingBaseUrl`, moving the dashboard's URL, standing the fallback tunnel down |
 
 Any HTTP status counts as an answer, including the edge's own 404 - a zone host is not
-a site Polaris serves (services live *under* it), so requiring a particular response
+a site Polaris serves (services live _under_ it), so requiring a particular response
 would require something that by design does not exist. What it rules out is a refused
 connection or a timeout: DNS pointed at a router whose ports were never forwarded.
 

@@ -560,7 +560,9 @@ describe.runIf(shell)("the macOS branch, run against a simulated Mac", () => {
         expect(outcome.status).toBe(0);
         expect(outcome.refused).toEqual([]);
         expect(outcome.editWithoutGroup).toBe(false);
-        expect(outcome.stdout).toContain("could not read whether this machine limits SSH to a list of logins");
+        expect(outcome.stdout).toContain(
+            "could not read whether this machine limits SSH to a list of logins"
+        );
         expect(outcome.stdout).toContain("reached: the claim");
     });
 });

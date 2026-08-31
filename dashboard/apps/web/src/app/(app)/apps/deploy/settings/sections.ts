@@ -30,19 +30,44 @@ export interface SettingsSection {
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
-    { slug: "general", label: "General", icon: SlidersHorizontal, hint: "Name, description, and who can see it" },
+    {
+        slug: "general",
+        label: "General",
+        icon: SlidersHorizontal,
+        hint: "Name, description, and who can see it"
+    },
     { slug: "usage", label: "Usage", icon: Gauge, hint: "What the project is consuming" },
-    { slug: "environments", label: "Environments", icon: Boxes, hint: "Rename, set the default, remove" },
+    {
+        slug: "environments",
+        label: "Environments",
+        icon: Boxes,
+        hint: "Rename, set the default, remove"
+    },
     {
         slug: "variables",
         label: "Shared variables",
         icon: Variable,
         hint: "Values every service in an environment gets"
     },
-    { slug: "webhooks", label: "Webhooks", icon: Webhook, hint: "Where this project reports its deploys" },
+    {
+        slug: "webhooks",
+        label: "Webhooks",
+        icon: Webhook,
+        hint: "Where this project reports its deploys"
+    },
     { slug: "flags", label: "Feature flags", icon: Flag, hint: "How this project behaves" },
-    { slug: "members", label: "Access", icon: Users, hint: "Who can reach the project, and to do what" },
+    {
+        slug: "members",
+        label: "Access",
+        icon: Users,
+        hint: "Who can reach the project, and to do what"
+    },
     { slug: "tokens", label: "Tokens", icon: KeyRound, hint: "API access scoped to this project" },
-    { slug: "integrations", label: "Integrations", icon: Blocks, hint: "What this project is connected to" },
+    {
+        slug: "integrations",
+        label: "Integrations",
+        icon: Blocks,
+        hint: "What this project is connected to"
+    },
     { slug: "danger", label: "Danger", icon: TriangleAlert, hint: "Irreversible things" }
 ];

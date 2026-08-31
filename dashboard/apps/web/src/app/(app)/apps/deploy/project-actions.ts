@@ -105,7 +105,11 @@ export async function updateProjectGeneralAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = projectGeneralSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        const access = await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
+        const access = await requireProjectAccess(
+            parsed.data.projectId,
+            user.id,
+            "project.settings"
+        );
         await projectService.updateProjectGeneral({
             projectId: parsed.data.projectId,
             ownerId: access.ownerId,
@@ -172,7 +176,11 @@ export async function renameEnvironmentAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentNameSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the name" };
-        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "project.settings");
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "project.settings"
+        );
         await deployService.renameEnvironment(
             parsed.data.environmentId,
             access.ownerId,
@@ -308,7 +316,11 @@ export async function createProjectTokenAction(
         const user = await requirePermission("deploy.manage");
         const parsed = projectTokenInputSchema.safeParse(input);
         if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
-        const access = await requireProjectAccess(parsed.data.projectId, user.id, "project.settings");
+        const access = await requireProjectAccess(
+            parsed.data.projectId,
+            user.id,
+            "project.settings"
+        );
         const created = await projectService.createProjectToken({
             ...parsed.data,
             ownerId: access.ownerId
@@ -460,7 +472,9 @@ export async function listStagedChangesAction(
         const user = await requirePermission("deploy.read");
         const access = await requireProjectAccess(projectId, user.id, "project.read");
         const changes = await staged.listProjectStagedChanges(projectId);
-        return { changes: changes.filter((change) => accessInEnvironment(access, change.environmentId)) };
+        return {
+            changes: changes.filter((change) => accessInEnvironment(access, change.environmentId))
+        };
     });
 }
 
@@ -474,7 +488,11 @@ export async function stageServiceDeleteAction(input: {
 }): Promise<Result<{ staged: boolean }>> {
     return attempt("Could not remove the service", async () => {
         const user = await requirePermission("deploy.manage");
-        const access = await requireApplicationAccess(input.applicationId, user.id, "service.delete");
+        const access = await requireApplicationAccess(
+            input.applicationId,
+            user.id,
+            "service.delete"
+        );
         const app = await deployService.getApplicationSummary(input.applicationId, access.ownerId);
         if (!app) return { error: "Service not found" };
 
@@ -510,7 +528,11 @@ export async function stageDatabaseDeleteAction(input: {
         const user = await requirePermission("deploy.manage");
         const database = await deployService.getDatabaseSummary(input.databaseId);
         if (!database) return { error: "Database not found" };
-        const access = await requireEnvironmentAccess(database.environmentId, user.id, "databases.manage");
+        const access = await requireEnvironmentAccess(
+            database.environmentId,
+            user.id,
+            "databases.manage"
+        );
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             const { deleteDatabase } = await import("@/lib/database-service");
@@ -546,7 +568,11 @@ export async function stageVolumeDeleteAction(input: {
         const user = await requirePermission("deploy.manage");
         const volume = await volumeFor(input.volumeId, user.id);
         if (!volume.applicationId) return { error: "This volume is not attached to a service" };
-        const access = await requireApplicationAccess(volume.applicationId, user.id, "volumes.manage");
+        const access = await requireApplicationAccess(
+            volume.applicationId,
+            user.id,
+            "volumes.manage"
+        );
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
             await deleteVolume(input.volumeId, access.ownerId, { wipe: input.wipe });
@@ -691,7 +717,11 @@ export async function wipeVolumeAction(volumeId: string): Promise<Result> {
         const user = await requirePermission("deploy.manage");
         const volume = await volumeFor(volumeId, user.id);
         if (!volume.applicationId) return { error: "This volume is not attached to a service" };
-        const access = await requireApplicationAccess(volume.applicationId, user.id, "volumes.manage");
+        const access = await requireApplicationAccess(
+            volume.applicationId,
+            user.id,
+            "volumes.manage"
+        );
         await wipeVolume(volumeId, access.ownerId);
         await recordAudit({
             actorId: user.id,

@@ -66,13 +66,15 @@ export const PROJECT_FLAGS = [
     {
         id: "autoDeployNewServices",
         label: "Auto-deploy new services",
-        description: "A service created from a git branch redeploys itself when a new commit lands on that branch.",
+        description:
+            "A service created from a git branch redeploys itself when a new commit lands on that branch.",
         default: true
     },
     {
         id: "keepReleasesByDefault",
         label: "Keep previous releases",
-        description: "New services keep earlier builds running alongside the current one instead of replacing them.",
+        description:
+            "New services keep earlier builds running alongside the current one instead of replacing them.",
         default: false
     },
     {
@@ -84,7 +86,8 @@ export const PROJECT_FLAGS = [
     {
         id: "wipeVolumesOnDelete",
         label: "Wipe volumes on delete",
-        description: "Deleting a service also destroys the data in the volumes attached to it. There is no undo.",
+        description:
+            "Deleting a service also destroys the data in the volumes attached to it. There is no undo.",
         default: false
     }
 ] as const;
@@ -226,9 +229,15 @@ export const projectWebhookInputSchema = z.object({
         .trim()
         .url("Enter a full URL, including https://")
         .max(2048)
-        .refine((value) => value.startsWith("https://") || value.startsWith("http://"), "Only http(s) endpoints"),
+        .refine(
+            (value) => value.startsWith("https://") || value.startsWith("http://"),
+            "Only http(s) endpoints"
+        ),
     format: z.enum(WEBHOOK_FORMATS).optional(),
-    events: z.array(z.enum(PROJECT_WEBHOOK_EVENT_IDS)).max(PROJECT_WEBHOOK_EVENTS.length).default([])
+    events: z
+        .array(z.enum(PROJECT_WEBHOOK_EVENT_IDS))
+        .max(PROJECT_WEBHOOK_EVENTS.length)
+        .default([])
 });
 
 export type ProjectWebhookInput = z.infer<typeof projectWebhookInputSchema>;
@@ -271,5 +280,8 @@ export const volumeAlertSchema = z.object({
         .int()
         .min(1)
         .max(99)
-        .refine((value) => (VOLUME_ALERT_THRESHOLDS as readonly number[]).includes(value), "Pick an offered threshold")
+        .refine(
+            (value) => (VOLUME_ALERT_THRESHOLDS as readonly number[]).includes(value),
+            "Pick an offered threshold"
+        )
 });

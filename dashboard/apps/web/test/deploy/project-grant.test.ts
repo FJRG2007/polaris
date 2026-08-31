@@ -119,7 +119,11 @@ describe("setProjectAccess", () => {
                 entry({
                     role: "viewer",
                     environmentIds: ["env-prod"],
-                    granter: { id: "granter-1", capabilities: ADMIN_SET, environmentIds: ["env-dev"] }
+                    granter: {
+                        id: "granter-1",
+                        capabilities: ADMIN_SET,
+                        environmentIds: ["env-dev"]
+                    }
                 })
             )
         ).rejects.toThrow(/environments you reach yourself/i);
@@ -131,7 +135,11 @@ describe("setProjectAccess", () => {
                 entry({
                     role: "viewer",
                     environmentIds: [],
-                    granter: { id: "granter-1", capabilities: ADMIN_SET, environmentIds: ["env-dev"] }
+                    granter: {
+                        id: "granter-1",
+                        capabilities: ADMIN_SET,
+                        environmentIds: ["env-dev"]
+                    }
                 })
             )
         ).rejects.toThrow(/environments you reach yourself/i);
@@ -152,9 +160,7 @@ describe("setProjectAccess", () => {
     it("refuses a team the granter is not on", async () => {
         teamFindFirst.mockResolvedValue(null);
         await expect(
-            setProjectAccess(
-                entry({ principal: "team", principalId: "team-9", role: "viewer" })
-            )
+            setProjectAccess(entry({ principal: "team", principalId: "team-9", role: "viewer" }))
         ).rejects.toThrow(/teams you are on/i);
         expect(teamFindFirst.mock.calls[0]?.[0]?.where.org).toBeDefined();
     });

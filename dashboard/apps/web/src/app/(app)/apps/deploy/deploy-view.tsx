@@ -19,14 +19,7 @@ import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
-import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-    useTransition,
-    type ReactNode
-} from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import {
     databaseCreateSchema,
     dbEngineLabel,
@@ -76,11 +69,14 @@ const ENGINE_OPTIONS: SelectOption[] = DB_ENGINES.map((engine) => ({
 }));
 
 type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
-type DbConnection = NonNullable<Awaited<ReturnType<typeof deployActions.databaseConnectionAction>>["connection"]>;
+type DbConnection = NonNullable<
+    Awaited<ReturnType<typeof deployActions.databaseConnectionAction>>["connection"]
+>;
 
 /** The dotted board texture shared with the canvas, for empty states. */
 const DOT_BG: React.CSSProperties = {
-    backgroundImage: "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
+    backgroundImage:
+        "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
     backgroundSize: "16px 16px"
 };
 
@@ -173,7 +169,13 @@ export function serviceKindOf(sourceType: string): ServiceKind {
 }
 
 /** Brand-accurate icon for a service kind (GitHub / Docker / database). */
-export function ServiceIcon({ kind, className = "size-4" }: { kind: ServiceKind; className?: string }) {
+export function ServiceIcon({
+    kind,
+    className = "size-4"
+}: {
+    kind: ServiceKind;
+    className?: string;
+}) {
     if (kind === "github") return <GitHubMark className={className} />;
     if (kind === "image") return <DockerMark className={className} />;
     return <Database className={className} />;
@@ -206,7 +208,10 @@ export function EnvironmentServices({
                 >
                     <div
                         className="pointer-events-none absolute inset-0"
-                        style={{ background: "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)" }}
+                        style={{
+                            background:
+                                "radial-gradient(120% 90% at 50% 40%, transparent 45%, hsl(var(--background)) 100%)"
+                        }}
                     />
                     <span className="relative grid size-11 place-items-center rounded-xl border border-border bg-card text-primary">
                         <Rocket className="size-5" />
@@ -272,9 +277,9 @@ function AppCard({
     const primary = primaryDomain(app.domains);
     // The footer is the card's whole set of verbs. With none of them held it is a
     // rule above nothing, so the row goes rather than sitting there empty.
-    const actions = (["deploy.run", "service.configure", "files.read", "console.use", "domains.manage"] as const).filter(
-        can
-    );
+    const actions = (
+        ["deploy.run", "service.configure", "files.read", "console.use", "domains.manage"] as const
+    ).filter(can);
 
     function onDeploy() {
         setError(null);
@@ -289,7 +294,9 @@ function AppCard({
     return (
         <div
             className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/15 ${
-                staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
+                staged
+                    ? "border-primary/50 ring-1 ring-primary/20"
+                    : "border-border/60 hover:border-border"
             }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -302,9 +309,14 @@ function AppCard({
                     <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface text-foreground transition-colors group-enabled:group-hover:border-primary/40">
                         <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-3.5" />
                     </span>
-                    <span className="truncate text-sm font-medium group-enabled:group-hover:text-primary">{app.name}</span>
+                    <span className="truncate text-sm font-medium group-enabled:group-hover:text-primary">
+                        {app.name}
+                    </span>
                 </button>
-                <StatusPill tone={dbTone(app.deployStatus ?? "")} label={app.deployStatus ?? "Not deployed"} />
+                <StatusPill
+                    tone={dbTone(app.deployStatus ?? "")}
+                    label={app.deployStatus ?? "Not deployed"}
+                />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -339,7 +351,9 @@ function AppCard({
                         </span>
                     )}
                     {app.domains.length > 1 && (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">+{app.domains.length - 1}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                            +{app.domains.length - 1}
+                        </span>
                     )}
                 </div>
             )}
@@ -349,8 +363,19 @@ function AppCard({
             {canManage && actions.length > 0 && (
                 <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
                     {can("deploy.run") && (
-                        <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={onDeploy}
+                            disabled={busy}
+                            className="mr-auto"
+                        >
+                            {busy ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Rocket className="size-4" />
+                            )}{" "}
+                            Deploy
                         </Button>
                     )}
                     {isGit && can("service.configure") && (
@@ -423,10 +448,20 @@ function AppCard({
                 </DialogContent>
             </Dialog>
 
-            <DomainDialog app={app} open={showDomain} onOpenChange={setShowDomain} onChanged={onChanged} />
+            <DomainDialog
+                app={app}
+                open={showDomain}
+                onOpenChange={setShowDomain}
+                onChanged={onChanged}
+            />
 
             {isGit && (
-                <AutoDeployDialog app={app} open={showAutoDeploy} onOpenChange={setShowAutoDeploy} onChanged={onChanged} />
+                <AutoDeployDialog
+                    app={app}
+                    open={showAutoDeploy}
+                    onOpenChange={setShowAutoDeploy}
+                    onChanged={onChanged}
+                />
             )}
 
             <Dialog open={logsFor !== null} onOpenChange={(open) => !open && setLogsFor(null)}>
@@ -474,7 +509,9 @@ function DatabaseCard({
     return (
         <div
             className={`flex flex-col gap-3 rounded-xl border bg-surface/60 p-4 transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/15 ${
-                staged ? "border-primary/50 ring-1 ring-primary/20" : "border-border/60 hover:border-border"
+                staged
+                    ? "border-primary/50 ring-1 ring-primary/20"
+                    : "border-border/60 hover:border-border"
             }`}
         >
             <div className="flex items-start justify-between gap-2">
@@ -495,7 +532,8 @@ function DatabaseCard({
                 {database.hostedOnInstance && <Badge>On a shared instance</Badge>}
                 {database.hostedCount ? (
                     <Badge>
-                        Hosts {database.hostedCount} {database.hostedCount === 1 ? "database" : "databases"}
+                        Hosts {database.hostedCount}{" "}
+                        {database.hostedCount === 1 ? "database" : "databases"}
                     </Badge>
                 ) : null}
             </div>
@@ -516,7 +554,12 @@ function DatabaseCard({
                             })
                         }
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Provision
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Rocket className="size-4" />
+                        )}{" "}
+                        Provision
                     </Button>
                     <Button
                         variant="ghost"
@@ -540,7 +583,11 @@ function DatabaseCard({
                 </div>
             )}
 
-            <DatabaseConnectionDialog database={database} open={connecting} onOpenChange={setConnecting} />
+            <DatabaseConnectionDialog
+                database={database}
+                open={connecting}
+                onOpenChange={setConnecting}
+            />
 
             <ConfirmDeleteDialog
                 open={confirming}
@@ -640,11 +687,22 @@ function DatabaseConnectionDialog({
                             </Field>
                         </div>
                         <Field label="Password">
-                            <CopyRow value={revealed ? connection.password : hidden} copyValue={connection.password} />
+                            <CopyRow
+                                value={revealed ? connection.password : hidden}
+                                copyValue={connection.password}
+                            />
                         </Field>
                         <div className="flex items-center justify-between gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => setRevealed((value) => !value)}>
-                                {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setRevealed((value) => !value)}
+                            >
+                                {revealed ? (
+                                    <EyeOff className="size-4" />
+                                ) : (
+                                    <Eye className="size-4" />
+                                )}
                                 {revealed ? "Hide password" : "Show password"}
                             </Button>
                             {connection.exposedPort && (
@@ -661,7 +719,15 @@ function DatabaseConnectionDialog({
 }
 
 /** A read-only value with a copy button, for anything meant to be pasted. */
-function CopyRow({ value, secret, copyValue }: { value: string; secret?: boolean; copyValue?: string }) {
+function CopyRow({
+    value,
+    secret,
+    copyValue
+}: {
+    value: string;
+    secret?: boolean;
+    copyValue?: string;
+}) {
     const [copied, setCopied] = useState(false);
     const shown = secret ? value.replace(/:\/\/([^:]*):[^@]*@/, "://$1:********@") : value;
 
@@ -684,7 +750,11 @@ function CopyRow({ value, secret, copyValue }: { value: string; secret?: boolean
                 aria-label="Copy"
                 className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-                {copied ? <CheckCircle2 className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+                {copied ? (
+                    <CheckCircle2 className="size-3.5 text-success" />
+                ) : (
+                    <Copy className="size-3.5" />
+                )}
             </button>
         </span>
     );
@@ -758,7 +828,13 @@ export function NewServiceDialog({
     );
 }
 
-export function NewServiceButton({ environmentId, onChanged }: { environmentId: string; onChanged: () => void }) {
+export function NewServiceButton({
+    environmentId,
+    onChanged
+}: {
+    environmentId: string;
+    onChanged: () => void;
+}) {
     const [open, setOpen] = useState(false);
     const [view, setView] = useState<ServiceView>("list");
 
@@ -800,7 +876,9 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
                     onClick={() => onPick(type.id)}
                     className="group flex items-center gap-4 rounded-lg px-3 py-3 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                    <span className="flex size-5 shrink-0 items-center justify-center">{type.icon}</span>
+                    <span className="flex size-5 shrink-0 items-center justify-center">
+                        {type.icon}
+                    </span>
                     <span className="flex-1 text-sm font-medium">{type.label}</span>
                     <ChevronRight className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>
@@ -830,7 +908,8 @@ function useDeployServers(environmentId: string): {
         // Scoped to the environment being deployed into, so the list is the
         // project owner's machines rather than the machines of whoever happens to
         // be filling the form in.
-        void deployActions.listDeployServersAction(environmentId)
+        void deployActions
+            .listDeployServersAction(environmentId)
             .then((list) => {
                 setServers(list);
                 if (list[0]) setServerId(list[0].id);
@@ -840,7 +919,15 @@ function useDeployServers(environmentId: string): {
     return { servers, serverId, setServerId };
 }
 
-function ServerField({ servers, value, onChange }: { servers: ServerOption[]; value: string; onChange: (id: string) => void }) {
+function ServerField({
+    servers,
+    value,
+    onChange
+}: {
+    servers: ServerOption[];
+    value: string;
+    onChange: (id: string) => void;
+}) {
     if (servers.length === 0) return null;
     return (
         <Field label="Server" hint="Where this service runs. Connect more under Servers.">
@@ -882,7 +969,12 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" autoFocus />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="my-app"
+                    autoFocus
+                />
             </Field>
             <Field
                 label="Image"
@@ -898,7 +990,12 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
                 label="Port"
                 hint="The port the container listens on. Leave empty to detect it from the image; set it (e.g. 5601 for OpenSearch Dashboards) only if the image exposes several ports or none."
             >
-                <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="Auto (from image)" inputMode="numeric" />
+                <Input
+                    value={port}
+                    onChange={(event) => setPort(event.target.value)}
+                    placeholder="Auto (from image)"
+                    inputMode="numeric"
+                />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -939,7 +1036,7 @@ function nameFromUrl(url: string): string {
  * The repository field is the shared picker; everything below it is what only a
  * deploy asks for - the name, the branch, the builder and where it runs.
  */
-function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void; }) {
+function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     // Null until the picker's first read answers, so the "not connected" notice
     // does not flash before anybody has been asked.
     const [connected, setConnected] = useState<boolean | null>(null);
@@ -976,7 +1073,11 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setInspecting(true);
         const [owner, repoName] = repo.fullName.split("/");
         void deployActions
-            .inspectRepoAction({ owner: owner ?? "", repo: repoName ?? "", branch: repo.defaultBranch })
+            .inspectRepoAction({
+                owner: owner ?? "",
+                repo: repoName ?? "",
+                branch: repo.defaultBranch
+            })
             .then((inspection) => {
                 setBuilder(inspection.builder);
                 setDockerfilePath(inspection.dockerfile ?? "Dockerfile");
@@ -1014,7 +1115,8 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 sourceType: builder,
                 repoUrl: choice.url,
                 branch: branch.trim() || undefined,
-                dockerfilePath: builder === "dockerfile" ? dockerfilePath.trim() || undefined : undefined,
+                dockerfilePath:
+                    builder === "dockerfile" ? dockerfilePath.trim() || undefined : undefined,
                 rootDirectory: rootDirectory.trim() || undefined,
                 // Only a GitHub repository can be cloned with the stored credentials.
                 provider: connected && choice.fullName ? "github" : undefined,
@@ -1042,9 +1144,14 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                     {choice.fullName ? (
                         <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
                     ) : (
-                        <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <Globe
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                     )}
-                    <span className="min-w-0 flex-1 truncate text-sm">{choice.fullName ?? choice.url}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">
+                        {choice.fullName ?? choice.url}
+                    </span>
                     {choice.private && <Lock className="size-3.5 shrink-0 text-muted-foreground" />}
                     <Button type="button" variant="ghost" size="sm" onClick={clearChoice}>
                         Change
@@ -1065,7 +1172,11 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Name">
-                            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-app" />
+                            <Input
+                                value={name}
+                                onChange={(event) => setName(event.target.value)}
+                                placeholder="my-app"
+                            />
                         </Field>
                         <Field label="Branch">
                             <Input
@@ -1110,7 +1221,11 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                     {builder === "dockerfile" && (
                         <Field
                             label="Dockerfile path"
-                            hint={rootDirectory.trim() ? `Relative to ${rootDirectory.trim()}.` : undefined}
+                            hint={
+                                rootDirectory.trim()
+                                    ? `Relative to ${rootDirectory.trim()}.`
+                                    : undefined
+                            }
                         >
                             <Input
                                 value={dockerfilePath}
@@ -1218,10 +1333,19 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     return (
         <div className="flex flex-col gap-3">
             <Field label="Name">
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="my-db" autoFocus />
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="my-db"
+                    autoFocus
+                />
             </Field>
             <Field label="Engine">
-                <Select value={engine} onValueChange={(value) => setEngine(value as DbEngine)} options={ENGINE_OPTIONS} />
+                <Select
+                    value={engine}
+                    onValueChange={(value) => setEngine(value as DbEngine)}
+                    options={ENGINE_OPTIONS}
+                />
             </Field>
             {!hosted && <ServerField servers={servers} value={serverId} onChange={setServerId} />}
 
@@ -1230,7 +1354,9 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                 onClick={() => setAdvanced((open) => !open)}
                 className="flex items-center gap-1 self-start text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-                <ChevronRight className={`size-3.5 transition-transform ${advanced ? "rotate-90" : ""}`} />
+                <ChevronRight
+                    className={`size-3.5 transition-transform ${advanced ? "rotate-90" : ""}`}
+                />
                 Advanced
             </button>
 
@@ -1307,7 +1433,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                                 administrative account, so there is nothing to scope
                                 down; the choice only exists on a shared instance. */}
                             {hosted && (
-                                <Field label="Privileges" hint="What this user may do inside its own database.">
+                                <Field
+                                    label="Privileges"
+                                    hint="What this user may do inside its own database."
+                                >
                                     <Select
                                         value={privileges}
                                         onValueChange={setPrivileges}
@@ -1318,7 +1447,10 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                         </>
                     )}
 
-                    <Field label="Password" hint="Blank generates a strong one and stores it encrypted.">
+                    <Field
+                        label="Password"
+                        hint="Blank generates a strong one and stores it encrypted."
+                    >
                         <Input
                             type="password"
                             value={password}
@@ -1387,20 +1519,35 @@ function AutoDeployDialog({
                         <span>
                             <span className="font-medium">Deploy on push</span>
                             <span className="block text-xs text-muted-foreground">
-                                Rebuild and deploy automatically when a matching commit is pushed. Needs GitHub App
-                                webhooks reaching this instance (public domain).
+                                Rebuild and deploy automatically when a matching commit is pushed.
+                                Needs GitHub App webhooks reaching this instance (public domain).
                             </span>
                         </span>
-                        <Switch checked={enabled} onChange={setEnabled} aria-label="Deploy on push" />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label="Deploy on push"
+                        />
                     </div>
-                    <Field label="Branch" hint="Only this branch triggers a deploy. Blank uses the app's branch.">
-                        <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                    <Field
+                        label="Branch"
+                        hint="Only this branch triggers a deploy. Blank uses the app's branch."
+                    >
+                        <Input
+                            value={branch}
+                            onChange={(event) => setBranch(event.target.value)}
+                            placeholder="main"
+                        />
                     </Field>
                     <Field
                         label="Commit filter"
                         hint='Deploy only when the commit message contains this (e.g. "build:"), or "regex:<pattern>". Blank = any commit.'
                     >
-                        <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="build:" />
+                        <Input
+                            value={filter}
+                            onChange={(event) => setFilter(event.target.value)}
+                            placeholder="build:"
+                        />
                     </Field>
                     <Field
                         label="Watch paths"
@@ -1493,11 +1640,16 @@ function DomainDialog({
                                         checked={domain.enabled}
                                         onChange={(next) =>
                                             startTransition(async () => {
-                                                await deployActions.setDomainEnabledAction(domain.id, next);
+                                                await deployActions.setDomainEnabledAction(
+                                                    domain.id,
+                                                    next
+                                                );
                                                 onChanged();
                                             })
                                         }
-                                        aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
+                                        aria-label={
+                                            domain.enabled ? "Disable domain" : "Enable domain"
+                                        }
                                     />
                                 </div>
                             ))}
@@ -1511,7 +1663,12 @@ function DomainDialog({
                         />
                     </Field>
                     <Field label="Target port">
-                        <Input value={port} onChange={(event) => setPort(event.target.value)} placeholder="80" className="w-28" />
+                        <Input
+                            value={port}
+                            onChange={(event) => setPort(event.target.value)}
+                            placeholder="80"
+                            className="w-28"
+                        />
                     </Field>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
@@ -1535,7 +1692,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     );
 }
 
-export function StatusPill({ tone, label }: { tone: "success" | "warning" | "danger" | "idle"; label: string }) {
+export function StatusPill({
+    tone,
+    label
+}: {
+    tone: "success" | "warning" | "danger" | "idle";
+    label: string;
+}) {
     const dot = {
         success: "bg-success",
         warning: "bg-warning",
@@ -1553,7 +1716,9 @@ export function StatusPill({ tone, label }: { tone: "success" | "warning" | "dan
         <span
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs capitalize ${chip}`}
         >
-            <span className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`} />
+            <span
+                className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`}
+            />
             {label}
         </span>
     );
@@ -1563,11 +1728,18 @@ export function dbTone(status: string): "success" | "warning" | "danger" | "idle
     const value = status.toLowerCase();
     if (["running", "active", "healthy", "ready"].includes(value)) return "success";
     if (["failed", "error", "stopped"].includes(value)) return "danger";
-    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value)) return "warning";
+    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value))
+        return "warning";
     return "idle";
 }
 
-export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+export function DeploymentLogs({
+    deploymentId,
+    onDone
+}: {
+    deploymentId: string;
+    onDone: () => void;
+}) {
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
     // Keep onDone out of the effect deps: it is recreated every render, and calling
@@ -1581,7 +1753,9 @@ export function DeploymentLogs({ deploymentId, onDone }: { deploymentId: string;
         let timer: ReturnType<typeof setTimeout>;
 
         async function poll(): Promise<void> {
-            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, {
+                cache: "no-store"
+            });
             if (!active) return;
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
