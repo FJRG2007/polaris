@@ -31,15 +31,32 @@ import { Check, ExternalLink, Loader2, Trash2, Wand2 } from "lucide-react";
 import { SigninDialog, type SigninDialogActions } from "./signin-dialog";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Input } from "@polaris/ui";
 
-/** A stored one, as the card needs it. Never the credential - only that there is
- *  one, and enough to remove it. */
+/**
+ * A stored one, as the card needs it.
+ *
+ * Never the credential itself - only that there is one, what its owner calls it,
+ * whose account it turned out to be, and enough to remove it.
+ *
+ * `lastUsedAt` is the closest thing to consumption there is here, and it is
+ * deliberately the only one. What a subscription has spent lives with the
+ * vendor and Polaris cannot ask; a figure invented for this screen would read as
+ * fact and never be re-checked.
+ */
 export interface StoredSignin {
     readonly id: string;
     readonly provider: string;
+    readonly name: string;
+    /** Whose account it is, as the login reported. Empty for one linked by
+     *  pasting, or by a tool that would not say. */
+    readonly config: Record<string, unknown>;
+    readonly lastUsedAt: string | null;
 }
 
 interface SigninActions {
     add: (input: unknown) => Promise<{ error?: string }>;
+    /** Puts them in the order they are tried in, exactly as the provider keys
+     *  are ordered. Absent where a screen shows one of each. */
+    reorder?: (input: unknown) => Promise<{ error?: string }>;
     remove: (input: unknown) => Promise<{ error?: string }>;
     /** The assisted flow, where Polaris supplies the machine and runs the
      *  vendor's own login on it. Absent on a screen that only takes a paste -
@@ -172,7 +189,7 @@ function Group({
                 <SigninRow
                     key={signin.slug}
                     signin={signin}
-                    held={stored.find((row) => row.provider === signin.slug) ?? null}
+                    accounts={stored.filter((row) => row.provider === signin.slug)}
                     fromPlatform={covered.has(signin.env)}
                     tier={tier}
                     actions={actions}
@@ -186,7 +203,7 @@ function Group({
 
 function SigninRow({
     signin,
-    held,
+    accounts,
     fromPlatform,
     tier,
     actions,
@@ -194,7 +211,7 @@ function SigninRow({
     onError
 }: {
     signin: AgentSignin;
-    held: StoredSignin | null;
+    accounts: StoredSignin[];
     fromPlatform: boolean;
     tier: SigninTier;
     actions: SigninActions;
@@ -202,13 +219,8 @@ function SigninRow({
     onError: (message: string | null) => void;
 }) {
     const [secret, setSecret] = useState("");
-    // Shown as linked the moment the write returns, rather than after the server
-    // component behind this has been re-read. The refresh still happens and is
-    // what makes it true; this is what stops the row reading as untouched in the
-    // second before it lands, which read as the credential not having been saved.
-    const [justLinked, setJustLinked] = useState(false);
     const [signingIn, setSigningIn] = useState(false);
-    const [removing, setRemoving] = useState(false);
+    const [removing, setRemoving] = useState<StoredSignin | null>(null);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
 
@@ -219,10 +231,11 @@ function SigninRow({
                 () =>
                     actions.add({
                         provider: signin.slug,
-                        // Not asked for. There is one of each of these, so a field
-                        // that only ever gets one answer is a field that should
-                        // not have been put on the screen.
-                        name: signin.env.toLowerCase().replace(/_/g, "-").slice(0, 20),
+                        // Numbered, because an account may hold several and the
+                        // store keeps names unique. Nothing is known about a
+                        // pasted credential - there was no login to ask - so it
+                        // is named after what it is and its owner renames it.
+                        name: nextName(signin.env, accounts),
                         secret: secret.trim(),
                         expiresAt: null
                     }),
@@ -233,29 +246,28 @@ function SigninRow({
                     return;
                 }
                 setSecret("");
-                setJustLinked(true);
+                // The refresh rather than a local flag: the row that comes back
+                // carries whose account it is, which is something only the
+                // server knows. Showing one without it and swapping it a moment
+                // later is a worse second than waiting for the real one.
                 router.refresh();
             });
         });
     };
 
     const remove = () => {
-        if (!held) return;
+        if (!removing) return;
+        const id = removing.id;
         startTransition(() => {
-            void runAction(() => actions.remove({ id: held.id }), onError).then((result) => {
+            void runAction(() => actions.remove({ id }), onError).then((result) => {
                 if (result?.error) onError(result.error);
-                setRemoving(false);
+                setRemoving(null);
                 router.refresh();
             });
         });
     };
 
     const serves = signin.serves.map((tool) => tool.label).join(", ");
-    // Either the server says so or this row just did it. The rollback is the
-    // refresh: a write that failed never set it, and one that succeeded is
-    // confirmed by the row that comes back.
-    const linked = held !== null || justLinked;
-
     return (
         <div className="rounded-md border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -267,10 +279,14 @@ function SigninRow({
                     className="size-4 shrink-0"
                 />
                 <span className="min-w-0 flex-1 truncate text-sm" title={signin.label}>{signin.label}</span>
-                {linked ? (
+                {accounts.length > 0 ? (
                     <Badge variant="success">
                         <Check className="size-3 shrink-0" />
-                        {tier === "platform" ? "Set" : "Yours"}
+                        {accounts.length === 1
+                            ? tier === "platform"
+                                ? "Set"
+                                : "Yours"
+                            : `${accounts.length} accounts`}
                     </Badge>
                 ) : fromPlatform ? (
                     // Held by the deployment and shared. Worth saying rather than
@@ -280,19 +296,59 @@ function SigninRow({
                     // be used first, which is why the field stays.
                     <Badge variant="neutral">From this Polaris</Badge>
                 ) : null}
-                {held ? (
-                    <Button size="sm" variant="ghost" onClick={() => setRemoving(true)} disabled={busy}>
-                        <Trash2 className="size-4 shrink-0" />
-                    </Button>
-                ) : null}
             </div>
 
             <p className="text-muted-foreground mt-1 text-xs">
                 Signs in {serves}.
-                {fromPlatform && !linked ? " This deployment already provides one, so nothing here is needed." : ""}
+                {fromPlatform && accounts.length === 0
+                    ? " This deployment already provides one, so nothing here is needed."
+                    : ""}
             </p>
 
-            {linked ? null : (
+            {/* One line per account, in the order they are tried. Several is the
+                ordinary case rather than the exotic one - a personal
+                subscription and a work one - and it is the whole reason the
+                identity is read at the end of a login: two rows called "Claude
+                subscription token" are a list nobody can choose from. */}
+            {accounts.length > 0 ? (
+                <ul className="mt-2 flex flex-col gap-1">
+                    {accounts.map((account, index) => (
+                        <li
+                            key={account.id}
+                            className="flex flex-wrap items-center gap-2 rounded border border-border px-2 py-1.5"
+                        >
+                            <span className="text-muted-foreground w-4 shrink-0 text-center text-xs">
+                                {index + 1}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-xs">
+                                {identityOf(account) ?? account.name}
+                            </span>
+                            {identityOf(account) ? (
+                                <span className="text-muted-foreground shrink-0 text-xs">{account.name}</span>
+                            ) : null}
+                            <span className="text-muted-foreground shrink-0 text-xs">
+                                {account.lastUsedAt
+                                    ? `used ${new Date(account.lastUsedAt).toLocaleDateString()}`
+                                    : "never used"}
+                            </span>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setRemoving(account)}
+                                disabled={busy}
+                                aria-label={`Remove ${account.name}`}
+                            >
+                                <Trash2 className="size-4 shrink-0" />
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+
+            {/* Always offered, even once there is one: an account may hold a
+                personal subscription and a work one, and the field beside the
+                button is for somebody pasting a credential they already have. */}
+            {(
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                     {/* The assisted route first, and as the filled button, because
                         it is the one that works for somebody who has never opened
@@ -302,7 +358,7 @@ function SigninRow({
                     {assisted ? (
                         <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
                             <Wand2 className="size-4 shrink-0" />
-                            Sign in here
+                            {accounts.length > 0 ? "Add another" : "Sign in here"}
                         </Button>
                     ) : null}
                     <Input
@@ -341,18 +397,21 @@ function SigninRow({
                         // Stored through the same write as the field beside it, so
                         // a credential that arrived by either route is checked
                         // exactly as carefully.
-                        save: (value: string) =>
+                        save: (value: string, identity, chosen: string) =>
                             actions.add({
                                 provider: signin.slug,
-                                name: signin.env.toLowerCase().replace(/_/g, "-").slice(0, 20),
+                                name: chosen,
                                 secret: value,
+                                // Whose account it is, stored beside it. It is the
+                                // only thing that tells two subscriptions apart
+                                // once they are both in the list.
+                                identity,
                                 expiresAt: null
                             })
                     }}
                     onClose={() => setSigningIn(false)}
                     onDone={() => {
                         setSigningIn(false);
-                        setJustLinked(true);
                         router.refresh();
                     }}
                 />
@@ -363,12 +422,12 @@ function SigninRow({
                 The rule is the component's own - typing is for the things that
                 hold other work. */}
             <ConfirmDeleteDialog
-                open={removing}
-                onOpenChange={setRemoving}
-                name={signin.label}
+                open={removing !== null}
+                onOpenChange={(open) => !open && setRemoving(null)}
+                name={removing?.name ?? signin.label}
                 kind="sign-in"
                 requireTyping={false}
-                title={`Remove the ${signin.label}?`}
+                title={`Remove ${removing?.name ?? "this account"}?`}
                 // Says what removing does NOT do, which is the part that matters.
                 // A token minted by one of these lives a year at the vendor and
                 // Polaris cannot revoke it - forgetting a credential here and
@@ -380,4 +439,33 @@ function SigninRow({
             />
         </div>
     );
+}
+
+/** Whose account a row belongs to, or null where the login would not say. The
+ *  address, since that is what somebody holding two of these tells them apart
+ *  by; the organisation only when there is no address. */
+function identityOf(account: StoredSignin): string | null {
+    const email = account.config.email;
+    if (typeof email === "string" && email.trim()) return email.trim();
+    const organization = account.config.organization;
+    if (typeof organization === "string" && organization.trim()) return organization.trim();
+    return null;
+}
+
+/**
+ * A name no other row of this owner's is using.
+ *
+ * The store keeps names unique across a whole account, so a second credential
+ * pasted for the same thing collides with the first - and the failure is a
+ * dialog refusing to save with a message about a name the person never typed.
+ * Numbered from what is already there.
+ */
+function nextName(env: string, accounts: StoredSignin[]): string {
+    const base = env.toLowerCase().replace(/_/g, "-").slice(0, 16);
+    if (!accounts.some((account) => account.name === base)) return base;
+    for (let index = 2; index < 100; index += 1) {
+        const candidate = `${base}-${index}`;
+        if (!accounts.some((account) => account.name === candidate)) return candidate;
+    }
+    return `${base}-${Date.now() % 1000}`;
 }

@@ -28,7 +28,7 @@
 
 import { runAction } from "@/lib/run-action";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
-import type { SigninView } from "@/lib/agents/signin-runtime";
+import type { SigninIdentity, SigninView } from "@/lib/agents/signin-runtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CornerDownLeft, ExternalLink, Loader2, Terminal } from "lucide-react";
 import {
@@ -50,7 +50,10 @@ export interface SigninDialogActions {
     screen: (id: unknown) => Promise<{ view?: SigninView; error?: string }>;
     answer: (input: unknown) => Promise<{ error?: string }>;
     end: (id: unknown) => Promise<{ error?: string }>;
-    save: (secret: string) => Promise<{ error?: string }>;
+    /** Whose account it turned out to be, asked while the container is still
+     *  there. Empty for a tool that will not say. */
+    identity: (input: unknown) => Promise<SigninIdentity>;
+    save: (secret: string, identity: SigninIdentity, name: string) => Promise<{ error?: string }>;
 }
 
 export function SigninDialog({
@@ -70,6 +73,10 @@ export function SigninDialog({
     const [ready, setReady] = useState(false);
     const [line, setLine] = useState("");
     const [secret, setSecret] = useState("");
+    // What to call this one. Asked because an account may hold several - a
+    // personal subscription and a work one - and "Claude subscription token"
+    // twice is a list nobody can choose from.
+    const [name, setName] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const view = useRef<HTMLPreElement>(null);
@@ -139,7 +146,15 @@ export function SigninDialog({
 
     const save = () => {
         setBusy(true);
-        void runAction(() => actions.save(secret.trim()), setError).then((result) => {
+        // The identity is read before the container goes, because after that
+        // there is nothing left to ask. A tool that will not answer costs a
+        // label on a row, never the credential.
+        void (async () => {
+            const identity = id ? await actions.identity({ id, env: signin.env }).catch(() => ({})) : {};
+            const result = await runAction(
+                () => actions.save(secret.trim(), identity, name.trim() || defaultName(identity)),
+                setError
+            );
             setBusy(false);
             if (result?.error) {
                 setError(result.error);
@@ -147,7 +162,7 @@ export function SigninDialog({
             }
             if (id) void actions.end(id);
             onDone();
-        });
+        })();
     };
 
     return (
@@ -239,6 +254,18 @@ export function SigninDialog({
 
                     <label className="block space-y-1 border-t border-border pt-3">
                         <span className="text-xs text-muted-foreground">
+                            What to call this account here. Leave it empty and Polaris names it after whoever it
+                            turns out to belong to.
+                        </span>
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="Work subscription"
+                        />
+                    </label>
+
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">
                             When it prints the {signin.label.toLowerCase()}, copy it in here. Polaris does not read
                             it off the screen for you - storing the wrong line would not show up until a session
                             failed to sign in.
@@ -266,4 +293,20 @@ export function SigninDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/**
+ * What to call a row nobody named.
+ *
+ * The address it belongs to, since that is the thing somebody holding two of
+ * these is telling apart. Falls back to a word rather than to an empty string:
+ * the store requires a name, and a row called nothing is a row that cannot be
+ * pointed at in a sentence.
+ */
+function defaultName(identity: SigninIdentity): string {
+    const from = identity.email ?? identity.organization ?? "";
+    // The store's names are short and have no @ in them, so an address becomes
+    // the part people actually read.
+    const cleaned = from.split("@")[0]?.replace(/[^A-Za-z0-9_-]/g, "-") ?? "";
+    return cleaned.slice(0, 20) || "account";
 }

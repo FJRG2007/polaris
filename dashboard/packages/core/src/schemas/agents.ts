@@ -266,6 +266,24 @@ export const createModelKeySchema = z.object({
     name: modelKeyNameSchema,
     secret: modelKeySecretSchema,
     config: gatewayKeyConfigSchema.optional(),
+    /**
+     * Whose account a credential turned out to belong to.
+     *
+     * Kept apart from `config`, which is the gateway's own shape and is read
+     * through the gateway's own reader. This is a different fact about a
+     * different kind of row - an agent sign-in, where an account may hold two
+     * subscriptions and the address is the only thing telling them apart - and
+     * folding it into one field would mean one reader guessing which it had.
+     *
+     * Bounded and optional throughout: it comes from asking somebody else's
+     * program a question it was not obliged to answer.
+     */
+    identity: z
+        .object({
+            email: z.string().trim().email().max(320).optional(),
+            organization: z.string().trim().min(1).max(200).optional()
+        })
+        .optional(),
     expiresAt: modelKeyExpirySchema
 });
 

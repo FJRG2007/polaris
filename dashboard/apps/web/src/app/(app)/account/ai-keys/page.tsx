@@ -24,6 +24,7 @@ import {
 } from "@/lib/agents/model-keys";
 import {
     addModelKeyAction,
+    agentSigninIdentityAction,
     agentSigninScreenAction,
     answerAgentSigninAction,
     beginAgentSigninAction,
@@ -87,7 +88,13 @@ export default async function AiKeysPage() {
                     <>
                         <AgentSigninsCard
                             signins={agentSignins()}
-                            stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
+                            stored={signins.map((row) => ({
+                                id: row.id,
+                                provider: row.provider,
+                                name: row.name,
+                                config: row.config,
+                                lastUsedAt: row.lastUsedAt
+                            }))}
                             platform={[...fromPlatform]}
                             actions={{
                                 add: addModelKeyAction,
@@ -100,6 +107,7 @@ export default async function AiKeysPage() {
                                     begin: beginAgentSigninAction,
                                     screen: agentSigninScreenAction,
                                     answer: answerAgentSigninAction,
+                                    identity: agentSigninIdentityAction,
                                     end: endAgentSigninAction
                                 }
                             }}

@@ -69,10 +69,15 @@ function containerName(id: string): string {
  * exactly the screen that exists today - a credential Polaris cannot walk
  * somebody through is still a credential they can paste.
  */
-const LOGIN_COMMANDS: Readonly<Record<string, { install: string; command: string }>> = {
+const LOGIN_COMMANDS: Readonly<Record<string, { install: string; command: string; whoami?: string }>> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
         install: "npm install -g @anthropic-ai/claude-code",
-        command: "claude setup-token"
+        command: "claude setup-token",
+        // Asked once, after the login, in the same container. It is the only way
+        // a stored credential can say whose it is - and without that, an account
+        // holding two of them has two rows called the same thing and no way to
+        // tell which subscription is behind either.
+        whoami: "claude auth status --json"
     }
 };
 
@@ -259,4 +264,82 @@ export async function sweepExpired(): Promise<number> {
         await new HostdPorts().composeDown(containerName(attempt.id)).catch(() => undefined);
     }
     return stale.length;
+}
+
+// ---------------------------------------------------------------------------
+// Whose account it turned out to be
+// ---------------------------------------------------------------------------
+
+/**
+ * What a credential says about itself.
+ *
+ * Every field is optional and the whole thing is optional, because the answer
+ * comes from asking somebody else's program a question it was not obliged to
+ * answer. A credential with no identity is still a working credential; it is
+ * just one whose row has to be told apart by the name its owner gave it.
+ *
+ * Deliberately no spend or plan figure. Neither is in anything Polaris can ask
+ * for here, and a number invented for a screen is worse than an empty space -
+ * it reads as fact and nobody re-checks it. What the row can honestly show is
+ * when it was last used, which the store already records.
+ */
+export interface SigninIdentity {
+    readonly email?: string;
+    readonly organization?: string;
+}
+
+/**
+ * Read the identity out of what the tool's own status command printed.
+ *
+ * Pure, so the shapes can be asserted without a container. Vendors disagree
+ * about where they put an address even between their own versions, so several
+ * keys are tried and the first that holds a string wins - and nothing is
+ * inferred from anything that is not one of them.
+ */
+export function parseSigninIdentity(output: string): SigninIdentity {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(output.trim());
+    } catch {
+        // Not JSON, which is what a version without the flag prints. No identity
+        // is a fine answer; a guess pulled out of prose is not.
+        return {};
+    }
+    if (!parsed || typeof parsed !== "object") return {};
+    const record = parsed as Record<string, unknown>;
+    const account =
+        record.account && typeof record.account === "object" ? (record.account as Record<string, unknown>) : {};
+
+    const read = (...keys: string[]): string | undefined => {
+        for (const key of keys) {
+            const value = record[key] ?? account[key];
+            if (typeof value === "string" && value.trim()) return value.trim();
+        }
+        return undefined;
+    };
+
+    const identity: SigninIdentity = {};
+    const email = read("email", "emailAddress");
+    if (email) Object.assign(identity, { email });
+    const organization = read("organizationName", "organization");
+    if (organization) Object.assign(identity, { organization });
+    return identity;
+}
+
+/**
+ * Ask the container who just signed in.
+ *
+ * Best effort by design: it runs after the credential is already in somebody's
+ * hand, so a tool that will not answer costs a label on a row rather than the
+ * login. Returns an empty identity for every failure there is - no command for
+ * this credential, a container already gone, a version that prints prose.
+ */
+export async function identifySignin(userId: string, id: string, env: string): Promise<SigninIdentity> {
+    const command = LOGIN_COMMANDS[env]?.whoami;
+    if (!command) return {};
+    try {
+        return parseSigninIdentity(await runIn(userId, id, command));
+    } catch {
+        return {};
+    }
 }

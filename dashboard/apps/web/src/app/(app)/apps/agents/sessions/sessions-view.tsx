@@ -365,14 +365,17 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <div className="min-w-0">
                                 <p className="text-sm">Let it work without asking</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {place === "host"
+                                    {enigma
+                                        ? "Enigma is on, so this is one of the things it settles: your own policies decide what the agent may run without asking, and Polaris does not add anything on top."
+                                        : place === "host"
                                         ? "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it."
-                                        : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
+                                          : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
                                 </p>
                             </div>
                             <Switch
                                 checked={core.agentRunsUnattended(place, unattended)}
                                 onChange={setUnattended}
+                                disabled={enigma}
                             />
                         </div>
 

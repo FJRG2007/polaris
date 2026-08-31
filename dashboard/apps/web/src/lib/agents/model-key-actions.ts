@@ -96,7 +96,15 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
             // Through the same reader every gateway config goes through, so one
             // shape is stored whichever screen wrote it, then widened to the
             // plain object the store keeps.
-            config: parsed.data.config ? { ...readGatewayConfig(parsed.data.config) } : undefined,
+            // Through the gateway's own reader where there is one, and otherwise
+            // whatever the login said about whose account it is. Never both:
+            // they belong to different kinds of row and one reader would have to
+            // guess which it had.
+            config: parsed.data.config
+                ? { ...readGatewayConfig(parsed.data.config) }
+                : parsed.data.identity && Object.keys(parsed.data.identity).length > 0
+                  ? { ...parsed.data.identity }
+                  : undefined,
             expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null
         });
     } catch (caught) {

@@ -69,7 +69,13 @@ export default async function ModelProvidersPage() {
                         <AgentSigninsCard
                             tier="platform"
                             signins={agentSignins()}
-                            stored={signins.map((row) => ({ id: row.id, provider: row.provider }))}
+                            stored={signins.map((row) => ({
+                                id: row.id,
+                                provider: row.provider,
+                                name: row.name,
+                                config: row.config,
+                                lastUsedAt: row.lastUsedAt
+                            }))}
                             actions={{ add: addInstanceModelKeyAction, remove: deleteInstanceModelKeyAction }}
                         />
                         <SharingCard shared={shared} />

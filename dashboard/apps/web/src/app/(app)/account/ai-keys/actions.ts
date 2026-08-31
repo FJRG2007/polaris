@@ -15,7 +15,9 @@ import {
     answerSignin,
     beginSignin,
     endSignin,
+    identifySignin,
     signinScreen,
+    type SigninIdentity,
     type SigninView
 } from "@/lib/agents/signin-runtime";
 import { agentSigninAnswerSchema, agentSigninEnvSchema, agentSigninIdSchema } from "@polaris/core";
@@ -118,4 +120,22 @@ export async function endAgentSigninAction(id: unknown): Promise<{ error?: strin
     // closing a dialog either way.
     if (parsed.success) await endSignin(user.id, parsed.data);
     return {};
+}
+
+/**
+ * Who the open sign-in belongs to.
+ *
+ * Asked by the dialog once the credential is in hand, so the row it is about to
+ * write can carry an address rather than only a name somebody typed. Never
+ * fails: an identity nobody could read is an empty object, and a credential with
+ * no identity is still a working credential.
+ */
+export async function agentSigninIdentityAction(input: unknown): Promise<SigninIdentity> {
+    const user = await requireUser();
+    const parsed = agentSigninAnswerSchema
+        .pick({ id: true })
+        .extend({ env: agentSigninEnvSchema })
+        .safeParse(input);
+    if (!parsed.success) return {};
+    return identifySignin(user.id, parsed.data.id, parsed.data.env);
 }

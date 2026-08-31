@@ -690,3 +690,27 @@ export function parseAgentCliVersion(output: string): string | null {
 export function agentRunsUnattended(place: "local" | "host", chosen: boolean | null): boolean {
     return chosen ?? place === "local";
 }
+
+/**
+ * Whether POLARIS is the one to append those flags, or whether something else
+ * has already settled it.
+ *
+ * Enigma is that something else. Installing it into a session is installing the
+ * policies, conventions and guardrails an account keeps for its agents, and
+ * deciding what the agent may run without asking is one of the things those
+ * settle - so a session with Enigma in it has already been configured by the
+ * time the agent starts, and Polaris adding a flag on top would be Polaris
+ * overruling the settings somebody keeps precisely so they do not have to say
+ * this twice.
+ *
+ * The two answers are not the same and the difference matters: "the agent runs
+ * unattended" stays true either way, and what changes is who wrote it down.
+ * Polaris only writes it where nobody else did.
+ */
+export function polarisAppliesAutonomy(
+    place: "local" | "host",
+    chosen: boolean | null,
+    enigmaActive: boolean
+): boolean {
+    return !enigmaActive && agentRunsUnattended(place, chosen);
+}

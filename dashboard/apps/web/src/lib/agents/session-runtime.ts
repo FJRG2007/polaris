@@ -89,7 +89,10 @@ interface Bootstrap {
  * agent the way a person would, so the flags are the agent's business and stay
  * out of a list here that would rot in a month.
  */
-function agentCommandFor(session: SessionView): {
+function agentCommandFor(
+    session: SessionView,
+    enigmaActive: boolean
+): {
     cli: core.AgentCli;
     binary: string;
     command: string;
@@ -113,8 +116,13 @@ function agentCommandFor(session: SessionView): {
     // Polaris made is a sandbox; somebody's own server is their machine, beside
     // their keys and their Docker socket. `agentRunsUnattended` is that rule, and
     // on a server it says no unless somebody said otherwise on purpose.
-    const unattended = core.agentRunsUnattended(session.place, session.unattended);
-    const args = unattended ? cli.autonomyArgs : [];
+    // Not when Enigma is in the session: installing it installs the policies an
+    // account keeps for its agents, and what the agent may run without asking is
+    // one of the things those settle. Adding a flag on top would be Polaris
+    // overruling settings somebody keeps so they do not have to say it twice.
+    const args = core.polarisAppliesAutonomy(session.place, session.unattended, enigmaActive)
+        ? cli.autonomyArgs
+        : [];
     return { cli, binary, command: [binary, ...args].join(" "), install: cli.install ?? "" };
 }
 
@@ -131,7 +139,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
     const mcp = `${base}/api/mcp`;
     const enigma = await resolveSessionEnigma(session.id);
-    const agent = agentCommandFor(session);
+    const agent = agentCommandFor(session, enigma.enabled);
 
     // Null is the store failing to answer, and it is not the same as an account
     // holding nothing. A session started on a blank environment because the
@@ -167,7 +175,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         credentials: credentialsForAgent(agent.cli, available),
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
-        autonomyEnv: core.agentRunsUnattended(session.place, session.unattended)
+        autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
             ? { ...agent.cli.autonomyEnv }
             : {}
     };
