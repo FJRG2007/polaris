@@ -6,8 +6,8 @@
  * project.
  */
 
-import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
+import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 
 export interface EnvVarView {
@@ -35,6 +35,17 @@ async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string
         select: { id: true }
     });
     if (!app) throw new Error("Application not found");
+}
+
+/**
+ * Which scope one variable belongs to, so a caller holding only its id can
+ * resolve who is allowed to touch it before it does. Null when the row is gone
+ * or names a scope this module does not own.
+ */
+export async function envVarScope(id: string): Promise<{ scope: EnvScope; scopeId: string } | null> {
+    const row = await prisma.envVar.findUnique({ where: { id }, select: { scopeId: true, scopeType: true } });
+    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
+    return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }
 
 /** List a scope's variables (secret values masked). Application scope is a service;

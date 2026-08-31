@@ -14,6 +14,7 @@ import { TerminalPanel } from "./terminal-panel";
 import { LogViewer } from "@/components/log-viewer";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { useProjectCan } from "./access-context";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
@@ -259,6 +260,7 @@ function AppCard({
     onChanged: () => void;
     onOpen?: () => void;
 }) {
+    const can = useProjectCan();
     const [busy, startTransition] = useTransition();
     const [showTerminal, setShowTerminal] = useState(false);
     const [showFiles, setShowFiles] = useState(false);
@@ -268,6 +270,11 @@ function AppCard({
     const [error, setError] = useState<string | null>(null);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
     const primary = primaryDomain(app.domains);
+    // The footer is the card's whole set of verbs. With none of them held it is a
+    // rule above nothing, so the row goes rather than sitting there empty.
+    const actions = (["deploy.run", "service.configure", "files.read", "console.use", "domains.manage"] as const).filter(
+        can
+    );
 
     function onDeploy() {
         setError(null);
@@ -339,25 +346,57 @@ function AppCard({
 
             {error && <p className="text-xs text-danger">{error}</p>}
 
-            {canManage && (
+            {canManage && actions.length > 0 && (
                 <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
-                        {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
-                    </Button>
-                    {isGit && (
-                        <Button variant="ghost" size="icon" onClick={() => setShowAutoDeploy(true)} title="Auto-deploy">
+                    {can("deploy.run") && (
+                        <Button size="sm" variant="secondary" onClick={onDeploy} disabled={busy} className="mr-auto">
+                            {busy ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />} Deploy
+                        </Button>
+                    )}
+                    {isGit && can("service.configure") && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowAutoDeploy(true)}
+                            title="Auto-deploy"
+                            aria-label="Auto-deploy"
+                        >
                             <GitBranch className="size-4" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" onClick={() => setShowFiles(true)} title="Files">
-                        <FolderOpen className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowTerminal(true)} title="Terminal">
-                        <TerminalSquare className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowDomain(true)} title="Domains">
-                        <Globe className="size-4" />
-                    </Button>
+                    {can("files.read") && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowFiles(true)}
+                            title="Files"
+                            aria-label="Files"
+                        >
+                            <FolderOpen className="size-4" />
+                        </Button>
+                    )}
+                    {can("console.use") && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowTerminal(true)}
+                            title="Terminal"
+                            aria-label="Terminal"
+                        >
+                            <TerminalSquare className="size-4" />
+                        </Button>
+                    )}
+                    {can("domains.manage") && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowDomain(true)}
+                            title="Domains"
+                            aria-label="Domains"
+                        >
+                            <Globe className="size-4" />
+                        </Button>
+                    )}
                 </div>
             )}
 
@@ -368,7 +407,7 @@ function AppCard({
                     </DialogHeader>
                     {showTerminal && (
                         <TerminalPanel
-                            target={{ kind: "container", targetId: app.targetId, containerRef: app.containerRef }}
+                            target={{ kind: "container", applicationId: app.id }}
                             label={app.containerRef}
                         />
                     )}
@@ -413,6 +452,7 @@ function DatabaseCard({
     staged: boolean;
     onChanged: () => void;
 }) {
+    const can = useProjectCan();
     const [pending, startTransition] = useTransition();
     const [confirming, setConfirming] = useState(false);
     const [connecting, setConnecting] = useState(false);
@@ -462,7 +502,7 @@ function DatabaseCard({
 
             {error && <p className="text-xs text-danger">{error}</p>}
 
-            {canManage && (
+            {canManage && can("databases.manage") && (
                 <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
                     <Button
                         size="sm"
@@ -747,9 +787,13 @@ export function NewServiceButton({ environmentId, onChanged }: { environmentId: 
 }
 
 function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list">) => void }) {
+    const can = useProjectCan();
+    // Starting a database is its own grant, so it is offered only to whoever
+    // holds it - the form behind it would refuse anyway.
+    const types = SERVICE_TYPES.filter((type) => type.id !== "database" || can("databases.manage"));
     return (
         <div className="flex flex-col gap-1">
-            {SERVICE_TYPES.map((type) => (
+            {types.map((type) => (
                 <button
                     key={type.id}
                     type="button"
@@ -775,17 +819,24 @@ interface ServerOption {
  * with the first one selected by default - so a single-server setup needs no
  * choice and multi-server setups get an explicit picker.
  */
-function useDeployServers(): { servers: ServerOption[]; serverId: string; setServerId: (id: string) => void } {
+function useDeployServers(environmentId: string): {
+    servers: ServerOption[];
+    serverId: string;
+    setServerId: (id: string) => void;
+} {
     const [servers, setServers] = useState<ServerOption[]>([]);
     const [serverId, setServerId] = useState("local");
     useEffect(() => {
-        void deployActions.listDeployServersAction()
+        // Scoped to the environment being deployed into, so the list is the
+        // project owner's machines rather than the machines of whoever happens to
+        // be filling the form in.
+        void deployActions.listDeployServersAction(environmentId)
             .then((list) => {
                 setServers(list);
                 if (list[0]) setServerId(list[0].id);
             })
             .catch(() => undefined);
-    }, []);
+    }, [environmentId]);
     return { servers, serverId, setServerId };
 }
 
@@ -807,7 +858,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
     const [name, setName] = useState("");
     const [image, setImage] = useState("");
     const [port, setPort] = useState("");
-    const { servers, serverId, setServerId } = useDeployServers();
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -900,7 +951,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [rootDirectory, setRootDirectory] = useState("");
     const [framework, setFramework] = useState<string | null>(null);
     const [inspecting, setInspecting] = useState(false);
-    const { servers, serverId, setServerId } = useDeployServers();
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -1096,7 +1147,7 @@ const PRIVILEGE_OPTIONS: SelectOption[] = [
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<DbEngine>("postgres");
-    const { servers, serverId, setServerId } = useDeployServers();
+    const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 

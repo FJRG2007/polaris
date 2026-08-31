@@ -7,6 +7,7 @@ import { currentReleaseRef } from "@/lib/deploy/releases";
 import { refreshCapabilities } from "@polaris/hostd-client";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { projectAccess } from "@/lib/deploy-project-access";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
 import { getApplicationDeployStatuses, getProjectFull, hostPortForApp } from "@/lib/deploy-service";
 
@@ -59,6 +60,17 @@ export default async function DeployProjectPage({
 
     const project = await getProjectFull(projectId, user.id);
     if (!project) notFound();
+
+    // An entry may be written for some of the project's environments only, which
+    // is how somebody works in development and not in production. Filtered here
+    // rather than in the view: what is not theirs to reach should never have been
+    // sent to their browser in the first place.
+    const access = await projectAccess(projectId, user.id);
+    if (!access) notFound();
+    if (access.environmentIds !== null) {
+        const reachable = new Set(access.environmentIds);
+        project.environments = project.environments.filter((environment) => reachable.has(environment.id));
+    }
 
     const caps = canManage ? await refreshCapabilities() : null;
     const localReady = Boolean(caps?.deploy);
@@ -162,6 +174,7 @@ export default async function DeployProjectPage({
         <ProjectDetail
             project={summary}
             canManage={canManage}
+            capabilities={access.capabilities}
             localReady={localReady}
             activeEnvironmentId={pick(query.env)}
             openService={pick(query.service)}

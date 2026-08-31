@@ -22,9 +22,10 @@ import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
+import { useProjectCan } from "./access-context";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { isTunnelHostname, type DisplayFormat } from "@polaris/core";
+import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
@@ -93,6 +94,26 @@ import {
 const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Notes", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
+/**
+ * What each tab takes to open. A tab the reader cannot use is not drawn: the
+ * variables tab in particular has to be absent rather than empty, since the whole
+ * point of withholding it is that the names of the variables are not shown
+ * either.
+ */
+const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
+    Deployments: ["project.read"],
+    Variables: ["variables.read"],
+    Metrics: ["project.read"],
+    Console: ["console.use"],
+    Files: ["files.read"],
+    Volumes: ["project.read"],
+    Notes: ["project.read"],
+    // Settings holds three separate jobs - how the service is built, where it
+    // answers, and removing it - so any one of them is enough to open it, and the
+    // sections inside are gated one by one.
+    Settings: ["service.configure", "domains.manage", "service.delete"]
+};
+
 const LINKED_TABS = [
     { label: "Security", icon: ShieldCheck, href: (id: string) => `/apps/firewall?scope=application&id=${id}` },
     { label: "Analytics", icon: ChartColumn, href: (id: string) => `/apps/analytics?scope=application&id=${id}` }
@@ -114,6 +135,8 @@ export function ServiceDetail({
     const [tab, setTab] = useState<Tab>("Deployments");
     const [full, setFull] = useState(false);
     const isGit = app.sourceType === "dockerfile" || app.sourceType === "nixpacks";
+    const can = useProjectCan();
+    const tabs = TABS.filter((name) => TAB_CAPABILITY[name].some(can));
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -146,7 +169,7 @@ export function ServiceDetail({
                 </div>
 
                 <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
-                    {TABS.map((name) => (
+                    {tabs.map((name) => (
                         <button
                             key={name}
                             type="button"
@@ -187,7 +210,7 @@ export function ServiceDetail({
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
                     {tab === "Console" && (
                         <TerminalPanel
-                            target={{ kind: "container", targetId: app.targetId, containerRef: app.containerRef }}
+                            target={{ kind: "container", applicationId: app.id }}
                             label={app.containerRef}
                         />
                     )}
@@ -315,6 +338,7 @@ function DeploymentMenu({
     /** A redeploy from here starts a NEW deployment; the caller follows it. */
     onDeployStarted: (deploymentId: string) => void;
 }) {
+    const can = useProjectCan();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const isActive = deployment.isCurrent;
@@ -347,6 +371,10 @@ function DeploymentMenu({
             if (result.deploymentId) onDeployStarted(result.deploymentId);
         });
     }
+
+    // Every item in this menu ships or tears down a release, so with no standing
+    // to do that there is no menu - not one that opens onto nothing.
+    if (!can("deploy.run")) return null;
 
     return (
         <DropdownMenu>
@@ -393,6 +421,7 @@ function DeploymentMenu({
 }
 
 function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
+    const can = useProjectCan();
     const format = useDisplayFormat();
     const [items, setItems] = useState<DepSummary[] | null>(null);
     const [logsFor, setLogsFor] = useState<string | null>(null);
@@ -492,9 +521,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     </span>
                     <span>1 Replica</span>
                 </div>
-                <Button size="sm" disabled={busy} onClick={deploy}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
-                </Button>
+                {can("deploy.run") && (
+                    <Button size="sm" disabled={busy} onClick={deploy}>
+                        {busy ? <Loader2 className="size-4 animate-spin" /> : "Deploy"}
+                    </Button>
+                )}
             </div>
 
             {items === null ? (
@@ -1371,6 +1402,7 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
 }
 
 function VariablesTab({ app }: { app: ProjectApp }) {
+    const can = useProjectCan();
     const [scope, setScope] = useState<"application" | "environment">("application");
     const scopeId = scope === "application" ? app.id : app.environmentId;
     const [items, setItems] = useState<Awaited<ReturnType<typeof deployActions.listEnvVarsAction>> | null>(null);
@@ -1458,14 +1490,16 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
                     {items && items.length === 1 ? "" : "s"}
                 </span>
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
-                        {"{ } Raw Editor"}
-                    </Button>
-                    <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
-                        <Plus className="size-4" /> New Variable
-                    </Button>
-                </div>
+                {can("variables.write") && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
+                            {"{ } Raw Editor"}
+                        </Button>
+                        <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
+                            <Plus className="size-4" /> New Variable
+                        </Button>
+                    </div>
+                )}
             </div>
             {note && <p className="text-xs text-success">{note}</p>}
             {rawOpen && (
@@ -1538,14 +1572,17 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                 >
                                     {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                                 </button>
-                                <button
-                                    type="button"
-                                    title="Remove"
-                                    onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
-                                    className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                >
-                                    <Trash2 className="size-4" />
-                                </button>
+                                {can("variables.write") && (
+                                    <button
+                                        type="button"
+                                        title="Remove"
+                                        aria-label={`Remove ${item.key}`}
+                                        onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
+                                        className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </button>
+                                )}
                             </li>
                         );
                     })}
@@ -1880,6 +1917,19 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
  *  empty select value, and "@" is how a DNS zone's own record is written anyway. */
 const ZONE_ROOT = "@";
 
+/** One entry in the zone picker, as the server describes it. */
+type DeployZone = Awaited<ReturnType<typeof deployActions.deployZonesAction>>["zones"][number];
+
+/** How a zone reads in the picker. The base domain is called out because it is the
+ *  one entry that needs a DNS record per name rather than riding a wildcard, and a
+ *  domain somebody brought is called out because it and one of this Polaris's own
+ *  look identical otherwise - which of the two a service answers on is the whole
+ *  decision being made here. */
+function zoneOptionLabel(zone: DeployZone): string {
+    if (zone.kind === "base") return `${zone.host} (your domain)`;
+    return zone.kind === "owned" ? `*.${zone.host} (your own)` : `*.${zone.host}`;
+}
+
 /** What the server says about the subdomain in the field: the name, the hostname it
  *  makes, and whether anything already answers on it. */
 type ZoneSubdomainCheck = Awaited<ReturnType<typeof deployActions.zoneSubdomainAction>>;
@@ -2060,6 +2110,7 @@ function SettingsTab({
     staged: boolean;
     onChanged: () => void;
 }) {
+    const can = useProjectCan();
     const [autoDeploy, setAutoDeploy] = useState(app.autoDeploy);
     const [branch, setBranch] = useState(app.deployBranch ?? "");
     const [filter, setFilter] = useState(app.commitFilter ?? "");
@@ -2084,7 +2135,10 @@ function SettingsTab({
     const exposureTouched = useRef(false);
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
-    const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean; owned: boolean }>>([]);
+    const [zones, setZones] = useState<DeployZone[]>([]);
+    // Where "Add a domain" goes: the account's own domains, or the organization's
+    // when that is the shelf this project is on.
+    const [domainsHref, setDomainsHref] = useState("/account/domains");
     // The operator's own domain, offered as the suggested custom hostname so a name
     // straight on it (app.example.com) is as obvious a choice as one in a zone.
     const [baseDomain, setBaseDomain] = useState("");
@@ -2116,18 +2170,25 @@ function SettingsTab({
         // server's domain instead.
         if (app.serverId !== "local") return;
         void deployActions.deployZonesAction()
-            .then(({ baseDomain: base, zones: result }) => {
+            .then(({ baseDomain: base, zones: result, manageHref }) => {
                 setZones(result);
                 setBaseDomain(base);
+                setDomainsHref(manageHref);
                 // A configured domain is the best default: it is the only option that
                 // yields a stable, public hostname without a third party in the path.
                 // The layout's own default zone wins, not merely the first stored one.
                 // Only while the operator has not chosen yet, though - this resolves
                 // after a round trip, and replacing a choice made in the meantime would
                 // add a different kind of domain than the one they pressed for.
-                if (result.length > 0 && !exposureTouched.current) {
+                // The base domain is offered but never the default: it is the one
+                // entry with no wildcard behind it, so a name taken there resolves
+                // nowhere until a record for it exists. Defaulting to a name that
+                // may not work is worse than defaulting to the free subdomain,
+                // which always does.
+                const wildcards = result.filter((zone) => zone.kind !== "base");
+                if (wildcards.length > 0 && !exposureTouched.current) {
                     setExposure("zone");
-                    setZoneLabel((result.find((zone) => zone.primary) ?? result[0])?.label ?? "");
+                    setZoneLabel((wildcards.find((zone) => zone.primary) ?? wildcards[0])?.label ?? "");
                 }
             })
             .catch(() => undefined);
@@ -2303,7 +2364,8 @@ function SettingsTab({
                   : "Connect"
               : "Add domain";
     // The zone the name goes in, for the suffix beside the field.
-    const zoneHost = zones.find((zone) => zone.label === zoneKey)?.host ?? zones[0]?.host ?? "";
+    const zone = zones.find((entry) => entry.label === zoneKey) ?? zones[0];
+    const zoneHost = zone?.host ?? "";
     // Only a checked answer about the name itself blocks the add: while a check is in
     // flight the operator is still typing, and a zone that cannot mint at all is the
     // add's error to report, not something to blame the typed name for.
@@ -2323,8 +2385,9 @@ function SettingsTab({
 
     return (
         <div className="flex flex-col gap-5 py-2">
-            <ServerSection app={app} onChanged={onChanged} />
+            {can("service.configure") && <ServerSection app={app} onChanged={onChanged} />}
 
+            {can("service.configure") && (
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Networking</h3>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -2353,7 +2416,9 @@ function SettingsTab({
                     </a>
                 )}
             </section>
+            )}
 
+            {can("domains.manage") && (
             <section className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                     <h3 className="text-sm font-medium">Public access</h3>
@@ -2461,16 +2526,19 @@ function SettingsTab({
                                         setZoneLabel(value === ZONE_ROOT ? "" : value);
                                         setSubdomainCheck(null);
                                     }}
-                                    // A domain brought by whoever owns this shelf is
-                                    // marked: it and one of this Polaris's own zones
-                                    // look identical otherwise, and which of the two a
-                                    // service answers on is the whole decision here.
                                     options={zones.map((zone) => ({
                                         value: zone.label || ZONE_ROOT,
-                                        label: zone.owned ? `*.${zone.host} (your own)` : `*.${zone.host}`
+                                        label: zoneOptionLabel(zone)
                                     }))}
                                     aria-label="Zone"
                                 />
+                                <Link
+                                    href={domainsHref}
+                                    className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                    <Plus className="size-3.5" />
+                                    Add a domain
+                                </Link>
                                 {!randomName && (
                                     <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
@@ -2537,7 +2605,9 @@ function SettingsTab({
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "zone"
-                                ? `A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name outside these zones${baseDomain ? `, like ${hostnameHint}` : ""}, or one on another domain, pick Custom domain.`
+                                ? zone?.kind === "base"
+                                    ? `A hostname straight on ${zoneHost}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.`
+                                    : "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name on a domain that is not listed, pick Custom domain."
                                 : exposure === "subdomain"
                                 ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "local"
@@ -2599,8 +2669,9 @@ function SettingsTab({
                     </div>
                 </MethodBlock>
             </section>
+            )}
 
-            {isGit && (
+            {isGit && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Source</h3>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2639,7 +2710,7 @@ function SettingsTab({
                 </section>
             )}
 
-            {app.sourceType === "nixpacks" && (
+            {app.sourceType === "nixpacks" && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Build</h3>
                     <p className="text-xs text-muted-foreground">
@@ -2685,7 +2756,7 @@ function SettingsTab({
                 </section>
             )}
 
-            {isGit && (
+            {isGit && can("service.configure") && (
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Auto-deploy</h3>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
@@ -2722,6 +2793,7 @@ function SettingsTab({
                 </section>
             )}
 
+            {can("service.configure") && (
             <section className="flex flex-col gap-2">
                 <h3 className="text-sm font-medium">Releases</h3>
                 <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
@@ -2736,15 +2808,18 @@ function SettingsTab({
                     <Switch checked={keepReleases} onChange={setKeepReleases} aria-label="Keep previous deployments" />
                 </div>
             </section>
+            )}
 
             {error && <p className="text-sm text-danger">{error}</p>}
+            {can("service.configure") && (
             <div className="flex justify-end">
                 <Button onClick={saveSettings} disabled={pending}>
                     {pending && <Loader2 className="size-4 animate-spin" />} Save settings
                 </Button>
             </div>
+            )}
 
-            <DangerSection app={app} staged={staged} onChanged={onChanged} />
+            {can("service.delete") && <DangerSection app={app} staged={staged} onChanged={onChanged} />}
         </div>
     );
 }
@@ -2814,10 +2889,10 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void deployActions.listDeployServersAction()
+        void deployActions.listDeployServersAction(app.environmentId)
             .then((list) => setServers(list))
             .catch(() => undefined);
-    }, []);
+    }, [app.environmentId]);
 
     const changed = serverId !== app.serverId;
 

@@ -16,6 +16,7 @@
 
 import { notify } from "./dispatch";
 import { prisma } from "@polaris/db";
+import { parseProjectCapabilities } from "@polaris/core";
 import { dispatchProjectWebhooks } from "../deploy-project-service";
 
 /** Where a domain sits, in words, plus who is answerable for it. */
@@ -26,14 +27,39 @@ interface DomainContext {
     recipients: string[];
 }
 
-/** The project owner and its admins, deduped. Viewers and developers are left out:
- *  this is an alert about something being broken, addressed to whoever can undo it. */
+/**
+ * The project owner and everybody its access entries let point a hostname
+ * somewhere, deduped. Whoever can only read is left out: this is an alert about
+ * something being broken, addressed to whoever can undo it, and paging people
+ * who cannot teaches everyone to ignore it.
+ *
+ * A team or an organization holding the capability is expanded to its people -
+ * an alert nobody is named on is an alert nobody reads.
+ */
 async function answerableFor(projectId: string, ownerId: string): Promise<string[]> {
-    const admins = await prisma.projectMember.findMany({
-        where: { projectId, role: "admin" },
-        select: { userId: true }
+    const entries = await prisma.projectMember.findMany({
+        where: {
+            projectId,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+        },
+        select: {
+            capabilities: true,
+            userId: true,
+            team: { select: { members: { select: { userId: true } } } },
+            org: { select: { ownerId: true, members: { select: { userId: true } } } }
+        }
     });
-    return [...new Set([ownerId, ...admins.map((member) => member.userId)])];
+    const recipients = new Set<string>([ownerId]);
+    for (const entry of entries) {
+        if (!parseProjectCapabilities(entry.capabilities).includes("domains.manage")) continue;
+        if (entry.userId) recipients.add(entry.userId);
+        for (const member of entry.team?.members ?? []) recipients.add(member.userId);
+        if (entry.org) {
+            recipients.add(entry.org.ownerId);
+            for (const member of entry.org.members) recipients.add(member.userId);
+        }
+    }
+    return [...recipients];
 }
 
 async function describeDomain(domainId: string): Promise<DomainContext | null> {

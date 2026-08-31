@@ -205,13 +205,6 @@ export const environmentNameSchema = z.object({
     name: projectName
 });
 
-export const projectMemberSchema = z.object({
-    projectId: z.string().uuid(),
-    // Accepts either, because that is what the operator has in front of them.
-    identifier: z.string().trim().min(1, "An email or username is required").max(320),
-    role: z.enum(PROJECT_ROLES)
-});
-
 /** The deploy events an endpoint can subscribe to. An empty selection means all
  *  of them, so a webhook added without a choice still reports something. */
 export const PROJECT_WEBHOOK_EVENTS = [

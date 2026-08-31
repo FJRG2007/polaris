@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { DeployCanvas } from "./deploy-canvas";
 import { ServiceDetail } from "./service-detail";
 import { useStagedChanges } from "./staged-changes";
+import { ProjectAccessProvider } from "./access-context";
+import type { ProjectCapability } from "@polaris/core";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
@@ -19,12 +21,15 @@ import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSum
 export function ProjectDetail({
     project,
     canManage,
+    capabilities,
     localReady,
     activeEnvironmentId,
     openService
 }: {
     project: ProjectSummary;
     canManage: boolean;
+    /** What this reader may do in this project, resolved on the server. */
+    capabilities: readonly ProjectCapability[];
     localReady: boolean;
     /** Which environment the shell has selected, resolved from the URL. */
     activeEnvironmentId: string | null;
@@ -85,7 +90,10 @@ export function ProjectDetail({
         window.history.replaceState(null, "", url);
     }
 
+    const can = (capability: ProjectCapability): boolean => capabilities.includes(capability);
+
     return (
+        <ProjectAccessProvider capabilities={capabilities}>
         <div className="flex w-full flex-col gap-4">
             {!localReady && canManage && (
                 <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
@@ -97,7 +105,9 @@ export function ProjectDetail({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">{active && <EnvSummary environment={active} />}</div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {canManage && active && <NewServiceButton environmentId={active.id} onChanged={refresh} />}
+                    {canManage && can("service.create") && active && (
+                        <NewServiceButton environmentId={active.id} onChanged={refresh} />
+                    )}
                     {canManage && (
                         <Link
                             href={`/apps/firewall?scope=project&id=${project.id}`}
@@ -155,6 +165,7 @@ export function ProjectDetail({
                 />
             )}
         </div>
+        </ProjectAccessProvider>
     );
 }
 

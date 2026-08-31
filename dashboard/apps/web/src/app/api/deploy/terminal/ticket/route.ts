@@ -1,6 +1,9 @@
+import { prisma } from "@polaris/db";
 import { NextResponse } from "next/server";
 import { accessFor } from "@/lib/container-service";
+import { currentReleaseRef } from "@/lib/deploy/releases";
 import { resolveDockerTransport } from "@/lib/docker-service";
+import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { requireUser, requirePermission, userHasManage } from "@/lib/session";
 import { canOpenHostShell, mintTerminalTicket } from "@/lib/terminal-service";
 
@@ -20,16 +23,20 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => null)) as {
-        targetId?: string;
-        containerRef?: string;
+        applicationId?: string;
         hostId?: string;
         connectionId?: string;
+        containerRef?: string;
         mode?: string;
     } | null;
 
     if (body?.connectionId) return mintContainersTicket(body.connectionId, body.containerRef ?? "");
 
     const user = await requirePermission("deploy.manage");
+
+    if (body?.applicationId) {
+        return mintServiceTicket(user.id, body.applicationId, body.mode === "logs" ? "logs" : "terminal");
+    }
 
     if (body?.hostId) {
         const asRoot = body.mode === "ssh-root";
@@ -46,13 +53,47 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ token });
     }
 
-    if (!body?.targetId || !body.containerRef) {
-        return NextResponse.json({ error: "targetId and containerRef are required" }, { status: 400 });
+    return NextResponse.json({ error: "applicationId, hostId or connectionId is required" }, { status: 400 });
+}
+
+/**
+ * A console on one deployed service.
+ *
+ * The caller names the service and nothing else. Which container that is - a
+ * service keeping its releases side by side runs each under its own name - is
+ * resolved here from the service's current release, so a ticket can never be
+ * asked for a container the caller has no standing on: the target and the
+ * container both come from the row the access check just passed.
+ *
+ * `console.use` rather than the ability to deploy, because a shell inside the
+ * container reaches whatever the container can, its variables included - which
+ * is a decision worth making on its own.
+ */
+async function mintServiceTicket(
+    userId: string,
+    applicationId: string,
+    mode: "terminal" | "logs"
+): Promise<Response> {
+    try {
+        await requireApplicationAccess(applicationId, userId, mode === "logs" ? "logs.read" : "console.use");
+    } catch {
+        return NextResponse.json({ error: "service not found" }, { status: 404 });
     }
-    const mode = body.mode === "logs" ? "logs" : "terminal";
-    const token = await mintTerminalTicket(user.id, {
-        targetId: body.targetId,
-        containerRef: body.containerRef,
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: {
+            id: true,
+            slug: true,
+            targetId: true,
+            currentDeploymentId: true,
+            environment: { select: { project: { select: { slug: true } } } }
+        }
+    });
+    if (!app) return NextResponse.json({ error: "service not found" }, { status: 404 });
+    const serving = await currentReleaseRef(app);
+    const token = await mintTerminalTicket(userId, {
+        targetId: app.targetId,
+        containerRef: serving.name,
         mode
     });
     return NextResponse.json({ token });

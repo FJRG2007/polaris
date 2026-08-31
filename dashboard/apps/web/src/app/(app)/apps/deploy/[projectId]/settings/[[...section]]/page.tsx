@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/session";
 import { ProjectSettings } from "../../../project-settings";
 import { SETTINGS_SECTIONS } from "../../../settings/sections";
 import { getProjectSettings } from "@/lib/deploy-project-service";
-import { accessAtLeast, requireProjectAccess } from "@/lib/deploy-project-access";
+import { accessCan, requireProjectAccess } from "@/lib/deploy-project-access";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function ProjectSettingsPage({
 
     let access;
     try {
-        access = await requireProjectAccess(projectId, user.id, "viewer");
+        access = await requireProjectAccess(projectId, user.id, "project.read");
     } catch {
         notFound();
     }
@@ -37,7 +37,7 @@ export default async function ProjectSettingsPage({
         <ProjectSettings
             settings={settings}
             section={slug}
-            canManage={accessAtLeast(access, "admin")}
+            canManage={accessCan(access, "project.settings")}
             isOwner={access.isOwner}
         />
     );
