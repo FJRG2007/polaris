@@ -141,13 +141,47 @@ export class SshPorts implements RuntimePorts {
      * this is already the recovery path, and a machine that cannot prune is a
      * machine the caller should hear "nothing freed" about, not an exception.
      */
+    /**
+     * How full the machine is, for the caller deciding whether to make room
+     * before asking it for several gigabytes.
+     *
+     * At the filesystem root rather than at the container store's own path: which
+     * path that is depends on the engine, and on almost every machine they are
+     * the same filesystem anyway. `-P` for the POSIX format, without which a long
+     * device name wraps onto its own line and the columns move.
+     */
+    public async diskFullness(): Promise<number | null> {
+        let said = "";
+        await this.run("df -P /", (chunk) => {
+            said += chunk.toString("utf8");
+        }).catch(() => undefined);
+        const line = said
+            .split("\n")
+            .map((row) => row.trim())
+            .filter((row) => row !== "")
+            .at(-1);
+        if (!line) return null;
+        // device, 1024-blocks, used, available, capacity%, mount
+        const columns = line.split(/\s+/);
+        const used = Number(columns[2]);
+        const available = Number(columns[3]);
+        if (!Number.isFinite(used) || !Number.isFinite(available)) return null;
+        const total = used + available;
+        return total > 0 ? used / total : null;
+    }
+
     public async reclaimSpace(): Promise<number> {
         let said = "";
         const keep = (chunk: Buffer): void => {
             said += chunk.toString("utf8");
         };
-        await this.run("docker builder prune -f", keep).catch(() => undefined);
-        await this.run("docker image prune -af", keep).catch(() => undefined);
+        // `system prune` rather than the build cache and the images separately:
+        // it takes those and the stopped containers and the unused networks with
+        // them, which on a machine that has been deploying for months is more
+        // than either alone. Never `--volumes` - they are usually the largest
+        // thing on the disk and every byte is somebody's database or save file.
+        await this.run("docker system prune -af", keep).catch(() => undefined);
+        await this.run("docker builder prune -af", keep).catch(() => undefined);
         return parseReclaimedBytes(said);
     }
 

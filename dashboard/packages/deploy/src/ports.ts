@@ -85,6 +85,17 @@ export interface RuntimePorts {
      * failure exactly as it did before.
      */
     reclaimSpace?(): Promise<number>;
+    /**
+     * How full the machine's disk is, 0 to 1, or null where it cannot be asked.
+     *
+     * Asked BEFORE a pull rather than only after one fails, and that ordering is
+     * the whole point. A pull that runs out of room part-way leaves the layers it
+     * had already written behind - containerd keeps them in its ingest directory
+     * and nothing in a prune removes them - so every failed attempt makes the
+     * next one likelier to fail. Freeing first is what stops a machine walking
+     * itself into a corner it cannot be pulled out of.
+     */
+    diskFullness?(): Promise<number | null>;
     /** A locally present image's declared exposed TCP ports (ascending), so a deploy
      *  can default the container port to what the image actually listens on. Empty
      *  when the image declares none or inspection is unavailable. */

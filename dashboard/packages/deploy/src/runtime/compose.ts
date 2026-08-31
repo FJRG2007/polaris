@@ -111,7 +111,30 @@ async function composeUpRetryingLease(
  * that frees nothing would fail identically, and a loop that keeps pulling at a
  * disk with no room is a deploy that never ends and a log nobody can read.
  */
+/** Above this, a pull is started by making room rather than by hoping. Lower
+ *  than the housekeeping sweep's own mark, because this is the moment a machine
+ *  is about to be asked for several gigabytes it may not have. */
+const TIGHT = 0.8;
+
 async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink): Promise<void> {
+    // Before the first attempt, not only after a failure. A pull that runs out
+    // of room part-way leaves what it had already fetched behind, and nothing in
+    // a prune takes that back - so failing first and cleaning afterwards is a
+    // machine that gets worse every time somebody tries.
+    if (ctx.ports.diskFullness && ctx.ports.reclaimSpace) {
+        const fullness = await ctx.ports.diskFullness().catch(() => null);
+        if (fullness !== null && fullness >= TIGHT) {
+            const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+            if (freed > 0) {
+                ctx.log(
+                    Buffer.from(
+                        `That machine was ${Math.round(fullness * 100)}% full, so ${Math.round(freed / 1_000_000)} MB of build cache and unused layers went first - no volume was touched.\n`
+                    )
+                );
+            }
+        }
+    }
+
     try {
         await ctx.ports.pull(image, sink);
         return;

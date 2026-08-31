@@ -138,6 +138,10 @@ export async function serverDiskFullness(hostId: string): Promise<number | null>
  * than an exception. Null means the server could not be reached at all.
  */
 export async function reclaimServerSpace(hostId: string): Promise<number | null> {
-    const said = await onServer(hostId, "docker builder prune -f; docker image prune -af");
+    // `system prune` takes the build cache, the dangling images, the stopped
+    // containers and the unused networks in one pass - more than the two
+    // separate prunes it replaces, on a machine that has been deploying for
+    // months. Never `--volumes`: see above.
+    const said = await onServer(hostId, "docker system prune -af; docker builder prune -af");
     return said === null ? null : parseReclaimedBytes(said);
 }

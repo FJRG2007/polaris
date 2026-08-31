@@ -104,3 +104,56 @@ describe("a pull with no room left", () => {
         expect(JSON.stringify(result)).toContain("disk space");
     });
 });
+
+describe("making room before the pull rather than after it fails", () => {
+    /** A context whose disk answers `fullness`, and whose pull always works. */
+    function tight(fullness: number | null) {
+        const order: string[] = [];
+        const ports = {
+            pull: vi.fn(async () => {
+                order.push("pull");
+            }),
+            composeUp: vi.fn(async () => undefined),
+            ensureMount: vi.fn(async () => false),
+            inspect: vi.fn(async () => ({})),
+            diskFullness: vi.fn(async () => {
+                order.push("ask");
+                return fullness;
+            }),
+            reclaimSpace: vi.fn(async () => {
+                order.push("free");
+                return 2_000_000_000;
+            })
+        };
+        const ctx = {
+            ports,
+            target: { id: "local", kind: "local", engine: "compose", proxyNetwork: "polaris" },
+            log: () => undefined
+        } as unknown as RuntimeContext;
+        return { ctx, order };
+    }
+
+    it("frees first when the machine is already tight", async () => {
+        // The loop this breaks: a pull that runs out of room part-way leaves what
+        // it had already fetched behind, and nothing in a prune takes that back -
+        // so failing first and cleaning afterwards is a machine that gets worse
+        // every time somebody tries.
+        const { ctx, order } = tight(0.93);
+        await new ComposeRuntime().deployApplication(plan(), ctx);
+        expect(order).toEqual(["ask", "free", "pull"]);
+    });
+
+    it("does not touch a machine with room", async () => {
+        const { ctx, order } = tight(0.4);
+        await new ComposeRuntime().deployApplication(plan(), ctx);
+        expect(order).toEqual(["ask", "pull"]);
+    });
+
+    it("pulls anyway when the machine will not say how full it is", async () => {
+        // Unknown is not full. A deploy refused because a `df` did not answer is
+        // a deploy refused for nothing.
+        const { ctx, order } = tight(null);
+        await new ComposeRuntime().deployApplication(plan(), ctx);
+        expect(order).toEqual(["ask", "pull"]);
+    });
+});
