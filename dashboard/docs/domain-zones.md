@@ -47,11 +47,20 @@ see below.
 
 ## Hostnames outside a zone
 
-A zone hostname rides its wildcard, so the zones bound what the picker can offer. Any
-other name - `app.example.com` straight on the base domain, or a name on a completely
-different domain - is added as a custom domain instead, which needs no wildcard behind
-it: `provisionHostnameDns()` (domain-dns) writes that one A record through the
-connected Cloudflare token, and the panel reports what to do by hand when it cannot.
+A zone hostname rides its wildcard, so the zones bound what the picker can offer on
+their own. Two ways to leave that:
+
+- **Straight on the base domain**, with no zone in front of it. The picker offers the
+  base domain as an entry of its own (`BASE_ZONE_KEY` in `domain-zones.ts`) whenever no
+  zone already sits on that label, and it is offered but never preselected - a name that
+  resolves nowhere is a worse default than the free subdomain. It rides no wildcard, so
+  the record for the exact hostname it returns is written when the domain is added
+  (through the connected Cloudflare account, or the screen names the record to create by
+  hand), and adding it is not gated on `domain.zones.verified` the way a zone hostname is.
+- **A name on a completely different domain** is added as a custom domain instead, which
+  needs no wildcard behind it either: `provisionHostnameDns()` (domain-dns) writes that
+  one A record through the connected Cloudflare token, and the panel reports what to do
+  by hand when it cannot.
 
 A record already pointing somewhere else is never repointed - the name may be a live
 site - and the domain is added either way, since DNS that is not there yet only

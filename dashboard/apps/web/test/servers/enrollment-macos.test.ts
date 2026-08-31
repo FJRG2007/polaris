@@ -279,7 +279,9 @@ const shell = (() => {
 // Each test shells out through the real harness, which itself shells out again to
 // the systemsetup/dscl/dseditgroup/curl stubs - nested process spawns that run well
 // past vitest's default 5s budget on this machine, timeout rather than a script defect.
-vi.setConfig({ testTimeout: 20000 });
+// 20s was still not enough once other test files are spawning subprocesses in
+// parallel during a full-suite run, so this gives it more headroom under load.
+vi.setConfig({ testTimeout: 60000 });
 
 describe.runIf(shell)("the macOS branch, run against a simulated Mac", () => {
     // The machine this whole change exists for: Remote Login off, no access list,
