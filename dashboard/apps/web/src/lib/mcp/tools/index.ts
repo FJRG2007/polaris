@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { TASK_TOOLS } from "./tasks";
+import { SESSION_TOOLS } from "./sessions";
 import type { McpTool } from "../protocol";
 
 const whoamiInput = z.object({});
@@ -43,4 +44,8 @@ const whoami: McpTool<z.infer<typeof whoamiInput>> = {
     }
 };
 
-export const MCP_TOOLS: readonly McpTool<never>[] = [whoami as unknown as McpTool<never>, ...TASK_TOOLS];
+export const MCP_TOOLS: readonly McpTool<never>[] = [
+    whoami as unknown as McpTool<never>,
+    ...TASK_TOOLS,
+    ...SESSION_TOOLS
+];

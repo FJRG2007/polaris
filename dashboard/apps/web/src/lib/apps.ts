@@ -1200,6 +1200,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 ]
             },
             {
+                label: "Sessions",
+                href: "/apps/agents/sessions",
+                icon: MessagesSquare,
+                keywords: [
+                    "live",
+                    "claude code",
+                    "codex",
+                    "terminal",
+                    "worktree",
+                    "steer",
+                    "interactive",
+                    "talk to"
+                ]
+            },
+            {
                 label: "Runs",
                 href: "/apps/agents/runs",
                 icon: History,

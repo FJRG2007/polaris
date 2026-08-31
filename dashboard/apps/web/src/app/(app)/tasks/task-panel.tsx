@@ -26,6 +26,7 @@ import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
 import { TaskNameField } from "./task-name-field";
 import { CopyButton } from "@/components/copy-button";
+import { HandToAgent } from "./hand-to-agent";
 import type { TaskDetail } from "@/lib/tasks/task-service";
 import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import { useDisplayFormat } from "@/components/display-format";
@@ -418,6 +419,16 @@ export function TaskPanel({
                                 {/* Icon-only on a phone, the way every other toolbar
                                     here narrows: the row already carries four controls
                                     and the reference beside them. */}
+                                {/* Handing the work to an agent belongs next to
+                                    handing it to a person: a task already says what
+                                    needs doing, and retyping it into an agent is
+                                    transcription. */}
+                                <HandToAgent
+                                    taskId={task.id}
+                                    reference={task.reference}
+                                    name={task.name}
+                                    description={task.description}
+                                />
                                 <Button
                                     size="sm"
                                     variant="ghost"
