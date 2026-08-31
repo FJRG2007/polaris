@@ -691,6 +691,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/tasks/reports",
             icon: ChartColumn,
             keywords: ["dashboard", "workload", "metrics"]
+        },
+        {
+            label: "Connected trackers",
+            href: "/tasks/trackers",
+            icon: Link2,
+            keywords: ["linear", "jira", "import", "sync", "issues", "two-way"]
         }
     ],
     notes: [

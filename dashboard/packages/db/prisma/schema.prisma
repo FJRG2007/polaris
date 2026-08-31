@@ -4409,6 +4409,7 @@ model TaskSpace {
     sprints     TaskSprint[]
     goals       TaskGoal[]
     docs        TaskDoc[]
+    trackers    TaskTracker[]
     views       TaskView[]
     automations TaskAutomation[]
     templates   TaskTemplate[]
@@ -4636,6 +4637,7 @@ model Task {
     attachments TaskAttachment[]
     commits     TaskCommit[]
     share       TaskShare?
+    trackerLink TaskTrackerLink?
 
     @@unique([spaceId, number])
     @@index([listId])
@@ -7839,4 +7841,87 @@ model CameraZone {
     // is the one thing the list has to be.
     @@unique([cameraId, name])
     @@index([cameraId])
+}
+// A tracker somebody else runs, connected to a space in Tasks.
+//
+// Teams that would use Polaris usually already have work written down in Linear
+// or Jira, and are not going to move it. This is what makes one board show all
+// of it: issues arrive as tasks that keep their reference, and the two fields
+// that actually change hands - the status and the comments - travel both ways.
+//
+// One connection is one space. That is a constraint rather than a limitation: a
+// space is what carries the statuses a tracker's states have to map onto, and a
+// connection spanning two of them would have to answer "which board" on every
+// single issue it saw.
+model TaskTracker {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    // linear | jira - see ISSUE_TRACKERS in @polaris/core.
+    provider  String
+    // What to call it on screen. An operator can connect two Jira sites, and
+    // "Jira" twice in a list is a list that has to be clicked to be read.
+    label     String
+    // The space its issues land in, and the list inside it.
+    spaceId   String   @db.Uuid
+    listId    String   @db.Uuid
+    // Which issues to bring in, in the provider's own query language: a JQL
+    // string for Jira, a team key or filter for Linear. Empty means whatever the
+    // provider gives by default, which is everything the credential can see.
+    query     String   @default("")
+    // The non-secret half of the credential - a Jira site and account email -
+    // as stringified JSON. The secret half is below, encrypted.
+    config    String   @default("{}")
+    // Envelope-encrypted with the master key, the same way a deploy secret and a
+    // stored credential are, and never returned to the client once written.
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+    enabled   Boolean  @default(true)
+    // Whether a change to a task's status here is pushed back to the tracker.
+    // Off by default: writing into somebody else's tracker is a decision, and an
+    // operator connecting one to see their work in one place has not made it.
+    pushStatus Boolean @default(false)
+    // When the last pull finished, and why the one before it did not. Kept on the
+    // connection rather than in a log nobody opens.
+    syncedAt  DateTime?
+    error     String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    space TaskSpace         @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    links TaskTrackerLink[]
+
+    @@index([ownerId])
+    @@index([spaceId])
+}
+
+// One task, and the issue it mirrors.
+//
+// Keyed by the issue's own reference rather than by its opaque id, because that
+// is what survives: a person quotes it, a branch name carries it, and both
+// providers keep it stable. The id is stored beside it because the write paths
+// want it.
+model TaskTrackerLink {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    trackerId String   @db.Uuid
+    taskId    String   @db.Uuid
+    // "ENG-42". Unique per connection.
+    issueKey  String
+    issueId   String
+    issueUrl  String   @default("")
+    // The status the tracker last reported, so a change can be told from a
+    // re-read, and so a push knows what it is changing from.
+    remoteStatus String @default("")
+    // What Polaris last pushed, so its own write is not read back as a remote
+    // change on the next pull and pushed again.
+    pushedStatus String @default("")
+    syncedAt  DateTime @default(now())
+    createdAt DateTime @default(now())
+
+    tracker TaskTracker @relation(fields: [trackerId], references: [id], onDelete: Cascade)
+    task    Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+    @@unique([trackerId, issueKey])
+    @@unique([taskId])
+    @@index([trackerId])
 }
