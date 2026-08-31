@@ -81,6 +81,34 @@ that edge 404 - and the vacant page - as down rather than up, and republishes th
 app routes itself the first time it finds an address unrouted, since that is the
 one outage here Polaris can end without a terminal.
 
+## Agent session environment
+
+The host daemon refuses to start a container if any environment value contains
+a control character (`crates/polaris-hostd/src/deploy.rs`), and the error names
+the variable, not the value - `env value for POLARIS_HOOK_SCRIPT contains a
+control character` is what a reader saw on screen before this was fixed, for a
+value they never typed.
+
+- **A value that is a file's contents has a newline by definition**, so it
+  cannot go into the boot environment as-is. The hook script, the hook
+  settings and the MCP config are each base64-encoded with `asFile()`
+  (`apps/web/src/lib/agents/session-runtime.ts`) and decoded back to a file by
+  the boot script (`session-commands.ts`) - never written to the environment
+  raw.
+- `bootEnv()` runs every value through `guardEnv()` before it reaches the
+  daemon, so a control character in anything else (a branch, a repository
+  name, a typed command) fails here, in a sentence that says which variable,
+  instead of surfacing the daemon's.
+- **Only a thrown `SessionRefusal` is shown on the session.** Anything else -
+  a daemon rejection, a closed socket, an SSH failure - is logged
+  server-side and replaced with a generic sentence (`readableFailure()` in
+  `session-service.ts`), because those messages name internals and paths
+  nobody asked to publish.
+- An agent's `credentials` list (`packages/core/src/agent-clis.ts`) can be
+  empty, and empty means "not sourced", not "broken" - it must never block a
+  session or be reported as an error. A machine that already has the tool
+  signed in needs none of them.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
