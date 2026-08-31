@@ -40,7 +40,11 @@ export async function POST(request: Request): Promise<Response> {
     const user = await requirePermission("deploy.manage");
 
     if (body?.applicationId) {
-        return mintServiceTicket(user.id, body.applicationId, body.mode === "logs" ? "logs" : "terminal");
+        return mintServiceTicket(
+            user.id,
+            body.applicationId,
+            body.mode === "logs" ? "logs" : "terminal"
+        );
     }
 
     if (body?.hostId) {
@@ -58,7 +62,10 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ token });
     }
 
-    return NextResponse.json({ error: "applicationId, hostId or connectionId is required" }, { status: 400 });
+    return NextResponse.json(
+        { error: "applicationId, hostId or connectionId is required" },
+        { status: 400 }
+    );
 }
 
 /**
@@ -117,7 +124,11 @@ async function mintServiceTicket(
     mode: "terminal" | "logs"
 ): Promise<Response> {
     try {
-        await requireApplicationAccess(applicationId, userId, mode === "logs" ? "logs.read" : "console.use");
+        await requireApplicationAccess(
+            applicationId,
+            userId,
+            mode === "logs" ? "logs.read" : "console.use"
+        );
     } catch {
         return NextResponse.json({ error: "service not found" }, { status: 404 });
     }

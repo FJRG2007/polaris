@@ -16,7 +16,12 @@ import type { ProjectCapability } from "@polaris/core";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { useEffect, useState, type ReactNode } from "react";
 import { List, ShieldCheck, Waypoints } from "lucide-react";
-import { EnvironmentServices, NewServiceButton, type ProjectApp, type ProjectSummary } from "./deploy-view";
+import {
+    EnvironmentServices,
+    NewServiceButton,
+    type ProjectApp,
+    type ProjectSummary
+} from "./deploy-view";
 
 export function ProjectDetail({
     project,
@@ -45,10 +50,14 @@ export function ProjectDetail({
     // A link that names a service lands on the environment holding it, not on
     // whichever one the project happens to open with.
     const linked = openService
-        ? environments.find((environment) => environment.applications.some((app) => app.id === openService))
+        ? environments.find((environment) =>
+              environment.applications.some((app) => app.id === openService)
+          )
         : undefined;
     const active =
-        linked ?? environments.find((environment) => environment.id === activeEnvironmentId) ?? defaultEnv;
+        linked ??
+        environments.find((environment) => environment.id === activeEnvironmentId) ??
+        defaultEnv;
 
     // Something is building or provisioning, so the board has a reason to look again:
     // a deploy finishes on the server with nothing to tell the page about it, and
@@ -71,7 +80,9 @@ export function ProjectDetail({
     // Derived rather than stored, so refreshed data reaches the open panel (e.g.
     // after removing a domain) and a deleted service closes it instead of leaving
     // a stale snapshot on screen.
-    const detailApp = environments.flatMap((env) => env.applications).find((app) => app.id === detailAppId) ?? null;
+    const detailApp =
+        environments.flatMap((env) => env.applications).find((app) => app.id === detailAppId) ??
+        null;
 
     // Ids queued for removal, so the canvas and the list can both mark them and
     // the panel can say so rather than offering a second delete. Read from the
@@ -94,77 +105,85 @@ export function ProjectDetail({
 
     return (
         <ProjectAccessProvider capabilities={capabilities}>
-        <div className="flex w-full flex-col gap-4">
-            {!localReady && canManage && (
-                <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
-                    The local host is not ready to build and deploy. This needs the full edition with a running{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">polaris-hostd</code>.
-                </div>
-            )}
+            <div className="flex w-full flex-col gap-4">
+                {!localReady && canManage && (
+                    <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-muted-foreground">
+                        The local host is not ready to build and deploy. This needs the full edition
+                        with a running{" "}
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs text-foreground">
+                            polaris-hostd
+                        </code>
+                        .
+                    </div>
+                )}
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">{active && <EnvSummary environment={active} />}</div>
-                <div className="flex flex-wrap items-center gap-2">
-                    {canManage && can("service.create") && active && (
-                        <NewServiceButton environmentId={active.id} onChanged={refresh} />
-                    )}
-                    {canManage && (
-                        <Link
-                            href={`/apps/firewall?scope=project&id=${project.id}`}
-                            aria-label="Firewall"
-                            title="Firewall"
-                            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <ShieldCheck className="size-4" />
-                        </Link>
-                    )}
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                        <ViewToggle
-                            active={view === "canvas"}
-                            label="Canvas view"
-                            onSelect={() => setView("canvas")}
-                            icon={<Waypoints className="size-4" />}
-                        />
-                        <ViewToggle
-                            active={view === "list"}
-                            label="List view"
-                            onSelect={() => setView("list")}
-                            icon={<List className="size-4" />}
-                        />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                        {active && <EnvSummary environment={active} />}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {canManage && can("service.create") && active && (
+                            <NewServiceButton environmentId={active.id} onChanged={refresh} />
+                        )}
+                        {canManage && (
+                            <Link
+                                href={`/apps/firewall?scope=project&id=${project.id}`}
+                                aria-label="Firewall"
+                                title="Firewall"
+                                className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <ShieldCheck className="size-4" />
+                            </Link>
+                        )}
+                        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                            <ViewToggle
+                                active={view === "canvas"}
+                                label="Canvas view"
+                                onSelect={() => setView("canvas")}
+                                icon={<Waypoints className="size-4" />}
+                            />
+                            <ViewToggle
+                                active={view === "list"}
+                                label="List view"
+                                onSelect={() => setView("list")}
+                                icon={<List className="size-4" />}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {active ? (
-                view === "canvas" ? (
-                    <DeployCanvas
-                        environment={active}
-                        canManage={canManage}
-                        stagedIds={stagedIds}
-                        onOpenService={showService}
-                    />
+                {active ? (
+                    view === "canvas" ? (
+                        <DeployCanvas
+                            environment={active}
+                            canManage={canManage}
+                            stagedIds={stagedIds}
+                            onOpenService={showService}
+                        />
+                    ) : (
+                        <EnvironmentServices
+                            environment={active}
+                            canManage={canManage}
+                            stagedIds={stagedIds}
+                            onChanged={refresh}
+                            onOpenService={showService}
+                        />
+                    )
                 ) : (
-                    <EnvironmentServices
-                        environment={active}
-                        canManage={canManage}
-                        stagedIds={stagedIds}
-                        onChanged={refresh}
-                        onOpenService={showService}
-                    />
-                )
-            ) : (
-                <p className="text-sm text-muted-foreground">This project has no environments.</p>
-            )}
+                    <p className="text-sm text-muted-foreground">
+                        This project has no environments.
+                    </p>
+                )}
 
-            {detailApp && (
-                <ServiceDetail
-                    app={detailApp}
-                    staged={stagedIds.has(detailApp.id)}
-                    onChanged={refresh}
-                    onClose={() => showService(null)}
-                />
-            )}
-        </div>
+                {detailApp && (
+                    <ServiceDetail
+                        app={detailApp}
+                        staged={stagedIds.has(detailApp.id)}
+                        onChanged={refresh}
+                        onClose={() => showService(null)}
+                    />
+                )}
+            </div>
         </ProjectAccessProvider>
     );
 }
@@ -198,8 +217,9 @@ function ViewToggle({
 function EnvSummary({ environment }: { environment: ProjectSummary["environments"][number] }) {
     const online =
         environment.applications.filter((app) => app.currentDeploymentId).length +
-        environment.databases.filter((db) => ["running", "active", "healthy", "ready"].includes(db.status.toLowerCase()))
-            .length;
+        environment.databases.filter((db) =>
+            ["running", "active", "healthy", "ready"].includes(db.status.toLowerCase())
+        ).length;
     const total = environment.applications.length + environment.databases.length;
     const partial = total > 0 && online < total;
     const chip =
@@ -210,7 +230,9 @@ function EnvSummary({ environment }: { environment: ProjectSummary["environments
               : "border-success/25 bg-success/10 text-success";
     const dot = total === 0 ? "bg-muted-foreground" : partial ? "bg-warning" : "bg-success";
     return (
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}>
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${chip}`}
+        >
             <span className={`size-1.5 rounded-full ${dot} ${partial ? "animate-pulse" : ""}`} />
             {total === 0 ? "No services" : `${online}/${total} online`}
         </span>

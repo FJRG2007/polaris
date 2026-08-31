@@ -91,18 +91,26 @@ describe("saveDomainZones", () => {
 
     it("refuses a domain with nowhere to put deployed services", async () => {
         await expect(
-            saveDomainZones({ baseDomain: "example.com", zones: [{ label: "polaris", scope: "polaris", primary: true }] })
+            saveDomainZones({
+                baseDomain: "example.com",
+                zones: [{ label: "polaris", scope: "polaris", primary: true }]
+            })
         ).rejects.toThrow(/deployed services/i);
     });
 
     it("refuses a label that is not a single DNS label", async () => {
         await expect(
-            saveDomainZones({ baseDomain: "example.com", zones: [{ label: "a.b", scope: "deploy", primary: true }] })
+            saveDomainZones({
+                baseDomain: "example.com",
+                zones: [{ label: "a.b", scope: "deploy", primary: true }]
+            })
         ).rejects.toThrow();
     });
 
     it("refuses something that is not a domain", async () => {
-        await expect(saveDomainZones({ baseDomain: "localhost", zones: [] })).rejects.toThrow(/example\.com/);
+        await expect(saveDomainZones({ baseDomain: "localhost", zones: [] })).rejects.toThrow(
+            /example\.com/
+        );
     });
 
     it("accepts no domain at all, for the free-subdomain setup", async () => {
@@ -127,7 +135,9 @@ describe("getDomainZones", () => {
     it("treats an unreadable stored value as unconfigured rather than trusting it", async () => {
         findUnique.mockResolvedValue({ value: "{not json" });
         expect((await getDomainZones()).baseDomain).toBe("");
-        findUnique.mockResolvedValue({ value: JSON.stringify({ baseDomain: "example.com", zones: "nope" }) });
+        findUnique.mockResolvedValue({
+            value: JSON.stringify({ baseDomain: "example.com", zones: "nope" })
+        });
         expect((await getDomainZones()).baseDomain).toBe("");
     });
 });
@@ -159,7 +169,10 @@ describe("hostnames minted from the layout", () => {
     it("mints in another zone when asked, including the base domain", async () => {
         const minted = await deployHostname("invoices", { zoneLabel: "" });
         expect(minted).toMatchObject({ zoneHost: "example.com" });
-        expect(minted).toHaveProperty("hostname", expect.stringMatching(/^[a-z0-9-]+\.example\.com$/));
+        expect(minted).toHaveProperty(
+            "hostname",
+            expect.stringMatching(/^[a-z0-9-]+\.example\.com$/)
+        );
     });
 
     it("mints the subdomain the operator picked, untouched", async () => {
@@ -232,7 +245,10 @@ describe("zoneRecords", () => {
  * the provider's record cap long before they run out of machine.
  */
 describe("gameZoneRecords", () => {
-    const config = { baseDomain: "example.com", zones: [{ label: "plr", scope: "deploy" as const, primary: true }] };
+    const config = {
+        baseDomain: "example.com",
+        zones: [{ label: "plr", scope: "deploy" as const, primary: true }]
+    };
 
     it("asks for one wildcard per game, and no host record", () => {
         const records = gameZoneRecords(config, [
@@ -250,7 +266,11 @@ describe("gameZoneRecords", () => {
     });
 
     it("asks for nothing when there is no domain", () => {
-        expect(gameZoneRecords({ baseDomain: "", zones: [] }, [{ name: "Minecraft", domainLabel: "mc" }])).toEqual([]);
+        expect(
+            gameZoneRecords({ baseDomain: "", zones: [] }, [
+                { name: "Minecraft", domainLabel: "mc" }
+            ])
+        ).toEqual([]);
     });
 
     it("asks for a label once, however many games share it", () => {
@@ -262,7 +282,9 @@ describe("gameZoneRecords", () => {
     });
 
     it("drops a label no DNS record could ever carry", () => {
-        expect(gameZoneRecords(config, [{ name: "Broken", domainLabel: "not a label" }])).toEqual([]);
+        expect(gameZoneRecords(config, [{ name: "Broken", domainLabel: "not a label" }])).toEqual(
+            []
+        );
     });
 });
 
@@ -283,7 +305,9 @@ describe("the verification gate", () => {
     });
 
     it("still mints straight on the base domain, which rides no wildcard", async () => {
-        expect(await deployHostname("invoices", { zoneLabel: "~base", subdomain: "billing" })).toEqual({
+        expect(
+            await deployHostname("invoices", { zoneLabel: "~base", subdomain: "billing" })
+        ).toEqual({
             hostname: "billing.example.com",
             zoneHost: "example.com"
         });

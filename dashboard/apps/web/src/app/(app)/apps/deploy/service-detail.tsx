@@ -30,7 +30,12 @@ import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import { SERVICE_METRICS_MS, useServiceMetrics } from "./service-metrics";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ServiceIcon, StatusPill, dbTone, serviceKindOf, type ProjectApp } from "./deploy-view";
-import { CONSUMPTION_METRICS, MetricsHistory, percent, type MetricSpec } from "@/components/metrics-history";
+import {
+    CONSUMPTION_METRICS,
+    MetricsHistory,
+    percent,
+    type MetricSpec
+} from "@/components/metrics-history";
 import {
     cn,
     Input,
@@ -91,7 +96,16 @@ import {
  * Security, sitting here showing the rules while the firewall grew everything
  * around them. So they link out with this service already selected instead.
  */
-const TABS = ["Deployments", "Variables", "Metrics", "Console", "Files", "Volumes", "Notes", "Settings"] as const;
+const TABS = [
+    "Deployments",
+    "Variables",
+    "Metrics",
+    "Console",
+    "Files",
+    "Volumes",
+    "Notes",
+    "Settings"
+] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -115,8 +129,16 @@ const TAB_CAPABILITY: Record<Tab, readonly ProjectCapability[]> = {
 };
 
 const LINKED_TABS = [
-    { label: "Security", icon: ShieldCheck, href: (id: string) => `/apps/firewall?scope=application&id=${id}` },
-    { label: "Analytics", icon: ChartColumn, href: (id: string) => `/apps/analytics?scope=application&id=${id}` }
+    {
+        label: "Security",
+        icon: ShieldCheck,
+        href: (id: string) => `/apps/firewall?scope=application&id=${id}`
+    },
+    {
+        label: "Analytics",
+        icon: ChartColumn,
+        href: (id: string) => `/apps/analytics?scope=application&id=${id}`
+    }
 ] as const;
 
 export function ServiceDetail({
@@ -143,13 +165,22 @@ export function ServiceDetail({
             <DialogContent
                 className={cn(
                     "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
-                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
+                    full
+                        ? "w-full max-w-none"
+                        : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
                 )}
             >
                 <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-                    <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-5 shrink-0 text-foreground" />
-                    <DialogTitle className="truncate text-base font-semibold">{app.name}</DialogTitle>
-                    {app.deployStatus && <StatusPill tone={dbTone(app.deployStatus)} label={app.deployStatus} />}
+                    <ServiceIcon
+                        kind={serviceKindOf(app.sourceType)}
+                        className="size-5 shrink-0 text-foreground"
+                    />
+                    <DialogTitle className="truncate text-base font-semibold">
+                        {app.name}
+                    </DialogTitle>
+                    {app.deployStatus && (
+                        <StatusPill tone={dbTone(app.deployStatus)} label={app.deployStatus} />
+                    )}
                     {staged && (
                         <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                             Removal pending
@@ -163,7 +194,11 @@ export function ServiceDetail({
                             title={full ? "Exit full screen" : "Full screen"}
                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
-                            {full ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+                            {full ? (
+                                <Minimize2 className="size-4" />
+                            ) : (
+                                <Maximize2 className="size-4" />
+                            )}
                         </button>
                     </div>
                 </div>
@@ -218,7 +253,12 @@ export function ServiceDetail({
                     {tab === "Volumes" && <VolumesTab app={app} />}
                     {tab === "Notes" && <NotesTab applicationId={app.id} />}
                     {tab === "Settings" && (
-                        <SettingsTab app={app} isGit={isGit} staged={staged ?? false} onChanged={onChanged} />
+                        <SettingsTab
+                            app={app}
+                            isGit={isGit}
+                            staged={staged ?? false}
+                            onChanged={onChanged}
+                        />
                     )}
                 </div>
             </DialogContent>
@@ -390,7 +430,11 @@ function DeploymentMenu({
                     )}
                     aria-label={error ? `Deployment actions - ${error}` : "Deployment actions"}
                 >
-                    {pending ? <Loader2 className="size-4 animate-spin" /> : <MoreVertical className="size-4" />}
+                    {pending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <MoreVertical className="size-4" />
+                    )}
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
@@ -399,10 +443,20 @@ function DeploymentMenu({
                 </DropdownMenuItem>
                 {isActive && (
                     <>
-                        <DropdownMenuItem onSelect={() => run(() => deployActions.restartApplicationAction(app.id))}>
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                run(() => deployActions.restartApplicationAction(app.id))
+                            }
+                        >
                             <RotateCw className="size-4" /> Restart
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => run(() => deployActions.setApplicationRunningAction(app.id, stopped))}>
+                        <DropdownMenuItem
+                            onSelect={() =>
+                                run(() =>
+                                    deployActions.setApplicationRunningAction(app.id, stopped)
+                                )
+                            }
+                        >
                             {stopped ? <Play className="size-4" /> : <Square className="size-4" />}
                             {stopped ? "Enable" : "Disable"}
                         </DropdownMenuItem>
@@ -411,7 +465,9 @@ function DeploymentMenu({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                     variant="danger"
-                    onSelect={() => run(() => deployActions.removeApplicationDeploymentAction(app.id))}
+                    onSelect={() =>
+                        run(() => deployActions.removeApplicationDeploymentAction(app.id))
+                    }
                 >
                     <Trash2 className="size-4" /> Remove
                 </DropdownMenuItem>
@@ -493,9 +549,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             rel="noreferrer"
                             className="inline-flex min-w-0 items-center gap-1.5 truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
                         >
-                            <Globe className="size-4 shrink-0 text-muted-foreground" /> {primary.hostname}
+                            <Globe className="size-4 shrink-0 text-muted-foreground" />{" "}
+                            {primary.hostname}
                             {isLocalDomain(primary) && (
-                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning">LAN</span>
+                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning">
+                                    LAN
+                                </span>
                             )}
                         </a>
                     ) : (
@@ -542,8 +601,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 </span>
                                 <DeployAvatar app={app} deployment={active} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-foreground">{depTitle(active)}</p>
-                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(active, app, format)}</p>
+                                    <p className="truncate text-sm font-medium text-foreground">
+                                        {depTitle(active)}
+                                    </p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                        {deploySubtitle(active, app, format)}
+                                    </p>
                                 </div>
                                 <Button
                                     variant="outline"
@@ -573,11 +636,20 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                     : active.status === "stopped"
                                       ? "Deployment disabled"
                                       : `Status: ${active.status}`}
-                                <ChevronDown className={cn("ml-auto size-3.5 transition-transform", successOpen && "rotate-180")} />
+                                <ChevronDown
+                                    className={cn(
+                                        "ml-auto size-3.5 transition-transform",
+                                        successOpen && "rotate-180"
+                                    )}
+                                />
                             </button>
                             {successOpen && (
                                 <div className="border-t border-success/20 px-3 py-2 text-xs text-muted-foreground">
-                                    {active.commitSha ? <CommitRef deployment={active} /> : "Manual deploy"}
+                                    {active.commitSha ? (
+                                        <CommitRef deployment={active} />
+                                    ) : (
+                                        "Manual deploy"
+                                    )}
                                     {" - "}
                                     {format.dateTime(active.createdAt)}
                                 </div>
@@ -593,7 +665,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                     onClick={() => setHistoryOpen((value) => !value)}
                                     className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
                                 >
-                                    <ChevronRight className={cn("size-3.5 transition-transform", historyOpen && "rotate-90")} />
+                                    <ChevronRight
+                                        className={cn(
+                                            "size-3.5 transition-transform",
+                                            historyOpen && "rotate-90"
+                                        )}
+                                    />
                                     History
                                 </button>
                             </div>
@@ -601,23 +678,38 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                 <ul className="flex flex-col gap-2">
                                     {history.map((deployment) => {
                                         const badge = depBadge(deployment);
-                                        const failed = ["failed", "cancelled", "rolled_back"].includes(deployment.status);
+                                        const failed = [
+                                            "failed",
+                                            "cancelled",
+                                            "rolled_back"
+                                        ].includes(deployment.status);
                                         return (
                                             <li
                                                 key={deployment.id}
                                                 onClick={() => setLogsFor(deployment.id)}
                                                 className={cn(
                                                     "flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition-colors hover:border-muted-foreground/40",
-                                                    failed ? "border-danger/30 bg-danger/5" : "border-border/60"
+                                                    failed
+                                                        ? "border-danger/30 bg-danger/5"
+                                                        : "border-border/60"
                                                 )}
                                             >
-                                                <span className={cn("shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide", badge.cls)}>
+                                                <span
+                                                    className={cn(
+                                                        "shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide",
+                                                        badge.cls
+                                                    )}
+                                                >
                                                     {badge.label}
                                                 </span>
                                                 <DeployAvatar app={app} deployment={deployment} />
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="truncate font-medium text-foreground">{depTitle(deployment)}</p>
-                                                    <p className="truncate text-xs text-muted-foreground">{deploySubtitle(deployment, app, format)}</p>
+                                                    <p className="truncate font-medium text-foreground">
+                                                        {depTitle(deployment)}
+                                                    </p>
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        {deploySubtitle(deployment, app, format)}
+                                                    </p>
                                                 </div>
                                                 <ReleaseLink deployment={deployment} />
                                                 {/* A deploy still in flight is listed
@@ -625,7 +717,10 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     from - without first opening a log to
                                                     look for the control. */}
                                                 {!isSettled(deployment) && (
-                                                    <CancelDeployButton deploymentId={deployment.id} onCancelled={reload} />
+                                                    <CancelDeployButton
+                                                        deploymentId={deployment.id}
+                                                        onCancelled={reload}
+                                                    />
                                                 )}
                                                 <DeploymentMenu
                                                     app={app}
@@ -662,7 +757,9 @@ function FollowToggle({ applicationId }: { applicationId: string }) {
 
     useEffect(() => {
         setFollowing(null);
-        void deployActions.serviceFollowStateAction(applicationId).then((state) => setFollowing(state.following));
+        void deployActions
+            .serviceFollowStateAction(applicationId)
+            .then((state) => setFollowing(state.following));
     }, [applicationId]);
 
     if (following === null) return null;
@@ -677,7 +774,10 @@ function FollowToggle({ applicationId }: { applicationId: string }) {
             onClick={async () => {
                 const next = !following;
                 setFollowing(next);
-                const result = await deployActions.setServiceFollowAction({ applicationId, following: next });
+                const result = await deployActions.setServiceFollowAction({
+                    applicationId,
+                    following: next
+                });
                 if (result.error) setFollowing(!next);
             }}
             className={cn(
@@ -720,14 +820,20 @@ function NotesTab({ applicationId }: { applicationId: string }) {
                 onPost={async (body) => {
                     setBusy(true);
                     setError("");
-                    const result = await deployActions.postServiceCommentAction({ applicationId, body });
+                    const result = await deployActions.postServiceCommentAction({
+                        applicationId,
+                        body
+                    });
                     if (result.error) setError(result.error);
                     setBusy(false);
                     reload();
                 }}
                 onDelete={async (commentId) => {
                     setError("");
-                    const result = await deployActions.deleteServiceCommentAction({ applicationId, commentId });
+                    const result = await deployActions.deleteServiceCommentAction({
+                        applicationId,
+                        commentId
+                    });
                     if (result.error) setError(result.error);
                     reload();
                 }}
@@ -762,7 +868,9 @@ function ServiceActivity({ applicationId }: { applicationId: string }) {
                 onClick={() => setOpen((value) => !value)}
                 className="inline-flex items-center gap-1 self-start text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
             >
-                <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+                <ChevronRight
+                    className={cn("size-3.5 transition-transform", open && "rotate-90")}
+                />
                 Activity
             </button>
             {open ? (
@@ -789,7 +897,13 @@ function DeploymentLogsView({
     onBack: () => void;
     onDone: () => void;
 }) {
-    const CATS = ["Details", "Build Logs", "Deploy Logs", "HTTP Logs", "Network Flow Logs"] as const;
+    const CATS = [
+        "Details",
+        "Build Logs",
+        "Deploy Logs",
+        "HTTP Logs",
+        "Network Flow Logs"
+    ] as const;
     const format = useDisplayFormat();
     // While it is still going there is only one log worth opening: the build's. The
     // runtime log belongs to a container that does not exist yet, and landing on it
@@ -817,7 +931,10 @@ function DeploymentLogsView({
                 >
                     <ChevronLeft className="size-4" />
                 </button>
-                <ServiceIcon kind={serviceKindOf(app.sourceType)} className="size-4 shrink-0 text-foreground" />
+                <ServiceIcon
+                    kind={serviceKindOf(app.sourceType)}
+                    className="size-4 shrink-0 text-foreground"
+                />
                 <span className="truncate text-sm font-semibold">{app.name}</span>
                 {deployment?.commitSha && (
                     <>
@@ -827,9 +944,17 @@ function DeploymentLogsView({
                         </span>
                     </>
                 )}
-                {badge && <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.label}</span>}
+                {badge && (
+                    <span
+                        className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.cls}`}
+                    >
+                        {badge.label}
+                    </span>
+                )}
                 {deployment && (
-                    <span className="ml-auto text-xs text-muted-foreground">{format.dateTime(deployment.createdAt)}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                        {format.dateTime(deployment.createdAt)}
+                    </span>
                 )}
                 {deployment && !isSettled(deployment) && (
                     <CancelDeployButton deploymentId={deployment.id} onCancelled={onDone} />
@@ -843,7 +968,9 @@ function DeploymentLogsView({
                         type="button"
                         onClick={() => setChosen(name)}
                         className={`-mb-px whitespace-nowrap border-b-2 px-1 py-1.5 transition-colors ${
-                            cat === name ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+                            cat === name
+                                ? "border-primary text-foreground"
+                                : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
                     >
                         {name}
@@ -856,7 +983,11 @@ function DeploymentLogsView({
             ) : cat === "Build Logs" ? (
                 <LogStream deploymentId={deploymentId} onDone={onDone} />
             ) : cat === "Deploy Logs" ? (
-                <RuntimeLogView appId={app.id} deployment={deployment} onSeeBuild={() => setChosen("Build Logs")} />
+                <RuntimeLogView
+                    appId={app.id}
+                    deployment={deployment}
+                    onSeeBuild={() => setChosen("Build Logs")}
+                />
             ) : cat === "HTTP Logs" ? (
                 <HttpLogsView appId={app.id} deploymentStart={deployment?.createdAt ?? null} />
             ) : cat === "Network Flow Logs" ? (
@@ -877,7 +1008,13 @@ function DeploymentLogsView({
  * be minutes from finishing and the reader cannot tell from a spinner - but only for a
  * plain confirmation, since redeploying is one click away.
  */
-function CancelDeployButton({ deploymentId, onCancelled }: { deploymentId: string; onCancelled: () => void }) {
+function CancelDeployButton({
+    deploymentId,
+    onCancelled
+}: {
+    deploymentId: string;
+    onCancelled: () => void;
+}) {
     const [open, setOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -970,7 +1107,9 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
         let timer: ReturnType<typeof setTimeout>;
         setLive(true);
         async function poll(): Promise<void> {
-            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, { cache: "no-store" });
+            const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, {
+                cache: "no-store"
+            });
             if (!active) return;
             if (res.ok) {
                 const data = (await res.json()) as { status: string; log: string };
@@ -1025,7 +1164,8 @@ function RuntimeLogView({
     const [log, setLog] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const pending = deployment !== null && !isSettled(deployment);
-    const failed = deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
+    const failed =
+        deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
 
     useEffect(() => {
         // Nothing to poll for: there is no container behind either state.
@@ -1038,7 +1178,9 @@ function RuntimeLogView({
                 return;
             }
             try {
-                const res = await fetch(`/api/deploy/apps/${appId}/logs?tail=500`, { cache: "no-store" });
+                const res = await fetch(`/api/deploy/apps/${appId}/logs?tail=500`, {
+                    cache: "no-store"
+                });
                 if (!active) return;
                 if (res.ok) {
                     const data = (await res.json()) as { log: string };
@@ -1078,7 +1220,9 @@ function RuntimeLogView({
     if (error) return <Empty text={error} />;
     if (log === null) return <Loading />;
     if (!log.trim()) {
-        return <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />;
+        return (
+            <Empty text="No runtime logs yet. The container may have just started, or writes nothing to stdout." />
+        );
     }
     return (
         <div className="flex flex-col gap-2">
@@ -1119,7 +1263,13 @@ const HTTP_PAGE = 100;
  * search all history), with method / status-class / date-range filters and an
  * infinite-scroll window so a large log renders only what is on screen.
  */
-function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentStart: string | null }) {
+function HttpLogsView({
+    appId,
+    deploymentStart
+}: {
+    appId: string;
+    deploymentStart: string | null;
+}) {
     const format = useDisplayFormat();
     const [entries, setEntries] = useState<HttpLogEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1142,7 +1292,9 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                 return;
             }
             try {
-                const res = await fetch(`/api/deploy/apps/${appId}/http-logs?tail=2000`, { cache: "no-store" });
+                const res = await fetch(`/api/deploy/apps/${appId}/http-logs?tail=2000`, {
+                    cache: "no-store"
+                });
                 if (!active) return;
                 if (res.ok) {
                     const data = (await res.json()) as { entries: HttpLogEntry[] };
@@ -1177,7 +1329,8 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
     const filtered = all.filter((entry) => {
         if (ipFilter && entry.ip !== ipFilter) return false;
         if (method !== "all" && entry.method !== method) return false;
-        if (statusClass !== "all" && Math.floor(entry.status / 100) !== Number(statusClass)) return false;
+        if (statusClass !== "all" && Math.floor(entry.status / 100) !== Number(statusClass))
+            return false;
         if (fromMs !== null || toMs !== null) {
             const t = entry.time ? Date.parse(entry.time) : NaN;
             if (!Number.isFinite(t)) {
@@ -1219,10 +1372,27 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
     const scoped = scopeDeploy && deploymentStart && !from;
     // True only when the user narrowed the set themselves. Distinguishes a genuine
     // "no match" from the deployment-scope clamp silently hiding all history.
-    const hasUserFilter = method !== "all" || statusClass !== "all" || query !== "" || ipFilter !== null || Boolean(from) || Boolean(to);
+    const hasUserFilter =
+        method !== "all" ||
+        statusClass !== "all" ||
+        query !== "" ||
+        ipFilter !== null ||
+        Boolean(from) ||
+        Boolean(to);
 
     function exportCsv(): void {
-        const header = ["time", "ip", "method", "path", "status", "host", "bytes", "referer", "user_agent", "duration_ms"];
+        const header = [
+            "time",
+            "ip",
+            "method",
+            "path",
+            "status",
+            "host",
+            "bytes",
+            "referer",
+            "user_agent",
+            "duration_ms"
+        ];
         const rows = filtered.map((entry) => [
             entry.time ?? "",
             entry.ip,
@@ -1240,7 +1410,9 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = url;
-        anchor.download = ipFilter ? `${appId}-http-logs-${ipFilter.replace(/[^\w.-]/g, "_")}.csv` : `${appId}-http-logs.csv`;
+        anchor.download = ipFilter
+            ? `${appId}-http-logs-${ipFilter.replace(/[^\w.-]/g, "_")}.csv`
+            : `${appId}-http-logs.csv`;
         anchor.click();
         URL.revokeObjectURL(url);
     }
@@ -1257,7 +1429,14 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                         className="pl-8 text-xs"
                     />
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={exportCsv} disabled={!filtered.length} className="shrink-0">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={exportCsv}
+                    disabled={!filtered.length}
+                    className="shrink-0"
+                >
                     <Download className="size-4" /> Export
                 </Button>
             </div>
@@ -1272,16 +1451,45 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                     }}
                     disabled={!deploymentStart}
                     className={`rounded-md border px-2 py-1 transition-colors disabled:opacity-40 ${
-                        scoped ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                        scoped
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:text-foreground"
                     }`}
                 >
                     {scoped ? "This deployment" : "All history"}
                 </button>
-                <Select value={method} onValueChange={setMethod} options={HTTP_METHODS.map((m) => ({ value: m, label: m === "all" ? "Any method" : m }))} className="h-8 w-36 min-w-[9rem]" aria-label="Method" />
-                <Select value={statusClass} onValueChange={setStatusClass} options={STATUS_CLASSES} className="h-8 w-36 min-w-[9rem]" aria-label="Status" />
-                <Input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} className="h-8 w-auto text-xs" aria-label="From" />
+                <Select
+                    value={method}
+                    onValueChange={setMethod}
+                    options={HTTP_METHODS.map((m) => ({
+                        value: m,
+                        label: m === "all" ? "Any method" : m
+                    }))}
+                    className="h-8 w-36 min-w-[9rem]"
+                    aria-label="Method"
+                />
+                <Select
+                    value={statusClass}
+                    onValueChange={setStatusClass}
+                    options={STATUS_CLASSES}
+                    className="h-8 w-36 min-w-[9rem]"
+                    aria-label="Status"
+                />
+                <Input
+                    type="datetime-local"
+                    value={from}
+                    onChange={(event) => setFrom(event.target.value)}
+                    className="h-8 w-auto text-xs"
+                    aria-label="From"
+                />
                 <span className="text-muted-foreground">to</span>
-                <Input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} className="h-8 w-auto text-xs" aria-label="To" />
+                <Input
+                    type="datetime-local"
+                    value={to}
+                    onChange={(event) => setTo(event.target.value)}
+                    className="h-8 w-auto text-xs"
+                    aria-label="To"
+                />
                 {(from || to || method !== "all" || statusClass !== "all" || ipFilter) && (
                     <button
                         type="button"
@@ -1310,7 +1518,12 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-foreground">
                             <span className="text-muted-foreground">IP</span>
                             <span className="font-mono">{ipFilter}</span>
-                            <button type="button" onClick={() => setIpFilter(null)} aria-label="Clear IP filter" className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover">
+                            <button
+                                type="button"
+                                onClick={() => setIpFilter(null)}
+                                aria-label="Clear IP filter"
+                                className="ml-0.5 rounded-full p-0.5 hover:bg-card-hover"
+                            >
                                 <X className="size-3" />
                             </button>
                         </span>
@@ -1336,7 +1549,12 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                         <p className="text-xs">
                             {all.length} earlier request{all.length === 1 ? "" : "s"} in the log.
                         </p>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setScopeDeploy(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setScopeDeploy(false)}
+                        >
                             Show all history
                         </Button>
                     </div>
@@ -1358,43 +1576,66 @@ function HttpLogsView({ appId, deploymentStart }: { appId: string; deploymentSta
                                 <th className="px-3 py-2 font-medium">Method</th>
                                 <th className="px-3 py-2 font-medium">Status</th>
                                 <th className="px-3 py-2 font-medium">Path</th>
-                                <th className="whitespace-nowrap px-3 py-2 font-medium">Client IP</th>
+                                <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                    Client IP
+                                </th>
                                 <th className="px-3 py-2 font-medium">User agent</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/40">
                             {shown.map((entry, index) => (
                                 <tr key={index} className="hover:bg-muted/40">
-                                    <td className="whitespace-nowrap px-3 py-1.5 text-muted-foreground" title={entry.time ?? undefined}>
-                                        {entry.time ? format.time(entry.time, { seconds: true }) : "-"}
+                                    <td
+                                        className="whitespace-nowrap px-3 py-1.5 text-muted-foreground"
+                                        title={entry.time ?? undefined}
+                                    >
+                                        {entry.time
+                                            ? format.time(entry.time, { seconds: true })
+                                            : "-"}
                                     </td>
                                     <td className="px-3 py-1.5 font-mono">{entry.method}</td>
                                     <td className="px-3 py-1.5">
-                                        <span className={`rounded px-1.5 py-0.5 font-mono ${statusTone(entry.status)}`}>{entry.status}</span>
+                                        <span
+                                            className={`rounded px-1.5 py-0.5 font-mono ${statusTone(entry.status)}`}
+                                        >
+                                            {entry.status}
+                                        </span>
                                     </td>
-                                    <td className="max-w-[18rem] truncate px-3 py-1.5 font-mono" title={entry.path}>
+                                    <td
+                                        className="max-w-[18rem] truncate px-3 py-1.5 font-mono"
+                                        title={entry.path}
+                                    >
                                         {entry.path}
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-1.5">
                                         <button
                                             type="button"
-                                            onClick={() => setIpFilter(ipFilter === entry.ip ? null : entry.ip)}
+                                            onClick={() =>
+                                                setIpFilter(ipFilter === entry.ip ? null : entry.ip)
+                                            }
                                             title="Show only this IP's requests"
                                             className={`font-mono hover:underline ${
-                                                ipFilter === entry.ip ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                                                ipFilter === entry.ip
+                                                    ? "text-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
                                             }`}
                                         >
                                             {entry.ip}
                                         </button>
                                     </td>
-                                    <td className="max-w-[16rem] truncate px-3 py-1.5 text-muted-foreground" title={entry.userAgent ?? undefined}>
+                                    <td
+                                        className="max-w-[16rem] truncate px-3 py-1.5 text-muted-foreground"
+                                        title={entry.userAgent ?? undefined}
+                                    >
                                         {entry.userAgent ?? "-"}
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    {shown.length < filtered.length && <div ref={sentinelRef} className="h-8 w-full" />}
+                    {shown.length < filtered.length && (
+                        <div ref={sentinelRef} className="h-8 w-full" />
+                    )}
                 </div>
             )}
         </div>
@@ -1405,7 +1646,9 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     const can = useProjectCan();
     const [scope, setScope] = useState<"application" | "environment">("application");
     const scopeId = scope === "application" ? app.id : app.environmentId;
-    const [items, setItems] = useState<Awaited<ReturnType<typeof deployActions.listEnvVarsAction>> | null>(null);
+    const [items, setItems] = useState<Awaited<
+        ReturnType<typeof deployActions.listEnvVarsAction>
+    > | null>(null);
     const [key, setKey] = useState("");
     const [value, setValue] = useState("");
     const [isSecret, setIsSecret] = useState(true);
@@ -1440,7 +1683,8 @@ function VariablesTab({ app }: { app: ProjectApp }) {
             return;
         }
         void deployActions.revealEnvVarAction(item.id).then((result) => {
-            if (typeof result.value === "string") setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
+            if (typeof result.value === "string")
+                setRevealed((prev) => ({ ...prev, [item.id]: result.value as string }));
         });
     }
 
@@ -1448,7 +1692,12 @@ function VariablesTab({ app }: { app: ProjectApp }) {
         setError(null);
         setNote(null);
         startTransition(async () => {
-            const result = await deployActions.importEnvVarsAction({ scope, scopeId, text: raw, isSecret: true });
+            const result = await deployActions.importEnvVarsAction({
+                scope,
+                scopeId,
+                text: raw,
+                isSecret: true
+            });
             if (result.error) setError(result.error);
             else {
                 setRaw("");
@@ -1462,7 +1711,13 @@ function VariablesTab({ app }: { app: ProjectApp }) {
     function add() {
         setError(null);
         startTransition(async () => {
-            const result = await deployActions.saveEnvVarAction({ scope, scopeId, key, value, isSecret });
+            const result = await deployActions.saveEnvVarAction({
+                scope,
+                scopeId,
+                key,
+                value,
+                isSecret
+            });
             if (result.error) {
                 setError(result.error);
                 return;
@@ -1487,12 +1742,17 @@ function VariablesTab({ app }: { app: ProjectApp }) {
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-medium">
-                    {items ? items.length : 0} {scope === "environment" ? "environment" : "service"} variable
+                    {items ? items.length : 0} {scope === "environment" ? "environment" : "service"}{" "}
+                    variable
                     {items && items.length === 1 ? "" : "s"}
                 </span>
                 {can("variables.write") && (
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setRawOpen((open) => !open)}>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setRawOpen((open) => !open)}
+                        >
                             {"{ } Raw Editor"}
                         </Button>
                         <Button size="sm" onClick={() => setShowAdd((open) => !open)}>
@@ -1505,13 +1765,16 @@ function VariablesTab({ app }: { app: ProjectApp }) {
             {rawOpen && (
                 <div className="flex flex-col gap-2 rounded-md border border-border/60 p-3">
                     <span className="text-xs font-medium text-muted-foreground">
-                        Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments are handled.
+                        Paste a .env - KEY=value per line. Quotes, spaces, `export` and # comments
+                        are handled.
                     </span>
                     <Textarea
                         value={raw}
                         onChange={(event) => setRaw(event.target.value)}
                         rows={6}
-                        placeholder={'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'}
+                        placeholder={
+                            'DATABASE_URL="postgres://user:pass@host:5432/db"\nAPI_KEY=abc123 # inline comment\nexport NODE_ENV=production'
+                        }
                         className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs "
                     />
                     <div className="flex items-center justify-between gap-2">
@@ -1523,7 +1786,12 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                 className="hidden"
                                 onChange={(event) => {
                                     const file = event.target.files?.[0];
-                                    if (file) void file.text().then((text) => setRaw((prev) => (prev ? `${prev}\n${text}` : text)));
+                                    if (file)
+                                        void file
+                                            .text()
+                                            .then((text) =>
+                                                setRaw((prev) => (prev ? `${prev}\n${text}` : text))
+                                            );
                                 }}
                             />
                         </label>
@@ -1535,10 +1803,21 @@ function VariablesTab({ app }: { app: ProjectApp }) {
             )}
             {showAdd && (
                 <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
-                    <Input value={key} onChange={(event) => setKey(event.target.value)} placeholder="KEY" className="w-44 font-mono" />
-                    <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder="value" className="min-w-0 flex-1" />
+                    <Input
+                        value={key}
+                        onChange={(event) => setKey(event.target.value)}
+                        placeholder="KEY"
+                        className="w-44 font-mono"
+                    />
+                    <Input
+                        value={value}
+                        onChange={(event) => setValue(event.target.value)}
+                        placeholder="value"
+                        className="min-w-0 flex-1"
+                    />
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" /> secret
+                        <Switch checked={isSecret} onChange={setIsSecret} aria-label="Secret" />{" "}
+                        secret
                     </label>
                     <Button onClick={add} disabled={pending || !key.trim()}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : "Add"}
@@ -1554,12 +1833,21 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                     {items.map((item) => {
                         const shown = item.id in revealed;
                         return (
-                            <li key={item.id} className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm">
+                            <li
+                                key={item.id}
+                                className="group flex items-center gap-3 border-b border-border/40 py-2.5 text-sm"
+                            >
                                 <span className="text-xs text-muted-foreground/50">{"{ }"}</span>
-                                <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">{item.key}</span>
+                                <span className="w-60 shrink-0 truncate font-mono text-xs font-medium">
+                                    {item.key}
+                                </span>
                                 <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
                                     {shown ? (
-                                        revealed[item.id] || <span className="text-muted-foreground/50">(empty)</span>
+                                        revealed[item.id] || (
+                                            <span className="text-muted-foreground/50">
+                                                (empty)
+                                            </span>
+                                        )
                                     ) : (
                                         <SecretMask />
                                     )}
@@ -1570,14 +1858,23 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                                     className="text-muted-foreground transition-opacity hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
                                     aria-label={shown ? "Hide value" : "Reveal value"}
                                 >
-                                    {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                                    {shown ? (
+                                        <EyeOff className="size-3.5" />
+                                    ) : (
+                                        <Eye className="size-3.5" />
+                                    )}
                                 </button>
                                 {can("variables.write") && (
                                     <button
                                         type="button"
                                         title="Remove"
                                         aria-label={`Remove ${item.key}`}
-                                        onClick={() => startTransition(async () => { await deployActions.deleteEnvVarAction(item.id); reload(); })}
+                                        onClick={() =>
+                                            startTransition(async () => {
+                                                await deployActions.deleteEnvVarAction(item.id);
+                                                reload();
+                                            })
+                                        }
                                         className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
                                     >
                                         <Trash2 className="size-4" />
@@ -1613,7 +1910,9 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
 
     return (
         <div className="flex flex-col gap-4 py-1">
-            {stale ? <p className="text-xs text-warning">Showing the last reading. {stale}</p> : null}
+            {stale ? (
+                <p className="text-xs text-warning">Showing the last reading. {stale}</p>
+            ) : null}
             {loading ? (
                 <Loading />
             ) : data?.state ? (
@@ -1637,11 +1936,17 @@ function MetricsTab({ applicationId }: { applicationId: string }) {
             )}
             <div>
                 <h3 className="mb-1 text-sm font-medium">History</h3>
-                <MetricsHistory endpoint={`/api/deploy/apps/${applicationId}/metrics/history`} metrics={CONSUMPTION_METRICS} />
+                <MetricsHistory
+                    endpoint={`/api/deploy/apps/${applicationId}/metrics/history`}
+                    metrics={CONSUMPTION_METRICS}
+                />
             </div>
             <div>
                 <h3 className="mb-1 text-sm font-medium">HTTP</h3>
-                <MetricsHistory<HttpPoint> endpoint={`/api/deploy/apps/${applicationId}/http-metrics`} metrics={HTTP_METRICS} />
+                <MetricsHistory<HttpPoint>
+                    endpoint={`/api/deploy/apps/${applicationId}/http-metrics`}
+                    metrics={HTTP_METRICS}
+                />
             </div>
         </div>
     );
@@ -1670,10 +1975,39 @@ function formatRate(bytesPerSec: number): string {
 
 /** Charts drawn on the Deploy Metrics tab HTTP section, derived from access logs. */
 const HTTP_METRICS: MetricSpec<HttpPoint>[] = [
-    { key: "req", label: "Requests", value: (point) => point.requests, format: (value) => String(Math.round(value)), tone: "primary", summary: "sum" },
-    { key: "err", label: "Request error rate", value: (point) => point.errorRate, format: percent, tone: "danger", max: 100, summary: "avg" },
-    { key: "rt", label: "Response time", value: (point) => point.avgResponseMs, format: (value) => `${Math.round(value)} ms`, tone: "warning", summary: "avg" },
-    { key: "net", label: "Public network traffic", value: (point) => point.bytesPerSec, format: formatRate, tone: "success", summary: "avg" }
+    {
+        key: "req",
+        label: "Requests",
+        value: (point) => point.requests,
+        format: (value) => String(Math.round(value)),
+        tone: "primary",
+        summary: "sum"
+    },
+    {
+        key: "err",
+        label: "Request error rate",
+        value: (point) => point.errorRate,
+        format: percent,
+        tone: "danger",
+        max: 100,
+        summary: "avg"
+    },
+    {
+        key: "rt",
+        label: "Response time",
+        value: (point) => point.avgResponseMs,
+        format: (value) => `${Math.round(value)} ms`,
+        tone: "warning",
+        summary: "avg"
+    },
+    {
+        key: "net",
+        label: "Public network traffic",
+        value: (point) => point.bytesPerSec,
+        format: formatRate,
+        tone: "success",
+        summary: "avg"
+    }
 ];
 
 /**
@@ -1779,9 +2113,16 @@ function ExposureRow({
                 </span>
             )}
             {badge && (
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    {badge}
+                </span>
             )}
-            <Switch checked={enabled} onChange={onToggle} disabled={pending} aria-label={enabled ? "Disable" : "Enable"} />
+            <Switch
+                checked={enabled}
+                onChange={onToggle}
+                disabled={pending}
+                aria-label={enabled ? "Disable" : "Enable"}
+            />
             {/* Remove sits to the right of the switch, in a fixed-width slot so the
                 switches still line up across every row whether or not a row has one. */}
             <span className="flex w-5 shrink-0 items-center justify-center">
@@ -1793,7 +2134,11 @@ function ExposureRow({
                         disabled={pending}
                         className="text-muted-foreground transition-opacity hover:text-danger disabled:opacity-50 md:opacity-0 md:group-hover:opacity-100"
                     >
-                        {pending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
+                        {pending ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                            <X className="size-3.5" />
+                        )}
                     </button>
                 )}
             </span>
@@ -1802,11 +2147,24 @@ function ExposureRow({
 }
 
 /** The app's Cloudflare quick tunnel, shown when running. Refetches on `nonce` change. */
-function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.quickTunnelStatusAction>> | null>(null);
+function QuickTunnelRow({
+    appId,
+    nonce,
+    onChanged
+}: {
+    appId: string;
+    nonce: number;
+    onChanged: () => void;
+}) {
+    const [status, setStatus] = useState<Awaited<
+        ReturnType<typeof deployActions.quickTunnelStatusAction>
+    > | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions.quickTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions
+            .quickTunnelStatusAction(appId)
+            .then(setStatus)
+            .catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.running) return null;
     return (
@@ -1830,11 +2188,24 @@ function QuickTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 }
 
 /** The app's ngrok tunnel, shown when running. */
-function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.ngrokTunnelStatusAction>> | null>(null);
+function NgrokTunnelRow({
+    appId,
+    nonce,
+    onChanged
+}: {
+    appId: string;
+    nonce: number;
+    onChanged: () => void;
+}) {
+    const [status, setStatus] = useState<Awaited<
+        ReturnType<typeof deployActions.ngrokTunnelStatusAction>
+    > | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions.ngrokTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions
+            .ngrokTunnelStatusAction(appId)
+            .then(setStatus)
+            .catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.running) return null;
     return (
@@ -1856,11 +2227,24 @@ function NgrokTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
 }
 
 /** The app's Cloudflare named tunnel (stable hostname), shown when configured. */
-function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: number; onChanged: () => void }) {
-    const [status, setStatus] = useState<Awaited<ReturnType<typeof deployActions.namedTunnelStatusAction>> | null>(null);
+function NamedTunnelRow({
+    appId,
+    nonce,
+    onChanged
+}: {
+    appId: string;
+    nonce: number;
+    onChanged: () => void;
+}) {
+    const [status, setStatus] = useState<Awaited<
+        ReturnType<typeof deployActions.namedTunnelStatusAction>
+    > | null>(null);
     const [pending, startTransition] = useTransition();
     useEffect(() => {
-        void deployActions.namedTunnelStatusAction(appId).then(setStatus).catch(() => undefined);
+        void deployActions
+            .namedTunnelStatusAction(appId)
+            .then(setStatus)
+            .catch(() => undefined);
     }, [appId, nonce]);
     if (!status?.configured || !status.hostname) return null;
     const enabled = status.enabled;
@@ -1869,12 +2253,22 @@ function NamedTunnelRow({ appId, nonce, onChanged }: { appId: string; nonce: num
             icon={<CloudflareMark className="size-3.5" />}
             label={status.hostname}
             href={`https://${status.hostname}`}
-            badge={!enabled ? "disabled" : status.managed ? "auto" : status.running ? "tunnel" : "not running"}
+            badge={
+                !enabled
+                    ? "disabled"
+                    : status.managed
+                      ? "auto"
+                      : status.running
+                        ? "tunnel"
+                        : "not running"
+            }
             enabled={enabled}
             pending={pending}
             onToggle={(next) =>
                 startTransition(async () => {
-                    await deployActions.setNamedTunnelEnabledAction({ applicationId: appId, enabled: next }).catch(() => undefined);
+                    await deployActions
+                        .setNamedTunnelEnabledAction({ applicationId: appId, enabled: next })
+                        .catch(() => undefined);
                     onChanged();
                 })
             }
@@ -1902,15 +2296,47 @@ type ExposureKind =
     | "ngrok";
 
 const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[] = [
-    { value: "zone", label: "Your domain (zone subdomain)", icon: <Globe className="size-4 text-primary" /> },
-    { value: "subdomain", label: "Free subdomain (auto)", icon: <Globe className="size-4 text-muted-foreground" /> },
-    { value: "local", label: "Local subdomain (LAN)", icon: <MapPin className="size-4 text-muted-foreground" /> },
-    { value: "le", label: "Custom domain (any hostname)", icon: <Globe className="size-4 text-muted-foreground" /> },
-    { value: "cf-named", label: "Cloudflare tunnel - custom domain", icon: <CloudflareMark className="size-4" /> },
-    { value: "cf-quick", label: "Cloudflare quick link (free)", icon: <CloudflareMark className="size-4" /> },
+    {
+        value: "zone",
+        label: "Your domain (zone subdomain)",
+        icon: <Globe className="size-4 text-primary" />
+    },
+    {
+        value: "subdomain",
+        label: "Free subdomain (auto)",
+        icon: <Globe className="size-4 text-muted-foreground" />
+    },
+    {
+        value: "local",
+        label: "Local subdomain (LAN)",
+        icon: <MapPin className="size-4 text-muted-foreground" />
+    },
+    {
+        value: "le",
+        label: "Custom domain (any hostname)",
+        icon: <Globe className="size-4 text-muted-foreground" />
+    },
+    {
+        value: "cf-named",
+        label: "Cloudflare tunnel - custom domain",
+        icon: <CloudflareMark className="size-4" />
+    },
+    {
+        value: "cf-quick",
+        label: "Cloudflare quick link (free)",
+        icon: <CloudflareMark className="size-4" />
+    },
     { value: "ngrok", label: "ngrok tunnel", icon: <NgrokMark className="size-4" /> },
-    { value: "duckdns", label: "DuckDNS subdomain", icon: <img src="/logos/duckdns.webp" alt="" className="size-4 shrink-0" /> },
-    { value: "proxy", label: "Behind a tunnel/proxy", icon: <Globe className="size-4 text-muted-foreground" /> }
+    {
+        value: "duckdns",
+        label: "DuckDNS subdomain",
+        icon: <img src="/logos/duckdns.webp" alt="" className="size-4 shrink-0" />
+    },
+    {
+        value: "proxy",
+        label: "Behind a tunnel/proxy",
+        icon: <Globe className="size-4 text-muted-foreground" />
+    }
 ];
 
 /** Stands in for the base-domain zone, whose label is empty - Radix rejects an
@@ -1936,7 +2362,13 @@ type ZoneSubdomainCheck = Awaited<ReturnType<typeof deployActions.zoneSubdomainA
 
 /** A URL-safe label from the app name, the default for a local/DuckDNS subdomain. */
 function defaultLabel(name: string): string {
-    return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "app";
+    return (
+        name
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "") || "app"
+    );
 }
 
 /** What the server did about a custom hostname's DNS, when it did anything. */
@@ -1946,7 +2378,8 @@ type AddDomainDns = Awaited<ReturnType<typeof deployActions.addDomainAction>>["d
  *  already answers here, which is the case that needs saying nothing. */
 function dnsAdvice(dns: AddDomainDns, hostname: string): string | null {
     if (!dns || dns.status === "unchanged") return null;
-    if (dns.status === "created") return `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`;
+    if (dns.status === "created")
+        return `${hostname} now points at ${dns.ip}. It may take a few minutes to spread.`;
     if (dns.status === "conflict") {
         return `${hostname} already points at ${dns.content}, so Polaris left it alone. Repoint it at ${dns.ip} to serve this app here.`;
     }
@@ -1983,7 +2416,9 @@ function DomainCertificateButton({
         startTransition(async () => {
             const result = await deployActions
                 .setDomainCertificateAction(domainId, input)
-                .catch((): { error?: string; warning?: string } => ({ error: "That did not go through." }));
+                .catch((): { error?: string; warning?: string } => ({
+                    error: "That did not go through."
+                }));
             if (result?.error) {
                 setError(result.error);
                 return;
@@ -2002,11 +2437,17 @@ function DomainCertificateButton({
             <button
                 type="button"
                 onClick={() => setOpen(true)}
-                aria-label={supplied ? `Replace the certificate on ${hostname}` : `Use your own certificate on ${hostname}`}
+                aria-label={
+                    supplied
+                        ? `Replace the certificate on ${hostname}`
+                        : `Use your own certificate on ${hostname}`
+                }
                 title={supplied ? "Serving your own certificate" : "Use your own certificate"}
                 className={cn(
                     "shrink-0 rounded p-1 transition-colors hover:bg-muted hover:text-foreground",
-                    supplied ? "text-primary" : "text-muted-foreground md:opacity-0 md:group-hover:opacity-100"
+                    supplied
+                        ? "text-primary"
+                        : "text-muted-foreground md:opacity-0 md:group-hover:opacity-100"
                 )}
             >
                 <ShieldCheck className="size-3.5" />
@@ -2016,9 +2457,9 @@ function DomainCertificateButton({
                     <DialogTitle>Certificate for {hostname}</DialogTitle>
                     <div className="flex flex-col gap-3 text-sm">
                         <p className="text-xs text-muted-foreground">
-                            Polaris issues and renews a certificate for this name on its own. Paste one here to serve
-                            yours instead - it has to cover {hostname} and still be valid, or Polaris keeps using the
-                            one it manages.
+                            Polaris issues and renews a certificate for this name on its own. Paste
+                            one here to serve yours instead - it has to cover {hostname} and still
+                            be valid, or Polaris keeps using the one it manages.
                         </p>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Certificate chain (PEM)
@@ -2043,11 +2484,24 @@ function DomainCertificateButton({
                         {error && <p className="text-xs text-danger">{error}</p>}
                         {warning && <p className="text-xs text-warning">{warning}</p>}
                         <div className="flex items-center gap-2">
-                            <Button size="sm" disabled={pending || !certPem.trim() || !keyPem.trim()} onClick={() => save({ certPem, keyPem })}>
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : "Use this certificate"}
+                            <Button
+                                size="sm"
+                                disabled={pending || !certPem.trim() || !keyPem.trim()}
+                                onClick={() => save({ certPem, keyPem })}
+                            >
+                                {pending ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    "Use this certificate"
+                                )}
                             </Button>
                             {supplied && (
-                                <Button size="sm" variant="outline" disabled={pending} onClick={() => save(null)}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={pending}
+                                    onClick={() => save(null)}
+                                >
                                     Back to the managed one
                                 </Button>
                             )}
@@ -2060,7 +2514,11 @@ function DomainCertificateButton({
 }
 
 /** One domain's probe result, as the panel overlays it onto what was rendered. */
-type DomainHealth = { healthStatus?: string | null; healthCode?: number | null; healthDetail?: string | null };
+type DomainHealth = {
+    healthStatus?: string | null;
+    healthCode?: number | null;
+    healthDetail?: string | null;
+};
 
 /**
  * Keep the status dots current while the panel is open.
@@ -2162,14 +2620,21 @@ function SettingsTab({
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void deployActions.cloudflareAccountStatusAction().then((status) => setCfConnected(status.connected)).catch(() => undefined);
-        void deployActions.duckdnsSubdomainAction().then((result) => setDuckSub(result.subdomain)).catch(() => undefined);
+        void deployActions
+            .cloudflareAccountStatusAction()
+            .then((status) => setCfConnected(status.connected))
+            .catch(() => undefined);
+        void deployActions
+            .duckdnsSubdomainAction()
+            .then((result) => setDuckSub(result.subdomain))
+            .catch(() => undefined);
         // The zones belong to the Polaris host: their wildcard points here, so an app
         // on a remote server would be offered a hostname that resolves to the wrong
         // machine (and the server would ignore it anyway). Those keep their own
         // server's domain instead.
         if (app.serverId !== "local") return;
-        void deployActions.deployZonesAction()
+        void deployActions
+            .deployZonesAction()
             .then(({ baseDomain: base, zones: result, manageHref }) => {
                 setZones(result);
                 setBaseDomain(base);
@@ -2188,7 +2653,9 @@ function SettingsTab({
                 const wildcards = result.filter((zone) => zone.kind !== "base");
                 if (wildcards.length > 0 && !exposureTouched.current) {
                     setExposure("zone");
-                    setZoneLabel((wildcards.find((zone) => zone.primary) ?? wildcards[0])?.label ?? "");
+                    setZoneLabel(
+                        (wildcards.find((zone) => zone.primary) ?? wildcards[0])?.label ?? ""
+                    );
                 }
             })
             .catch(() => undefined);
@@ -2206,19 +2673,27 @@ function SettingsTab({
         if (checkedSubdomain.current === key) return;
         let active = true;
         setCheckingSubdomain(true);
-        const timer = setTimeout(() => {
-            void deployActions.zoneSubdomainAction({ applicationId: app.id, zoneLabel: zoneKey, subdomain: typed || undefined })
-                .then((result) => {
-                    if (!active) return;
-                    checkedSubdomain.current = `${zoneKey}|${result.subdomain}`;
-                    setCheckingSubdomain(false);
-                    setSubdomainCheck(result);
-                    if (!typed && result.subdomain) setSubdomain(result.subdomain);
-                })
-                .catch(() => {
-                    if (active) setCheckingSubdomain(false);
-                });
-        }, typed ? 400 : 0);
+        const timer = setTimeout(
+            () => {
+                void deployActions
+                    .zoneSubdomainAction({
+                        applicationId: app.id,
+                        zoneLabel: zoneKey,
+                        subdomain: typed || undefined
+                    })
+                    .then((result) => {
+                        if (!active) return;
+                        checkedSubdomain.current = `${zoneKey}|${result.subdomain}`;
+                        setCheckingSubdomain(false);
+                        setSubdomainCheck(result);
+                        if (!typed && result.subdomain) setSubdomain(result.subdomain);
+                    })
+                    .catch(() => {
+                        if (active) setCheckingSubdomain(false);
+                    });
+            },
+            typed ? 400 : 0
+        );
         return () => {
             active = false;
             clearTimeout(timer);
@@ -2275,7 +2750,12 @@ function SettingsTab({
         exposure === "proxy";
     const usesLabel = exposure === "local" || exposure === "duckdns";
     const needsHostname = exposure === "le" || exposure === "proxy" || exposure === "cf-named";
-    const labelSuffix = exposure === "local" ? ".plr.local" : exposure === "duckdns" && duckSub ? `.${duckSub}.duckdns.org` : "";
+    const labelSuffix =
+        exposure === "local"
+            ? ".plr.local"
+            : exposure === "duckdns" && duckSub
+              ? `.${duckSub}.duckdns.org`
+              : "";
     // Suggest a name straight on the operator's own domain, since that is the one
     // people reach for first and the zone picker cannot offer it. Any other domain is
     // just as valid - the field takes whatever is typed.
@@ -2283,7 +2763,8 @@ function SettingsTab({
     const duckMissing = exposure === "duckdns" && !duckSub;
     // A tunnel URL is already exposed by its tunnel; adding it as a domain only makes a
     // duplicate, dead route. Flag it as the user types (the server rejects it too).
-    const hostnameIsTunnel = (exposure === "le" || exposure === "proxy") && isTunnelHostname(hostname.trim());
+    const hostnameIsTunnel =
+        (exposure === "le" || exposure === "proxy") && isTunnelHostname(hostname.trim());
 
     // The target port the route stores: the Advanced override, else the app's known
     // port, else a sensible default. Routing serves on 80/443 regardless.
@@ -2313,23 +2794,53 @@ function SettingsTab({
             } else if (exposure === "subdomain") {
                 // Auto = always reachable: a universally-resolvable sslip.io LAN name,
                 // plus a free Cloudflare quick tunnel for public access when behind NAT.
-                result = await deployActions.autoExposeAction({ applicationId: app.id, targetPort: targetPort() });
+                result = await deployActions.autoExposeAction({
+                    applicationId: app.id,
+                    targetPort: targetPort()
+                });
             } else if (exposure === "local") {
-                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: `${labelValue}.plr.local`, targetPort: targetPort(), cert: "internal" });
+                result = await deployActions.addDomainAction({
+                    applicationId: app.id,
+                    hostname: `${labelValue}.plr.local`,
+                    targetPort: targetPort(),
+                    cert: "internal"
+                });
             } else if (exposure === "duckdns") {
                 if (!duckSub) {
                     setError("Configure DuckDNS under Integrations first");
                     return;
                 }
-                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: `${labelValue}.${duckSub}.duckdns.org`, targetPort: targetPort(), cert: "le" });
+                result = await deployActions.addDomainAction({
+                    applicationId: app.id,
+                    hostname: `${labelValue}.${duckSub}.duckdns.org`,
+                    targetPort: targetPort(),
+                    cert: "le"
+                });
             } else if (exposure === "le") {
-                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "le" });
+                result = await deployActions.addDomainAction({
+                    applicationId: app.id,
+                    hostname: hostname.trim() || undefined,
+                    targetPort: targetPort(),
+                    cert: "le"
+                });
             } else if (exposure === "proxy") {
-                result = await deployActions.addDomainAction({ applicationId: app.id, hostname: hostname.trim() || undefined, targetPort: targetPort(), cert: "none" });
+                result = await deployActions.addDomainAction({
+                    applicationId: app.id,
+                    hostname: hostname.trim() || undefined,
+                    targetPort: targetPort(),
+                    cert: "none"
+                });
             } else if (exposure === "cf-named") {
                 result = cfConnected
-                    ? await deployActions.provisionNamedTunnelAction({ applicationId: app.id, hostname })
-                    : await deployActions.startNamedTunnelAction({ applicationId: app.id, token: connectorToken, hostname });
+                    ? await deployActions.provisionNamedTunnelAction({
+                          applicationId: app.id,
+                          hostname
+                      })
+                    : await deployActions.startNamedTunnelAction({
+                          applicationId: app.id,
+                          token: connectorToken,
+                          hostname
+                      });
             } else if (exposure === "cf-quick") {
                 result = await deployActions.startQuickTunnelAction(app.id);
             } else if (exposure === "ngrok") {
@@ -2388,287 +2899,346 @@ function SettingsTab({
             {can("service.configure") && <ServerSection app={app} onChanged={onChanged} />}
 
             {can("service.configure") && (
-            <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Networking</h3>
-                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    Container port
-                    <Input
-                        value={containerPort}
-                        onChange={(event) => setContainerPort(event.target.value)}
-                        placeholder="Auto (from image)"
-                        inputMode="numeric"
-                        className="w-40"
-                    />
-                    <span>
-                        The port the app listens on inside its container. Leave empty to detect it from the image
-                        automatically; set it (e.g. 5601 for OpenSearch Dashboards) only when the image exposes several
-                        ports or none. The IP:port link and every domain route target it. Applies on the next deploy.
-                    </span>
-                </label>
-                {app.ipUrl && (
-                    <a
-                        href={app.ipUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                        <Globe className="size-3" /> {app.ipUrl.replace(/^https?:\/\//, "")}
-                    </a>
-                )}
-            </section>
+                <section className="flex flex-col gap-2">
+                    <h3 className="text-sm font-medium">Networking</h3>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Container port
+                        <Input
+                            value={containerPort}
+                            onChange={(event) => setContainerPort(event.target.value)}
+                            placeholder="Auto (from image)"
+                            inputMode="numeric"
+                            className="w-40"
+                        />
+                        <span>
+                            The port the app listens on inside its container. Leave empty to detect
+                            it from the image automatically; set it (e.g. 5601 for OpenSearch
+                            Dashboards) only when the image exposes several ports or none. The
+                            IP:port link and every domain route target it. Applies on the next
+                            deploy.
+                        </span>
+                    </label>
+                    {app.ipUrl && (
+                        <a
+                            href={app.ipUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                            <Globe className="size-3" /> {app.ipUrl.replace(/^https?:\/\//, "")}
+                        </a>
+                    )}
+                </section>
             )}
 
             {can("domains.manage") && (
-            <section className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-medium">Public access</h3>
-                    <p className="text-xs text-muted-foreground">
-                        Reach this service from the internet. Point a domain here, or expose it through a Cloudflare
-                        tunnel that needs no DNS or port-forwarding - pick whichever method fits your setup.
-                    </p>
-                </div>
-                <ul className="flex flex-col gap-1">
-                    {app.domains.map((rendered) => {
-                        const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
-                        return (
-                        <li key={domain.id} className="group flex items-center gap-2">
-                            {domain.enabled && (
-                                <span
-                                    title={
-                                        domain.healthStatus === "down"
-                                            ? `Not reachable${domain.healthDetail ? ` - ${domain.healthDetail}` : ""}`
-                                            : domain.healthStatus === "up"
-                                              ? `Reachable${domain.healthCode ? ` (HTTP ${domain.healthCode})` : ""}`
-                                              : "Checking..."
-                                    }
-                                    className={cn(
-                                        "size-2 shrink-0 rounded-full",
-                                        domain.healthStatus === "up" && "bg-success",
-                                        domain.healthStatus === "down" && "bg-danger",
-                                        domain.healthStatus !== "up" &&
-                                            domain.healthStatus !== "down" &&
-                                            "animate-pulse bg-muted-foreground/40"
-                                    )}
-                                />
-                            )}
-                            {domain.enabled ? (
-                                <a
-                                    href={`https://${domain.hostname}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
-                                >
-                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                </a>
-                            ) : (
-                                <span
-                                    title="Domain disabled - not serving"
-                                    className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
-                                >
-                                    <Globe className="size-3 shrink-0" /> {domain.hostname}
-                                </span>
-                            )}
-                            {(domain.kind === "lan" || domain.hostname.endsWith(".plr.local")) && (
-                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">local</span>
-                            )}
-                            <DomainCertificateButton
-                                domainId={domain.id}
-                                hostname={domain.hostname}
-                                supplied={domain.hasCertificate === true}
-                                onChanged={onChanged}
-                            />
-                            <Switch
-                                checked={domain.enabled}
-                                onChange={(next) => startTransition(async () => { await deployActions.setDomainEnabledAction(domain.id, next); onChanged(); })}
-                                aria-label={domain.enabled ? "Disable domain" : "Enable domain"}
-                            />
-                            <span className="flex w-5 shrink-0 items-center justify-center">
-                                <button
-                                    type="button"
-                                    title="Remove domain"
-                                    onClick={() => startTransition(async () => { await deployActions.removeDomainAction(domain.id); onChanged(); })}
-                                    className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
-                                >
-                                    <Trash2 className="size-3.5" />
-                                </button>
-                            </span>
-                        </li>
-                        );
-                    })}
-                    <NamedTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
-                    <QuickTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
-                    <NgrokTunnelRow appId={app.id} nonce={tunnelNonce} onChanged={() => setTunnelNonce((nonce) => nonce + 1)} />
-                </ul>
-                <MethodBlock
-                    icon={<Globe className="size-4" />}
-                    title="Add a domain"
-                    description="Pick how to expose this service - a free subdomain, your own domain with Let's Encrypt, or a Cloudflare/ngrok tunnel that needs no DNS or port-forwarding."
-                >
+                <section className="flex flex-col gap-4">
                     <div className="flex flex-col gap-2">
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            Exposure
-                            <Select
-                                value={exposure}
-                                onValueChange={(value) => {
-                                    exposureTouched.current = true;
-                                    setExposure(value as ExposureKind);
-                                    setDnsNote(null);
-                                }}
-                                options={EXPOSURE_OPTIONS.filter((option) => option.value !== "zone" || zones.length > 0)}
-                                aria-label="Exposure method"
-                            />
-                        </label>
-                        {exposure === "zone" && zones.length > 0 && (
-                            <div className="flex flex-col gap-2">
+                        <h3 className="text-sm font-medium">Public access</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Reach this service from the internet. Point a domain here, or expose it
+                            through a Cloudflare tunnel that needs no DNS or port-forwarding - pick
+                            whichever method fits your setup.
+                        </p>
+                    </div>
+                    <ul className="flex flex-col gap-1">
+                        {app.domains.map((rendered) => {
+                            const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
+                            return (
+                                <li key={domain.id} className="group flex items-center gap-2">
+                                    {domain.enabled && (
+                                        <span
+                                            title={
+                                                domain.healthStatus === "down"
+                                                    ? `Not reachable${domain.healthDetail ? ` - ${domain.healthDetail}` : ""}`
+                                                    : domain.healthStatus === "up"
+                                                      ? `Reachable${domain.healthCode ? ` (HTTP ${domain.healthCode})` : ""}`
+                                                      : "Checking..."
+                                            }
+                                            className={cn(
+                                                "size-2 shrink-0 rounded-full",
+                                                domain.healthStatus === "up" && "bg-success",
+                                                domain.healthStatus === "down" && "bg-danger",
+                                                domain.healthStatus !== "up" &&
+                                                    domain.healthStatus !== "down" &&
+                                                    "animate-pulse bg-muted-foreground/40"
+                                            )}
+                                        />
+                                    )}
+                                    {domain.enabled ? (
+                                        <a
+                                            href={`https://${domain.hostname}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-primary hover:underline"
+                                        >
+                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                        </a>
+                                    ) : (
+                                        <span
+                                            title="Domain disabled - not serving"
+                                            className="inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs text-muted-foreground line-through"
+                                        >
+                                            <Globe className="size-3 shrink-0" /> {domain.hostname}
+                                        </span>
+                                    )}
+                                    {(domain.kind === "lan" ||
+                                        domain.hostname.endsWith(".plr.local")) && (
+                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                            local
+                                        </span>
+                                    )}
+                                    <DomainCertificateButton
+                                        domainId={domain.id}
+                                        hostname={domain.hostname}
+                                        supplied={domain.hasCertificate === true}
+                                        onChanged={onChanged}
+                                    />
+                                    <Switch
+                                        checked={domain.enabled}
+                                        onChange={(next) =>
+                                            startTransition(async () => {
+                                                await deployActions.setDomainEnabledAction(
+                                                    domain.id,
+                                                    next
+                                                );
+                                                onChanged();
+                                            })
+                                        }
+                                        aria-label={
+                                            domain.enabled ? "Disable domain" : "Enable domain"
+                                        }
+                                    />
+                                    <span className="flex w-5 shrink-0 items-center justify-center">
+                                        <button
+                                            type="button"
+                                            title="Remove domain"
+                                            onClick={() =>
+                                                startTransition(async () => {
+                                                    await deployActions.removeDomainAction(
+                                                        domain.id
+                                                    );
+                                                    onChanged();
+                                                })
+                                            }
+                                            className="text-muted-foreground transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                        </button>
+                                    </span>
+                                </li>
+                            );
+                        })}
+                        <NamedTunnelRow
+                            appId={app.id}
+                            nonce={tunnelNonce}
+                            onChanged={() => setTunnelNonce((nonce) => nonce + 1)}
+                        />
+                        <QuickTunnelRow
+                            appId={app.id}
+                            nonce={tunnelNonce}
+                            onChanged={() => setTunnelNonce((nonce) => nonce + 1)}
+                        />
+                        <NgrokTunnelRow
+                            appId={app.id}
+                            nonce={tunnelNonce}
+                            onChanged={() => setTunnelNonce((nonce) => nonce + 1)}
+                        />
+                    </ul>
+                    <MethodBlock
+                        icon={<Globe className="size-4" />}
+                        title="Add a domain"
+                        description="Pick how to expose this service - a free subdomain, your own domain with Let's Encrypt, or a Cloudflare/ngrok tunnel that needs no DNS or port-forwarding."
+                    >
+                        <div className="flex flex-col gap-2">
+                            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                Exposure
                                 <Select
-                                    value={(zoneLabel ?? zones[0]?.label) || ZONE_ROOT}
+                                    value={exposure}
                                     onValueChange={(value) => {
-                                        setZoneLabel(value === ZONE_ROOT ? "" : value);
-                                        setSubdomainCheck(null);
+                                        exposureTouched.current = true;
+                                        setExposure(value as ExposureKind);
+                                        setDnsNote(null);
                                     }}
-                                    options={zones.map((zone) => ({
-                                        value: zone.label || ZONE_ROOT,
-                                        label: zoneOptionLabel(zone)
-                                    }))}
-                                    aria-label="Zone"
+                                    options={EXPOSURE_OPTIONS.filter(
+                                        (option) => option.value !== "zone" || zones.length > 0
+                                    )}
+                                    aria-label="Exposure method"
                                 />
-                                <Link
-                                    href={domainsHref}
+                            </label>
+                            {exposure === "zone" && zones.length > 0 && (
+                                <div className="flex flex-col gap-2">
+                                    <Select
+                                        value={(zoneLabel ?? zones[0]?.label) || ZONE_ROOT}
+                                        onValueChange={(value) => {
+                                            setZoneLabel(value === ZONE_ROOT ? "" : value);
+                                            setSubdomainCheck(null);
+                                        }}
+                                        options={zones.map((zone) => ({
+                                            value: zone.label || ZONE_ROOT,
+                                            label: zoneOptionLabel(zone)
+                                        }))}
+                                        aria-label="Zone"
+                                    />
+                                    <Link
+                                        href={domainsHref}
+                                        className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                                    >
+                                        <Plus className="size-3.5" />
+                                        Add a domain
+                                    </Link>
+                                    {!randomName && (
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    value={subdomain}
+                                                    onChange={(event) =>
+                                                        setSubdomain(event.target.value)
+                                                    }
+                                                    placeholder={defaultLabel(app.name)}
+                                                    autoComplete="off"
+                                                    aria-invalid={subdomainTaken}
+                                                    aria-label="Subdomain"
+                                                />
+                                                <span className="shrink-0 text-xs text-muted-foreground">
+                                                    .{zoneHost}
+                                                </span>
+                                            </div>
+                                            {subdomainTaken && (
+                                                <p className="text-xs text-danger">
+                                                    {subdomainCheck?.invalid
+                                                        ? "Use letters, digits and dashes."
+                                                        : "That subdomain is already in use."}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <Checkbox
+                                            checked={randomName}
+                                            onChange={(event) =>
+                                                setRandomName(event.target.checked)
+                                            }
+                                        />
+                                        Use a random name instead
+                                    </label>
+                                </div>
+                            )}
+                            {usesLabel && !duckMissing && (
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        value={label}
+                                        onChange={(event) => setLabel(event.target.value)}
+                                        placeholder={defaultLabel(app.name)}
+                                        autoComplete="off"
+                                    />
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        {labelSuffix}
+                                    </span>
+                                </div>
+                            )}
+                            {needsHostname && (
+                                <Input
+                                    value={hostname}
+                                    onChange={(event) => setHostname(event.target.value)}
+                                    placeholder={hostnameHint}
+                                    aria-invalid={hostnameIsTunnel}
+                                />
+                            )}
+                            {hostnameIsTunnel && (
+                                <p className="text-xs text-danger">
+                                    That is a tunnel URL - it is already exposed by its tunnel, so
+                                    it can&apos;t be added as a domain.
+                                </p>
+                            )}
+                            {exposure === "cf-named" && !cfConnected && (
+                                <Input
+                                    value={connectorToken}
+                                    onChange={(event) => setConnectorToken(event.target.value)}
+                                    placeholder="Cloudflare connector token (eyJhIjoi...)"
+                                    className="font-mono"
+                                />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {exposure === "zone"
+                                    ? zone?.kind === "base"
+                                        ? `A hostname straight on ${zoneHost}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.`
+                                        : "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name on a domain that is not listed, pick Custom domain."
+                                    : exposure === "subdomain"
+                                      ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
+                                      : exposure === "local"
+                                        ? "A friendly <name>.plr.local address, LOCAL only - it resolves on your LAN via mDNS (works on macOS/iOS and most modern devices; Windows may not resolve it, use the free subdomain there). Trusted HTTPS once you install the CA root (Admin - Domains)."
+                                        : exposure === "le"
+                                          ? `Any hostname on any domain - ${hostnameHint} on your own, or a different domain entirely. Polaris writes the DNS record itself when the domain sits in your connected Cloudflare account; otherwise point it at this server. The certificate is issued automatically either way.`
+                                          : exposure === "duckdns"
+                                            ? duckMissing
+                                                ? "Configure DuckDNS under Integrations first, then pick a subdomain here."
+                                                : "Just the subdomain - the base is your DuckDNS domain. It resolves via DuckDNS with a Let's Encrypt certificate automatically."
+                                            : exposure === "proxy"
+                                              ? "For a domain fronted by an external proxy that terminates TLS."
+                                              : exposure === "cf-named"
+                                                ? cfConnected
+                                                    ? "Polaris creates the tunnel and the DNS record for you - just enter a hostname on a domain in your Cloudflare account."
+                                                    : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
+                                                : exposure === "cf-quick"
+                                                  ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
+                                                  : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
+                            </p>
+                            {duckMissing && (
+                                <a
+                                    href="/admin/integrations"
                                     className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
                                 >
-                                    <Plus className="size-3.5" />
-                                    Add a domain
-                                </Link>
-                                {!randomName && (
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-2">
+                                    Set up DuckDNS <ExternalLink className="size-3" />
+                                </a>
+                            )}
+                            {isDomainExposure && (
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAdvanced((value) => !value)}
+                                        className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                        {advanced ? (
+                                            <ChevronDown className="size-3.5" />
+                                        ) : (
+                                            <ChevronRight className="size-3.5" />
+                                        )}{" "}
+                                        Advanced
+                                    </button>
+                                    {advanced && (
+                                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                            Target port
                                             <Input
-                                                value={subdomain}
-                                                onChange={(event) => setSubdomain(event.target.value)}
-                                                placeholder={defaultLabel(app.name)}
-                                                autoComplete="off"
-                                                aria-invalid={subdomainTaken}
-                                                aria-label="Subdomain"
+                                                value={port}
+                                                onChange={(event) => setPort(event.target.value)}
+                                                placeholder={String(app.port ?? "auto")}
+                                                inputMode="numeric"
+                                                className="w-40"
                                             />
-                                            <span className="shrink-0 text-xs text-muted-foreground">.{zoneHost}</span>
-                                        </div>
-                                        {subdomainTaken && (
-                                            <p className="text-xs text-danger">
-                                                {subdomainCheck?.invalid
-                                                    ? "Use letters, digits and dashes."
-                                                    : "That subdomain is already in use."}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Checkbox
-                                        checked={randomName}
-                                        onChange={(event) => setRandomName(event.target.checked)}
-                                    />
-                                    Use a random name instead
-                                </label>
-                            </div>
-                        )}
-                        {usesLabel && !duckMissing && (
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    value={label}
-                                    onChange={(event) => setLabel(event.target.value)}
-                                    placeholder={defaultLabel(app.name)}
-                                    autoComplete="off"
-                                />
-                                <span className="shrink-0 text-xs text-muted-foreground">{labelSuffix}</span>
-                            </div>
-                        )}
-                        {needsHostname && (
-                            <Input
-                                value={hostname}
-                                onChange={(event) => setHostname(event.target.value)}
-                                placeholder={hostnameHint}
-                                aria-invalid={hostnameIsTunnel}
-                            />
-                        )}
-                        {hostnameIsTunnel && (
-                            <p className="text-xs text-danger">
-                                That is a tunnel URL - it is already exposed by its tunnel, so it can&apos;t be added as
-                                a domain.
-                            </p>
-                        )}
-                        {exposure === "cf-named" && !cfConnected && (
-                            <Input
-                                value={connectorToken}
-                                onChange={(event) => setConnectorToken(event.target.value)}
-                                placeholder="Cloudflare connector token (eyJhIjoi...)"
-                                className="font-mono"
-                            />
-                        )}
-                        <p className="text-xs text-muted-foreground">
-                            {exposure === "zone"
-                                ? zone?.kind === "base"
-                                    ? `A hostname straight on ${zoneHost}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.`
-                                    : "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name on a domain that is not listed, pick Custom domain."
-                                : exposure === "subdomain"
-                                ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
-                                : exposure === "local"
-                                  ? "A friendly <name>.plr.local address, LOCAL only - it resolves on your LAN via mDNS (works on macOS/iOS and most modern devices; Windows may not resolve it, use the free subdomain there). Trusted HTTPS once you install the CA root (Admin - Domains)."
-                                  : exposure === "le"
-                                    ? `Any hostname on any domain - ${hostnameHint} on your own, or a different domain entirely. Polaris writes the DNS record itself when the domain sits in your connected Cloudflare account; otherwise point it at this server. The certificate is issued automatically either way.`
-                                    : exposure === "duckdns"
-                                      ? duckMissing
-                                          ? "Configure DuckDNS under Integrations first, then pick a subdomain here."
-                                          : "Just the subdomain - the base is your DuckDNS domain. It resolves via DuckDNS with a Let's Encrypt certificate automatically."
-                                      : exposure === "proxy"
-                                        ? "For a domain fronted by an external proxy that terminates TLS."
-                                        : exposure === "cf-named"
-                                          ? cfConnected
-                                              ? "Polaris creates the tunnel and the DNS record for you - just enter a hostname on a domain in your Cloudflare account."
-                                              : "Create the tunnel in Cloudflare and paste its connector token. Tip: connect a Cloudflare API token under Integrations to skip this - then you only pick a hostname."
-                                          : exposure === "cf-quick"
-                                            ? "A throwaway *.trycloudflare.com URL - no account, no DNS, no port-forwarding. The link changes each time it starts."
-                                              : "A public ngrok URL forwarded to this app. Add your ngrok authtoken under Integrations first; ngrok's free plan allows one tunnel at a time."}
-                        </p>
-                        {duckMissing && (
-                            <a href="/admin/integrations" className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline">
-                                Set up DuckDNS <ExternalLink className="size-3" />
-                            </a>
-                        )}
-                        {isDomainExposure && (
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setAdvanced((value) => !value)}
-                                    className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                                            <span>
+                                                The container port this route targets. The service
+                                                is served on the standard 80/443 - you never put a
+                                                port in the URL. Defaults to the app's port.
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
+                            )}
+                            {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote}</p>}
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="outline"
+                                    onClick={submitExposure}
+                                    disabled={submitDisabled}
                                 >
-                                    {advanced ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />} Advanced
-                                </button>
-                                {advanced && (
-                                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                                        Target port
-                                        <Input
-                                            value={port}
-                                            onChange={(event) => setPort(event.target.value)}
-                                            placeholder={String(app.port ?? "auto")}
-                                            inputMode="numeric"
-                                            className="w-40"
-                                        />
-                                        <span>
-                                            The container port this route targets. The service is served on the standard
-                                            80/443 - you never put a port in the URL. Defaults to the app's port.
-                                        </span>
-                                    </label>
-                                )}
+                                    {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                                    {submitLabel}
+                                </Button>
                             </div>
-                        )}
-                        {dnsNote && <p className="text-xs text-muted-foreground">{dnsNote}</p>}
-                        <div className="flex justify-end">
-                            <Button variant="outline" onClick={submitExposure} disabled={submitDisabled}>
-                                {pending && <Loader2 className="size-4 animate-spin" />} {submitLabel}
-                            </Button>
                         </div>
-                    </div>
-                </MethodBlock>
-            </section>
+                    </MethodBlock>
+                </section>
             )}
 
             {isGit && can("service.configure") && (
@@ -2686,8 +3256,9 @@ function SettingsTab({
                                 spellCheck={false}
                             />
                             <span>
-                                Where this service lives in the repository. The build still gets the whole repository, so
-                                shared packages and the lockfile above it are available. Blank = the repository root.
+                                Where this service lives in the repository. The build still gets the
+                                whole repository, so shared packages and the lockfile above it are
+                                available. Blank = the repository root.
                             </span>
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -2714,9 +3285,9 @@ function SettingsTab({
                 <section className="flex flex-col gap-3">
                     <h3 className="text-sm font-medium">Build</h3>
                     <p className="text-xs text-muted-foreground">
-                        Polaris reads the repository and works these out - the framework, the package manager, and the
-                        workspace when there is one. Fill one in only to override what it found; the deployment log says
-                        what it detected.
+                        Polaris reads the repository and works these out - the framework, the
+                        package manager, and the workspace when there is one. Fill one in only to
+                        override what it found; the deployment log says what it detected.
                     </p>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -2761,16 +3332,28 @@ function SettingsTab({
                     <h3 className="text-sm font-medium">Auto-deploy</h3>
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>Deploy on push</span>
-                        <Switch checked={autoDeploy} onChange={setAutoDeploy} aria-label="Deploy on push" />
+                        <Switch
+                            checked={autoDeploy}
+                            onChange={setAutoDeploy}
+                            aria-label="Deploy on push"
+                        />
                     </div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Branch
-                            <Input value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="main" />
+                            <Input
+                                value={branch}
+                                onChange={(event) => setBranch(event.target.value)}
+                                placeholder="main"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Commit filter
-                            <Input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="build:" />
+                            <Input
+                                value={filter}
+                                onChange={(event) => setFilter(event.target.value)}
+                                placeholder="build:"
+                            />
                         </label>
                     </div>
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -2785,41 +3368,48 @@ function SettingsTab({
                             spellCheck={false}
                         />
                         <span>
-                            One glob per line. Deploy only when the push touched one of them, so a repository holding
-                            several services rebuilds just the ones that changed. Prefix with ! to exclude. Blank = any
-                            change.
+                            One glob per line. Deploy only when the push touched one of them, so a
+                            repository holding several services rebuilds just the ones that changed.
+                            Prefix with ! to exclude. Blank = any change.
                         </span>
                     </label>
                 </section>
             )}
 
             {can("service.configure") && (
-            <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Releases</h3>
-                <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
-                    <span>
-                        <span className="font-medium">Keep previous deployments</span>
-                        <span className="block text-xs text-muted-foreground">
-                            Keep the last few versions running, each on its own address, while this
-                            service&apos;s own address stays on the newest. A service with a volume or on
-                            another server keeps the history but not the containers.
+                <section className="flex flex-col gap-2">
+                    <h3 className="text-sm font-medium">Releases</h3>
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span>
+                            <span className="font-medium">Keep previous deployments</span>
+                            <span className="block text-xs text-muted-foreground">
+                                Keep the last few versions running, each on its own address, while
+                                this service&apos;s own address stays on the newest. A service with
+                                a volume or on another server keeps the history but not the
+                                containers.
+                            </span>
                         </span>
-                    </span>
-                    <Switch checked={keepReleases} onChange={setKeepReleases} aria-label="Keep previous deployments" />
-                </div>
-            </section>
+                        <Switch
+                            checked={keepReleases}
+                            onChange={setKeepReleases}
+                            aria-label="Keep previous deployments"
+                        />
+                    </div>
+                </section>
             )}
 
             {error && <p className="text-sm text-danger">{error}</p>}
             {can("service.configure") && (
-            <div className="flex justify-end">
-                <Button onClick={saveSettings} disabled={pending}>
-                    {pending && <Loader2 className="size-4 animate-spin" />} Save settings
-                </Button>
-            </div>
+                <div className="flex justify-end">
+                    <Button onClick={saveSettings} disabled={pending}>
+                        {pending && <Loader2 className="size-4 animate-spin" />} Save settings
+                    </Button>
+                </div>
             )}
 
-            {can("service.delete") && <DangerSection app={app} staged={staged} onChanged={onChanged} />}
+            {can("service.delete") && (
+                <DangerSection app={app} staged={staged} onChanged={onChanged} />
+            )}
         </div>
     );
 }
@@ -2829,7 +3419,15 @@ function SettingsTab({
  * the top of the project is what actually carries it out, so there is a step
  * between the click and the container being gone.
  */
-function DangerSection({ app, staged, onChanged }: { app: ProjectApp; staged: boolean; onChanged: () => void }) {
+function DangerSection({
+    app,
+    staged,
+    onChanged
+}: {
+    app: ProjectApp;
+    staged: boolean;
+    onChanged: () => void;
+}) {
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -2859,7 +3457,12 @@ function DangerSection({ app, staged, onChanged }: { app: ProjectApp; staged: bo
                             : "Removes the container, its domains, variables and deploy history."}
                     </span>
                 </span>
-                <Button variant="danger" size="sm" disabled={staged} onClick={() => setConfirming(true)}>
+                <Button
+                    variant="danger"
+                    size="sm"
+                    disabled={staged}
+                    onClick={() => setConfirming(true)}
+                >
                     <Trash2 className="size-4" /> {staged ? "Removal pending" : "Delete"}
                 </Button>
             </div>
@@ -2889,7 +3492,8 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
     const [pending, startTransition] = useTransition();
 
     useEffect(() => {
-        void deployActions.listDeployServersAction(app.environmentId)
+        void deployActions
+            .listDeployServersAction(app.environmentId)
             .then((list) => setServers(list))
             .catch(() => undefined);
     }, [app.environmentId]);
@@ -2919,15 +3523,17 @@ function ServerSection({ app, onChanged }: { app: ProjectApp; onChanged: () => v
                     aria-label="Server"
                 />
                 <span>
-                    Move the service to another connected server. Connect more under Servers. Changing this stops the
-                    current container on the old server; redeploy to bring it up on the new one.
+                    Move the service to another connected server. Connect more under Servers.
+                    Changing this stops the current container on the old server; redeploy to bring
+                    it up on the new one.
                 </span>
             </label>
             {error && <p className="text-sm text-danger">{error}</p>}
             {changed && (
                 <div className="flex justify-end">
                     <Button variant="outline" onClick={move} disabled={pending}>
-                        {pending && <Loader2 className="size-4 animate-spin" />} Move to {options.find((server) => server.id === serverId)?.name ?? "server"}
+                        {pending && <Loader2 className="size-4 animate-spin" />} Move to{" "}
+                        {options.find((server) => server.id === serverId)?.name ?? "server"}
                     </Button>
                 </div>
             )}

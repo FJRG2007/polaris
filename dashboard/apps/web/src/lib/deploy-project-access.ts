@@ -20,7 +20,13 @@
 
 import { prisma } from "@polaris/db";
 import { canOn, grantedResourceIds } from "@polaris/auth";
-import { memberOrgIds, orgCan, orgIdsWhere, resolveOrgAccess, teamIdsFor } from "@/lib/orgs/org-service";
+import {
+    memberOrgIds,
+    orgCan,
+    orgIdsWhere,
+    resolveOrgAccess,
+    teamIdsFor
+} from "@/lib/orgs/org-service";
 import {
     resourceRef,
     parseProjectCapabilities,
@@ -121,7 +127,8 @@ async function entriesFor(
     // capabilities themselves.
     let environmentIds: string[] | null = [];
     for (const row of rows) {
-        for (const capability of parseProjectCapabilities(row.capabilities)) capabilities.add(capability);
+        for (const capability of parseProjectCapabilities(row.capabilities))
+            capabilities.add(capability);
         const scope = parseEnvironmentScope(row.environments);
         if (scope === null) environmentIds = null;
         else if (environmentIds !== null) environmentIds.push(...scope);
@@ -137,7 +144,10 @@ async function entriesFor(
  * `internal` project is deliberately the weakest access there is - the viewer
  * set - so opening a project up never quietly hands out the ability to change it.
  */
-export async function projectAccess(projectId: string, userId: string): Promise<ProjectAccess | null> {
+export async function projectAccess(
+    projectId: string,
+    userId: string
+): Promise<ProjectAccess | null> {
     const project = await prisma.project.findUnique({
         where: { id: projectId },
         select: { id: true, ownerId: true, orgId: true, visibility: true }
@@ -164,10 +174,18 @@ export async function projectAccess(projectId: string, userId: string): Promise<
     // deletion stay with the people the project belongs to.
     const ref = resourceRef("project", project.id);
     if (await canOn(userId, "deploy.manage", ref, { ownerId: project.ownerId })) {
-        return fromCapabilities(project, expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer), null);
+        return fromCapabilities(
+            project,
+            expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer),
+            null
+        );
     }
     if (await canOn(userId, "deploy.read", ref, { ownerId: project.ownerId })) {
-        return fromCapabilities(project, expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer), null);
+        return fromCapabilities(
+            project,
+            expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer),
+            null
+        );
     }
 
     // A project on an organization's shelf answers to that organization first.
@@ -182,16 +200,28 @@ export async function projectAccess(projectId: string, userId: string): Promise<
         // named holds nothing, and `internal` has to keep meaning the roster.
         if (!orgCan(access, "org.read")) return null;
         if (orgCan(access, "deploy.manage")) {
-            return fromCapabilities(project, expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.admin), null);
+            return fromCapabilities(
+                project,
+                expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.admin),
+                null
+            );
         }
         if (project.visibility === "internal") {
-            return fromCapabilities(project, expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer), null);
+            return fromCapabilities(
+                project,
+                expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer),
+                null
+            );
         }
         return null;
     }
 
     if (project.visibility === "internal") {
-        return fromCapabilities(project, expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer), null);
+        return fromCapabilities(
+            project,
+            expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.viewer),
+            null
+        );
     }
     return null;
 }
@@ -336,7 +366,9 @@ export async function visibleProjectIds(userId: string): Promise<string[]> {
                 // Internal on a personal project is the whole instance; on an
                 // organization's it is that roster and no further.
                 { visibility: "internal", orgId: null },
-                ...(belongsTo.length > 0 ? [{ visibility: "internal", orgId: { in: belongsTo } }] : []),
+                ...(belongsTo.length > 0
+                    ? [{ visibility: "internal", orgId: { in: belongsTo } }]
+                    : []),
                 ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])
             ]
         },

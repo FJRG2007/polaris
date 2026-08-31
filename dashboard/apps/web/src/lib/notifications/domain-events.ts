@@ -71,7 +71,9 @@ async function describeDomain(domainId: string): Promise<DomainContext | null> {
                 select: {
                     id: true,
                     name: true,
-                    environment: { select: { project: { select: { id: true, name: true, ownerId: true } } } }
+                    environment: {
+                        select: { project: { select: { id: true, name: true, ownerId: true } } }
+                    }
                 }
             }
         }
@@ -107,7 +109,9 @@ export async function notifyDomainHealthChanged(input: {
 
         const down = input.status === "down";
         const event = down ? "domain.down" : "domain.up";
-        const title = down ? `Domain not serving: ${context.label}` : `Domain serving again: ${context.label}`;
+        const title = down
+            ? `Domain not serving: ${context.label}`
+            : `Domain serving again: ${context.label}`;
         const body = down
             ? `${input.detail ?? "It stopped answering"}. The service itself may still be running - check the domain's route and the port it points at.`
             : "It is answering again.";

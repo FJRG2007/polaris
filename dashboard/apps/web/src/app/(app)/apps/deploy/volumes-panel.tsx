@@ -56,7 +56,13 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                     {items ? items.length : 0} volume{items && items.length === 1 ? "" : "s"}
                 </span>
                 {can("volumes.manage") && (
-                    <Button size="sm" onClick={() => { setEditVolume(null); setShowAdd((open) => !open); }}>
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            setEditVolume(null);
+                            setShowAdd((open) => !open);
+                        }}
+                    >
                         <Plus className="size-4" /> New Volume
                     </Button>
                 )}
@@ -64,17 +70,29 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
 
             {showAdd && (
                 <div className="rounded-md border border-border/60 p-3">
-                    <VolumeForm applicationId={app.id} onSaved={() => { setShowAdd(false); reload(); }} onCancel={() => setShowAdd(false)} />
+                    <VolumeForm
+                        applicationId={app.id}
+                        onSaved={() => {
+                            setShowAdd(false);
+                            reload();
+                        }}
+                        onCancel={() => setShowAdd(false)}
+                    />
                 </div>
             )}
 
             {editVolume && (
                 <div className="rounded-md border border-border/60 p-3">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">Editing {editVolume.name}</p>
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                        Editing {editVolume.name}
+                    </p>
                     <VolumeForm
                         applicationId={app.id}
                         volume={editVolume}
-                        onSaved={() => { setEditVolume(null); reload(); }}
+                        onSaved={() => {
+                            setEditVolume(null);
+                            reload();
+                        }}
                         onCancel={() => setEditVolume(null)}
                     />
                 </div>
@@ -83,9 +101,14 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
             {error && <p className="text-xs text-red-400">{error}</p>}
 
             <div className="overflow-hidden rounded-md border border-border/60">
-                {items && items.length === 0 && <p className="p-3 text-xs text-muted-foreground">No volumes attached.</p>}
+                {items && items.length === 0 && (
+                    <p className="p-3 text-xs text-muted-foreground">No volumes attached.</p>
+                )}
                 {items?.map((volume) => (
-                    <div key={volume.id} className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0">
+                    <div
+                        key={volume.id}
+                        className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 last:border-0"
+                    >
                         <div className="flex min-w-0 items-center gap-2">
                             {volume.kind === "nas" ? (
                                 <HardDrive className="size-4 shrink-0 text-sky-400" />
@@ -95,7 +118,9 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">{volume.name}</p>
                                 <p className="truncate text-xs text-muted-foreground">
-                                    {volume.kind === "nas" && volume.connectionName ? `${volume.connectionName}: ` : ""}
+                                    {volume.kind === "nas" && volume.connectionName
+                                        ? `${volume.connectionName}: `
+                                        : ""}
                                     {volume.source} {"->"} {volume.mountPath}
                                     {volume.sizeLimit ? ` · ${volume.sizeLimit}` : ""}
                                 </p>
@@ -106,7 +131,10 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => { setShowAdd(false); setEditVolume(volume); }}
+                                    onClick={() => {
+                                        setShowAdd(false);
+                                        setEditVolume(volume);
+                                    }}
                                     title="Volume options"
                                     aria-label={`Options for ${volume.name}`}
                                 >

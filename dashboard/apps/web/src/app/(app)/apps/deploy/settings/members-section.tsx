@@ -109,8 +109,8 @@ interface Draft {
 
 function emptyDraft(grantable: readonly ProjectCapability[]): Draft {
     const held = new Set(grantable);
-    const role = expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer).every((capability) =>
-        held.has(capability)
+    const role = expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES.developer).every(
+        (capability) => held.has(capability)
     )
         ? "developer"
         : "viewer";
@@ -191,7 +191,10 @@ export function MembersSection({ projectId }: { projectId: string }) {
 
     useEffect(load, [projectId]);
 
-    const byId = useMemo(() => new Map(environments.map((entry) => [entry.id, entry.name])), [environments]);
+    const byId = useMemo(
+        () => new Map(environments.map((entry) => [entry.id, entry.name])),
+        [environments]
+    );
 
     function save() {
         if (!draft) return;
@@ -235,7 +238,11 @@ export function MembersSection({ projectId }: { projectId: string }) {
         const parts: string[] = [];
         if (entry.contact) parts.push(entry.contact);
         if (entry.isOwner) return parts.join(" - ");
-        parts.push(entry.role === "custom" ? `${entry.capabilities.length} permissions` : PROJECT_ROLE_LABELS[entry.role]);
+        parts.push(
+            entry.role === "custom"
+                ? `${entry.capabilities.length} permissions`
+                : PROJECT_ROLE_LABELS[entry.role]
+        );
         if (entry.environmentIds) {
             const names = entry.environmentIds.map((id) => byId.get(id) ?? "removed environment");
             parts.push(names.length > 0 ? names.join(", ") : "no environment");
@@ -302,7 +309,11 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                             >
                                                 <Pencil className="size-4" />
                                             </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setRemoving(entry)}>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setRemoving(entry)}
+                                            >
                                                 Remove
                                             </Button>
                                         </div>
@@ -331,7 +342,9 @@ export function MembersSection({ projectId }: { projectId: string }) {
                 <dl className="flex flex-col gap-1">
                     {PROJECT_ROLES.map((entry) => (
                         <div key={entry} className="flex gap-2 text-xs">
-                            <dt className="w-20 shrink-0 font-medium">{PROJECT_ROLE_LABELS[entry]}</dt>
+                            <dt className="w-20 shrink-0 font-medium">
+                                {PROJECT_ROLE_LABELS[entry]}
+                            </dt>
                             <dd className="text-muted-foreground">{PROJECT_ROLE_HINTS[entry]}</dd>
                         </div>
                     ))}
@@ -494,8 +507,8 @@ function AccessDialog({
                                 />
                             ) : (
                                 <span className="text-xs text-muted-foreground">
-                                    You are not on a team yet. Teams live inside an organization, under
-                                    Account.
+                                    You are not on a team yet. Teams live inside an organization,
+                                    under Account.
                                 </span>
                             )}
                         </label>
@@ -503,7 +516,9 @@ function AccessDialog({
 
                     {draft.principal === "org" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">Organization</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Organization
+                            </span>
                             {orgOptions.length > 0 ? (
                                 <Select
                                     value={draft.principalId}
@@ -540,7 +555,8 @@ function AccessDialog({
                         <div className="flex flex-col gap-3 rounded-md border border-border/60 p-3">
                             {PROJECT_CAPABILITY_AREAS.filter((area) =>
                                 grantable.some(
-                                    (capability) => PROJECT_CAPABILITY_META[capability].area === area
+                                    (capability) =>
+                                        PROJECT_CAPABILITY_META[capability].area === area
                                 )
                             ).map((area) => (
                                 <div key={area} className="flex flex-col gap-1.5">
@@ -550,11 +566,17 @@ function AccessDialog({
                                             PROJECT_CAPABILITY_META[capability].area === area &&
                                             grantable.includes(capability)
                                     ).map((capability) => (
-                                        <label key={capability} className="flex items-start gap-2 text-xs">
+                                        <label
+                                            key={capability}
+                                            className="flex items-start gap-2 text-xs"
+                                        >
                                             <Checkbox
                                                 checked={draft.capabilities.includes(capability)}
                                                 onChange={(event) =>
-                                                    toggleCapability(capability, event.target.checked)
+                                                    toggleCapability(
+                                                        capability,
+                                                        event.target.checked
+                                                    )
                                                 }
                                             />
                                             <span>
@@ -573,7 +595,9 @@ function AccessDialog({
                     )}
 
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">Environments</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            Environments
+                        </span>
                         {everyEnvironment && (
                             <label className="flex items-center gap-2 text-xs">
                                 <Checkbox
@@ -613,7 +637,10 @@ function AccessDialog({
                             onValueChange={(value) => patch({ expiry: value })}
                             options={
                                 draft.expiry === "keep"
-                                    ? [{ value: "keep", label: "Keep the current date" }, ...EXPIRY_OPTIONS]
+                                    ? [
+                                          { value: "keep", label: "Keep the current date" },
+                                          ...EXPIRY_OPTIONS
+                                      ]
                                     : EXPIRY_OPTIONS
                             }
                             aria-label="When this access ends"

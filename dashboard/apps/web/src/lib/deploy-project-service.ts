@@ -332,7 +332,10 @@ async function resolvePrincipal(
               select: { id: true }
           });
     if (!user) throw new Error("No account here matches that email or username");
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { ownerId: true } });
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { ownerId: true }
+    });
     if (!project) throw new Error("Project not found");
     if (project.ownerId === user.id) throw new Error("That account already owns this project");
     return { userId: user.id, teamId: null, orgId: null };
@@ -392,7 +395,10 @@ export async function setProjectAccess(
     // The same ceiling for where the entry reaches: an empty list means every
     // environment, which somebody limited to one of them cannot hand out.
     const reaches = input.granter.environmentIds;
-    if (reaches !== null && (environmentIds.length === 0 || environmentIds.some((id) => !reaches.includes(id)))) {
+    if (
+        reaches !== null &&
+        (environmentIds.length === 0 || environmentIds.some((id) => !reaches.includes(id)))
+    ) {
         throw new Error("You can only give access to the environments you reach yourself");
     }
 
@@ -429,11 +435,17 @@ export interface ProjectAccessCandidates {
     teams: { id: string; name: string; orgName: string }[];
 }
 
-export async function listProjectAccessCandidates(userId: string): Promise<ProjectAccessCandidates> {
+export async function listProjectAccessCandidates(
+    userId: string
+): Promise<ProjectAccessCandidates> {
     const orgs = await prisma.organization.findMany({
         where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, teams: { orderBy: { name: "asc" }, select: { id: true, name: true } } }
+        select: {
+            id: true,
+            name: true,
+            teams: { orderBy: { name: "asc" }, select: { id: true, name: true } }
+        }
     });
     return {
         orgs: orgs.map((org) => ({ id: org.id, name: org.name })),

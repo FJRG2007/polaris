@@ -69,7 +69,9 @@ export default async function DeployProjectPage({
     if (!access) notFound();
     if (access.environmentIds !== null) {
         const reachable = new Set(access.environmentIds);
-        project.environments = project.environments.filter((environment) => reachable.has(environment.id));
+        project.environments = project.environments.filter((environment) =>
+            reachable.has(environment.id)
+        );
     }
 
     const caps = canManage ? await refreshCapabilities() : null;
@@ -77,11 +79,16 @@ export default async function DeployProjectPage({
 
     const statuses = await getApplicationDeployStatuses(
         project.environments.flatMap((environment) =>
-            environment.applications.map((app) => ({ id: app.id, currentDeploymentId: app.currentDeploymentId }))
+            environment.applications.map((app) => ({
+                id: app.id,
+                currentDeploymentId: app.currentDeploymentId
+            }))
         )
     );
     const serverIp = await getPublicIp();
-    const appIds = project.environments.flatMap((environment) => environment.applications.map((app) => app.id));
+    const appIds = project.environments.flatMap((environment) =>
+        environment.applications.map((app) => app.id)
+    );
     const tunnelDomains = await listActiveTunnelDomains(appIds);
     // A service that keeps its history is served by the release it currently points
     // at, which has a container name and a published port of its own - so the
@@ -89,7 +96,10 @@ export default async function DeployProjectPage({
     const allApps = project.environments.flatMap((environment) => environment.applications);
     const serving = new Map(
         await Promise.all(
-            allApps.map(async (app) => [app.id, await currentReleaseRef({ ...app, environment: { project } })] as const)
+            allApps.map(
+                async (app) =>
+                    [app.id, await currentReleaseRef({ ...app, environment: { project } })] as const
+            )
         )
     );
 
@@ -111,7 +121,8 @@ export default async function DeployProjectPage({
                 // it serves. Null only when it has never been deployed.
                 deployStatus: statuses[app.id] ?? null,
                 targetId: app.targetId,
-                serverId: app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
+                serverId:
+                    app.target.kind === "local" || !app.target.hostId ? "local" : app.target.hostId,
                 serverName: app.target.name,
                 containerRef: serving.get(app.id)?.name ?? "",
                 autoDeploy: app.autoDeploy,
@@ -125,7 +136,9 @@ export default async function DeployProjectPage({
                 buildCommand: storedText(app.buildConfig, "buildCommand"),
                 startCommand: storedText(app.buildConfig, "startCommand"),
                 port: portOf(app.sourceConfig),
-                ipUrl: serverIp ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}` : null,
+                ipUrl: serverIp
+                    ? `http://${serverIp}:${hostPortForApp(serving.get(app.id)?.portSubject ?? app.id)}`
+                    : null,
                 domains: mergeTunnelDomains(
                     // A per-release hostname belongs to one build, not to the service, so
                     // it is listed on that deployment rather than among the service's own

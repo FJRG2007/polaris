@@ -95,7 +95,10 @@ export const PROJECT_CAPABILITY_META: Readonly<Record<ProjectCapability, Project
         label: "Add, resize and detach volumes",
         hint: "Detaching a volume can erase what it holds, and that cannot be undone."
     },
-    "databases.manage": { area: "Storage", label: "Create databases and read their connection details" },
+    "databases.manage": {
+        area: "Storage",
+        label: "Create databases and read their connection details"
+    },
     "project.settings": {
         area: "Project",
         label: "Change project settings",
@@ -105,14 +108,23 @@ export const PROJECT_CAPABILITY_META: Readonly<Record<ProjectCapability, Project
 };
 
 /** The order the editor groups capabilities in. */
-export const PROJECT_CAPABILITY_AREAS = ["Project", "Services", "Variables", "Access", "Networking", "Storage"] as const;
+export const PROJECT_CAPABILITY_AREAS = [
+    "Project",
+    "Services",
+    "Variables",
+    "Access",
+    "Networking",
+    "Storage"
+] as const;
 
 /**
  * Capabilities another one cannot sensibly be held without, in the same spirit
  * as IMPLIED_PERMISSIONS: writing a variable you cannot read back, or managing a
  * service you cannot see, is an access set that only looks narrower than it is.
  */
-export const IMPLIED_PROJECT_CAPABILITIES: Readonly<Partial<Record<ProjectCapability, readonly ProjectCapability[]>>> = {
+export const IMPLIED_PROJECT_CAPABILITIES: Readonly<
+    Partial<Record<ProjectCapability, readonly ProjectCapability[]>>
+> = {
     "logs.read": ["project.read"],
     "deploy.run": ["project.read", "logs.read"],
     "service.configure": ["project.read", "logs.read"],
@@ -156,7 +168,9 @@ export function expandProjectCapabilities(
  * the variables away is a real decision, and it is made by taking the console
  * and the files with them - which is what the custom set is for.
  */
-export const PROJECT_ROLE_CAPABILITIES: Readonly<Record<ProjectRole, readonly ProjectCapability[]>> = {
+export const PROJECT_ROLE_CAPABILITIES: Readonly<
+    Record<ProjectRole, readonly ProjectCapability[]>
+> = {
     viewer: ["project.read", "logs.read"],
     developer: [
         "project.read",
@@ -186,7 +200,8 @@ export function projectRoleFor(capabilities: readonly ProjectCapability[]): Proj
     const held = new Set(capabilities);
     for (const role of PROJECT_ROLES) {
         const expected = expandProjectCapabilities(PROJECT_ROLE_CAPABILITIES[role]);
-        if (expected.length === held.size && expected.every((capability) => held.has(capability))) return role;
+        if (expected.length === held.size && expected.every((capability) => held.has(capability)))
+            return role;
     }
     return null;
 }
@@ -241,7 +256,10 @@ export const projectAccessInputSchema = z
         expiresAt: z.string().datetime().optional().nullable()
     })
     .refine(
-        (value) => value.principal === "everyone" || Boolean(value.principalId) || Boolean(value.identifier),
+        (value) =>
+            value.principal === "everyone" ||
+            Boolean(value.principalId) ||
+            Boolean(value.identifier),
         { message: "Choose who this is for", path: ["principalId"] }
     )
     .refine((value) => Boolean(value.role) || (value.capabilities?.length ?? 0) > 0, {
@@ -257,7 +275,9 @@ export function resolveProjectCapabilities(input: {
     role?: ProjectRole;
     capabilities?: readonly ProjectCapability[];
 }): ProjectCapability[] {
-    const chosen = input.capabilities?.length ? input.capabilities : PROJECT_ROLE_CAPABILITIES[input.role ?? "viewer"];
+    const chosen = input.capabilities?.length
+        ? input.capabilities
+        : PROJECT_ROLE_CAPABILITIES[input.role ?? "viewer"];
     return expandProjectCapabilities(chosen);
 }
 

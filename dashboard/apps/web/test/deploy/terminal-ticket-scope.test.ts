@@ -13,9 +13,15 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requirePermission = vi.fn(async () => ({ id: "user-1" }));
-const requireApplicationAccess = vi.fn(async () => ({ ownerId: "owner-1", environmentId: "env-1" }));
+const requireApplicationAccess = vi.fn(async () => ({
+    ownerId: "owner-1",
+    environmentId: "env-1"
+}));
 const applicationFindUnique = vi.fn();
-const currentReleaseRef = vi.fn(async () => ({ name: "the-real-container", project: "polaris-real" }));
+const currentReleaseRef = vi.fn(async () => ({
+    name: "the-real-container",
+    project: "polaris-real"
+}));
 const mintTerminalTicket = vi.fn(async () => "raw-token");
 
 vi.mock("@/lib/session", () => ({
@@ -72,7 +78,11 @@ describe("minting a terminal ticket for a service", () => {
     });
 
     it("requires console.use and ignores any container the caller names", async () => {
-        const response = await post({ applicationId: "app-1", containerRef: "some-other-container", mode: "terminal" });
+        const response = await post({
+            applicationId: "app-1",
+            containerRef: "some-other-container",
+            mode: "terminal"
+        });
         expect(response.status).toBe(200);
 
         expect(requireApplicationAccess).toHaveBeenCalledWith("app-1", "user-1", "console.use");

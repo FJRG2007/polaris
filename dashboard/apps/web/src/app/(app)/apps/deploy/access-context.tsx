@@ -27,7 +27,11 @@ export function ProjectAccessProvider({
     capabilities: readonly ProjectCapability[];
     children: ReactNode;
 }) {
-    return <ProjectAccessContext.Provider value={capabilities}>{children}</ProjectAccessContext.Provider>;
+    return (
+        <ProjectAccessContext.Provider value={capabilities}>
+            {children}
+        </ProjectAccessContext.Provider>
+    );
 }
 
 /** Ask whether the reader holds one capability here. */
