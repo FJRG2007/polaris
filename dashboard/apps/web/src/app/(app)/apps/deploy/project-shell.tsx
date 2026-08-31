@@ -15,12 +15,12 @@
 
 import Link from "next/link";
 import { createProjectAction } from "./actions";
-import { Plus, type LucideIcon } from "lucide-react";
+import { Plus } from "lucide-react";
+import { SECTIONS } from "./project-sections";
 import { HeaderPortal } from "@/components/header-portal";
 import { useState, useTransition, type ReactNode } from "react";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Activity, LayoutGrid, ScrollText, Settings } from "lucide-react";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
@@ -39,21 +39,6 @@ export interface ShellProject {
     name: string;
     environments: ShellEnvironment[];
 }
-
-interface Section {
-    label: string;
-    /** Appended to the project's own path; "" is the project root. */
-    path: string;
-    icon: LucideIcon;
-    hint: string;
-}
-
-const SECTIONS: Section[] = [
-    { label: "Architecture", path: "", icon: LayoutGrid, hint: "Services and how they connect" },
-    { label: "Observability", path: "/observability", icon: Activity, hint: "Metrics across the environment" },
-    { label: "Logs", path: "/logs", icon: ScrollText, hint: "Every service's output in one stream" },
-    { label: "Settings", path: "/admin/settings", icon: Settings, hint: "Project configuration" }
-];
 
 export function ProjectShell({
     project,
