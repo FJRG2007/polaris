@@ -56,6 +56,51 @@ describe("the boot script", () => {
     it("keeps the container alive after the agent inside it exits", () => {
         expect(commands.SESSION_BOOT.trimEnd().endsWith("exec tail -f /dev/null")).toBe(true);
     });
+
+    it("starts the branch from the ref that was asked for, and from the default when none was", () => {
+        expect(commands.SESSION_BOOT).toContain("$POLARIS_BASE_REF");
+        expect(commands.SESSION_BOOT).toContain('git clone --depth 50 --branch "$POLARIS_BASE_REF"');
+        // The other arm of the same `if`: no ref, no --branch.
+        expect(commands.SESSION_BOOT).toContain('  git clone --depth 50 -c http.extraHeader');
+    });
+
+    it("puts the resolved Enigma settings on the machine, not only the install", () => {
+        expect(commands.SESSION_BOOT).toContain("$POLARIS_ENIGMA_ARGV");
+        expect(commands.SESSION_BOOT).toContain("$POLARIS_ENIGMA_CONFIG");
+    });
+});
+
+describe("the boot script for an enrolled server", () => {
+    const host = commands.SESSION_BOOT_FOR_HOST;
+
+    it("closes every conditional it opens, which filtering one script into another did not", () => {
+        const lines = host.split("\n").map((line) => line.trim());
+        expect(lines.filter((line) => line.startsWith("if ")).length).toBe(
+            lines.filter((line) => line === "fi").length
+        );
+        expect(lines.filter((line) => line === "fi").length).toBeGreaterThan(0);
+    });
+
+    it("installs nothing on somebody else's machine", () => {
+        expect(host).not.toContain("apt-get");
+        expect(host).not.toContain("$POLARIS_AGENT_INSTALL");
+    });
+
+    it("says what is missing rather than reaching for a package manager", () => {
+        expect(host).toContain("this machine has no tmux");
+        expect(host).toContain("is not installed and could not be installed here");
+    });
+
+    it("does not park a foreground process on it, and still leaves the agent running", () => {
+        expect(host).not.toContain("exec tail -f");
+        expect(host).toContain("tmux new-session -d");
+    });
+
+    it("clones and writes the hooks exactly as the container does", () => {
+        expect(host).toContain('git checkout -b "$POLARIS_BRANCH"');
+        expect(host).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
+        expect(host).toContain("unset GIT_AUTH_HEADER");
+    });
 });
 
 describe("shellQuote", () => {
@@ -86,6 +131,11 @@ describe("steering a session", () => {
         expect(commands.submitCommand()).toContain("Enter");
         expect(commands.submitDelayMs("x")).toBeGreaterThanOrEqual(500);
         expect(commands.submitDelayMs("x".repeat(40_960))).toBeGreaterThan(commands.submitDelayMs("x"));
+    });
+
+    it("asks whether there is a terminal to type into before deciding one is missing", () => {
+        expect(commands.aliveCommand()).toContain("has-session");
+        expect(commands.aliveCommand()).toContain("polaris-agent");
     });
 
     it("interrupts with Escape, not with the key that would quit", () => {

@@ -30,12 +30,17 @@ function hasControlChar(value: string): boolean {
     return false;
 }
 
+/** What a name and a body can hold. Named because they are also what anything
+ *  mirroring somebody else's system has to clamp to before it gets here. */
+export const TASK_NAME_MAX = 255;
+export const TASK_DESCRIPTION_MAX = 20000;
+
 /** A name shown in a nav, a card or a cell: printable, trimmed, never blank. */
 export const taskName = z
     .string()
     .trim()
     .min(1, "A name is required")
-    .max(255, "Keep the name under 255 characters")
+    .max(TASK_NAME_MAX, "Keep the name under 255 characters")
     .refine((value) => !hasControlChar(value), "The name must not contain control characters");
 
 /** A shorter name for the containers a person scans down a sidebar. */
@@ -48,7 +53,10 @@ export const containerName = z
 
 /** An optional free-text body. An empty string clears it rather than leaving the
  *  previous value behind, which is what a cleared editor should mean. */
-export const taskDescription = z.string().trim().max(20000, "Keep the description under 20,000 characters");
+export const taskDescription = z
+    .string()
+    .trim()
+    .max(TASK_DESCRIPTION_MAX, "Keep the description under 20,000 characters");
 
 /** Hex colours are stored, not class names, so a colour picked once renders the
  *  same in a chart, a badge and an exported view. */

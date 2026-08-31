@@ -58,32 +58,36 @@ export function sessionContainerName(sessionId: string): string {
 // Bringing a session up
 // ---------------------------------------------------------------------------
 
-/**
- * What a `local` session's container does when it starts.
- *
- * Fixed rather than assembled, exactly as a run's is: nothing from a repository
- * name, a branch, a prompt or an operator's own settings is interpolated into a
- * shell here. Every value it needs arrives in the environment, where a command
- * line's readability by anything that can list processes does not apply.
- *
- * It ends by parking rather than exiting. The container's job is to be somewhere
- * a tmux session can live; the agent inside it comes and goes, and a container
- * that stopped when the first agent exited would take the worktree, the branch
- * and the uncommitted work with it.
- */
-export const SESSION_BOOT = [
-    "set -eu",
-    // tmux is what holds the agent's terminal open, and the Node image does not
-    // carry it. One install per session, on a layer nothing caches - the honest
-    // cost of not shipping an image of our own.
+/** Making tmux available where Polaris owns the machine. The Node image does not
+ *  carry it, and one install per session on a layer nothing caches is the honest
+ *  cost of not shipping an image of our own. */
+const INSTALL_TMUX = [
     "if ! command -v tmux >/dev/null 2>&1; then",
     "  apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq tmux >/dev/null 2>&1 || true",
-    "fi",
-    'command -v tmux >/dev/null 2>&1 || { echo "polaris: this machine has no tmux and one could not be installed"; exit 1; }',
+    "fi"
+];
+
+/** No tmux, no session. Said plainly, because on a server that is the whole
+ *  answer: Polaris does not reach for a package manager it was never given. */
+const REQUIRE_TMUX = [
+    'command -v tmux >/dev/null 2>&1 || { echo "polaris: this machine has no tmux and one could not be installed"; exit 1; }'
+];
+
+/** The worktree, and everything Polaris writes into it. */
+const PREPARE_WORKTREE = [
     // The credential goes to git as a config value read from the environment,
     // never as part of the URL - which would put it in the reflog and in every
     // error message git prints.
-    'git clone --depth 50 -c http.extraHeader="$GIT_AUTH_HEADER" "https://github.com/$GITHUB_REPOSITORY.git" "$POLARIS_WORKDIR"',
+    //
+    // The ref the work starts from is a clone argument rather than a checkout
+    // afterwards, because a shallow clone only carries the history of what it
+    // was asked for. Empty is the repository's own default branch, which is what
+    // almost every session wants.
+    'if [ -n "$POLARIS_BASE_REF" ]; then',
+    '  git clone --depth 50 --branch "$POLARIS_BASE_REF" -c http.extraHeader="$GIT_AUTH_HEADER" "https://github.com/$GITHUB_REPOSITORY.git" "$POLARIS_WORKDIR"',
+    "else",
+    '  git clone --depth 50 -c http.extraHeader="$GIT_AUTH_HEADER" "https://github.com/$GITHUB_REPOSITORY.git" "$POLARIS_WORKDIR"',
+    "fi",
     'cd "$POLARIS_WORKDIR"',
     'git checkout -b "$POLARIS_BRANCH"',
     // The agent reports what it is doing through a script Polaris registers in
@@ -111,22 +115,84 @@ export const SESSION_BOOT = [
     // The Polaris tools, registered in the worktree so the agent has them on its
     // first turn without anybody configuring anything.
     'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_WORKDIR/.mcp.json"',
-    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
-    // Enigma, when the resolved settings asked for it. Best effort: a session
-    // without it works to weaker standards, and failing the whole thing over a
-    // network blip would be worse than that.
+    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"'
+];
+
+/**
+ * Enigma, when the resolved settings asked for it, followed by the settings that
+ * resolution actually landed on - the gate, and whatever the operator put in the
+ * escape hatch. Both are best effort: a session without them works to weaker
+ * standards, and failing the whole thing over a network blip would be worse.
+ */
+const INSTALL_ENIGMA = [
     '[ -n "$POLARIS_ENIGMA_ARGV" ] && npx $POLARIS_ENIGMA_ARGV >/dev/null 2>&1 || true',
-    // The agent itself. Also best effort - the check below is what decides.
-    '[ -n "$POLARIS_AGENT_INSTALL" ] && sh -c "$POLARIS_AGENT_INSTALL" >/dev/null 2>&1 || true',
-    'command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1 || { echo "polaris: $POLARIS_AGENT_BINARY is not installed and could not be installed here"; exit 1; }',
-    // The clone is done, so the credential that did it goes before the agent
-    // starts and can read its own environment. The token the agent's own git and
-    // GitHub tools need stays.
+    '[ -n "$POLARIS_ENIGMA_CONFIG" ] && sh -c "$POLARIS_ENIGMA_CONFIG" >/dev/null 2>&1 || true'
+];
+
+/** The agent itself, where Polaris owns the machine. Best effort - the check that
+ *  follows is what decides. */
+const INSTALL_AGENT = ['[ -n "$POLARIS_AGENT_INSTALL" ] && sh -c "$POLARIS_AGENT_INSTALL" >/dev/null 2>&1 || true'];
+
+const REQUIRE_AGENT = [
+    'command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1 || { echo "polaris: $POLARIS_AGENT_BINARY is not installed and could not be installed here"; exit 1; }'
+];
+
+/** The clone is done, so the credential that did it goes before the agent starts
+ *  and can read its own environment. The token the agent's own git and GitHub
+ *  tools need stays. */
+const START_AGENT = [
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG",
-    'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" -c "$POLARIS_WORKDIR" "$POLARIS_AGENT_COMMAND"',
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_CONFIG",
+    'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" -c "$POLARIS_WORKDIR" "$POLARIS_AGENT_COMMAND"'
+];
+
+/**
+ * What a `local` session's container does when it starts.
+ *
+ * Fixed rather than assembled, exactly as a run's is: nothing from a repository
+ * name, a branch, a prompt or an operator's own settings is interpolated into a
+ * shell here. Every value it needs arrives in the environment, where a command
+ * line's readability by anything that can list processes does not apply.
+ *
+ * It ends by parking rather than exiting. The container's job is to be somewhere
+ * a tmux session can live; the agent inside it comes and goes, and a container
+ * that stopped when the first agent exited would take the worktree, the branch
+ * and the uncommitted work with it.
+ */
+export const SESSION_BOOT = [
+    "set -eu",
+    ...INSTALL_TMUX,
+    ...REQUIRE_TMUX,
+    ...PREPARE_WORKTREE,
+    ...INSTALL_ENIGMA,
+    ...INSTALL_AGENT,
+    ...REQUIRE_AGENT,
+    ...START_AGENT,
     // Park. See above: the container outlives the agent inside it.
     "exec tail -f /dev/null"
+].join("\n");
+
+/**
+ * The same boot, on a machine that is not Polaris's.
+ *
+ * Composed from the same fragments rather than filtered out of the script above.
+ * A filter that drops lines by matching them drops every line that matches: one
+ * more `if` anywhere in the boot and this variant loses a `fi` it needed, on the
+ * one path that cannot be exercised from here.
+ *
+ * A server is somebody's machine. Polaris installs nothing on it - not tmux, not
+ * the agent - does not park a foreground process on it, and says plainly what is
+ * missing rather than reaching for a package manager it was never given
+ * permission to use. The tmux session it starts outlives the SSH connection that
+ * started it, which is the whole reason this shape works over SSH at all.
+ */
+export const SESSION_BOOT_FOR_HOST = [
+    "set -eu",
+    ...REQUIRE_TMUX,
+    ...PREPARE_WORKTREE,
+    ...INSTALL_ENIGMA,
+    ...REQUIRE_AGENT,
+    ...START_AGENT
 ].join("\n");
 
 // ---------------------------------------------------------------------------

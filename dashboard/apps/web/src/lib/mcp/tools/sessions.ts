@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { after } from "next/server";
 import * as core from "@polaris/core";
 import { McpRefusal, type McpTool } from "../protocol";
 import * as runtime from "@/lib/agents/session-runtime";
@@ -151,9 +152,13 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
         });
         await runtime.startSession(session, token);
         await sessions.addSessionMessage(session.id, "user", input.prompt, caller.userId);
-        await runtime.promptSession(session.id, input.prompt);
+        // After the answer, not before it: the container is still cloning and
+        // installing, and a model held for that would spend its turn waiting on
+        // apt-get. The delivery waits for the agent's terminal and records what
+        // happened on the session either way.
+        after(() => runtime.deliverFirstPrompt(session.id, input.prompt));
         return {
-            text: `Started ${session.id} on ${session.branch}. Check on it with agent_session_get.`,
+            text: `Started ${session.id} on ${session.branch}. It gets the prompt as soon as it is up; check on it with agent_session_get.`,
             structured: { id: session.id, branch: session.branch }
         };
     }

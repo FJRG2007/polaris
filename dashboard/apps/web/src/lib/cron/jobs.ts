@@ -17,6 +17,7 @@
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
 import { sweepDueBackups } from "@/lib/backups/service";
+import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepCameraReachability } from "@/lib/home/reachability";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
@@ -43,7 +44,10 @@ const HOUR = 60 * MINUTE;
  *  a Linear to go stale. */
 async function syncTrackers(): Promise<number> {
     const ids = await trackersToSync();
-    for (const id of ids) await syncTracker(id);
+    // Caught here as well as inside the sync. `syncTracker` puts the reason on the
+    // connection and answers rather than throwing, and this is what makes that
+    // promise true from the schedule even when something under it breaks it.
+    for (const id of ids) await syncTracker(id).catch(() => undefined);
     return ids.length;
 }
 
@@ -243,6 +247,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // issue as two tasks: the link that stops that is written after the task.
         leaseMs: 10 * MINUTE,
         run: syncTrackers
+    },
+    {
+        key: "agent-sessions",
+        // A session reports through its own hooks, so silence is the only signal
+        // there is that its container was reaped or its server went away. Half an
+        // hour, because the row it leaves behind sorts above real work in the list
+        // and keeps its reporting token live until somebody closes it.
+        everyMs: Number(process.env.POLARIS_SESSION_SWEEP_MS) || 30 * MINUTE,
+        // Unleased: it names the rows it would change and writes the same ending
+        // on each, so a second runner finds nothing left to do.
+        leaseMs: null,
+        run: () => sweepSilentSessions()
     },
     {
         key: "task-reminders",

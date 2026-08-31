@@ -142,9 +142,14 @@ export function resolveEnigma(...tiers: readonly (EnigmaSettings | null | undefi
  * rather than passed as a flag because that is how npx selects a version.
  */
 export function enigmaInstallArgv(settings: ResolvedEnigma): string[] {
-    const spec = settings.version ? `enigma-cli@${settings.version}` : "enigma-cli";
     const parts = settings.scope === "all" ? ["--all"] : ["--policies"];
-    return ["-y", spec, "install", ...parts, "--yes"];
+    return ["-y", enigmaPackageSpec(settings), "install", ...parts, "--yes"];
+}
+
+/** The npm spec a resolved setup names, pinned or not. One place, so an install
+ *  and the config calls that follow it can never reach two different versions. */
+export function enigmaPackageSpec(settings: ResolvedEnigma): string {
+    return settings.version ? `enigma-cli@${settings.version}` : "enigma-cli";
 }
 
 /**
@@ -162,6 +167,18 @@ export function enigmaConfigArgv(settings: ResolvedEnigma): string[][] {
     return Object.entries(settings.config)
         .filter(([key, value]) => safeKey.test(key) && safeValue.test(value))
         .map(([key, value]) => ["config", key, value]);
+}
+
+/**
+ * The `enigma config` call that puts the resolved gate mode on the machine.
+ *
+ * The gate is a first-class field here and a plain on/off to the CLI, so a mode
+ * of `off` refuses it and every other mode asks for it. Emitted after the config
+ * map so this setting, which has a screen of its own, wins over a stale key
+ * somebody left in the escape hatch.
+ */
+export function enigmaGateArgv(settings: ResolvedEnigma): string[] {
+    return ["config", "gate", settings.gate === "off" ? "off" : "on"];
 }
 
 /** Whether a gate mode is one this build knows. A stored column is not a type,

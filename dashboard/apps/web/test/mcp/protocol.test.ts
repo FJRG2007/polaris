@@ -87,6 +87,12 @@ describe("notifications", () => {
         expect(await send({ jsonrpc: "2.0", method: "notifications/initialized" })).toBeNull();
     });
 
+    it("gets none for a method that would otherwise have answered, which is the same rule", async () => {
+        expect(await send({ jsonrpc: "2.0", method: "ping" })).toBeNull();
+        expect(await send({ jsonrpc: "2.0", method: "tools/list" })).toBeNull();
+        expect(await send({ jsonrpc: "2.0", method: "initialize" })).toBeNull();
+    });
+
     it("still answers a request for a method that does not exist", async () => {
         const answer = await send({ jsonrpc: "2.0", id: 7, method: "resources/list" });
         expect(answer?.error?.code).toBe(RPC_METHOD_NOT_FOUND);

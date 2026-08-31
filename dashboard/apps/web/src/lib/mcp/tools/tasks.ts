@@ -52,6 +52,14 @@ function summarize(row: TaskRow): Record<string, unknown> {
     };
 }
 
+/** What the id column actually holds. A reference that is not one is a string
+ *  Prisma refuses to compare rather than a row that does not exist. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** And what the number column holds. A reference quoting more than this is not a
+ *  task, whatever else it might be. */
+const INT_MAX = 2_147_483_647;
+
 /** Both ways a task gets named. A reference is what a person quotes and what an
  *  agent is most likely to have been handed; an id is what a previous tool call
  *  returned. */
@@ -76,10 +84,23 @@ async function resolveTask(caller: McpCaller, ref: string): Promise<{ id: string
     const reachable = access.scopeTaskWhere(scope);
     const trimmed = ref.trim();
     const match = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(trimmed);
+    // Neither branch reaches the database with something the column cannot hold.
+    // A reference whose number is past what an Int holds, and an id that is not a
+    // UUID, both make Prisma throw rather than answer - and a thrown query is
+    // reported to the model as "Polaris has logged why", which is no help at all
+    // to something that has simply quoted a title instead of a reference. This is
+    // the mistake the sentence below exists for, so it has to be the answer.
+    const number = match ? Number(match[2]) : 0;
+    if (match && (!Number.isSafeInteger(number) || number > INT_MAX)) {
+        throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
+    }
+    if (!match && !UUID.test(trimmed)) {
+        throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
+    }
     const task = match
         ? await prisma.task.findFirst({
               where: {
-                  AND: [reachable, { number: Number(match[2]), space: { prefix: match[1]!.toUpperCase() } }]
+                  AND: [reachable, { number, space: { prefix: match[1]!.toUpperCase() } }]
               },
               select: { id: true, spaceId: true }
           })

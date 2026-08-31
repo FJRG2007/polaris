@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf } from "./agent-defaults-service";
 
 /**
  * A failure whose message is meant for whoever is reading the screen.
@@ -423,11 +424,17 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
     if (!session) return core.resolveEnigma();
 
     const owner = session.repo.ownerId;
-    const account = session.repo.repoFullName.split("/")[0] ?? "";
-    const tiers = await prisma.agentDefaults.findMany({
-        where: { ownerId: owner, scope: { in: [account, ""] } },
-        select: { scope: true, enigma: true, gate: true }
-    });
+    // Through the same helper the defaults screens use: organization tiers are
+    // stored under a lowercased login, and a row looked up by the repository's own
+    // casing is a tier that silently decides nothing.
+    const account = scopeOf(session.repo.repoFullName);
+    const [tiers, platform] = await Promise.all([
+        prisma.agentDefaults.findMany({
+            where: { ownerId: owner, scope: { in: [account, GENERAL_SCOPE] } },
+            select: { scope: true, enigma: true, gate: true }
+        }),
+        getPlatformAgentDefaults()
+    ]);
     const byScope = (scope: string): core.EnigmaSettings => {
         const row = tiers.find((tier) => tier.scope === scope);
         if (!row) return core.INHERIT_ENIGMA;
@@ -445,5 +452,20 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
             ? { ...repoSettings, gate: session.repo.gate }
             : repoSettings;
 
-    return core.resolveEnigma(core.parseEnigmaSettings(session.enigma), repoTier, byScope(account), byScope(""));
+    // The instance tier last, and from the setting store rather than from a row:
+    // it is an administrator's answer for the whole deployment, so it has no owner
+    // to key a row on. Its own `gate` column is folded in the same way the others
+    // are, so an administrator who set only that still reaches a session.
+    const platformEnigma: core.EnigmaSettings =
+        platform.enigma.gate === null && platform.gate && core.isEnigmaGateMode(platform.gate)
+            ? { ...platform.enigma, gate: platform.gate }
+            : platform.enigma;
+
+    return core.resolveEnigma(
+        core.parseEnigmaSettings(session.enigma),
+        repoTier,
+        byScope(account),
+        byScope(GENERAL_SCOPE),
+        platformEnigma
+    );
 }

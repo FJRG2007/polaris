@@ -34,7 +34,11 @@ function bearer(request: Request): string {
     return scheme?.toLowerCase() === "bearer" ? rest.join("") : "";
 }
 
-const ACKNOWLEDGED = Response.json({}, { status: 200 });
+/** A fresh response every time: a Response body is a single-use stream, so one
+ *  shared object would serve the first hook and throw for every hook after it. */
+function acknowledged(): Response {
+    return Response.json({}, { status: 200 });
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }): Promise<Response> {
     const { id } = await params;
@@ -44,24 +48,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!session || session.id !== id) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await request.text();
-    if (body.length > MAX_BODY) return ACKNOWLEDGED;
+    if (body.length > MAX_BODY) return acknowledged();
 
     let payload: unknown;
     try {
         payload = JSON.parse(body);
     } catch {
-        return ACKNOWLEDGED;
+        return acknowledged();
     }
 
     const event = normalizeHookEvent(payload);
     // An event this build cannot place says nothing, and moving the session for a
     // reason no screen could explain is worse than missing it.
-    if (!event) return ACKNOWLEDGED;
+    if (!event) return acknowledged();
 
     // A tool that failed and one that worked arrive through the same event; the
     // outcome is in what the tool answered.
     const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
 
     await recordSessionEvents(id, [{ kind, detail: event.detail, subject: event.subject }]);
-    return ACKNOWLEDGED;
+    return acknowledged();
 }

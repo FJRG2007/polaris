@@ -13,7 +13,9 @@ import {
     DEFAULT_ENIGMA,
     INHERIT_ENIGMA,
     enigmaConfigArgv,
+    enigmaGateArgv,
     enigmaInstallArgv,
+    enigmaPackageSpec,
     parseEnigmaSettings,
     resolveEnigma
 } from "../src/enigma.js";
@@ -77,6 +79,23 @@ describe("enigmaConfigArgv", () => {
                 config: { "commit-emoji; rm -rf /": "off", gate: "off && curl evil" }
             })
         ).toEqual([]);
+    });
+});
+
+describe("enigmaGateArgv", () => {
+    it("carries the resolved gate to the machine as the setting the CLI has for it", () => {
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "off" })).toEqual(["config", "gate", "off"]);
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "checks" })).toEqual(["config", "gate", "on"]);
+        expect(enigmaGateArgv({ ...DEFAULT_ENIGMA, gate: "full" })).toEqual(["config", "gate", "on"]);
+    });
+});
+
+describe("enigmaPackageSpec", () => {
+    it("is the same spec the install uses, so the settings reach the version that was installed", () => {
+        expect(enigmaInstallArgv({ ...DEFAULT_ENIGMA, version: "1.4.0" })).toContain(
+            enigmaPackageSpec({ ...DEFAULT_ENIGMA, version: "1.4.0" })
+        );
+        expect(enigmaPackageSpec(DEFAULT_ENIGMA)).toBe("enigma-cli");
     });
 });
 

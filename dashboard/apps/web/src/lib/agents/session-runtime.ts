@@ -30,6 +30,7 @@ import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-servic
 import { sessionSecretsFor } from "@/lib/agents/model-keys";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import {
+    addSessionMessage,
     finishSession,
     markSessionStarted,
     readableFailure,
@@ -59,11 +60,13 @@ function hostWorkdir(sessionId: string): string {
 interface Bootstrap {
     readonly repoFullName: string;
     readonly branch: string;
+    readonly baseRef: string;
     readonly workdir: string;
     readonly agentBinary: string;
     readonly agentCommand: string;
     readonly agentInstall: string;
     readonly enigmaArgv: string;
+    readonly enigmaConfig: string;
     readonly hookScript: string;
     readonly hookSettings: string;
     readonly mcpConfig: string;
@@ -122,12 +125,14 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     return {
         repoFullName: session.repoFullName,
         branch: session.branch,
+        baseRef: session.baseRef,
         workdir: session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR,
         agentBinary: agent.binary,
         agentCommand: agent.command,
         agentInstall: agent.install,
         // Empty when Enigma is off, which is what the boot script tests for.
         enigmaArgv: enigma.enabled ? core.enigmaInstallArgv(enigma).join(" ") : "",
+        enigmaConfig: enigma.enabled ? enigmaConfigScript(enigma) : "",
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(claudeHookSettings(`${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`)),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
@@ -151,6 +156,25 @@ function asFile(contents: string): string {
 }
 
 /**
+ * The `enigma config` calls a resolved setup means, as one shell command.
+ *
+ * Settings rather than an install: the gate mode the tiers resolved to, and
+ * whatever the operator put in the escape hatch. Every part is quoted on the way
+ * out even though the keys and values were filtered first - this becomes a
+ * command line on somebody else's machine, and one of those checks being enough
+ * is not a reason to have only one.
+ *
+ * `npx` rather than a bare `enigma`, and against the same pinned spec the install
+ * used, because an install through npx leaves nothing on the PATH to call.
+ */
+function enigmaConfigScript(enigma: core.ResolvedEnigma): string {
+    const spec = core.enigmaPackageSpec(enigma);
+    return [...core.enigmaConfigArgv(enigma), core.enigmaGateArgv(enigma)]
+        .map((argv) => ["npx", "-y", spec, ...argv].map(shellQuote).join(" "))
+        .join(" ; ");
+}
+
+/**
  * The environment the boot script reads. One place, so the container and the
  * server are handed the same names for the same things.
  *
@@ -165,6 +189,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         GH_TOKEN: boot.githubToken,
         POLARIS_WORKDIR: boot.workdir,
         POLARIS_BRANCH: boot.branch,
+        POLARIS_BASE_REF: boot.baseRef,
         POLARIS_TMUX: commands.TMUX_SESSION,
         POLARIS_COLS: String(commands.TMUX_COLS),
         POLARIS_ROWS: String(commands.TMUX_ROWS),
@@ -172,6 +197,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_ENIGMA_ARGV: boot.enigmaArgv,
+        POLARIS_ENIGMA_CONFIG: boot.enigmaConfig,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
@@ -285,7 +311,7 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
             assignments,
             `export ${Object.keys(bootEnv(boot)).join(" ")}`,
             'mkdir -p "$(dirname "$POLARIS_WORKDIR")"',
-            SESSION_BOOT_FOR_HOST
+            commands.SESSION_BOOT_FOR_HOST
         ].join("\n");
         // Output is collected rather than returned: the SSH primitive reports the
         // exit code and streams the rest, so what a failure SAID is only knowable
@@ -319,25 +345,6 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
         lease.release();
     }
 }
-
-/**
- * The boot script, minus the parts that only make sense in a container.
- *
- * A server is somebody's machine: Polaris does not install packages on it, does
- * not park a foreground process on it, and says so plainly when tmux is missing
- * rather than reaching for a package manager it was never given permission to
- * use. The tmux session it starts outlives the SSH connection that started it,
- * which is the whole reason this shape works over SSH at all.
- */
-const SESSION_BOOT_FOR_HOST = commands.SESSION_BOOT.split("\n")
-    .filter(
-        (line) =>
-            !line.includes("apt-get") &&
-            !line.startsWith("if ! command -v tmux") &&
-            line !== "fi" &&
-            !line.startsWith("exec tail -f")
-    )
-    .join("\n");
 
 // ---------------------------------------------------------------------------
 // Steering
@@ -379,6 +386,54 @@ async function runInSession(sessionId: string, command: string): Promise<{ code:
 }
 
 /**
+ * Run one of the built commands and insist that it worked.
+ *
+ * Steering is fire-and-forget by nature - tmux says nothing back about what the
+ * agent made of a paste - so the exit code is the only evidence there is that the
+ * keystrokes reached a terminal at all. Dropping it makes a prompt that was never
+ * delivered indistinguishable from one the agent is already working on, which is
+ * the one failure a transcript cannot show.
+ */
+async function steer(sessionId: string, command: string, whatFor: string): Promise<void> {
+    const result = await runInSession(sessionId, command);
+    if (result.code === 0) return;
+    const said = result.output.trim().slice(-300);
+    throw new Error(said ? `${whatFor}: ${said}` : whatFor);
+}
+
+/** How long a first prompt waits for the agent to open its terminal. A session
+ *  boots by cloning a repository and installing an agent, so the budget is a slow
+ *  network's worth of that rather than a click's worth. */
+const AGENT_READY_TIMEOUT_MS = 10 * 60 * 1000;
+const AGENT_READY_POLL_MS = 5000;
+
+/**
+ * Wait until there is a terminal to type into.
+ *
+ * `startSession` returns as soon as the machine has a process, which is minutes
+ * before the agent exists: the boot still has a clone and an install in front of
+ * it. Anything sent in that window goes to a tmux session that is not there yet,
+ * so the paste fails and the prompt is simply lost. This is what a person does
+ * instead - wait for the window to open, then type.
+ */
+async function waitForAgent(sessionId: string, timeoutMs = AGENT_READY_TIMEOUT_MS): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        // A session that ended while this was waiting stops it, rather than
+        // spending the whole budget on a machine that is gone.
+        const placement = await sessionPlacement(sessionId);
+        if (!placement) throw new Error("That session no longer exists.");
+        if (core.isSessionOver(placement.state)) throw new Error("That session has ended.");
+        // A machine part-way through its boot refuses the probe as often as it
+        // answers no, and neither one is a reason to stop waiting.
+        const alive = await runInSession(sessionId, commands.aliveCommand()).catch(() => null);
+        if (alive?.code === 0) return true;
+        if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;
+        await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));
+    }
+}
+
+/**
  * Send a session something to work on.
  *
  * Two calls with a wait between them, and the wait is the point: the paste has to
@@ -387,14 +442,39 @@ async function runInSession(sessionId: string, command: string): Promise<{ code:
  * first, so what somebody asked for survives even if the machine has gone away.
  */
 export async function promptSession(sessionId: string, text: string): Promise<void> {
-    await runInSession(sessionId, commands.pastePromptCommand(text));
+    await steer(sessionId, commands.pastePromptCommand(text), "The agent's terminal did not take the prompt");
     await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(text)));
-    await runInSession(sessionId, commands.submitCommand());
+    await steer(sessionId, commands.submitCommand(), "The prompt was pasted but not submitted");
+}
+
+/**
+ * The prompt somebody started a session with, delivered once there is an agent to
+ * deliver it to.
+ *
+ * Separate from `promptSession` because the wait belongs to this one case: every
+ * later prompt is typed at a session that is already running, and one of those
+ * failing is worth hearing about immediately rather than after ten minutes of
+ * polling. Failure is written into the transcript, because the person who typed
+ * it has already been told the session started.
+ */
+export async function deliverFirstPrompt(sessionId: string, text: string): Promise<void> {
+    try {
+        if (!(await waitForAgent(sessionId))) {
+            throw new Error("its agent never opened a terminal to type into");
+        }
+        await promptSession(sessionId, text);
+    } catch (error) {
+        await addSessionMessage(
+            sessionId,
+            "system",
+            `Polaris could not send the first prompt: ${error instanceof Error ? error.message : "unknown"}. Send it again from the box below.`
+        ).catch(() => undefined);
+    }
 }
 
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
-    await runInSession(sessionId, commands.interruptCommand());
+    await steer(sessionId, commands.interruptCommand(), "The agent's terminal did not take the interrupt");
 }
 
 /** What the agent's terminal currently shows. */
