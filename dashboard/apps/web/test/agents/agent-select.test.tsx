@@ -34,7 +34,12 @@ function choicesFor(held: Set<string>): AgentChoice[] {
         readiness: core.agentReadiness(cli, present),
         missing:
             core.agentReadiness(cli, present) === "missing"
-                ? cli.credentials.map((c) => ({ env: c.env, label: c.label, url: c.url, howto: c.howto }))
+                ? cli.credentials.map((c) => ({
+                      env: c.env,
+                      label: c.label,
+                      url: c.url,
+                      howto: c.howto
+                  }))
                 : []
     }));
 }
@@ -42,7 +47,9 @@ function choicesFor(held: Set<string>): AgentChoice[] {
 describe("AgentSelect", () => {
     it("draws the vendor's own mark for the tool that is picked", () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
-        const { container } = render(<AgentSelect options={options} value="claude" onChange={() => {}} />);
+        const { container } = render(
+            <AgentSelect options={options} value="claude" onChange={() => {}} />
+        );
         // Anthropic's mark is inline SVG carrying its own path data; a
         // monogram (the fallback for a tool with no mark) draws a <span> of
         // initials instead, never an <svg>.
@@ -93,11 +100,14 @@ describe("AgentSelect", () => {
 
     it("captures the open picker as evidence of what a person actually sees", async () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
-        const { container } = render(<AgentSelect options={options} value="claude" onChange={() => {}} />);
+        const { container } = render(
+            <AgentSelect options={options} value="claude" onChange={() => {}} />
+        );
         await userEvent.click(screen.getByRole("button", { name: /claude code/i }));
 
         const fs = await import("node:fs");
-        const dir = "C:\\Users\\admin\\AppData\\Local\\Temp\\enigma-gate-evidence\\01M1CEM62Q4V7JHQ3RH95H407Z";
+        const dir =
+            "C:\\Users\\admin\\AppData\\Local\\Temp\\enigma-gate-evidence\\01M1CEM62Q4V7JHQ3RH95H407Z";
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(`${dir}\\agent-select-open.html`, container.innerHTML, "utf8");
 
