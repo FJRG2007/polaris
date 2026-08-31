@@ -19,6 +19,7 @@ import * as sessions from "@/lib/agents/session-service";
 import * as taskAccess from "@/lib/tasks/access";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, type AgentChoice } from "@/lib/agents/agent-readiness";
+import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
 
@@ -104,6 +105,12 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         });
         if (!host) return { error: "That server is not one of yours." };
     }
+
+    // Before anything else, because it is the cheapest question and the one whose
+    // answer does not change with the form: a box already running as many
+    // containers as it is set to should not be asked to check credentials first.
+    const refusal = capacityRefusal(await sessionCapacity(user.id));
+    if (refusal) return { error: refusal };
 
     // Before a row exists, because a session that could never have signed in is
     // not a record of an attempt - it is a dead row somebody has to notice and

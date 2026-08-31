@@ -5778,6 +5778,13 @@ model AgentSession {
     @@unique([tokenHash])
     @@index([repoId, createdAt])
     @@index([state])
+    // What is alive, per account and in total: the ceiling check runs before
+    // every session starts, and counting live rows by scanning the state index
+    // alone means reading every session anybody ever started.
+    @@index([startedById, state])
+    // The silence sweep, which asks for live sessions ordered by when they last
+    // said anything. Without this it is the same full scan on a timer.
+    @@index([state, lastEventAt])
     @@index([taskId])
     @@index([hostId])
 }
