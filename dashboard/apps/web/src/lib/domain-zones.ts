@@ -304,7 +304,47 @@ export function ownerZoneKey(domain: string): string {
 
 /** The domain a picker key names, or null when the key is an operator zone. */
 export function ownerZoneDomain(key: string | undefined): string | null {
-    return key && key.startsWith(OWNER_ZONE_PREFIX) ? key.slice(OWNER_ZONE_PREFIX.length) : null;
+    if (!key || key === BASE_ZONE_KEY || !key.startsWith(OWNER_ZONE_PREFIX)) return null;
+    return key.slice(OWNER_ZONE_PREFIX.length) || null;
+}
+
+/**
+ * The picker key for a name directly on the operator's base domain.
+ *
+ * Every zone above stands on one wildcard record, which is what lets Polaris hand
+ * out names under it without touching DNS again. Plenty of domains have no
+ * wildcard and still want `invoices.example.com`, and that name needs a record of
+ * its own - so the base domain is offered as its own entry rather than as a zone,
+ * and whoever adds the domain writes the record for the exact hostname it returns.
+ *
+ * `~` is not legal in a DNS label and is not the owner prefix, so this key can be
+ * confused with neither.
+ */
+export const BASE_ZONE_KEY = "~base";
+
+export function isBaseZoneKey(key: string | undefined): boolean {
+    return key === BASE_ZONE_KEY;
+}
+
+/**
+ * The hostname a base yields for these options: a random label, the subdomain
+ * that was picked, or one derived from the service name so a redeploy keeps the
+ * URL.
+ *
+ * "bad-name" when something was typed and no DNS label survives it. Refused
+ * rather than quietly replaced by the derived name, or the operator ends up
+ * looking at a URL they never asked for.
+ */
+function mintUnder(
+    host: string,
+    name: string,
+    options: { random?: boolean; subdomain?: string }
+): string | "bad-name" {
+    const zone = { label: "", scope: "deploy" as const, primary: false };
+    if (options.random) return randomZoneHostname(zone, host);
+    const picked = normalizeZoneName(options.subdomain ?? "");
+    if (picked) return namedZoneHostname(picked, zone, host);
+    return options.subdomain?.trim() ? "bad-name" : zoneHostname(name, zone, host);
 }
 
 /** Why a hostname could not be minted, so the caller can say which of the two it is
@@ -338,49 +378,44 @@ export async function deployHostname(
         if (!options.owner) return "unknown-zone";
         const usable = await usableOwnerDomains(options.owner);
         if (!usable.includes(owned)) return "unverified";
-        const picked = options.random ? "" : normalizeZoneName(options.subdomain ?? "");
-        if (!picked && options.subdomain?.trim() && !options.random) return "bad-name";
-        const zone = { label: "", scope: "deploy" as const, primary: false };
-        return {
-            hostname: options.random
-                ? randomZoneHostname(zone, owned)
-                : picked
-                  ? namedZoneHostname(picked, zone, owned)
-                  : zoneHostname(name, zone, owned),
-            zoneHost: owned
-        };
+        const minted = mintUnder(owned, name, options);
+        return minted === "bad-name" ? minted : { hostname: minted, zoneHost: owned };
     }
 
     const config = await getDomainZones();
     if (!config.baseDomain) return "no-domain";
+    // A name straight on the base domain. Deliberately ahead of the verification
+    // gate below: that gate stands for a wildcard record, and this path does not
+    // ride one - the caller writes a record for the exact hostname, exactly as it
+    // does for a hostname somebody typed in full.
+    if (isBaseZoneKey(options.zoneLabel)) {
+        const minted = mintUnder(config.baseDomain, name, options);
+        return minted === "bad-name" ? minted : { hostname: minted, zoneHost: config.baseDomain };
+    }
     // The same gate the picker applies, enforced where the hostname is actually
     // minted: an unproven zone yields a name nobody can reach and an ACME order that
     // cannot complete, however the caller got here.
     if (!(await zoneDnsVerified())) return "unverified";
     const zone = pickZone(config.zones, "deploy", options.zoneLabel);
     if (!zone) return "unknown-zone";
-    const picked = options.random ? "" : normalizeZoneName(options.subdomain ?? "");
-    // Something was typed but nothing of it survives as a DNS label. Refused rather
-    // than quietly replaced by the derived name: the operator would then be looking
-    // at a URL they never asked for.
-    if (!picked && options.subdomain?.trim() && !options.random) return "bad-name";
-    return {
-        hostname: options.random
-            ? randomZoneHostname(zone, config.baseDomain)
-            : picked
-              ? namedZoneHostname(picked, zone, config.baseDomain)
-              : zoneHostname(name, zone, config.baseDomain),
-        zoneHost: zoneHost(zone, config.baseDomain)
-    };
+    const host = zoneHost(zone, config.baseDomain);
+    const minted = mintUnder(host, name, options);
+    return minted === "bad-name" ? minted : { hostname: minted, zoneHost: host };
 }
+
+/**
+ * Where a hostname would come from. `zone` and `owned` both ride a wildcard
+ * record and need no DNS work; `base` is one record per name, so a picker has to
+ * say so and the caller has to write it.
+ */
+export type DeployZoneKind = "zone" | "owned" | "base";
 
 export interface DeployZoneOption {
     /** What a picker sends back, and what `deployHostname` reads. */
     readonly label: string;
     readonly host: string;
     readonly primary: boolean;
-    /** True when the domain belongs to the deployer rather than to the operator. */
-    readonly owned: boolean;
+    readonly kind: DeployZoneKind;
 }
 
 /**
@@ -398,7 +433,7 @@ export async function listDeployZones(owner?: DomainOwner): Promise<DeployZoneOp
     // Unproven zones are not offered: this is the picker's default, so a service added
     // right after the wizard would otherwise take a hostname that resolves nowhere and
     // ask Let's Encrypt to certify it, retrying until the records exist.
-    const operator =
+    const operator: DeployZoneOption[] =
         config.baseDomain && (await zoneDnsVerified())
             ? config.zones
                   .filter((zone) => zone.scope === "deploy")
@@ -406,16 +441,25 @@ export async function listDeployZones(owner?: DomainOwner): Promise<DeployZoneOp
                       label: zone.label,
                       host: zoneHost(zone, config.baseDomain),
                       primary: zone.primary,
-                      owned: false
+                      kind: "zone" as const
                   }))
             : [];
 
-    if (!owner) return operator;
-    const brought = (await usableOwnerDomains(owner)).map((domain) => ({
+    // The base domain on its own, unless a zone already sits on it. Offered even
+    // with no proven zone, because this one does not stand on a wildcard: the
+    // record for the exact hostname is written when the domain is added, so there
+    // is nothing here to have verified first.
+    const base: DeployZoneOption[] =
+        config.baseDomain && !operator.some((zone) => zone.host === config.baseDomain)
+            ? [{ label: BASE_ZONE_KEY, host: config.baseDomain, primary: false, kind: "base" }]
+            : [];
+
+    if (!owner) return [...operator, ...base];
+    const brought: DeployZoneOption[] = (await usableOwnerDomains(owner)).map((domain) => ({
         label: ownerZoneKey(domain),
         host: domain,
         primary: false,
-        owned: true
+        kind: "owned"
     }));
-    return [...operator, ...brought];
+    return [...operator, ...base, ...brought];
 }

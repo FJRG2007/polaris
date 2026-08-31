@@ -1880,6 +1880,19 @@ const EXPOSURE_OPTIONS: { value: ExposureKind; label: string; icon: ReactNode }[
  *  empty select value, and "@" is how a DNS zone's own record is written anyway. */
 const ZONE_ROOT = "@";
 
+/** One entry in the zone picker, as the server describes it. */
+type DeployZone = Awaited<ReturnType<typeof deployActions.deployZonesAction>>["zones"][number];
+
+/** How a zone reads in the picker. The base domain is called out because it is the
+ *  one entry that needs a DNS record per name rather than riding a wildcard, and a
+ *  domain somebody brought is called out because it and one of this Polaris's own
+ *  look identical otherwise - which of the two a service answers on is the whole
+ *  decision being made here. */
+function zoneOptionLabel(zone: DeployZone): string {
+    if (zone.kind === "base") return `${zone.host} (your domain)`;
+    return zone.kind === "owned" ? `*.${zone.host} (your own)` : `*.${zone.host}`;
+}
+
 /** What the server says about the subdomain in the field: the name, the hostname it
  *  makes, and whether anything already answers on it. */
 type ZoneSubdomainCheck = Awaited<ReturnType<typeof deployActions.zoneSubdomainAction>>;
@@ -2084,7 +2097,10 @@ function SettingsTab({
     const exposureTouched = useRef(false);
     const [cfConnected, setCfConnected] = useState(false);
     const [duckSub, setDuckSub] = useState<string | null>(null);
-    const [zones, setZones] = useState<Array<{ label: string; host: string; primary: boolean; owned: boolean }>>([]);
+    const [zones, setZones] = useState<DeployZone[]>([]);
+    // Where "Add a domain" goes: the account's own domains, or the organization's
+    // when that is the shelf this project is on.
+    const [domainsHref, setDomainsHref] = useState("/account/domains");
     // The operator's own domain, offered as the suggested custom hostname so a name
     // straight on it (app.example.com) is as obvious a choice as one in a zone.
     const [baseDomain, setBaseDomain] = useState("");
@@ -2116,18 +2132,25 @@ function SettingsTab({
         // server's domain instead.
         if (app.serverId !== "local") return;
         void deployActions.deployZonesAction()
-            .then(({ baseDomain: base, zones: result }) => {
+            .then(({ baseDomain: base, zones: result, manageHref }) => {
                 setZones(result);
                 setBaseDomain(base);
+                setDomainsHref(manageHref);
                 // A configured domain is the best default: it is the only option that
                 // yields a stable, public hostname without a third party in the path.
                 // The layout's own default zone wins, not merely the first stored one.
                 // Only while the operator has not chosen yet, though - this resolves
                 // after a round trip, and replacing a choice made in the meantime would
                 // add a different kind of domain than the one they pressed for.
-                if (result.length > 0 && !exposureTouched.current) {
+                // The base domain is offered but never the default: it is the one
+                // entry with no wildcard behind it, so a name taken there resolves
+                // nowhere until a record for it exists. Defaulting to a name that
+                // may not work is worse than defaulting to the free subdomain,
+                // which always does.
+                const wildcards = result.filter((zone) => zone.kind !== "base");
+                if (wildcards.length > 0 && !exposureTouched.current) {
                     setExposure("zone");
-                    setZoneLabel((result.find((zone) => zone.primary) ?? result[0])?.label ?? "");
+                    setZoneLabel((wildcards.find((zone) => zone.primary) ?? wildcards[0])?.label ?? "");
                 }
             })
             .catch(() => undefined);
@@ -2303,7 +2326,8 @@ function SettingsTab({
                   : "Connect"
               : "Add domain";
     // The zone the name goes in, for the suffix beside the field.
-    const zoneHost = zones.find((zone) => zone.label === zoneKey)?.host ?? zones[0]?.host ?? "";
+    const zone = zones.find((entry) => entry.label === zoneKey) ?? zones[0];
+    const zoneHost = zone?.host ?? "";
     // Only a checked answer about the name itself blocks the add: while a check is in
     // flight the operator is still typing, and a zone that cannot mint at all is the
     // add's error to report, not something to blame the typed name for.
@@ -2461,16 +2485,19 @@ function SettingsTab({
                                         setZoneLabel(value === ZONE_ROOT ? "" : value);
                                         setSubdomainCheck(null);
                                     }}
-                                    // A domain brought by whoever owns this shelf is
-                                    // marked: it and one of this Polaris's own zones
-                                    // look identical otherwise, and which of the two a
-                                    // service answers on is the whole decision here.
                                     options={zones.map((zone) => ({
                                         value: zone.label || ZONE_ROOT,
-                                        label: zone.owned ? `*.${zone.host} (your own)` : `*.${zone.host}`
+                                        label: zoneOptionLabel(zone)
                                     }))}
                                     aria-label="Zone"
                                 />
+                                <Link
+                                    href={domainsHref}
+                                    className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                    <Plus className="size-3.5" />
+                                    Add a domain
+                                </Link>
                                 {!randomName && (
                                     <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
@@ -2537,7 +2564,9 @@ function SettingsTab({
                         )}
                         <p className="text-xs text-muted-foreground">
                             {exposure === "zone"
-                                ? `A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name outside these zones${baseDomain ? `, like ${hostnameHint}` : ""}, or one on another domain, pick Custom domain.`
+                                ? zone?.kind === "base"
+                                    ? `A hostname straight on ${zoneHost}, with a Let's Encrypt certificate. This one is not covered by a wildcard, so it needs its own DNS record - Polaris writes it when the domain sits in your connected Cloudflare account, and otherwise tells you the record to add. For a name on a different domain, pick Custom domain.`
+                                    : "A hostname on your own domain, covered by the zone's wildcard record - no DNS to add, with a Let's Encrypt certificate. Choose the subdomain, or take a random one for an unguessable URL. Each build also gets this name with its commit added. For a name on a domain that is not listed, pick Custom domain."
                                 : exposure === "subdomain"
                                 ? "Always reachable: a free sslip.io subdomain that resolves on any device (a public Let's Encrypt name on a reachable box). Behind NAT, Polaris also starts a free Cloudflare quick link so it works from outside. Connect a Cloudflare account or a custom domain for a stable public URL."
                                 : exposure === "local"

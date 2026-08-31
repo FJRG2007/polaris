@@ -185,11 +185,13 @@ describe("hostnames minted from the layout", () => {
     });
 
     it("lists the deploy zones for a picker, flagging the default", async () => {
-        // `owned` says whose domain it is. Every entry here is the operator's;
-        // asked without an owner, nothing brought by anybody is offered at all.
+        // `kind` says where the name would come from. Every entry here is one of the
+        // operator's wildcard zones; asked without an owner, nothing brought by
+        // anybody is offered at all. The base domain gets no entry of its own
+        // because a zone already sits on it.
         expect(await listDeployZones()).toEqual([
-            { label: "plr", host: "plr.example.com", primary: true, owned: false },
-            { label: "", host: "example.com", primary: false, owned: false }
+            { label: "plr", host: "plr.example.com", primary: true, kind: "zone" },
+            { label: "", host: "example.com", primary: false, kind: "zone" }
         ]);
     });
 
@@ -280,7 +282,18 @@ describe("the verification gate", () => {
         expect(await deployHostname("invoices")).toBe("unverified");
     });
 
-    it("offers no zone in the picker either, so it cannot be the default there", async () => {
-        expect(await listDeployZones()).toEqual([]);
+    it("still mints straight on the base domain, which rides no wildcard", async () => {
+        expect(await deployHostname("invoices", { zoneLabel: "~base", subdomain: "billing" })).toEqual({
+            hostname: "billing.example.com",
+            zoneHost: "example.com"
+        });
+    });
+
+    it("offers no wildcard zone in the picker either, so it cannot be the default there", async () => {
+        // The base domain survives an unproven layout: it takes a record per name
+        // rather than riding a wildcard, so there is nothing about it to prove here.
+        expect(await listDeployZones()).toEqual([
+            { label: "~base", host: "example.com", primary: false, kind: "base" }
+        ]);
     });
 });

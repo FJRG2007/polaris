@@ -17,7 +17,7 @@ import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { resolveScope, scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { getNetworkStatus } from "@/lib/network-service";
 import { githubTokenForUser } from "@/lib/github-access";
@@ -28,7 +28,7 @@ import { getFlagsForEnvironment } from "@/lib/deploy-project-service";
 import { ensurePublicIp, getDomainConfig } from "@/lib/domain-service";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
-import { getDomainZones, listDeployZones, type DeployZoneOption } from "@/lib/domain-zones";
+import { getDomainZones, isBaseZoneKey, listDeployZones, type DeployZoneOption } from "@/lib/domain-zones";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
 import { inspectGithubRepo, type GithubRepo, type RepoInspection } from "@/lib/github-service";
 import { listVolumes, createVolume, updateVolume, deleteVolume, type VolumeView } from "@/lib/deploy-volume-service";
@@ -688,12 +688,13 @@ export async function addDomainAction(input: {
         });
         await recordAudit({ actorId: user.id, action: "deploy.domain.add", targetType: "application", targetId: input.applicationId });
         revalidatePath(DEPLOY_PATH);
-        // A hostname the operator typed is the only one whose DNS is not already
-        // handled: a zone name rides its wildcard, and a LAN or proxied name is not
-        // Polaris's to point. Best-effort, and reported rather than thrown - the
-        // domain is added either way, and missing DNS only delays the certificate.
-        const dns =
-            input.hostname && (input.cert ?? "le") === "le" ? await provisionHostnameDns(hostname) : undefined;
+        // A zone name rides its wildcard, and a LAN or proxied name is not Polaris's
+        // to point. The two that need a record of their own are a hostname the
+        // operator typed and a name minted straight on the base domain. Best-effort,
+        // and reported rather than thrown - the domain is added either way, and
+        // missing DNS only delays the certificate.
+        const needsRecord = Boolean(input.hostname) || isBaseZoneKey(input.zoneLabel);
+        const dns = needsRecord && (input.cert ?? "le") === "le" ? await provisionHostnameDns(hostname) : undefined;
         return { hostname, dns };
     } catch (caught) {
         return { error: caught instanceof Error ? caught.message : "Could not add the domain" };
@@ -758,15 +759,21 @@ export async function duckdnsSubdomainAction(): Promise<{ subdomain: string | nu
 export async function deployZonesAction(): Promise<{
     baseDomain: string;
     zones: DeployZoneOption[];
+    /** Where adding another domain happens, for the shelf that is open. */
+    manageHref: string;
 }> {
     const user = await requirePermission("deploy.manage");
     // The shelf that is open decides whose brought domains are offered: an
     // organization's names belong to its projects, and somebody's own names must
     // not be on the list while they are deploying for a client.
-    const orgId = await scopeOrgIdFor(user.id);
-    const owner: DomainOwner = orgId ? { kind: "org", id: orgId } : { kind: "user", id: user.id };
+    const scope = await resolveScope(user.id);
+    const owner: DomainOwner = scope.org ? { kind: "org", id: scope.org.id } : { kind: "user", id: user.id };
     const [config, zones] = await Promise.all([getDomainZones(), listDeployZones(owner)]);
-    return { baseDomain: config.baseDomain, zones };
+    return {
+        baseDomain: config.baseDomain,
+        zones,
+        manageHref: scope.org ? `/account/organizations/${scope.org.slug}/domains` : "/account/domains"
+    };
 }
 
 const zoneSubdomainSchema = z.object({
