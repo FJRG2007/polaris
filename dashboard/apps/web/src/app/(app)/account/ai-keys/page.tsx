@@ -106,6 +106,7 @@ export default async function AiKeysPage() {
                 }}
                 copy={{
                     title: "Your agent accounts",
+                    action: "Add account",
                     hint: "Tried from the top. The first that signs the agent in is the one a session on this box uses.",
                     empty:
                         fromPlatform.size > 0

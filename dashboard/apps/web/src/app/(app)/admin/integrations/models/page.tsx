@@ -84,6 +84,7 @@ export default async function ModelProvidersPage() {
                 }}
                 copy={{
                     title: "The deployment's agent accounts",
+                    action: "Add account",
                     hint: "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
                     empty: "None yet. Without one, only people who bring their own can start a session here.",
                     adding: "The account this deployment's sessions sign an agent in with."

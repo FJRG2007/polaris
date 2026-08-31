@@ -469,8 +469,12 @@ async function waitForAgent(
         if (core.isSessionOver(placement.state)) throw new Error("That session has ended.");
         // A machine part-way through its boot refuses the probe as often as it
         // answers no, and neither one is a reason to stop waiting.
-        const alive = await runInSession(sessionId, commands.aliveCommand()).catch(() => null);
-        if (alive?.code === 0) return true;
+        // Not `tmux has-session`: the setup runs inside that session now, so it
+        // exists from the first second and answering on it delivered the prompt
+        // into the middle of an install. The flag is written immediately before
+        // the agent takes the window over.
+        const ready = await runInSession(sessionId, commands.agentReadyCommand()).catch(() => null);
+        if (ready?.code === 0) return true;
         if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;
         await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));
     }

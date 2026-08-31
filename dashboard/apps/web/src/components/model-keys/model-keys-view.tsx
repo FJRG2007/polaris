@@ -58,6 +58,16 @@ export interface ModelKeyActions {
 export interface ModelKeysCopy {
     /** Heading over the table. */
     title: string;
+    /**
+     * What the button that opens the dialog says, and what the dialog's own
+     * button says once it is open.
+     *
+     * A word rather than a default, because the same table lists two different
+     * things: a provider key is a key somebody adds, and an agent account is a
+     * subscription somebody signs in - and "Add key" over a list of
+     * subscriptions is the screen telling them they are about to buy tokens.
+     */
+    action?: string;
     /** The line under it, saying what the order means. */
     hint: string;
     /** What the table says when there is nothing in it. */
@@ -225,7 +235,7 @@ export function ModelKeysView({
                         </div>
                         <Button size="sm" onClick={() => setAdding(true)}>
                             <Plus className="size-4 shrink-0" />
-                            Add key
+                            {copy.action ?? "Add key"}
                         </Button>
                     </div>
 
@@ -289,6 +299,7 @@ export function ModelKeysView({
                     providers={providers}
                     actions={actions}
                     adding={copy.adding}
+                    action={copy.action}
                     existing={null}
                     takenNames={namesTaken(rows, null)}
                     onClose={() => setAdding(false)}
@@ -305,6 +316,7 @@ export function ModelKeysView({
                     providers={providers}
                     actions={actions}
                     adding={copy.adding}
+                    action={copy.action}
                     existing={editing}
                     takenNames={namesTaken(rows, editing.id)}
                     onClose={() => setEditing(null)}
@@ -460,6 +472,7 @@ function KeyDialog({
     providers,
     actions,
     adding,
+    action,
     existing,
     takenNames,
     onClose,
@@ -469,6 +482,8 @@ function KeyDialog({
     actions: ModelKeyActions;
     /** What adding a key means on this screen, said under the title. */
     adding: string;
+    /** The word this screen uses for it, on the button that finishes. */
+    action?: string;
     /** The key being edited, or null when this is a new one. */
     existing: ModelKeyView | null;
     /** Every name this owner already uses, lowercased, minus the row being
@@ -732,7 +747,7 @@ function KeyDialog({
                             Cancel
                         </Button>
                         <Button onClick={() => void submit()} disabled={busy || !ready}>
-                            {busy ? "Checking..." : existing ? "Save" : "Add key"}
+                            {busy ? "Checking..." : existing ? "Save" : (action ?? "Add key")}
                         </Button>
                     </div>
                 </div>

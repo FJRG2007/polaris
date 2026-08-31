@@ -182,7 +182,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             // paying twice for the same work.
             {
                 env: "CLAUDE_CODE_OAUTH_TOKEN",
-                label: "Claude subscription token",
+                label: "Claude subscription",
                 url: "https://docs.claude.com/en/docs/claude-code",
                 howto: "Run `claude setup-token` wherever you are already signed in to Claude Code, and paste what it prints.",
                 subscription: true

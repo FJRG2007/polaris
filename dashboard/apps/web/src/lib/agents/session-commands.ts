@@ -163,10 +163,32 @@ const REQUIRE_AGENT = [
 /** The clone is done, so the credential that did it goes before the agent starts
  *  and can read its own environment. The token the agent's own git and GitHub
  *  tools need stays. */
+/**
+ * The file the setup touches immediately before the agent replaces it.
+ *
+ * "Is the agent up" used to be answered by asking whether the tmux session
+ * existed, and that stopped being an answer the moment the setup moved inside
+ * tmux: the session now exists from the first second, so the first prompt was
+ * delivered into the middle of an npm install and the agent never saw it.
+ *
+ * A file rather than the pane's current command, which is what a vendor's
+ * launcher happens to be called - `node` for one of these, a shell for another -
+ * and would need a list nobody can keep right.
+ */
+export const AGENT_READY_FLAG = "/tmp/polaris-agent-started";
+
+/** Whether the agent is actually up, for the caller holding a prompt. */
+export function agentReadyCommand(): string {
+    return `test -f ${AGENT_READY_FLAG}`;
+}
+
 const START_AGENT = [
     "unset GIT_AUTH_HEADER",
     "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP",
     'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
+    // Written last, so anything holding a prompt knows the terminal it is about
+    // to type into belongs to the agent rather than to the installer.
+    `: > ${AGENT_READY_FLAG}`,
     // Takes the window over rather than opening a second one, so the terminal
     // that showed the clone and the installs is the terminal the agent runs in.
     'cd "$POLARIS_WORKDIR"',

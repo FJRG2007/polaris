@@ -383,9 +383,18 @@ export async function markSessionStarted(
         data: {
             containerId,
             workdir,
-            state: "idle",
+            // Still starting. The machine has a container; the agent inside it is
+            // minutes of cloning and installing away from existing. Writing
+            // `idle` here is what put "Waiting for you" on a session that had
+            // never run anything - idle means a finished turn, and there had not
+            // been one.
+            state: "starting",
             startedAt: new Date(),
-            lastEventAt: new Date()
+            // Deliberately not touched. This is when the AGENT last said
+            // something, and it has not said anything - setting it to now was
+            // what made the honest label impossible to derive, and it hides a
+            // session that never reports from the sweep that would end it.
+            lastEventAt: null
         }
     });
 }
