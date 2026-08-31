@@ -35,14 +35,58 @@ import { notifyDeployFinished } from "./notifications/deploy-events";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
-import { deployHostname, deployZoneHosts, isBaseZoneKey, type ZoneMintFailure } from "./domain-zones";
+import {
+    deployHostname,
+    deployZoneHosts,
+    isBaseZoneKey,
+    type ZoneMintFailure
+} from "./domain-zones";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
-import { quickTunnelAppIds, tunnelHostForApp, stopQuickTunnel } from "./deploy/quick-tunnel-service";
-import { githubCloneIdentity, githubCloneProblem, githubRepoReach, githubTokenForOwner } from "./github-access";
-import { announceDeployFinished, announceDeployQueued, announceDeployStarted } from "./deploy/github-deployment";
-import { KEPT_RELEASES, currentReleaseRef, keepsReleases, portSubject, releaseMarker, releaseRef, serviceRef } from "./deploy/releases";
-import { bucketHttpMetrics, normalizeRoot, normalizeZoneName, parseHttpLogs, parseWatchPaths, releaseDomain, resolveDockerfilePath, shortHash, shouldDeployForPaths, slugify, type AppDeployPlan, type DeployResult, type HttpLogEntry, type HttpMetricPoint, type RuntimeContext, type RuntimeDriver, type RuntimePorts } from "@polaris/deploy";
+import {
+    quickTunnelAppIds,
+    tunnelHostForApp,
+    stopQuickTunnel
+} from "./deploy/quick-tunnel-service";
+import {
+    githubCloneIdentity,
+    githubCloneProblem,
+    githubRepoReach,
+    githubTokenForOwner
+} from "./github-access";
+import {
+    announceDeployFinished,
+    announceDeployQueued,
+    announceDeployStarted
+} from "./deploy/github-deployment";
+import {
+    KEPT_RELEASES,
+    currentReleaseRef,
+    keepsReleases,
+    portSubject,
+    releaseMarker,
+    releaseRef,
+    serviceRef
+} from "./deploy/releases";
+import {
+    bucketHttpMetrics,
+    normalizeRoot,
+    normalizeZoneName,
+    parseHttpLogs,
+    parseWatchPaths,
+    releaseDomain,
+    resolveDockerfilePath,
+    shortHash,
+    shouldDeployForPaths,
+    slugify,
+    type AppDeployPlan,
+    type DeployResult,
+    type HttpLogEntry,
+    type HttpMetricPoint,
+    type RuntimeContext,
+    type RuntimeDriver,
+    type RuntimePorts
+} from "@polaris/deploy";
 
 /** A locally-installed messaging hub (this catalog app) joins a dedicated web<->hub
  *  network and POSTs inbound events to the web by service DNS - the public app URL
@@ -186,7 +230,10 @@ export async function listProjectScopes(ownerId: string) {
                 select: {
                     id: true,
                     name: true,
-                    applications: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } }
+                    applications: {
+                        select: { id: true, name: true },
+                        orderBy: { createdAt: "asc" }
+                    }
                 },
                 orderBy: { createdAt: "asc" }
             }
@@ -214,7 +261,11 @@ export async function getProjectFull(projectId: string, ownerId: string) {
             environments: {
                 include: {
                     applications: {
-                        include: { domains: true, target: true, volumes: { include: { connection: { select: { name: true } } } } }
+                        include: {
+                            domains: true,
+                            target: true,
+                            volumes: { include: { connection: { select: { name: true } } } }
+                        }
                     },
                     // The child count comes along so the screen can say, before an
                     // instance is removed, that the databases hosted inside it go
@@ -239,7 +290,11 @@ export async function createEnvironment(projectId: string, ownerId: string, name
 }
 
 /** Persist an environment's canvas layout (node positions + links) as JSON. */
-export async function saveEnvironmentLayout(environmentId: string, ownerId: string, layout: string): Promise<void> {
+export async function saveEnvironmentLayout(
+    environmentId: string,
+    ownerId: string,
+    layout: string
+): Promise<void> {
     const environment = await prisma.environment.findFirst({
         where: { id: environmentId, project: { ownerId } }
     });
@@ -252,7 +307,11 @@ export async function saveEnvironmentLayout(environmentId: string, ownerId: stri
 /** Rename an environment, keeping its slug in step with the new name. A slug
  *  already taken in this project is left alone rather than blocking the rename;
  *  the name is what the operator asked to change. */
-export async function renameEnvironment(environmentId: string, ownerId: string, name: string): Promise<void> {
+export async function renameEnvironment(
+    environmentId: string,
+    ownerId: string,
+    name: string
+): Promise<void> {
     const environment = await prisma.environment.findFirst({
         where: { id: environmentId, project: { ownerId } },
         select: { id: true, projectId: true }
@@ -304,10 +363,20 @@ export async function getDatabaseSummary(
 ): Promise<{ id: string; name: string; environmentId: string; projectId: string } | null> {
     const row = await prisma.managedDatabase.findUnique({
         where: { id: databaseId },
-        select: { id: true, name: true, environmentId: true, environment: { select: { projectId: true } } }
+        select: {
+            id: true,
+            name: true,
+            environmentId: true,
+            environment: { select: { projectId: true } }
+        }
     });
     return row
-        ? { id: row.id, name: row.name, environmentId: row.environmentId, projectId: row.environment.projectId }
+        ? {
+              id: row.id,
+              name: row.name,
+              environmentId: row.environmentId,
+              projectId: row.environment.projectId
+          }
         : null;
 }
 
@@ -417,7 +486,10 @@ export async function createProject(ownerId: string, name: string, orgId: string
  *  and deliberately not enough to remove it, so a non-owner is told plainly
  *  rather than getting a silent no-op. */
 export async function deleteProject(projectId: string, ownerId: string) {
-    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId }, select: { id: true } });
+    const project = await prisma.project.findFirst({
+        where: { id: projectId, ownerId },
+        select: { id: true }
+    });
     if (!project) throw new Error("Only the project's owner can delete it");
     await tearDownProject(projectId, ownerId);
     await prisma.project.delete({ where: { id: projectId } });
@@ -468,7 +540,11 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
     if (presets.length > 0) {
         await prisma.wafRule
             .create({
-                data: { scopeType: "application", scopeId: application.id, presets: JSON.stringify(presets) }
+                data: {
+                    scopeType: "application",
+                    scopeId: application.id,
+                    presets: JSON.stringify(presets)
+                }
             })
             // A service that deploys without its default packs is worse than one that
             // does not deploy at all only if nobody says so - the packs are visible
@@ -487,7 +563,13 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
  *  reference for an image deploy, the builder/provider for a repo one. */
 function stackHint(input: CreateApplicationInput): string {
     const config = input.sourceConfig as Record<string, unknown> | undefined;
-    const parts = [input.sourceType, config?.imageRef, config?.provider, config?.builder, config?.repoUrl];
+    const parts = [
+        input.sourceType,
+        config?.imageRef,
+        config?.provider,
+        config?.builder,
+        config?.repoUrl
+    ];
     return parts.filter((part): part is string => typeof part === "string").join(" ");
 }
 
@@ -560,7 +642,9 @@ export interface ZoneSubdomainCheck {
  * Read from the project row so it cannot drift from what the shelf actually says.
  */
 function domainOwnerOf(project: { ownerId: string; orgId: string | null }): DomainOwner {
-    return project.orgId ? { kind: "org", id: project.orgId } : { kind: "user", id: project.ownerId };
+    return project.orgId
+        ? { kind: "org", id: project.orgId }
+        : { kind: "user", id: project.ownerId };
 }
 
 export async function checkZoneSubdomain(
@@ -570,7 +654,10 @@ export async function checkZoneSubdomain(
 ): Promise<ZoneSubdomainCheck | ZoneMintFailure> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { slug: true, environment: { select: { project: { select: { ownerId: true, orgId: true } } } } }
+        select: {
+            slug: true,
+            environment: { select: { project: { select: { ownerId: true, orgId: true } } } }
+        }
     });
     if (!app) throw new Error("Application not found");
     const owner = domainOwnerOf(app.environment.project);
@@ -581,11 +668,20 @@ export async function checkZoneSubdomain(
     const candidates = typed ? [typed] : [base, `${base}-${shortHash(applicationId, 4)}`];
     let result: ZoneSubdomainCheck = { subdomain: base, hostname: "", available: false };
     for (const candidate of candidates) {
-        const minted = await deployHostname(app.slug, { zoneLabel: opts.zoneLabel, subdomain: candidate, owner });
-        if (minted === "bad-name") return { subdomain: typed, hostname: "", available: false, invalid: true };
+        const minted = await deployHostname(app.slug, {
+            zoneLabel: opts.zoneLabel,
+            subdomain: candidate,
+            owner
+        });
+        if (minted === "bad-name")
+            return { subdomain: typed, hostname: "", available: false, invalid: true };
         if (typeof minted === "string") return minted;
         const taken = await hostnameTaken(minted.hostname);
-        result = { subdomain: normalizeZoneName(candidate), hostname: minted.hostname, available: !taken };
+        result = {
+            subdomain: normalizeZoneName(candidate),
+            hostname: minted.hostname,
+            available: !taken
+        };
         if (!taken) break;
     }
     return result;
@@ -655,7 +751,9 @@ export async function addApplicationDomain(
             throw new Error("Use letters, digits and dashes for the subdomain.");
         }
         if (minted === "no-domain") {
-            throw new Error("No domain is configured yet. Run the guided setup under Domains first.");
+            throw new Error(
+                "No domain is configured yet. Run the guided setup under Domains first."
+            );
         }
         if (minted === "unverified") {
             throw new Error(
@@ -663,16 +761,23 @@ export async function addApplicationDomain(
             );
         }
         if (minted === "unknown-zone") {
-            throw new Error("That zone no longer exists. Pick another one, or add it back under Domains.");
+            throw new Error(
+                "That zone no longer exists. Pick another one, or add it back under Domains."
+            );
         }
         // A random name is meant to be unguessable, not new on every click: minting a
         // fresh one each time would pile up a Domain row, an edge route and a
         // certificate request per press, with nothing saying which is the real URL.
-        const existing = opts.random ? await findRandomDomain(applicationId, minted.zoneHost) : null;
+        const existing = opts.random
+            ? await findRandomDomain(applicationId, minted.zoneHost)
+            : null;
         if (existing) {
             // The operator may have changed the port since; the reused name should
             // serve what they just asked for rather than silently keeping the old one.
-            if (existing.targetPort !== opts.targetPort || existing.certResolver !== (opts.cert ?? "le")) {
+            if (
+                existing.targetPort !== opts.targetPort ||
+                existing.certResolver !== (opts.cert ?? "le")
+            ) {
                 await prisma.domain.update({
                     where: { id: existing.id },
                     data: { targetPort: opts.targetPort, certResolver: opts.cert ?? "le" }
@@ -806,12 +911,19 @@ export async function addApplicationDomain(
  * that does not keep its releases side by side.
  */
 function dialTarget(
-    domain: { applicationId: string; deploymentId: string | null; application: { currentDeploymentId: string | null } },
+    domain: {
+        applicationId: string;
+        deploymentId: string | null;
+        application: { currentDeploymentId: string | null };
+    },
     isolated: ReadonlySet<string>
 ): string {
     if (domain.deploymentId) return domain.deploymentId;
     const current = domain.application.currentDeploymentId;
-    return portSubject(domain.applicationId, current ? { id: current, isolated: isolated.has(current) } : null);
+    return portSubject(
+        domain.applicationId,
+        current ? { id: current, isolated: isolated.has(current) } : null
+    );
 }
 
 export async function syncAppRoutes(): Promise<void> {
@@ -823,7 +935,9 @@ export async function syncAppRoutes(): Promise<void> {
             certResolver: true,
             applicationId: true,
             deploymentId: true,
-            application: { select: { target: { select: { kind: true } }, currentDeploymentId: true } }
+            application: {
+                select: { target: { select: { kind: true } }, currentDeploymentId: true }
+            }
         }
     });
     // Which of the serving releases run in a project of their own, and so publish on
@@ -833,7 +947,11 @@ export async function syncAppRoutes(): Promise<void> {
             await prisma.deployment.findMany({
                 where: {
                     isolated: true,
-                    id: { in: domains.map((domain) => domain.application.currentDeploymentId).filter((id) => id !== null) }
+                    id: {
+                        in: domains
+                            .map((domain) => domain.application.currentDeploymentId)
+                            .filter((id) => id !== null)
+                    }
                 },
                 select: { id: true }
             })
@@ -966,7 +1084,10 @@ export async function deployAppIdForHost(host: string): Promise<string | null> {
  * base configured just leaves the app domainless. The target port is inferred
  * from the source (built apps listen on 3000, prebuilt images on 80).
  */
-export async function ensureApplicationDomain(applicationId: string, ownerId: string): Promise<void> {
+export async function ensureApplicationDomain(
+    applicationId: string,
+    ownerId: string
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { sourceType: true, _count: { select: { domains: true } } }
@@ -988,7 +1109,14 @@ export async function ensureApplicationDomain(applicationId: string, ownerId: st
 export async function applicationDomainHealth(
     applicationId: string,
     ownerId: string
-): Promise<{ id: string; healthStatus: string | null; healthCode: number | null; healthDetail: string | null }[]> {
+): Promise<
+    {
+        id: string;
+        healthStatus: string | null;
+        healthCode: number | null;
+        healthDetail: string | null;
+    }[]
+> {
     return prisma.domain.findMany({
         where: { applicationId, application: { environment: { project: { ownerId } } } },
         select: { id: true, healthStatus: true, healthCode: true, healthDetail: true }
@@ -1041,12 +1169,17 @@ export async function reconcileNasMounts(): Promise<void> {
         include: {
             environment: { include: { project: { select: { ownerId: true, slug: true } } } },
             target: true,
-            volumes: { where: { kind: "nas", connectionId: { not: null } }, select: { connectionId: true } }
+            volumes: {
+                where: { kind: "nas", connectionId: { not: null } },
+                select: { connectionId: true }
+            }
         }
     });
     for (const app of apps) {
         const ownerId = app.environment.project.ownerId;
-        const connectionIds = [...new Set(app.volumes.map((volume) => volume.connectionId as string))];
+        const connectionIds = [
+            ...new Set(app.volumes.map((volume) => volume.connectionId as string))
+        ];
         let ports;
         try {
             ports = await getPorts(app.target as TargetRow, ownerId);
@@ -1085,7 +1218,11 @@ export async function reconcileNasMounts(): Promise<void> {
 async function appRuntime(applicationId: string, ownerId: string) {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true, volumes: { select: { id: true } } }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            volumes: { select: { id: true } }
+        }
     });
     if (!app) throw new Error("Application not found");
     const ref = await currentReleaseRef(app);
@@ -1130,7 +1267,11 @@ export async function readAppHttpMetrics(
  * i.e. what the app itself prints at runtime (distinct from the build/pipeline
  * log stored on the Deployment). Empty if the container is not running.
  */
-export async function readAppRuntimeLog(applicationId: string, ownerId: string, tail = 500): Promise<string> {
+export async function readAppRuntimeLog(
+    applicationId: string,
+    ownerId: string,
+    tail = 500
+): Promise<string> {
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     const chunks: Buffer[] = [];
@@ -1154,7 +1295,11 @@ const LOG_TS_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)/;
  */
 function sortLogByTimestamp(raw: string): string {
     const lines = raw.split("\n");
-    const tagged = lines.map((line, index) => ({ line, index, ts: LOG_TS_RE.exec(line)?.[1] ?? null }));
+    const tagged = lines.map((line, index) => ({
+        line,
+        index,
+        ts: LOG_TS_RE.exec(line)?.[1] ?? null
+    }));
     if (!tagged.some((entry) => entry.ts)) return raw;
     tagged.sort((a, b) => {
         if (a.ts && b.ts) return a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.index - b.index;
@@ -1173,9 +1318,16 @@ const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/a
  * the app's hostnames. Falls back to the container's own stdout for an app that
  * logs its requests directly or is reached by IP:port off the proxy.
  */
-async function readAppHttpEntries(applicationId: string, ownerId: string, tail: number): Promise<HttpLogEntry[]> {
+async function readAppHttpEntries(
+    applicationId: string,
+    ownerId: string,
+    tail: number
+): Promise<HttpLogEntry[]> {
     const { container, target } = await appRuntime(applicationId, ownerId);
-    const domains = await prisma.domain.findMany({ where: { applicationId }, select: { hostname: true } });
+    const domains = await prisma.domain.findMany({
+        where: { applicationId },
+        select: { hostname: true }
+    });
     const hosts = new Set(domains.map((domain) => domain.hostname.toLowerCase()));
     // The quick tunnel routes through the edge under this internal host, so its requests
     // are logged there under it - include it so tunnel traffic shows in the HTTP Logs.
@@ -1251,13 +1403,19 @@ export async function setApplicationRunning(
     // stopping just halts the container while keeping the deployment record.
     if (running) {
         await deployApplication(applicationId, ownerId, ownerId);
-        await prisma.application.update({ where: { id: applicationId }, data: { desiredState: "running" } });
+        await prisma.application.update({
+            where: { id: applicationId },
+            data: { desiredState: "running" }
+        });
         return;
     }
     const { app, container, target } = await appRuntime(applicationId, ownerId);
     // Recorded before the container is touched: a stop that half-succeeded must
     // not leave the app claiming it should be up, or the next reconcile undoes it.
-    await prisma.application.update({ where: { id: applicationId }, data: { desiredState: "stopped" } });
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { desiredState: "stopped" }
+    });
     const ports = await getPorts(target, ownerId);
     try {
         await ports.container(container, "stop");
@@ -1310,7 +1468,10 @@ export async function stopApplicationOnTarget(
  * stack rm) and mark its releases removed, clearing the app's current pointer.
  * The application config stays, so it can be deployed again later.
  */
-export async function removeApplicationDeployment(applicationId: string, ownerId: string): Promise<void> {
+export async function removeApplicationDeployment(
+    applicationId: string,
+    ownerId: string
+): Promise<void> {
     const { app, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -1330,10 +1491,17 @@ export async function removeApplicationDeployment(applicationId: string, ownerId
         await stopQuickTunnel(applicationId, ownerId).catch(() => undefined);
     }
     await prisma.deployment.updateMany({
-        where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
+        where: {
+            deployableType: "application",
+            deployableId: applicationId,
+            status: { in: ["running", "stopped"] }
+        },
         data: { status: "removed", finishedAt: new Date() }
     });
-    await prisma.application.update({ where: { id: applicationId }, data: { currentDeploymentId: null } });
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { currentDeploymentId: null }
+    });
 }
 
 /**
@@ -1359,7 +1527,9 @@ export async function deleteApplication(applicationId: string, ownerId: string):
     }
 
     await removeApplicationDeployment(applicationId, ownerId).catch(() => undefined);
-    await prisma.deployment.deleteMany({ where: { deployableType: "application", deployableId: applicationId } });
+    await prisma.deployment.deleteMany({
+        where: { deployableType: "application", deployableId: applicationId }
+    });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
     await prisma.application.delete({ where: { id: applicationId } });
     await releaseInstallsOf(applicationId);
@@ -1401,7 +1571,10 @@ async function releaseInstallsOf(applicationId: string): Promise<void> {
  * source, build, and variables, but its own name/slug and no domains or history.
  * It is not deployed automatically - the copy is created ready to deploy.
  */
-export async function duplicateApplication(applicationId: string, ownerId: string): Promise<string> {
+export async function duplicateApplication(
+    applicationId: string,
+    ownerId: string
+): Promise<string> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } }
     });
@@ -1409,7 +1582,12 @@ export async function duplicateApplication(applicationId: string, ownerId: strin
     const base = slugify(`${app.name}-copy`) || `${app.slug}-copy`;
     let slug = base;
     let suffix = 1;
-    while (await prisma.application.findFirst({ where: { environmentId: app.environmentId, slug }, select: { id: true } })) {
+    while (
+        await prisma.application.findFirst({
+            where: { environmentId: app.environmentId, slug },
+            select: { id: true }
+        })
+    ) {
         suffix += 1;
         slug = `${base}-${suffix}`;
     }
@@ -1429,7 +1607,9 @@ export async function duplicateApplication(applicationId: string, ownerId: strin
             keepReleases: app.keepReleases
         }
     });
-    const vars = await prisma.envVar.findMany({ where: { scopeType: "application", scopeId: app.id } });
+    const vars = await prisma.envVar.findMany({
+        where: { scopeType: "application", scopeId: app.id }
+    });
     for (const variable of vars) {
         await prisma.envVar.create({
             data: {
@@ -1473,7 +1653,12 @@ async function buildAppPlan(
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        include: { environment: { include: { project: true } }, target: true, volumes: true, domains: true }
+        include: {
+            environment: { include: { project: true } },
+            target: true,
+            volumes: true,
+            domains: true
+        }
     });
     if (!app) throw new Error("Application not found");
 
@@ -1496,7 +1681,9 @@ async function buildAppPlan(
             })
         );
     if (isLocalHub) env.WEB_INGEST_URL = WEB_INTERNAL_INGEST_URL;
-    const healthcheck = app.healthcheck ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"]) : undefined;
+    const healthcheck = app.healthcheck
+        ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"])
+        : undefined;
     // Resolved WAF rules for this service, materialized into edge labels on deploy so
     // a remote server's own Traefik enforces them without the control plane.
     const resolvedWaf = await resolveWaf(app.id);
@@ -1524,7 +1711,10 @@ async function buildAppPlan(
               // applied live, which is how everything else in this plan reaches a
               // remote server - so changing the Polaris domain reaches these routes on
               // their next deploy.
-              { ...resolvedWaf, loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined }
+              {
+                  ...resolvedWaf,
+                  loginUrl: resolvedWaf.requireLogin ? await appBaseUrl() : undefined
+              }
             : undefined;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
@@ -1533,7 +1723,8 @@ async function buildAppPlan(
     // source default; the host port is derived from the app id so it stays
     // consistent across redeploys without a schema column.
     const storedPort = typeof source.port === "number" ? source.port : undefined;
-    const containerPort = storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
+    const containerPort =
+        storedPort ?? app.domains[0]?.targetPort ?? (app.sourceType === "image" ? 80 : 3000);
     // A game server is reached by typing an address into a game, not by a proxy, so
     // it publishes on the port that game expects (25565, 19132) instead of the
     // derived one nobody would guess. Pinned at install; absent for everything else.
@@ -1579,11 +1770,17 @@ async function buildAppPlan(
     // volume uses, so the deploy kernel-mounts each at `<mount_root>/<id>` before the
     // container comes up - the bind `<mount_root>/<id>/<subpath>` then lands on the NAS.
     const nasConnectionIds = [
-        ...new Set(app.volumes.filter((volume) => volume.kind === "nas" && volume.connectionId).map((volume) => volume.connectionId as string))
+        ...new Set(
+            app.volumes
+                .filter((volume) => volume.kind === "nas" && volume.connectionId)
+                .map((volume) => volume.connectionId as string)
+        )
     ];
-    const mounts = (await Promise.all(nasConnectionIds.map((id) => resolveMountTarget(id, ownerId).catch(() => null)))).filter(
-        (mount): mount is NonNullable<typeof mount> => mount !== null
-    );
+    const mounts = (
+        await Promise.all(
+            nasConnectionIds.map((id) => resolveMountTarget(id, ownerId).catch(() => null))
+        )
+    ).filter((mount): mount is NonNullable<typeof mount> => mount !== null);
 
     const plan: AppDeployPlan = {
         ref,
@@ -1613,7 +1810,9 @@ async function buildAppPlan(
                 typeof source.rootDirectory === "string" ? source.rootDirectory : undefined,
                 typeof source.dockerfilePath === "string" ? source.dockerfilePath : undefined
             ),
-            rootDirectory: normalizeRoot(typeof source.rootDirectory === "string" ? source.rootDirectory : undefined),
+            rootDirectory: normalizeRoot(
+                typeof source.rootDirectory === "string" ? source.rootDirectory : undefined
+            ),
             contextPath: ".",
             composeYaml: typeof source.composeYaml === "string" ? source.composeYaml : undefined
         },
@@ -1628,7 +1827,11 @@ async function buildAppPlan(
         // carries only its own hostname; the service's own domains are re-pointed at
         // it by the edge on promote, so no two releases ever claim the same address.
         domains: app.domains
-            .filter((domain) => domain.enabled && (kept ? domain.deploymentId === release.id : domain.deploymentId === null))
+            .filter(
+                (domain) =>
+                    domain.enabled &&
+                    (kept ? domain.deploymentId === release.id : domain.deploymentId === null)
+            )
             .map((domain) => ({
                 hostname: domain.hostname,
                 targetPort: domain.targetPort,
@@ -1641,14 +1844,18 @@ async function buildAppPlan(
         volumes: app.volumes.map((volume) => {
             const kind = volume.kind === "bind" ? "bind" : volume.kind === "nas" ? "nas" : "volume";
             const stored = volume.source ?? volume.name;
-            const source = kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
+            const source =
+                kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
             return { mountPath: volume.mountPath, source, kind };
         }),
         healthcheck
     };
     let gitSource: GitSource | undefined;
     if (typeof source.repoUrl === "string" && source.repoUrl) {
-        gitSource = { repoUrl: source.repoUrl, branch: typeof source.branch === "string" ? source.branch : undefined };
+        gitSource = {
+            repoUrl: source.repoUrl,
+            branch: typeof source.branch === "string" ? source.branch : undefined
+        };
         // GitHub-sourced repos clone with the project owner's own account so their
         // private repositories build, falling back to the App installation an
         // administrator put on them; the header is null (public clone) when there
@@ -1712,15 +1919,26 @@ export async function redeployForEnvScope(
 ): Promise<void> {
     const where =
         scope === "application"
-            ? { id: scopeId, environment: { project: { ownerId } }, currentDeploymentId: { not: null } }
-            : { environmentId: scopeId, environment: { project: { ownerId } }, currentDeploymentId: { not: null } };
+            ? {
+                  id: scopeId,
+                  environment: { project: { ownerId } },
+                  currentDeploymentId: { not: null }
+              }
+            : {
+                  environmentId: scopeId,
+                  environment: { project: { ownerId } },
+                  currentDeploymentId: { not: null }
+              };
     const apps = await prisma.application.findMany({ where, select: { id: true } });
     for (const app of apps) {
         await deployApplication(app.id, ownerId, ownerId).catch(() => undefined);
     }
 }
 
-async function mergedEnv(environmentId: string, applicationId: string): Promise<Record<string, string>> {
+async function mergedEnv(
+    environmentId: string,
+    applicationId: string
+): Promise<Record<string, string>> {
     const rows = await prisma.envVar.findMany({
         where: {
             OR: [
@@ -1730,7 +1948,10 @@ async function mergedEnv(environmentId: string, applicationId: string): Promise<
         }
     });
     // Environment scope first, then application scope overrides it.
-    rows.sort((a, b) => (a.scopeType === "environment" ? -1 : 1) - (b.scopeType === "environment" ? -1 : 1));
+    rows.sort(
+        (a, b) =>
+            (a.scopeType === "environment" ? -1 : 1) - (b.scopeType === "environment" ? -1 : 1)
+    );
     const masterKey = loadEnv().POLARIS_MASTER_KEY;
     const env: Record<string, string> = {};
     for (const row of rows) {
@@ -1759,9 +1980,17 @@ export async function deployApplication(
     applicationId: string,
     ownerId: string,
     userId: string,
-    meta?: { commitMessage?: string; commitSha?: string; authorName?: string; authorAvatarUrl?: string }
+    meta?: {
+        commitMessage?: string;
+        commitSha?: string;
+        authorName?: string;
+        authorAvatarUrl?: string;
+    }
 ): Promise<string> {
-    const { plan, target, gitSource, buildCommands, keepsHistory } = await buildAppPlan(applicationId, ownerId);
+    const { plan, target, gitSource, buildCommands, keepsHistory } = await buildAppPlan(
+        applicationId,
+        ownerId
+    );
 
     // Asked before anything is started, and refused here rather than eight
     // minutes later at the clone.
@@ -1839,7 +2068,9 @@ export async function deployApplication(
     // actually succeeds (see executeDeployment) - so history never shows a build
     // as "current" before it finishes, and the old version stays active until the
     // new one is up (zero-downtime cutover, the way Railway does it).
-    queue.enqueue(target.id, () => runDeployment(deployment.id, planned, target, ownerId, gitSource, buildCommands));
+    queue.enqueue(target.id, () =>
+        runDeployment(deployment.id, planned, target, ownerId, gitSource, buildCommands)
+    );
     return deployment.id;
 }
 
@@ -1902,7 +2133,10 @@ export interface DeploymentSummary {
  * changed on Friday. Owner-checked the same way the deployment list is, because
  * the history of a service says as much about it as the releases do.
  */
-export async function serviceHistory(applicationId: string, ownerId: string): Promise<activity.ActivityLine[]> {
+export async function serviceHistory(
+    applicationId: string,
+    ownerId: string
+): Promise<activity.ActivityLine[]> {
     await requireOwnedApplication(applicationId, ownerId);
     return activity.history("app", applicationId, 60);
 }
@@ -1921,7 +2155,10 @@ export async function serviceHistory(applicationId: string, ownerId: string): Pr
  * it, and a note by a collaborator has to carry their name rather than the
  * owner's.
  */
-export async function serviceComments(applicationId: string, ownerId: string): Promise<comments.CommentView[]> {
+export async function serviceComments(
+    applicationId: string,
+    ownerId: string
+): Promise<comments.CommentView[]> {
     await requireOwnedApplication(applicationId, ownerId);
     return comments.thread("app", applicationId);
 }
@@ -1986,7 +2223,10 @@ async function requireOwnedApplication(applicationId: string, ownerId: string): 
 }
 
 /** An application's deployment history, most recent first (owner-checked). */
-export async function listDeployments(applicationId: string, ownerId: string): Promise<DeploymentSummary[]> {
+export async function listDeployments(
+    applicationId: string,
+    ownerId: string
+): Promise<DeploymentSummary[]> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { id: true, currentDeploymentId: true, sourceConfig: true }
@@ -2020,7 +2260,12 @@ export async function listDeployments(applicationId: string, ownerId: string): P
     const hostnames = new Map(
         (
             await prisma.domain.findMany({
-                where: { applicationId, kind: "release", enabled: true, deploymentId: { in: rows.map((row) => row.id) } },
+                where: {
+                    applicationId,
+                    kind: "release",
+                    enabled: true,
+                    deploymentId: { in: rows.map((row) => row.id) }
+                },
                 select: { hostname: true, deploymentId: true }
             })
         ).map((domain) => [domain.deploymentId, domain.hostname])
@@ -2044,7 +2289,10 @@ export async function listDeployments(applicationId: string, ownerId: string): P
 async function getDeploymentStatuses(ids: string[]): Promise<Record<string, string>> {
     const unique = [...new Set(ids.filter(Boolean))];
     if (unique.length === 0) return {};
-    const rows = await prisma.deployment.findMany({ where: { id: { in: unique } }, select: { id: true, status: true } });
+    const rows = await prisma.deployment.findMany({
+        where: { id: { in: unique } },
+        select: { id: true, status: true }
+    });
     return Object.fromEntries(rows.map((row) => [row.id, row.status]));
 }
 
@@ -2106,8 +2354,13 @@ export async function getApplicationDeployStatuses(
 
 /** Set the container port an application listens on (stored in its source config).
  *  Takes effect on the next deploy: the IP:port link and domain routes retarget. */
-export async function setApplicationPort(applicationId: string, ownerId: string, port: number): Promise<void> {
-    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("A valid port is required");
+export async function setApplicationPort(
+    applicationId: string,
+    ownerId: string,
+    port: number
+): Promise<void> {
+    if (!Number.isInteger(port) || port < 1 || port > 65535)
+        throw new Error("A valid port is required");
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { id: true, sourceConfig: true }
@@ -2115,7 +2368,10 @@ export async function setApplicationPort(applicationId: string, ownerId: string,
     if (!app) throw new Error("Application not found");
     const source = JSON.parse(app.sourceConfig) as Record<string, unknown>;
     source.port = port;
-    await prisma.application.update({ where: { id: app.id }, data: { sourceConfig: JSON.stringify(source) } });
+    await prisma.application.update({
+        where: { id: app.id },
+        data: { sourceConfig: JSON.stringify(source) }
+    });
 }
 
 /**
@@ -2171,7 +2427,11 @@ export async function setApplicationSourcePaths(
  * so it does not keep running orphaned, then the app is retargeted; it redeploys
  * on the new server on the next deploy. No-op when the server is unchanged.
  */
-export async function setApplicationServer(applicationId: string, ownerId: string, serverId: string): Promise<void> {
+export async function setApplicationServer(
+    applicationId: string,
+    ownerId: string,
+    serverId: string
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: { environment: { include: { project: true } }, target: true }
@@ -2182,7 +2442,10 @@ export async function setApplicationServer(applicationId: string, ownerId: strin
     if (!serverId || serverId === "local") {
         newTarget = await getOrCreateLocalTarget(ownerId);
     } else {
-        const host = await prisma.host.findFirst({ where: { id: serverId, ownerId }, select: { id: true, name: true } });
+        const host = await prisma.host.findFirst({
+            where: { id: serverId, ownerId },
+            select: { id: true, name: true }
+        });
         if (!host) throw new Error("The selected server was not found");
         newTarget = await getOrCreateHostTarget(host.id, ownerId, host.name);
     }
@@ -2201,7 +2464,11 @@ export async function setApplicationServer(applicationId: string, ownerId: strin
         }
         await prisma.domain.deleteMany({ where: { applicationId, kind: "release" } });
         await prisma.deployment.updateMany({
-            where: { deployableType: "application", deployableId: applicationId, status: { in: ["running", "stopped"] } },
+            where: {
+                deployableType: "application",
+                deployableId: applicationId,
+                status: { in: ["running", "stopped"] }
+            },
             data: { status: "removed", finishedAt: new Date() }
         });
     }
@@ -2275,13 +2542,19 @@ async function releaseCurrentOnly(applicationId: string, ownerId: string): Promi
     const ports = await getPorts(app.target as TargetRow, ownerId);
     try {
         for (const release of superseded) {
-            await ports.composeDown(releaseRef(base, releaseMarker(release)).project).catch(() => undefined);
+            await ports
+                .composeDown(releaseRef(base, releaseMarker(release)).project)
+                .catch(() => undefined);
         }
     } finally {
         await ports.dispose().catch(() => undefined);
     }
     await prisma.domain.deleteMany({
-        where: { applicationId, kind: "release", deploymentId: { in: superseded.map((release) => release.id) } }
+        where: {
+            applicationId,
+            kind: "release",
+            deploymentId: { in: superseded.map((release) => release.id) }
+        }
     });
     await prisma.deployment.updateMany({
         where: { id: { in: superseded.map((release) => release.id) } },
@@ -2344,7 +2617,9 @@ export async function triggerAutoDeploysForPush(input: {
             repoUrl.endsWith(`/${wanted}`) ||
             repoUrl.endsWith(`/${wanted}.git`);
         if (!matchesRepo) continue;
-        const configuredBranch = (app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")).trim();
+        const configuredBranch = (
+            app.deployBranch?.trim() || (typeof source.branch === "string" ? source.branch : "")
+        ).trim();
         if (configuredBranch && configuredBranch !== input.branch) continue;
         if (!commitPassesFilter(input.commitMessage, app.commitFilter)) continue;
         // Several services can track the same repository. Without this every one of
@@ -2364,7 +2639,10 @@ export async function triggerAutoDeploysForPush(input: {
                 commitMessage: input.commitMessage,
                 commitSha: input.commitSha
             });
-            await prisma.application.update({ where: { id: app.id }, data: { lastDeployedSha: input.commitSha } });
+            await prisma.application.update({
+                where: { id: app.id },
+                data: { lastDeployedSha: input.commitSha }
+            });
             started += 1;
         } catch {
             // Skip this app; the others still deploy.
@@ -2382,7 +2660,8 @@ function runDeployment(
     buildCommands?: BuildCommands
 ): Promise<void> {
     // Only an image source pulls a registry image that may need a login.
-    const pullImages = plan.build.method === "image" && plan.build.imageRef ? [plan.build.imageRef] : [];
+    const pullImages =
+        plan.build.method === "image" && plan.build.imageRef ? [plan.build.imageRef] : [];
     return executeDeployment(
         deploymentId,
         target,
@@ -2427,7 +2706,8 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
         select: { status: true }
     });
     if (!deployment) throw new Error("Deployment not found");
-    if (TERMINAL_DEPLOY_STATUSES.has(deployment.status)) throw new Error("That deploy has already finished");
+    if (TERMINAL_DEPLOY_STATUSES.has(deployment.status))
+        throw new Error("That deploy has already finished");
 
     running.get(deploymentId)?.abort(new Error("cancelled"));
     const settled = await settleDeployment(deploymentId, {
@@ -2436,7 +2716,8 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
         finishedAt: new Date()
     });
     await dropReleaseDomain(deploymentId);
-    if (settled) await notifyDeployFinished({ deploymentId, ownerId, ok: false }).catch(() => undefined);
+    if (settled)
+        await notifyDeployFinished({ deploymentId, ownerId, ok: false }).catch(() => undefined);
 }
 
 /**
@@ -2463,7 +2744,9 @@ export async function recoverAbandonedDeployments(): Promise<void> {
             finishedAt: new Date()
         }
     });
-    console.warn(`polaris: ${abandoned.length} deploy(s) were interrupted by a restart and are marked failed`);
+    console.warn(
+        `polaris: ${abandoned.length} deploy(s) were interrupted by a restart and are marked failed`
+    );
     for (const row of abandoned) await announceDeployFinished(row.id, "failed");
 }
 
@@ -2500,7 +2783,10 @@ export async function executeDeployment(
 ): Promise<void> {
     // Cancelled while it waited its turn on the target's queue. Nothing has started,
     // so there is nothing to unwind - and starting now would ignore the operator.
-    const queuedRow = await prisma.deployment.findUnique({ where: { id: deploymentId }, select: { status: true } });
+    const queuedRow = await prisma.deployment.findUnique({
+        where: { id: deploymentId },
+        select: { status: true }
+    });
     if (!queuedRow || TERMINAL_DEPLOY_STATUSES.has(queuedRow.status)) return;
 
     await mkdir(deployLogDir(), { recursive: true });
@@ -2521,7 +2807,11 @@ export async function executeDeployment(
     // restart, and nothing here bounded it. The deadline runs the same path an
     // operator's cancel does, so a wedged deploy ends by itself and says why.
     const deadline = setTimeout(() => {
-        log(Buffer.from(`\n[error] this deploy passed ${DEPLOY_DEADLINE_MS / 60_000} minutes and was stopped\n`));
+        log(
+            Buffer.from(
+                `\n[error] this deploy passed ${DEPLOY_DEADLINE_MS / 60_000} minutes and was stopped\n`
+            )
+        );
         controller.abort(new Error("timed out"));
     }, DEPLOY_DEADLINE_MS);
 
@@ -2532,7 +2822,9 @@ export async function executeDeployment(
     try {
         ports = await getPorts(target, ownerId, controller.signal);
         const driver = getDriver(target);
-        const buildContext = buildSource ? gitBuildContext(buildSource, log, buildCommands) : undefined;
+        const buildContext = buildSource
+            ? gitBuildContext(buildSource, log, buildCommands)
+            : undefined;
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but
         // not fatal - the pull surfaces the real error if the image is truly private.
@@ -2546,7 +2838,10 @@ export async function executeDeployment(
                 log(Buffer.from("[warn] registry login failed; the pull may be unauthorized\n"));
             }
         }
-        const result = await run({ ports, target: toTargetInfo(target), log, buildContext }, driver);
+        const result = await run(
+            { ports, target: toTargetInfo(target), log, buildContext },
+            driver
+        );
         // An abort usually surfaces as a thrown connection error below, but work that
         // was between two steps can come back with a verdict nobody is waiting for any
         // more. Promoting it would put a release the operator stopped in front of
@@ -2612,11 +2907,17 @@ async function settleDeployment(
 /** Finish a deployment that was stopped rather than allowed to fail: the release is
  *  never promoted, its hostname goes the way a failed build's does, and the reason
  *  says which of the two ways it was stopped. */
-async function settleCancelled(deploymentId: string, ownerId: string, reason: unknown): Promise<void> {
+async function settleCancelled(
+    deploymentId: string,
+    ownerId: string,
+    reason: unknown
+): Promise<void> {
     const timedOut = reason instanceof Error && reason.message === "timed out";
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
-        error: timedOut ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing` : "Cancelled",
+        error: timedOut
+            ? `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
+            : "Cancelled",
         finishedAt: new Date()
     });
     await dropReleaseDomain(deploymentId);
@@ -2692,12 +2993,19 @@ async function ensureReleaseDomain(
     if (!hostname) return null;
     // Re-deploying the same commit lands on the same hostname; point the existing
     // record at the new build rather than failing on the unique hostname.
-    const existing = await prisma.domain.findUnique({ where: { hostname }, select: { id: true, applicationId: true } });
+    const existing = await prisma.domain.findUnique({
+        where: { hostname },
+        select: { id: true, applicationId: true }
+    });
     if (existing) {
         if (existing.applicationId !== applicationId) return null;
         await prisma.domain.update({
             where: { id: existing.id },
-            data: { deploymentId: release.id, targetPort: stable.targetPort, certResolver: stable.certResolver }
+            data: {
+                deploymentId: release.id,
+                targetPort: stable.targetPort,
+                certResolver: stable.certResolver
+            }
         });
         return hostname;
     }
@@ -2727,15 +3035,25 @@ async function retireOldReleases(applicationId: string): Promise<void> {
         include: { environment: { include: { project: true } }, target: true }
     });
     const current = app?.currentDeploymentId
-        ? await prisma.deployment.findUnique({ where: { id: app.currentDeploymentId }, select: { isolated: true } })
+        ? await prisma.deployment.findUnique({
+              where: { id: app.currentDeploymentId },
+              select: { isolated: true }
+          })
         : null;
     if (!app || !current?.isolated) return;
     const kept = await prisma.deployment.findMany({
-        where: { deployableType: "application", deployableId: applicationId, status: "running", isolated: true },
+        where: {
+            deployableType: "application",
+            deployableId: applicationId,
+            status: "running",
+            isolated: true
+        },
         orderBy: { createdAt: "desc" },
         select: { id: true, commitSha: true }
     });
-    const retiring = kept.slice(KEPT_RELEASES).filter((release) => release.id !== app.currentDeploymentId);
+    const retiring = kept
+        .slice(KEPT_RELEASES)
+        .filter((release) => release.id !== app.currentDeploymentId);
 
     const base = serviceRef(app.environment.project.slug, app.slug, app.id);
     const ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
@@ -2745,7 +3063,9 @@ async function retireOldReleases(applicationId: string): Promise<void> {
         // service's port; downing it is a no-op once it is empty.
         await ports.composeDown(base.project).catch(() => undefined);
         for (const release of retiring) {
-            await ports.composeDown(releaseRef(base, releaseMarker(release)).project).catch(() => undefined);
+            await ports
+                .composeDown(releaseRef(base, releaseMarker(release)).project)
+                .catch(() => undefined);
             await prisma.domain.deleteMany({ where: { applicationId, deploymentId: release.id } });
             await prisma.deployment.update({
                 where: { id: release.id },
@@ -2769,10 +3089,17 @@ async function downAllReleases(
 ): Promise<void> {
     const base = serviceRef(app.environment.project.slug, app.slug, app.id);
     const releases = await prisma.deployment.findMany({
-        where: { deployableType: "application", deployableId: app.id, status: { in: ["running", "stopped"] } },
+        where: {
+            deployableType: "application",
+            deployableId: app.id,
+            status: { in: ["running", "stopped"] }
+        },
         select: { id: true, commitSha: true }
     });
-    const projects = [base.project, ...releases.map((release) => releaseRef(base, releaseMarker(release)).project)];
+    const projects = [
+        base.project,
+        ...releases.map((release) => releaseRef(base, releaseMarker(release)).project)
+    ];
     for (const project of [...new Set(projects)]) {
         if (swarm) await ports.stackDown(project).catch(() => undefined);
         else await ports.composeDown(project).catch(() => undefined);

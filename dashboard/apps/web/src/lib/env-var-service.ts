@@ -42,15 +42,24 @@ async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string
  * resolve who is allowed to touch it before it does. Null when the row is gone
  * or names a scope this module does not own.
  */
-export async function envVarScope(id: string): Promise<{ scope: EnvScope; scopeId: string } | null> {
-    const row = await prisma.envVar.findUnique({ where: { id }, select: { scopeId: true, scopeType: true } });
+export async function envVarScope(
+    id: string
+): Promise<{ scope: EnvScope; scopeId: string } | null> {
+    const row = await prisma.envVar.findUnique({
+        where: { id },
+        select: { scopeId: true, scopeType: true }
+    });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
     return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }
 
 /** List a scope's variables (secret values masked). Application scope is a service;
  *  environment scope is shared by every service in that environment. */
-export async function listEnvVars(scope: EnvScope, scopeId: string, ownerId: string): Promise<EnvVarView[]> {
+export async function listEnvVars(
+    scope: EnvScope,
+    scopeId: string,
+    ownerId: string
+): Promise<EnvVarView[]> {
     await assertOwnsScope(scope, scopeId, ownerId);
     const rows = await prisma.envVar.findMany({
         where: { scopeType: scope, scopeId },
@@ -73,7 +82,11 @@ export async function revealEnvVar(id: string, ownerId: string): Promise<string 
     if (!row.isSecret) return row.value;
     if (!row.encryptedValue || !row.valueNonce || !row.valueKeyId) return null;
     return decryptSecret(
-        { ciphertext: Buffer.from(row.encryptedValue), nonce: Buffer.from(row.valueNonce), keyId: row.valueKeyId },
+        {
+            ciphertext: Buffer.from(row.encryptedValue),
+            nonce: Buffer.from(row.valueNonce),
+            keyId: row.valueKeyId
+        },
         loadEnv().POLARIS_MASTER_KEY
     );
 }
@@ -89,7 +102,8 @@ export async function setEnvVar(
 ): Promise<void> {
     await assertOwnsScope(scope, scopeId, ownerId);
     const key = input.key.trim();
-    if (!VALID_KEY.test(key)) throw new Error("Key must be letters, digits and underscores, not starting with a digit");
+    if (!VALID_KEY.test(key))
+        throw new Error("Key must be letters, digits and underscores, not starting with a digit");
 
     const existing = await prisma.envVar.findFirst({
         where: { scopeType: scope, scopeId, key }
@@ -104,9 +118,21 @@ export async function setEnvVar(
     };
     if (input.isSecret) {
         const blob = encryptSecret(input.value, loadEnv().POLARIS_MASTER_KEY);
-        data = { isSecret: true, value: null, encryptedValue: blob.ciphertext, valueNonce: blob.nonce, valueKeyId: blob.keyId };
+        data = {
+            isSecret: true,
+            value: null,
+            encryptedValue: blob.ciphertext,
+            valueNonce: blob.nonce,
+            valueKeyId: blob.keyId
+        };
     } else {
-        data = { isSecret: false, value: input.value, encryptedValue: null, valueNonce: null, valueKeyId: null };
+        data = {
+            isSecret: false,
+            value: input.value,
+            encryptedValue: null,
+            valueNonce: null,
+            valueKeyId: null
+        };
     }
 
     if (existing) {
@@ -130,7 +156,10 @@ export function parseDotEnv(text: string): Array<{ key: string; value: string }>
         if (!match || !match[1]) continue;
         const key = match[1];
         let value = (match[2] ?? "").trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
             value = value.slice(1, -1);
         } else {
             // Strip a trailing inline comment on an unquoted value.
@@ -163,8 +192,14 @@ export async function setEnvVars(
 }
 
 /** Delete a variable the owner owns; returns its scope so the caller can redeploy. */
-export async function deleteEnvVar(id: string, ownerId: string): Promise<{ scope: EnvScope; scopeId: string } | null> {
-    const row = await prisma.envVar.findUnique({ where: { id }, select: { scopeId: true, scopeType: true } });
+export async function deleteEnvVar(
+    id: string,
+    ownerId: string
+): Promise<{ scope: EnvScope; scopeId: string } | null> {
+    const row = await prisma.envVar.findUnique({
+        where: { id },
+        select: { scopeId: true, scopeType: true }
+    });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     await prisma.envVar.delete({ where: { id } });

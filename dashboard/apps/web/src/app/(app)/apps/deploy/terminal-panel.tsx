@@ -65,7 +65,11 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
             ]);
             if (disposed || !mountRef.current) return;
 
-            const term = new Terminal({ fontSize: 13, cursorBlink: true, theme: { background: "#0b0e14" } });
+            const term = new Terminal({
+                fontSize: 13,
+                cursorBlink: true,
+                theme: { background: "#0b0e14" }
+            });
             const fit = new FitAddon();
             term.loadAddon(fit);
             term.open(mountRef.current);
@@ -107,7 +111,11 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 sendResize();
             };
             socket.onmessage = (event) => {
-                term.write(event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : (event.data as string));
+                term.write(
+                    event.data instanceof ArrayBuffer
+                        ? new Uint8Array(event.data)
+                        : (event.data as string)
+                );
             };
             // A session that ran and ended is just over. One that never opened is a
             // failure, and which of the two it is decides what there is to say: the
@@ -156,8 +164,13 @@ export function TerminalPanel({ target, label }: { target: TerminalTarget; label
                 <span>{label}</span>
                 <span>{status}</span>
             </div>
-            <div ref={mountRef} className="h-80 w-full overflow-hidden rounded-md bg-[#0b0e14] p-2" />
-            {failure ? <FailureNote failure={failure} onRetry={() => setAttempt((n) => n + 1)} /> : null}
+            <div
+                ref={mountRef}
+                className="h-80 w-full overflow-hidden rounded-md bg-[#0b0e14] p-2"
+            />
+            {failure ? (
+                <FailureNote failure={failure} onRetry={() => setAttempt((n) => n + 1)} />
+            ) : null}
         </div>
     );
 }
@@ -178,8 +191,9 @@ function FailureNote({ failure, onRetry }: { failure: Failure; onRetry: () => vo
                     <span>The server refused the session: {failure.reason}.</span>
                 ) : (
                     <span>
-                        The browser would not open the connection. A terminal needs this address&apos;s certificate
-                        trusted, and accepting the warning on the page is not enough.{" "}
+                        The browser would not open the connection. A terminal needs this
+                        address&apos;s certificate trusted, and accepting the warning on the page is
+                        not enough.{" "}
                         <a
                             href="/api/system/local-ca"
                             className="font-medium text-foreground underline underline-offset-2"

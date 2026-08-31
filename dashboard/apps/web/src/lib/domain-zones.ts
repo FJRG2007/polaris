@@ -39,7 +39,11 @@ const REACHABLE_KEY = "domain.zones.reachable";
 const DASHBOARD_KEY = "domain.zones.dashboard";
 
 const zoneSchema = z.object({
-    label: z.string().trim().toLowerCase().refine(isZoneLabel, "Use a single label like plr, or leave it empty"),
+    label: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine(isZoneLabel, "Use a single label like plr, or leave it empty"),
     scope: z.enum(["polaris", "deploy"]),
     primary: z.boolean().default(false)
 });
@@ -107,7 +111,8 @@ function safeJson(raw: string): unknown {
 /** Validate and store the layout. Throws a user-safe message on invalid input. */
 export async function saveDomainZones(input: unknown): Promise<DomainZoneConfig> {
     const parsed = domainZoneInputSchema.safeParse(input);
-    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid domain configuration");
+    if (!parsed.success)
+        throw new Error(parsed.error.issues[0]?.message ?? "Invalid domain configuration");
     const zones = reconcile(parsed.data.zones);
     if (parsed.data.baseDomain && zones.every((zone) => zone.scope !== "deploy")) {
         throw new Error("Keep at least one zone for deployed services");
@@ -214,7 +219,10 @@ export interface GameZone {
  * Deduplicated by label: two games sharing one would otherwise ask for the same record
  * twice and check it twice.
  */
-export function gameZoneRecords(config: DomainZoneConfig, games: readonly GameZone[]): GameZoneRecords[] {
+export function gameZoneRecords(
+    config: DomainZoneConfig,
+    games: readonly GameZone[]
+): GameZoneRecords[] {
     if (!config.baseDomain) return [];
     const seen = new Set<string>();
     return games.flatMap((game) => {
