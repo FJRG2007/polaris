@@ -26,6 +26,8 @@ import { clickMode, type BoardMove, type SelectMode, type ViewProps } from "./sh
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
+    ChevronLeft,
+    ChevronRight,
     GripVertical,
     MessageSquare,
     MoreHorizontal,
@@ -47,6 +49,11 @@ import {
 } from "../pickers";
 import {
     ConfirmDeleteDialog,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -459,6 +466,101 @@ export function TaskCard({
     );
 }
 
+/**
+ * The right-press menu on a column.
+ *
+ * Everything the column header offers behind its two buttons, reachable from the
+ * whole column - including the empty space under the last card, which is where
+ * somebody who wants another task in this column actually presses. Nothing new
+ * lives here: an item this board cannot do is not rendered rather than rendered
+ * dead, so a column that only takes new work shows one line.
+ */
+function ColumnMenu({
+    label,
+    canEdit,
+    canAddColumn,
+    canRename,
+    canDelete,
+    canMoveLeft,
+    canMoveRight,
+    onAddTask,
+    onRename,
+    onMove,
+    onDelete,
+    onAddColumn,
+    children
+}: {
+    label: string;
+    canEdit: boolean;
+    canAddColumn: boolean;
+    canRename: boolean;
+    canDelete: boolean;
+    canMoveLeft: boolean;
+    canMoveRight: boolean;
+    onAddTask: () => void;
+    onRename: () => void;
+    onMove: (delta: -1 | 1) => void;
+    onDelete: () => void;
+    onAddColumn: () => void;
+    children: React.ReactNode;
+}) {
+    const manage = canRename || canMoveLeft || canMoveRight || canDelete;
+    // A menu with nothing in it is worse than no menu: it takes the browser's
+    // away and gives back an empty box.
+    if (!canEdit && !manage && !canAddColumn) return <>{children}</>;
+
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+                {canEdit && (
+                    <ContextMenuItem className="gap-2" onSelect={onAddTask}>
+                        <Plus className="size-3.5" />
+                        Add a task
+                    </ContextMenuItem>
+                )}
+                {canEdit && manage && <ContextMenuSeparator />}
+                {canRename && (
+                    <ContextMenuItem className="gap-2" onSelect={onRename}>
+                        <Pencil className="size-3.5" />
+                        Edit column
+                    </ContextMenuItem>
+                )}
+                {canMoveLeft && (
+                    <ContextMenuItem className="gap-2" onSelect={() => onMove(-1)}>
+                        <ChevronLeft className="size-3.5" />
+                        Move left
+                    </ContextMenuItem>
+                )}
+                {canMoveRight && (
+                    <ContextMenuItem className="gap-2" onSelect={() => onMove(1)}>
+                        <ChevronRight className="size-3.5" />
+                        Move right
+                    </ContextMenuItem>
+                )}
+                {canAddColumn && (
+                    <>
+                        {(canEdit || manage) && <ContextMenuSeparator />}
+                        <ContextMenuItem className="gap-2" onSelect={onAddColumn}>
+                            <Plus className="size-3.5" />
+                            New column
+                        </ContextMenuItem>
+                    </>
+                )}
+                {canDelete && (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem variant="danger" className="gap-2" onSelect={onDelete}>
+                            <Trash2 className="size-3.5" />
+                            Delete {label}
+                        </ContextMenuItem>
+                    </>
+                )}
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
 export function BoardView(props: ViewProps) {
     const { context, groups, selection, onSelect, onMove, onQuickCreate, canEdit, orderable } =
         props;
@@ -545,6 +647,20 @@ export function BoardView(props: ViewProps) {
         await props.onReorderStatuses(order.flatMap(columnIds));
     };
 
+    /** Move a column one place, for the reader who reached for the right button
+     *  rather than for the header. The same reorder the drag writes, aimed at the
+     *  neighbour instead of at wherever the pointer was let go. */
+    const shiftColumn = async (key: string, delta: -1 | 1) => {
+        if (!props.onReorderStatuses) return;
+        const ids = columns.map((column) => column.id);
+        const at = ids.indexOf(key);
+        const target = ids[at + delta];
+        if (at === -1 || target === undefined) return;
+        const order = reorderColumns(ids, key, target);
+        setPendingOrder(order);
+        await props.onReorderStatuses(order.flatMap(columnIds));
+    };
+
     /** Start removing a column, on the one it would hand its work to. */
     const askToRemove = (group: { key: string; label: string }) => {
         setRemoving({ key: group.key, label: group.label });
@@ -566,202 +682,227 @@ export function BoardView(props: ViewProps) {
                         ? context.statuses.find((entry) => entry.id === group.key)
                         : undefined;
 
-                    return (
-                        <section
-                            key={group.key}
-                            className={cn(
-                                "group/column flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-shadow",
-                                draggingColumn === group.key && "opacity-60",
-                                columnOver === group.key && "ring-2 ring-primary"
-                            )}
-                            onDragOver={(event) => {
-                                event.preventDefault();
-                                if (draggingColumn && draggingColumn !== group.key && isColumn)
-                                    setColumnOver(group.key);
-                            }}
-                            onDragLeave={(event) => {
-                                // Moving between the column's own children leaves it as
-                                // far as the browser is concerned, so the pointer is only
-                                // gone when what it entered is outside.
-                                if (
-                                    event.currentTarget.contains(event.relatedTarget as Node | null)
-                                )
-                                    return;
-                                setColumnOver((current) =>
-                                    current === group.key ? null : current
-                                );
-                            }}
-                            onDrop={(event) => {
-                                event.preventDefault();
-                                if (draggingColumn) void dropColumn(group.key);
-                                else drop(group.key, group.tasks, null);
-                            }}
-                        >
-                            {editing === group.key ? (
-                                <ColumnEditor
-                                    initial={{
-                                        name: group.label,
-                                        type: status?.type ?? "open",
-                                        color: group.color ?? "#64748b"
-                                    }}
-                                    submitLabel="Save"
-                                    onCancel={() => setEditing(null)}
-                                    onSubmit={async (next) => {
-                                        const saved = await Promise.all(
-                                            columnIds(group.key).map((id) =>
-                                                props.onUpdateStatus?.(
-                                                    id,
-                                                    next.name,
-                                                    next.type,
-                                                    next.color
-                                                )
-                                            )
-                                        );
-                                        if (saved.every(Boolean)) setEditing(null);
-                                    }}
-                                />
-                            ) : (
-                                <header
-                                    draggable={movable}
-                                    onDragStart={(event) => {
-                                        if (!movable) return;
-                                        event.dataTransfer.effectAllowed = "move";
-                                        event.dataTransfer.setData("text/plain", group.key);
-                                        setDraggingColumn(group.key);
-                                    }}
-                                    onDragEnd={() => {
-                                        setDraggingColumn(null);
-                                        setColumnOver(null);
-                                    }}
-                                    className={cn(
-                                        "flex items-center gap-2 px-3 py-2",
-                                        movable && "cursor-grab active:cursor-grabbing"
-                                    )}
-                                >
-                                    {movable && (
-                                        // Fades in rather than appearing, so a row of
-                                        // headers does not shuffle sideways on hover.
-                                        <GripVertical
-                                            aria-hidden
-                                            className="size-3.5 shrink-0 text-muted-foreground transition-opacity md:opacity-0 md:group-hover/column:opacity-100"
-                                        />
-                                    )}
-                                    {group.color && <StatusDot color={group.color} />}
-                                    <h3
-                                        className="truncate text-sm font-medium"
-                                        title={group.label}
-                                    >
-                                        {group.label}
-                                    </h3>
-                                    <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
-                                        {group.tasks.length}
-                                    </span>
-                                    <span className="flex-1" />
-                                    {canEdit && (
-                                        <button
-                                            type="button"
-                                            aria-label={`Add a task to ${group.label}`}
-                                            title="Add a task"
-                                            onClick={() => {
-                                                setAddingTo(group.key);
-                                                setDraft("");
-                                            }}
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                                        >
-                                            <Plus className="size-3.5" />
-                                        </button>
-                                    )}
-                                    {manageable && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button
-                                                    type="button"
-                                                    aria-label={`Column options for ${group.label}`}
-                                                    title="Column options"
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-                                                >
-                                                    <MoreHorizontal className="size-3.5" />
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            {/* The rename field this menu opens would be
-                                        blurred the moment the menu handed focus
-                                        back to its trigger. */}
-                                            <DropdownMenuContent
-                                                align="end"
-                                                className="w-44"
-                                                onCloseAutoFocus={keepFocusOnClose}
-                                            >
-                                                {props.onUpdateStatus && (
-                                                    <DropdownMenuItem
-                                                        className="gap-2"
-                                                        onSelect={() => setEditing(group.key)}
-                                                    >
-                                                        <Pencil className="size-3.5" />
-                                                        Edit column
-                                                    </DropdownMenuItem>
-                                                )}
-                                                {props.onDeleteStatus && (
-                                                    <DropdownMenuItem
-                                                        variant="danger"
-                                                        className="gap-2"
-                                                        // A board needs somewhere for the
-                                                        // work to go, so the last column
-                                                        // stays.
-                                                        disabled={columns.length <= 1}
-                                                        onSelect={() => askToRemove(group)}
-                                                    >
-                                                        <Trash2 className="size-3.5" />
-                                                        Delete column
-                                                    </DropdownMenuItem>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
-                                </header>
-                            )}
+                    const columnAt = columns.findIndex((column) => column.id === group.key);
 
-                            <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
-                                {addingTo === group.key && (
-                                    <li>
-                                        <input
-                                            autoFocus
-                                            value={draft}
-                                            placeholder="Task name, then enter"
-                                            onChange={(event) => setDraft(event.target.value)}
-                                            onBlur={() => setAddingTo(null)}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Escape") setAddingTo(null);
-                                                if (event.key === "Enter" && draft.trim()) {
-                                                    onQuickCreate(group.key, draft.trim());
-                                                    setDraft("");
-                                                }
-                                            }}
-                                            className="w-full rounded-lg border border-primary bg-card px-3 py-2 text-sm outline-none"
-                                        />
-                                    </li>
+                    return (
+                        // The whole column takes a right press, not just its header:
+                        // the empty space under the cards is where somebody aiming at
+                        // "add one here" actually presses. A card inside it has its own
+                        // menu and prevents the default first, so the two never both
+                        // open - see TaskMenu.
+                        <ColumnMenu
+                            key={group.key}
+                            label={group.label}
+                            canEdit={canEdit}
+                            canAddColumn={canAddColumn}
+                            canRename={isColumn && props.onUpdateStatus !== undefined}
+                            canDelete={isColumn && props.onDeleteStatus !== undefined && columns.length > 1}
+                            canMoveLeft={movable && columnAt > 0}
+                            canMoveRight={movable && columnAt !== -1 && columnAt < columns.length - 1}
+                            onAddTask={() => {
+                                setAddingTo(group.key);
+                                setDraft("");
+                            }}
+                            onRename={() => setEditing(group.key)}
+                            onMove={(delta) => void shiftColumn(group.key, delta)}
+                            onDelete={() => askToRemove(group)}
+                            onAddColumn={() => setCreating(true)}
+                        >
+                            <section
+                                className={cn(
+                                    "group/column flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-shadow",
+                                    draggingColumn === group.key && "opacity-60",
+                                    columnOver === group.key && "ring-2 ring-primary"
                                 )}
-                                {group.tasks.map((task) => (
-                                    <TaskCard
-                                        key={task.id}
-                                        commands={commandsFor(props, task)}
-                                        accepting={draggingColumn === null}
-                                        selected={selection.has(task.id)}
-                                        showLocation={props.showLocation}
-                                        positioned={orderable && dragging !== task.id}
-                                        onSelect={(mode) => onSelect(task.id, mode, rendered)}
-                                        onDragStart={() => setDragging(task.id)}
-                                        onDropAt={(edge) =>
-                                            drop(group.key, group.tasks, { id: task.id, edge })
-                                        }
+                                onDragOver={(event) => {
+                                    event.preventDefault();
+                                    if (draggingColumn && draggingColumn !== group.key && isColumn)
+                                        setColumnOver(group.key);
+                                }}
+                                onDragLeave={(event) => {
+                                    // Moving between the column's own children leaves it as
+                                    // far as the browser is concerned, so the pointer is only
+                                    // gone when what it entered is outside.
+                                    if (
+                                        event.currentTarget.contains(event.relatedTarget as Node | null)
+                                    )
+                                        return;
+                                    setColumnOver((current) =>
+                                        current === group.key ? null : current
+                                    );
+                                }}
+                                onDrop={(event) => {
+                                    event.preventDefault();
+                                    if (draggingColumn) void dropColumn(group.key);
+                                    else drop(group.key, group.tasks, null);
+                                }}
+                            >
+                                {editing === group.key ? (
+                                    <ColumnEditor
+                                        initial={{
+                                            name: group.label,
+                                            type: status?.type ?? "open",
+                                            color: group.color ?? "#64748b"
+                                        }}
+                                        submitLabel="Save"
+                                        onCancel={() => setEditing(null)}
+                                        onSubmit={async (next) => {
+                                            const saved = await Promise.all(
+                                                columnIds(group.key).map((id) =>
+                                                    props.onUpdateStatus?.(
+                                                        id,
+                                                        next.name,
+                                                        next.type,
+                                                        next.color
+                                                    )
+                                                )
+                                            );
+                                            if (saved.every(Boolean)) setEditing(null);
+                                        }}
                                     />
-                                ))}
-                                {group.tasks.length === 0 && addingTo !== group.key && (
-                                    <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
-                                        Drop work here
-                                    </li>
+                                ) : (
+                                    <header
+                                        draggable={movable}
+                                        onDragStart={(event) => {
+                                            if (!movable) return;
+                                            event.dataTransfer.effectAllowed = "move";
+                                            event.dataTransfer.setData("text/plain", group.key);
+                                            setDraggingColumn(group.key);
+                                        }}
+                                        onDragEnd={() => {
+                                            setDraggingColumn(null);
+                                            setColumnOver(null);
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-2 px-3 py-2",
+                                            movable && "cursor-grab active:cursor-grabbing"
+                                        )}
+                                    >
+                                        {movable && (
+                                            // Fades in rather than appearing, so a row of
+                                            // headers does not shuffle sideways on hover.
+                                            <GripVertical
+                                                aria-hidden
+                                                className="size-3.5 shrink-0 text-muted-foreground transition-opacity md:opacity-0 md:group-hover/column:opacity-100"
+                                            />
+                                        )}
+                                        {group.color && <StatusDot color={group.color} />}
+                                        <h3
+                                            className="truncate text-sm font-medium"
+                                            title={group.label}
+                                        >
+                                            {group.label}
+                                        </h3>
+                                        <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
+                                            {group.tasks.length}
+                                        </span>
+                                        <span className="flex-1" />
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                aria-label={`Add a task to ${group.label}`}
+                                                title="Add a task"
+                                                onClick={() => {
+                                                    setAddingTo(group.key);
+                                                    setDraft("");
+                                                }}
+                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                            >
+                                                <Plus className="size-3.5" />
+                                            </button>
+                                        )}
+                                        {manageable && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Column options for ${group.label}`}
+                                                        title="Column options"
+                                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                                    >
+                                                        <MoreHorizontal className="size-3.5" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                {/* The rename field this menu opens would be
+                                            blurred the moment the menu handed focus
+                                            back to its trigger. */}
+                                                <DropdownMenuContent
+                                                    align="end"
+                                                    className="w-44"
+                                                    onCloseAutoFocus={keepFocusOnClose}
+                                                >
+                                                    {props.onUpdateStatus && (
+                                                        <DropdownMenuItem
+                                                            className="gap-2"
+                                                            onSelect={() => setEditing(group.key)}
+                                                        >
+                                                            <Pencil className="size-3.5" />
+                                                            Edit column
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {props.onDeleteStatus && (
+                                                        <DropdownMenuItem
+                                                            variant="danger"
+                                                            className="gap-2"
+                                                            // A board needs somewhere for the
+                                                            // work to go, so the last column
+                                                            // stays.
+                                                            disabled={columns.length <= 1}
+                                                            onSelect={() => askToRemove(group)}
+                                                        >
+                                                            <Trash2 className="size-3.5" />
+                                                            Delete column
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
+                                    </header>
                                 )}
-                            </ul>
-                        </section>
+
+                                <ul className="flex min-h-24 flex-col gap-2 px-2 pb-2">
+                                    {addingTo === group.key && (
+                                        <li>
+                                            <input
+                                                autoFocus
+                                                value={draft}
+                                                placeholder="Task name, then enter"
+                                                onChange={(event) => setDraft(event.target.value)}
+                                                onBlur={() => setAddingTo(null)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Escape") setAddingTo(null);
+                                                    if (event.key === "Enter" && draft.trim()) {
+                                                        onQuickCreate(group.key, draft.trim());
+                                                        setDraft("");
+                                                    }
+                                                }}
+                                                className="w-full rounded-lg border border-primary bg-card px-3 py-2 text-sm outline-none"
+                                            />
+                                        </li>
+                                    )}
+                                    {group.tasks.map((task) => (
+                                        <TaskCard
+                                            key={task.id}
+                                            commands={commandsFor(props, task)}
+                                            accepting={draggingColumn === null}
+                                            selected={selection.has(task.id)}
+                                            showLocation={props.showLocation}
+                                            positioned={orderable && dragging !== task.id}
+                                            onSelect={(mode) => onSelect(task.id, mode, rendered)}
+                                            onDragStart={() => setDragging(task.id)}
+                                            onDropAt={(edge) =>
+                                                drop(group.key, group.tasks, { id: task.id, edge })
+                                            }
+                                        />
+                                    ))}
+                                    {group.tasks.length === 0 && addingTo !== group.key && (
+                                        <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                                            Drop work here
+                                        </li>
+                                    )}
+                                </ul>
+                            </section>
+                        </ColumnMenu>
                     );
                 })}
 
