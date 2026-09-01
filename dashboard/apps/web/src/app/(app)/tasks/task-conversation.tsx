@@ -12,6 +12,14 @@
  * Comments are threaded one level deep on purpose. A reply to a reply is how a
  * task turns into a forum, and the thing being discussed is right there in the
  * other column.
+ *
+ * The box is the one from Chat, not a second one that looks like it. Writing a
+ * comment and writing a message are the same act - the same mentions, the same
+ * emoji, the same Enter, the same screenshot pasted straight in - and this
+ * screen had a plainer copy that quietly did less. What a task does not have is
+ * a conversation, so nothing here announces that somebody is typing, and it does
+ * not have chat's files either: a task's attachments live in its own panel, and
+ * two places to put a file on one task is one too many.
  */
 
 import * as actions from "./actions";
@@ -23,8 +31,8 @@ import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { RelativeTime } from "@/components/relative-time";
 import { RichText } from "@/components/rich-text/rich-text";
 import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
-import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { CheckCircle2, Play, SendHorizontal, Square, Trash2 } from "lucide-react";
+import { Composer } from "@/app/(app)/chat/composer";
+import { CheckCircle2, Play, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
 import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
 
@@ -32,65 +40,20 @@ import { describeActivity, mergeConversation, type ConversationFilter } from "./
 // The thread
 // ---------------------------------------------------------------------------
 
-function Composer({
-    placeholder,
-    busy,
-    compact,
-    onSubmit,
-    onCancel
-}: {
-    placeholder: string;
-    busy: boolean;
-    /** The reply box, which sits inside a bubble and has no send affordance of
-     *  its own beyond the two buttons. */
-    compact?: boolean;
-    onSubmit: (body: string) => Promise<void>;
-    onCancel?: () => void;
-}) {
-    const [body, setBody] = useState("");
-    /** Bumped after each send, to give the editor a fresh one to draw. */
-    const [sent, setSent] = useState(0);
-
-    const submit = async (text = body) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
-        await onSubmit(trimmed);
-        setBody("");
-        setSent((count) => count + 1);
-    };
-
-    return (
-        <div className="flex flex-col gap-2">
-            <RichTextEditor
-                // Remounted after a send, which is what clears the surface: the
-                // editor holds its own document and does not empty itself
-                // because the string behind it did.
-                key={sent}
-                value={body}
-                bordered
-                placeholder={placeholder}
-                onChange={setBody}
-                // Enter sends, shift+enter breaks the line: the shape people
-                // already have in their fingers from every chat client.
-                onSubmit={(next) => void submit(next)}
-            />
-            <div className="flex items-center gap-2">
-                <Button size="sm" disabled={busy || !body.trim()} onClick={() => void submit()}>
-                    <SendHorizontal className="size-3.5" />
-                    Send
-                </Button>
-                {onCancel && (
-                    <Button size="sm" variant="ghost" onClick={onCancel}>
-                        Cancel
-                    </Button>
-                )}
-                {!compact && (
-                    <span className="text-[0.6875rem] text-muted-foreground">Enter sends, shift+enter for a new line</span>
-                )}
-            </div>
-        </div>
-    );
-}
+/**
+ * What the comment box allows.
+ *
+ * Chat's own rules are an instance setting about conversations, and a task is
+ * not one - so a comment answers to the comment schema's own ceiling, and to no
+ * attachments at all. A task's files live in its own panel; a second place to
+ * put one, with a different limit, is how two lists of the same attachments come
+ * to disagree.
+ */
+const COMMENT_RULES: core.ChatRules = {
+    ...core.DEFAULT_CHAT_RULES,
+    maxMessageLength: core.COMMENT_BODY_MAX,
+    maxAttachments: 0
+};
 
 export function ActivityStream({
     taskId,
@@ -189,14 +152,22 @@ export function ActivityStream({
                 </div>
 
                 {replyTo === comment.id && (
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-col gap-1">
                         <Composer
-                            compact
+                            channelId={null}
+                            rules={COMMENT_RULES}
+                            disabled={busy}
+                            attachable={false}
                             placeholder="Write a reply"
-                            busy={busy}
-                            onSubmit={(body) => post(body, comment.id)}
-                            onCancel={() => setReplyTo(null)}
+                            onSend={(body) => post(body, comment.id)}
                         />
+                        <button
+                            type="button"
+                            onClick={() => setReplyTo(null)}
+                            className="self-start text-[0.6875rem] text-muted-foreground hover:text-foreground"
+                        >
+                            Cancel
+                        </button>
                     </div>
                 )}
             </div>
@@ -248,7 +219,14 @@ export function ActivityStream({
             </div>
 
             <div className="border-t border-border p-4">
-                <Composer placeholder="Write a comment" busy={busy} onSubmit={(body) => post(body, null)} />
+                <Composer
+                    channelId={null}
+                    rules={COMMENT_RULES}
+                    disabled={busy}
+                    attachable={false}
+                    placeholder="Write a comment"
+                    onSend={(body) => post(body, null)}
+                />
             </div>
         </div>
     );

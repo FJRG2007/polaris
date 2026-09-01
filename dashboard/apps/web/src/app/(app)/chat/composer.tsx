@@ -95,7 +95,16 @@ export function Composer({
     onSaveEdit,
     onCancelEdit
 }: {
-    channelId: string;
+    /**
+     * The conversation this box belongs to, or null where it is not one.
+     *
+     * Null is a task's comment box: nobody is watching for typing dots and there
+     * is no room whose people @ should offer, so the editor asks its usual
+     * question instead. Everything else this composer does - the editor, the
+     * keys, the staged files, the emoji - is the same wherever it is drawn,
+     * which is the whole reason there is one of these rather than three.
+     */
+    channelId: string | null;
     /**
      * Where an unsent message is kept for next time, or null for a box whose
      * conversation does not outlive the sitting.
@@ -517,8 +526,9 @@ export function Composer({
     const announce = () => {
         // Nobody to tell, and nobody to tell them as. A call has no typing
         // indicator, and half the people in one have no session for an action
-        // that starts with `requirePermission` to run under.
-        if (inCall) return;
+        // that starts with `requirePermission` to run under. A comment box has
+        // no conversation at all.
+        if (inCall || !channelId) return;
         const now = Date.now();
         if (now - lastAnnounced.current < TYPING_EVERY_MS) return;
         lastAnnounced.current = now;
@@ -534,7 +544,7 @@ export function Composer({
      * lapses after a few seconds by design, and a recording runs for minutes.
      */
     useEffect(() => {
-        if (!voice.recording || disabled || inCall) return;
+        if (!voice.recording || disabled || inCall || !channelId) return;
         const say = () => {
             lastAnnounced.current = Date.now();
             void typingAction(channelId, "recording");
@@ -847,7 +857,11 @@ export function Composer({
                             )}
                             <EmojiPicker
                                 disabled={disabled}
-                                media={!inCall}
+                                // Emoji everywhere; pictures only where there is
+                                // somewhere for one to go. A comment box takes no
+                                // media, and a picker offering a GIF that lands
+                                // nowhere is worse than one that does not offer.
+                                media={!inCall && (onMedia !== undefined || onSaved !== undefined)}
                                 // Back to the box, caret at the end. Picking an
                                 // emoji is part of writing the message, and
                                 // leaving the focus on the closed picker means
