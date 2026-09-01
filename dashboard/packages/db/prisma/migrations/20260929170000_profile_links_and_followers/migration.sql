@@ -13,9 +13,17 @@
 -- meant as a place people follow each other want opposite answers, and only the
 -- person running it can say which this is.
 --
+-- Every statement stands on its own and every one is `IF NOT EXISTS`, because a
+-- migration here has to survive being run twice. The entrypoint retries
+-- `migrate deploy` while the database comes up, and the update rolls a build
+-- back by killing its container - so a script interrupted between two of its
+-- statements is an ordinary event, and one that cannot be re-run turns it into a
+-- deployment that can never migrate again. This one was written as a single
+-- multi-column ALTER and did exactly that.
+--
 -- Widening only: every existing row keeps everything it has.
-ALTER TABLE "User" ADD COLUMN "headline" TEXT,
-ADD COLUMN "pronouns" TEXT,
-ADD COLUMN "links" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "headline" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "pronouns" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "links" TEXT;
 
-ALTER TABLE "UserPrivacy" ADD COLUMN "followers" TEXT;
+ALTER TABLE "UserPrivacy" ADD COLUMN IF NOT EXISTS "followers" TEXT;

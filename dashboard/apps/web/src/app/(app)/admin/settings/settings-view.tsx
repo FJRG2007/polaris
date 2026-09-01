@@ -361,13 +361,32 @@ export function SettingsView({
      * window opened after one is a popup as far as the browser is concerned - and
      * the report would be silently blocked on the click that asked for it.
      */
+    /**
+     * Open the failure as an issue, in a tab of its own.
+     *
+     * The tab is opened on the press and pointed at the report afterwards,
+     * because the address is built on the server and a tab opened after that
+     * round trip is a popup the browser blocks.
+     *
+     * Opened WITHOUT `noopener`, which is the correction: with it the browser
+     * hands back null rather than a handle, so the blank tab was left sitting on
+     * about:blank and the report loaded over the settings screen instead. The
+     * link is severed by hand the moment the tab has somewhere to go, which buys
+     * the same thing `noopener` does and still leaves something to point.
+     */
     async function onReport() {
         setReporting(true);
-        const tab = window.open("", "_blank", "noopener");
+        const tab = window.open("about:blank", "_blank");
         try {
             const { url } = await updateReportAction();
-            if (tab) tab.location.href = url;
-            else window.location.href = url;
+            if (tab) {
+                tab.opener = null;
+                tab.location.replace(url);
+            } else {
+                // The popup was blocked, and there is nothing else to do with a
+                // report somebody asked for.
+                window.location.href = url;
+            }
         } catch {
             tab?.close();
             setUpdateMsg("Could not prepare the report. The log above can be attached to an issue by hand.");
