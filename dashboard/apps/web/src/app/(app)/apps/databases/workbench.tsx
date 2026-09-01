@@ -41,6 +41,34 @@ import {
  *  for. */
 const PAGE = 100;
 
+/**
+ * The schemas a database has that nobody keeps their own tables in.
+ *
+ * Postgres hands back `information_schema` and its `pg_*` catalogues alongside
+ * the one somebody actually uses, and they sort first. Opening on one of those
+ * means the first thing anybody sees is a hundred system views, and the schema
+ * with their work in it is one selector away with nothing saying so.
+ */
+const SYSTEM_NAMESPACES = new Set(["information_schema", "pg_catalog", "pg_toast", "sys", "mysql", "performance_schema"]);
+
+/**
+ * Which schema to open on.
+ *
+ * `public` where there is one, which is where a Postgres database keeps its
+ * tables unless somebody has deliberately arranged otherwise - and that is
+ * essentially every database Polaris will be pointed at. Otherwise the first one
+ * that is not the engine's own bookkeeping, and only then whatever came first.
+ *
+ * Opening on a guess rather than asking, because a database browser that opens on
+ * an empty pane makes everybody's first action the same click. Anybody who wants
+ * a different schema still picks one.
+ */
+function openingNamespace(namespaces: readonly DataNamespace[]): string | null {
+    const named = namespaces.map((entry) => entry.name);
+    if (named.includes("public")) return "public";
+    return named.find((name) => !SYSTEM_NAMESPACES.has(name)) ?? named[0] ?? null;
+}
+
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
@@ -64,8 +92,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             setShape(result.shape ?? "sql");
             setNamespaces(result.namespaces ?? []);
             setRelations(result.relations ?? []);
-            const first = result.namespaces?.[0]?.name ?? null;
-            setNamespace(chosen ?? first);
+            setNamespace(chosen ?? openingNamespace(result.namespaces ?? []));
             // A key-value store has one thing to look at, so it is opened rather
             // than offered as a list of one.
             if ((result.relations?.length ?? 0) === 1 && result.shape === "keyvalue") {

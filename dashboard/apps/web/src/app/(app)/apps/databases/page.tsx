@@ -11,7 +11,7 @@
  * address is a request, not a permission.
  */
 
-import { PageHeader } from "@polaris/ui";
+import { PAGE_FILL, PageHeader, cn } from "@polaris/ui";
 import { DatabasesView } from "./databases-view";
 import { requirePermission } from "@/lib/session";
 
@@ -21,7 +21,12 @@ export default async function DatabasesPage() {
     await requirePermission("deploy.read");
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col">
+        // The screen fills the window and scrolls inside its own panes. Without
+        // this the `flex-1` chain below has nothing to fill: `main` is not a
+        // bounded flex parent, so the panes grew instead and the whole page
+        // scrolled - which put the list of tables and the column headings off
+        // the top of the window the moment anybody looked at a wide table.
+        <div className={cn(PAGE_FILL, "flex flex-col")}>
             <PageHeader
                 title="Databases"
                 description="Browse and query your databases - the ones Polaris runs and the ones it does not."
