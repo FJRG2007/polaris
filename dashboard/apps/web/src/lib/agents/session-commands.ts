@@ -147,13 +147,21 @@ const INSTALL_ENIGMA = [
     // on the PATH afterwards, which is what the agent went looking for and could
     // not find. Every `enigma config` line after it failed for the same reason,
     // silently, so an account's gate mode and its own settings reached nothing.
-    '[ -n "$POLARIS_ENIGMA_SETUP" ] && { echo "polaris: installing Enigma"; printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d | sh; }'
+    'if [ -n "$POLARIS_ENIGMA_SETUP" ]; then',
+    '  echo "polaris: installing Enigma"',
+    // Not fatal. A session without Enigma works to weaker standards; one that
+    // died because a registry was slow works to none.
+    '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d | sh || echo "polaris: Enigma did not install"',
+    "fi"
 ];
 
 /** The agent itself, where Polaris owns the machine. Best effort - the check that
  *  follows is what decides. */
 const INSTALL_AGENT = [
-    '[ -n "$POLARIS_AGENT_INSTALL" ] && { echo "polaris: installing $POLARIS_AGENT_BINARY"; sh -c "$POLARIS_AGENT_INSTALL"; }'
+    'if [ -n "$POLARIS_AGENT_INSTALL" ]; then',
+    '  echo "polaris: installing $POLARIS_AGENT_BINARY"',
+    '  sh -c "$POLARIS_AGENT_INSTALL" || echo "polaris: the install did not finish"',
+    "fi"
 ];
 
 const REQUIRE_AGENT = [

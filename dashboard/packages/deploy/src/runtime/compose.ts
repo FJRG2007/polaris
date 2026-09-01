@@ -116,6 +116,31 @@ async function composeUpRetryingLease(
  *  is about to be asked for several gigabytes it may not have. */
 const TIGHT = 0.8;
 
+/**
+ * Hand back what the deploy that just finished stopped needing.
+ *
+ * After every one, whatever the disk says. A release replaces an image, and the
+ * one it replaced is unreferenced from that moment - waiting for a threshold
+ * means carrying every superseded image until the machine is nearly full, which
+ * is the state a pull cannot be recovered from. Cleaning at the end costs a few
+ * seconds on a deploy that has already succeeded and is the only moment nothing
+ * is waiting on it.
+ *
+ * Never fails a deploy. It has already worked; a prune that could not run is a
+ * disk to sweep later, not a release to undo.
+ */
+async function tidyAfter(ctx: RuntimeContext): Promise<void> {
+    if (!ctx.ports.reclaimSpace) return;
+    const freed = await ctx.ports.reclaimSpace().catch(() => 0);
+    if (freed > 0) {
+        ctx.log(
+            Buffer.from(
+                `Handed back ${Math.round(freed / 1_000_000)} MB the old image was holding - no volume was touched.\n`
+            )
+        );
+    }
+}
+
 async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink): Promise<void> {
     // Before the first attempt, not only after a failure. A pull that runs out
     // of room part-way leaves what it had already fetched behind, and nothing in
@@ -261,6 +286,11 @@ export class ComposeRuntime implements RuntimeDriver {
             return fail(ctx, deployFailureReason(reasonOf(error, ""), "compose up failed"));
         }
         started();
+        // The release landed, so whatever it replaced is unreferenced from this
+        // moment. Handed back now rather than at a threshold: waiting means
+        // carrying every superseded image until the machine is nearly full,
+        // which is the state a pull cannot be recovered from.
+        await tidyAfter(ctx);
         return { ok: true, imageTag };
     }
 

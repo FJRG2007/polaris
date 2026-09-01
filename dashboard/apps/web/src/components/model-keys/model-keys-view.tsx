@@ -22,6 +22,8 @@
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
+import type { AgentSignin } from "@/lib/agents/agent-signins";
+import { SigninDialog, type SigninDialogActions } from "./signin-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useMemo, useState, type ReactNode } from "react";
 import { RelativeTime } from "@/components/relative-time";
@@ -30,7 +32,7 @@ import type { ProviderRow } from "@/lib/agents/model-key-providers";
 import type { KeyActionResult } from "@/lib/agents/model-key-actions";
 import { MODEL_KEY_NAME_HINT, modelKeyNameSchema } from "@polaris/core";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
-import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -55,6 +57,19 @@ export interface ModelKeyActions {
 
 /** The words that differ between the two owners. Everything else the table says
  *  is true of both. */
+/**
+ * A login Polaris can run instead of asking somebody to go and find a terminal.
+ *
+ * Offered inside the Add dialog, on the providers it knows a login command for.
+ * Everything else in that dialog stays exactly as it is: the credential this
+ * produces is stored, named, ordered and removed like any other.
+ */
+export interface AssistedSignin {
+    /** The credentials there is a login for, by the slug the table stores. */
+    signins: AgentSignin[];
+    actions: Omit<SigninDialogActions, "save">;
+}
+
 export interface ModelKeysCopy {
     /** Heading over the table. */
     title: string;
@@ -135,12 +150,22 @@ export function ModelKeysView({
     keys,
     actions,
     copy,
+    assist,
     footer
 }: {
     providers: ProviderRow[];
     keys: ModelKeyView[];
     actions: ModelKeyActions;
     copy: ModelKeysCopy;
+    /**
+     * The credentials Polaris can run a login for, and how.
+     *
+     * Reaches the Add dialog rather than sitting beside the table, because that
+     * is where somebody has already said which account they are adding: a button
+     * outside it asks them to pick the agent twice, once on a card and once in
+     * the form, for the same credential.
+     */
+    assist?: AssistedSignin;
     /** What sits under the table: what a run falls back to on an account's own
      *  screen, and who may spend these on the deployment's. */
     footer?: ReactNode;
@@ -300,6 +325,7 @@ export function ModelKeysView({
                     actions={actions}
                     adding={copy.adding}
                     action={copy.action}
+                    assist={assist}
                     existing={null}
                     takenNames={namesTaken(rows, null)}
                     onClose={() => setAdding(false)}
@@ -317,6 +343,7 @@ export function ModelKeysView({
                     actions={actions}
                     adding={copy.adding}
                     action={copy.action}
+                    assist={assist}
                     existing={editing}
                     takenNames={namesTaken(rows, editing.id)}
                     onClose={() => setEditing(null)}
@@ -473,6 +500,7 @@ function KeyDialog({
     actions,
     adding,
     action,
+    assist,
     existing,
     takenNames,
     onClose,
@@ -484,6 +512,8 @@ function KeyDialog({
     adding: string;
     /** The word this screen uses for it, on the button that finishes. */
     action?: string;
+    /** Set where Polaris can run this provider's login itself. */
+    assist?: AssistedSignin;
     /** The key being edited, or null when this is a new one. */
     existing: ModelKeyView | null;
     /** Every name this owner already uses, lowercased, minus the row being
@@ -496,6 +526,10 @@ function KeyDialog({
     const [provider, setProvider] = useState(existing?.provider ?? providers[0]?.slug ?? "");
     const [name, setName] = useState(existing?.name ?? "");
     const [secret, setSecret] = useState("");
+    const [signingIn, setSigningIn] = useState(false);
+    // Whose account this is, once the login says. Carried to the write so the
+    // stored row can show an address rather than only the name somebody typed.
+    const [identity, setIdentity] = useState<Record<string, string>>({});
     const [expiry, setExpiry] = useState(() => asDateValue(existing?.expiresAt ?? null));
     const [gateway, setGateway] = useState<GatewayForm>(() => readGateway(existing));
     const [touched, setTouched] = useState(false);
@@ -554,6 +588,10 @@ function KeyDialog({
                           // the runtime sends a placeholder rather than nothing.
                           secret: entry?.isGateway && typed.length === 0 ? "unused-gateway" : typed,
                           config,
+                          // Whose account it is, when a login said so. The only
+                          // thing that tells two subscriptions apart in a table
+                          // where every other column is identical.
+                          ...(Object.keys(identity).length > 0 ? { identity } : {}),
                           expiresAt: ends
                       }),
             setError
@@ -567,11 +605,15 @@ function KeyDialog({
         onSaved(result.warning);
     };
 
+    const signin = assist?.signins.find((one) => one.slug === provider) ?? null;
+
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{existing ? "Edit provider key" : "Add provider key"}</DialogTitle>
+                    <DialogTitle>
+                        {existing ? `Edit ${thing(action)}` : (action ?? "Add provider key")}
+                    </DialogTitle>
                     <DialogDescription>
                         {existing ? "Rename it, or paste a new key to replace the stored one." : adding}
                     </DialogDescription>
@@ -666,6 +708,27 @@ function KeyDialog({
                         </>
                     ) : null}
 
+                    {/* The login, where the account has already been chosen. A
+                        button outside this form would be asking somebody to pick
+                        the agent twice for one credential - once on a card and
+                        once here. */}
+                    {signin && !existing ? (
+                        <div className="border-primary/40 bg-primary/10 flex flex-wrap items-center gap-2 rounded-md border p-3">
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm">Polaris can sign you in</p>
+                                <p className="text-muted-foreground text-xs">
+                                    It runs {signin.serves[0]?.label ?? "the tool"}&apos;s own login on a machine of
+                                    its own. You authorise it in your browser; the credential lands in the field
+                                    below.
+                                </p>
+                            </div>
+                            <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
+                                <Wand2 className="size-4 shrink-0" />
+                                Sign in here
+                            </Button>
+                        </div>
+                    ) : null}
+
                     <label className="flex flex-col gap-1 text-sm">
                         {entry?.apiKeyLabel ?? "API key"}
                         <Input
@@ -752,8 +815,34 @@ function KeyDialog({
                     </div>
                 </div>
             </DialogContent>
+
+            {/* Fills the form rather than saving behind it: what the login
+                produces lands in the field, and the person still presses the
+                button that adds it. One write, one confirmation, one place the
+                name and the order are decided. */}
+            {signingIn && signin && assist ? (
+                <SigninDialog
+                    signin={signin}
+                    actions={{
+                        ...assist.actions,
+                        save: async (value: string, found, chosen: string) => {
+                            setSecret(value);
+                            setIdentity(found as Record<string, string>);
+                            if (!name.trim()) setName(chosen);
+                            return {};
+                        }
+                    }}
+                    onClose={() => setSigningIn(false)}
+                    onDone={() => setSigningIn(false)}
+                />
+            ) : null}
         </Dialog>
     );
+}
+
+/** What this screen calls the thing it lists, from the word on its button. */
+function thing(action: string | undefined): string {
+    return action?.toLowerCase().replace(/^add /, "") ?? "provider key";
 }
 
 /** The gateway settings a stored key carries, as the form's strings. */

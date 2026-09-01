@@ -13,7 +13,6 @@ import { Badge, Card, CardBody } from "@polaris/ui";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { AssistedSigninCard } from "@/components/model-keys/assisted-signin-card";
 import { modelProviderName, modelProviderRows } from "@/lib/agents/model-key-providers";
 import {
     instanceKeysAreShared,
@@ -114,19 +113,16 @@ export default async function AiKeysPage() {
                             : "None yet. A session on this box needs one to sign an agent in.",
                     adding: "The account a session signs an agent in with. A subscription costs nothing extra; an API key is metered."
                 }}
-                footer={
-                    <AssistedSigninCard
-                        signins={assistedSignins()}
-                        actions={{
-                            begin: beginAgentSigninAction,
-                            screen: agentSigninScreenAction,
-                            answer: answerAgentSigninAction,
-                            identity: agentSigninIdentityAction,
-                            end: endAgentSigninAction,
-                            save: addModelKeyAction
-                        }}
-                    />
-                }
+                assist={{
+                    signins: assistedSignins(),
+                    actions: {
+                        begin: beginAgentSigninAction,
+                        screen: agentSigninScreenAction,
+                        answer: answerAgentSigninAction,
+                        identity: agentSigninIdentityAction,
+                        end: endAgentSigninAction
+                    }
+                }}
             />
         </div>
     );

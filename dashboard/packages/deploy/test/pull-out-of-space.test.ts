@@ -65,7 +65,9 @@ describe("a pull with no room left", () => {
     it("frees what nothing is using and fetches it again", async () => {
         const { ctx, ports, reclaimed, attempts } = context({ failures: 1, freed: 6_500_000_000 });
         await new ComposeRuntime().deployApplication(plan(), ctx);
-        expect(reclaimed).toHaveBeenCalledTimes(1);
+        // Twice: once to make room for the retry, and once after the release
+        // landed, since what it replaced is unreferenced from that moment.
+        expect(reclaimed).toHaveBeenCalledTimes(2);
         expect(ports.pull).toHaveBeenCalledTimes(2);
         expect(attempts()).toBe(2);
     });
@@ -140,13 +142,18 @@ describe("making room before the pull rather than after it fails", () => {
         // every time somebody tries.
         const { ctx, order } = tight(0.93);
         await new ComposeRuntime().deployApplication(plan(), ctx);
-        expect(order).toEqual(["ask", "free", "pull"]);
+        // And again at the end, which happens on every deploy whatever the disk
+        // said: a release makes the image it replaced unreferenced, and waiting
+        // for a threshold means carrying every superseded one until the machine
+        // is nearly full.
+        expect(order).toEqual(["ask", "free", "pull", "free"]);
     });
 
     it("does not touch a machine with room", async () => {
         const { ctx, order } = tight(0.4);
         await new ComposeRuntime().deployApplication(plan(), ctx);
-        expect(order).toEqual(["ask", "pull"]);
+        // Nothing freed before it, and the end-of-deploy tidy after it.
+        expect(order).toEqual(["ask", "pull", "free"]);
     });
 
     it("pulls anyway when the machine will not say how full it is", async () => {
@@ -154,6 +161,6 @@ describe("making room before the pull rather than after it fails", () => {
         // a deploy refused for nothing.
         const { ctx, order } = tight(null);
         await new ComposeRuntime().deployApplication(plan(), ctx);
-        expect(order).toEqual(["ask", "pull"]);
+        expect(order).toEqual(["ask", "pull", "free"]);
     });
 });
