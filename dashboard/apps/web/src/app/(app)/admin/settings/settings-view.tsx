@@ -25,10 +25,11 @@ import { normalizeLegalContact } from "@polaris/core";
 import { AddressList } from "@/components/address-list";
 import type { UpdateStatus } from "@/lib/update-service";
 import type { CheckedAddress } from "@/lib/address-health";
+import type { SettingsOverview } from "./overview";
 import { useDisplayFormat } from "@/components/display-format";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { isRecentRun, isUpdateInFlight, type UpdateLogTail } from "@/lib/update-log";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Skeleton } from "@polaris/ui";
 import type { AutoUpdateMode, AutoUpdatePolicy, DisplayFormat, UpdateSource } from "@polaris/core";
 import { Bug, CheckCircle2, CircleDashed, DownloadCloud, Hammer, RefreshCw, TriangleAlert } from "lucide-react";
 import {
@@ -40,16 +41,14 @@ import {
     updateReportAction
 } from "./actions";
 
+/** The facts that come from the environment, which the server already has when
+ *  it renders the page. Everything that has to be gone and asked for arrives
+ *  later, in one request - see `SettingsOverview`. */
 interface Deployment {
-    readonly addresses: CheckedAddress[];
     readonly hostname: string;
     readonly repo: string;
     readonly branch: string;
     readonly autoUpdate: boolean;
-    /** The box's external address, and the one it answers on itself. Either can be
-     *  unknown: a container behind NAT cannot always see either from the inside. */
-    readonly publicIp: string | null;
-    readonly serverIp: string | null;
 }
 
 const SOURCE_CHOICES: { value: UpdateSource; label: string; }[] = [
@@ -146,14 +145,12 @@ function currentStep(log: string): string | null {
 }
 
 export function SettingsView({
-    initialStatus,
     initialPolicy,
     initialSource,
     initialContact,
     publicPages,
     deployment
 }: {
-    initialStatus: UpdateStatus;
     initialPolicy: AutoUpdatePolicy;
     initialSource: UpdateSource;
     initialContact: string;
@@ -161,7 +158,10 @@ export function SettingsView({
     deployment: Deployment;
 }) {
     const format = useDisplayFormat();
-    const [status, setStatus] = useState(initialStatus);
+    // Null until the overview lands. The card draws its shape meanwhile rather
+    // than a sentence about a check that has not happened - "Up to date" before
+    // anybody has looked is the one thing this line must never say.
+    const [status, setStatus] = useState<UpdateStatus | null>(null);
     const [policy, setPolicy] = useState(initialPolicy);
     const [source, setSource] = useState(initialSource);
     // What the time field shows. A time input empties itself between segments, so
@@ -179,13 +179,37 @@ export function SettingsView({
     const [reporting, setReporting] = useState(false);
     // Followed rather than read once: removing an address changes the list, and the
     // page that did it must not keep offering the entry it has just taken away.
-    const [addresses, setAddresses] = useState(deployment.addresses);
+    const [addresses, setAddresses] = useState<CheckedAddress[] | null>(null);
+    const [network, setNetwork] = useState<{ publicIp: string | null; serverIp: string | null } | null>(null);
     // The build that was serving when this run started. A different one answering
     // later means the new dashboard has taken over - the completion signal that
     // survives the updater being cut off by the restart it is performing.
     const startBuild = useRef<string | null>(null);
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const waitRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    /**
+     * Everything that had to be gone and asked for, once the page is on screen.
+     *
+     * One request for the three of them: they all land in the same render, and
+     * three round trips would fill the update line, then the addresses, then the
+     * IPs, each a frame apart. A failure leaves the skeletons standing rather
+     * than replacing them with a wrong answer - the Check button is right there,
+     * and it is the same question asked again.
+     */
+    useEffect(() => {
+        const controller = new AbortController();
+        void fetch("/api/admin/settings/overview", { signal: controller.signal })
+            .then((answer) => (answer.ok ? (answer.json() as Promise<SettingsOverview>) : null))
+            .then((overview) => {
+                if (!overview) return;
+                setStatus(overview.status);
+                setAddresses(overview.addresses);
+                setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
+            })
+            .catch(() => undefined);
+        return () => controller.abort();
+    }, []);
 
     function onCheck(force = true) {
         startTransition(async () => {
@@ -480,7 +504,7 @@ export function SettingsView({
     useEffect(() => stopPolling, []);
 
     const step = updating ? currentStep(logText) : null;
-    const available = status.phase === "available";
+    const available = status?.phase === "available";
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -503,6 +527,8 @@ export function SettingsView({
                                 <RefreshCw className="size-4 animate-spin text-primary" />
                                 <span>Updating{step ? ` - ${step}` : "..."}</span>
                             </>
+                        ) : !status ? (
+                            <Skeleton className="h-4 w-56" />
                         ) : status.error ? (
                             <>
                                 <TriangleAlert className="size-4 text-warning" />
@@ -560,13 +586,15 @@ export function SettingsView({
                     </div>
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label="Running build" value={status.current ?? "unknown"} />
+                        <Row label="Running build" value={status?.current ?? null} />
                         <Row
-                            label={status.source === "build" ? `Latest on ${deployment.branch}` : "Published build"}
-                            value={status.latest ?? "-"}
+                            label={
+                                status?.source === "build" ? `Latest on ${deployment.branch}` : "Published build"
+                            }
+                            value={status ? (status.latest ?? "-") : null}
                         />
                         <Row label="Updates from here" value={deployment.autoUpdate ? "allowed" : "blocked on this host"} />
-                        <Row label="Last checked" value={formatChecked(status.checkedAt, format)} />
+                        <Row label="Last checked" value={status ? formatChecked(status.checkedAt, format) : null} />
                     </dl>
 
                     <div className="flex flex-col gap-2 border-t border-border pt-3">
@@ -691,12 +719,25 @@ export function SettingsView({
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
                         <span className="text-sm text-muted-foreground">Reachable at</span>
-                        <AddressList addresses={addresses} onChanged={setAddresses} manageHref="/admin/domains" />
+                        {addresses ? (
+                            <AddressList
+                                addresses={addresses}
+                                onChanged={setAddresses}
+                                manageHref="/admin/domains"
+                            />
+                        ) : (
+                            // Shaped like the rows it will become: a list of
+                            // addresses, each with its verdict beside it.
+                            <div className="flex flex-col gap-1.5">
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-4/5" />
+                            </div>
+                        )}
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <Row label="Local hostname" value={`${deployment.hostname}.local`} />
-                        <Row label="Server IP" value={deployment.serverIp ?? "unknown"} />
-                        <Row label="Public IP" value={deployment.publicIp ?? "not detected"} />
+                        <Row label="Server IP" value={network ? (network.serverIp ?? "unknown") : null} />
+                        <Row label="Public IP" value={network ? (network.publicIp ?? "not detected") : null} />
                         <Row
                             label="Repository"
                             value={deployment.repo}
@@ -790,12 +831,16 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
     );
 }
 
-function Row({ label, value, href }: { label: string; value: string; href?: string; }) {
+/** One fact. A null value is one that has not arrived yet - the label is already
+ *  right, so it stays and only the answer is a placeholder. */
+function Row({ label, value, href }: { label: string; value: string | null; href?: string; }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="truncate font-medium">
-                {href ? (
+                {value === null ? (
+                    <Skeleton className="h-4 w-24" />
+                ) : href ? (
                     <a className="text-primary hover:underline" href={href} target="_blank" rel="noreferrer">
                         {value}
                     </a>
