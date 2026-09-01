@@ -31,8 +31,10 @@ import {
 import {
     clearNotificationsAction,
     deleteNotificationAction,
+    deleteNotificationsAction,
     markAllNotificationsReadAction,
-    markNotificationReadAction
+    markNotificationReadAction,
+    markNotificationsReadAction
 } from "@/app/(app)/account/notifications/actions";
 
 export interface NotificationFeed {
@@ -42,6 +44,9 @@ export interface NotificationFeed {
     markAllRead: () => void;
     remove: (id: string) => void;
     clearAll: () => void;
+    /** A selection, in one write rather than one per row. */
+    markManyRead: (ids: readonly string[]) => void;
+    removeMany: (ids: readonly string[]) => void;
 }
 
 const STREAM_PATH = "/api/notifications/stream";
@@ -154,6 +159,23 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
             clearAll: () => {
                 if (items.length === 0) return;
                 apply({ kind: "clear" }, () => clearNotificationsAction());
+            },
+            markManyRead: (ids) => {
+                // Only the ones that would actually change: marking twenty rows
+                // of which two are unread is two rows of work, and a write that
+                // changes nothing still costs a round trip and a rollback path.
+                const unreadIds = items.filter((row) => !row.read && ids.includes(row.id)).map((row) => row.id);
+                if (unreadIds.length === 0) return;
+                apply({ kind: "readMany", ids: unreadIds }, () =>
+                    markNotificationsReadAction({ ids: unreadIds })
+                );
+            },
+            removeMany: (ids) => {
+                const present = items.filter((row) => ids.includes(row.id)).map((row) => row.id);
+                if (present.length === 0) return;
+                apply({ kind: "removeMany", ids: present }, () =>
+                    deleteNotificationsAction({ ids: present })
+                );
             }
         };
     }, [items, apply]);

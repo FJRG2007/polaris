@@ -36,7 +36,14 @@ const mutationSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("read"), id: z.string().min(1) }),
     z.object({ kind: z.literal("readAll") }),
     z.object({ kind: z.literal("remove"), id: z.string().min(1) }),
-    z.object({ kind: z.literal("clear") })
+    z.object({ kind: z.literal("clear") }),
+    // A selection, as its own kind rather than by widening the two above: a tab
+    // running an older build of this file would fail to parse a `read` that had
+    // grown a list where it expects one id, and would then ignore the write
+    // entirely. A kind it has never heard of is refused the same way, but only
+    // the new gesture is affected.
+    z.object({ kind: z.literal("readMany"), ids: z.array(z.string().min(1)).min(1) }),
+    z.object({ kind: z.literal("removeMany"), ids: z.array(z.string().min(1)).min(1) })
 ]);
 
 /** One change to the feed, as any tab can replay it. */
@@ -61,5 +68,13 @@ export function applyFeedMutation(rows: NotificationView[], mutation: FeedMutati
             return rows.filter((row) => row.id !== mutation.id);
         case "clear":
             return [];
+        case "readMany": {
+            const marked = new Set(mutation.ids);
+            return rows.map((row) => (marked.has(row.id) && !row.read ? { ...row, read: true } : row));
+        }
+        case "removeMany": {
+            const gone = new Set(mutation.ids);
+            return rows.filter((row) => !gone.has(row.id));
+        }
     }
 }
