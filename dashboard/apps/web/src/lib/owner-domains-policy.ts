@@ -46,6 +46,49 @@ export type OwnerDomainPolicy = z.infer<typeof ownerDomainPolicySchema>;
 export const OWNER_DOMAIN_POLICY_DEFAULTS: OwnerDomainPolicy = ownerDomainPolicySchema.parse({});
 
 /**
+ * Whether what has been typed so far is a domain at all, and why not.
+ *
+ * The Add button used to come alive on the first keystroke, so a single letter
+ * looked like something Polaris would accept - and pressing it spent a round
+ * trip to be told no by the schema. A control that offers itself for input it is
+ * going to refuse is a control that has to be tried before it can be understood.
+ *
+ * Written here rather than reached for from `@polaris/deploy`, which owns the
+ * same pattern: that package pulls in node:crypto and the SSH stack the moment
+ * it is imported, and this module exists to be read by a form running in a
+ * browser. The pattern is small and stated in both places on purpose - see
+ * `bareDomain` below, which is inlined for the same reason.
+ *
+ * Silent on an empty field. Nothing has been typed, so there is nothing to be
+ * wrong about, and a form that scolds somebody before they start is worse than
+ * one that waits.
+ */
+export function domainProblem(value: string): string | null {
+    const wanted = bareDomain(value);
+    if (!wanted) return null;
+    // A name that reached this pattern is well formed, but four groups of digits
+    // is well formed too and is an address: nothing can publish a TXT record
+    // under it, so a claim on one would sit here unverifiable forever while
+    // looking like a claim somebody made. Named separately because the sentence
+    // has to say which of the two it is.
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(wanted)) return "That is an address, not a domain";
+    if (!wanted.includes(".")) return "A domain needs a suffix, like example.com";
+    if (!DOMAIN_PATTERN.test(wanted)) return "Enter a domain like example.com";
+    // The last label is the suffix, and it is the one part that cannot be
+    // digits or a single letter. `example.c` and `example.1` both pass the
+    // pattern above and neither is a name anybody can hold.
+    const suffix = wanted.slice(wanted.lastIndexOf(".") + 1);
+    if (suffix.length < 2 || !/^[a-z]+$/.test(suffix)) return "That suffix is not a real one";
+    // RFC 1035, and the reason a domain cannot be arbitrarily long.
+    if (wanted.length > 253) return "That domain is too long";
+    return null;
+}
+
+/** A registrable domain: two or more labels, no wildcard, no scheme. The same
+ *  pattern `@polaris/deploy` applies on the server. */
+const DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+/**
  * Whether a domain somebody wants to claim collides with one this Polaris itself
  * occupies.
  *

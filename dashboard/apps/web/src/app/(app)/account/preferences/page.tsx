@@ -46,7 +46,13 @@ export default async function PreferencesPage() {
                 allowTheme={mayChooseTheme}
                 save={saveDisplayPreferencesAction}
             />
-            <AccessibilityForm initial={effective.textSize} save={saveTextSizeAction} />
+            <AccessibilityForm
+                initial={effective.textSize}
+                // What this deployment treats as normal, so somebody who has
+                // moved the slider can find their way back to it.
+                standard={resolveDisplayPreferences(platform).textSize}
+                save={saveTextSizeAction}
+            />
             <DeviceCacheCard />
         </div>
     );

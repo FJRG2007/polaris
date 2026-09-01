@@ -19,7 +19,7 @@ import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OwnerDomainView } from "@/lib/owner-domains";
-import { instanceDomainConflict } from "@/lib/owner-domains-policy";
+import { domainProblem, instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useDisplayFormat } from "@/components/display-format";
 import { CheckCircle2, Clock, Globe, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
@@ -61,7 +61,15 @@ export function OwnerDomainsView({
 
     // Empty until something has been typed: a field nobody has filled in yet is
     // incomplete, not wrong.
-    const reserved = value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
+    // Two different refusals and they are answered in order: what was typed has
+    // to be a domain before there is any point asking whether it is one Polaris
+    // already occupies.
+    const malformed = domainProblem(value);
+    const reserved = !malformed && value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
+    // What stops the Add button. A single letter is not a domain, and a button
+    // that offers itself for input it will refuse has to be pressed before it
+    // can be understood.
+    const refusal = malformed ?? (reserved ? `${reserved}. Pick a domain of your own.` : null);
 
     // The list is kept here rather than re-read from the server on every check,
     // so pressing Check on one domain does not blank the others while a DNS
@@ -113,7 +121,7 @@ export function OwnerDomainsView({
                             className="flex flex-wrap items-end gap-2"
                             onSubmit={async (event) => {
                                 event.preventDefault();
-                                if (!value.trim() || reserved) return;
+                                if (!value.trim() || refusal) return;
                                 setBusy(true);
                                 setError("");
                                 const result = await runAction(
@@ -135,22 +143,22 @@ export function OwnerDomainsView({
                                     value={value}
                                     placeholder="example.com"
                                     className="h-9"
-                                    aria-invalid={reserved ? true : undefined}
-                                    aria-describedby={reserved ? "owner-domain-reserved" : undefined}
+                                    aria-invalid={refusal ? true : undefined}
+                                    aria-describedby={refusal ? "owner-domain-refusal" : undefined}
                                     onChange={(event) => setValue(event.target.value)}
                                 />
                             </label>
                             <Button
                                 type="submit"
                                 size="sm"
-                                aria-disabled={busy || !value.trim() || reserved !== null}
-                                disabled={busy || !value.trim() || reserved !== null}
+                                aria-disabled={busy || !value.trim() || refusal !== null}
+                                disabled={busy || !value.trim() || refusal !== null}
                             >
                                 <Plus className="size-4 shrink-0" /> Add
                             </Button>
-                            {reserved ? (
-                                <p id="owner-domain-reserved" className="text-danger w-full text-xs">
-                                    {reserved}. Pick a domain of your own.
+                            {refusal ? (
+                                <p id="owner-domain-refusal" className="text-danger w-full text-xs">
+                                    {refusal}
                                 </p>
                             ) : (
                                 <p className="text-muted-foreground w-full text-xs">

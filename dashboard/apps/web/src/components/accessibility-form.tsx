@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { TEXT_SIZES, type TextSize } from "@polaris/core";
-import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, cn } from "@polaris/ui";
 
 /** The custom property the whole interface is laid out against - see globals.css. */
 const PROPERTY = "--app-text-size";
@@ -27,11 +27,22 @@ function applySize(size: number): void {
 
 export function AccessibilityForm({
     initial,
+    standard,
     save
 }: {
     /** The size in force for this account, already resolved through the platform
      *  default, so the slider opens where the page is actually drawn. */
     initial: TextSize;
+    /**
+     * What this deployment treats as normal - what an account that has never
+     * touched this setting is drawn at.
+     *
+     * Named because somebody who has moved the slider around cannot get back
+     * without it. Seven numbers on a scale say nothing about which one they
+     * started from, and 16 is a guess unless the operator happens not to have
+     * changed it. It is marked on the scale and offered as a way back.
+     */
+    standard: TextSize;
     save: (size: number) => Promise<{ error?: string }>;
 }) {
     const [size, setSize] = useState<TextSize>(initial);
@@ -68,7 +79,12 @@ export function AccessibilityForm({
                         <label htmlFor="text-size" className="text-sm font-medium">
                             Text size
                         </label>
-                        <span className="text-sm tabular-nums text-muted-foreground">{size}px</span>
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                            {size}px
+                            {size === standard ? (
+                                <span className="pl-1.5 text-xs">Default</span>
+                            ) : null}
+                        </span>
                     </div>
                     {/* An index rather than the size itself: the sizes are not evenly
                         spaced, and a range that stepped in pixels would offer the
@@ -99,7 +115,18 @@ export function AccessibilityForm({
                                     setDone(false);
                                     setSize(step);
                                 }}
-                                className={step === size ? "font-medium text-foreground" : "hover:text-foreground"}
+                                // The one to come back to is marked on the scale
+                                // itself, so it is visible while the slider is
+                                // being moved rather than only after it lands.
+                                title={step === standard ? `${step} - the default here` : undefined}
+                                className={cn(
+                                    step === size
+                                        ? "font-medium text-foreground"
+                                        : "hover:text-foreground",
+                                    step === standard &&
+                                        step !== size &&
+                                        "underline decoration-dotted underline-offset-4"
+                                )}
                             >
                                 {step}
                             </button>
@@ -107,7 +134,28 @@ export function AccessibilityForm({
                     </div>
                     <p className="text-xs text-muted-foreground">
                         Polaris is laid out in this size, so the rows and panels around the text grow with it.
-                        The page changes as you move the slider; it stays that way once you save.
+                        The page changes as you move the slider; it stays that way once you save.{" "}
+                        {size === standard ? (
+                            <>This is the default here.</>
+                        ) : (
+                            <>
+                                The default here is {standard}px.{" "}
+                                {/* A way back rather than a number to remember.
+                                    Sets the slider like any other step, so it is
+                                    still a change somebody saves rather than one
+                                    that happens to them. */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDone(false);
+                                        setSize(standard);
+                                    }}
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    Go back to it
+                                </button>
+                            </>
+                        )}
                     </p>
                 </div>
 
