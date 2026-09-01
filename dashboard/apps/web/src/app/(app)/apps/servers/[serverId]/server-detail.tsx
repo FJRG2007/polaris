@@ -70,9 +70,14 @@ export function ServerDetail({
     server,
     connectionId,
     metricsId,
+    machineName,
     initialUsage
 }: {
     server: ServerRow;
+    /** What the box calls itself, resolved on the server so the line under the
+     *  name is complete on the first paint rather than growing a clause a
+     *  moment later. The live payload replaces it if the engine disagrees. */
+    machineName: string;
     /** How the Containers app reaches this machine's engine, so its containers can
      *  be listed and linked. */
     connectionId: string;
@@ -107,7 +112,7 @@ export function ServerDetail({
     // same string is what the tooltip hands back when that paragraph clips.
     const reach =
         server.kind === "local"
-            ? `The machine Polaris runs on${live?.machineName ? `, ${live.machineName}` : ""}`
+            ? `The machine Polaris runs on, ${live?.machineName ?? machineName}`
             : `${server.detail}@${server.address}${server.port ? `:${server.port}` : ""}`;
 
     return (

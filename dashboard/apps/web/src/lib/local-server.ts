@@ -57,7 +57,28 @@ export async function setLocalHostId(hostId: string | null): Promise<void> {
     await setSetting(HOST_KEY, hostId);
 }
 
-/** The name the machine calls itself. Best-effort and time-boxed. */
+/**
+ * What the box calls itself, without asking anything.
+ *
+ * `hostname()` is a syscall - no socket, no container engine, no timeout - and on
+ * essentially every deployment it is the same string `localMachineName` ends up
+ * returning, because the engine's node name is the hostname unless somebody has
+ * deliberately set it otherwise.
+ *
+ * That makes it the right thing to render with. The Servers screen used to draw a
+ * skeleton where this line goes and wait for the status endpoint, which meant a
+ * grey bar sitting under the name of a machine whose name was already on the
+ * page - a loading state for a fact that does not change and did not need
+ * fetching. The live answer still arrives and still replaces this, so a machine
+ * that has been given a different engine name is right a moment later, in the
+ * same place and without the row moving.
+ */
+export function localMachineNameNow(): string {
+    return hostname();
+}
+
+/** The name the machine calls itself, as the engine reports it. Best-effort and
+ *  time-boxed; falls back to the hostname, which is what it almost always is. */
 export async function localMachineName(): Promise<string> {
     try {
         const driver = localDockerDriver();

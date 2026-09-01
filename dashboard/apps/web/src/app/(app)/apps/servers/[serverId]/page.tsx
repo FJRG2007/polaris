@@ -1,4 +1,5 @@
 import { ServerDetail } from "./server-detail";
+import { localMachineNameNow } from "@/lib/local-server";
 import { findServerRow } from "../server-rows";
 import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
@@ -53,6 +54,7 @@ export default async function ServerPage({ params }: { params: Promise<{ serverI
 
     return (
         <ServerDetail
+            machineName={localMachineNameNow()}
             server={server}
             initialUsage={cached ? { at: cached.at, value: cached.metrics } : undefined}
             connectionId={

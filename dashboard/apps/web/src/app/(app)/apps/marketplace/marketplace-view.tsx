@@ -6,11 +6,32 @@
  * server. Installing opens a dialog that reuses Deploy's notions of a target
  * server and per-volume storage (a server-local volume or a NAS mount), then
  * calls the deploy.manage-gated install action.
+ *
+ * It reads as a store now rather than as a list of what happens to be declared,
+ * and four things are what changed:
+ *
+ * - **A search field.** Every store has one, and a page of categories somebody
+ *   has to scroll to find "Minecraft" is a page that gets scrolled past. Fuzzy,
+ *   so a near miss and a category still land.
+ * - **Coming soon goes last.** It was mixed in with what can actually be
+ *   installed, so the first row of a category could be three things nobody can
+ *   have. They are still shown - saying what is coming is the point of declaring
+ *   them - underneath, and out of the way.
+ * - **Every card says who is behind it.** A store that does not say where a thing
+ *   comes from is a store nobody should install from. Read off the image the app
+ *   installs rather than typed in - see `appProvenance`.
+ * - **Installed lists apps, not their parts.** A camera relay and six Minecraft
+ *   servers are not seven things somebody installed; they are what two apps run.
+ *   The manifests already said so (`internal` and `ownedBy`) and this screen was
+ *   the one place not reading it.
  */
 
+import Fuse from "fuse.js";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { appProvenance } from "@/lib/apps/provenance";
+import { AppMark } from "@/components/app-mark";
 import { appInstallInputSchema } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
@@ -69,6 +90,7 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
     const [installingId, setInstallingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [query, setQuery] = useState("");
     const groups = appsByCategory();
 
     /**
@@ -95,6 +117,44 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
             });
     }
 
+    /**
+     * Everything on offer, indexed once.
+     *
+     * Over the name, the summary and the category, weighted in that order: people
+     * search a store for a name, occasionally for what a thing does, and the
+     * category is the tie-break rather than the answer. The description is
+     * deliberately left out - it is a paragraph, and matching inside one puts
+     * apps at the top for a word buried in their third sentence.
+     */
+    const index = useMemo(() => {
+        const all = groups.flatMap((group) => group.apps);
+        return new Fuse(all, {
+            threshold: 0.35,
+            ignoreLocation: true,
+            keys: [
+                { name: "name", weight: 3 },
+                { name: "summary", weight: 2 },
+                { name: "category", weight: 1 }
+            ]
+        });
+    }, [groups]);
+
+    /**
+     * What the grid draws: the categories, or one flat list of matches.
+     *
+     * A search that still drew category headings would draw four headings with
+     * one card under each, which is a worse answer than the list. Within either,
+     * what can be installed comes before what is only announced.
+     */
+    const shown = useMemo(() => {
+        const term = query.trim();
+        if (term) {
+            const hits = index.search(term).map((hit) => hit.item);
+            return hits.length === 0 ? [] : [{ category: "Results", apps: sortOffered(hits) }];
+        }
+        return groups.map((group) => ({ category: group.category, apps: sortOffered(group.apps) }));
+    }, [groups, index, query]);
+
     const installedByCatalog = useMemo(() => {
         const map = new Map<string, number>();
         for (const item of installed) map.set(item.catalogId, (map.get(item.catalogId) ?? 0) + 1);
@@ -113,11 +173,30 @@ export function MarketplaceView({ installed }: { installed: InstalledAppView[] }
         <div className="flex flex-col gap-6">
             <PageHeader title="Marketplace" description="Install and run apps on your servers in one click." />
 
+            {/* Above everything, the way a store puts it: the first thing
+                somebody arriving with a name in mind reaches for. */}
+            <div className="relative max-w-md">
+                <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+                <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search apps"
+                    aria-label="Search apps"
+                    className="pl-8"
+                />
+            </div>
+
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            {installed.length > 0 && <InstalledSection installed={installed} />}
+            {installed.length > 0 && !query.trim() && <InstalledSection installed={installed} />}
 
-            {groups.map((group) => (
+            {shown.length === 0 ? (
+                <p className="text-muted-foreground py-10 text-center text-sm">
+                    Nothing here matches that.
+                </p>
+            ) : null}
+
+            {shown.map((group) => (
                 <section key={group.category} className="flex flex-col gap-3">
                     <h2 className="text-sm font-medium text-muted-foreground">{group.category}</h2>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -155,21 +234,56 @@ function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): s
     return app.opensAt ?? `/apps/installed/${singletonInstall.get(app.id)}`;
 }
 
+/**
+ * What can be installed, before what is only announced.
+ *
+ * Coming soon is worth showing - it is why those manifests exist - but mixed in
+ * it meant the first row of a category could be three things nobody can have.
+ * Order is otherwise left alone: the catalog's is deliberate.
+ */
+function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
+    return [...apps].sort((left, right) => Number(left.comingSoon ?? false) - Number(right.comingSoon ?? false));
+}
+
+/**
+ * The apps somebody has installed - the apps, not the containers they run.
+ *
+ * A camera relay, a face recognizer and six Minecraft servers are not eight
+ * things anybody installed: they are what Places and Game servers run, and every
+ * one of them was appearing here as an independent app with its own card. The
+ * manifests have said so all along (`internal`, and `ownedBy` naming the app that
+ * creates them); this screen was the one place not reading it.
+ *
+ * An install whose manifest is gone entirely is still shown. It is on somebody's
+ * server, and hiding it because the catalog no longer describes it is how a
+ * container becomes unreachable from the product that started it.
+ */
+function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[] {
+    return installed.filter((item) => {
+        const manifest = findApp(item.catalogId);
+        return !manifest || !manifest.internal;
+    });
+}
+
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
+    const own = ownInstalls(installed);
+    if (own.length === 0) return null;
+
     return (
         <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Installed</h2>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {installed.map((item) => {
+                {own.map((item) => {
                     const manifest = findApp(item.catalogId);
-                    const Icon = manifest?.icon;
                     return (
                         <Link key={item.id} href={manifest?.opensAt ?? `/apps/installed/${item.id}`}>
                             <Card className="transition-colors hover:border-border">
                                 <CardBody className="flex items-center gap-3 py-3">
-                                    <div className="grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface">
-                                        {Icon ? <Icon className="size-4" /> : null}
-                                    </div>
+                                    {manifest ? (
+                                        <AppMark app={manifest} size={36} />
+                                    ) : (
+                                        <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md" />
+                                    )}
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium">{item.name}</p>
                                         <p className="truncate text-xs text-muted-foreground">
@@ -194,6 +308,20 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
     );
 }
 
+/**
+ * One line naming who is behind an app.
+ *
+ * Both halves when they differ - somebody else's software in somebody else's
+ * container is two facts and a reader deciding whether to run it wants both - and
+ * one when they do not, because "Polaris - published by Polaris" says nothing
+ * twice.
+ */
+function by(from: { developer: string; distributor: string }): string {
+    return from.developer === from.distributor
+        ? `By ${from.developer}`
+        : `By ${from.developer} - image by ${from.distributor}`;
+}
+
 function AppCard({
     app,
     installedCount,
@@ -214,18 +342,23 @@ function AppCard({
     onInstall: () => void;
     onConfigure: () => void;
 }) {
-    const Icon = app.icon;
     const installable = isInstallable(app);
+    // Who made it and who ships the image, read off what the app installs rather
+    // than typed in - see `appProvenance`.
+    const from = appProvenance(app);
     return (
-        <Card className="flex h-full flex-col">
+        <Card className={cn("flex h-full flex-col", app.comingSoon && "opacity-75")}>
             <CardBody className="flex h-full flex-col gap-3">
                 <div className="flex items-start gap-3">
-                    <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
-                        <Icon className="size-5" />
-                    </div>
+                    <AppMark app={app} size={40} />
                     <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{app.name}</p>
-                        <p className="text-xs text-muted-foreground">{app.category}</p>
+                        {/* Who is behind it, in the line the category used to
+                            have to itself. The category is a heading two inches
+                            above; whose software this is was nowhere. */}
+                        <p className="text-muted-foreground truncate text-xs" title={by(from)}>
+                            {by(from)}
+                        </p>
                     </div>
                 </div>
                 <p className="line-clamp-3 text-sm text-muted-foreground">{app.summary}</p>

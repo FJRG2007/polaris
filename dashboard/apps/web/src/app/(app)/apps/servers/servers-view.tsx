@@ -46,15 +46,23 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle,
-    Skeleton
+    DialogTitle
 } from "@polaris/ui";
 
 /** How often reachability is re-checked. A server going down is worth noticing
  *  while the page is open, and each pass is one short-lived socket per server. */
 const STATUS_POLL_MS = 30_000;
 
-export function ServersView({ servers }: { servers: ServerRow[] }) {
+export function ServersView({
+    servers,
+    machineName
+}: {
+    servers: ServerRow[];
+    /** What the box calls itself, resolved on the server so the row is complete
+     *  on the first paint. The live payload replaces it if the container engine
+     *  reports something else. */
+    machineName: string;
+}) {
     const router = useRouter();
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
     const [outcome, setOutcome] = useState<RemoveServerResult | null>(null);
@@ -154,15 +162,17 @@ export function ServersView({ servers }: { servers: ServerRow[] }) {
                                             ) : null}
                                         </Link>
                                         <span className="block text-xs text-muted-foreground">
-                                            {server.kind === "host" ? (
-                                                server.detail
-                                            ) : live?.machineName ? (
-                                                live.machineName
-                                            ) : (
-                                                // Its own name is on the way; hold the line's
-                                                // height so the row does not jump when it lands.
-                                                <Skeleton className="mt-0.5 inline-block h-3 w-24 align-middle" />
-                                            )}
+                                            {/* The hostname the server render
+                                                already knew, replaced by what the
+                                                engine reports if the two differ.
+                                                There is nothing to wait for here,
+                                                and a skeleton under the name of
+                                                the machine it is about was a
+                                                loading state for a fact that does
+                                                not change. */}
+                                            {server.kind === "host"
+                                                ? server.detail
+                                                : (live?.machineName ?? machineName)}
                                             {/* On this line rather than in a column of its own: the
                                                 table already carries six, and a seventh is what makes
                                                 it unreadable on a laptop. */}
