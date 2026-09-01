@@ -16,7 +16,12 @@
 
 import * as core from "@polaris/core";
 import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
-import { keySourcesFor, signinAccountsFor, signinEnvsFor, signinOptionsFor } from "@/lib/agents/model-keys";
+import {
+    keySourcesFor,
+    signinAccountsFor,
+    signinEnvsFor,
+    signinOptionsFor
+} from "@/lib/agents/model-keys";
 
 /**
  * Variables every session is handed whether or not anybody linked anything.
@@ -69,7 +74,10 @@ export interface AgentChoice {
 
 /** The catalogue, answered for this person. */
 export async function agentChoicesFor(userId: string | null): Promise<AgentChoice[]> {
-    const [held, accounts] = await Promise.all([credentialsHeldBy(userId), signinAccountsFor(userId)]);
+    const [held, accounts] = await Promise.all([
+        credentialsHeldBy(userId),
+        signinAccountsFor(userId)
+    ]);
     const present = (env: string): boolean => held.has(env);
     return core.AGENT_CLIS.map((cli) => {
         const readiness = core.agentReadiness(cli, present);
@@ -172,7 +180,10 @@ export interface AgentOption {
 
 /** The catalogue crossed with the accounts, as the picker lists it. */
 export async function agentOptionsFor(userId: string | null): Promise<AgentOption[]> {
-    const [choices, accounts] = await Promise.all([agentChoicesFor(userId), signinOptionsFor(userId)]);
+    const [choices, accounts] = await Promise.all([
+        agentChoicesFor(userId),
+        signinOptionsFor(userId)
+    ]);
     const options: AgentOption[] = [];
     for (const choice of choices) {
         const cli = core.agentCliById(choice.id);

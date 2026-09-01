@@ -102,8 +102,13 @@ export function AgentSelect({
                 onClick={() => setOpen((was) => !was)}
                 className="border-border bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-                {chosen ? <AgentLogo id={chosen.cli} label={chosen.label} className="size-4 shrink-0" /> : null}
-                <span className="min-w-0 flex-1 truncate text-left" title={chosen?.label ?? undefined}>
+                {chosen ? (
+                    <AgentLogo id={chosen.cli} label={chosen.label} className="size-4 shrink-0" />
+                ) : null}
+                <span
+                    className="min-w-0 flex-1 truncate text-left"
+                    title={chosen?.label ?? undefined}
+                >
                     {chosen?.label ?? "Pick an agent"}
                 </span>
                 {chosen?.account ? (
@@ -156,7 +161,11 @@ export function AgentSelect({
                                     <Check
                                         className={`size-4 shrink-0 ${option.key === value ? "opacity-100" : "opacity-0"}`}
                                     />
-                                    <AgentLogo id={option.cli} label={option.label} className="size-4 shrink-0" />
+                                    <AgentLogo
+                                        id={option.cli}
+                                        label={option.label}
+                                        className="size-4 shrink-0"
+                                    />
                                     <span className="min-w-0 flex-1 truncate" title={option.label}>
                                         {option.label}
                                     </span>
@@ -187,7 +196,9 @@ export function AgentSelect({
                                             {option.account}
                                         </span>
                                     ) : option.vendor ? (
-                                        <span className="text-muted-foreground shrink-0 text-xs">{option.vendor}</span>
+                                        <span className="text-muted-foreground shrink-0 text-xs">
+                                            {option.vendor}
+                                        </span>
                                     ) : null}
                                     {option.mine === false ? (
                                         <Badge variant="neutral" className="shrink-0">
@@ -203,7 +214,9 @@ export function AgentSelect({
                             );
                         })}
                         {results.length === 0 ? (
-                            <p className="text-muted-foreground px-3 py-6 text-center text-sm">Nothing matches.</p>
+                            <p className="text-muted-foreground px-3 py-6 text-center text-sm">
+                                Nothing matches.
+                            </p>
                         ) : null}
                     </div>
                 </div>
@@ -261,12 +274,13 @@ export function SignInNotice({ agent }: { agent: AgentOption }) {
         <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3">
             <p className="text-sm">Nothing here signs {agent.label} in.</p>
             <p className="text-xs text-muted-foreground">
-                On this box it would start and sit at its own login prompt, where nobody would ever answer it. Sign it
-                in under AI keys - Polaris runs the sign-in for you and supplies the machine - or run it on a server
-                you have already signed it in on.
+                On this box it would start and sit at its own login prompt, where nobody would ever
+                answer it. Sign it in under AI keys - Polaris runs the sign-in for you and supplies
+                the machine - or run it on a server you have already signed it in on.
             </p>
             <p className="text-xs text-muted-foreground">
-                It takes {agent.missing.map((credential) => credential.label.toLowerCase()).join(" or ")}.
+                It takes{" "}
+                {agent.missing.map((credential) => credential.label.toLowerCase()).join(" or ")}.
             </p>
             <Link href="/account/ai-keys" className="inline-block text-xs underline">
                 Sign in under AI keys

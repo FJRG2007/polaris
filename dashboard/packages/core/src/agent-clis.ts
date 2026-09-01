@@ -171,7 +171,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         label: "Claude Code",
         vendor: "Anthropic",
         binaries: ["claude"],
-        install: "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
+        install:
+            "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         home: ".claude",
         observe: "hooks",
         docs: "https://docs.claude.com/en/docs/claude-code",
@@ -362,7 +363,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {"GOOSE_MODE": "auto"}
+        autonomyEnv: { GOOSE_MODE: "auto" }
     },
     {
         id: "aider",
@@ -568,7 +569,10 @@ export function customAgentCli(command: string): AgentCli {
  * key of the same vendor so a person holding both is reported as running on the
  * plan they already pay for.
  */
-export function credentialInPlace(cli: AgentCli, present: (env: string) => boolean): AgentCredential | null {
+export function credentialInPlace(
+    cli: AgentCli,
+    present: (env: string) => boolean
+): AgentCredential | null {
     return cli.credentials.find((credential) => present(credential.env)) ?? null;
 }
 
