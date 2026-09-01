@@ -22,6 +22,7 @@ import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { SelectionToolbar } from "./toolbar";
+import { EditorMenu, type ListAction } from "./editor-menu";
 import { mentionExtension, popupOpen } from "./suggestion";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
@@ -113,6 +114,16 @@ export interface RichTextEditorProps {
     mentionSource?: ((kinds: readonly refs.ReferenceKind[], query: string) => Promise<
         readonly { kind: refs.ReferenceKind; id: string; label: string; detail?: string; image?: string | null }[]
     >) | null;
+    /**
+     * What the right-press menu offers for a list somebody selected, when this
+     * surface can do something with one.
+     *
+     * A task description holding three lines of work is three subtasks written as
+     * prose, and only the screen around the editor knows where they would go - so
+     * the editor draws the item and the caller does the moving. Left unset
+     * everywhere else, and then the menu simply does not carry it.
+     */
+    listAction?: ListAction;
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
@@ -150,6 +161,7 @@ export function RichTextEditor({
     onPasteFiles,
     mentionsIn = null,
     mentionSource = null,
+    listAction,
     bordered = false,
     className
 }: RichTextEditorProps) {
@@ -351,10 +363,22 @@ export function RichTextEditor({
         return <div className={cn(surfaceClass(bordered, disabled), "min-h-[3rem]", className)} />;
     }
 
+    // A surface nobody may write in keeps the browser's menu: every item this
+    // one carries changes the document.
+    if (disabled) {
+        return (
+            <div className={cn(surfaceClass(bordered, disabled), className)}>
+                <EditorContent editor={editor} />
+            </div>
+        );
+    }
+
     return (
         <div className={cn(surfaceClass(bordered, disabled), className)}>
-            {!disabled && <SelectionToolbar editor={editor} />}
-            <EditorContent editor={editor} />
+            <SelectionToolbar editor={editor} />
+            <EditorMenu editor={editor} listAction={listAction}>
+                <EditorContent editor={editor} />
+            </EditorMenu>
         </div>
     );
 }

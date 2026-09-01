@@ -260,6 +260,32 @@ export function TaskPanel({
         auto.save(fieldsOf(input), () => commit(input, "typed"));
 
     /**
+     * Turn the lines somebody selected into subtasks.
+     *
+     * Written in order and one at a time, because the order is the point - a list
+     * of steps pasted in as three parallel writes comes back in whichever order
+     * the database finished them. Answers false if any of them was refused, and
+     * the editor then leaves the list where it is: a list deleted after a failed
+     * write is work that no longer exists anywhere.
+     */
+    const toSubtasks = async (parentId: string, listId: string, items: readonly string[]) => {
+        setError("");
+        for (const name of items) {
+            const result = await runAction(
+                () => actions.createTaskAction({ listId, name, parentId }),
+                setError
+            );
+            if (!result || result.error) {
+                if (result?.error) setError(result.error);
+                load(parentId);
+                return false;
+            }
+        }
+        load(parentId);
+        return true;
+    };
+
+    /**
      * Commit whatever has focus but has not been committed.
      *
      * Every field here either holds what is typed into it or saves when it loses
@@ -591,6 +617,20 @@ export function TaskPanel({
                                         // the panel closed on the same breath.
                                         onChange={(description) => hold({ description })}
                                         onBlur={(description) => void save({ description })}
+                                        // A list in a description is work written
+                                        // as prose. Selecting it and choosing this
+                                        // makes each line a subtask and takes the
+                                        // list out of the text - which is the one
+                                        // thing somebody was going to do by hand.
+                                        listAction={
+                                            context.canEdit
+                                                ? {
+                                                      label: "Move to subtasks",
+                                                      run: (items) =>
+                                                          toSubtasks(task.id, task.listId, items)
+                                                  }
+                                                : undefined
+                                        }
                                     />
                                 </section>
 
