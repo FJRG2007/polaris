@@ -35,6 +35,7 @@ import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
 import { ProfileActions } from "./profile-actions";
+import { MutualPanel } from "@/components/mutual-panel";
 import { FollowLists } from "./follow-lists";
 import { linkLabel } from "@polaris/core";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
@@ -110,6 +111,10 @@ export function ProfileCard({
 
                 {!own && signedIn ? (
                     <ProfileActions personId={profile.id} name={profile.name} standing={profile.standing} />
+                ) : null}
+
+                {profile.mutual ? (
+                    <MutualPanel friends={profile.mutual.friends} spaces={profile.mutual.spaces} />
                 ) : null}
 
                 {profile.follows ? (

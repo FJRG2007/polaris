@@ -52,6 +52,7 @@ import { Avatar } from "@/components/avatar";
 import { PRESENCE_WORDS } from "@polaris/core";
 import { NicknameDialog } from "./nickname-dialog";
 import type { ChatProfile } from "@/lib/chat/profiles";
+import { MutualPanel } from "@/components/mutual-panel";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usePresence } from "@/components/presence-store";
 import { ProfileBanner } from "@/components/profile-banner";
@@ -130,8 +131,15 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="truncate text-sm font-medium" title={name}>
+                    <p className="flex items-baseline justify-center gap-1.5 truncate text-sm font-medium" title={name}>
                         {name}
+                        {/* Beside the name, because that is what it is about -
+                            and only when they have said. */}
+                        {profile?.pronouns ? (
+                            <span className="text-xs font-normal text-muted-foreground">
+                                {profile.pronouns}
+                            </span>
+                        ) : null}
                     </p>
                     {loading && !profile ? (
                         <Skeleton className="h-3 w-24" />
@@ -158,6 +166,9 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                             {profile.fullName}
                         </p>
                     )}
+                    {profile?.headline ? (
+                        <p className="mt-1 break-words text-xs text-foreground/90">{profile.headline}</p>
+                    ) : null}
                 </div>
 
                 {/* Where they are and what they are showing, in that order and in
@@ -176,6 +187,20 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                         )}
                     </div>
                 )}
+
+                {/* What the two of them have in common, drawn from the same
+                    module the page draws it from: this panel is that profile in
+                    a column, and a second answer to the same question is how the
+                    two come to disagree. */}
+                {profile?.mutual ? (
+                    <div className="w-full text-left">
+                        <MutualPanel
+                            compact
+                            friends={profile.mutual.friends}
+                            spaces={profile.mutual.spaces}
+                        />
+                    </div>
+                ) : null}
 
                 {profile?.description && (
                     <div className="w-full text-left">

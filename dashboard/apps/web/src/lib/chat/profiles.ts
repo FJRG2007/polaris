@@ -33,6 +33,7 @@
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
+import { mutualsBetween } from "@/lib/mutuals";
 import { channelAccess, type ChatActor } from "./access";
 
 /** Somebody, as a profile panel draws them. */
@@ -47,6 +48,23 @@ export interface ChatProfile {
     readonly username: string;
     /** What they wrote about themselves. Empty when they have written nothing. */
     readonly description: string;
+    /** The one line under their name, empty when they have written none. */
+    readonly headline: string;
+    /** How they want to be referred to. Empty when they have not said, and then
+     *  nothing is drawn - it is a person who did not answer, not a blank field. */
+    readonly pronouns: string;
+    /**
+     * The friends and the spaces the two of them share.
+     *
+     * The same answer the profile page draws and from the same module, because
+     * this panel IS that profile drawn in a column. Neither half is a disclosure
+     * either side has not already made: a friend in common is somebody both are
+     * friends with, and a space in common is a room both are standing in.
+     */
+    readonly mutual: {
+        readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
+        readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
+    };
 }
 
 /**
@@ -73,7 +91,16 @@ export async function chatProfile(
     const [person, together, blocked, mayReadName] = await Promise.all([
         prisma.user.findFirst({
             where: { id: userId, ...VISIBLE_USER },
-            select: { id: true, name: true, firstName: true, lastName: true, username: true, description: true }
+            select: {
+                id: true,
+                name: true,
+                firstName: true,
+                lastName: true,
+                username: true,
+                description: true,
+                headline: true,
+                pronouns: true
+            }
         }),
         // Asked the same way about them, rather than by looking for a membership
         // row: a public channel in an "everybody here" space is reached without
@@ -88,12 +115,20 @@ export async function chatProfile(
     ]);
     if (!person || !together || blocked.has(person.id)) return null;
 
+    // Asked after the reach above rather than beside it: there is no point
+    // working out what two people have in common before it is settled that this
+    // one may be shown the other at all.
+    const mutual = await mutualsBetween(actor.id, person.id);
+
     return {
         name: person.name,
         fullName: mayReadName
             ? [person.firstName, person.lastName].filter(Boolean).join(" ").trim()
             : "",
         username: person.username ?? "",
-        description: person.description.trim()
+        description: person.description.trim(),
+        headline: person.headline?.trim() ?? "",
+        pronouns: person.pronouns?.trim() ?? "",
+        mutual
     };
 }

@@ -67,6 +67,16 @@ vi.mock("@/lib/blocks", () => ({
 // The rule for "is this person in this conversation", mocked at the same seam
 // the service reads it through - so what is asserted here is which question is
 // asked, not a second copy of how membership is worked out.
+// What the two of them have in common. Its own module and its own test; here it
+// is stubbed empty, so what this file asserts stays "who may be shown to whom"
+// rather than quietly also testing the intersection.
+vi.mock("@/lib/mutuals", () => ({
+    mutualsBetween: async () => ({
+        friends: { people: [], total: 0 },
+        spaces: { spaces: [], total: 0 }
+    })
+}));
+
 vi.mock("@/lib/chat/access", () => ({
     channelAccess: async (actor: { id: string }, channelId: string) =>
         channelId === "d1" && members.has(actor.id) ? { channelId, member: true } : null
