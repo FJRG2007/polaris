@@ -20,15 +20,15 @@ import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
 import { RelativeTime } from "@/components/relative-time";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
-import { describeAudience, levelStyle } from "@/components/notifications/notification-visuals";
+import { NotificationFace } from "@/components/notifications/notification-face";
+import { describeAudience } from "@/components/notifications/notification-visuals";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    cn
+    DropdownMenuTrigger
 } from "@polaris/ui";
 
 /** How many alerts the dropdown previews before sending the user to the page. */
@@ -92,7 +92,6 @@ export function NotificationBell() {
                 ) : (
                     <div className="max-h-80 overflow-auto">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
-                            const { Icon, color } = levelStyle(item.level, item.type);
                             const audience = describeAudience(item.audience, item.audienceLabel);
                             return (
                                 <div key={item.id} className="flex items-start">
@@ -108,7 +107,7 @@ export function NotificationBell() {
                                                     : "/account/notifications"
                                             }
                                         >
-                                            <Icon className={cn("mt-0.5 size-3.5 shrink-0", color)} />
+                                            <NotificationFace row={item} className="mt-0.5" />
                                             <span className="min-w-0 flex-1">
                                                 <span className="flex items-center gap-1.5">
                                                     {!item.read ? (

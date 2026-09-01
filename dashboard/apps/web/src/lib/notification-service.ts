@@ -52,6 +52,18 @@ export interface NotificationView {
     actionRequired: boolean;
     read: boolean;
     createdAt: string;
+    /**
+     * The person the alert is about, when it is about one.
+     *
+     * A notification that somebody added you is drawn with their face rather
+     * than with the grey circle every other alert wears - it is news about a
+     * person, and a column of identical outlines is a column nobody scans. The
+     * id is already recorded in the alert's own metadata (see the friends
+     * service); the name is resolved when the list is read rather than copied
+     * into the row, because a notification is not a place to keep a stale copy
+     * of somebody's name.
+     */
+    about: { id: string; name: string } | null;
 }
 
 const LEVELS: ReadonlySet<string> = new Set(["info", "success", "warning", "danger"]);
@@ -67,11 +79,12 @@ const ROW_FIELDS = {
     audience: true,
     audienceLabel: true,
     actionRequired: true,
+    metadata: true,
     readAt: true,
     createdAt: true
 } as const;
 
-function toView(row: {
+interface NotificationRow {
     id: string;
     type: string;
     title: string;
@@ -81,9 +94,14 @@ function toView(row: {
     audience: string;
     audienceLabel: string | null;
     actionRequired: boolean;
+    metadata: string | null;
     readAt: Date | null;
     createdAt: Date;
-}): NotificationView {
+}
+
+function toView(row: NotificationRow, names: ReadonlyMap<string, string>): NotificationView {
+    const personId = personIn(row.metadata);
+    const name = personId ? names.get(personId) : undefined;
     return {
         id: row.id,
         type: row.type,
@@ -95,8 +113,36 @@ function toView(row: {
         audienceLabel: row.audienceLabel,
         actionRequired: row.actionRequired,
         read: row.readAt !== null,
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        // Only when the account is still there: a face for somebody who has
+        // since been deleted would be a request for a picture that cannot exist.
+        about: personId && name !== undefined ? { id: personId, name } : null
     };
+}
+
+/** The person an alert is about, from its own metadata. Anything unparseable
+ *  reads as "about nobody" rather than failing a list. */
+function personIn(metadata: string | null): string | null {
+    if (!metadata) return null;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        const id = (parsed as { personId?: unknown } | null)?.personId;
+        return typeof id === "string" && id.length > 0 ? id : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Names for the people a page of alerts is about, in one query rather than one
+ *  per row. Empty when no row names anybody, which is most pages. */
+async function namesFor(rows: readonly NotificationRow[]): Promise<Map<string, string>> {
+    const ids = [...new Set(rows.map((row) => personIn(row.metadata)).filter((id): id is string => id !== null))];
+    if (ids.length === 0) return new Map();
+    const people = await prisma.user.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true }
+    });
+    return new Map(people.map((person) => [person.id, person.name]));
 }
 
 /** Write a notification for a user. Best-effort; never throws to its caller. */
@@ -134,7 +180,8 @@ export async function listNotifications(userId: string, limit = NOTIFICATION_FEE
         take: limit,
         select: ROW_FIELDS
     });
-    return rows.map(toView);
+    const names = await namesFor(rows);
+    return rows.map((row) => toView(row, names));
 }
 
 /** How many rows one page of the history holds. */
@@ -168,8 +215,9 @@ export async function listNotificationHistory(
         select: ROW_FIELDS
     });
     const page = rows.slice(0, NOTIFICATION_PAGE_SIZE);
+    const names = await namesFor(page);
     return {
-        items: page.map(toView),
+        items: page.map((row) => toView(row, names)),
         cursor: rows.length > NOTIFICATION_PAGE_SIZE ? (page.at(-1)?.createdAt.toISOString() ?? null) : null
     };
 }
@@ -248,6 +296,24 @@ export async function markNotificationsReadByType(types: readonly string[]): Pro
         // was taken is the alert nobody can clear because nothing is wrong.
         data: { readAt: new Date(), actionRequired: false }
     });
+}
+
+/** Mark a chosen set read. Scoped to the owner, so ids that arrive from a
+ *  browser and belong to somebody else are simply not matched. */
+export async function markNotificationsRead(userId: string, ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const done = await prisma.notification.updateMany({
+        where: { id: { in: [...ids] }, userId, readAt: null },
+        data: { readAt: new Date() }
+    });
+    return done.count;
+}
+
+/** Delete a chosen set (scoped to the owner). */
+export async function deleteNotifications(userId: string, ids: readonly string[]): Promise<number> {
+    if (ids.length === 0) return 0;
+    const gone = await prisma.notification.deleteMany({ where: { id: { in: [...ids] }, userId } });
+    return gone.count;
 }
 
 /** Delete one notification (scoped to the owner). */
