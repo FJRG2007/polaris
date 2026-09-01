@@ -256,6 +256,13 @@ Agents (coding sessions):
       installs into that home's npm prefix, so the tool is already there for the
       first session, and keeps a shell open after the login exits instead of
       closing the one window somebody was there to read
+- [x] A tool's own first-run wizard - Claude Code's colour-scheme and
+      login-method screens on a machine it has never run on - answered before a
+      session ever reaches it: the catalogue names the file and the key its
+      onboarding writes, filled in only where the tool has not answered that
+      question itself yet, and only into a home Polaris owns. The same answers
+      run ahead of a sign-in container too, since it prepares the same
+      persistent home
 - [x] What a session is doing is read from its own lifecycle hooks where the
       tool supports them (written into the worktree rather than the machine's
       home directory), and from its terminal output otherwise; steering it is a
@@ -284,7 +291,11 @@ Agents (coding sessions):
       a login that already works
 - [x] Sessions list sorted by what needs a person, a session page with the
       transcript, the activity and the prompt box, and a terminal that attaches
-      to the agent's own tmux rather than opening a shell beside it
+      to the agent's own tmux rather than opening a shell beside it (fixed: an
+      exec inherits the container's environment, which carries no TERM on the
+      Node image, so tmux refused and closed the socket; the attach now
+      supplies one only when none is already set, and falls back to a shell
+      with a readable sentence instead of a closed socket)
 - [x] Polaris answers MCP at `/api/mcp`: stateless JSON-RPC 2.0 with tools for
       Tasks and for sessions, authorized by an API key or by a session's own
       reporting token, so an agent Polaris started has the tools from its first
