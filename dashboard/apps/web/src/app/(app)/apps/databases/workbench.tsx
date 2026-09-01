@@ -13,28 +13,54 @@
  * million rows in a browser tab - and a value that is not a scalar is drawn as
  * the JSON it is rather than as `[object Object]`.
  *
- * Nothing is written from here yet: the statement box is how a change is made,
- * and a connection has to have read-only turned off before the engine will take
- * one. An editable grid is the next thing this wants, and it is deliberately not
- * the first: a cell that saves as you leave it is the one feature of a database
- * client that can quietly destroy somebody's afternoon.
+ * The grid edits now, and the care that went into it is the point rather than the
+ * feature: a cell that saves as you leave it is the one thing in a database
+ * client that can quietly destroy somebody's afternoon. So an edit is a
+ * double-click and then a deliberate commit, it only exists on a table with a
+ * primary key, it is aimed by that key and by nothing else, and a read-only
+ * connection does not offer it at all. Everything about which statement it
+ * becomes is `prepareCellEdit`, on the server, and none of it is decided here.
+ *
+ * Rows select the way rows select everywhere else in Polaris - a click, a
+ * Ctrl-click, a Shift-range - and the right-click menu is the same component the
+ * file browser uses, so what somebody has learnt in Drive works here.
  */
 
 import Fuse from "fuse.js";
 import * as actions from "./actions";
 import { StatsPanel } from "./stats-panel";
+import { CodeSurface } from "@/components/code-surface";
 import type { KeyValueView } from "@/lib/data/browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Card, CardBody, Input, SegmentedControl, Select, Skeleton, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Input,
+    MenuShortcut,
+    SegmentedControl,
+    Select,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
 import {
+    Check,
     ChevronLeft,
     ChevronRight,
+    Copy,
     Loader2,
+    Pencil,
     Play,
     RefreshCw,
     Search,
-    Table2
+    Table2,
+    X
 } from "lucide-react";
 
 /** How many rows a page holds. The server clamps it too; this is what is asked
@@ -233,6 +259,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                             namespace={namespace}
                             relation={relation}
                             shape={shape}
+                            readOnly={readOnly}
                         />
                     ) : (
                         <Card>
@@ -249,17 +276,124 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
     );
 }
 
+/** The selection as JSON, which is what somebody pasting into an editor wants. */
+function rowsAsJson(rows: readonly Record<string, unknown>[]): string {
+    if (rows.length === 0) return "";
+    return JSON.stringify(rows.length === 1 ? rows[0] : rows, null, 2);
+}
+
+/**
+ * The selection as tab-separated text, with a header row.
+ *
+ * What a spreadsheet reads when it is pasted into, which is the other half of
+ * why anybody copies rows out of a database at all.
+ */
+function rowsAsText(
+    rows: readonly Record<string, unknown>[],
+    columns: readonly DataColumn[]
+): string {
+    if (rows.length === 0) return "";
+    const header = columns.map((column) => column.name).join("\t");
+    const body = rows.map((row) => columns.map((column) => cellText(row[column.name])).join("\t"));
+    return [header, ...body].join("\n");
+}
+
+/**
+ * One cell, open for editing.
+ *
+ * Enter commits and Escape abandons, which is what every grid does - and the
+ * commit is deliberate rather than automatic. A cell that saved on blur would
+ * write to the database because somebody clicked somewhere else, and that is the
+ * single worst thing a database client can do.
+ *
+ * Leaving it also abandons, for the same reason: the safe reading of "I clicked
+ * away" is that the edit was not meant.
+ */
+function CellEditor({
+    value,
+    saving,
+    onChange,
+    onCommit,
+    onCancel
+}: {
+    value: string;
+    saving: boolean;
+    onChange: (next: string) => void;
+    onCommit: () => void;
+    onCancel: () => void;
+}) {
+    return (
+        <span className="flex items-center gap-1">
+            <input
+                autoFocus
+                value={value}
+                disabled={saving}
+                spellCheck={false}
+                onChange={(event) => onChange(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onDoubleClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                        event.preventDefault();
+                        onCommit();
+                    }
+                    if (event.key === "Escape") {
+                        event.preventDefault();
+                        onCancel();
+                    }
+                }}
+                onBlur={onCancel}
+                className="min-w-0 flex-1 rounded border border-border-strong bg-background px-1 py-0.5 font-mono text-xs outline-none"
+                aria-label="New value"
+            />
+            {/* Pressed with the pointer rather than the keyboard: the field's own
+                blur would otherwise abandon the edit before the button was
+                reached, so both act on pointer-down. */}
+            <button
+                type="button"
+                aria-label="Save this value"
+                title="Save"
+                disabled={saving}
+                onMouseDown={(event) => {
+                    event.preventDefault();
+                    onCommit();
+                }}
+                className="text-success shrink-0 rounded p-0.5 hover:bg-muted"
+            >
+                {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+            </button>
+            <button
+                type="button"
+                aria-label="Leave it as it was"
+                title="Cancel"
+                onMouseDown={(event) => {
+                    event.preventDefault();
+                    onCancel();
+                }}
+                className="text-muted-foreground shrink-0 rounded p-0.5 hover:bg-muted"
+            >
+                <X className="size-3.5" />
+            </button>
+        </span>
+    );
+}
+
 /** A page of rows, with the controls that move through them. */
 function RowsPanel({
     connectionId,
     namespace,
     relation,
-    shape
+    shape,
+    readOnly
 }: {
     connectionId: string;
     namespace: string | null;
     relation: string;
     shape: string;
+    /** Whether the connection refuses writes. Editing is not offered at all on
+     *  one that does - a cell that opens and then fails on save is worse than a
+     *  cell that never opened. */
+    readOnly: boolean;
 }) {
     const [page, setPage] = useState<DataPage | null>(null);
     const [offset, setOffset] = useState(0);
@@ -271,6 +405,16 @@ function RowsPanel({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [opened, setOpened] = useState<KeyValueView | null>(null);
+    /** Which rows are picked out, by their index on this page. A page is the
+     *  unit here: an index means nothing once the offset moves, so the set is
+     *  emptied whenever the rows underneath change. */
+    const [picked, setPicked] = useState<ReadonlySet<number>>(new Set());
+    /** Where a Shift-range reaches back to: the last row clicked on its own. */
+    const [anchor, setAnchor] = useState<number | null>(null);
+    /** The cell being edited, and what is currently typed into it. */
+    const [editing, setEditing] = useState<{ row: number; column: string } | null>(null);
+    const [draft, setDraft] = useState("");
+    const [saving, setSaving] = useState(false);
 
     const read = useCallback(async () => {
         setBusy(true);
@@ -309,8 +453,126 @@ function RowsPanel({
         setOpened(null);
     }, [relation, namespace]);
 
+    // A selection is a set of positions on the page in front of somebody. The
+    // moment the rows underneath change - another page, another sort, another
+    // filter - those positions point at different rows, so the set goes rather
+    // than quietly coming to mean something else.
+    useEffect(() => {
+        setPicked(new Set());
+        setAnchor(null);
+        setEditing(null);
+    }, [page]);
+
     const columns = page?.columns ?? [];
     const cursorPaged = shape === "keyvalue";
+    /** The columns that identify a row. No primary key means no way to aim an
+     *  edit at one row, which is what decides whether editing exists at all. */
+    const keyColumns = useMemo(() => columns.filter((column) => column.primaryKey), [columns]);
+    const editable = !readOnly && !cursorPaged && keyColumns.length > 0;
+
+    /** What a click on a row means, read the way every list in Polaris reads it. */
+    const pick = (index: number, event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+        if (event.shiftKey && anchor !== null) {
+            const [from, to] = anchor <= index ? [anchor, index] : [index, anchor];
+            const range = new Set(picked);
+            for (let at = from; at <= to; at += 1) range.add(at);
+            setPicked(range);
+            return;
+        }
+        if (event.metaKey || event.ctrlKey) {
+            const next = new Set(picked);
+            if (next.has(index)) next.delete(index);
+            else next.add(index);
+            setPicked(next);
+            setAnchor(index);
+            return;
+        }
+        setPicked(new Set([index]));
+        setAnchor(index);
+    };
+
+    /**
+     * Right-clicking a row that is not in the selection takes it over.
+     *
+     * The same rule the file browser follows, and the reason it exists is the
+     * accident it prevents: right-clicking one row while four others are
+     * selected, and having the menu act on the four.
+     */
+    const adoptForMenu = (index: number) => {
+        if (picked.has(index)) return;
+        setPicked(new Set([index]));
+        setAnchor(index);
+    };
+
+    /** The rows behind the current selection, in the order they are drawn. */
+    const pickedRows = useMemo(
+        () => (page?.rows ?? []).filter((_row, index) => picked.has(index)),
+        [page, picked]
+    );
+
+    const copy = (text: string) => {
+        void navigator.clipboard?.writeText(text).catch(() => undefined);
+    };
+
+    /** Start editing a cell, with what is in it already typed. */
+    const beginEdit = (index: number, column: DataColumn) => {
+        if (!editable || column.primaryKey) return;
+        const value = (page?.rows[index] ?? {})[column.name];
+        setEditing({ row: index, column: column.name });
+        setDraft(value === null || value === undefined ? "" : cellText(value));
+    };
+
+    /**
+     * Commit the cell, then read the page again.
+     *
+     * Re-read rather than patched in place: the engine may have stored something
+     * other than what was typed - a trimmed string, a rounded number, a trigger's
+     * doing - and a grid that showed the typed value would be lying about what is
+     * in the database until the next refresh.
+     */
+    const commitEdit = async () => {
+        const target = editing;
+        if (!target || !page) return;
+        const row = page.rows[target.row];
+        const column = columns.find((entry) => entry.name === target.column);
+        if (!row || !column) {
+            setEditing(null);
+            return;
+        }
+        const before = row[target.column];
+        const wanted = draft === "" && column.nullable ? null : draft;
+        // Nothing typed is nothing to send. A no-op UPDATE still writes a row
+        // version and still fires triggers.
+        if (wanted === (before === null || before === undefined ? null : cellText(before))) {
+            setEditing(null);
+            return;
+        }
+
+        setSaving(true);
+        setError("");
+        const key: Record<string, unknown> = {};
+        for (const entry of keyColumns) key[entry.name] = row[entry.name];
+        const result = await actions.updateCellAction(connectionId, {
+            namespace,
+            relation,
+            column: target.column,
+            value: wanted,
+            key
+        });
+        setSaving(false);
+        setEditing(null);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        if (result.changed === 0) {
+            // The row was there when the page was drawn and is not now, or its
+            // key has moved. Said rather than swallowed: a silent no-op reads as
+            // a save that worked.
+            setError("Nothing was changed - that row is no longer there.");
+        }
+        await read();
+    };
 
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -337,11 +599,13 @@ function RowsPanel({
                     {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                    {page
-                        ? cursorPaged
-                            ? `${page.rows.length} keys${page.total === null ? "" : ` of about ${page.total}`}`
-                            : `rows ${page.rows.length === 0 ? 0 : offset + 1}-${offset + page.rows.length}${page.total === null ? "" : ` of ${page.total}`}`
-                        : ""}
+                    {picked.size > 0
+                        ? `${picked.size} selected`
+                        : page
+                          ? cursorPaged
+                              ? `${page.rows.length} keys${page.total === null ? "" : ` of about ${page.total}`}`
+                              : `rows ${page.rows.length === 0 ? 0 : offset + 1}-${offset + page.rows.length}${page.total === null ? "" : ` of ${page.total}`}`
+                          : ""}
                 </span>
                 <div className="flex items-center gap-1">
                     <Button
@@ -422,39 +686,101 @@ function RowsPanel({
                                 </tr>
                             ) : (
                                 page.rows.map((row, index) => (
-                                    <tr
-                                        key={index}
-                                        className={cn(
-                                            "border-t border-border",
-                                            cursorPaged && "cursor-pointer hover:bg-card-hover"
-                                        )}
-                                        onClick={
-                                            cursorPaged
-                                                ? () => {
-                                                      void actions
-                                                          .redisValueAction(
-                                                              connectionId,
-                                                              namespace,
-                                                              String(row.key)
-                                                          )
-                                                          .then((result) => {
-                                                              if (result.error) setError(result.error);
-                                                              else setOpened(result.value ?? null);
-                                                          });
-                                                  }
-                                                : undefined
-                                        }
-                                    >
-                                        {columns.map((column) => (
-                                            <td
-                                                key={column.name}
-                                                className="max-w-xs truncate px-3 py-1.5 align-top font-mono text-xs"
-                                                title={cellText(row[column.name])}
+                                    <ContextMenu key={index}>
+                                        <ContextMenuTrigger asChild>
+                                            <tr
+                                                className={cn(
+                                                    "border-t border-border",
+                                                    "cursor-default hover:bg-card-hover",
+                                                    picked.has(index) && "bg-primary/10 hover:bg-primary/15"
+                                                )}
+                                                onContextMenu={() => adoptForMenu(index)}
+                                                onClick={(event) => {
+                                                    if (cursorPaged) {
+                                                        void actions
+                                                            .redisValueAction(
+                                                                connectionId,
+                                                                namespace,
+                                                                String(row.key)
+                                                            )
+                                                            .then((result) => {
+                                                                if (result.error)
+                                                                    setError(result.error);
+                                                                else setOpened(result.value ?? null);
+                                                            });
+                                                        return;
+                                                    }
+                                                    pick(index, event);
+                                                }}
                                             >
-                                                {cell(row[column.name])}
-                                            </td>
-                                        ))}
-                                    </tr>
+                                                {columns.map((column) => {
+                                                    const open =
+                                                        editing?.row === index &&
+                                                        editing.column === column.name;
+                                                    return (
+                                                        <td
+                                                            key={column.name}
+                                                            className={cn(
+                                                                "max-w-xs px-3 py-1.5 align-top font-mono text-xs",
+                                                                !open && "truncate"
+                                                            )}
+                                                            title={open ? undefined : cellText(row[column.name])}
+                                                            onDoubleClick={() => beginEdit(index, column)}
+                                                        >
+                                                            {open ? (
+                                                                <CellEditor
+                                                                    value={draft}
+                                                                    saving={saving}
+                                                                    onChange={setDraft}
+                                                                    onCommit={() => void commitEdit()}
+                                                                    onCancel={() => setEditing(null)}
+                                                                />
+                                                            ) : (
+                                                                cell(row[column.name])
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        </ContextMenuTrigger>
+                                        <ContextMenuContent className="w-56">
+                                            <ContextMenuItem
+                                                onSelect={() => copy(rowsAsJson(pickedRows))}
+                                            >
+                                                <Copy className="size-3.5" />
+                                                {picked.size > 1
+                                                    ? `Copy ${picked.size} rows as JSON`
+                                                    : "Copy row as JSON"}
+                                            </ContextMenuItem>
+                                            <ContextMenuItem
+                                                onSelect={() => copy(rowsAsText(pickedRows, columns))}
+                                            >
+                                                <Copy className="size-3.5" />
+                                                Copy as text
+                                            </ContextMenuItem>
+                                            {editable ? (
+                                                <>
+                                                    <ContextMenuSeparator />
+                                                    {/* Named, because "edit" on a
+                                                        row is ambiguous and this
+                                                        only ever changes one
+                                                        cell. */}
+                                                    <ContextMenuItem
+                                                        onSelect={() => {
+                                                            const first = columns.find(
+                                                                (column) => !column.primaryKey
+                                                            );
+                                                            if (first) beginEdit(index, first);
+                                                        }}
+                                                    >
+                                                        <Pencil className="size-3.5" />
+                                                        Edit a value
+                                                        <MenuShortcut>Double-click</MenuShortcut>
+                                                    </ContextMenuItem>
+                                                </>
+                                            ) : null}
+                                        </ContextMenuContent>
+                                    </ContextMenu>
                                 ))
                             )}
                         </tbody>
@@ -575,10 +901,18 @@ function QueryPanel({ connectionId, shape }: { connectionId: string; shape: stri
 
     return (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <textarea
-                value={statement}
-                spellCheck={false}
-                onChange={(event) => setStatement(event.target.value)}
+            {/* Painted while it is typed, through the same surface the code
+                viewer and the snippet editor use - a transparent textarea over
+                the highlighted text, so the caret lands where the character is.
+                A statement box with no colour is the one part of a database
+                client where an unclosed quote is invisible until the engine
+                refuses the whole thing.
+
+                Only SQL is painted. A key-value store's commands are not SQL and
+                highlighting them as if they were would colour the wrong words,
+                which is worse than colouring none. */}
+            <div
+                className="h-32 shrink-0 overflow-hidden rounded-lg border border-border bg-surface focus-within:border-border-strong"
                 onKeyDown={(event) => {
                     // The shortcut every client has: run it without reaching for
                     // the mouse, and a newline still just makes a newline.
@@ -587,9 +921,15 @@ function QueryPanel({ connectionId, shape }: { connectionId: string; shape: stri
                         void run();
                     }
                 }}
-                placeholder={placeholderFor(shape)}
-                className="h-32 w-full resize-y rounded-lg border border-border bg-surface p-3 font-mono text-xs outline-none focus-visible:border-border-strong"
-            />
+            >
+                <CodeSurface
+                    code={statement}
+                    language={shape === "sql" ? "sql" : null}
+                    onChange={setStatement}
+                    ariaLabel={placeholderFor(shape)}
+                    className="h-full"
+                />
+            </div>
             <div className="flex items-center gap-2">
                 <Button onClick={() => void run()} disabled={!statement.trim() || running}>
                     {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}

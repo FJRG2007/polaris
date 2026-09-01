@@ -13,6 +13,7 @@
  */
 
 import * as data from "../driver";
+import { prepareCellEdit } from "../cell-edit";
 import * as mysql from "mysql2/promise";
 import {
     quoteQualified,
@@ -206,6 +207,26 @@ export class MysqlDriver implements data.DataDriver {
             });
         }
         return results;
+    }
+
+    /**
+     * Change one cell, aimed by primary key.
+     *
+     * MySQL's placeholders are positional and unnumbered, which is the only thing
+     * this differs from Postgres on; everything else about which statement it
+     * becomes is `prepareCellEdit`.
+     */
+    async updateCell(edit: data.CellEdit): Promise<data.CellEditResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("changing a value");
+        const columns = await this.columns(edit.namespace, edit.relation);
+        const prepared = prepareCellEdit(edit, columns, {
+            quote: quoteBacktickIdent,
+            placeholder: () => "?",
+            target: quoteQualified([edit.namespace, edit.relation], quoteBacktickIdent)
+        });
+        const connection = await this.open();
+        const [result] = await connection.query(prepared.text, prepared.params);
+        return { changed: (result as { affectedRows?: number }).affectedRows ?? 0 };
     }
 
     async close(): Promise<void> {

@@ -131,6 +131,39 @@ export interface QueryResult {
     readonly note?: string;
 }
 
+/**
+ * One cell, changed in place.
+ *
+ * The row is identified by its primary key and by nothing else, which is the
+ * whole safety of this: a WHERE built from whatever happened to be on screen
+ * would match every row that looks the same, and "update the row I was pointing
+ * at" would quietly become "update the four rows with that email address". A
+ * table with no primary key is not editable here, and the grid says so rather
+ * than offering an edit it cannot aim.
+ *
+ * The value is a parameter, never text spliced into a statement. Column and
+ * table names are checked against the catalogue the driver just read and then
+ * quoted, which is the same rule every other read here follows.
+ */
+export interface CellEdit {
+    readonly namespace: string | null;
+    readonly relation: string;
+    /** The column being written, by name. */
+    readonly column: string;
+    /** What to put in it. Null is SQL NULL; everything else goes in as a bound
+     *  parameter and the engine decides how to read it against the column type. */
+    readonly value: string | null;
+    /** The primary key of the row, column by column. Must name every key column
+     *  the table has, or the edit is refused before it is sent. */
+    readonly key: Readonly<Record<string, unknown>>;
+}
+
+/** What an edit did. `changed` is what the engine says it touched, and anything
+ *  other than one row is reported rather than assumed. */
+export interface CellEditResult {
+    readonly changed: number;
+}
+
 export interface DataDriver {
     readonly shape: DataShape;
     /** The engine's own version string, which doubles as the connection test. */
@@ -142,6 +175,15 @@ export interface DataDriver {
     /** Whatever somebody typed. Refused in its entirety when the connection is
      *  read-only and any of it writes. */
     run(statement: string): Promise<QueryResult[]>;
+    /**
+     * Change one cell of one row.
+     *
+     * Optional, and absent is the honest answer for an engine where "the row with
+     * this primary key" is not a thing: a Redis key is a value rather than a row,
+     * and a Mongo document is edited as a document. Those keep the panel that
+     * already opens their value.
+     */
+    updateCell?(edit: CellEdit): Promise<CellEditResult>;
     close(): Promise<void>;
 }
 

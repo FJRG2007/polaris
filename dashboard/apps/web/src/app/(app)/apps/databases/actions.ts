@@ -134,6 +134,38 @@ export async function runAction(
     return result.error ? { error: result.error } : { results: result.value };
 }
 
+/**
+ * Change one cell of one row.
+ *
+ * The only write this screen makes that is not a statement somebody typed, and
+ * every guard it has is on the other side of this call: the connection's
+ * read-only flag, the relation having to be one the connection holds, and the
+ * edit having to name a whole primary key. Nothing is decided here beyond who is
+ * asking.
+ */
+export async function updateCellAction(
+    id: string,
+    edit: {
+        namespace: string | null;
+        relation: string;
+        column: string;
+        value: string | null;
+        key: Record<string, unknown>;
+    }
+): Promise<{ changed?: number; error?: string }> {
+    const me = await actor();
+    const result = await guard(() =>
+        browser.updateCell(me.id, String(id), {
+            namespace: edit.namespace,
+            relation: String(edit.relation),
+            column: String(edit.column),
+            value: edit.value === null ? null : String(edit.value),
+            key: edit.key
+        })
+    );
+    return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
+}
+
 /** What one Redis key holds. Its own action because it is the one read that is
  *  about a single row rather than a page of them. */
 export async function redisValueAction(

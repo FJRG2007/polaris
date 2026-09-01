@@ -94,6 +94,38 @@ export async function rows(
     });
 }
 
+/**
+ * Change one cell of one row.
+ *
+ * The same gate the row read goes through, and for the same reason: the relation
+ * has to be one this connection actually holds, because its name goes into a
+ * statement in a position no parameter can occupy. Everything after that is the
+ * driver's, and the rules that keep the edit aimed at one row are
+ * `prepareCellEdit`.
+ *
+ * An engine with no `updateCell` is refused with a sentence rather than a crash.
+ * A Redis key is a value and a Mongo document is a document; neither has a row
+ * with a primary key to aim at, and pretending otherwise here would be worse
+ * than saying so.
+ */
+export async function updateCell(
+    userId: string,
+    connectionId: string,
+    edit: data.CellEdit
+): Promise<data.CellEditResult> {
+    const address = await addressOf(userId, connectionId);
+    return withDriver(address, async (driver) => {
+        if (!driver.updateCell) {
+            throw new data.DataRequestError("Values in this kind of database are not edited from the grid.");
+        }
+        const known = await driver.relations(edit.namespace);
+        if (!known.some((entry) => entry.name === edit.relation)) {
+            throw new data.DataRequestError("There is nothing here by that name.");
+        }
+        return driver.updateCell(edit);
+    });
+}
+
 /** Whatever somebody typed into the statement box. */
 export async function run(
     userId: string,

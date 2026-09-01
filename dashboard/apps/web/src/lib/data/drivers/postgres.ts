@@ -15,6 +15,7 @@
 
 import { Client } from "pg";
 import * as data from "../driver";
+import { prepareCellEdit } from "../cell-edit";
 import {
     quoteQualified,
     quoteSqlIdent,
@@ -213,6 +214,27 @@ export class PostgresDriver implements data.DataDriver {
             });
         }
         return results;
+    }
+
+    /**
+     * Change one cell, aimed by primary key.
+     *
+     * Refused outright on a read-only connection - the session is already set
+     * READ ONLY, so the engine would refuse it too, but a sentence somebody can
+     * act on is better than a transaction error. Everything else about which
+     * statement this becomes is `prepareCellEdit`, shared with MySQL.
+     */
+    async updateCell(edit: data.CellEdit): Promise<data.CellEditResult> {
+        if (this.address.readOnly) throw new data.ReadOnlyError("changing a value");
+        const columns = await this.columns(edit.namespace, edit.relation);
+        const prepared = prepareCellEdit(edit, columns, {
+            quote: quoteSqlIdent,
+            placeholder: (index) => `$${index}`,
+            target: quoteQualified([edit.namespace ?? "public", edit.relation], quoteSqlIdent)
+        });
+        const client = await this.open();
+        const result = await client.query(prepared.text, prepared.params);
+        return { changed: result.rowCount ?? 0 };
     }
 
     async close(): Promise<void> {
