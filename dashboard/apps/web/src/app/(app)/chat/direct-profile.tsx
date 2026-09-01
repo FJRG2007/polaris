@@ -42,6 +42,7 @@
  * the profile itself, once, and nothing after that.
  */
 
+import Link from "next/link";
 import { AtSign, MoreHorizontal, X } from "lucide-react";
 import { profileAction } from "./actions";
 import { useChat } from "./chat-context";
@@ -136,10 +137,17 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                         <Skeleton className="h-3 w-24" />
                     ) : (
                         profile?.username && (
-                            <p className="flex items-center gap-0.5 truncate text-xs text-muted-foreground">
+                            // The handle is the address of their own page, so it
+                            // is the way to it: pressing a person's @name and
+                            // being taken to them is what it does everywhere
+                            // else, and this panel is where it is already drawn.
+                            <Link
+                                href={`/u/${profile.username}`}
+                                className="flex items-center gap-0.5 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
+                            >
                                 <AtSign className="size-3 shrink-0" />
                                 {profile.username}
-                            </p>
+                            </Link>
                         )
                     )}
                     {/* Their name, when it is not already what they are called

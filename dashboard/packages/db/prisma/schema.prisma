@@ -56,8 +56,16 @@ model User {
     usernameChangedAt DateTime?
     emailVerified Boolean  @default(false)
     image         String?
-    // Free-text organisation the account belongs to; shown on the profile only.
+    // Free-text organisation the account belongs to; shown on the profile only,
+    // and never verified: Polaris knows nothing about it beyond that somebody
+    // typed it. The organizations on this Polaris that an account belongs to are
+    // the verified half of the same answer - see `profileOrgIds`.
     company       String?
+    // Which of this account's organizations it shows on its profile, as a
+    // stringified JSON array of ids. Empty (and a null column) is none, which is
+    // the default on purpose: being on a roster is a fact about an organization,
+    // not a statement somebody made about themselves.
+    profileOrgIds String?
     // What this account says about itself, in its own words. Shown wherever a
     // profile is opened - the panel beside a direct message, the card on a name -
     // and nowhere it would be mistaken for something Polaris asserts.
@@ -7096,6 +7104,11 @@ model UserPrivacy {
     fullName     String   @default("nobody")
     email        String   @default("nobody")
     phone        String   @default("nobody")
+    // Where somebody works: the line they typed and the organizations here they
+    // marked as theirs. Open by default, unlike the three above it, because it is
+    // the one thing on this list that exists in order to be seen - and which
+    // organizations it covers is a separate choice nobody has made yet.
+    companies    String   @default("everyone")
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

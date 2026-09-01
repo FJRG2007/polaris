@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setSetting } from "@/lib/setting-store";
+import { setProfilesPublic } from "@/lib/profile-service";
 import { setSharingPolicy } from "@/lib/sharing-policy";
 import {
     accessRulesSchema,
@@ -203,6 +204,29 @@ export async function setUsernameCooldownAction(days: unknown): Promise<{ error?
         targetType: "setting",
         targetId: USERNAME_COOLDOWN_KEY,
         metadata: { days: parsed.data }
+    });
+    revalidatePath("/admin/users");
+    return {};
+}
+
+/**
+ * Whether somebody's page may be read without signing in.
+ *
+ * Audited, because it is the one setting on this screen that changes what leaves
+ * the deployment: turning it on makes an address readable by anybody who has it,
+ * and whoever asks later deserves to be able to see when that was decided and by
+ * whom.
+ */
+export async function setPublicProfilesAction(allowed: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const on = allowed === true;
+    await setProfilesPublic(on);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.public-profiles",
+        targetType: "setting",
+        targetId: "profiles.public",
+        metadata: { enabled: on }
     });
     revalidatePath("/admin/users");
     return {};

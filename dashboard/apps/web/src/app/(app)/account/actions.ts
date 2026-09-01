@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { emailField, USERNAME_COOLDOWN_KEY, usernameCooldownDays } from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -23,6 +24,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { getSetting } from "@/lib/setting-store";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { setProfileOrganizations } from "@/lib/profile-service";
 import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
     addUserEmail,
@@ -102,6 +104,40 @@ export async function updateProfileAction(input: {
     );
     if (!result.error) revalidatePath("/account");
     return result;
+}
+
+/**
+ * Where somebody works, on their own profile: the line they typed and the
+ * organizations here they have marked as theirs.
+ *
+ * Its own action rather than another field on the profile form, because the two
+ * halves are two different claims - one Polaris can vouch for, one it cannot -
+ * and they are edited on their own card for the same reason.
+ *
+ * The ids arrive from a browser like any other list, so they are narrowed to
+ * rosters this account is actually on before anything is stored: marking an
+ * organization you are not in would put a tick beside a company you have nothing
+ * to do with.
+ */
+const companiesSchema = z.object({
+    company: core.companyField,
+    organizationIds: z.array(z.string().uuid()).max(50)
+});
+
+export async function saveCompaniesAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = companiesSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you typed" };
+
+    const result = await updateUserProfile(
+        user.id,
+        { company: parsed.data.company },
+        { cooldownDays: usernameCooldownDays(await getSetting(USERNAME_COOLDOWN_KEY)) }
+    );
+    if (result.error) return result;
+    await setProfileOrganizations(user.id, parsed.data.organizationIds);
+    revalidatePath("/account");
+    return {};
 }
 
 export async function addEmailAction(input: unknown): Promise<{ error?: string }> {

@@ -38,6 +38,7 @@ const AUDIENCE_COLUMNS = {
     fullName: true,
     email: true,
     phone: true,
+    companies: true,
     lastSeen: true,
     forwarding: true,
     discoverable: true,

@@ -8,6 +8,8 @@ import { listRoleOptions } from "@/lib/role-service";
 import { getSetting } from "@/lib/setting-store";
 import { SharingPolicyForm } from "./sharing-policy-form";
 import { UsernameCooldownForm } from "./username-cooldown-form";
+import { PublicProfilesForm } from "./public-profiles-form";
+import { profilesArePublic } from "@/lib/profile-service";
 import { usernameCooldownDays, USERNAME_COOLDOWN_KEY } from "@polaris/core";
 import { listRecoveryRequests } from "@/lib/account-recovery-service";
 import { listImposableGroups, listUserDirectory } from "@/lib/user-admin-service";
@@ -24,7 +26,8 @@ export default async function UsersAdminPage({
 }) {
     const { user } = await searchParams;
     const admin = await requireAdmin();
-    const [users, invites, recoveries, groups, mail, roles, sharing, cooldown] = await Promise.all([
+    const [users, invites, recoveries, groups, mail, roles, sharing, cooldown, publicProfiles] =
+        await Promise.all([
         listUserDirectory(),
         listInvites(),
         listRecoveryRequests(),
@@ -34,7 +37,8 @@ export default async function UsersAdminPage({
         // pickers offer whatever this instance actually defines.
         listRoleOptions(),
         sharingPolicy(),
-        getSetting(USERNAME_COOLDOWN_KEY)
+        getSetting(USERNAME_COOLDOWN_KEY),
+        profilesArePublic()
     ]);
 
     return (
@@ -58,6 +62,7 @@ export default async function UsersAdminPage({
                 roles={roles.map((role) => ({ value: role.name, label: role.name }))}
             />
             <UsernameCooldownForm days={usernameCooldownDays(cooldown)} />
+            <PublicProfilesForm enabled={publicProfiles} />
         </>
     );
 }

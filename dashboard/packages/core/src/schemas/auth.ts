@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { isReservedUsername, RESERVED_USERNAME_MESSAGE } from "./usernames.js";
 import { normalizePersonName } from "../names.js";
 import { pendingGrantSchema } from "./sharing.js";
 import { accessRulesSchema } from "./account-security.js";
@@ -62,7 +63,11 @@ export const usernameField = z
     .toLowerCase()
     .min(3, "At least 3 characters")
     .max(30, "At most 30 characters")
-    .regex(/^[a-z0-9_-]+$/, "Use letters, numbers, - or _");
+    .regex(/^[a-z0-9_-]+$/, "Use letters, numbers, - or _")
+    // A username addresses a public profile and is printed beside everything
+    // somebody writes, which is what makes a handful of them dangerous rather
+    // than confusing - see `usernames.ts`.
+    .refine((value) => !isReservedUsername(value), RESERVED_USERNAME_MESSAGE);
 export const passwordField = z
     .string()
     .min(10, "Use at least 10 characters")

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Profile self-service view: who the account is (name, username, company, the
+ * Profile self-service view: who the account is (name, username, the
  * address it signs in with and the number it can be reached on), and the
  * addresses it holds. Credentials live under Account > Security. Every change is
  * re-authorized server-side; this view only reflects the result.
@@ -17,7 +17,7 @@ import { updateProfileAction } from "./actions";
 import { Card, CardBody, Button, Input, Textarea } from "@polaris/ui";
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { UserEmailView, UserPhoneView } from "@polaris/auth";
-import { MAX_COMPANY_LENGTH, MAX_DESCRIPTION, normalizePersonName } from "@polaris/core";
+import { MAX_DESCRIPTION, normalizePersonName } from "@polaris/core";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -28,7 +28,6 @@ interface Profile {
     firstName: string;
     lastName: string;
     username: string;
-    company: string;
     description: string;
 }
 
@@ -39,7 +38,6 @@ function normalize(profile: Profile): string {
         profile.firstName.trim(),
         profile.lastName.trim(),
         profile.username.trim().toLowerCase(),
-        profile.company.trim(),
         profile.description.trim()
     ].join("\n");
 }
@@ -71,7 +69,6 @@ export function AccountView({
     lastName,
     username,
     usernameChangeIn,
-    company,
     description,
     emails,
     mailReady,
@@ -93,7 +90,6 @@ export function AccountView({
      * would render one answer on the server and another in the browser.
      */
     usernameChangeIn?: string;
-    company: string;
     description: string;
     emails: UserEmailView[];
     /** Whether an email channel is configured, which decides whether an address
@@ -110,7 +106,7 @@ export function AccountView({
     // field whose Save was never going to work.
     const usernameLocked = usernameChangeIn !== undefined;
 
-    const stored: Profile = { name, firstName, lastName, username, company, description };
+    const stored: Profile = { name, firstName, lastName, username, description };
     const [profile, setProfile] = useState<Profile>(stored);
     const [saved, setSaved] = useState<Profile>(stored);
     const [profileBusy, setProfileBusy] = useState(false);
@@ -127,7 +123,6 @@ export function AccountView({
             firstName: profile.firstName,
             lastName: profile.lastName,
             username: profile.username,
-            company: profile.company,
             description: profile.description
         });
         setProfileBusy(false);
@@ -228,16 +223,6 @@ export function AccountView({
                                 ? `Other people find and address you by this, so it can only be changed once in a while. You can change it again in ${usernameChangeIn}.`
                                 : "3-32 characters: letters, numbers, and . _ - Used to sign in."}
                         </span>
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Company
-                        <Input
-                            value={profile.company}
-                            placeholder="Optional"
-                            maxLength={MAX_COMPANY_LENGTH}
-                            autoComplete="organization"
-                            onChange={(event) => setProfile({ ...profile, company: event.target.value })}
-                        />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         About you

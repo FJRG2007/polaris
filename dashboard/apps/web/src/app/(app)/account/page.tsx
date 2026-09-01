@@ -10,6 +10,8 @@ import { prisma } from "@polaris/db";
 import { ProfilePicturesCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
+import { CompaniesCard } from "./companies-card";
+import { organizationsOf, shownOrganizations } from "@/lib/profile-service";
 import { getSetting } from "@/lib/setting-store";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import {
@@ -24,7 +26,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, photo, banner, emails, mail, phone, whatsappChannel] = await Promise.all([
+    const [user, photo, banner, emails, mail, phone, whatsappChannel, organizations, shown] =
+        await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: {
@@ -50,7 +53,12 @@ export default async function AccountPage() {
         prisma.channel.findFirst({
             where: { ownerId: session.id, platform: "whatsapp", status: "connected" },
             select: { id: true }
-        })
+        }),
+        // Where they work: the organizations here they could show, and the ones
+        // they have. Both read from one place, so the list somebody picks from
+        // and the list their page publishes cannot drift.
+        organizationsOf(session.id),
+        shownOrganizations(session.id)
     ]);
 
     // How long until this account may take a different handle, as a phrase the
@@ -88,12 +96,17 @@ export default async function AccountPage() {
                 // can say so before anybody types into it - finding out by being
                 // refused is the version that wastes somebody's time.
                 usernameChangeIn={usernameChangeIn}
-                company={user?.company ?? ""}
                 description={user?.description ?? ""}
                 emails={emails}
                 mailReady={mail.channelId !== null}
                 phone={phone}
                 canSendWhatsApp={whatsappChannel !== null}
+            />
+            <CompaniesCard
+                company={user?.company ?? ""}
+                organizations={organizations}
+                shown={shown.map((org) => org.id)}
+                username={user?.username ?? ""}
             />
         </div>
     );

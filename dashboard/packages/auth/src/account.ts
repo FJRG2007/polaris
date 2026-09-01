@@ -14,7 +14,9 @@ import {
     descriptionField,
     displayNameField,
     nameHalfField,
+    isReservedUsername,
     usernameChangeRefusal,
+    RESERVED_USERNAME_MESSAGE,
     USERNAME_COOLDOWN_DAYS
 } from "@polaris/core";
 
@@ -117,6 +119,11 @@ export async function updateUserProfile(
                 if (!/^[a-z0-9_.-]{3,32}$/.test(username)) {
                     return { error: "Username must be 3-32 characters: letters, numbers, . _ -" };
                 }
+                // A handle addresses a public page and is printed beside
+                // everything somebody writes, which is what makes a few of them
+                // dangerous rather than confusing - see `usernames.ts`. Checked
+                // here as well as in the form, because the form is a courtesy.
+                if (isReservedUsername(username)) return { error: RESERVED_USERNAME_MESSAGE };
                 const taken = await prisma.user.findFirst({
                     where: { username, id: { not: userId } },
                     select: { id: true }

@@ -76,6 +76,7 @@ export const PRIVACY_FIELD_LABELS = {
     fullName: "Your full name",
     email: "Your email address",
     phone: "Your phone number",
+    companies: "Where you work",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -92,6 +93,8 @@ export const PRIVACY_FIELD_NOTES = {
         "Who can open your photo and look at it full size. Anybody who cannot still sees it beside your name - this is a rule about the press, not a second copy of the picture.",
     email: "Who sees the address you sign in with. Anybody who cannot sees your name and username, which is enough to write to you here.",
     phone: "The number kept for sign-in codes. Nobody is shown it unless you say so.",
+    companies:
+        "The company on your profile, and the organizations here you have chosen to show. Which organizations those are is picked one at a time on your profile; this decides who sees the ones you picked.",
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
 } as const;
@@ -104,6 +107,7 @@ export const PRIVACY_FIELDS = [
     "fullName",
     "email",
     "phone",
+    "companies",
     "lastSeen",
     "readReceipts",
     "forwarding"
@@ -128,7 +132,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["avatar", "photoFullSize", "fullName", "email", "phone"]
+        fields: ["avatar", "photoFullSize", "fullName", "email", "phone", "companies"]
     },
     {
         id: "presence",
@@ -245,6 +249,21 @@ export const privacySettingsSchema = z.object({
      * added to a team by the name they show.
      */
     fullName: closed,
+    /**
+     * Who is shown where somebody works.
+     *
+     * Open by default, unlike the address and the number, because it is the one
+     * thing on this list that exists to be seen: a company is typed into a
+     * profile in order to appear on it.
+     *
+     * What it governs is the whole of that answer - the line somebody typed and
+     * the organizations here they marked as theirs. Which organizations those are
+     * is a separate, per-organization choice made on the profile itself, and none
+     * of them is shown until it is made: being on a roster is not a statement
+     * somebody made about themselves, and a default that published it would be
+     * this setting deciding something it was never asked.
+     */
+    companies: open,
     /**
      * Who is shown the address the account signs in with.
      *

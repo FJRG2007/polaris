@@ -78,6 +78,7 @@ export * from "./schemas/file-request.js";
 export * from "./schemas/snippet.js";
 export * from "./schemas/vault.js";
 export * from "./schemas/auth.js";
+export * from "./schemas/usernames.js";
 export * from "./schemas/host.js";
 export * from "./schemas/enrollment.js";
 export * from "./schemas/runners.js";
