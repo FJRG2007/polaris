@@ -33,6 +33,7 @@ import {
     addSessionMessage,
     finishSession,
     markSessionStarted,
+    failureDetail,
     readableFailure,
     resolveSessionEnigma,
     SessionRefusal,
@@ -281,7 +282,15 @@ export async function startSession(session: SessionView, token: string): Promise
     } catch (error) {
         // What lands on the session is what somebody will read on it, so the
         // internals of a daemon or an SSH failure stop here. See `readableFailure`.
-        await finishSession(session.id, "failed", readableFailure(error, `starting ${session.id}`));
+        // Both: the sentence goes on the session, and what actually happened
+        // goes with it. See `failureDetail` - a reason removed from a screen
+        // nobody can replace with a log is a reason nobody has.
+        await finishSession(
+            session.id,
+            "failed",
+            readableFailure(error, `starting ${session.id}`),
+            failureDetail(error)
+        );
         throw error;
     }
 }

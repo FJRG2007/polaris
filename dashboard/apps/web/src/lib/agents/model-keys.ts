@@ -652,6 +652,53 @@ export async function listProviderKeys(owner: KeyOwner): Promise<ModelKeyView[]>
 /** Which sign-ins this person can actually spend - their own, and the
  *  deployment's where it shares them. By variable, which is what readiness is
  *  asked in. */
+/**
+ * Which account, by name, a session would actually sign each agent in with.
+ *
+ * The narrower question `signinEnvsFor` answers is "is there one". This one is
+ * "whose, and called what" - which is what somebody handing a task to an agent
+ * needs, because a deployment can hold accounts of its own and an account can
+ * hold several, and until this existed the screen said nothing at all about
+ * which of them was about to do the work.
+ *
+ * Own before the deployment's, which is the order they are actually spent in.
+ */
+export async function signinAccountsFor(
+    userId: string | null
+): Promise<Map<string, { name: string; identity: string | null; source: KeySource }>> {
+    const found = new Map<string, { name: string; identity: string | null; source: KeySource }>();
+    try {
+        const shared = await instanceKeysAreShared();
+        const own = userId ? await storedKeys(userId) : [];
+        const instance = shared ? await storedKeys(INSTANCE) : [];
+        // The name and whose account it is are not on the row the resolver
+        // returns, so the descriptive columns are read alongside it.
+        const described = new Map(
+            (await prisma.userModelKey.findMany({
+                where: { OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])] },
+                select: { id: true, name: true, config: true }
+            })).map((row) => [row.id, row])
+        );
+        for (const signin of agentSignins()) {
+            const slug = signinSlug(signin.env);
+            const mine = firstUsable(own, slug);
+            const picked = mine ?? firstUsable(instance, slug);
+            if (!picked) continue;
+            const row = described.get(picked.row.id);
+            const config = row ? parseConfig(row.config) : {};
+            const email = typeof config.email === "string" ? config.email : null;
+            found.set(signin.env, {
+                name: row?.name ?? "an account",
+                identity: email,
+                source: mine ? "own" : "instance"
+            });
+        }
+    } catch {
+        return found;
+    }
+    return found;
+}
+
 export async function signinEnvsFor(userId: string | null): Promise<Set<string>> {
     const found = new Set<string>();
     try {

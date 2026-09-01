@@ -52,6 +52,26 @@ export function readableFailure(error: unknown, context: string): string {
     return "Polaris could not start this session. Nothing was left running.";
 }
 
+/**
+ * The same failure, as the thing that actually went wrong.
+ *
+ * Kept alongside the sentence rather than instead of it, and shown on the
+ * session itself. The sentence is what a screen reads well; this is what makes
+ * the difference between a person saying "it did not work" and a person saying
+ * what did not work - and on a deployment where nobody opens a terminal or reads
+ * a container's logs, a message with the reason removed leaves them with
+ * nothing at all. The session belongs to whoever is reading it, so there is
+ * nobody here to keep it from.
+ *
+ * Bounded, because a daemon that is unhappy can be unhappy at length.
+ */
+export function failureDetail(error: unknown): string | null {
+    if (error instanceof SessionRefusal) return null;
+    const said = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+    const trimmed = said.trim();
+    return trimmed ? trimmed.slice(0, 2000) : null;
+}
+
 export interface SessionView {
     readonly id: string;
     readonly title: string;
@@ -409,11 +429,25 @@ export async function markSessionStarted(
 export async function finishSession(
     sessionId: string,
     state: "stopped" | "failed",
-    error: string | null = null
+    error: string | null = null,
+    /** What actually went wrong, for the session page. Null where the sentence
+     *  above already is the whole of it. */
+    detail: string | null = null
 ): Promise<void> {
     await prisma.agentSession.update({
         where: { id: sessionId },
-        data: { state, error, tokenHash: null, finishedAt: new Date() }
+        data: {
+            state,
+            error,
+            // The sentence lives in `detail`, which is the line the list shows;
+            // the technical reason lives in `error`, which the session page
+            // shows under it. They were the other way round, which is why one of
+            // them was never rendered anywhere.
+            ...(error ? { detail: error } : {}),
+            ...(detail ? { error: detail } : {}),
+            tokenHash: null,
+            finishedAt: new Date()
+        }
     });
 }
 

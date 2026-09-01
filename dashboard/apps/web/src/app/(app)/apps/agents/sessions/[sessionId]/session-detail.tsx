@@ -65,6 +65,17 @@ interface Props {
 
 export function SessionDetail({ session, events, messages }: Props) {
     const [text, setText] = useState("");
+    /**
+     * What has been typed and not yet come back from the server.
+     *
+     * A session page re-reads itself on a timer, so a message sent between two
+     * of those reads was invisible for up to four seconds - the box emptied and
+     * nothing appeared, which reads as a message that went nowhere. These are
+     * shown under the conversation until the server's copy arrives, and a queue
+     * rather than one because typing the next thing should never wait for the
+     * last one to land.
+     */
+    const [pending, setPending] = useState<{ key: number; body: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [screen, setScreen] = useState<string | null>(null);
     const [attached, setAttached] = useState(false);
@@ -84,23 +95,43 @@ export function SessionDetail({ session, events, messages }: Props) {
         bottom.current?.scrollIntoView({ block: "end" });
     }, [messages.length, events.length]);
 
+    // The server's copy has landed, so the local one goes. Matched on the body
+    // rather than an id, because the row the server writes has one of its own
+    // and the two were never the same message twice.
+    useEffect(() => {
+        if (pending.length === 0) return;
+        const said = new Set(messages.filter((message) => message.role === "user").map((one) => one.body));
+        setPending((queue) => queue.filter((one) => !said.has(one.body)));
+        // Only when the server's list changes; `pending` is read, never depended on.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages]);
+
     const send = () => {
         const body = text.trim();
         if (!body) return;
-        // Cleared before the round trip. What was sent is already on the way, and a
-        // box that stays full reads as a message that did not go.
+        // Cleared and shown at once. What was sent is already on the way, and a
+        // box that stays full reads as a message that did not go - while a
+        // conversation that does not show it reads as one that was lost.
         setText("");
-        startTransition(() => {
-            void runAction(
-                () => promptSessionAction({ sessionId: session.id, text: body }),
-                setError
-            ).then((result) => {
+        const key = Date.now() + Math.random();
+        setPending((queue) => [...queue, { key, body }]);
+        setError(null);
+        // Deliberately outside a transition: a transition makes the next send
+        // wait for this one, and somebody typing three things in a row should
+        // not be queueing behind a round trip they cannot see.
+        void runAction(() => promptSessionAction({ sessionId: session.id, text: body }), setError).then(
+            (result) => {
                 if (result?.error) {
+                    // Rolled back, and the text handed back rather than lost:
+                    // it is the only copy of what they wrote.
+                    setPending((queue) => queue.filter((one) => one.key !== key));
                     setError(result.error);
-                    setText(body);
+                    setText((current) => (current ? current : body));
+                    return;
                 }
-            });
-        });
+                router.refresh();
+            }
+        );
     };
 
     const interrupt = () => {
@@ -241,6 +272,16 @@ export function SessionDetail({ session, events, messages }: Props) {
                                 </div>
                             ))
                         )}
+
+                        {/* Sent, not yet echoed back. Dimmed rather than marked
+                            as failing: nothing has gone wrong, the server has
+                            simply not been re-read yet. */}
+                        {pending.map((one) => (
+                            <div key={one.key} className="space-y-1 opacity-60">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">You</p>
+                                <p className="whitespace-pre-wrap break-words text-sm">{one.body}</p>
+                            </div>
+                        ))}
                         <div ref={bottom} />
                     </CardBody>
                 </Card>
@@ -298,7 +339,11 @@ export function SessionDetail({ session, events, messages }: Props) {
                         }}
                     />
                     <div className="flex justify-end">
-                        <Button size="sm" onClick={send} disabled={busy || !text.trim()}>
+                        {/* Not held by `busy`: that is the terminal or a stop
+                            in flight, and neither is a reason somebody cannot
+                            type the next thing. Sending is its own path and
+                            queues on the screen. */}
+                        <Button size="sm" onClick={send} disabled={!text.trim()}>
                             {busy ? (
                                 <Loader2 className="size-4 shrink-0 animate-spin" />
                             ) : (
