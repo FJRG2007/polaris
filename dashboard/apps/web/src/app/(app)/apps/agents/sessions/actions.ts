@@ -10,14 +10,14 @@
  * itself may have ended.
  */
 
+import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
+import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
-import * as taskAccess from "@/lib/tasks/access";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import {
@@ -159,12 +159,15 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     // on a server the person already signed the tool in on is `missing` too, which
     // is why the message says so rather than insisting.
     // Only the tool matters here: an option that names an account is an account
-    // that exists, so it can never be the missing case.
-    const blocked = value.accountId
-        ? undefined
-        : (await agentChoicesFor(user.id)).find(
-              (agent) => agent.id === value.cli && agent.readiness === "missing"
-          );
+    // that exists, so it can never be the missing case. Neither can the machine's
+    // own login: it is the answer for exactly the tool Polaris holds nothing for,
+    // so refusing it here would refuse the case the option exists for.
+    const blocked =
+        value.accountId || value.useMachineLogin
+            ? undefined
+            : (await agentChoicesFor(user.id)).find(
+                  (agent) => agent.id === value.cli && agent.readiness === "missing"
+              );
     if (blocked) {
         const ways = blocked.missing.map((credential) => credential.label).join(" or ");
         return {

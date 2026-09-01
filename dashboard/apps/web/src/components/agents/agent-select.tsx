@@ -15,10 +15,11 @@
  * sign that tool in, and the row that cannot says what would.
  */
 
-import { Badge, Button, Input } from "@polaris/ui";
-import { AgentLogo } from "@/components/logos";
 import Link from "next/link";
+import * as core from "@polaris/core";
 import { Check, Search } from "lucide-react";
+import { AgentLogo } from "@/components/logos";
+import { Badge, Button, Input } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 
@@ -209,6 +210,34 @@ export function AgentSelect({
             ) : null}
         </div>
     );
+}
+
+/**
+ * The picker's value is a tool and a sign-in, joined.
+ *
+ * One control rather than two, because they are one decision: "run this with
+ * that subscription". Split on the way to the server, which stores the halves
+ * apart - the tool decides what is launched and the other half decides what
+ * signs it in. Here rather than beside each form because every screen that
+ * picks an agent reads the same value, and a copy that missed a case sent an
+ * account id of "machine" to a field that takes a uuid.
+ */
+export function agentOf(value: string): string {
+    return value.split(":")[0] ?? value;
+}
+
+/** The account half, or null for "whichever would resolve" - and null too for
+ *  the machine's own login, which is not an account. `machineOf` is what tells
+ *  those last two apart. */
+export function accountOf(value: string): string | null {
+    const half = value.split(":")[1] ?? null;
+    return half === core.MACHINE_LOGIN_KEY ? null : half;
+}
+
+/** Whether the picked row was "sign it in with nothing and let the machine
+ *  answer". A third answer, not a shade of the other two. */
+export function machineOf(value: string): boolean {
+    return (value.split(":")[1] ?? "") === core.MACHINE_LOGIN_KEY;
 }
 
 /**

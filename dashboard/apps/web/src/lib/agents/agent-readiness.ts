@@ -170,34 +170,38 @@ export interface AgentOption {
     readonly missing: AgentChoice["missing"];
 }
 
-
 /** The catalogue crossed with the accounts, as the picker lists it. */
 export async function agentOptionsFor(userId: string | null): Promise<AgentOption[]> {
     const [choices, accounts] = await Promise.all([agentChoicesFor(userId), signinOptionsFor(userId)]);
     const options: AgentOption[] = [];
     for (const choice of choices) {
-        // Offered for every tool, always, because it is the only true answer for
-        // a machine somebody signed in themselves - and the only way to stop a
-        // stored token that was revoked months ago being injected over a login
-        // that works. Its readiness is `unknown` rather than `ready`: Polaris
-        // cannot see inside that home, and claiming otherwise would be inventing
-        // evidence.
         const cli = core.agentCliById(choice.id);
         const envs = new Set((cli?.credentials ?? []).map((credential) => credential.env));
         const mine = accounts.filter((account) => envs.has(account.env));
-        options.push({
-            key: `${choice.id}:${core.MACHINE_LOGIN_KEY}`,
-            cli: choice.id,
-            label: choice.label,
-            vendor: choice.vendor,
-            docs: choice.docs,
-            readiness: "unknown",
-            accountId: null,
-            account: "This machine's own login",
-            mine: null,
-            machine: true,
-            missing: []
-        });
+        // Offered for every tool Polaris could sign in itself, because it is the
+        // only true answer for a machine somebody signed in themselves - and the
+        // only way to stop a stored token that was revoked months ago being
+        // injected over a login that works. Its readiness is `unknown` rather
+        // than `ready`: Polaris cannot see inside that home, and claiming
+        // otherwise would be inventing evidence.
+        // A tool the catalogue names no credential for is handed nothing
+        // already, so its plain row means exactly this - and a second row saying
+        // it again is one tool listed twice with nothing to tell the two apart.
+        if (envs.size > 0) {
+            options.push({
+                key: `${choice.id}:${core.MACHINE_LOGIN_KEY}`,
+                cli: choice.id,
+                label: choice.label,
+                vendor: choice.vendor,
+                docs: choice.docs,
+                readiness: "unknown",
+                accountId: null,
+                account: "This machine's own login",
+                mine: null,
+                machine: true,
+                missing: []
+            });
+        }
         if (mine.length === 0) {
             options.push({
                 key: choice.id,

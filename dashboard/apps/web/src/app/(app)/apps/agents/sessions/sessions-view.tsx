@@ -17,7 +17,14 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import type { SessionView } from "@/lib/agents/session-service";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
-import { AgentSelect, CUSTOM_CHOICE, SignInNotice } from "@/components/agents/agent-select";
+import {
+    accountOf,
+    agentOf,
+    AgentSelect,
+    CUSTOM_CHOICE,
+    machineOf,
+    SignInNotice
+} from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { sessionChoicesAction, startSessionAction, stopSessionAction } from "./actions";
 import {
@@ -470,30 +477,4 @@ function StartDialog({ onClose }: { onClose: () => void }) {
             </DialogContent>
         </Dialog>
     );
-}
-
-/**
- * The picker's value is a tool and an account, joined.
- *
- * One control rather than two, because they are one decision: "run this with
- * that subscription". Split here on the way to the server, which stores them
- * apart - the tool decides what is launched and the account decides what signs
- * it in.
- */
-function agentOf(value: string): string {
-    return value.split(":")[0] ?? value;
-}
-
-/** The account half, or null for "whichever would resolve" - and null too for
- *  the machine's own login, which is not an account. `machineOf` is what tells
- *  those last two apart. */
-function accountOf(value: string): string | null {
-    const half = value.split(":")[1] ?? null;
-    return half === core.MACHINE_LOGIN_KEY ? null : half;
-}
-
-/** Whether the picked row was "sign it in with nothing and let the machine
- *  answer". A third answer, not a shade of the other two. */
-function machineOf(value: string): boolean {
-    return (value.split(":")[1] ?? "") === core.MACHINE_LOGIN_KEY;
 }

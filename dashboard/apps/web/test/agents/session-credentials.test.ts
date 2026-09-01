@@ -22,8 +22,14 @@
  */
 
 import * as core from "@polaris/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
+
+// The narrowing under test is pure, but it lives beside the readiness queries,
+// so importing it reaches the key store and constructs a Prisma client. Nothing
+// here asks the database anything, and a generated client is not a thing these
+// assertions should need.
+vi.mock("@polaris/db", () => ({ prisma: {} }));
 
 /**
  * Variable names that would move a request somewhere else.

@@ -164,15 +164,15 @@ export const startAgentSessionSchema = z
     // The shared machine is one of Polaris's own containers. An enrolled server
     // is already somebody's machine with its own home, so asking for both is
     // asking for two different things at once.
+    .refine((value) => !value.sharedHome || value.place === "local", {
+        message: "A server already has a home of its own",
+        path: ["sharedHome"]
+    })
     // Picking an account and asking for none of them are two different answers
     // to one question, and a form that sent both would have the server choose.
     .refine((value) => !value.useMachineLogin || !value.accountId, {
         message: "Pick an account or the machine's own login, not both",
         path: ["accountId"]
-    })
-    .refine((value) => !value.sharedHome || value.place === "local", {
-        message: "A server already has a home of its own",
-        path: ["sharedHome"]
     });
 
 export type StartAgentSessionInput = z.infer<typeof startAgentSessionSchema>;

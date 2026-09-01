@@ -212,7 +212,12 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // holding nothing. A session started on a blank environment because the
     // store blinked would come up at a login prompt and look, from every screen,
     // exactly like an agent thinking.
-    const available = await sessionSecretsFor(session.ownerId);
+    // Not asked at all when the machine answers for itself: that session wants
+    // nothing out of the store, so a store that blinked would be refusing it
+    // over credentials the person deliberately declined.
+    const available: Record<string, string> | null = session.useMachineLogin
+        ? {}
+        : await sessionSecretsFor(session.ownerId);
     if (available === null) {
         throw new SessionRefusal(
             "Polaris could not read the stored credentials just now. Try again in a moment."
