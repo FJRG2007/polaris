@@ -18,18 +18,44 @@
  * The hit rate is the one derived figure worth its own chart: hits against hits
  * plus misses over the same interval, which is the difference between a cache
  * doing its job and one being read straight through.
+ *
+ * **A rate needs two readings, and that used to mean an empty panel for the
+ * first ten seconds.** The first pair is now taken a second apart and the poll
+ * settles to its real cadence afterwards, so there is a line almost at once; and
+ * while there is only one reading the panel says what it is waiting for rather
+ * than showing an empty chart, which reads as a database doing nothing.
+ *
+ * **Two things here are not rates at all.** What is taking up the room, and what
+ * the engine is asked most often, are the questions somebody opens this screen
+ * with when a disk is filling or a page is slow - and neither is a counter
+ * climbing. They are read once when the panel opens rather than on the poll:
+ * both change over hours, and a catalogue scan every five seconds for a chart
+ * nobody is watching change would make this panel the load it is measuring.
  */
 
 import * as actions from "./actions";
 import { formatBytes } from "@polaris/core";
+import { grouped } from "@/app/(app)/apps/firewall/page-parts";
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { DatabaseStats, StatValue } from "@/lib/data/stats";
-import { Button, Card, CardBody, Select, TimeSeriesChart, type TimePoint } from "@polaris/ui";
+import type { DatabaseInsights } from "@/lib/data/insights";
+import { Button, Card, CardBody, Select, TimeSeriesChart, cn, type TimePoint } from "@polaris/ui";
 
 /** How often a reading is taken. Fast enough to watch something happen, slow
  *  enough that the panel is not itself the load. */
 const POLL_MS = 5000;
+
+/**
+ * How long after the first reading the second is taken.
+ *
+ * A rate is the difference between two readings, so one reading draws nothing -
+ * and at the normal cadence that meant an empty panel for the first ten seconds,
+ * which is what "Activity takes too long to load" actually was. The second
+ * reading is taken almost at once so there is a line to look at, and the poll
+ * settles to its real interval from there. One extra query per visit.
+ */
+const FIRST_PAIR_MS = 1000;
 
 /** How many readings are kept. Twenty minutes at the default cadence, which is
  *  long enough to see a spike arrive and pass. */
@@ -62,6 +88,10 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     const [busy, setBusy] = useState(false);
     const [engine, setEngine] = useState("");
     const [chosen, setChosen] = useState<string>("");
+    /** What is in here and what it is asked, read once on the way in. Null until
+     *  the answer lands, which is what draws the skeleton rather than an empty
+     *  chart. */
+    const [insights, setInsights] = useState<DatabaseInsights | null>(null);
     // Kept in a ref as well so the timer below reads the current one without
     // being rebuilt - a poll that restarts on every reading is a poll that
     // never fires at the interval it says it does.
@@ -88,9 +118,32 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
     useEffect(() => {
         setReadings([]);
         void sample();
+        // The second one quickly, so there is a rate to draw; then the real
+        // cadence. Both are cleared together, so leaving the panel mid-pair does
+        // not leave a timer behind.
+        const soon = setTimeout(() => void sample(), FIRST_PAIR_MS);
         const timer = setInterval(() => void sample(), POLL_MS);
-        return () => clearInterval(timer);
+        return () => {
+            clearTimeout(soon);
+            clearInterval(timer);
+        };
     }, [sample]);
+
+    // Once, when the panel opens. Not on the poll: see the note at the top.
+    useEffect(() => {
+        let alive = true;
+        setInsights(null);
+        void actions.insightsAction(connectionId).then((result) => {
+            if (!alive) return;
+            // A failure here is not the panel's failure. The rates above are
+            // still worth watching, and an engine that will not answer this is
+            // said in the section itself.
+            setInsights(result.insights ?? { biggest: [], frequent: [], frequentUnavailable: "" });
+        });
+        return () => {
+            alive = false;
+        };
+    }, [connectionId]);
 
     const latest = readings[readings.length - 1];
     const rates = RATES[engine] ?? { keys: [] };
@@ -106,7 +159,8 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                     ) : (
                         <>
                             <Loader2 className="size-4 animate-spin" />
-                            Taking the first reading.
+                            Taking the first reading. A rate is the difference between two, so the
+                            charts appear a moment after this one.
                         </>
                     )}
                 </CardBody>
@@ -196,7 +250,167 @@ export function StatsPanel({ connectionId }: { connectionId: string }) {
                     </CardBody>
                 </Card>
             )}
+
+            <BiggestPanel insights={insights} />
+            <FrequentPanel insights={insights} />
         </div>
+    );
+}
+
+/**
+ * A bar in a list, drawn as a share of the largest.
+ *
+ * Deliberately not a chart component: ten labelled bars where the label is the
+ * thing being measured is a list, and a list is what somebody reads down looking
+ * for a name they recognise. A pie of ten tables is unreadable, and a time series
+ * of a number that changes hourly is a flat line.
+ */
+function Bar({
+    label,
+    value,
+    of,
+    caption,
+    title
+}: {
+    label: string;
+    value: number;
+    /** The largest in the set, which is what the width is a share of. */
+    of: number;
+    caption: string;
+    title?: string;
+}) {
+    // A zero-width bar for the smallest row reads as "nothing", so everything
+    // that exists at all gets a sliver.
+    const share = of > 0 ? Math.max(2, Math.round((value / of) * 100)) : 0;
+    return (
+        <div className="flex flex-col gap-0.5">
+            <div className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate font-mono text-xs" title={title ?? label}>
+                    {label}
+                </span>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{caption}</span>
+            </div>
+            <div className="bg-border h-1.5 overflow-hidden rounded-full">
+                <div className="bg-primary h-full rounded-full" style={{ width: `${share}%` }} />
+            </div>
+        </div>
+    );
+}
+
+/** What a section looks like while its one read is in flight, and when it has
+ *  nothing to say. */
+function InsightCard({
+    title,
+    note,
+    insights,
+    empty,
+    children
+}: {
+    title: string;
+    note?: string;
+    insights: DatabaseInsights | null;
+    empty: string;
+    children: ReactNode;
+}) {
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <div>
+                    <h3 className="text-sm font-medium">{title}</h3>
+                    {note ? <p className="text-muted-foreground text-xs">{note}</p> : null}
+                </div>
+                {insights === null ? (
+                    <div className="flex flex-col gap-2" aria-hidden="true">
+                        {[0, 1, 2, 3].map((row) => (
+                            <div key={row} className={cn("bg-muted h-6 animate-pulse rounded")} />
+                        ))}
+                    </div>
+                ) : (
+                    (children ?? <p className="text-muted-foreground text-xs">{empty}</p>)
+                )}
+            </CardBody>
+        </Card>
+    );
+}
+
+/** Where the room is going. The question somebody opens this screen with when a
+ *  disk is filling, and the one a rate cannot answer. */
+function BiggestPanel({ insights }: { insights: DatabaseInsights | null }) {
+    const rows = insights?.biggest ?? [];
+    if (insights !== null && rows.length === 0) return null;
+    const largest = rows[0]?.bytes ?? 0;
+    return (
+        <InsightCard
+            title="Biggest tables"
+            note="Table, indexes and out-of-line storage together - what the table actually costs."
+            insights={insights}
+            empty="Nothing to measure yet."
+        >
+            {rows.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                    {rows.map((row) => (
+                        <Bar
+                            key={row.name}
+                            label={row.name}
+                            value={row.bytes}
+                            of={largest}
+                            caption={
+                                row.rows === null
+                                    ? formatBytes(row.bytes)
+                                    : `${formatBytes(row.bytes)} - about ${grouped(row.rows)} rows`
+                            }
+                        />
+                    ))}
+                </div>
+            ) : null}
+        </InsightCard>
+    );
+}
+
+/**
+ * What the engine is asked most often.
+ *
+ * Only where the engine records it, and it says which thing is missing when it
+ * does not - Postgres needs an extension, MySQL needs the performance schema, and
+ * on a managed database neither is something the person reading this can turn on.
+ * A sentence naming it is worth more than an empty chart, which reads as a
+ * database doing nothing.
+ *
+ * The statements are the engine's own normalized forms: the literals have already
+ * been replaced by the server, so nothing here prints somebody's data back at
+ * them.
+ */
+function FrequentPanel({ insights }: { insights: DatabaseInsights | null }) {
+    const rows = insights?.frequent ?? [];
+    const unavailable = insights?.frequentUnavailable ?? "";
+    if (insights !== null && rows.length === 0 && !unavailable) return null;
+    const most = rows[0]?.calls ?? 0;
+    return (
+        <InsightCard
+            title="Most repeated statements"
+            note="Counted by the engine since it last started, with the values already stripped out."
+            insights={insights}
+            empty={unavailable || "Nothing recorded yet."}
+        >
+            {rows.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                    {rows.map((row) => (
+                        <Bar
+                            key={row.statement}
+                            label={row.statement}
+                            title={row.statement}
+                            value={row.calls}
+                            of={most}
+                            caption={
+                                row.totalMs === null
+                                    ? `${grouped(row.calls)} calls`
+                                    : `${grouped(row.calls)} calls - ${grouped(row.totalMs)}ms total`
+                            }
+                        />
+                    ))}
+                </div>
+            ) : null}
+        </InsightCard>
     );
 }
 

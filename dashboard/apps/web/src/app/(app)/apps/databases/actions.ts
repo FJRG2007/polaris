@@ -21,6 +21,7 @@ import * as browser from "@/lib/data/browser";
 import { requirePermission } from "@/lib/session";
 import * as connections from "@/lib/data/connections";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
+import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { DataRequestError, ReadOnlyError } from "@/lib/data/driver";
 import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
 
@@ -186,6 +187,21 @@ export async function statsAction(
     const me = await actor();
     const result = await guard(() => engineStats(me.id, String(id)));
     return result.error ? { error: result.error } : { stats: result.value };
+}
+
+/**
+ * What is in the database and what it spends its time on.
+ *
+ * Asked once when the panel opens rather than on the poll: both answers change
+ * over hours, and putting them on a five-second timer would mean a catalogue scan
+ * every five seconds for a chart nobody is watching change.
+ */
+export async function insightsAction(
+    id: string
+): Promise<{ insights?: DatabaseInsights; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => databaseInsights(me.id, String(id)));
+    return result.error ? { error: result.error } : { insights: result.value };
 }
 
 /** The engines a connection can be made for, for the form's picker. Server-side
