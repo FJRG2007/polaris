@@ -53,6 +53,7 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
+    MenuShortcut,
     keepFocusOnClose,
     useToast
 } from "@polaris/ui";
@@ -386,9 +387,7 @@ export function MessageMenu({
                             <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
                                 <Pencil className="size-3.5" />
                                 Edit
-                                <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
-                                    F2
-                                </span>
+                                <MenuShortcut>F2</MenuShortcut>
                             </ContextMenuItem>
                         )}
                         <ContextMenuItem
@@ -397,9 +396,7 @@ export function MessageMenu({
                         >
                             <Trash2 className="size-3.5" />
                             Delete
-                            <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
-                                Del
-                            </span>
+                            <MenuShortcut>Del</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}

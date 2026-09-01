@@ -59,6 +59,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
+    MenuShortcut,
     Select,
     cn,
     keepFocusOnClose,
@@ -100,6 +101,16 @@ interface RowAction {
     readonly onSelect: () => void;
     readonly quick?: boolean;
     readonly danger?: boolean;
+    /**
+     * The key that does this without opening the menu.
+     *
+     * Its own field rather than part of the label, which is where it used to
+     * live: "Rename (F2)" reads as the name of the action rather than as a key
+     * to press, and it followed the label onto the hover button's tooltip, where
+     * there is no key at all. Drawn against the right-hand edge of the menu, the
+     * way chat has always drawn one.
+     */
+    readonly shortcut?: string;
 }
 
 /**
@@ -414,6 +425,9 @@ function TreeRow({
                                 >
                                     <action.Icon className="size-3.5" />
                                     {action.label}
+                                    {action.shortcut ? (
+                                        <MenuShortcut>{action.shortcut}</MenuShortcut>
+                                    ) : null}
                                 </ContextMenuItem>
                             </span>
                         ))}
@@ -845,7 +859,8 @@ function SpaceSection({
                                 ]
                               : []),
                           {
-                              label: "Rename (F2)",
+                              label: "Rename",
+                              shortcut: "F2",
                               Icon: Pencil,
                               quick: true,
                               onSelect: () => onRenaming(`list:${list.id}`)
@@ -898,7 +913,8 @@ function SpaceSection({
                   ]
                 : []),
             {
-                label: "Rename (F2)",
+                label: "Rename",
+                shortcut: "F2",
                 Icon: Pencil,
                 quick: true,
                 onSelect: () => onRenaming(`folder:${folder.id}`)
@@ -1133,7 +1149,8 @@ function SpaceSection({
                                 </ContextMenuItem>
                                 <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
                                     <Pencil className="size-3.5" />
-                                    Rename (F2)
+                                    Rename
+                                    <MenuShortcut>F2</MenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuItem asChild>
                                     <Link href={`/tasks/s/${space.id}`}>

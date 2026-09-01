@@ -12,7 +12,16 @@ import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
-import { forwardRef, useMemo, useState, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { useReopenElsewhere } from "../lib/menu-reopen";
+import {
+    forwardRef,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentPropsWithoutRef,
+    type ElementRef,
+    type ReactNode
+} from "react";
 import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
 
 export const ContextMenu = RadixMenu.Root;
@@ -58,34 +67,81 @@ export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithout
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, onFocus, ...props }, ref) => (
-    <RadixMenu.Portal>
-        <RadixMenu.Content
-            ref={ref}
-            className={cn(
-                "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                className
-            )}
-            {...props}
-            // A menu with a field at the top of it hands that field the focus
-            // the surface was given - see `redirectMenuFocus`. On the surface's
-            // own focus rather than on the way open, because the menu focuses
-            // itself and this has to be the answer to that rather than a race
-            // with it.
-            onFocus={(event) => {
-                onFocus?.(event);
-                redirectMenuFocus(event);
-            }}
-            // After the spread: the menu must never commit an option on the
-            // release of the press that opened it.
-            onPointerUpCapture={ignoreOpeningPress}
-            // And once it has it, the pointer does not take it back off it -
-            // see `keepSearchFocus`.
-            onPointerMoveCapture={keepSearchFocus}
-        />
-    </RadixMenu.Portal>
-));
+>(({ className, onFocus, ...props }, ref) => {
+    // The surface itself, so a right-click landing on it is told apart from one
+    // landing on the page behind it - see `useReopenElsewhere`, which is what
+    // makes a second right-click open the menu where the pointer now is instead
+    // of doing nothing at all.
+    const surface = useRef<HTMLDivElement | null>(null);
+    useReopenElsewhere(surface);
+
+    return (
+        <RadixMenu.Portal>
+            <RadixMenu.Content
+                ref={mergeRefs(ref, surface)}
+                className={cn(
+                    "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                    className
+                )}
+                {...props}
+                // A menu with a field at the top of it hands that field the focus
+                // the surface was given - see `redirectMenuFocus`. On the
+                // surface's own focus rather than on the way open, because the
+                // menu focuses itself and this has to be the answer to that
+                // rather than a race with it.
+                onFocus={(event) => {
+                    onFocus?.(event);
+                    redirectMenuFocus(event);
+                }}
+                // After the spread: the menu must never commit an option on the
+                // release of the press that opened it.
+                onPointerUpCapture={ignoreOpeningPress}
+                // And once it has it, the pointer does not take it back off it -
+                // see `keepSearchFocus`.
+                onPointerMoveCapture={keepSearchFocus}
+            />
+        </RadixMenu.Portal>
+    );
+});
 ContextMenuContent.displayName = "ContextMenuContent";
+
+/**
+ * Two refs on one node.
+ *
+ * The caller's, which a screen may be using to measure or focus the menu, and
+ * this file's, which tells a right-click on the menu from a right-click on the
+ * page behind it. Dropping either one is silent, so neither is dropped.
+ */
+function mergeRefs<T>(
+    ...refs: (((value: T | null) => void) | { current: T | null } | null | undefined)[]
+): (value: T | null) => void {
+    return (value) => {
+        for (const ref of refs) {
+            if (typeof ref === "function") ref(value);
+            else if (ref) ref.current = value;
+        }
+    };
+}
+
+/**
+ * The keys that do the same thing as the option beside them.
+ *
+ * Written out because a shortcut nobody is told about is a shortcut nobody uses,
+ * and drawn here rather than by each menu because it was already being written by
+ * hand in several - and elsewhere it had been squeezed into the label itself
+ * ("Rename (F2)"), which reads as part of the name of the thing rather than as a
+ * key to press.
+ *
+ * `ml-auto` on purpose: the keys sit against the right-hand edge whatever the
+ * label does, so a column of them lines up.
+ */
+export function MenuShortcut({ children, className }: { children: ReactNode; className?: string }) {
+    return (
+        <span className={cn("ml-auto pl-6 text-[0.6875rem] text-foreground-subtle", className)}>
+            {children}
+        </span>
+    );
+}
 
 export const ContextMenuItem = forwardRef<
     ElementRef<typeof RadixMenu.Item>,

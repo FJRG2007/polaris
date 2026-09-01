@@ -25,6 +25,8 @@ import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { MessageMenu } from "./message-menu";
+import { copyText } from "./links";
+import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
@@ -420,15 +422,23 @@ function sharesBlock(
 /**
  * The keys that act on the message being pointed at.
  *
- * F2 rewrites it, Delete takes it back, and R answers it - the three things the
- * hover row already offers. The row lights up on hover and carries a pencil, a
- * bin and an arrow, so what is being aimed at is never in doubt: these are
- * shortcuts to controls that are visibly there, not hidden gestures. Focus counts
- * as well as hover, so the same keys reach the same message from a keyboard.
+ * F2 rewrites it, Delete takes it back, R answers it and Ctrl+C copies what it
+ * says - the four things the hover row and the menu already offer. The row lights
+ * up on hover and carries a pencil, a bin and an arrow, so what is being aimed at
+ * is never in doubt: these are shortcuts to controls that are visibly there, not
+ * hidden gestures. Focus counts as well as hover, so the same keys reach the same
+ * message from a keyboard.
  *
  * Delete opens the confirmation rather than doing it, exactly as the menu item
  * does. A key that removed a message on a single press would be the one gesture
  * in a conversation with no undo, reachable by leaning on a keyboard.
+ *
+ * Copy is the one that is not about writing, and it behaves differently in two
+ * ways that both matter. It works for a reader who cannot post - reading a
+ * conversation and copying a line out of it is the same act - and it stands aside
+ * the moment there is a selection on the page, because Ctrl+C over highlighted
+ * text means that text, always. A shortcut that quietly replaced what somebody
+ * had just selected with something else would be worse than not having one.
  *
  * All of them are ignored while a field has focus. R is a letter, and somebody
  * typing "r" in the composer means the letter every time - which is also why
@@ -458,15 +468,26 @@ function useMessageKeys({
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
+            // Copy is the only one that wants a modifier, and the only one that
+            // is refused when the others are held. Worked out first so the plain
+            // keys below can go on rejecting every modifier there is.
+            const holding = event.ctrlKey || event.metaKey;
             const wanted =
-                event.key === "F2"
-                    ? "edit"
-                    : event.key === "Delete"
-                      ? "delete"
-                      : event.key === "r" || event.key === "R"
-                        ? "reply"
-                        : null;
-            if (!wanted || event.metaKey || event.ctrlKey || event.altKey) return;
+                holding && (event.key === "c" || event.key === "C")
+                    ? "copy"
+                    : holding || event.altKey
+                      ? null
+                      : event.key === "F2"
+                        ? "edit"
+                        : event.key === "Delete"
+                          ? "delete"
+                          : event.key === "r" || event.key === "R"
+                            ? "reply"
+                            : null;
+            if (!wanted) return;
+            // Highlighted text is what Ctrl+C is for. The browser's own copy is
+            // left to do exactly what the person asked for.
+            if (wanted === "copy" && !window.getSelection()?.isCollapsed) return;
             const active = document.activeElement;
             if (
                 active instanceof HTMLElement &&
@@ -477,7 +498,10 @@ function useMessageKeys({
             }
 
             const shown = latest.current;
-            if (!shown.canPost) return;
+            // Everything except copying is a way of writing, and a reader who
+            // cannot post is offered none of them. Copying a line out of a
+            // conversation is reading it.
+            if (!shown.canPost && wanted !== "copy") return;
             const row =
                 document.querySelector("li[id^='message-']:hover") ??
                 active?.closest("li[id^='message-']");
@@ -487,6 +511,14 @@ function useMessageKeys({
             // A line Polaris wrote itself - somebody joined, a call started - is
             // not a message to answer, rewrite or take down.
             if (message.kind === "system") return;
+
+            if (wanted === "copy") {
+                event.preventDefault();
+                // The same text the menu's "Copy text" hands over: what the
+                // message says, not the markup it is stored as.
+                void copyText(plainText(message.body));
+                return;
+            }
 
             const mine = message.authorId === shown.viewerId;
             // The same rules the pencil, the bin and the arrow are drawn under,
