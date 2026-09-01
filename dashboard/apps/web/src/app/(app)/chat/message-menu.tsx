@@ -226,9 +226,7 @@ export function MessageMenu({
                             tab's own origin, which is the hostname known to
                             work from here. */}
                         <ContextMenuItem
-                            onSelect={() =>
-                                window.open(link.open, "_blank", "noopener,noreferrer")
-                            }
+                            onSelect={() => window.open(link.open, "_blank", "noopener,noreferrer")}
                         >
                             <ExternalLink className="size-3.5" />
                             {link.kind === "email" ? "Send an email" : "Open link"}
@@ -252,9 +250,7 @@ export function MessageMenu({
                             here, and what they get is these words quoted in the
                             conversation the two of you would have had anyway. */}
                         {!mine && message.authorId && actions.onReplyPrivately && (
-                            <ContextMenuItem
-                                onSelect={() => actions.onReplyPrivately?.(message)}
-                            >
+                            <ContextMenuItem onSelect={() => actions.onReplyPrivately?.(message)}>
                                 <MessageCircleReply className="size-3.5" />
                                 Reply privately
                             </ContextMenuItem>

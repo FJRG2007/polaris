@@ -78,7 +78,11 @@ function SentFile({
 
     if (!readable) {
         return (
-            <a href={`/api/chat/attachments/${file.id}?download=1`} download={file.name} className={chip}>
+            <a
+                href={`/api/chat/attachments/${file.id}?download=1`}
+                download={file.name}
+                className={chip}
+            >
                 <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate" title={file.name}>
                     {file.name}
@@ -94,7 +98,9 @@ function SentFile({
                 type="button"
                 className={chip}
                 title={`Open ${file.name}`}
-                onClick={() => onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })}
+                onClick={() =>
+                    onOpen({ id: file.id, name: file.name, size: file.size, sentAt: at })
+                }
             >
                 <FileText className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="max-w-[16rem] truncate">{file.name}</span>
@@ -1385,7 +1391,8 @@ function QuotedMessageCard({
                           // A click held with a modifier is somebody asking for
                           // a tab or a window. That is the browser's to answer,
                           // and it needs the address left alone.
-                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+                              return;
                           event.preventDefault();
                           jump(reference.id);
                       }

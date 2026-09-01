@@ -40,7 +40,10 @@ export const ContextMenuGroup = RadixMenu.Group;
  * coming back to it is a class change rather than a rebuild. It lasts as long as
  * the menu is open, which is the span somebody is moving between the options.
  */
-export function ContextMenuSub({ onOpenChange, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
+export function ContextMenuSub({
+    onOpenChange,
+    ...props
+}: ComponentPropsWithoutRef<typeof RadixMenu.Sub>) {
     const [open, setOpen] = useState(false);
     const [kept, setKept] = useState(false);
     // Published rather than kept to this file: something drawn inside a submenu
@@ -152,7 +155,8 @@ export const ContextMenuSubTrigger = forwardRef<
                 // A submenu whose options all do the same heavy thing is that
                 // thing, and the trigger is the only part of it anybody reads
                 // before deciding. Same red as an item, for the same reason.
-                variant === "danger" && "text-danger focus:bg-danger/10 data-[state=open]:bg-danger/10",
+                variant === "danger" &&
+                    "text-danger focus:bg-danger/10 data-[state=open]:bg-danger/10",
                 className
             )}
             {...props}
@@ -195,9 +199,9 @@ export const ContextMenuSubContent = forwardRef<
                 // After the spread: the menu must never commit an option on the
                 // release of the press that opened it.
                 onPointerUpCapture={ignoreOpeningPress}
-            // And once it has it, the pointer does not take it back off it -
-            // see `keepSearchFocus`.
-            onPointerMoveCapture={keepSearchFocus}
+                // And once it has it, the pointer does not take it back off it -
+                // see `keepSearchFocus`.
+                onPointerMoveCapture={keepSearchFocus}
             />
         </RadixMenu.Portal>
     );
@@ -208,10 +212,16 @@ export function ContextMenuSeparator({ className }: { className?: string }) {
     return <RadixMenu.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} />;
 }
 
-export function ContextMenuLabel({ className, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
+export function ContextMenuLabel({
+    className,
+    ...props
+}: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
     return (
         <RadixMenu.Label
-            className={cn("truncate px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+            className={cn(
+                "truncate px-2 py-1.5 text-xs font-medium text-muted-foreground",
+                className
+            )}
             {...props}
         />
     );
