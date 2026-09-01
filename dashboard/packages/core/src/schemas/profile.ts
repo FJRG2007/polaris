@@ -12,9 +12,10 @@
 
 import { z } from "zod";
 
-/** One line under a name. Long enough for "Infrastructure, on the storage team",
- *  short enough that it cannot become the bio. */
-export const MAX_HEADLINE = 80;
+/** One line under a name. Long enough for what people actually write there -
+ *  a role, a team and what they are working on - and still short enough that it
+ *  cannot become the bio, which is the paragraph underneath. */
+export const MAX_HEADLINE = 220;
 
 export const headlineField = z
     .string()
@@ -66,16 +67,42 @@ export const profileLinkSchema = z.object({
         .trim()
         .max(2048)
         .transform((value) => (value && !/^[a-z][a-z0-9+.-]*:/i.test(value) ? `https://${value}` : value))
-        .refine((value) => {
-            if (!value) return false;
-            try {
-                const parsed = new URL(value);
-                return parsed.protocol === "https:" || parsed.protocol === "http:";
-            } catch {
-                return false;
-            }
-        }, "Enter a web address")
+        .refine((value) => linkProblem(value) === null, "Enter a web address")
 });
+
+/**
+ * What is wrong with a typed address, in the words the field says it in, or null
+ * when there is nothing wrong with it.
+ *
+ * Split out from the schema so the form can say WHICH of the three it is while
+ * somebody types - "https" on its own, a scheme that is not the web, or a host
+ * with no dot in it are three different mistakes and one message for all of them
+ * is a message nobody can act on. The schema refuses exactly what this refuses.
+ */
+export function linkProblem(value: string): string | null {
+    const typed = value.trim();
+    if (!typed) return "Enter a web address";
+    // A bare host is what people type, so it is completed rather than refused -
+    // the same thing the schema does before it checks.
+    const full = /^[a-z][a-z0-9+.-]*:/i.test(typed) ? typed : `https://${typed}`;
+
+    let parsed: URL;
+    try {
+        parsed = new URL(full);
+    } catch {
+        return "That is not a web address";
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        return "Only http:// and https:// addresses";
+    }
+    // `https` on its own parses as a host called "https" with nothing after it.
+    // Refused for the reason any single word is: there is no such site, and a
+    // profile that printed it would print a dead link.
+    if (!parsed.hostname.includes(".") || parsed.hostname.endsWith(".")) {
+        return "That address has no site in it";
+    }
+    return null;
+}
 
 export type ProfileLink = z.infer<typeof profileLinkSchema>;
 

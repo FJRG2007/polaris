@@ -20,6 +20,7 @@ import { Link2, Plus, X } from "lucide-react";
 import { saveProfileDetailsAction } from "./actions";
 import { Button, Card, CardBody, Input, Select } from "@polaris/ui";
 import {
+    linkProblem,
     MAX_HEADLINE,
     MAX_LINK_LABEL,
     MAX_PRONOUNS,
@@ -64,6 +65,11 @@ export function DetailsCard({
     const settled = rows
         .map((row) => ({ label: row.label.trim(), url: row.url.trim() }))
         .filter((row) => row.url !== "");
+    // What is wrong with each row that has something in it. A row nobody has
+    // filled in yet is incomplete rather than wrong, so it carries no message and
+    // does not hold Save down - the same rule every other field here follows.
+    const problems = rows.map((row) => (row.url.trim() ? linkProblem(row.url) : null));
+    const broken = problems.some((problem) => problem !== null);
     const changed =
         line.trim() !== saved.headline.trim() ||
         said.trim() !== saved.pronouns.trim() ||
@@ -163,6 +169,8 @@ export function DetailsCard({
                                 placeholder="yoursite.com"
                                 inputMode="url"
                                 aria-label={`Link ${index + 1} address`}
+                                aria-invalid={problems[index] ? true : undefined}
+                                aria-describedby={problems[index] ? `link-${index}-problem` : undefined}
                                 className="min-w-0 flex-1"
                                 onChange={(event) => {
                                     const next = [...rows];
@@ -180,6 +188,11 @@ export function DetailsCard({
                             >
                                 <X className="size-4 shrink-0" />
                             </Button>
+                            {problems[index] ? (
+                                <p id={`link-${index}-problem`} className="text-danger w-full text-xs">
+                                    {problems[index]}
+                                </p>
+                            ) : null}
                         </div>
                     ))}
                     {rows.length < MOST_PROFILE_LINKS ? (
@@ -196,7 +209,8 @@ export function DetailsCard({
                     ) : null}
                     <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                         <Link2 className="size-3 shrink-0" />
-                        A portfolio, a site, a linktree. An address with no name is drawn as its own host.
+                        A portfolio, a site, a linktree. Typing the site is enough - https:// is added for
+                        you - and an address with no name is drawn as its own host.
                     </span>
                 </div>
 
@@ -206,7 +220,8 @@ export function DetailsCard({
                     <Button
                         type="button"
                         className="ml-auto"
-                        disabled={busy || !changed}
+                        aria-disabled={busy || !changed || broken}
+                        disabled={busy || !changed || broken}
                         onClick={async () => {
                             setBusy(true);
                             setError("");
