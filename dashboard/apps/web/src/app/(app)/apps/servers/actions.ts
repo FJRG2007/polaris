@@ -19,6 +19,11 @@ import { setLocalEnvironment } from "@/lib/network-service";
 import { getServerMetrics } from "@/lib/server-metrics-service";
 import { hostSpace, reclaimHostSpace, type HostSpace } from "@/lib/deploy/host-space";
 import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
+import {
+    removeStrayContainer,
+    strayContainers,
+    type StrayContainer
+} from "@/lib/deploy/host-containers";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
 import {
@@ -443,6 +448,41 @@ export async function removeHostVolumeAction(name: string): Promise<{ error?: st
         targetType: "volume",
         targetId: name,
         metadata: { bytes: before?.bytes ?? null, project: before?.project ?? null }
+    });
+    revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+/** The containers Polaris deployed here and no longer has a record of. Null when
+ *  the machine would not say, which is not the same as none. */
+export async function strayContainersAction(): Promise<StrayContainer[] | null> {
+    await requirePermission("system.manage");
+    return strayContainers().catch(() => null);
+}
+
+/**
+ * Remove one container Polaris left behind.
+ *
+ * Audited with what it was, because this is Polaris tidying up after itself and
+ * the record of that belongs beside the deploys that made it. The checks that
+ * decide whether it may go at all are in `host-containers.ts`, re-run there at
+ * the moment of the call - and its volumes are deliberately not taken with it.
+ */
+export async function removeStrayContainerAction(id: string): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const strays = await strayContainers().catch(() => null);
+    const before = strays?.find((entry) => entry.id === id) ?? null;
+
+    const result = await removeStrayContainer(id).catch(() => null);
+    if (!result) return { error: "This machine would not answer. Nothing was removed." };
+    if (!result.ok) return { error: result.reason };
+
+    await recordAudit({
+        actorId: user.id,
+        action: "server.container.removed",
+        targetType: "container",
+        targetId: id,
+        metadata: { name: before?.name ?? null, project: before?.project ?? null, image: before?.image ?? null }
     });
     revalidatePath(SERVERS_PATH);
     return {};

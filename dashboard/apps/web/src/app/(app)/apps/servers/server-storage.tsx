@@ -18,6 +18,15 @@
  *
  * Only the machine Polaris runs on. It is the one it reaches through its own
  * daemon, and the one whose disk filling up stops Polaris deploying at all.
+ *
+ * Two questions a list of names cannot answer on its own, and both are here.
+ * What is holding a volume open - because "idle" is the wrong half of the answer
+ * to a 22 GB row, and the useful half is which container has it and what is
+ * inside it, which is a link into Drive through the app that mounts it. And what
+ * Polaris itself left behind: a service removed, a stack recreated under another
+ * name, a release that outlived its record, each leaving a container on the disk
+ * that nothing in Polaris mentions again. Finding those in `docker ps` is the
+ * one thing this product promises nobody has to do.
  */
 
 import Link from "next/link";
@@ -25,10 +34,16 @@ import { useCallback, useState } from "react";
 import { ContainerStorage } from "./container-storage";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { HostVolume } from "@/lib/deploy/host-volumes";
+import type { StrayContainer } from "@/lib/deploy/host-containers";
 import { useLiveRead } from "@/components/use-live-resource";
 import { Badge, Button, EmptyState } from "@polaris/ui";
-import { HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
-import { hostVolumesAction, removeHostVolumeAction } from "./actions";
+import { Boxes, HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
+import {
+    hostVolumesAction,
+    removeHostVolumeAction,
+    removeStrayContainerAction,
+    strayContainersAction
+} from "./actions";
 
 /** A disk does not change between two glances at it. */
 const REFRESH_MS = 60_000;
@@ -164,6 +179,7 @@ export function ServerStorage() {
                                                     : volume.project
                                                       ? `Created by ${volume.project}`
                                                       : "Polaris has no record of this one"}
+                                                {volume.heldBy.length > 0 ? ` - ${holders(volume)}` : ""}
                                             </span>
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">
@@ -173,22 +189,43 @@ export function ServerStorage() {
                                             {age(volume.createdAt) ?? "unknown"}
                                         </td>
                                         <td className="px-3 py-2 text-right">
-                                            {volume.spare ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    disabled={removing !== null}
-                                                    onClick={() => void remove(volume)}
-                                                    aria-label={`Delete ${volume.name}`}
-                                                    title="Delete"
-                                                >
-                                                    {removing === volume.name ? (
-                                                        <Loader2 className="size-4 shrink-0 animate-spin" />
-                                                    ) : (
-                                                        <Trash2 className="size-4 shrink-0" />
-                                                    )}
-                                                </Button>
-                                            ) : null}
+                                            <span className="flex items-center justify-end gap-0.5">
+                                                {/* The way in is the app that mounts
+                                                    it, at the path it mounts it on:
+                                                    a volume is a directory under the
+                                                    daemon's own root, and nothing
+                                                    else on this machine is allowed
+                                                    in there. */}
+                                                {volume.browseHref ? (
+                                                    <Button
+                                                        asChild
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        aria-label={`Open ${volume.name} in Drive`}
+                                                        title="See what is inside"
+                                                    >
+                                                        <Link href={volume.browseHref}>
+                                                            <FolderOpen className="size-4 shrink-0" />
+                                                        </Link>
+                                                    </Button>
+                                                ) : null}
+                                                {volume.spare ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        disabled={removing !== null}
+                                                        onClick={() => void remove(volume)}
+                                                        aria-label={`Delete ${volume.name}`}
+                                                        title="Delete"
+                                                    >
+                                                        {removing === volume.name ? (
+                                                            <Loader2 className="size-4 shrink-0 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="size-4 shrink-0" />
+                                                        )}
+                                                    </Button>
+                                                ) : null}
+                                            </span>
                                         </td>
                                     </tr>
                                 ))}
@@ -214,6 +251,8 @@ export function ServerStorage() {
                 {error ? <p className="text-danger text-xs">{error}</p> : null}
             </section>
 
+            <StrayContainers />
+
             <section className="flex flex-col gap-2">
                 <div>
                     <h2 className="flex items-center gap-1.5 text-sm font-medium">
@@ -235,5 +274,146 @@ export function ServerStorage() {
 
             {confirmElement}
         </div>
+    );
+}
+
+/** What has a volume open, in a sentence rather than a count: "held by
+ *  minecraft-a1b2" is the answer somebody looking at a large row is after, and a
+ *  number is not. */
+function holders(volume: HostVolume): string {
+    const names = volume.heldBy.map((holder) => `${holder.name}${holder.running ? "" : " (stopped)"}`);
+    if (names.length === 1) return `held by ${names[0]}`;
+    const rest = names.length - 2;
+    return `held by ${names.slice(0, 2).join(", ")}${rest > 0 ? ` and ${rest} more` : ""}`;
+}
+
+/**
+ * What Polaris deployed here and stopped keeping track of.
+ *
+ * Its own section rather than a line in the volumes table, because it is a
+ * different admission: a volume nothing uses may have been left by anything on
+ * the machine, and these were left by Polaris. They are named, dated, and
+ * removed one at a time - and never with their volumes, which are listed above
+ * with their sizes and go on their own.
+ *
+ * Draws nothing at all when there is nothing to say, which is almost always: a
+ * heading reading "Left behind: none" is a worry offered to somebody who did not
+ * have one.
+ */
+function StrayContainers() {
+    const [confirm, confirmElement] = useConfirm();
+    const [removing, setRemoving] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const load = useCallback(async (): Promise<StrayContainer[]> => {
+        const strays = await strayContainersAction();
+        // Thrown rather than resolved empty, for the reason the volumes list does
+        // it: "nothing was left behind" and "this machine would not say" are
+        // different answers.
+        if (!strays) throw new Error("unavailable");
+        return strays;
+    }, []);
+
+    const { data: strays, refresh } = useLiveRead<StrayContainer[]>({
+        load,
+        cacheKey: "servers.stray-containers",
+        intervalMs: REFRESH_MS
+    });
+
+    const remove = async (stray: StrayContainer) => {
+        const ok = await confirm({
+            title: `Remove "${stray.name}"?`,
+            description: `Polaris deployed this and no longer has a record of it${
+                stray.running ? ", and it is still running" : ""
+            }. Removing it frees its image layer and its ports. Anything it wrote to a volume stays where it is - those are listed above, with their sizes.`,
+            confirmLabel: "Remove it",
+            danger: true
+        });
+        if (!ok) return;
+        setRemoving(stray.id);
+        setError(null);
+        const result = await removeStrayContainerAction(stray.id);
+        setRemoving(null);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        await refresh();
+    };
+
+    if (!strays || strays.length === 0) return null;
+
+    return (
+        <section className="flex flex-col gap-2">
+            <div>
+                <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                    <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                    Left behind
+                </h2>
+                <p className="text-muted-foreground text-xs">
+                    Polaris put {strays.length === 1 ? "this container" : `these ${strays.length} containers`} on
+                    this machine and has no record of {strays.length === 1 ? "it" : "them"} any more - a service
+                    removed, or a stack recreated under another name. Nothing else on the machine is touched.
+                </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-border">
+                <table className="w-full text-sm">
+                    <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
+                        <tr>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">Container</th>
+                            <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
+                                Created
+                            </th>
+                            <th className="px-3 py-2" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {strays.map((stray) => (
+                            <tr key={stray.id} className="border-t border-border">
+                                <td className="w-full max-w-0 px-3 py-2">
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <span className="min-w-0 truncate font-medium" title={stray.name}>
+                                            {stray.name}
+                                        </span>
+                                        {stray.running ? (
+                                            <Badge variant="warning" className="shrink-0">
+                                                Still running
+                                            </Badge>
+                                        ) : null}
+                                    </span>
+                                    <span className="text-muted-foreground block truncate text-xs">
+                                        {stray.image}
+                                        {stray.status ? ` - ${stray.status}` : ""}
+                                    </span>
+                                </td>
+                                <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
+                                    {age(stray.createdAt) ?? "unknown"}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={removing !== null}
+                                        onClick={() => void remove(stray)}
+                                        aria-label={`Remove ${stray.name}`}
+                                        title="Remove"
+                                    >
+                                        {removing === stray.id ? (
+                                            <Loader2 className="size-4 shrink-0 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="size-4 shrink-0" />
+                                        )}
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {error ? <p className="text-danger text-xs">{error}</p> : null}
+            {confirmElement}
+        </section>
     );
 }
