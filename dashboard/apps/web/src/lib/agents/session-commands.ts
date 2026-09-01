@@ -465,16 +465,26 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         "        if (current[key] === undefined) { current[key] = value; changed = true; }",
         "    }",
         "    if (!changed) continue;",
-        "    fs.mkdirSync(path.dirname(file), { recursive: true });",
-        // Said out loud, on the screen somebody is watching. Where a tool keeps
-        // its configuration is a thing that MOVES - Claude Code's file follows
-        // `CLAUDE_CONFIG_DIR`, so a launcher setting that variable relocates it -
-        // and the failure that causes is invisible by nature: the answer is
-        // written, nothing reads it, the wizard appears anyway, and the terminal
-        // says nothing at all. One line naming the file turns that into
-        // something a person can see the first time it happens.
-        '    console.log("polaris: answered its first run in " + file);',
-        '    fs.writeFileSync(file, JSON.stringify(current, null, 2) + "\\n");',
+        // Said out loud, on the screen somebody is watching - and said AFTER
+        // the write rather than before it. Where a tool keeps its configuration
+        // is a thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so
+        // a launcher that sets it relocates the file, and the failure that causes
+        // is invisible by nature - the answer is written, nothing reads it, the
+        // wizard appears anyway, and the terminal says nothing. A line naming the
+        // file is what turns that into something a person sees the first time,
+        // and it is worth nothing if it can appear for a file never written.
+        //
+        // Each answer stands on its own, so a path that cannot be written is
+        // named on the screen instead of taking the answers after it down with
+        // it. One unwritable file is one tool asking its question; an abort is
+        // every question left unanswered.
+        "    try {",
+        "        fs.mkdirSync(path.dirname(file), { recursive: true });",
+        '        fs.writeFileSync(file, JSON.stringify(current, null, 2) + "\\n");',
+        '        console.log("polaris: answered its first run in " + file);',
+        "    } catch (error) {",
+        '        console.log("polaris: could not write " + file + " (" + error.message + ")");',
+        "    }",
         "}"
     ].join("\n");
     return [

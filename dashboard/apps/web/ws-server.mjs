@@ -126,22 +126,36 @@ const ATTACH_TO_AGENT = [
         // set if there is one, then the two a terminal emulator would ask for,
         // then the one tmux uses for its own panes, then the last-resort entry
         // that every ncurses install has.
-        'for t in "$TERM" xterm-256color screen xterm ansi; do',
+        "u=; for t in \"$TERM\" xterm-256color screen xterm ansi; do",
         // `dumb` is a terminal with no cursor addressing, so tmux refuses it
         // like a missing one - and it is what a stripped environment leaves
         // behind. Skipped rather than tried, so it costs no error line.
         '  { [ -n "$t" ] && [ "$t" != dumb ]; } || continue;',
-        '  TERM="$t" tmux attach-session -t polaris-agent && exit 0;',
+        // Remembered, so the shell below inherits a terminal name rather than
+        // the empty one this exec started with. A shell with no TERM is one
+        // nobody can run an editor or a pager in, and the last candidate tried
+        // is the most conservative entry there is - which is the right thing to
+        // hand a plain shell even when it was not enough for tmux.
+        '  u="$t"; TERM="$t" tmux attach-session -t polaris-agent && exit 0;',
         "done;",
         // Reached only when none of them opened. tmux has already said why on
         // this same terminal, above this line.
         'echo "polaris: could not attach to the agent terminal. This shell is inside the same container.";',
-        // And it is a shell somebody can work in. The agent installs into a
-        // prefix inside its own home, so a root shell with the image's PATH
-        // does not have the tool that is running two feet away - which is
-        // exactly what the last person to land here found.
-        "h=$(getent passwd node 2>/dev/null | cut -d: -f6);",
+        '[ -n "$u" ] && { TERM="$u"; export TERM; };',
+        // And it is a shell somebody can work in, as the account the agent runs
+        // as rather than as root. The agent installs into a prefix inside its
+        // own home, so a root shell with the image's PATH does not have the tool
+        // that is running two feet away - which is exactly what the last person
+        // to land here found when they typed its name.
+        //
+        // Both names come from the container's own environment, which the
+        // session put there; naming the account here would be a second copy of
+        // a decision that is made in one place.
+        'a="$POLARIS_RUNAS"; h="$POLARIS_HOME";',
         'if [ -n "$h" ] && [ -d "$h" ]; then HOME="$h"; PATH="$h/.npm-global/bin:$PATH"; export HOME PATH; fi;',
+        'if [ "$(id -u)" = 0 ] && [ -n "$a" ] && id "$a" >/dev/null 2>&1 && command -v su >/dev/null 2>&1; then',
+        '  exec su -p "$a" -s /bin/sh;',
+        "fi;",
         "exec /bin/sh"
     ].join(" ")
 ];

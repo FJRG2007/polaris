@@ -214,6 +214,23 @@ describe("the tool's own first-run wizard", () => {
         );
     });
 
+    it("says it after the write, not before", () => {
+        // A line that can appear for a file that was never written is worse
+        // than no line: it is the same silence with a reassurance on top.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script.indexOf("fs.writeFileSync(file")).toBeLessThan(
+            script.indexOf("polaris: answered its first run in")
+        );
+    });
+
+    it("names a file it could not write instead of abandoning the rest", () => {
+        // One unwritable path is one tool asking its question; an abort there
+        // is every question after it left unanswered.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("polaris: could not write");
+        expect(script).toContain("} catch (error) {");
+    });
+
     it("says nothing about a tool nothing has been sourced for", () => {
         // The same rule as `credentials`: an empty list is an answer. A guessed
         // key is written, ignored, and leaves the session in front of the wizard
