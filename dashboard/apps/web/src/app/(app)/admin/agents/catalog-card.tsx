@@ -41,7 +41,10 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
         setOn(next);
         startTransition(() => {
             void (async () => {
-                const result = await runAction(() => setInstanceKeySharingAction({ shared: next }), setError);
+                const result = await runAction(
+                    () => setInstanceKeySharingAction({ shared: next }),
+                    setError
+                );
                 if (!result || result.error) setOn(!next);
             })();
         });
@@ -52,14 +55,21 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
             <CardBody className="space-y-3">
                 <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1 space-y-1">
-                        <p className="text-sm font-medium">Share this deployment&apos;s provider keys</p>
+                        <p className="text-sm font-medium">
+                            Share this deployment&apos;s provider keys
+                        </p>
                         <p className="text-muted-foreground text-xs">
                             {on
                                 ? "Anybody without a key of their own runs on the keys stored under Integrations, and those accounts are billed to you."
                                 : "Runs only use keys people add themselves, under Account > AI provider keys. Nobody spends this deployment's providers."}
                         </p>
                     </div>
-                    <Switch checked={on} onChange={toggle} disabled={pending} aria-label="Share provider keys" />
+                    <Switch
+                        checked={on}
+                        onChange={toggle}
+                        disabled={pending}
+                        aria-label="Share provider keys"
+                    />
                 </div>
                 {error ? <p className="text-xs text-red-400">{error}</p> : null}
             </CardBody>
@@ -121,7 +131,13 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
     );
 }
 
-export function CatalogCard({ models, refreshedAt }: { models: number; refreshedAt: string | null }) {
+export function CatalogCard({
+    models,
+    refreshedAt
+}: {
+    models: number;
+    refreshedAt: string | null;
+}) {
     const [count, setCount] = useState(models);
     const [at, setAt] = useState(refreshedAt);
     const [error, setError] = useState<string | null>(null);

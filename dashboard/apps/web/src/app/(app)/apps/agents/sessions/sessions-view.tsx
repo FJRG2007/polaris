@@ -144,7 +144,10 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     )}
                                 </span>
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
-                                    {core.sessionStateLabel(session.state, session.lastEventAt !== null)}
+                                    {core.sessionStateLabel(
+                                        session.state,
+                                        session.lastEventAt !== null
+                                    )}
                                 </span>
                                 {core.isSessionOver(session.state) ? null : (
                                     <Button size="sm" variant="ghost" onClick={() => stop(session)}>
@@ -267,188 +270,186 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                 </DialogHeader>
 
                 <div className="space-y-3">
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">What is it working on</span>
+                        <Input
+                            value={title}
+                            onChange={(event) => setTitle(event.target.value)}
+                            placeholder="Fix the login redirect"
+                        />
+                    </label>
+
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">Repository</span>
+                        <Select
+                            value={repoId}
+                            onValueChange={setRepoId}
+                            options={[
+                                // First, because it is the answer that needs
+                                // nothing set up. Somebody who just wants an
+                                // agent should not have to connect a
+                                // repository to get one.
+                                { value: NO_REPO, label: "No repository - just open the agent" },
+                                ...(choices?.repos ?? []).map((repo) => ({
+                                    value: repo.id,
+                                    label: repo.name
+                                }))
+                            ]}
+                            placeholder="Pick a repository"
+                        />
+                    </label>
+
+                    {workspace ? (
+                        <p className="text-xs text-muted-foreground">
+                            It opens on a machine of your own with an empty directory and nothing
+                            checked out. The machine keeps its home, so what you install and sign in
+                            to stays there for next time.
+                        </p>
+                    ) : null}
+                    {noRepos ? (
+                        <p className="text-xs text-muted-foreground">
+                            Nothing is connected yet. Add one under{" "}
+                            <Link href="/apps/agents/repos" className="underline">
+                                Repositories
+                            </Link>{" "}
+                            to have an agent work in it.
+                        </p>
+                    ) : null}
+
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">Agent</span>
+                        <AgentSelect
+                            options={agents}
+                            value={cli}
+                            onChange={setCli}
+                            disabled={choices === null}
+                        />
+                    </label>
+
+                    {unlinked ? <SignInNotice agent={unlinked} /> : null}
+
+                    {cli === core.CUSTOM_AGENT_CLI ? (
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
-                                What is it working on
+                                The command that starts it. It has to already be installed on the
+                                machine.
                             </span>
                             <Input
-                                value={title}
-                                onChange={(event) => setTitle(event.target.value)}
-                                placeholder="Fix the login redirect"
+                                value={command}
+                                onChange={(event) => setCommand(event.target.value)}
+                                placeholder="my-agent"
                             />
                         </label>
+                    ) : null}
 
-                        <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Repository</span>
-                            <Select
-                                value={repoId}
-                                onValueChange={setRepoId}
-                                options={[
-                                    // First, because it is the answer that needs
-                                    // nothing set up. Somebody who just wants an
-                                    // agent should not have to connect a
-                                    // repository to get one.
-                                    { value: NO_REPO, label: "No repository - just open the agent" },
-                                    ...(choices?.repos ?? []).map((repo) => ({
-                                        value: repo.id,
-                                        label: repo.name
-                                    }))
-                                ]}
-                                placeholder="Pick a repository"
-                            />
-                        </label>
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">Where it runs</span>
+                        <Select
+                            value={place}
+                            onValueChange={(value) => setPlace(value as core.AgentSessionPlace)}
+                            options={core.AGENT_SESSION_PLACES.map((option) => ({
+                                value: option,
+                                label: core.AGENT_SESSION_PLACE_LABELS[option]
+                            }))}
+                        />
+                    </label>
 
-                        {workspace ? (
-                            <p className="text-xs text-muted-foreground">
-                                It opens on a machine of your own with an empty directory and
-                                nothing checked out. The machine keeps its home, so what you
-                                install and sign in to stays there for next time.
-                            </p>
-                        ) : null}
-                        {noRepos ? (
-                            <p className="text-xs text-muted-foreground">
-                                Nothing is connected yet. Add one under{" "}
-                                <Link href="/apps/agents/repos" className="underline">
-                                    Repositories
-                                </Link>{" "}
-                                to have an agent work in it.
-                            </p>
-                        ) : null}
-
-                        <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Agent</span>
-                            <AgentSelect
-                                options={agents}
-                                value={cli}
-                                onChange={setCli}
-                                disabled={choices === null}
-                            />
-                        </label>
-
-                        {unlinked ? <SignInNotice agent={unlinked} /> : null}
-
-                        {cli === core.CUSTOM_AGENT_CLI ? (
-                            <label className="block space-y-1">
-                                <span className="text-xs text-muted-foreground">
-                                    The command that starts it. It has to already be installed on
-                                    the machine.
-                                </span>
-                                <Input
-                                    value={command}
-                                    onChange={(event) => setCommand(event.target.value)}
-                                    placeholder="my-agent"
-                                />
-                            </label>
-                        ) : null}
-
-                        <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">Where it runs</span>
-                            <Select
-                                value={place}
-                                onValueChange={(value) => setPlace(value as core.AgentSessionPlace)}
-                                options={core.AGENT_SESSION_PLACES.map((option) => ({
-                                    value: option,
-                                    label: core.AGENT_SESSION_PLACE_LABELS[option]
-                                }))}
-                            />
-                        </label>
-
-                        {/* Only where the deployment offers one, and only for a
+                    {/* Only where the deployment offers one, and only for a
                             container Polaris owns - an enrolled server already
                             has a home of its own. The copy says what it means
                             rather than what it is called: one home, so the
                             logins and the files are everybody's. */}
-                        {place === "local" && choices?.sharedWorkspace ? (
-                            <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
-                                <div className="min-w-0">
-                                    <p className="text-sm">Use the machine everybody shares</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {sharedHome
-                                            ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find."
-                                            : "It opens on a machine of your own, with your logins and your files. Nobody else reaches it."}
-                                    </p>
-                                </div>
-                                <Switch checked={sharedHome} onChange={setSharedHome} />
+                    {place === "local" && choices?.sharedWorkspace ? (
+                        <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                            <div className="min-w-0">
+                                <p className="text-sm">Use the machine everybody shares</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {sharedHome
+                                        ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find."
+                                        : "It opens on a machine of your own, with your logins and your files. Nobody else reaches it."}
+                                </p>
                             </div>
-                        ) : null}
+                            <Switch checked={sharedHome} onChange={setSharedHome} />
+                        </div>
+                    ) : null}
 
-                        {place === "host" ? (
-                            <label className="block space-y-1">
-                                <span className="text-xs text-muted-foreground">Which server</span>
-                                <Select
-                                    value={hostId}
-                                    onValueChange={setHostId}
-                                    options={(choices?.hosts ?? []).map((host) => ({
-                                        value: host.id,
-                                        label: host.name
-                                    }))}
-                                    placeholder="Pick a server"
-                                />
-                            </label>
-                        ) : null}
-
-                        {workspace ? null : (
-                            <label className="block space-y-1">
-                                <span className="text-xs text-muted-foreground">
-                                    Branch to start from. Leave it empty for the repository&apos;s
-                                    default.
-                                </span>
-                                <Input
-                                    value={baseRef}
-                                    onChange={(event) => setBaseRef(event.target.value)}
-                                    placeholder="main"
-                                />
-                            </label>
-                        )}
-
+                    {place === "host" ? (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">
-                                What to start with. Leave it empty to open the agent and type into
-                                it yourself.
-                            </span>
-                            <Textarea
-                                value={prompt}
-                                onChange={(event) => setPrompt(event.target.value)}
-                                rows={4}
-                                placeholder="Read the failing test in auth.test.ts and fix what it is telling you."
+                            <span className="text-xs text-muted-foreground">Which server</span>
+                            <Select
+                                value={hostId}
+                                onValueChange={setHostId}
+                                options={(choices?.hosts ?? []).map((host) => ({
+                                    value: host.id,
+                                    label: host.name
+                                }))}
+                                placeholder="Pick a server"
                             />
                         </label>
+                    ) : null}
 
-                        {/* The one control on this form that changes what the
+                    {workspace ? null : (
+                        <label className="block space-y-1">
+                            <span className="text-xs text-muted-foreground">
+                                Branch to start from. Leave it empty for the repository&apos;s
+                                default.
+                            </span>
+                            <Input
+                                value={baseRef}
+                                onChange={(event) => setBaseRef(event.target.value)}
+                                placeholder="main"
+                            />
+                        </label>
+                    )}
+
+                    <label className="block space-y-1">
+                        <span className="text-xs text-muted-foreground">
+                            What to start with. Leave it empty to open the agent and type into it
+                            yourself.
+                        </span>
+                        <Textarea
+                            value={prompt}
+                            onChange={(event) => setPrompt(event.target.value)}
+                            rows={4}
+                            placeholder="Read the failing test in auth.test.ts and fix what it is telling you."
+                        />
+                    </label>
+
+                    {/* The one control on this form that changes what the
                             agent may do to a machine, so it says which machine.
                             In a container it is the difference between working
                             and sitting on a permission prompt nobody will answer;
                             on somebody's server it is the difference between a
                             tool that asks and a tool that does not. */}
-                        <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
-                            <div className="min-w-0">
-                                <p className="text-sm">Let it work without asking</p>
-                                <p className="text-xs text-muted-foreground">
-                                    {enigma
-                                        ? "Enigma is on, so this is one of the things it settles: your own policies decide what the agent may run without asking, and Polaris does not add anything on top."
-                                        : place === "host"
-                                        ? "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it."
-                                          : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
-                                </p>
-                            </div>
-                            <Switch
-                                checked={core.agentRunsUnattended(place, unattended)}
-                                onChange={setUnattended}
-                                disabled={enigma}
-                            />
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                        <div className="min-w-0">
+                            <p className="text-sm">Let it work without asking</p>
+                            <p className="text-xs text-muted-foreground">
+                                {enigma
+                                    ? "Enigma is on, so this is one of the things it settles: your own policies decide what the agent may run without asking, and Polaris does not add anything on top."
+                                    : place === "host"
+                                      ? "This server is your machine: the agent runs as the account Polaris enrolled, beside everything that account can reach. Off, it asks before each command - which means taking the terminal to answer it."
+                                      : "It runs in a container of its own holding one checkout, removed when the session ends. Off, it waits on its own permission prompts, and nobody is watching a container."}
+                            </p>
                         </div>
+                        <Switch
+                            checked={core.agentRunsUnattended(place, unattended)}
+                            onChange={setUnattended}
+                            disabled={enigma}
+                        />
+                    </div>
 
-                        <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
-                            <div className="min-w-0">
-                                <p className="text-sm">Work to your Enigma standards</p>
-                                <p className="text-xs text-muted-foreground">
-                                    Installs your policies, conventions and guardrails into the
-                                    session before the agent starts. Its own settings come from this
-                                    repository and from Agents settings.
-                                </p>
-                            </div>
-                            <Switch checked={enigma} onChange={setEnigma} />
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                        <div className="min-w-0">
+                            <p className="text-sm">Work to your Enigma standards</p>
+                            <p className="text-xs text-muted-foreground">
+                                Installs your policies, conventions and guardrails into the session
+                                before the agent starts. Its own settings come from this repository
+                                and from Agents settings.
+                            </p>
                         </div>
+                        <Switch checked={enigma} onChange={setEnigma} />
+                    </div>
 
                     {error ? <p className="text-sm text-red-400">{error}</p> : null}
                 </div>

@@ -70,12 +70,15 @@ function containerName(id: string): string {
  * exactly the screen that exists today - a credential Polaris cannot walk
  * somebody through is still a credential they can paste.
  */
-const LOGIN_COMMANDS: Readonly<Record<string, { install: string; command: string; whoami?: string }>> = {
+const LOGIN_COMMANDS: Readonly<
+    Record<string, { install: string; command: string; whoami?: string }>
+> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
         // The same install line the catalogue uses, --allow-scripts and all:
         // npm now declines a package's postinstall unless it is named, and this
         // one's postinstall is what puts the binary on the PATH.
-        install: "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
+        install:
+            "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         command: "claude setup-token",
         // Asked once, after the login, in the same container. It is the only way
         // a stored credential can say whose it is - and without that, an account
@@ -345,7 +348,9 @@ export function parseSigninIdentity(output: string): SigninIdentity {
     if (!parsed || typeof parsed !== "object") return {};
     const record = parsed as Record<string, unknown>;
     const account =
-        record.account && typeof record.account === "object" ? (record.account as Record<string, unknown>) : {};
+        record.account && typeof record.account === "object"
+            ? (record.account as Record<string, unknown>)
+            : {};
 
     const read = (...keys: string[]): string | undefined => {
         for (const key of keys) {
@@ -397,7 +402,11 @@ export function whoamiScript(command: string): string {
  * login. Returns an empty identity for every failure there is - no command for
  * this credential, a container already gone, a version that prints prose.
  */
-export async function identifySignin(userId: string, id: string, env: string): Promise<SigninIdentity> {
+export async function identifySignin(
+    userId: string,
+    id: string,
+    env: string
+): Promise<SigninIdentity> {
     const command = LOGIN_COMMANDS[env]?.whoami;
     if (!command) return {};
     try {

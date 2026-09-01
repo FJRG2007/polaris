@@ -405,7 +405,7 @@ const START_AGENT = [
     // Said where somebody will read it, because nothing else advertises this: a
     // machine that keeps its home can hold several logins, and one command makes
     // the next one.
-    '  echo "polaris: this machine keeps its logins. \'enigma account add <name> --login\' adds another, \'enigma account use <name>\' picks it."',
+    "  echo \"polaris: this machine keeps its logins. 'enigma account add <name> --login' adds another, 'enigma account use <name>' picks it.\"",
     "fi",
     'echo "polaris: starting $POLARIS_LAUNCH"',
     // Written last, so anything holding a prompt knows the terminal it is about

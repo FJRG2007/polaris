@@ -19,7 +19,11 @@ import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers"
 import { deleteUsageLimit, saveUsageLimit } from "@/lib/agents/agent-usage-limits";
 import { connectedProviders, setInstanceKeysShared } from "@/lib/agents/model-keys";
 import { agentDefaultsSchema, LIMIT_METRICS, LIMIT_PERIODS, LIMIT_SUBJECTS } from "@polaris/core";
-import { catalogRefreshedAt, listCatalogModels, refreshModelCatalog } from "@/lib/agents/model-catalog";
+import {
+    catalogRefreshedAt,
+    listCatalogModels,
+    refreshModelCatalog
+} from "@/lib/agents/model-catalog";
 
 /** The same list the accounts' own screens get, read through the admin gate.
  *  Kept apart rather than imported from the app's actions so /admin never
@@ -91,21 +95,23 @@ export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?
     return {};
 }
 
-const limitSchema = z.object({
-    subjectType: z.enum(LIMIT_SUBJECTS),
-    // Empty only for `everyone`, which is the deployment-wide floor and names
-    // nothing. The refine below is what stops a half-filled form storing a rule
-    // that matches nobody.
-    subjectId: z.string().trim().max(200).default(""),
-    metric: z.enum(LIMIT_METRICS),
-    period: z.enum(LIMIT_PERIODS),
-    // Zero is a real answer - it stops the subject running at all - so the floor
-    // is zero rather than one.
-    amount: z.number().int().min(0).max(1_000_000_000)
-}).refine((value) => value.subjectType === "everyone" || value.subjectId.length > 0, {
-    message: "Say who or what the limit is for",
-    path: ["subjectId"]
-});
+const limitSchema = z
+    .object({
+        subjectType: z.enum(LIMIT_SUBJECTS),
+        // Empty only for `everyone`, which is the deployment-wide floor and names
+        // nothing. The refine below is what stops a half-filled form storing a rule
+        // that matches nobody.
+        subjectId: z.string().trim().max(200).default(""),
+        metric: z.enum(LIMIT_METRICS),
+        period: z.enum(LIMIT_PERIODS),
+        // Zero is a real answer - it stops the subject running at all - so the floor
+        // is zero rather than one.
+        amount: z.number().int().min(0).max(1_000_000_000)
+    })
+    .refine((value) => value.subjectType === "everyone" || value.subjectId.length > 0, {
+        message: "Say who or what the limit is for",
+        path: ["subjectId"]
+    });
 
 export async function saveUsageLimitAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
@@ -118,7 +124,11 @@ export async function saveUsageLimitAction(input: unknown): Promise<{ error?: st
         action: "agents.limit.save",
         targetType: parsed.data.subjectType,
         targetId: parsed.data.subjectId || "everyone",
-        metadata: { metric: parsed.data.metric, period: parsed.data.period, amount: parsed.data.amount }
+        metadata: {
+            metric: parsed.data.metric,
+            period: parsed.data.period,
+            amount: parsed.data.amount
+        }
     });
     revalidatePath("/admin/agents");
     return {};
@@ -130,7 +140,11 @@ export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: 
     if (!parsed.success) return { error: "Pick a limit" };
 
     await deleteUsageLimit(parsed.data.id);
-    await recordAudit({ actorId: admin.id, action: "agents.limit.delete", targetId: parsed.data.id });
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.limit.delete",
+        targetId: parsed.data.id
+    });
     revalidatePath("/admin/agents");
     return {};
 }
@@ -142,7 +156,11 @@ export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: 
  * wrong answer: a deployment that has just come online and has an empty
  * catalogue, and a model released today that somebody wants to pick.
  */
-export async function refreshModelCatalogAction(): Promise<{ models?: number; at?: string; error?: string }> {
+export async function refreshModelCatalogAction(): Promise<{
+    models?: number;
+    at?: string;
+    error?: string;
+}> {
     const admin = await requireAdmin();
     const result = await refreshModelCatalog();
     if (!result.ok) return { error: result.error ?? "The catalog could not be read." };
@@ -166,7 +184,9 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     if (parsed.data.model) {
         const provider = providerForModel(parsed.data.model);
         if (provider && !(await connectedProviders()).includes(provider.slug)) {
-            return { error: `Connect ${provider.name} under Integrations before defaulting to this model.` };
+            return {
+                error: `Connect ${provider.name} under Integrations before defaulting to this model.`
+            };
         }
     }
 

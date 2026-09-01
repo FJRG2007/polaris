@@ -35,9 +35,7 @@ describe("startAgentSessionSchema, on the shape with no repository", () => {
     });
 
     it("refuses a branch on a workspace, since there is no checkout to have one", () => {
-        const parsed = startAgentSessionSchema.safeParse(
-            base({ repoId: null, baseRef: "main" })
-        );
+        const parsed = startAgentSessionSchema.safeParse(base({ repoId: null, baseRef: "main" }));
         expect(parsed.success).toBe(false);
         if (!parsed.success) expect(parsed.error.issues[0]?.path).toEqual(["baseRef"]);
     });
@@ -68,8 +66,9 @@ describe("startAgentSessionSchema, on the machine everybody shares", () => {
 
     it("takes it on the box Polaris runs", () => {
         expect(
-            startAgentSessionSchema.safeParse(base({ repoId: null, place: "local", sharedHome: true }))
-                .success
+            startAgentSessionSchema.safeParse(
+                base({ repoId: null, place: "local", sharedHome: true })
+            ).success
         ).toBe(true);
     });
 

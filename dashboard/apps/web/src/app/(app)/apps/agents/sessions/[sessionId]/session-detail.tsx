@@ -138,7 +138,9 @@ export function SessionDetail({ session, events, messages }: Props) {
     // and the two were never the same message twice.
     useEffect(() => {
         if (pending.length === 0) return;
-        const said = new Set(messages.filter((message) => message.role === "user").map((one) => one.body));
+        const said = new Set(
+            messages.filter((message) => message.role === "user").map((one) => one.body)
+        );
         setPending((queue) => queue.filter((one) => !said.has(one.body)));
         // Only when the server's list changes; `pending` is read, never depended on.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -157,19 +159,20 @@ export function SessionDetail({ session, events, messages }: Props) {
         // Deliberately outside a transition: a transition makes the next send
         // wait for this one, and somebody typing three things in a row should
         // not be queueing behind a round trip they cannot see.
-        void runAction(() => promptSessionAction({ sessionId: session.id, text: body }), setError).then(
-            (result) => {
-                if (result?.error) {
-                    // Rolled back, and the text handed back rather than lost:
-                    // it is the only copy of what they wrote.
-                    setPending((queue) => queue.filter((one) => one.key !== key));
-                    setError(result.error);
-                    setText((current) => (current ? current : body));
-                    return;
-                }
-                router.refresh();
+        void runAction(
+            () => promptSessionAction({ sessionId: session.id, text: body }),
+            setError
+        ).then((result) => {
+            if (result?.error) {
+                // Rolled back, and the text handed back rather than lost:
+                // it is the only copy of what they wrote.
+                setPending((queue) => queue.filter((one) => one.key !== key));
+                setError(result.error);
+                setText((current) => (current ? current : body));
+                return;
             }
-        );
+            router.refresh();
+        });
     };
 
     const interrupt = () => {
@@ -329,8 +332,8 @@ export function SessionDetail({ session, events, messages }: Props) {
                             is the reason this looked broken. It will not: the
                             home this runs in is kept between sessions. */}
                         <p className="text-muted-foreground mt-3 text-xs">
-                            If the agent asks you to sign in, do it here. This machine keeps its home
-                            between sessions, so it only asks once.
+                            If the agent asks you to sign in, do it here. This machine keeps its
+                            home between sessions, so it only asks once.
                         </p>
                     </CardBody>
                 </Card>
@@ -382,8 +385,12 @@ export function SessionDetail({ session, events, messages }: Props) {
                             simply not been re-read yet. */}
                         {pending.map((one) => (
                             <div key={one.key} className="space-y-1 opacity-60">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">You</p>
-                                <p className="whitespace-pre-wrap break-words text-sm">{one.body}</p>
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    You
+                                </p>
+                                <p className="whitespace-pre-wrap break-words text-sm">
+                                    {one.body}
+                                </p>
                             </div>
                         ))}
                         <div ref={bottom} />

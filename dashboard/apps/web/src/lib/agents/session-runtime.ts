@@ -190,7 +190,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // no token. Refusing to start one because an organization has not connected
     // GitHub would be refusing over a repository nobody named.
     const owner = session.repoFullName.split("/")[0] ?? "";
-    const githubToken = session.repoFullName ? ((await githubAppInstallationToken(owner)) ?? "") : "";
+    const githubToken = session.repoFullName
+        ? ((await githubAppInstallationToken(owner)) ?? "")
+        : "";
     if (session.repoFullName && !githubToken) {
         throw new SessionRefusal(
             `Polaris has no GitHub App installation for ${owner}, so it cannot check the repository out. Connect it again under Agents settings.`
@@ -202,7 +204,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const mcp = `${base}/api/mcp`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session, enigma.enabled);
-    const chosen = session.accountId ? await secretForAccount(session.ownerId, session.accountId) : null;
+    const chosen = session.accountId
+        ? await secretForAccount(session.ownerId, session.accountId)
+        : null;
 
     // Null is the store failing to answer, and it is not the same as an account
     // holding nothing. A session started on a blank environment because the
@@ -412,9 +416,7 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                         // person's sign-in in another person's terminal.
                         source: session.sharedHome
                             ? commands.SHARED_HOME_SOURCE
-                            : commands.agentHomeSource(
-                                  session.ownerId ?? `session-${session.id}`
-                              ),
+                            : commands.agentHomeSource(session.ownerId ?? `session-${session.id}`),
                         target: commands.AGENT_HOME,
                         kind: "bind" as const
                     }

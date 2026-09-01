@@ -19,8 +19,16 @@ export const dynamic = "force-dynamic";
 
 export default async function AgentDefaultsAdminPage() {
     await requireAdmin();
-    const [platform, pools, providers, catalogModels, catalogAt, keysShared, limits, sharedMachine] =
-        await Promise.all([
+    const [
+        platform,
+        pools,
+        providers,
+        catalogModels,
+        catalogAt,
+        keysShared,
+        limits,
+        sharedMachine
+    ] = await Promise.all([
         getPlatformAgentDefaults(),
         // Every pool on the deployment, not one person's: a default here applies
         // to everybody.
@@ -33,9 +41,9 @@ export default async function AgentDefaultsAdminPage() {
         prisma.agentModel.count(),
         catalogRefreshedAt(),
         instanceKeysAreShared(),
-            listUsageLimits(),
-            sharedWorkspaceAllowed()
-        ]);
+        listUsageLimits(),
+        sharedWorkspaceAllowed()
+    ]);
 
     return (
         // Narrow page: centre the column in the content area, header included, so
@@ -49,7 +57,10 @@ export default async function AgentDefaultsAdminPage() {
                 <KeySharingCard shared={keysShared} />
                 <SharedWorkspaceCard allowed={sharedMachine} />
                 <UsageLimitsCard limits={limits} />
-                <CatalogCard models={catalogModels} refreshedAt={catalogAt?.toISOString() ?? null} />
+                <CatalogCard
+                    models={catalogModels}
+                    refreshedAt={catalogAt?.toISOString() ?? null}
+                />
                 <PlatformDefaultsView platform={platform} pools={pools} providers={providers} />
             </div>
         </div>

@@ -32,7 +32,9 @@ vi.mock("../../src/app/(app)/apps/agents/sessions/actions", () => ({
 }));
 vi.mock("../../src/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 
-const { SessionDetail } = await import("../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail");
+const { SessionDetail } = await import(
+    "../../src/app/(app)/apps/agents/sessions/[sessionId]/session-detail"
+);
 
 function workspaceSession(overrides: Partial<SessionView> = {}): SessionView {
     return {
@@ -87,7 +89,13 @@ describe("the boot progress card", () => {
 
     it("shows nothing once the agent has the terminal", async () => {
         sessionScreenAction.mockResolvedValueOnce({ screen: "polaris: starting claude" });
-        render(<SessionDetail session={workspaceSession({ state: "working" })} events={[]} messages={[]} />);
+        render(
+            <SessionDetail
+                session={workspaceSession({ state: "working" })}
+                events={[]}
+                messages={[]}
+            />
+        );
 
         await waitFor(() => expect(sessionScreenAction).not.toHaveBeenCalled());
         expect(screen.queryByText("Getting the machine ready.")).toBeNull();

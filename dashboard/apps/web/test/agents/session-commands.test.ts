@@ -153,7 +153,9 @@ describe("the boot script for an enrolled server", () => {
 
     it("says what is missing rather than reaching for a package manager", () => {
         expect(commands.SESSION_BOOT_FOR_HOST).toContain("this machine has no tmux");
-        expect(commands.SESSION_SETUP).toContain("is not installed and could not be installed here");
+        expect(commands.SESSION_SETUP).toContain(
+            "is not installed and could not be installed here"
+        );
     });
 
     it("does not park a foreground process on it, and still leaves the agent running", () => {
@@ -478,8 +480,12 @@ describe("finding the address a login printed", () => {
     it("leaves the punctuation a sentence put around it", () => {
         // A bracket or a full stop swept into the address is a link that 404s in
         // a way nobody looks at twice.
-        expect(commands.firstUrlIn("open (https://example.com/a/b).")).toBe("https://example.com/a/b");
-        expect(commands.firstUrlIn("see https://example.com/x, then paste")).toBe("https://example.com/x");
+        expect(commands.firstUrlIn("open (https://example.com/a/b).")).toBe(
+            "https://example.com/a/b"
+        );
+        expect(commands.firstUrlIn("see https://example.com/x, then paste")).toBe(
+            "https://example.com/x"
+        );
     });
 
     it("says nothing when there is nothing to say", () => {
