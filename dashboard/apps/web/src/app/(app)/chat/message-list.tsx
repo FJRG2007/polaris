@@ -471,7 +471,12 @@ function useMessageKeys({
             // Copy is the only one that wants a modifier, and the only one that
             // is refused when the others are held. Worked out first so the plain
             // keys below can go on rejecting every modifier there is.
-            const holding = event.ctrlKey || event.metaKey;
+            //
+            // Alt disqualifies it, and that is not tidiness. AltGr is reported as
+            // Ctrl+Alt on Windows, so a layout that puts a character on AltGr+C -
+            // and the person writing this is typing on one - would have that
+            // character swallowed and a message copied instead, every time.
+            const holding = (event.ctrlKey || event.metaKey) && !event.altKey;
             const wanted =
                 holding && (event.key === "c" || event.key === "C")
                     ? "copy"
@@ -513,10 +518,17 @@ function useMessageKeys({
             if (message.kind === "system") return;
 
             if (wanted === "copy") {
-                event.preventDefault();
                 // The same text the menu's "Copy text" hands over: what the
                 // message says, not the markup it is stored as.
-                void copyText(plainText(message.body));
+                const text = plainText(message.body);
+                // A message can be a picture and nothing else - the composer
+                // allows it - and its body is then empty. Writing that to the
+                // clipboard destroys whatever was on it, which is the worst
+                // thing a shortcut can do: silent, and it takes something that
+                // was not ours. The press is left to the browser instead.
+                if (!text) return;
+                event.preventDefault();
+                void copyText(text);
                 return;
             }
 

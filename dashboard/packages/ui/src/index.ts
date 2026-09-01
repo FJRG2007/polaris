@@ -11,6 +11,11 @@ export { useDeferredFocus } from "./lib/use-deferred-focus";
 export { MenuSearch, menuSearchMatches } from "./components/menu-search";
 export { refocusMenuSearch } from "./lib/menu-search-focus";
 export { MenuSurfaceProvider, useMenuSurface, type MenuSurfaceState } from "./lib/menu-surface";
+// Published beside the other menu helpers rather than kept to the context menu.
+// It decides when the browser's own right-click menu is suppressed across the
+// whole application, which is exactly the kind of rule worth being able to assert
+// on directly - see the test that pins when the watch is and is not live.
+export { useReopenElsewhere } from "./lib/menu-reopen";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { Textarea, type TextareaProps } from "./components/textarea";

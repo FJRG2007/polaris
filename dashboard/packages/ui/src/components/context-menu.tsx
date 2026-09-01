@@ -16,7 +16,6 @@ import { useReopenElsewhere } from "../lib/menu-reopen";
 import {
     forwardRef,
     useMemo,
-    useRef,
     useState,
     type ComponentPropsWithoutRef,
     type ElementRef,
@@ -68,17 +67,22 @@ export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
 >(({ className, onFocus, ...props }, ref) => {
-    // The surface itself, so a right-click landing on it is told apart from one
-    // landing on the page behind it - see `useReopenElsewhere`, which is what
-    // makes a second right-click open the menu where the pointer now is instead
-    // of doing nothing at all.
-    const surface = useRef<HTMLDivElement | null>(null);
+    // The surface itself, in state rather than in a ref, and that is
+    // load-bearing: this component sits in the tree whether or not its menu is
+    // open - Radix gates on the open state inside the portal below - so a ref
+    // would have handed the watch a value that never changes and left it running
+    // for the life of the page, on every menu in the application. A node arrives
+    // when Radix mounts the content and goes back to null when it unmounts, so
+    // the watch is on exactly while a menu is on screen. See
+    // `useReopenElsewhere`, which is what makes a second right-click open the
+    // menu where the pointer now is instead of doing nothing at all.
+    const [surface, setSurface] = useState<HTMLDivElement | null>(null);
     useReopenElsewhere(surface);
 
     return (
         <RadixMenu.Portal>
             <RadixMenu.Content
-                ref={mergeRefs(ref, surface)}
+                ref={mergeRefs(ref, setSurface)}
                 className={cn(
                     "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                     className
