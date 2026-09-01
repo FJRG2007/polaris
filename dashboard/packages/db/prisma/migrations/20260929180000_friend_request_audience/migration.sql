@@ -1,0 +1,11 @@
+-- Who may ask to be somebody's friend.
+--
+-- Open unless the account says otherwise: a request is the mildest thing one
+-- account can do to another - it is answered or it is not, and nothing happens
+-- until it is - so the default is the one that does not quietly cut people off
+-- from each other on an instance where everybody knows everybody.
+--
+-- `IF NOT EXISTS`, like every statement here: the entrypoint retries while the
+-- database comes up and an update kills the container it rolls back, so a script
+-- that cannot be run twice is a deployment that stops being able to migrate.
+ALTER TABLE "UserPrivacy" ADD COLUMN IF NOT EXISTS "friendRequests" TEXT NOT NULL DEFAULT 'everyone';

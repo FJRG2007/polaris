@@ -46,6 +46,9 @@ export const PRIVACY_AUDIENCES = [
     "everyoneExcept",
     "friends",
     "friendsExcept",
+    "friendsOfFriends",
+    "following",
+    "followers",
     "only",
     "nobody"
 ] as const;
@@ -57,9 +60,27 @@ export const PRIVACY_AUDIENCE_LABELS: Record<PrivacyAudience, string> = {
     everyoneExcept: "Everybody except",
     friends: "Friends",
     friendsExcept: "Friends except",
+    friendsOfFriends: "Friends of my friends",
+    following: "People I follow",
+    followers: "People who follow me",
     only: "Only",
     nobody: "Nobody"
 };
+
+/**
+ * The three audiences that are answered by following rather than by friendship.
+ *
+ * Named as a set because two things have to know it and they are far apart: the
+ * screen, so it can offer them only where they mean something, and the service,
+ * so it knows when it has to go and ask who follows whom rather than skipping a
+ * query nothing needs. A setting that never uses them costs neither.
+ */
+export const REACH_AUDIENCES = ["friendsOfFriends", "following", "followers"] as const;
+
+/** Whether an audience is answered by who follows whom. */
+export function audienceNeedsReach(audience: PrivacyAudience): boolean {
+    return (REACH_AUDIENCES as readonly string[]).includes(audience);
+}
 
 /** Whether an audience is incomplete until a set of people is chosen for it. */
 export function audienceNeedsList(audience: PrivacyAudience): boolean {
@@ -78,6 +99,7 @@ export const PRIVACY_FIELD_LABELS = {
     phone: "Your phone number",
     companies: "Where you work",
     followers: "Who follows you, and who you follow",
+    friendRequests: "Who can ask to be your friend",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -98,6 +120,8 @@ export const PRIVACY_FIELD_NOTES = {
         "The company on your profile, and the organizations here you have chosen to show. Which organizations those are is picked one at a time on your profile; this decides who sees the ones you picked.",
     followers:
         "Both lists together, on your profile. Following somebody is not a request and they are not asked, so who can read the list is the only decision there is to make about it. Your administrator sets what a new account starts on; this is yours.",
+    friendRequests:
+        "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered.",
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
 } as const;
@@ -112,6 +136,7 @@ export const PRIVACY_FIELDS = [
     "phone",
     "companies",
     "followers",
+    "friendRequests",
     "lastSeen",
     "readReceipts",
     "forwarding"
@@ -137,6 +162,11 @@ export const PRIVACY_SECTIONS = [
         id: "details",
         label: "Your details",
         fields: ["avatar", "photoFullSize", "fullName", "email", "phone", "companies", "followers"]
+    },
+    {
+        id: "reaching",
+        label: "Reaching you",
+        fields: ["friendRequests"]
     },
     {
         id: "presence",
@@ -284,6 +314,21 @@ export const privacySettingsSchema = z.object({
      */
     followers: closed,
     /**
+     * Who may ask to be your friend.
+     *
+     * Open by default, because a request is the mildest thing one account can do
+     * to another: it is answered or it is not, and nothing happens until it is.
+     * The narrower answers are for the two cases people actually have - somebody
+     * being asked by strangers, and an instance where being findable is not the
+     * same as being reachable.
+     *
+     * `nobody` still leaves the requests already waiting answerable. Shutting the
+     * door is not the same statement as throwing away what is already inside it,
+     * and the alternative would delete other people's outstanding asks without
+     * telling either side.
+     */
+    friendRequests: open,
+    /**
      * Who is shown the address the account signs in with.
      *
      * Closed by default, and the only reason it is not open like the rest: an
@@ -365,6 +410,18 @@ export function audienceAllows(
          *  it names none, which is why the `Except` audiences stay open and
          *  `only` stays shut. */
         readonly inList?: boolean;
+        /**
+         * Whether the subject follows the viewer. "People I follow" is the
+         * subject's sentence, so it is the subject's following that answers it.
+         */
+        readonly subjectFollowsViewer?: boolean;
+        /** Whether the viewer follows the subject, which is what "people who
+         *  follow me" asks. */
+        readonly viewerFollowsSubject?: boolean;
+        /** Whether the two share a friend. Absent where nothing asked, and
+         *  absent reads as no - an audience answered by a fact nobody looked up
+         *  must close rather than open. */
+        readonly sharesAFriend?: boolean;
     }
 ): boolean {
     // Your own screen always shows you your own. A setting that hid your photo
@@ -382,6 +439,14 @@ export function audienceAllows(
             return context.friends;
         case "friendsExcept":
             return context.friends && !listed;
+        case "friendsOfFriends":
+            // A friend is a friend of a friend as well, which is what somebody
+            // choosing this means: the circle widens, it does not move.
+            return context.friends || (context.sharesAFriend ?? false);
+        case "following":
+            return context.subjectFollowsViewer ?? false;
+        case "followers":
+            return context.viewerFollowsSubject ?? false;
         case "only":
             return listed;
         case "nobody":

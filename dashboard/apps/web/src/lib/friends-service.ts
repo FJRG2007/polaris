@@ -219,6 +219,23 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
     // contradiction the screen should not have to explain twice.
     if (await blockedEitherWay(userId, otherId)) throw new FriendError(CANNOT_ASK);
 
+    // Whether they take requests from somebody like this, which is their
+    // decision and not the asker's. Refused with the sentence a block gives, for
+    // the same reason: a different one would say which of the two it was.
+    //
+    // Never as an administrator. Every other setting bends for one because an
+    // administrator can read the database anyway; this one is not about reading,
+    // it is about putting something on somebody's screen, and "nobody" that an
+    // administrator walks through is not the setting it says it is.
+    //
+    // Reached at call time rather than imported: the privacy service asks this
+    // module who somebody's friends are, and importing it back at the top would
+    // close the loop.
+    const { maySee } = await import("@/lib/privacy-service");
+    if (!(await maySee(otherId, "friendRequests", { id: userId, isAdmin: false }))) {
+        throw new FriendError(CANNOT_ASK);
+    }
+
     const existing = await prisma.friendship.findFirst({
         where: {
             OR: [
@@ -236,6 +253,13 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
             where: { id: existing.id },
             data: { status: "accepted", respondedAt: new Date() }
         });
+        // The same thing accepting from the friends screen does: two people who
+        // have agreed to be friends have already said the smaller thing
+        // following says - see `respondToRequest`, where the reasoning lives.
+        await Promise.all([
+            follow("user", otherId, userId, "friend"),
+            follow("user", userId, otherId, "friend")
+        ]).catch(() => undefined);
         await announce(otherId, userId, "accepted");
         return;
     }

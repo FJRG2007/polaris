@@ -7131,6 +7131,10 @@ model UserPrivacy {
     // instance meant as a company directory and one meant as a place people
     // follow each other want opposite answers.
     followers    String?
+    // Who may ask to be this account's friend. Open unless it says otherwise: a
+    // request is the mildest thing one account can do to another, and nothing
+    // happens until it is answered.
+    friendRequests String @default("everyone")
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

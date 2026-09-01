@@ -64,6 +64,7 @@ const AUDIENCE_COLUMNS = {
     phone: true,
     companies: true,
     followers: true,
+    friendRequests: true,
     lastSeen: true,
     forwarding: true,
     discoverable: true,
@@ -162,18 +163,29 @@ export async function allowedBy(
     const audiences = new Map(
         wanted.map((userId) => [userId, core.storedAudience(field, stored.get(userId) ?? unset)])
     );
-    const [listed, friends] = await Promise.all([
+    // Only what an audience in play actually asks for. A page of results whose
+    // settings are all "everybody" costs the one read above and nothing else.
+    const needsReach = wanted.filter((userId) => core.audienceNeedsReach(audiences.get(userId)!));
+    const needsFriends = wanted.filter((userId) => {
+        const audience = audiences.get(userId)!;
+        return audience === "friends" || audience === "friendsExcept" || audience === "friendsOfFriends";
+    });
+
+    const [listed, friends, reach, shared] = await Promise.all([
         listingViewer(
             viewer.id,
             field,
             wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
         ),
-        wanted.some((userId) => {
-            const audience = audiences.get(userId)!;
-            return audience === "friends" || audience === "friendsExcept";
-        })
-            ? friendIds(viewer.id)
-            : new Set<string>()
+        needsFriends.length > 0 ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
+        reachBetween(
+            viewer.id,
+            needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
+        ),
+        sharingAFriend(
+            viewer.id,
+            needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
+        )
     ]);
 
     return new Set(
@@ -182,10 +194,94 @@ export async function allowedBy(
                 self: userId === viewer.id,
                 friends: friends.has(userId),
                 viewerIsAdmin: false,
-                inList: listed.has(userId)
+                inList: listed.has(userId),
+                subjectFollowsViewer: reach.subjectFollows.has(userId),
+                viewerFollowsSubject: reach.viewerFollows.has(userId),
+                sharesAFriend: shared.has(userId)
             })
         )
     );
+}
+
+/**
+ * Who, among these subjects, is connected to the viewer by following.
+ *
+ * Two directions and they are not the same question. "People I follow" is the
+ * SUBJECT's sentence, so it is answered by the subject following the viewer;
+ * "people who follow me" is answered by the viewer following the subject.
+ * Getting them the wrong way round is silent in both directions, which is why
+ * they are named for who is doing the following rather than for the label on the
+ * setting.
+ *
+ * One query for both. A row says who is followed (`subjectId`) and who follows
+ * them (`userId`), so both directions are the same table read twice over the
+ * same small set of ids.
+ */
+async function reachBetween(
+    viewerId: string,
+    subjectIds: readonly string[]
+): Promise<{ subjectFollows: Set<string>; viewerFollows: Set<string> }> {
+    if (subjectIds.length === 0) return { subjectFollows: new Set(), viewerFollows: new Set() };
+    const ids = [...subjectIds];
+    const rows = await prisma.follow.findMany({
+        where: {
+            subjectType: "user",
+            OR: [
+                // The subject following the viewer.
+                { subjectId: viewerId, userId: { in: ids } },
+                // The viewer following the subject.
+                { userId: viewerId, subjectId: { in: ids } }
+            ]
+        },
+        select: { subjectId: true, userId: true }
+    });
+    const subjectFollows = new Set<string>();
+    const viewerFollows = new Set<string>();
+    for (const row of rows) {
+        if (row.subjectId === viewerId) subjectFollows.add(row.userId);
+        if (row.userId === viewerId) viewerFollows.add(row.subjectId);
+    }
+    return { subjectFollows, viewerFollows };
+}
+
+/**
+ * Which of these subjects share a friend with the viewer.
+ *
+ * The viewer's own friends first, then one read for any friendship between one
+ * of those and one of the subjects - rather than a query per subject, which is
+ * what a page of search results would turn this into.
+ *
+ * A viewer with no friends shares none with anybody, and the answer is empty
+ * without asking: "friends of my friends" on an account that has none is nobody,
+ * which is what it says.
+ */
+async function sharingAFriend(
+    viewerId: string,
+    subjectIds: readonly string[]
+): Promise<Set<string>> {
+    if (subjectIds.length === 0) return new Set();
+    const mine = [...(await friendIds(viewerId))];
+    if (mine.length === 0) return new Set();
+
+    const ids = [...subjectIds];
+    const rows = await prisma.friendship.findMany({
+        where: {
+            status: "accepted",
+            OR: [
+                { requesterId: { in: mine }, addresseeId: { in: ids } },
+                { addresseeId: { in: mine }, requesterId: { in: ids } }
+            ]
+        },
+        select: { requesterId: true, addresseeId: true }
+    });
+
+    const wanted = new Set(ids);
+    const shared = new Set<string>();
+    for (const row of rows) {
+        if (wanted.has(row.requesterId)) shared.add(row.requesterId);
+        if (wanted.has(row.addresseeId)) shared.add(row.addresseeId);
+    }
+    return shared;
 }
 
 /**
