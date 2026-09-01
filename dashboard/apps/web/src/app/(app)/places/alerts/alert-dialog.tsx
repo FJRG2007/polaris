@@ -120,7 +120,7 @@ export function AlertDialog({
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Name<span className="text-danger"> *</span>
                         </span>
                         <Input
@@ -132,14 +132,14 @@ export function AlertDialog({
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-[12px] font-medium text-muted-foreground">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Tell me when
                         </span>
                         <div className="flex flex-wrap gap-3">
                             {KINDS.map((item) => (
                                 <label
                                     key={item.value}
-                                    className="flex items-center gap-2 text-[13px]"
+                                    className="flex items-center gap-2 text-[0.8125rem]"
                                 >
                                     <Checkbox
                                         checked={kinds.includes(item.value)}
@@ -157,7 +157,7 @@ export function AlertDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 On
                             </span>
                             <Select
@@ -174,7 +174,7 @@ export function AlertDialog({
                         </label>
                         {known.length > 0 ? (
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     Only about
                                 </span>
                                 <Select
@@ -194,14 +194,14 @@ export function AlertDialog({
 
                     {areas.length > 0 ? (
                         <div className="flex flex-col gap-2">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 Only in
                             </span>
                             <div className="flex flex-wrap gap-3">
                                 {areas.map((area) => (
                                     <label
                                         key={area}
-                                        className="flex items-center gap-2 text-[13px]"
+                                        className="flex items-center gap-2 text-[0.8125rem]"
                                     >
                                         <Checkbox
                                             checked={zones.includes(area)}
@@ -213,7 +213,7 @@ export function AlertDialog({
                                     </label>
                                 ))}
                             </div>
-                            <p className="text-[12px] text-foreground-subtle">
+                            <p className="text-[0.75rem] text-foreground-subtle">
                                 {zones.length === 0
                                     ? "Anywhere the camera can see."
                                     : "A camera nobody has drawn on will never match this."}
@@ -223,7 +223,7 @@ export function AlertDialog({
 
                     <div className="flex flex-col gap-2">
                         <label className="flex items-center justify-between gap-3">
-                            <span className="text-[13px] text-foreground">
+                            <span className="text-[0.8125rem] text-foreground">
                                 Only at certain hours
                             </span>
                             <Switch checked={hoursOn} onChange={setHoursOn} />
@@ -237,7 +237,7 @@ export function AlertDialog({
                                     inputMode="numeric"
                                     aria-label="From hour"
                                 />
-                                <span className="text-[12px] text-muted-foreground">to</span>
+                                <span className="text-[0.75rem] text-muted-foreground">to</span>
                                 <Input
                                     value={to}
                                     onChange={(event) => setTo(event.target.value)}
@@ -245,7 +245,7 @@ export function AlertDialog({
                                     inputMode="numeric"
                                     aria-label="To hour"
                                 />
-                                <span className="text-[12px] text-foreground-subtle">
+                                <span className="text-[0.75rem] text-foreground-subtle">
                                     24-hour clock. 22 to 7 is overnight.
                                 </span>
                             </div>
@@ -253,14 +253,14 @@ export function AlertDialog({
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-[12px] font-medium text-muted-foreground">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Tell<span className="text-danger"> *</span>
                         </span>
                         <div className="flex max-h-40 flex-col gap-2 overflow-y-auto rounded-md border border-border p-2">
                             {people.map((person) => (
                                 <label
                                     key={person.id}
-                                    className="flex items-center gap-2 text-[13px]"
+                                    className="flex items-center gap-2 text-[0.8125rem]"
                                 >
                                     <Checkbox
                                         checked={recipients.includes(person.id)}
@@ -278,12 +278,12 @@ export function AlertDialog({
 
                     <div className="flex flex-col gap-1.5">
                         <label className="flex items-center justify-between gap-3">
-                            <span className="text-[13px] text-foreground">
+                            <span className="text-[0.8125rem] text-foreground">
                                 Also send it to their notifications
                             </span>
                             <Switch checked={notify} onChange={setNotify} />
                         </label>
-                        <p className="text-[12px] text-foreground-subtle">
+                        <p className="text-[0.75rem] text-foreground-subtle">
                             {notify
                                 ? "It reaches the bell as well, and wherever each person sends their alerts. Everyone chooses that in their own notification settings."
                                 : "Only the conversation. Nothing lands on the bell."}
@@ -291,7 +291,7 @@ export function AlertDialog({
                     </div>
                 </div>
 
-                {error ? <p className="mt-3 text-[12px] text-danger">{error}</p> : null}
+                {error ? <p className="mt-3 text-[0.75rem] text-danger">{error}</p> : null}
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>

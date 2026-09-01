@@ -178,7 +178,7 @@ export function FivemResources({
                                 <span className="flex min-w-0 items-center gap-2">
                                     <span className="truncate font-medium" title={resource.name}>{resource.name}</span>
                                     {resource.managed && (
-                                        <Badge className="shrink-0 text-[11px]">Polaris</Badge>
+                                        <Badge className="shrink-0 text-[0.6875rem]">Polaris</Badge>
                                     )}
                                 </span>
                                 {resource.managed && (

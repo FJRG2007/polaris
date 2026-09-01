@@ -242,7 +242,7 @@ export function MessageMenu({
                             <ContextMenuItem onSelect={() => actions.onReply?.(message)}>
                                 <CornerUpLeft className="size-3.5" />
                                 Reply
-                                <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                                <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
                                     R
                                 </span>
                             </ContextMenuItem>
@@ -333,7 +333,7 @@ export function MessageMenu({
                                     >
                                         {choice.label}
                                         {choice.format === "original" && (
-                                            <span className="ml-auto pl-4 text-[11px] uppercase text-foreground-subtle">
+                                            <span className="ml-auto pl-4 text-[0.6875rem] uppercase text-foreground-subtle">
                                                 {extensionOf(file.name)}
                                             </span>
                                         )}
@@ -386,7 +386,7 @@ export function MessageMenu({
                             <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
                                 <Pencil className="size-3.5" />
                                 Edit
-                                <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                                <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
                                     F2
                                 </span>
                             </ContextMenuItem>
@@ -397,7 +397,7 @@ export function MessageMenu({
                         >
                             <Trash2 className="size-3.5" />
                             Delete
-                            <span className="ml-auto pl-6 text-[11px] text-foreground-subtle">
+                            <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
                                 Del
                             </span>
                         </ContextMenuItem>

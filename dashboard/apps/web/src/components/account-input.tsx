@@ -337,7 +337,7 @@ export function AccountInput({
                                         {account.name}
                                     </span>
                                     <span
-                                        className="max-w-[9rem] shrink-0 truncate text-[11px] text-muted-foreground"
+                                        className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
                                         title={identity}
                                     >
                                         {identity}

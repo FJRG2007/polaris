@@ -43,7 +43,7 @@ export function ServerNotesPanel({ hostId }: { hostId: string }) {
                     <h2 className="text-sm font-medium">Notes</h2>
                     <FollowToggle hostId={hostId} />
                 </div>
-                {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+                {error ? <p className="text-[0.8125rem] text-danger">{error}</p> : null}
                 <Discussion
                     comments={notes}
                     canModerate

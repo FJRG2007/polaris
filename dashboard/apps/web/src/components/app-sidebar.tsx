@@ -100,7 +100,7 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
             ) : null}
             {groups.map((group, index) => (
                 <div key={group.label} className={cn("flex flex-col gap-0.5", index > 0 && "mt-4")}>
-                    <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-foreground-subtle">
+                    <p className="px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
                         {group.label}
                     </p>
                     {group.items.map((item) => (
@@ -150,7 +150,7 @@ function RailLink({
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[13px] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
+                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
                 active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >
@@ -160,7 +160,7 @@ function RailLink({
                 <span
                     aria-label={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
                     title={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
-                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[11px] font-medium leading-4 text-primary-foreground"
+                    className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground"
                 >
                     {badgeLabel(unread)}
                 </span>

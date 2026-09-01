@@ -84,7 +84,7 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm" title={scope.placeholder}>{scope.placeholder}</span>
             </span>
-            <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+            <kbd className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none text-muted-foreground">
                 {scope.sigil ?? `/${scope.keywords[0]}`}
             </kbd>
         </Row>
@@ -115,7 +115,7 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
                     {hit.reference ? (
-                        <Badge className="shrink-0 font-mono text-[10px]">
+                        <Badge className="shrink-0 font-mono text-[0.625rem]">
                             {hit.reference}
                         </Badge>
                     ) : null}

@@ -107,7 +107,7 @@ export function DetectionBox({
                 }}
             >
                 {label ? (
-                    <span className="absolute -top-px left-0 -translate-y-full whitespace-nowrap rounded-t-[3px] bg-primary px-1 text-[10px] leading-4 text-primary-foreground">
+                    <span className="absolute -top-px left-0 -translate-y-full whitespace-nowrap rounded-t-[3px] bg-primary px-1 text-[0.625rem] leading-4 text-primary-foreground">
                         {label}
                     </span>
                 ) : null}

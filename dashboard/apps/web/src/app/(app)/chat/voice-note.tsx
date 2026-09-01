@@ -220,7 +220,7 @@ export function VoiceNote({
         <span className="inline-flex max-w-full flex-col gap-1 rounded-md border border-border bg-card px-2 py-1.5">
             {!recorded && (
                 <span
-                    className="max-w-[16rem] truncate text-[11px] text-muted-foreground"
+                    className="max-w-[16rem] truncate text-[0.6875rem] text-muted-foreground"
                     title={name}
                 >
                     {name}
@@ -230,7 +230,7 @@ export function VoiceNote({
                 bytes live on whatever storage this instance writes uploads to,
                 and "the NAS is not answering" looks exactly like a broken
                 player from here. */}
-            {broken && <span className="text-[11px] text-danger">{broken}</span>}
+            {broken && <span className="text-[0.6875rem] text-danger">{broken}</span>}
             <span className="flex items-center gap-2">
                 <button
                     type="button"
@@ -318,7 +318,7 @@ export function VoiceNote({
                     />
                 )}
 
-                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">
                     {length > 0 ? spokenLength(length - at) : spokenLength(at)}
                 </span>
 
@@ -327,7 +327,7 @@ export function VoiceNote({
                     onClick={faster}
                     aria-label={`Playing at ${speed} times speed. Press to change.`}
                     title="Playback speed"
-                    className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-card-hover"
+                    className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] font-medium tabular-nums text-muted-foreground transition-colors hover:bg-card-hover"
                 >
                     {speed}x
                 </button>
@@ -372,7 +372,7 @@ export function VoiceNote({
                             onChange={(event) => setVolume(Number(event.target.value) / 100)}
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border accent-primary"
                         />
-                        <p className="pt-2 text-[11px] text-muted-foreground">
+                        <p className="pt-2 text-[0.6875rem] text-muted-foreground">
                             Every recording in every conversation, on this device.
                         </p>
                     </DropdownMenuContent>

@@ -741,7 +741,7 @@ function Section({
                     type="button"
                     onClick={onToggle}
                     aria-expanded={!folded}
-                    className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
+                    className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
                 >
                     <ChevronDown
                         className={cn(
@@ -807,7 +807,7 @@ function Row({
             {unread > 0 && (
                 <span
                     className={cn(
-                        "shrink-0 rounded-full px-1.5 text-[10px] font-medium leading-4",
+                        "shrink-0 rounded-full px-1.5 text-[0.625rem] font-medium leading-4",
                         muted
                             ? "bg-muted text-muted-foreground"
                             : "bg-primary text-primary-foreground"

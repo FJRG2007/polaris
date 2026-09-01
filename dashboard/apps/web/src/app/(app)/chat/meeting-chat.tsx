@@ -247,11 +247,11 @@ export function MeetingChat({
                                             from outside decides how somebody
                                             answers them. */}
                                         {line.guest && (
-                                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                                            <span className="shrink-0 text-[0.625rem] text-muted-foreground">
                                                 guest
                                             </span>
                                         )}
-                                        <span className="shrink-0 text-[10px] text-foreground-subtle">
+                                        <span className="shrink-0 text-[0.625rem] text-foreground-subtle">
                                             <RelativeTime iso={line.at} />
                                         </span>
                                     </span>
@@ -457,7 +457,7 @@ function Poll({
                     </button>
                 );
             })}
-            <span className="flex items-center justify-between gap-2 pt-0.5 text-[10px] text-foreground-subtle">
+            <span className="flex items-center justify-between gap-2 pt-0.5 text-[0.625rem] text-foreground-subtle">
                 <span>
                     {poll.hidden
                         ? "The answers are hidden until it closes"

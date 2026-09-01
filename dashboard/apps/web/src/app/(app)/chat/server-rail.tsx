@@ -368,7 +368,7 @@ const Pill = forwardRef<
                 {children}
             </button>
             {unread > 0 && (
-                <span className="pointer-events-none absolute -bottom-0.5 -right-1 rounded-full bg-primary px-1 text-[10px] font-medium leading-4 text-primary-foreground">
+                <span className="pointer-events-none absolute -bottom-0.5 -right-1 rounded-full bg-primary px-1 text-[0.625rem] font-medium leading-4 text-primary-foreground">
                     {unread > 98 ? "99+" : unread}
                 </span>
             )}

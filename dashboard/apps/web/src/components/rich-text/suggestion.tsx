@@ -196,11 +196,11 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                                 size={20}
                             />
                         ) : item.kind === "room" ? (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[11px] text-primary">
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
                                 <AtSign className="size-3" />
                             </span>
                         ) : (
-                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] uppercase text-muted-foreground">
+                            <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
                                 {item.kind.slice(0, 1)}
                             </span>
                         )}
@@ -208,7 +208,7 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                             {item.label}
                         </span>
                         {item.detail && (
-                            <span className="max-w-[9rem] shrink-0 truncate text-[11px] text-muted-foreground">
+                            <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
                                 {item.detail}
                             </span>
                         )}

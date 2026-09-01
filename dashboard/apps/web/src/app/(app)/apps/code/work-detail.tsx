@@ -113,10 +113,10 @@ export function WorkDetail({
             <div className="flex flex-wrap items-start gap-3">
                 <StateIcon state={item.state} kind={item.kind} />
                 <div className="min-w-0 flex-1">
-                    <h1 className="text-[17px] font-semibold leading-tight tracking-tight">
+                    <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">
                         {item.title} <span className="text-muted-foreground">#{item.number}</span>
                     </h1>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
+                    <p className="mt-1 text-[0.8125rem] text-muted-foreground">
                         {item.repo} - opened by {item.authorLogin}{" "}
                         <RelativeTime iso={item.createdAt} />
                         {item.branches && (
@@ -171,7 +171,7 @@ export function WorkDetail({
                                 {comment.review && comment.review !== "commented" && (
                                     <span
                                         className={cn(
-                                            "rounded px-1.5 py-px text-[10px] font-medium",
+                                            "rounded px-1.5 py-px text-[0.625rem] font-medium",
                                             comment.review === "approved"
                                                 ? "bg-[#3fb950]/15 text-[#3fb950]"
                                                 : "bg-[#f85149]/15 text-[#f85149]"

@@ -121,7 +121,7 @@ export function ProjectsGrid({
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <h1 className="text-[17px] font-semibold tracking-tight">Projects</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Projects</h1>
                 {canManage && (
                     <div className="flex flex-wrap items-center gap-2">
                         <RegistryCredentialsButton />

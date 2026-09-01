@@ -239,7 +239,7 @@ export function FilterBar({
                                                             })
                                                         }
                                                         className={cn(
-                                                            "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] transition-colors",
+                                                            "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[0.6875rem] transition-colors",
                                                             on
                                                                 ? "border-primary bg-primary/10 text-primary"
                                                                 : "border-border text-muted-foreground hover:bg-muted"

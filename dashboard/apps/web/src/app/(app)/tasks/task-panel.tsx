@@ -397,7 +397,7 @@ export function TaskPanel({
                                 {auto.busy && !error && (
                                     <span
                                         role="status"
-                                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                        className="inline-flex items-center gap-1 text-[0.6875rem] text-muted-foreground"
                                     >
                                         <Loader2
                                             className="size-3.5 shrink-0 animate-spin"
@@ -406,12 +406,12 @@ export function TaskPanel({
                                         Saving
                                     </span>
                                 )}
-                                <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                                <span className="hidden text-[0.6875rem] text-muted-foreground sm:inline">
                                     Created {format.date(task.createdAt)}
                                 </span>
                                 {task.recurring && (
                                     <span
-                                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                                        className="inline-flex items-center gap-1 text-[0.6875rem] text-muted-foreground"
                                         title="This task repeats"
                                         aria-label="This task repeats"
                                     >

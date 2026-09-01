@@ -77,7 +77,7 @@ export function StandingView({
                     <div className="flex items-start gap-4">
                         <Avatar person={person} size={64} status={false} className="mt-0.5 shrink-0" />
                         <div className="flex min-w-0 flex-col gap-1">
-                            <h2 className="text-[15px] font-medium">
+                            <h2 className="text-[0.9375rem] font-medium">
                                 Your account is{" "}
                                 <span className={cn("font-semibold", WORD_COLOURS[standing])}>
                                     {ACCOUNT_STANDING_WORDS[standing]}
@@ -151,7 +151,7 @@ export function StandingView({
                                     </span>
                                     <span
                                         className={cn(
-                                            "text-[11px] leading-tight sm:text-xs",
+                                            "text-[0.6875rem] leading-tight sm:text-xs",
                                             lit ? "font-medium text-foreground" : "text-muted-foreground"
                                         )}
                                     >

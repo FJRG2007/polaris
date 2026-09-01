@@ -41,7 +41,7 @@ export default async function ModelProvidersPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">AI providers</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">AI providers</h1>
                 <p className="text-muted-foreground text-sm">
                     This deployment&apos;s own accounts with the model providers. A key is handed to a run over
                     an authenticated call and never written into a repository, so replacing it here takes effect

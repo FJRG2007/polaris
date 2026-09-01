@@ -61,7 +61,7 @@ export function GanttView(props: ViewProps) {
         <div className="flex flex-col gap-3">
             <div className="overflow-x-auto rounded-lg border border-border">
                 <div className="min-w-[48rem]">
-                    <div className="relative flex border-b border-border bg-muted/40 text-[11px] text-muted-foreground">
+                    <div className="relative flex border-b border-border bg-muted/40 text-[0.6875rem] text-muted-foreground">
                         <div className="w-56 shrink-0 px-3 py-1.5">Task</div>
                         <div className="relative flex-1 py-1.5">
                             {ticks.map((tick) => (
@@ -105,7 +105,7 @@ export function GanttView(props: ViewProps) {
                                             onClick={() => onOpen(task.id)}
                                             title={`${task.name}: ${format.date(bar.start.toISOString())} to ${format.date(bar.end.toISOString())}`}
                                             className={cn(
-                                                "absolute top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded px-1.5 text-[10px] text-white transition-opacity hover:opacity-90",
+                                                "absolute top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded px-1.5 text-[0.625rem] text-white transition-opacity hover:opacity-90",
                                                 task.blocked && "ring-1 ring-amber-500"
                                             )}
                                             style={{

@@ -478,7 +478,7 @@ export function CommandPalette({ isAdmin = false, appIds }: { isAdmin?: boolean;
             >
                 <Search className="size-4 shrink-0" aria-hidden="true" />
                 <span className="hidden flex-1 truncate text-left text-sm lg:block">Search</span>
-                <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] leading-none lg:block">
+                <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none lg:block">
                     {hint}
                 </kbd>
             </button>

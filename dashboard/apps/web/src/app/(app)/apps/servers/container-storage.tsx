@@ -92,8 +92,8 @@ export function ContainerStorage() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {rows.map((row) => (
                     <div key={row.label} className="rounded-lg border border-border bg-surface px-3 py-2">
-                        <p className="text-[15px] font-medium leading-none">{size(row.value)}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground">{row.label}</p>
+                        <p className="text-[0.9375rem] font-medium leading-none">{size(row.value)}</p>
+                        <p className="mt-1 text-[0.6875rem] text-muted-foreground">{row.label}</p>
                     </div>
                 ))}
             </div>

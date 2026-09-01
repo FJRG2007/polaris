@@ -241,7 +241,7 @@ function MonthGrid({
         <div className="flex h-[calc(100dvh-19rem)] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
             <div className="grid grid-cols-7 border-b border-border bg-muted/40">
                 {headings.map((index) => (
-                    <div key={index} className="px-2 py-1.5 text-center text-[11px] text-muted-foreground">
+                    <div key={index} className="px-2 py-1.5 text-center text-[0.6875rem] text-muted-foreground">
                         <span className="hidden sm:inline">{core.WEEKDAY_SHORT_NAMES[index]}</span>
                         <span className="sm:hidden">{(core.WEEKDAY_SHORT_NAMES[index] as string).slice(0, 1)}</span>
                     </div>
@@ -277,7 +277,7 @@ function MonthGrid({
                                     aria-label={`${core.WEEKDAY_NAMES[day.getDay()]} ${day.getDate()}`}
                                     aria-pressed={selected}
                                     className={cn(
-                                        "rounded text-[11px]",
+                                        "rounded text-[0.6875rem]",
                                         isToday
                                             ? "bg-primary px-1.5 font-medium text-primary-foreground"
                                             : outside
@@ -288,7 +288,7 @@ function MonthGrid({
                                     {day.getDate()}
                                 </button>
                                 {entries.length > 0 && (
-                                    <span className="text-[10px] text-muted-foreground sm:hidden">
+                                    <span className="text-[0.625rem] text-muted-foreground sm:hidden">
                                         {entries.length}
                                     </span>
                                 )}
@@ -312,7 +312,7 @@ function MonthGrid({
                                     <EntryChip key={entry.key} entry={entry} props={props} />
                                 ))}
                                 {entries.length > 4 && (
-                                    <li className="px-1 text-[10px] text-muted-foreground">
+                                    <li className="px-1 text-[0.625rem] text-muted-foreground">
                                         +{entries.length - 4} more
                                     </li>
                                 )}
@@ -375,7 +375,7 @@ function TimeGrid({
                         <div className="w-12 shrink-0 sm:w-14" />
                         {columns.map((column) => (
                             <div key={column.day.toISOString()} className="min-w-0 flex-1 px-1 py-1.5 text-center">
-                                <div className="text-[11px] text-muted-foreground">
+                                <div className="text-[0.6875rem] text-muted-foreground">
                                     {core.WEEKDAY_SHORT_NAMES[column.day.getDay()]}
                                 </div>
                                 <div
@@ -392,7 +392,7 @@ function TimeGrid({
 
                     {columns.some((column) => column.allDay.length > 0) && (
                         <div className="flex border-b border-border">
-                            <div className="w-12 shrink-0 px-1 py-1 text-right text-[10px] text-muted-foreground sm:w-14">
+                            <div className="w-12 shrink-0 px-1 py-1 text-right text-[0.625rem] text-muted-foreground sm:w-14">
                                 All day
                             </div>
                             {columns.map((column) => (
@@ -417,7 +417,7 @@ function TimeGrid({
                             <div
                                 key={hour}
                                 style={{ height: HOUR_HEIGHT }}
-                                className="relative pr-1 text-right text-[10px] text-muted-foreground"
+                                className="relative pr-1 text-right text-[0.625rem] text-muted-foreground"
                             >
                                 <span className="absolute -top-1.5 right-1">{hourLabel(hour, format)}</span>
                             </div>
@@ -501,8 +501,8 @@ function TimedEntry({
 
     const body = (
         <span className="flex flex-col overflow-hidden text-left">
-            <span className="truncate text-[11px] font-medium leading-tight">{entry.title}</span>
-            <span className="truncate text-[10px] leading-tight text-muted-foreground">
+            <span className="truncate text-[0.6875rem] font-medium leading-tight">{entry.title}</span>
+            <span className="truncate text-[0.625rem] leading-tight text-muted-foreground">
                 {format.time(entry.start)}
                 {entry.location ? ` - ${entry.location}` : ""}
             </span>
@@ -553,7 +553,7 @@ function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps })
                     target="_blank"
                     rel="noreferrer noopener"
                     title={`${entry.title} (Google Calendar)`}
-                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-[11px] transition-colors hover:bg-muted"
+                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-[0.6875rem] transition-colors hover:bg-muted"
                 >
                     <span className="size-2 shrink-0 rounded-[2px]" style={{ backgroundColor: entry.color }} />
                     <span className="truncate">{entry.title}</span>
@@ -572,7 +572,7 @@ function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps })
                         props.onOpen(task.id);
                     }}
                     title={task.name}
-                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[11px] transition-colors hover:bg-muted"
+                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left text-[0.6875rem] transition-colors hover:bg-muted"
                 >
                     <StatusIcon color={task.statusColor} type={task.statusType} size={12} />
                     <span className="truncate">{task.name}</span>

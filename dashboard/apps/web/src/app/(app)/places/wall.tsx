@@ -90,7 +90,7 @@ export function Wall({ canManage, canControl }: { canManage: boolean; canControl
             {zones.map((zone) => (
                 <section key={zone || "unplaced"} className="flex flex-col gap-2">
                     {zones.length > 1 ? (
-                        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
+                        <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle">
                             {zone || "Everywhere else"}
                         </h2>
                     ) : null}

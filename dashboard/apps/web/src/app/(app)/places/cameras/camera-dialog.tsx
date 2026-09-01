@@ -334,7 +334,7 @@ export function CameraDialog({
                             />
                         </Field>
                         {vendor.note ? (
-                            <p className="text-[12px] leading-relaxed text-muted-foreground">
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                                 {vendor.note}
                             </p>
                         ) : null}
@@ -407,7 +407,7 @@ export function CameraDialog({
                                 Ask the camera
                             </Button>
                             {tested ? (
-                                <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     {tested}
                                 </span>
@@ -467,7 +467,7 @@ export function CameraDialog({
                                 label: DETECTOR_META[id].label
                             }))}
                         />
-                        <p className="text-[12px] leading-relaxed text-muted-foreground">
+                        <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                             {DETECTOR_META[form.detector].summary}{" "}
                             <span className="text-foreground-subtle">
                                 {DETECTOR_META[form.detector].cost}
@@ -479,7 +479,7 @@ export function CameraDialog({
                             and a house with it switched off read the same
                             sentence and had no way to tell the two apart. */}
                         {form.detector === "faces" && recognizes === false ? (
-                            <p className="text-[12px] leading-relaxed text-warning">
+                            <p className="text-[0.75rem] leading-relaxed text-warning">
                                 {DETECTOR_META.faces.requires}{" "}
                                 <Link href="/places/settings" className="underline underline-offset-2">
                                     Open Settings
@@ -490,7 +490,7 @@ export function CameraDialog({
                             <DetectorActivity activity={activity} />
                         ) : null}
                         {form.detector === "faces" && recognizes === true ? (
-                            <p className="text-[12px] leading-relaxed text-muted-foreground">
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                                 Face recognition is on. Teach it who lives here under People and this camera
                                 starts using their names.
                             </p>
@@ -579,7 +579,7 @@ export function CameraDialog({
                                     />
                                 </Field>
                                 <label className="flex items-center justify-between gap-3">
-                                    <span className="text-[13px] text-foreground">
+                                    <span className="text-[0.8125rem] text-foreground">
                                         Only at certain hours
                                     </span>
                                     <Switch
@@ -598,7 +598,7 @@ export function CameraDialog({
                                             inputMode="numeric"
                                             aria-label="From hour"
                                         />
-                                        <span className="text-[12px] text-muted-foreground">
+                                        <span className="text-[0.75rem] text-muted-foreground">
                                             to
                                         </span>
                                         <Input
@@ -608,7 +608,7 @@ export function CameraDialog({
                                             inputMode="numeric"
                                             aria-label="To hour"
                                         />
-                                        <span className="text-[12px] text-foreground-subtle">
+                                        <span className="text-[0.75rem] text-foreground-subtle">
                                             24-hour clock. 22 to 6 is overnight.
                                         </span>
                                     </div>
@@ -622,7 +622,7 @@ export function CameraDialog({
                                     {OBJECT_CLASSES.map((item) => (
                                         <label
                                             key={item}
-                                            className="flex items-center gap-2 text-[13px]"
+                                            className="flex items-center gap-2 text-[0.8125rem]"
                                         >
                                             <Checkbox
                                                 checked={form.classes.includes(item)}
@@ -642,7 +642,7 @@ export function CameraDialog({
                                     ))}
                                 </div>
                                 {form.classes.includes("package") ? (
-                                    <p className="text-[12px] text-foreground-subtle">
+                                    <p className="text-[0.75rem] text-foreground-subtle">
                                         {OBJECT_CLASS_HINTS.package}
                                     </p>
                                 ) : null}
@@ -702,9 +702,9 @@ export function CameraDialog({
                             </Field>
                         ) : null}
                         <label className="flex items-center justify-between gap-3">
-                            <span className="text-[13px] text-foreground">
+                            <span className="text-[0.8125rem] text-foreground">
                                 Switched on
-                                <span className="block text-[12px] text-foreground-subtle">
+                                <span className="block text-[0.75rem] text-foreground-subtle">
                                     Off means Polaris does not connect to it at all.
                                 </span>
                             </span>
@@ -716,7 +716,7 @@ export function CameraDialog({
                     </Section>
                 </div>
 
-                {error ? <p className="mt-4 text-[12px] text-danger">{error}</p> : null}
+                {error ? <p className="mt-4 text-[0.75rem] text-danger">{error}</p> : null}
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
@@ -744,9 +744,9 @@ function Section({
     return (
         <section className="flex flex-col gap-3">
             <div>
-                <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
+                <h3 className="text-[0.8125rem] font-semibold text-foreground">{title}</h3>
                 {hint ? (
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                    <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                         {hint}
                     </p>
                 ) : null}
@@ -769,12 +769,12 @@ function Field({
 }) {
     return (
         <label className="flex flex-col gap-1.5">
-            <span className={cn("text-[12px] font-medium text-muted-foreground")}>
+            <span className={cn("text-[0.75rem] font-medium text-muted-foreground")}>
                 {label}
                 {required ? <span className="text-danger"> *</span> : null}
             </span>
             {children}
-            {hint ? <span className="text-[11px] text-foreground-subtle">{hint}</span> : null}
+            {hint ? <span className="text-[0.6875rem] text-foreground-subtle">{hint}</span> : null}
         </label>
     );
 }
@@ -796,7 +796,7 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
     if (activity === undefined) return <Skeleton className="h-4 w-64" />;
     if (activity === null) {
         return (
-            <p className="text-[12px] leading-relaxed text-warning">
+            <p className="text-[0.75rem] leading-relaxed text-warning">
                 No detector has reported on this camera. If you have just saved it, give it a minute - the
                 worker asks for its cameras every half minute.
             </p>
@@ -815,9 +815,9 @@ function DetectorActivity({ activity }: { activity: CameraActivity | null | unde
 
     return (
         <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface px-3 py-2">
-            <p className="text-[12px] leading-relaxed text-muted-foreground">{lines.join(" ")}</p>
+            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">{lines.join(" ")}</p>
             {activity.limitedTo ? (
-                <p className="text-[12px] leading-relaxed text-warning">It is {activity.limitedTo}.</p>
+                <p className="text-[0.75rem] leading-relaxed text-warning">It is {activity.limitedTo}.</p>
             ) : null}
         </div>
     );

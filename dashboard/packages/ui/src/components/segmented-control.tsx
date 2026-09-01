@@ -103,7 +103,7 @@ export function SegmentedControl<T extends string>({
                             // kind of wrong. Options size to their labels and share
                             // what is left over.
                             "min-w-0 flex-1 basis-auto truncate rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
-                            size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[13px]",
+                            size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[0.8125rem]",
                             active
                                 ? "border border-border-strong bg-card-hover text-foreground"
                                 : "border border-transparent text-muted-foreground hover:text-foreground"

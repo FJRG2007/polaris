@@ -90,7 +90,7 @@ export function PdfSidebar({
                                 </span>
                                 <span
                                     className={cn(
-                                        "text-[11px] tabular-nums",
+                                        "text-[0.6875rem] tabular-nums",
                                         page === pageNumber
                                             ? "text-foreground"
                                             : "text-muted-foreground"

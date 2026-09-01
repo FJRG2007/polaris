@@ -22,7 +22,7 @@ export default async function StatusSchedulePage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Status schedule</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Status schedule</h1>
                 <p className="text-sm text-muted-foreground">
                     Hours you are away, busy, or not shown at all, repeated every week. A schedule
                     takes over when it starts, and anything you pick while one is running is yours

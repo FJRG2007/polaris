@@ -1007,7 +1007,7 @@ export function ShareExplorer({
                                         <EntryIcon entry={entry} className="size-10" />
                                         <span className="line-clamp-2 w-full break-words text-xs">{entry.name}</span>
                                         {entry.kind !== "dir" ? (
-                                            <span className="text-[10px] text-muted-foreground">
+                                            <span className="text-[0.625rem] text-muted-foreground">
                                                 {formatBytes(BigInt(entry.size))}
                                             </span>
                                         ) : null}

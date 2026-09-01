@@ -98,7 +98,7 @@ export function LogsView({ environmentName, services }: { environmentName: strin
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Logs</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Logs</h1>
                     <p className="text-sm text-muted-foreground">
                         Runtime output across {environmentName}. Build logs live on each deployment.
                     </p>

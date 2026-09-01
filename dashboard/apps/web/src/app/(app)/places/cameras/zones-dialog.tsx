@@ -249,7 +249,7 @@ export function ZonesDialog({
                                 an area can still be drawn on the empty box, and the numbers
                                 mean the same thing. */}
                             {noPicture ? (
-                                <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[12px] text-foreground-subtle">
+                                <span className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[0.75rem] text-foreground-subtle">
                                     No picture from this camera right now. You can still draw on the
                                     frame - an area is a fraction of the picture, not a set of
                                     pixels.
@@ -337,7 +337,7 @@ export function ZonesDialog({
                                 <Eraser className="size-4 shrink-0" />
                                 Start over
                             </Button>
-                            <span className="text-[12px] text-foreground-subtle">
+                            <span className="text-[0.75rem] text-foreground-subtle">
                                 {enough
                                     ? `${draft.points.length} corners. Drag one to move it.`
                                     : `${zoning.MIN_ZONE_POINTS - draft.points.length} more corners needed.`}
@@ -347,13 +347,13 @@ export function ZonesDialog({
 
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1">
-                            <p className="text-[12px] font-medium text-muted-foreground">Areas</p>
+                            <p className="text-[0.75rem] font-medium text-muted-foreground">Areas</p>
                             {loading ? (
-                                <p className="text-[13px] text-foreground-subtle">
+                                <p className="text-[0.8125rem] text-foreground-subtle">
                                     Reading them...
                                 </p>
                             ) : zones.length === 0 ? (
-                                <p className="text-[13px] text-foreground-subtle">
+                                <p className="text-[0.8125rem] text-foreground-subtle">
                                     None yet, so everything this camera sees counts.
                                 </p>
                             ) : (
@@ -369,7 +369,7 @@ export function ZonesDialog({
                                                 type="button"
                                                 onClick={() => setDraft(draftOf(zone))}
                                                 className={cn(
-                                                    "min-w-0 flex-1 truncate text-left text-[13px]",
+                                                    "min-w-0 flex-1 truncate text-left text-[0.8125rem]",
                                                     draft.id === zone.id &&
                                                         "font-medium text-primary"
                                                 )}
@@ -400,7 +400,7 @@ export function ZonesDialog({
 
                         <div className="flex flex-col gap-3 border-t border-border pt-3">
                             <label className="flex flex-col gap-1">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     Name <span aria-hidden>*</span>
                                 </span>
                                 <Input
@@ -418,19 +418,19 @@ export function ZonesDialog({
                                     label: zoning.ZONE_KIND_META[kind].label
                                 }))}
                             />
-                            <p className="text-[12px] text-foreground-subtle">
+                            <p className="text-[0.75rem] text-foreground-subtle">
                                 {zoning.ZONE_KIND_META[draft.kind].summary}
                             </p>
 
                             <div className="flex flex-col gap-1">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     What counts here
                                 </span>
                                 <div className="flex flex-wrap gap-3">
                                     {OBJECT_CLASSES.map((item) => (
                                         <label
                                             key={item}
-                                            className="flex items-center gap-2 text-[13px]"
+                                            className="flex items-center gap-2 text-[0.8125rem]"
                                         >
                                             <Checkbox
                                                 checked={draft.objects.includes(item)}
@@ -449,7 +449,7 @@ export function ZonesDialog({
                                         </label>
                                     ))}
                                 </div>
-                                <p className="text-[12px] text-foreground-subtle">
+                                <p className="text-[0.75rem] text-foreground-subtle">
                                     {draft.objects.length === 0
                                         ? "Everything this camera reports."
                                         : "Anything else here is treated as if the area were not drawn."}
@@ -458,7 +458,7 @@ export function ZonesDialog({
 
                             <div className="flex gap-3">
                                 <label className="flex min-w-0 flex-1 flex-col gap-1">
-                                    <span className="text-[12px] font-medium text-muted-foreground">
+                                    <span className="text-[0.75rem] font-medium text-muted-foreground">
                                         Frames before it counts
                                     </span>
                                     <Input
@@ -468,7 +468,7 @@ export function ZonesDialog({
                                     />
                                 </label>
                                 <label className="flex min-w-0 flex-1 flex-col gap-1">
-                                    <span className="text-[12px] font-medium text-muted-foreground">
+                                    <span className="text-[0.75rem] font-medium text-muted-foreground">
                                         Seconds it must stay
                                     </span>
                                     <Input
@@ -482,7 +482,7 @@ export function ZonesDialog({
                             </div>
 
                             <label className="flex items-center justify-between gap-3">
-                                <span className="text-[13px]">In use</span>
+                                <span className="text-[0.8125rem]">In use</span>
                                 <Switch
                                     checked={draft.enabled}
                                     onChange={(checked) => set("enabled", checked)}
@@ -492,7 +492,7 @@ export function ZonesDialog({
                     </div>
                 </div>
 
-                {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+                {error ? <p className="text-[0.8125rem] text-danger">{error}</p> : null}
 
                 <DialogFooter>
                     {draft.id ? (

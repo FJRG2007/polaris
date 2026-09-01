@@ -231,8 +231,8 @@ export function HomeSettingsView({
         <div className="flex flex-col gap-6">
             <section className="flex flex-col gap-2">
                 <div>
-                    <h2 className="text-[13px] font-semibold text-foreground">Where footage goes</h2>
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                    <h2 className="text-[0.8125rem] font-semibold text-foreground">Where footage goes</h2>
+                    <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                         Recordings and the pictures that go with events are written to{" "}
                         <span className="text-foreground">{storage}</span>. That is set for the whole instance under
                         Uploads, beside where photos and attachments go - one place for one decision. A camera that
@@ -248,8 +248,8 @@ export function HomeSettingsView({
 
             <section className="flex flex-col gap-3">
                 <div>
-                    <h2 className="text-[13px] font-semibold text-foreground">How sensitive a new camera is</h2>
-                    <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                    <h2 className="text-[0.8125rem] font-semibold text-foreground">How sensitive a new camera is</h2>
+                    <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                         Nobody guesses these right the first time, and they are not the same for a hallway and a garden
                         facing a hedge. Set them once here, from the camera you have already tuned, and every camera
                         added afterwards starts there. Each camera can still disagree.
@@ -261,7 +261,7 @@ export function HomeSettingsView({
                 ) : (
                     <>
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 Sensitivity - {defaults.sensitivity}
                             </span>
                             <input
@@ -276,13 +276,13 @@ export function HomeSettingsView({
                                 className="w-64 accent-primary"
                                 aria-label="Sensitivity"
                             />
-                            <span className="text-[11px] text-foreground-subtle">
+                            <span className="text-[0.6875rem] text-foreground-subtle">
                                 Higher notices smaller changes. Too high and every shadow is an event.
                             </span>
                         </label>
 
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 Ignore anything shorter than
                             </span>
                             <Input
@@ -295,14 +295,14 @@ export function HomeSettingsView({
                                 inputMode="numeric"
                                 aria-label="Settle seconds"
                             />
-                            <span className="text-[11px] text-foreground-subtle">
+                            <span className="text-[0.6875rem] text-foreground-subtle">
                                 Seconds. This is the one that stops moths, gusts and passing lorries: nearly every
                                 false alarm is over within a second or two, and a person is not.
                             </span>
                         </label>
 
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 Wait between detections
                             </span>
                             <Input
@@ -315,7 +315,7 @@ export function HomeSettingsView({
                                 inputMode="numeric"
                                 aria-label="Wait between detections"
                             />
-                            <span className="text-[11px] text-foreground-subtle">
+                            <span className="text-[0.6875rem] text-foreground-subtle">
                                 Seconds. Somebody standing at a door is one thing that happened, not sixty.
                             </span>
                         </label>
@@ -326,7 +326,7 @@ export function HomeSettingsView({
                                 Save
                             </Button>
                             {savedDefaults ? (
-                                <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                <span className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     Saved
                                 </span>
@@ -339,8 +339,8 @@ export function HomeSettingsView({
             <section className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h2 className="text-[13px] font-semibold text-foreground">Face recognition</h2>
-                        <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        <h2 className="text-[0.8125rem] font-semibold text-foreground">Face recognition</h2>
+                        <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                             Off unless you turn it on. It puts names to the people you have taught it under People,
                             and only after a camera has already seen somebody - the pictures and what is learned from
                             them stay on the machine it runs on. While it is on it holds its models in memory, so
@@ -369,11 +369,11 @@ export function HomeSettingsView({
                         // that is still holding a gigabyte is the opposite of
                         // what somebody switching it off asked for.
                         <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
-                            <p className="flex items-center gap-1.5 text-[12px] text-foreground">
+                            <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
                                 Off, but still running on {settings.installedOn ?? "this server"}.
                             </p>
-                            <p className="text-[11px] text-foreground-subtle">
+                            <p className="text-[0.6875rem] text-foreground-subtle">
                                 Nothing is asking it anything. Stopping it gives back the memory it holds its models
                                 in; turning recognition back on starts it again.
                             </p>
@@ -389,7 +389,7 @@ export function HomeSettingsView({
                             </Button>
                         </div>
                     ) : (
-                        <p className="text-[12px] text-foreground-subtle">
+                        <p className="text-[0.75rem] text-foreground-subtle">
                             Cameras report that somebody is there, and never who. Nothing is running for it.
                         </p>
                     )
@@ -397,7 +397,7 @@ export function HomeSettingsView({
                     <>
                         {settings.installedOn ? (
                             <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
-                                <p className="flex items-center gap-1.5 text-[12px] text-foreground">
+                                <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                                     {settings.answering ? (
                                         <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     ) : waited ? (
@@ -411,7 +411,7 @@ export function HomeSettingsView({
                                           ? `Not answering on ${settings.installedOn}.`
                                           : `Starting on ${settings.installedOn}.`}
                                 </p>
-                                <p className="text-[11px] text-foreground-subtle">
+                                <p className="text-[0.6875rem] text-foreground-subtle">
                                     {settings.answering
                                         ? "Teach it who lives here under People, and cameras set to recognize faces will start using their names."
                                         : waited
@@ -432,7 +432,7 @@ export function HomeSettingsView({
                         ) : (
                             <div className="flex flex-wrap items-end gap-2">
                                 <label className="flex flex-col gap-1.5">
-                                    <span className="text-[12px] font-medium text-muted-foreground">
+                                    <span className="text-[0.75rem] font-medium text-muted-foreground">
                                         Run it on
                                     </span>
                                     <Select
@@ -452,7 +452,7 @@ export function HomeSettingsView({
                                     )}
                                     {installing ? "Installing" : "Install it"}
                                 </Button>
-                                <span className="pb-2 text-[11px] text-foreground-subtle">
+                                <span className="pb-2 text-[0.6875rem] text-foreground-subtle">
                                     A few hundred megabytes, once. It runs on the processor - no graphics card needed.
                                 </span>
                             </div>
@@ -464,7 +464,7 @@ export function HomeSettingsView({
                         {settings.installedOn ? null : manual ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">Address</span>
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">Address</span>
                                 <Input
                                     value={url}
                                     onChange={(event) => setUrl(event.target.value)}
@@ -474,7 +474,7 @@ export function HomeSettingsView({
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">Key</span>
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">Key</span>
                                 {/* enigma:allow-no-breach-check - this is a key the
                                     recognizer minted in its own interface, not a
                                     password anybody is choosing here.
@@ -496,7 +496,7 @@ export function HomeSettingsView({
                                 Save
                             </Button>
                             {saved ? (
-                                <span className="flex items-center gap-1.5 pb-2 text-[12px] text-muted-foreground">
+                                <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     Saved
                                 </span>
@@ -514,7 +514,7 @@ export function HomeSettingsView({
                         )}
 
                         {!settings.recognizerReady ? (
-                            <p className="text-[11px] text-foreground-subtle">
+                            <p className="text-[0.6875rem] text-foreground-subtle">
                                 Until there is one, cameras set to recognize faces still report that somebody is there -
                                 just not who.
                             </p>
@@ -523,7 +523,7 @@ export function HomeSettingsView({
                 )}
             </section>
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
         </div>
     );
 }

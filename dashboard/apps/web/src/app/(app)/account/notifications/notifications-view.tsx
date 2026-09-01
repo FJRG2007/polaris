@@ -139,7 +139,7 @@ function NotificationRow({
         <li className={cn("flex items-start gap-2.5 px-3 py-2.5", !row.read && "bg-primary/5")}>
             <Icon className={cn("mt-0.5 size-3.5 shrink-0", color)} />
             <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 text-[13px] font-medium leading-5">
+                <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium leading-5">
                     {!row.read ? <span className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
                     {row.href ? (
                         <NotificationLink href={row.href} onOpen={onRead}>
@@ -150,7 +150,7 @@ function NotificationRow({
                     )}
                 </p>
                 {row.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.body}</p> : null}
-                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground/70">
+                <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem] text-muted-foreground/70">
                     <RelativeTime iso={row.createdAt} />
                     <span aria-hidden="true">-</span>
                     <span title={audience.hint}>{audience.text}</span>
@@ -161,7 +161,7 @@ function NotificationRow({
                         </>
                     ) : null}
                     {row.actionRequired ? (
-                        <Badge variant="warning" className="px-1.5 py-0 text-[10px]">
+                        <Badge variant="warning" className="px-1.5 py-0 text-[0.625rem]">
                             Action needed
                         </Badge>
                     ) : null}

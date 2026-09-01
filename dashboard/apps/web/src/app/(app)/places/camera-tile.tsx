@@ -378,7 +378,7 @@ export function CameraTile({
                             one that was deliberately stopped - and the reader is
                             the person who stopped it. */}
                         {idle && drawn !== false ? (
-                            <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[11px] text-muted-foreground">
+                            <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
                                 Paused
                             </span>
                         ) : null}
@@ -409,13 +409,13 @@ export function CameraTile({
                     <button
                         type="button"
                         onClick={onOpen}
-                        className="block max-w-full truncate text-left text-[13px] font-medium text-foreground hover:underline"
+                        className="block max-w-full truncate text-left text-[0.8125rem] font-medium text-foreground hover:underline"
                     >
                         {camera.name}
                     </button>
                     {camera.zone ? (
                         <p
-                            className="truncate text-[11px] text-foreground-subtle"
+                            className="truncate text-[0.6875rem] text-foreground-subtle"
                             title={camera.zone}
                         >
                             {camera.zone}
@@ -491,7 +491,7 @@ function Placeholder({ icon, label }: { icon: React.ReactNode; label: string }) 
     return (
         <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-background text-foreground-subtle">
             {icon}
-            <span className="text-[11px]">{label}</span>
+            <span className="text-[0.6875rem]">{label}</span>
         </span>
     );
 }

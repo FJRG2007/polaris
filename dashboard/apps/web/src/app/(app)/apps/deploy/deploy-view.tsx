@@ -321,7 +321,7 @@ function AppCard({
 
             <div className="flex flex-wrap items-center gap-2">
                 {staged && (
-                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
                         Removal pending
                     </span>
                 )}
@@ -345,13 +345,13 @@ function AppCard({
                     {isLocalDomain(primary) && (
                         <span
                             title="Resolves only on your local network"
-                            className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning"
+                            className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning"
                         >
                             LAN
                         </span>
                     )}
                     {app.domains.length > 1 && (
-                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                        <span className="shrink-0 text-[0.625rem] text-muted-foreground">
                             +{app.domains.length - 1}
                         </span>
                     )}
@@ -524,7 +524,7 @@ function DatabaseCard({
 
             <div className="flex flex-wrap items-center gap-2">
                 {staged && (
-                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
                         Removal pending
                     </span>
                 )}

@@ -88,7 +88,7 @@ export function MarkdownContent({ html, className }: { html: string; className?:
             )}
             {copied ? (
                 <span
-                    className="pointer-events-none absolute z-10 -translate-y-6 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                    className="pointer-events-none absolute z-10 -translate-y-6 rounded border border-border bg-card px-1.5 py-0.5 text-[0.625rem] font-medium text-muted-foreground"
                     style={{ top: copied.top, left: copied.left }}
                 >
                     Copied

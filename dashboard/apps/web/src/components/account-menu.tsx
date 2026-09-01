@@ -326,7 +326,7 @@ export function AccountMenu({
                                 />
                                 <span className="flex-1">{PRESENCE_LABELS[choice]}</span>
                                 {shownChoice === choice && shownUntil && (
-                                    <span className="text-[11px] text-muted-foreground">
+                                    <span className="text-[0.6875rem] text-muted-foreground">
                                         {shownByRule ? "scheduled, until " : "until "}
                                         {endLabel(shownUntil, format)}
                                     </span>

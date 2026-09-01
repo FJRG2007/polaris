@@ -106,7 +106,7 @@ export function InboxView({
     return (
         <div className="flex h-[calc(100vh-8rem)] flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <h1 className="text-[17px] font-semibold tracking-tight">Inbox</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Inbox</h1>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         size="sm"

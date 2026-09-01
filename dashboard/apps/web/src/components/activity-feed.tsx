@@ -36,7 +36,7 @@ export function ActivityFeed({
                 )}
             >
                 <History className="size-5 text-foreground-subtle" />
-                <p className="text-[13px] text-muted-foreground">{empty}</p>
+                <p className="text-[0.8125rem] text-muted-foreground">{empty}</p>
             </div>
         );
     }
@@ -52,8 +52,8 @@ export function ActivityFeed({
                         {index < lines.length - 1 ? <span className="w-px flex-1 bg-border" /> : null}
                     </div>
                     <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 pb-3">
-                        <span className="text-[13px] text-foreground">{describe(line)}</span>
-                        <span className="text-[11px] text-foreground-subtle">
+                        <span className="text-[0.8125rem] text-foreground">{describe(line)}</span>
+                        <span className="text-[0.6875rem] text-foreground-subtle">
                             <RelativeTime iso={line.createdAt} />
                         </span>
                     </div>

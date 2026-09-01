@@ -32,7 +32,7 @@ export default async function NotesPage({
         <div className="flex w-full flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Notes</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Notes</h1>
                     <p className="text-sm text-muted-foreground">
                         Yours alone. Mention people and tasks the way you would anywhere else in
                         Polaris.

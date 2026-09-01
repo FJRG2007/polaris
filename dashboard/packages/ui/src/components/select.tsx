@@ -35,7 +35,7 @@ export const SelectTrigger = forwardRef<
         className={cn(
             // The value renders as a flex row (icon beside label), which is why the
             // label carries the truncation: `line-clamp` cannot apply to a flex box.
-            "group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[13px] transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-foreground-subtle data-[state=open]:border-border-strong [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
+            "group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-foreground-subtle data-[state=open]:border-border-strong [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
             className
         )}
         {...props}
@@ -82,7 +82,7 @@ export const SelectLabel = forwardRef<
     <RadixSelect.Label
         ref={ref}
         className={cn(
-            "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-foreground-subtle",
+            "px-2 py-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle",
             className
         )}
         {...props}
@@ -97,7 +97,7 @@ export const SelectItem = forwardRef<
     <RadixSelect.Item
         ref={ref}
         className={cn(
-            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
+            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
             className
         )}
         {...props}

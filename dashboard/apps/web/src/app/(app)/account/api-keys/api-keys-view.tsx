@@ -243,7 +243,7 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         <div className="-mx-1 overflow-x-auto px-1">
                             <table className="w-full min-w-[62rem] border-collapse text-sm">
                                 <thead>
-                                    <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                    <tr className="border-b border-border text-left text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
                                         <th scope="col" className="w-full max-w-0 py-2 pr-3 font-medium">
                                             Name
                                         </th>

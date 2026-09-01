@@ -171,7 +171,7 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
 
                 {profile?.description && (
                     <div className="w-full text-left">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                        <p className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                             About
                         </p>
                         <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">

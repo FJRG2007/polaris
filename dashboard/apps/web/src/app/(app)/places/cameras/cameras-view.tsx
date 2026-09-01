@@ -52,7 +52,7 @@ function Subtitle({ camera }: { camera: CameraView }) {
     const format = useDisplayFormat();
     const quiet = quietFor(camera);
     return (
-        <p className="truncate text-[11px] text-foreground-subtle">
+        <p className="truncate text-[0.6875rem] text-foreground-subtle">
             {quiet
                 ? `Not answering since ${format.dateTime(quiet.toISOString())}`
                 : [camera.zone, cameraVendor(camera.vendor).label, camera.address]
@@ -180,7 +180,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 </div>
             ) : null}
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
             {cameras.length === 0 ? (
                 <EmptyState
@@ -194,7 +194,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 />
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
-                    <table className="w-full text-[13px]">
+                    <table className="w-full text-[0.8125rem]">
                         <thead>
                             <tr>
                                 <th className="w-full max-w-0 px-3 py-2 text-left">Camera</th>

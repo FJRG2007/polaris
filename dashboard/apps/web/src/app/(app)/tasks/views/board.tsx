@@ -180,7 +180,7 @@ function ColumnEditor({
                         aria-pressed={draft.type === type}
                         title={core.TASK_STATUS_TYPE_HINTS[type]}
                         className={cn(
-                            "rounded-md border px-2 py-1 text-[11px] transition-colors",
+                            "rounded-md border px-2 py-1 text-[0.6875rem] transition-colors",
                             draft.type === type
                                 ? "border-primary bg-primary/10 text-foreground"
                                 : "border-border text-muted-foreground hover:text-foreground"
@@ -351,7 +351,7 @@ export function TaskCard({
                         >
                             <TaskStatusMarker commands={commands} />
                         </span>
-                        <span className="font-mono text-[10px] text-muted-foreground">
+                        <span className="font-mono text-[0.625rem] text-muted-foreground">
                             {task.reference}
                         </span>
                         <span className="flex-1" />
@@ -432,7 +432,7 @@ export function TaskCard({
                     )}
 
                     {hasMeta && (
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
                             <DueBadge
                                 dueDate={task.dueDate}
                                 statusType={task.statusType}
@@ -793,7 +793,7 @@ export function BoardView(props: ViewProps) {
                                         >
                                             {group.label}
                                         </h3>
-                                        <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
+                                        <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
                                             {group.tasks.length}
                                         </span>
                                         <span className="flex-1" />

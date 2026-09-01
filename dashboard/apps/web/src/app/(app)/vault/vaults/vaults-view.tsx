@@ -101,7 +101,7 @@ export function VaultsView() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Vaults</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Vaults</h1>
                     <p className="text-sm text-muted-foreground">
                         Every vault you can open, each with its own key. Yours is the first.
                     </p>
@@ -295,7 +295,7 @@ function AccountVaultPanel() {
             <CardHeader>
                 <CardTitle>My own vault</CardTitle>
             </CardHeader>
-            <CardBody className="flex flex-col gap-3 text-[13px] text-muted-foreground">
+            <CardBody className="flex flex-col gap-3 text-[0.8125rem] text-muted-foreground">
                 <p>
                     Everything you save lands here unless you put it somewhere else. It is yours
                     alone: nobody can be let in, because the key is wrapped under your master

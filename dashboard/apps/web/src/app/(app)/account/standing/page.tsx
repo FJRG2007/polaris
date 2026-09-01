@@ -25,7 +25,7 @@ export default async function AccountStandingPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Account standing</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Account standing</h1>
                 <p className="text-sm text-muted-foreground">
                     Where your account stands here, and anything in force against it.
                 </p>

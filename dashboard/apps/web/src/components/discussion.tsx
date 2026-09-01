@@ -74,16 +74,16 @@ export function Discussion({
                             {comment.author ? (
                                 <Avatar person={comment.author} size={26} />
                             ) : (
-                                <span className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-muted text-[10px] text-foreground-subtle">
+                                <span className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] text-foreground-subtle">
                                     AUT
                                 </span>
                             )}
                             <div className="group min-w-0 flex-1">
                                 <div className="flex flex-wrap items-baseline gap-2">
-                                    <span className="text-[13px] font-medium">
+                                    <span className="text-[0.8125rem] font-medium">
                                         {comment.author?.name ?? "Polaris"}
                                     </span>
-                                    <span className="text-[11px] text-foreground-subtle">
+                                    <span className="text-[0.6875rem] text-foreground-subtle">
                                         <RelativeTime iso={comment.createdAt} />
                                     </span>
                                     {canModerate || comment.author?.id === currentUserId ? (
@@ -98,7 +98,7 @@ export function Discussion({
                                         </button>
                                     ) : null}
                                 </div>
-                                <RichText value={comment.body} className="break-words text-[13px] text-foreground/90" />
+                                <RichText value={comment.body} className="break-words text-[0.8125rem] text-foreground/90" />
                             </div>
                         </li>
                     ))}

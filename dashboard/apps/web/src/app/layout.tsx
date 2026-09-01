@@ -2,12 +2,12 @@
 // the token import cannot live here.
 import "./globals.css";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import localFont from "next/font/local";
 import { DropGuard } from "@/components/drop-guard";
 import { themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
-import { resolveTheme } from "@/lib/display-prefs-service";
+import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
 
 /**
  * The typeface. Self-hosted rather than fetched from a font service: a build must
@@ -48,23 +48,29 @@ export const metadata: Metadata = {
 };
 
 /**
- * The theme is resolved here, on the server, and written into the class the
- * document is served with.
+ * The theme and the text size are resolved here, on the server, and written onto
+ * the document it is served as.
  *
- * Which means there is no flash: the first paint is already in the right
- * palette, with no script to run and nothing to correct afterwards. It costs one
- * cached settings read per request - and it answers "dark" for anything with no
- * session and no database, which is what keeps a build that prerenders a page
- * from needing one.
+ * Which means there is no flash: the first paint is already in the right palette
+ * and at the right size, with no script to run and nothing to correct
+ * afterwards. It costs one cached settings read per request - and it answers
+ * "dark" at 16px for anything with no session and no database, which is what
+ * keeps a build that prerenders a page from needing one.
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
-    const theme = await resolveTheme(session?.id ?? null);
+    const [theme, textSize] = await Promise.all([
+        resolveTheme(session?.id ?? null),
+        resolveTextSize(session?.id ?? null)
+    ]);
 
     return (
         <html
             lang="en"
             className={`${sans.variable} ${mono.variable} ${themeClass(theme)}`.trim()}
+            // Everything Polaris draws is sized in rem, so this is what the whole
+            // interface is laid out against - see globals.css.
+            style={{ "--app-text-size": `${textSize}px` } as CSSProperties}
             suppressHydrationWarning
         >
             <body>

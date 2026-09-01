@@ -294,7 +294,7 @@ function SettingRow({
                         came here from a wiki is holding, and without it they are
                         reading forty rows of prose looking for a word that
                         appears in none of them. */}
-                    <code className="min-w-0 truncate font-mono text-[11px] font-normal text-foreground-subtle">
+                    <code className="min-w-0 truncate font-mono text-[0.6875rem] font-normal text-foreground-subtle">
                         {setting.key}
                     </code>
                     {busy && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}

@@ -172,7 +172,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                 </Button>
             ) : null}
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
             {rules.length === 0 ? (
                 <EmptyState
@@ -202,7 +202,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
                                             <span
-                                                className="truncate text-[13px] text-foreground"
+                                                className="truncate text-[0.8125rem] text-foreground"
                                                 title={rule.name}
                                             >
                                                 {rule.name}
@@ -211,10 +211,10 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                                 <Badge variant="neutral">Never fired</Badge>
                                             )}
                                         </div>
-                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                        <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {describe(rule)}
                                         </p>
-                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                        <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             Tells{" "}
                                             {rule.recipients
                                                 .map(

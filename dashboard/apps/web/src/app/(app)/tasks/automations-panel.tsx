@@ -521,7 +521,7 @@ export function FormsPanel({
                                             {form.submissionCount === 1 ? "submission" : "submissions"}
                                         </p>
                                     </div>
-                                    <code className="hidden max-w-64 truncate rounded bg-muted px-2 py-1 text-[11px] md:block">
+                                    <code className="hidden max-w-64 truncate rounded bg-muted px-2 py-1 text-[0.6875rem] md:block">
                                         {url}
                                     </code>
                                     <CopyButton value={url} label="Copy the form link" />

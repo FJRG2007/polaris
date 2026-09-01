@@ -70,7 +70,7 @@ export function PlaceDialog({
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Name<span className="text-danger"> *</span>
                         </span>
                         <Input
@@ -81,7 +81,7 @@ export function PlaceDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">What it is</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">What it is</span>
                         <Select
                             value={kind}
                             onValueChange={setKind}
@@ -92,7 +92,7 @@ export function PlaceDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">Where it is</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">Where it is</span>
                         <Input
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}
@@ -101,7 +101,7 @@ export function PlaceDialog({
                     </label>
                 </div>
 
-                {error ? <p className="mt-3 text-[12px] text-danger">{error}</p> : null}
+                {error ? <p className="mt-3 text-[0.75rem] text-danger">{error}</p> : null}
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>

@@ -15,6 +15,24 @@
 @tailwind utilities;
 
 /*
+ * The size the interface is drawn at.
+ *
+ * Everything Polaris draws is sized in rem, so this one number moves the text
+ * and the rows, buttons and rails around it together. That is the point: text
+ * that grew inside a box that did not is text that is clipped, and somebody who
+ * turned the size up needs to be able to read the whole screen rather than a
+ * larger version of the part that still fits.
+ *
+ * The value is written onto the document by the server from the reader's own
+ * preference, so the first paint is already at the right size and there is no
+ * script to run and nothing to correct afterwards. The default here is what a
+ * page with no session gets, and it is the browser's own 16px.
+ */
+html {
+    font-size: var(--app-text-size, 16px);
+}
+
+/*
  * The webfonts the root layout loads, folded into the token the whole design
  * system reads. Named separately from --font-sans so the cascade order between
  * this file and the font loader's own stylesheet cannot decide which face wins:

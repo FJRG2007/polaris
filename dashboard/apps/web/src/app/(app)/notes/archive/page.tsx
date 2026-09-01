@@ -20,7 +20,7 @@ export default async function NotesArchivePage() {
     return (
         <div className="flex w-full flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Archive</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Archive</h1>
                 <p className="text-sm text-muted-foreground">
                     Notes you have put away. Nothing here is deleted. Putting one back returns it
                     where it sat, or to the top level if that note is still archived.

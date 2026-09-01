@@ -160,7 +160,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
     return (
         <div className="flex flex-col gap-4">
             {!ready ? (
-                <p className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[12px] text-muted-foreground">
+                <p className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-[0.75rem] text-muted-foreground">
                     Nothing is recognizing faces yet. Names written here start working the moment something is.
                     <Button asChild variant="secondary" size="sm">
                         <Link href="/places/settings">Set it up</Link>
@@ -177,7 +177,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                 </div>
             ) : null}
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
             {people.length === 0 ? (
                 <EmptyState
@@ -218,7 +218,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 ref={nameField}
                                                 value={draft}
                                                 aria-label={`Name for ${person.name}`}
-                                                className="h-7 text-[13px]"
+                                                className="h-7 text-[0.8125rem]"
                                                 onChange={(event) => setDraft(event.target.value)}
                                                 onBlur={() => commitRename(person)}
                                                 onKeyDown={(event) => {
@@ -232,9 +232,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 }}
                                             />
                                         ) : (
-                                            <p className="truncate text-[13px] text-foreground" title={person.name}>{person.name}</p>
+                                            <p className="truncate text-[0.8125rem] text-foreground" title={person.name}>{person.name}</p>
                                         )}
-                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                        <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {person.faces === 0
                                                 ? "No photographs yet - they will still be reported as a stranger"
                                                 : `${person.faces} photograph${person.faces === 1 ? "" : "s"}`}
@@ -246,7 +246,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 Add more
                                             </Badge>
                                         ) : null}
-                                        <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                        <label className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">
                                             Tell me
                                             <Switch
                                                 checked={person.notify}

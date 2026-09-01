@@ -31,6 +31,29 @@ export const WEEK_STARTS = ["sun", "mon", "sat"] as const;
 export const LANGUAGES = ["en"] as const;
 
 /**
+ * The sizes text is offered at, in pixels, smallest first.
+ *
+ * A short ladder rather than a free number: every size here has been looked at,
+ * and the two ends are the ones somebody actually needs - small enough to fit a
+ * dense board on a laptop, large enough to be read without leaning in. 16 is the
+ * middle and the default, which is also the browser's own.
+ *
+ * It is the root size, so the interface is laid out in it rather than only
+ * written in it: everything Polaris draws is sized in rem, and a reader who
+ * needs larger text needs the row it sits in to grow with it - text that grew
+ * inside a box that did not is text that is clipped.
+ */
+export const TEXT_SIZES = [12, 14, 15, 16, 18, 20, 24] as const;
+export type TextSize = (typeof TEXT_SIZES)[number];
+
+/** Whether a number is one of the offered sizes. Anything else - a value from a
+ *  hand-made payload, a size dropped in a later release - reads as unset and
+ *  follows the layer below. */
+export function isTextSize(value: unknown): value is TextSize {
+    return typeof value === "number" && (TEXT_SIZES as readonly number[]).includes(value);
+}
+
+/**
  * "Wherever this person happens to be", which is what almost everybody wants.
  *
  * The alternative to having this value is storing a zone at sign-up and being
@@ -130,7 +153,9 @@ export const displayPreferencesSchema = z.object({
     /** An IANA zone name, or `auto` for the clock of the device in front of the
      *  person. Every time on screen is written in it. */
     timeZone: timeZoneField,
-    theme: z.enum(THEME_IDS)
+    theme: z.enum(THEME_IDS),
+    /** The root text size in pixels, which the whole interface is drawn in. */
+    textSize: z.coerce.number().refine(isTextSize, "Not a size Polaris offers")
 });
 
 export type DisplayPreferences = z.infer<typeof displayPreferencesSchema>;
@@ -151,7 +176,8 @@ export const DISPLAY_DEFAULTS: DisplayPreferences = {
     currency: "EUR",
     language: "en",
     timeZone: AUTOMATIC_TIME_ZONE,
-    theme: "dark"
+    theme: "dark",
+    textSize: 16
 };
 
 /** Drop the keys that were not chosen, so a spread cannot overwrite a lower

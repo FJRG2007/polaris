@@ -26,7 +26,7 @@ export default async function NotificationsPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Notifications</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Notifications</h1>
                 <p className="text-sm text-muted-foreground">
                     Alerts from Polaris and your integrations, and where each one is sent.
                 </p>

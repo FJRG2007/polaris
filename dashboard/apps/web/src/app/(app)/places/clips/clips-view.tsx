@@ -276,7 +276,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                 />
                 {chosen.length > 0 ? (
                     <div className="flex items-center gap-1 rounded-md border border-border bg-surface px-2 py-1">
-                        <span className="text-[12px] text-foreground-subtle">{chosen.length} selected</span>
+                        <span className="text-[0.75rem] text-foreground-subtle">{chosen.length} selected</span>
                         <Button
                             variant="ghost"
                             size="icon"
@@ -310,7 +310,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                 ) : null}
             </div>
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
             {rows.length === 0 ? (
                 <EmptyState
@@ -346,10 +346,10 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                         >
                                             <div className="flex items-center justify-between gap-3">
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-[13px] text-foreground">
+                                                    <p className="truncate text-[0.8125rem] text-foreground">
                                                         {clip.cameraName} - {when}
                                                     </p>
-                                                    <p className="truncate text-[11px] text-foreground-subtle">
+                                                    <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                                         {REASON_LABEL[clip.reason] ?? clip.reason} -{" "}
                                                         {duration(clip.durationMs)} - {size(clip.bytes)}
                                                     </p>

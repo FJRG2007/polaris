@@ -134,7 +134,7 @@ export function PollCard({
 
     return (
         <div className="mt-1 max-w-md rounded-md border border-border bg-card p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="mb-2 flex items-center gap-1.5 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                 <BarChart3 className="size-3" />
                 {closed ? "Poll closed" : shown.multiple ? "Pick as many as apply" : "Pick one"}
             </p>

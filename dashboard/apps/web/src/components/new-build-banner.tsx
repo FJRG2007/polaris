@@ -84,7 +84,7 @@ export function NewBuildBanner({ served }: { served: string | null }) {
                 <ArrowUpCircle className="size-4 shrink-0 text-primary" />
                 <span className="min-w-0 flex-1 text-sm font-medium">Polaris has been updated</span>
             </span>
-            <p className="text-[12px] leading-relaxed text-muted-foreground">
+            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                 This tab is still running the previous version. Reload when you are ready -
                 anything half-written on this page is lost
                 {held?.session ? ", though you will come straight back into your call" : ""}.

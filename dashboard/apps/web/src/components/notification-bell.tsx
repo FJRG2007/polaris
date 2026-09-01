@@ -65,7 +65,7 @@ export function NotificationBell() {
             >
                 <Bell className="size-4" />
                 {badge ? (
-                    <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[10px] font-medium leading-4 text-white">
+                    <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
                         {badge}
                     </span>
                 ) : null}
@@ -114,9 +114,9 @@ export function NotificationBell() {
                                                     {!item.read ? (
                                                         <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                                                     ) : null}
-                                                    <span className="truncate text-[13px]" title={item.title}>{item.title}</span>
+                                                    <span className="truncate text-[0.8125rem]" title={item.title}>{item.title}</span>
                                                 </span>
-                                                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                                     <RelativeTime iso={item.createdAt} />
                                                     <span aria-hidden="true">-</span>
                                                     <span className="truncate" title={audience.text}>{audience.text}</span>

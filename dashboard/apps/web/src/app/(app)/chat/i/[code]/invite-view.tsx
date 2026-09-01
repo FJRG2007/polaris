@@ -81,7 +81,7 @@ export function InviteView({ code }: { code: string }) {
             <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-lg border border-border bg-card p-6 text-center">
                 <MessageSquare className="size-8 text-muted-foreground" />
                 <div className="flex flex-col gap-1">
-                    <p className="text-[17px] font-semibold tracking-tight">{offer.spaceName}</p>
+                    <p className="text-[1.0625rem] font-semibold tracking-tight">{offer.spaceName}</p>
                     {offer.spaceDescription && (
                         <p className="text-sm text-muted-foreground">{offer.spaceDescription}</p>
                     )}

@@ -306,12 +306,12 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                             <p className="flex items-center gap-2 truncate text-sm font-medium">
                                                 {entry.name}
                                                 {entry.isOwner && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-muted-foreground">
+                                                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-muted-foreground">
                                                         <Crown className="size-3" /> Owner
                                                     </span>
                                                 )}
                                                 {entry.expired && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[10px] text-warning">
+                                                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-warning">
                                                         <Clock className="size-3" /> Expired
                                                     </span>
                                                 )}

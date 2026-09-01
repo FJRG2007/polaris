@@ -123,7 +123,7 @@ export function ScopePicker({
                                 onClick={() => toggle(scope, false)}
                                 aria-label={`Remove ${SCOPE_LABELS[scope]}`}
                                 title={`Remove ${SCOPE_LABELS[scope]}`}
-                                className="inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px text-[11px] font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25"
+                                className="inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px text-[0.6875rem] font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25"
                             >
                                 {SCOPE_LABELS[scope]}
                                 <X className="size-3 shrink-0" />
@@ -199,7 +199,7 @@ export function ScopePicker({
                                                 <span className="min-w-0">
                                                     <span className="flex flex-wrap items-center gap-x-2">
                                                         {SCOPE_LABELS[scope]}
-                                                        <code className="text-[11px] text-muted-foreground">
+                                                        <code className="text-[0.6875rem] text-muted-foreground">
                                                             {scope}
                                                         </code>
                                                         {source ? (

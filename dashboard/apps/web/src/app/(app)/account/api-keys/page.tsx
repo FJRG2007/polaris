@@ -23,7 +23,7 @@ export default async function ApiKeysPage() {
         // nobody can compare.
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">API keys</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">API keys</h1>
                 <p className="text-sm text-muted-foreground">
                     Credentials for scripts and integrations acting as you. Keep them somewhere
                     safe: anyone holding one can do what it allows, as you.

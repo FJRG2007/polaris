@@ -126,7 +126,7 @@ export function PolarisMark({ className, nameClassName }: { className?: string; 
             <svg viewBox="0 0 24 24" className="size-[18px] shrink-0 text-primary" fill="currentColor" aria-hidden="true">
                 <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
             </svg>
-            <span className={cn("text-[13px] font-semibold tracking-tight", nameClassName)}>Polaris</span>
+            <span className={cn("text-[0.8125rem] font-semibold tracking-tight", nameClassName)}>Polaris</span>
         </span>
     );
 }
@@ -145,9 +145,9 @@ export function PageHeader({
     return (
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-                <h1 className="text-[17px] font-semibold leading-tight tracking-tight">{title}</h1>
+                <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">{title}</h1>
                 {description ? (
-                    <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+                    <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">{description}</p>
                 ) : null}
             </div>
             {actions ? <div className="flex items-center gap-2">{actions}</div> : null}

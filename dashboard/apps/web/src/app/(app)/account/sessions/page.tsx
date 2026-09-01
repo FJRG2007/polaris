@@ -29,7 +29,7 @@ export default async function SessionsPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Sessions</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Sessions</h1>
                 <p className="text-sm text-muted-foreground">
                     Where your account is signed in, and which devices it stops asking.
                 </p>

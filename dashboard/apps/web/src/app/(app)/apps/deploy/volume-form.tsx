@@ -210,7 +210,7 @@ export function VolumeForm({
                         }))}
                     />
                     {connections.length === 0 && (
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[0.6875rem] text-muted-foreground">
                             No NAS connections found. Add an NFS, SMB, or UniFi UNAS connection in Drive first.
                         </span>
                     )}
@@ -232,7 +232,7 @@ export function VolumeForm({
                         />
                     )}
                     {!usesCustomPath ? (
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[0.6875rem] text-muted-foreground">
                             Polaris creates and organizes it under <code className="text-foreground">polaris/deploy/&lt;project&gt;/&lt;service&gt;/{name.trim() || "name"}</code>.
                         </p>
                     ) : (
@@ -253,7 +253,7 @@ export function VolumeForm({
                                     </Button>
                                 )}
                             </div>
-                            <span className="text-[11px] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
+                            <span className="text-[0.6875rem] text-muted-foreground">A subpath (no leading slash, no `..`). Created if it does not exist.</span>
                         </label>
                     )}
                     {kind === "nas" && connectionId && (

@@ -80,7 +80,7 @@ export function DiscoverDialog({
                 <div className="flex flex-col gap-3">
                     <div className="flex items-end gap-2">
                         <label className="flex flex-1 flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">Address range</span>
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">Address range</span>
                             <Input
                                 value={subnet}
                                 onChange={(event) => setSubnet(event.target.value)}
@@ -98,7 +98,7 @@ export function DiscoverDialog({
                     </div>
                     {servers.length > 0 ? (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-[12px] font-medium text-muted-foreground">Look from</span>
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">Look from</span>
                             <Select
                                 value={from}
                                 onValueChange={setFrom}
@@ -107,7 +107,7 @@ export function DiscoverDialog({
                                     ...servers.map((server) => ({ value: server.id, label: server.label }))
                                 ]}
                             />
-                            <span className="text-[11px] text-foreground-subtle">
+                            <span className="text-[0.6875rem] text-foreground-subtle">
                                 For a camera on a network Polaris cannot reach - another building, a guest network, the
                                 far side of a repeater. That machine does the looking.
                             </span>
@@ -115,11 +115,11 @@ export function DiscoverDialog({
                     ) : null}
                 </div>
 
-                {error ? <p className="mt-3 text-[12px] text-danger">{error}</p> : null}
+                {error ? <p className="mt-3 text-[0.75rem] text-danger">{error}</p> : null}
 
                 {found !== null ? (
                     found.length === 0 ? (
-                        <p className="mt-4 text-[13px] text-muted-foreground">
+                        <p className="mt-4 text-[0.8125rem] text-muted-foreground">
                             Nothing answered. If the camera is on another network, add it by address and choose the
                             server that can see it.
                         </p>
@@ -128,10 +128,10 @@ export function DiscoverDialog({
                             {found.map((camera) => (
                                 <li key={camera.address} className="flex items-center justify-between gap-3 px-3 py-2">
                                     <div className="min-w-0">
-                                        <p className="truncate text-[13px] text-foreground">
+                                        <p className="truncate text-[0.8125rem] text-foreground">
                                             {camera.name ?? camera.address}
                                         </p>
-                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                        <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {camera.name ? `${camera.address} - ` : ""}
                                             {camera.via === "probe" ? "answered ONVIF" : "has a stream port open"}
                                         </p>

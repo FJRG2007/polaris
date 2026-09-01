@@ -30,7 +30,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
                 />
             ) : (
                 <div className="text-center">
-                    <h1 className="text-[17px] font-semibold tracking-tight">This form is not available</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">This form is not available</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         The link may have expired, or the form may have been closed.
                     </p>

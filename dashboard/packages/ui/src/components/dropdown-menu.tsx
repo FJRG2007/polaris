@@ -69,7 +69,7 @@ export const DropdownMenuItem = forwardRef<
     <RadixMenu.Item
         ref={ref}
         className={cn(
-            "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+            "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
             variant === "danger" && "text-danger focus:bg-danger/10 focus:text-danger",
             className
         )}
@@ -89,7 +89,7 @@ export const DropdownMenuSubTrigger = forwardRef<
         <RadixMenu.SubTrigger
             ref={ref}
             className={cn(
-                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[13px] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[state=open]:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
                 // A submenu whose options all do the same heavy thing is that
                 // thing, and the trigger is the only part of it anybody reads
                 // before deciding. Same red as an item, for the same reason.
@@ -145,7 +145,7 @@ export function DropdownMenuLabel({ className, ...props }: ComponentPropsWithout
     return (
         <RadixMenu.Label
             className={cn(
-                "px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-foreground-subtle",
+                "px-2 py-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle",
                 className
             )}
             {...props}

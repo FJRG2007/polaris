@@ -28,7 +28,7 @@ export default async function PrivacyPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Privacy</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Privacy</h1>
                 <p className="text-sm text-muted-foreground">
                     Who can find you, who sees your details, and who sees what you are doing.
                     Everything here can be answered with everybody, nobody, or a set of people you
@@ -45,8 +45,8 @@ export default async function PrivacyPage() {
                 <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
                     <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-[14rem] flex-1">
-                        <span className="block text-[13px]">Status schedule</span>
-                        <span className="block text-[11px] leading-snug text-foreground-subtle">
+                        <span className="block text-[0.8125rem]">Status schedule</span>
+                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                             Hours you are away, busy, or not shown at all, repeated every week.
                         </span>
                     </span>

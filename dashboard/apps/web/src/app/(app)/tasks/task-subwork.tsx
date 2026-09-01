@@ -329,7 +329,7 @@ export function SubtaskSection({
                                     onClick={() => onOpen(subtask.id)}
                                     className="flex-1 truncate text-left text-sm hover:underline"
                                 >
-                                    <span className="mr-2 font-mono text-[11px] text-muted-foreground">
+                                    <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
                                         {subtask.reference}
                                     </span>
                                     <span
@@ -721,7 +721,7 @@ export function DependencySection({
                 onClick={() => onOpen(edge.taskId)}
                 className="flex-1 truncate text-left text-sm hover:underline"
             >
-                <span className="mr-2 font-mono text-[11px] text-muted-foreground">
+                <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
                     {edge.reference}
                 </span>
                 {edge.name}
@@ -819,7 +819,7 @@ export function DependencySection({
                                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
                                     >
                                         <Link2 className="size-3.5 text-muted-foreground" />
-                                        <span className="font-mono text-[11px] text-muted-foreground">
+                                        <span className="font-mono text-[0.6875rem] text-muted-foreground">
                                             {candidate.reference}
                                         </span>
                                         <span className="truncate">{candidate.name}</span>

@@ -247,7 +247,7 @@ export function ForwardDialog({
                                                     target.spaceId === space.id &&
                                                     chosen.includes(target.id)
                                             ) && (
-                                                <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[11px] text-primary">
+                                                <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[0.6875rem] text-primary">
                                                     chosen
                                                 </span>
                                             )}
@@ -290,7 +290,7 @@ export function ForwardDialog({
                                             )}
                                         </span>
                                         {chosen.includes(target.id) && (
-                                            <span className="shrink-0 text-[11px] text-primary">
+                                            <span className="shrink-0 text-[0.6875rem] text-primary">
                                                 chosen
                                             </span>
                                         )}

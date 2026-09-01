@@ -124,7 +124,7 @@ export function MeetingDetailsDialog({
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[0.6875rem] text-muted-foreground">
                             Clear it for a room that is open whenever you are. The link does not
                             change either way.
                         </span>

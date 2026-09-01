@@ -277,7 +277,7 @@ export function CameraViewer({
                     {drawn === false && !playing ? (
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">
                             <Camera className="size-6 shrink-0" />
-                            <span className="text-[12px]">This camera is not answering</span>
+                            <span className="text-[0.75rem]">This camera is not answering</span>
                         </span>
                     ) : null}
 
@@ -288,7 +288,7 @@ export function CameraViewer({
                         and "something is broken". It took three reports to
                         establish which. */}
                     {!trying && drawn ? (
-                        <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] text-white/80">
+                        <span className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-black/70 px-2.5 py-1 text-[0.6875rem] text-white/80">
                             <Camera className="size-3.5 shrink-0" />
                             Pictures only - the live stream would not start
                             <button
@@ -310,8 +310,8 @@ export function CameraViewer({
                         it is a smaller live view. */}
                     <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 pr-12 opacity-0 transition-opacity group-hover/frame:opacity-100">
                         <div className="min-w-0">
-                            <p className="truncate text-[13px] font-medium text-white" title={camera.name}>{camera.name}</p>
-                            {camera.zone ? <p className="truncate text-[11px] text-white/70" title={camera.zone}>{camera.zone}</p> : null}
+                            <p className="truncate text-[0.8125rem] font-medium text-white" title={camera.name}>{camera.name}</p>
+                            {camera.zone ? <p className="truncate text-[0.6875rem] text-white/70" title={camera.zone}>{camera.zone}</p> : null}
                         </div>
                     </div>
 

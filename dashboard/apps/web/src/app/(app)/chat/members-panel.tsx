@@ -300,7 +300,7 @@ function MemberRow({
                                     </span>
                                     {under && (
                                         <span
-                                            className="block truncate text-[11px] text-muted-foreground"
+                                            className="block truncate text-[0.6875rem] text-muted-foreground"
                                             title={under}
                                         >
                                             {under}

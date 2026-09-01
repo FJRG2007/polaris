@@ -196,7 +196,7 @@ export function SearchPanel({
                                     onClick={() => onOpen(hit)}
                                     className="flex w-full flex-col gap-0.5 border-b border-border px-3 py-2 text-left transition-colors hover:bg-card-hover"
                                 >
-                                    <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                    <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                         {hit.inSpace ? (
                                             <Hash className="size-3 shrink-0" />
                                         ) : (

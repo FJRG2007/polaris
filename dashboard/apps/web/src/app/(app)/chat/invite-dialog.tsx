@@ -163,7 +163,7 @@ export function InviteDialog({
                                     <code className="min-w-0 flex-1 truncate font-mono text-xs">
                                         {linkFor(invite.code)}
                                     </code>
-                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                                         {invite.maxUses === null
                                             ? `${invite.uses} used`
                                             : `${invite.uses}/${invite.maxUses}`}

@@ -140,7 +140,7 @@ export function PropertyRows({
                     disabled={disabled}
                     onChange={(dueDate) => patch({ dueDate })}
                 />
-                <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <label className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                     <input
                         type="checkbox"
                         checked={task.timed}
@@ -200,7 +200,7 @@ export function PropertyRows({
                         className="min-w-[12rem] flex-1 rounded-md border border-border bg-field px-2 py-1 text-xs hover:border-border-strong focus:border-border-strong disabled:opacity-50"
                     />
                     {waitingOn > 0 && (
-                        <span className="text-[11px] text-amber-600">
+                        <span className="text-[0.6875rem] text-amber-600">
                             Waiting on {waitingOn} unfinished {waitingOn === 1 ? "task" : "tasks"}
                         </span>
                     )}

@@ -35,7 +35,7 @@ export default async function OrganizationLayout({
             <header className="flex items-start gap-3">
                 <OrgAvatar org={org} size={44} />
                 <div className="min-w-0 flex-1">
-                    <h1 className="flex flex-wrap items-center gap-2 text-[17px] font-semibold tracking-tight">
+                    <h1 className="flex flex-wrap items-center gap-2 text-[1.0625rem] font-semibold tracking-tight">
                         <span className="truncate" title={org.name}>
                             {org.name}
                         </span>

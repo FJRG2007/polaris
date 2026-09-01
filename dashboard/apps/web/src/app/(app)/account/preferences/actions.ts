@@ -11,15 +11,52 @@ import { requireUser } from "@/lib/session";
 import * as core from "@polaris/core";
 import { setPresenceChoice, setStatus } from "@/lib/presence-service";
 import { userDisplayPreferencesSchema } from "@polaris/core";
-import { recordDeviceTimeZone, saveUserDisplayPreferences } from "@/lib/display-prefs-service";
+import {
+    getUserDisplayPreferences,
+    patchUserDisplayPreferences,
+    recordDeviceTimeZone,
+    saveUserDisplayPreferences
+} from "@/lib/display-prefs-service";
 import { PRESENCE_CHOICES, type PresenceChoice } from "@polaris/core";
 
 export async function saveDisplayPreferencesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = userDisplayPreferencesSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Unsupported choice." };
-    await saveUserDisplayPreferences(user.id, parsed.data);
+    // A replace rather than a merge, because a field left on "Platform default"
+    // has to be able to go back to being absent - which a merge cannot say. The
+    // text size is the one field this form does not own, so whatever is stored
+    // for it survives a save here rather than being written away by a form that
+    // was never showing it.
+    const held = await getUserDisplayPreferences(user.id);
+    await saveUserDisplayPreferences(user.id, {
+        ...parsed.data,
+        textSize: parsed.data.textSize ?? held.textSize
+    });
     // Formatting is resolved in the app layout, so every screen re-renders.
+    revalidatePath("/", "layout");
+    return {};
+}
+
+/**
+ * The size the interface is drawn at.
+ *
+ * Its own action, and a merge rather than a replace, because it sits in its own
+ * form on the same page as the formats: writing the whole blob from either one
+ * would undo whatever the other had saved since the page loaded.
+ *
+ * The size is served onto the document by the root layout, so the whole tree is
+ * revalidated - the browser has already applied it to itself, and this is what
+ * makes the next page load agree.
+ */
+export async function saveTextSizeAction(size: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.userDisplayPreferencesSchema
+        .pick({ textSize: true })
+        .required()
+        .safeParse({ textSize: size });
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Not a size Polaris offers" };
+    await patchUserDisplayPreferences(user.id, { textSize: parsed.data.textSize });
     revalidatePath("/", "layout");
     return {};
 }

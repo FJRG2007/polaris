@@ -67,7 +67,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
         return (
             <Shell signedIn={signedIn}>
                 <div className="flex flex-1 flex-col items-center justify-center text-center">
-                    <h1 className="text-[17px] font-semibold tracking-tight">This task is not available</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">This task is not available</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         The link may have been turned off, or the task may have been deleted.
                     </p>
@@ -119,7 +119,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                                     {task.tags.map((tag) => (
                                         <Badge
                                             key={tag.name}
-                                            className="border-transparent text-[11px]"
+                                            className="border-transparent text-[0.6875rem]"
                                             style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
                                         >
                                             {tag.name}
@@ -199,7 +199,7 @@ export default async function PublicTaskPage({ params }: { params: Promise<{ tok
                         </section>
                     )}
 
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[0.6875rem] text-muted-foreground">
                         Last changed {format.dateTime(task.updatedAt)}. This is a read-only copy.
                     </p>
                 </CardBody>

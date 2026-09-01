@@ -488,7 +488,7 @@ export function EmojiPicker({
                                         for any two people. */}
                                     {recent.emoji.length > 0 && (
                                         <section className="mb-2">
-                                            <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                            <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 Recent
                                             </h3>
                                             <Grid
@@ -506,7 +506,7 @@ export function EmojiPicker({
                                     )}
                                     {EMOJI_GROUPS.map((group) => (
                                         <section key={group.name} className="mb-2">
-                                            <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                            <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 {group.name}
                                             </h3>
                                             <Grid
@@ -574,7 +574,7 @@ export function EmojiPicker({
                             // sent from this browser. Somebody opening the GIF
                             // tab is usually reaching for the same one again.
                             <>
-                                <h3 className="px-1 pb-1 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                     Recent
                                 </h3>
                                 <MediaGrid
@@ -588,7 +588,7 @@ export function EmojiPicker({
                                     }}
                                 />
                                 {results.length > 0 && (
-                                    <h3 className="px-1 pb-1 pt-2 text-[10px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                    <h3 className="px-1 pb-1 pt-2 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                         Trending
                                     </h3>
                                 )}

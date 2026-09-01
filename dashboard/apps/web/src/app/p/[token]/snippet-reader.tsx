@@ -130,7 +130,7 @@ export function SnippetReader({
                 <div className="min-w-0">
                     <h1
                         title={title}
-                        className="flex items-center gap-2 truncate text-[17px] font-semibold tracking-tight"
+                        className="flex items-center gap-2 truncate text-[1.0625rem] font-semibold tracking-tight"
                     >
                         {title}
                         {sealed ? (

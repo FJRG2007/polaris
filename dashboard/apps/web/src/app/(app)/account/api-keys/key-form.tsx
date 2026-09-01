@@ -210,7 +210,7 @@ export function KeyForm({
         return (
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">{name}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{name}</h1>
                     <p className="text-sm text-muted-foreground">
                         Copy it now. Polaris stores only a hash of it and cannot show it again -
                         losing it means making another key.
@@ -259,7 +259,7 @@ export function KeyForm({
                     <ArrowLeft className="size-3.5" />
                     API keys
                 </Link>
-                <h1 className="text-[17px] font-semibold tracking-tight">
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {editing ? editing.name : "New API key"}
                 </h1>
                 <p className="text-sm text-muted-foreground">

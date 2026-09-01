@@ -121,7 +121,7 @@ export function PersonDialog({
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-[12px] font-medium text-muted-foreground">
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Name<span className="text-danger"> *</span>
                         </span>
                         <Input
@@ -133,7 +133,7 @@ export function PersonDialog({
                     </label>
 
                     <div className="flex flex-col gap-2">
-                        <span className="text-[12px] font-medium text-muted-foreground">Photographs</span>
+                        <span className="text-[0.75rem] font-medium text-muted-foreground">Photographs</span>
                         {chosen.length > 0 ? (
                             <ul className="flex flex-wrap gap-2">
                                 {chosen.map((item, index) => (
@@ -168,7 +168,7 @@ export function PersonDialog({
                             <ImagePlus className="size-4 shrink-0" />
                             {chosen.length > 0 ? "Add more" : "Choose photographs"}
                         </Button>
-                        <span className="text-[11px] text-foreground-subtle">
+                        <span className="text-[0.6875rem] text-foreground-subtle">
                             {recognizerReady
                                 ? "Four or five, in different light, one face per photograph. One photograph recognizes that photograph; several recognize a person."
                                 : "Face recognition is off, so there is nowhere to send them. Turn it on under Settings - the name can be written down now and starts working then."}
@@ -187,7 +187,7 @@ export function PersonDialog({
                     </div>
                 </div>
 
-                {error ? <p className="mt-3 text-[12px] text-danger">{error}</p> : null}
+                {error ? <p className="mt-3 text-[0.75rem] text-danger">{error}</p> : null}
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose} disabled={busy}>

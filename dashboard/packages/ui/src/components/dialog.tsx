@@ -72,7 +72,7 @@ export function DialogTitle({
 }: ComponentPropsWithoutRef<typeof RadixDialog.Title>) {
     return (
         <RadixDialog.Title
-            className={cn("text-[15px] font-semibold tracking-tight", className)}
+            className={cn("text-[0.9375rem] font-semibold tracking-tight", className)}
             {...props}
         />
     );
@@ -84,7 +84,7 @@ export function DialogDescription({
 }: ComponentPropsWithoutRef<typeof RadixDialog.Description>) {
     return (
         <RadixDialog.Description
-            className={cn("text-[13px] leading-relaxed text-muted-foreground", className)}
+            className={cn("text-[0.8125rem] leading-relaxed text-muted-foreground", className)}
             {...props}
         />
     );

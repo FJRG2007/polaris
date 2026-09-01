@@ -858,7 +858,7 @@ function PlayerRow({
             <td className="px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate font-medium" title={entry.name}>{entry.name}</span>
-                    {entry.admin && <Badge className="shrink-0 text-[11px]">{playerStanding.operator}</Badge>}
+                    {entry.admin && <Badge className="shrink-0 text-[0.6875rem]">{playerStanding.operator}</Badge>}
                 </span>
                 <span className="text-xs text-muted-foreground">
                     {entry.online
@@ -874,7 +874,7 @@ function PlayerRow({
                             <span
                                 key={identifier}
                                 title={identifier}
-                                className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+                                className="rounded bg-surface px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground"
                             >
                                 {kind ? IDENTIFIER_LABEL[kind] : identifier}
                             </span>

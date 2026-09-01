@@ -866,7 +866,7 @@ export function Composer({
                         {typed > rules.maxMessageLength - COUNTER_WITHIN && (
                             <span
                                 className={cn(
-                                    "text-[11px] tabular-nums",
+                                    "text-[0.6875rem] tabular-nums",
                                     tooLong ? "text-danger" : "text-muted-foreground"
                                 )}
                             >

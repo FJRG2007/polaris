@@ -143,7 +143,7 @@ export default async function FirewallPage({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 items-baseline gap-2">
-                    <h1 className="text-[17px] font-semibold tracking-tight">Firewall</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Firewall</h1>
                     {/* The selects live in the app bar on a wide screen, where the
                         chosen scope is no longer next to the title - so the title
                         carries it. */}

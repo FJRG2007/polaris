@@ -287,7 +287,7 @@ function NewMeetingDialog({
                             value={when}
                             onChange={(event) => setWhen(event.target.value)}
                         />
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[0.6875rem] text-muted-foreground">
                             Leave it empty for a room that is open as soon as you make it.
                         </span>
                     </label>
@@ -336,7 +336,7 @@ function Setting({
         <label className={cn("flex items-start justify-between gap-4", className)}>
             <span className="min-w-0">
                 <span className="block text-xs font-medium">{label}</span>
-                <span className="block text-[11px] text-muted-foreground">{hint}</span>
+                <span className="block text-[0.6875rem] text-muted-foreground">{hint}</span>
             </span>
             <Switch checked={checked} onChange={onChange} aria-label={label} />
         </label>

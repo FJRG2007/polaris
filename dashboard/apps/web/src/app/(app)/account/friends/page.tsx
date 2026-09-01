@@ -18,7 +18,7 @@ export default async function FriendsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Friends</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Friends</h1>
                 <p className="text-sm text-muted-foreground">
                     Who sees what you show your friends. Being friends grants nothing else.
                 </p>

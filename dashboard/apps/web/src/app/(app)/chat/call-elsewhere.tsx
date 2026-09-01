@@ -135,10 +135,10 @@ export function CallElsewhere() {
                         You are in a call on another device
                     </span>
                 </span>
-                <p className="text-[12px] leading-relaxed text-muted-foreground">
+                <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                     Moving it here hangs up there. A call is in one place at a time.
                 </p>
-                {failed ? <p className="text-[12px] text-danger">{failed}</p> : null}
+                {failed ? <p className="text-[0.75rem] text-danger">{failed}</p> : null}
 
                 <span className="flex items-center gap-2">
                     <Button size="sm" className="flex-1" disabled={moving} onClick={move}>

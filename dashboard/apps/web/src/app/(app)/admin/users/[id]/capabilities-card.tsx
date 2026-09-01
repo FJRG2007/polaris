@@ -74,7 +74,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
             <CardBody className="flex flex-col gap-3">
                 <div>
                     <h2 className="text-sm font-medium">Capabilities</h2>
-                    <p className="mt-1 text-[13px] text-muted-foreground">
+                    <p className="mt-1 text-[0.8125rem] text-muted-foreground">
                         What this account may do, one thing at a time. Each follows their role
                         unless it is set here.
                     </p>
@@ -103,7 +103,7 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                     <div className="flex flex-col gap-4">
                         {areas.map(([area, entries]) => (
                             <section key={area} className="flex flex-col gap-1.5">
-                                <h3 className="text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                     {area}
                                 </h3>
                                 <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
@@ -113,16 +113,16 @@ export function CapabilitiesCard({ userId, onSaved }: { userId: string; onSaved:
                                             className="flex flex-wrap items-center gap-2 px-3 py-2"
                                         >
                                             <span className="min-w-0 flex-1">
-                                                <span className="block text-[13px]">
+                                                <span className="block text-[0.8125rem]">
                                                     {capability.label}
                                                 </span>
-                                                <span className="block font-mono text-[11px] text-foreground-subtle">
+                                                <span className="block font-mono text-[0.6875rem] text-foreground-subtle">
                                                     {capability.permission}
                                                 </span>
                                             </span>
                                             <span
                                                 className={cn(
-                                                    "shrink-0 text-[11px]",
+                                                    "shrink-0 text-[0.6875rem]",
                                                     capability.inherited
                                                         ? "text-muted-foreground"
                                                         : "text-foreground-subtle"

@@ -244,7 +244,7 @@ function ReportFiles({
                             <Download className="size-3.5 shrink-0 text-muted-foreground" />
                         </a>
                     )}
-                    <span className="text-[11px] text-foreground-subtle">
+                    <span className="text-[0.6875rem] text-foreground-subtle">
                         {file.name}
                         {/* Said out loud, because the two are different claims: a
                             live file is the one still on the message, and a kept
@@ -275,7 +275,7 @@ function ReportLink({ link }: { link: LinkPreviewView }) {
                 />
             ) : null}
             <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-[11px] text-foreground-subtle">
+                <span className="text-[0.6875rem] text-foreground-subtle">
                     {link.siteName || new URL(link.url).hostname}
                 </span>
                 <span
@@ -288,7 +288,7 @@ function ReportLink({ link }: { link: LinkPreviewView }) {
                 >
                     {link.title}
                 </span>
-                <span className="line-clamp-2 text-[12px] text-muted-foreground">
+                <span className="line-clamp-2 text-[0.75rem] text-muted-foreground">
                     {link.description}
                 </span>
             </span>

@@ -47,7 +47,7 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                 >
                     <ArrowLeft className="size-3" /> Channels
                 </Link>
-                <h1 className="text-[17px] font-semibold tracking-tight">Connect a channel</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Connect a channel</h1>
                 <p className="text-sm text-muted-foreground">
                     Pick what to connect. Add as many as you like and handle them all from one inbox.
                 </p>

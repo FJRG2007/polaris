@@ -122,7 +122,7 @@ export function ServerDetail({
                     </Link>
                     <h1
                         title={server.name}
-                        className="mt-1 flex flex-wrap items-center gap-2 truncate text-[17px] font-semibold tracking-tight"
+                        className="mt-1 flex flex-wrap items-center gap-2 truncate text-[1.0625rem] font-semibold tracking-tight"
                     >
                         {server.name}
                         {server.kind === "local" ? (

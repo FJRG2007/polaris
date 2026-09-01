@@ -200,7 +200,7 @@ function WorkRow({ item }: { item: CodeItem }) {
                     {item.labels.slice(0, 3).map((label) => (
                         <span
                             key={label.name}
-                            className="rounded-full px-1.5 py-px text-[10px] ring-1"
+                            className="rounded-full px-1.5 py-px text-[0.625rem] ring-1"
                             style={{
                                 color: label.color,
                                 boxShadow: `inset 0 0 0 1px ${label.color}55`

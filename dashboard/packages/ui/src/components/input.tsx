@@ -32,7 +32,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
  * application's one ring (tokens.css), so nothing is restated here.
  */
 const baseClass =
-    "flex h-8 w-full rounded-md border border-border bg-field px-2.5 text-[13px] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
+    "flex h-8 w-full rounded-md border border-border bg-field px-2.5 text-[0.8125rem] text-foreground transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong focus:border-border-strong disabled:cursor-not-allowed disabled:opacity-50";
 
 /** What a `bare` field turns off. The container is the field, and it is the one
  *  that says where the caret is. */

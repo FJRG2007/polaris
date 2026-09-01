@@ -35,7 +35,7 @@ function Stat({
                 <div className="min-w-0">
                     <p className={cn("text-2xl font-semibold leading-none", tone)}>{value}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-                    {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
+                    {hint && <p className="mt-0.5 text-[0.6875rem] text-muted-foreground">{hint}</p>}
                 </div>
             </CardBody>
         </Card>
@@ -57,7 +57,7 @@ export function ReportsView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header>
-                <h1 className="text-[17px] font-semibold tracking-tight">Reporting</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Reporting</h1>
                 <p className="text-sm text-muted-foreground">
                     Across every space you can see. Archived work is left out of all of it.
                 </p>

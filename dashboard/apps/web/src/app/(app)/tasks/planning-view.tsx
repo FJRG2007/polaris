@@ -54,7 +54,7 @@ export function SprintsView({
             <AccessDialog target={access} onClose={() => setAccess(null)} />
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Sprints</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Sprints</h1>
                     <p className="text-sm text-muted-foreground">Time-boxed runs of work, with what is left each day.</p>
                 </div>
                 <span className="flex-1" />
@@ -293,7 +293,7 @@ export function GoalsView({
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Goals</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Goals</h1>
                     <p className="text-sm text-muted-foreground">
                         Objectives measured by targets. A target that watches a list keeps itself current.
                     </p>

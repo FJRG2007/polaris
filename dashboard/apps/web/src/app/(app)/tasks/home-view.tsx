@@ -189,7 +189,7 @@ export function HomeView({
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">My work</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">My work</h1>
                 <p className="text-sm text-muted-foreground">Everything assigned to you, soonest first.</p>
             </div>
 
@@ -271,7 +271,7 @@ export function HomeView({
                                             onClick={() => setOpenTaskId(task.id)}
                                             className="flex min-w-0 items-center gap-2 text-left"
                                         >
-                                            <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+                                            <span className="hidden font-mono text-[0.6875rem] text-muted-foreground sm:inline">
                                                 {task.reference}
                                             </span>
                                             <span className="truncate text-sm">{task.name}</span>
@@ -279,7 +279,7 @@ export function HomeView({
                                         </button>
                                         <TaskLocation task={task} />
                                     </div>
-                                    <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
+                                    <span className="hidden items-center gap-1 text-[0.6875rem] text-muted-foreground md:flex">
                                         <StatusDot color={task.statusColor} />
                                         {task.statusName}
                                     </span>

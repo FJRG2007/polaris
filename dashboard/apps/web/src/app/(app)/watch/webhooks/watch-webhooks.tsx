@@ -35,7 +35,7 @@ export function WatchWebhooks({ projects }: { projects: { id: string; name: stri
                             >
                                 <span className="truncate">{project.name}</span>
                                 {project.count > 0 && (
-                                    <span className="shrink-0 rounded-full border border-border/60 px-1.5 text-[10px]">
+                                    <span className="shrink-0 rounded-full border border-border/60 px-1.5 text-[0.625rem]">
                                         {project.count}
                                     </span>
                                 )}

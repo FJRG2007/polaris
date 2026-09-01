@@ -18,7 +18,7 @@ export default async function RecentPage() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Recent</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Recent</h1>
                 <p className="text-sm text-muted-foreground">
                     Files you recently opened, changed, or created.
                 </p>

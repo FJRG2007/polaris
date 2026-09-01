@@ -379,7 +379,7 @@ export function AvatarStack({ people, size = 24 }: { people: readonly AvatarPers
             ))}
             {people.length > shown.length && (
                 <span
-                    className="inline-flex items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground ring-1 ring-border"
+                    className="inline-flex items-center justify-center rounded-full bg-muted text-[0.625rem] font-medium text-muted-foreground ring-1 ring-border"
                     style={{ width: size, height: size }}
                 >
                     +{people.length - shown.length}

@@ -126,7 +126,7 @@ export function ProjectWebhooks({
                             <div className="min-w-0 flex-1">
                                 <p className="flex items-center gap-2 truncate text-sm font-medium">
                                     {hook.name}
-                                    <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                    <span className="rounded border border-border/60 px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                                         {FORMAT_LABELS[hook.format]}
                                     </span>
                                     {hook.status === "ok" && <CheckCircle2 className="size-3.5 shrink-0 text-success" />}

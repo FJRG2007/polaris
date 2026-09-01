@@ -143,7 +143,7 @@ export function TaskLocation({
     return (
         <span
             title={trail}
-            className={cn("flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground", className)}
+            className={cn("flex min-w-0 items-center gap-1 text-[0.6875rem] text-muted-foreground", className)}
         >
             <Link
                 href={`/tasks/s/${task.spaceId}`}
@@ -383,7 +383,7 @@ export function StatusPicker({
                             {status.id === value ? (
                                 <Check className="size-3.5 text-primary" />
                             ) : (
-                                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                <span className="text-[0.625rem] uppercase tracking-wide text-muted-foreground">
                                     {core.TASK_STATUS_TYPE_LABELS[status.type]}
                                 </span>
                             )}
@@ -491,7 +491,7 @@ export function PriorityPicker({
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
-                <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Priority</p>
+                <p className="px-2 pb-1 text-[0.625rem] uppercase tracking-wide text-muted-foreground">Priority</p>
                 {/* Every priority, "none" included and in its own place at the
                     bottom of the scale. It used to be a "Clear" row with a
                     crossed-out circle on it, which reads as an action rather
@@ -535,7 +535,7 @@ export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: (
             // A tag is named by whoever needed it, in a hurry, and nothing stops
             // that name being one long word. Capped at the width of whatever is
             // showing it rather than allowed out through the side of a card.
-            className="max-w-full gap-1 border-transparent text-[11px]"
+            className="max-w-full gap-1 border-transparent text-[0.6875rem]"
             style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
         >
             <span className="truncate" title={tag.name}>{tag.name}</span>
@@ -675,7 +675,7 @@ export function TagPicker({
                         >
                             <Plus className="size-3.5" />
                             <span className="flex-1 truncate">Create &ldquo;{query.trim()}&rdquo;</span>
-                            <span className="text-[10px] text-muted-foreground">Enter</span>
+                            <span className="text-[0.625rem] text-muted-foreground">Enter</span>
                         </DropdownMenuItem>
                     )}
                 </div>
@@ -751,7 +751,7 @@ export function DateField({
             {/* Two date boxes stack on a phone, and stacked they are two identical
                 boxes: which is the start and which is the due date is only in the
                 label a mouse never reaches on one. */}
-            <span className="w-16 shrink-0 text-[11px] text-muted-foreground sm:hidden">{label}</span>
+            <span className="w-16 shrink-0 text-[0.6875rem] text-muted-foreground sm:hidden">{label}</span>
             <input
                 type={timed ? "datetime-local" : "date"}
                 aria-label={label}
@@ -836,7 +836,7 @@ export function DurationField({
                 aria-invalid={invalid}
                 className="h-8 w-28 text-xs"
             />
-            {invalid && <p className="mt-1 text-[11px] text-danger">Try 2h 30m, 1d or 90</p>}
+            {invalid && <p className="mt-1 text-[0.6875rem] text-danger">Try 2h 30m, 1d or 90</p>}
         </div>
     );
 }

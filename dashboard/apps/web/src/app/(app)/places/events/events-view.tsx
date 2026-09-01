@@ -321,14 +321,14 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                     value={from}
                     onChange={(event) => setFrom(event.target.value)}
                     aria-label="From"
-                    className="h-9 rounded-md border border-border bg-field px-2 text-[13px] text-foreground"
+                    className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
                 />
                 <input
                     type="datetime-local"
                     value={to}
                     onChange={(event) => setTo(event.target.value)}
                     aria-label="To"
-                    className="h-9 rounded-md border border-border bg-field px-2 text-[13px] text-foreground"
+                    className="h-9 rounded-md border border-border bg-field px-2 text-[0.8125rem] text-foreground"
                 />
                 {cameraId || kind || label || zone || from || to ? (
                     <Button
@@ -354,7 +354,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                 ) : null}
             </div>
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
             {events === null ? (
                 <FeedSkeleton />
@@ -415,7 +415,7 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                             unoptimized
                                         />
                                     ) : (
-                                        <span className="flex size-full items-center justify-center text-[11px] text-foreground-subtle">
+                                        <span className="flex size-full items-center justify-center text-[0.6875rem] text-foreground-subtle">
                                             No picture kept
                                         </span>
                                     )}
@@ -432,19 +432,19 @@ export function EventsView({ canControl }: { canControl: boolean }) {
                                         />
                                     ) : null}
                                     {noFootage === event.id ? (
-                                        <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[11px] text-white">
+                                        <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[0.6875rem] text-white">
                                             No footage of this moment was kept
                                         </span>
                                     ) : null}
                                 </button>
                                 <div className="flex items-start justify-between gap-2 border-t border-border px-3 py-2">
                                     <div className="min-w-0">
-                                        <p className="truncate text-[13px] text-foreground">
+                                        <p className="truncate text-[0.8125rem] text-foreground">
                                             {nameFor(event.label) ??
                                                 KIND_LABEL[event.kind] ??
                                                 event.kind}
                                         </p>
-                                        <p className="truncate text-[11px] text-foreground-subtle">
+                                        <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                             {[
                                                 event.cameraName,
                                                 format.dateTime(event.at),

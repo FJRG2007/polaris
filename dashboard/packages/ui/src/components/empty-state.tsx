@@ -40,9 +40,9 @@ export function EmptyState({
             )}
         >
             {icon ? <span className="mb-1 text-foreground-subtle [&_svg]:size-6">{icon}</span> : null}
-            <p className="text-[13px] font-medium text-foreground">{title}</p>
+            <p className="text-[0.8125rem] font-medium text-foreground">{title}</p>
             {description ? (
-                <p className="max-w-sm text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+                <p className="max-w-sm text-[0.8125rem] leading-relaxed text-muted-foreground">{description}</p>
             ) : null}
             {action ? <div className="mt-2 flex items-center gap-2">{action}</div> : null}
         </div>

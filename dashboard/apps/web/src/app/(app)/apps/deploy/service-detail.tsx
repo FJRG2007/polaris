@@ -552,7 +552,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <Globe className="size-4 shrink-0 text-muted-foreground" />{" "}
                             {primary.hostname}
                             {isLocalDomain(primary) && (
-                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[10px] font-medium text-warning">
+                                <span className="shrink-0 rounded bg-warning/10 px-1 text-[0.625rem] font-medium text-warning">
                                     LAN
                                 </span>
                             )}
@@ -596,7 +596,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                     {active && (
                         <div className="overflow-hidden rounded-xl border border-success/30 bg-success/[0.06]">
                             <div className="flex items-center gap-3 p-3">
-                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[11px] font-semibold tracking-wide text-success">
+                                <span className="shrink-0 rounded bg-success/15 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-success">
                                     ACTIVE
                                 </span>
                                 <DeployAvatar app={app} deployment={active} />
@@ -696,7 +696,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                             >
                                                 <span
                                                     className={cn(
-                                                        "shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold tracking-wide",
+                                                        "shrink-0 rounded px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide",
                                                         badge.cls
                                                     )}
                                                 >
@@ -811,7 +811,7 @@ function NotesTab({ applicationId }: { applicationId: string }) {
 
     return (
         <div className="flex flex-col gap-3 py-2">
-            {error ? <p className="text-[13px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.8125rem] text-danger">{error}</p> : null}
             <Discussion
                 comments={notes}
                 canModerate
@@ -2113,7 +2113,7 @@ function ExposureRow({
                 </span>
             )}
             {badge && (
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                     {badge}
                 </span>
             )}
@@ -2984,7 +2984,7 @@ function SettingsTab({
                                     )}
                                     {(domain.kind === "lan" ||
                                         domain.hostname.endsWith(".plr.local")) && (
-                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
                                             local
                                         </span>
                                     )}

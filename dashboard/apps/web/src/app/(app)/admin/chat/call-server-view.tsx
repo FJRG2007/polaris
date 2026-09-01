@@ -143,8 +143,8 @@ export function CallServerView() {
     return (
         <section className="flex flex-col gap-3">
             <div>
-                <h2 className="text-[13px] font-semibold text-foreground">Where calls run</h2>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                <h2 className="text-[0.8125rem] font-semibold text-foreground">Where calls run</h2>
+                <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                     Every call goes through a media server, so each browser sends its camera once
                     instead of once per person. Polaris starts one with the stack and hands it its
                     own key, so there is nothing to set up; until it answers, Chat says calls are
@@ -157,7 +157,7 @@ export function CallServerView() {
             ) : (
                 <>
                     <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
-                        <p className="flex items-center gap-1.5 text-[12px] text-foreground">
+                        <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                             {settings.answering ? (
                                 <CircleCheck className="size-3.5 shrink-0 text-success" />
                             ) : waited || missing || !settings.ready || settings.container === "stopped" ? (
@@ -177,7 +177,7 @@ export function CallServerView() {
                                         ? `Not answering ${where}.`
                                         : `Starting ${where}.`}
                         </p>
-                        <p className="text-[11px] text-foreground-subtle">
+                        <p className="text-[0.6875rem] text-foreground-subtle">
                             {!settings.ready ? (
                                 "Calls have nowhere to run on this deployment yet. Nothing to do here: it repairs itself the next time Polaris starts, and this says so as soon as it has."
                             ) : missing ? (
@@ -230,7 +230,7 @@ export function CallServerView() {
                         // while that is set is saved and then never used. Said
                         // here rather than left to be discovered on a call that
                         // keeps going somewhere else.
-                        <p className="text-[11px] text-warning">
+                        <p className="text-[0.6875rem] text-warning">
                             This deployment was started pointing at another call server, so calls go
                             there and the address below is not in use.
                         </p>
@@ -238,7 +238,7 @@ export function CallServerView() {
                         // Half a pairing signs nothing, so it is skipped. Nothing
                         // on the screen said so: the address sat there looking
                         // like the one calls were going to.
-                        <p className="text-[11px] text-warning">
+                        <p className="text-[0.6875rem] text-warning">
                             {settings.key
                                 ? "The address below has no secret saved with it, so it signs nothing and is not in use. Paste it and save."
                                 : settings.hasSecret
@@ -250,7 +250,7 @@ export function CallServerView() {
                     {manual ? (
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     Address
                                 </span>
                                 <Input
@@ -262,7 +262,7 @@ export function CallServerView() {
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     Key
                                 </span>
                                 <Input
@@ -275,7 +275,7 @@ export function CallServerView() {
                                 />
                             </label>
                             <label className="flex flex-col gap-1.5">
-                                <span className="text-[12px] font-medium text-muted-foreground">
+                                <span className="text-[0.75rem] font-medium text-muted-foreground">
                                     Secret
                                 </span>
                                 {/* enigma:allow-no-breach-check - this is a secret
@@ -299,7 +299,7 @@ export function CallServerView() {
                                 Save
                             </Button>
                             {saved ? (
-                                <span className="flex items-center gap-1.5 pb-2 text-[12px] text-muted-foreground">
+                                <span className="flex items-center gap-1.5 pb-2 text-[0.75rem] text-muted-foreground">
                                     <CircleCheck className="size-3.5 shrink-0 text-success" />
                                     Saved
                                 </span>
@@ -318,7 +318,7 @@ export function CallServerView() {
                 </>
             )}
 
-            {error ? <p className="text-[12px] text-danger">{error}</p> : null}
+            {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
         </section>
     );
 }

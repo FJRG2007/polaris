@@ -287,7 +287,7 @@ export function DropPointDetail({
                     <div className="min-w-0">
                         <h1
                             title={config.title}
-                            className="flex items-center gap-2 truncate text-[17px] font-semibold tracking-tight"
+                            className="flex items-center gap-2 truncate text-[1.0625rem] font-semibold tracking-tight"
                         >
                             {config.title}
                             <Badge variant={state.variant}>{state.label}</Badge>

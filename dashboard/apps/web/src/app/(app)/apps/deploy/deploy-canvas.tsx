@@ -768,7 +768,7 @@ export function DeployCanvas({
                                             >
                                                 <HardDrive className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`} />
                                                 <span className="truncate">{vol.name}</span>
-                                                <span className="ml-auto shrink-0 truncate text-[10px] text-muted-foreground/70">
+                                                <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
                                                     {vol.kind === "nas" ? (vol.connectionName ?? "NAS") : vol.kind === "bind" ? "Server" : "Volume"}
                                                 </span>
                                             </button>

@@ -137,7 +137,7 @@ export function EnvironmentsSection({
                                         <p className="flex items-center gap-2 truncate text-sm font-medium">
                                             {environment.name}
                                             {environment.isDefault && (
-                                                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                                <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
                                                     Default
                                                 </span>
                                             )}

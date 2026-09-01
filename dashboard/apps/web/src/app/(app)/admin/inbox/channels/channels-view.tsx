@@ -125,7 +125,7 @@ export function ChannelsView({
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Channels</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Channels</h1>
                     <p className="text-sm text-muted-foreground">
                         Everything Polaris talks through: the messaging channels the Inbox and Watch
                         alerts send over, and the senders that carry its mail.

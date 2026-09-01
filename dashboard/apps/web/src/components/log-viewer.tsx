@@ -126,7 +126,7 @@ export function LogViewer({
                 ) : (
                     <>
                         {hiddenCount > 0 && (
-                            <p className="px-3 py-1 text-[11px] text-zinc-500">
+                            <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
                                 {hiddenCount.toLocaleString()} earlier lines hidden - showing the latest {MAX_LOG_ROWS.toLocaleString()}.
                             </p>
                         )}

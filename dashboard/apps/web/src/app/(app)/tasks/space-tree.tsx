@@ -278,7 +278,7 @@ function TreeRow({
             {expander}
             {icon}
             <span className="flex-1 truncate text-left">{label}</span>
-            {badge && <span className="text-[11px] opacity-70">{badge}</span>}
+            {badge && <span className="text-[0.6875rem] opacity-70">{badge}</span>}
         </>
     );
 
@@ -1099,7 +1099,7 @@ function SpaceSection({
                                 {space.name}
                             </Link>
                         )}
-                        <span className="font-mono text-[10px] text-muted-foreground">
+                        <span className="font-mono text-[0.625rem] text-muted-foreground">
                             {space.prefix}
                         </span>
                         {editable && !space.partial && (
@@ -1193,7 +1193,7 @@ function SpaceSection({
                     )}
 
                     {space.partial && (
-                        <p className="px-2 py-1 text-[11px] text-muted-foreground">
+                        <p className="px-2 py-1 text-[0.6875rem] text-muted-foreground">
                             You have been given part of this space.
                         </p>
                     )}

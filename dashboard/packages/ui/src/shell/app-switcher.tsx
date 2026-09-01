@@ -124,7 +124,7 @@ export function AppSwitcher({
                                     ) : null}
                                 </span>
                                 {app.badge ? (
-                                    <span className="shrink-0 rounded-full bg-primary px-1.5 text-[11px] font-medium leading-4 text-primary-foreground">
+                                    <span className="shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground">
                                         {app.badge}
                                     </span>
                                 ) : null}

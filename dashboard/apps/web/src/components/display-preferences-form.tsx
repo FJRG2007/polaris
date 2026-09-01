@@ -292,9 +292,12 @@ function weekSample(weekStart: WeekStart): string {
     return `${WEEKDAY_SHORT_NAMES[order[0] as number]} to ${WEEKDAY_SHORT_NAMES[order[6] as number]}`;
 }
 
-/** The short name of a value, so "Platform default" can say what it resolves to. */
-function shortFor(field: FieldSpec, value: string): string {
-    return field.options.find((entry) => entry.value === value)?.short ?? value;
+/** The short name of a value, so "Platform default" can say what it resolves to.
+ *  Not every preference is a string - the text size is a number, and it belongs
+ *  to another form - so the value is compared as one. */
+function shortFor(field: FieldSpec, value: string | number): string {
+    const key = String(value);
+    return field.options.find((entry) => entry.value === key)?.short ?? key;
 }
 
 function Sample({ label, value }: { label: string; value: string }) {

@@ -85,7 +85,7 @@ function Composer({
                     </Button>
                 )}
                 {!compact && (
-                    <span className="text-[11px] text-muted-foreground">Enter sends, shift+enter for a new line</span>
+                    <span className="text-[0.6875rem] text-muted-foreground">Enter sends, shift+enter for a new line</span>
                 )}
             </div>
         </div>
@@ -138,7 +138,7 @@ export function ActivityStream({
             {comment.author ? (
                 <Avatar person={comment.author} size={28} />
             ) : (
-                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground ring-1 ring-border">
+                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground ring-1 ring-border">
                     AUT
                 </span>
             )}
@@ -149,13 +149,13 @@ export function ActivityStream({
                         <RelativeTime iso={comment.createdAt} />
                     </span>
                     {comment.resolvedAt && (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500">
+                        <span className="inline-flex items-center gap-1 text-[0.6875rem] text-emerald-500">
                             <CheckCircle2 className="size-3" /> Resolved
                         </span>
                     )}
                 </div>
                 <RichText value={comment.body} className="break-words text-foreground/90" />
-                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                <div className="mt-1 flex items-center gap-3 text-[0.6875rem] text-muted-foreground">
                     {!nested && (
                         <button type="button" onClick={() => setReplyTo(comment.id)} className="hover:text-foreground">
                             Reply
@@ -385,7 +385,7 @@ export function TimeSection({
                                 {entry.userName}
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
-                            {entry.billable && <span className="text-[11px] text-emerald-500">billable</span>}
+                            {entry.billable && <span className="text-[0.6875rem] text-emerald-500">billable</span>}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button
                                     type="button"

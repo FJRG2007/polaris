@@ -43,7 +43,7 @@ export function TimesheetView({
         <div className="flex min-w-0 flex-1 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Timesheet</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Timesheet</h1>
                     <p className="text-sm text-muted-foreground">
                         {format.date(sheet.from)} to {format.date(sheet.to)}
                     </p>
@@ -144,15 +144,15 @@ export function TimesheetView({
                             <tr key={`${entry.taskId}-${entry.billable}`} className="border-b border-border">
                                 <td className="max-w-xs px-3 py-2">
                                     <Link href={`/tasks/t/${entry.taskId}`} className="flex items-center gap-2 hover:underline">
-                                        <span className="font-mono text-[11px] text-muted-foreground">
+                                        <span className="font-mono text-[0.6875rem] text-muted-foreground">
                                             {entry.reference}
                                         </span>
                                         <span className="truncate">{entry.taskName}</span>
                                         {entry.billable && (
-                                            <span className="shrink-0 text-[10px] text-emerald-500">billable</span>
+                                            <span className="shrink-0 text-[0.625rem] text-emerald-500">billable</span>
                                         )}
                                     </Link>
-                                    <p className="truncate text-[11px] text-muted-foreground">
+                                    <p className="truncate text-[0.6875rem] text-muted-foreground">
                                         {entry.spaceName} / {entry.listName}
                                     </p>
                                 </td>

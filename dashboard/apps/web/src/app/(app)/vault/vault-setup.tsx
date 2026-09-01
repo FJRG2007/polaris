@@ -98,7 +98,7 @@ export function VaultSetup({
     return (
         <div className="mx-auto flex max-w-lg flex-col gap-4">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Set up your vault</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Set up your vault</h1>
                 <p className="text-sm text-muted-foreground">
                     Your master password unlocks everything in it, and it never leaves this browser.
                 </p>

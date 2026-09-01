@@ -2107,7 +2107,7 @@ export function FilesView({
                                                                         </span>
                                                                     )}
                                                                     <span
-                                                                        className="text-[11px] text-muted-foreground"
+                                                                        className="text-[0.6875rem] text-muted-foreground"
                                                                         title={sizeTitle(entry)}
                                                                     >
                                                                         {entry.kind === "dir" &&

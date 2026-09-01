@@ -130,7 +130,7 @@ export function ChannelSettingsDialog({
                             script. Whoever moderates the room is not held by
                             it. */}
                         <label className="flex flex-col gap-1">
-                            <span className="text-[12px] font-medium text-muted-foreground">
+                            <span className="text-[0.75rem] font-medium text-muted-foreground">
                                 Wait between messages
                             </span>
                             <Select

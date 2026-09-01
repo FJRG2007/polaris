@@ -141,7 +141,7 @@ export function ScheduleView({
             <Card>
                 <CardBody className="flex flex-col gap-3 p-3">
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-[11px] leading-snug text-foreground-subtle">
+                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
                             {core.scheduleZoneIsAssumed(timeZone) ? (
                                 <>
                                     These run on the clock of whichever machine Polaris is on. Pick
@@ -193,12 +193,12 @@ export function ScheduleView({
                                             )}
                                         />
                                         <span className={cn("min-w-[12rem] flex-1", !enabled && "opacity-60")}>
-                                            <span className="block text-[13px]">
+                                            <span className="block text-[0.8125rem]">
                                                 {core.PRESENCE_LABELS[rule.presence]}, {core.clockTime(rule.startMinute)} to{" "}
                                                 {core.clockTime(rule.endMinute)}
                                                 {rule.endMinute <= rule.startMinute ? " the next day" : ""}
                                             </span>
-                                            <span className="block text-[11px] leading-snug text-foreground-subtle">
+                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                                                 {core.nameDays(rule.days, weekOrder)}
                                             </span>
                                         </span>
@@ -379,7 +379,7 @@ function ScheduleDialog({
                                     key={preset.label}
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 px-2 text-[11px]"
+                                    className="h-7 px-2 text-[0.6875rem]"
                                     onClick={() => change({ days: preset.days })}
                                 >
                                     {preset.label}
@@ -388,7 +388,7 @@ function ScheduleDialog({
                         </div>
                     </div>
 
-                    <p className="text-[11px] leading-snug text-foreground-subtle">
+                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
                         {problem || summarize(draft, weekOrder)}
                     </p>
                 </div>

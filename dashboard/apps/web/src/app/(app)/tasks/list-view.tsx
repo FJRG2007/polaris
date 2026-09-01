@@ -881,7 +881,7 @@ export function ListScreen({
         <div className="flex min-w-0 flex-col gap-4">
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
-                    <h1 title={title} className="truncate text-[17px] font-semibold tracking-tight">
+                    <h1 title={title} className="truncate text-[1.0625rem] font-semibold tracking-tight">
                         {title}
                     </h1>
                     {subtitle && (
@@ -1072,7 +1072,7 @@ export function ListScreen({
                 />
             )}
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[0.6875rem] text-muted-foreground">
                 Ctrl-click (or Cmd-click) selects a task without opening it, shift-click takes
                 everything between, Esc clears the selection, and N starts a new task.
             </p>

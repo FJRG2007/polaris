@@ -61,7 +61,7 @@ export function WatchSubjectDetail({
                     >
                         <ArrowLeft className="size-3" /> Watch
                     </Link>
-                    <h1 title={name} className="mt-1 truncate text-[17px] font-semibold tracking-tight">
+                    <h1 title={name} className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight">
                         {name}
                     </h1>
                     <p title={detail} className="truncate text-sm text-muted-foreground">

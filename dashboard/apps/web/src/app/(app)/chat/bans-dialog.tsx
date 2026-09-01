@@ -104,7 +104,7 @@ export function BansDialog({
                                 <Avatar person={{ id: ban.userId, name: ban.name }} size={28} />
                                 <span className="flex min-w-0 flex-1 flex-col">
                                     <span className="truncate text-sm" title={ban.name}>{ban.name}</span>
-                                    <span className="truncate text-[11px] text-muted-foreground">
+                                    <span className="truncate text-[0.6875rem] text-muted-foreground">
                                         {ban.reason || "No reason given"}
                                         {ban.byName ? ` - ${ban.byName}` : ""},{" "}
                                         <RelativeTime iso={ban.at} />

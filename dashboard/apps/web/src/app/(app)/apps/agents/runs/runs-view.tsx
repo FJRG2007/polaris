@@ -197,7 +197,7 @@ function GateSteps({ steps }: { steps: GateStepReport[] }) {
                         {GATE_STEP_LABELS[step.step]}
                     </span>
                     {step.state === "failed" && step.detail ? (
-                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[11px] text-red-300">
+                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-surface/60 px-2 py-1 text-[0.6875rem] text-red-300">
                             {step.detail}
                         </pre>
                     ) : null}

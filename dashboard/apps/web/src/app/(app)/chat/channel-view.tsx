@@ -2013,7 +2013,7 @@ function TypingLine({ typists, viewerId }: { typists: readonly Typist[]; viewerI
               : `Several people are ${doing}`;
 
     return (
-        <p aria-live="polite" className="h-4 px-4 text-[11px] text-muted-foreground">
+        <p aria-live="polite" className="h-4 px-4 text-[0.6875rem] text-muted-foreground">
             {names}
         </p>
     );

@@ -113,7 +113,7 @@ export function AnalyticsView({
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <div className="flex flex-col gap-3">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-2">
-                    <h1 className="text-[17px] font-semibold tracking-tight">Analytics</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Analytics</h1>
                     {data ? (
                         <span className="hidden min-w-0 truncate text-sm text-muted-foreground md:inline">
                             {data.site.name}

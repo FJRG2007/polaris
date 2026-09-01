@@ -152,7 +152,7 @@ function TaskLine({
                         a list nobody can check. Nothing is drawn for a task with
                         none, so it costs no width in the common case. */}
                         <PriorityMark priority={task.priority} />
-                        <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+                        <span className="hidden font-mono text-[0.6875rem] text-muted-foreground sm:inline">
                             {task.reference}
                         </span>
                         <span
@@ -173,7 +173,7 @@ function TaskLine({
                 </div>
 
                 {showStatus && (
-                    <span className="hidden items-center gap-1 text-[11px] text-muted-foreground md:flex">
+                    <span className="hidden items-center gap-1 text-[0.6875rem] text-muted-foreground md:flex">
                         <StatusDot color={task.statusColor} />
                         {task.statusName}
                     </span>
@@ -272,7 +272,7 @@ export function ListView(props: ViewProps) {
                             </button>
                             {group.color && <StatusDot color={group.color} />}
                             <h3 className="text-sm font-medium">{group.label}</h3>
-                            <span className="rounded bg-background px-1.5 text-[11px] text-muted-foreground">
+                            <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
                                 {group.tasks.length}
                             </span>
                             <span className="flex-1" />
@@ -470,7 +470,7 @@ export function TableView(props: ViewProps) {
                                             }}
                                             className="flex w-full items-center gap-2 text-left"
                                         >
-                                            <span className="font-mono text-[11px] text-muted-foreground">
+                                            <span className="font-mono text-[0.6875rem] text-muted-foreground">
                                                 {task.reference}
                                             </span>
                                             <span className="truncate" title={task.name}>

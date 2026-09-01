@@ -129,13 +129,13 @@ export function AudienceDialog({
                                 {list?.members.map((member) => (
                                     <li
                                         key={member.id}
-                                        className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
+                                        className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem]"
                                     >
                                         {member.name}
                                     </li>
                                 ))}
                             </ul>
-                            <p className="text-[11px] text-foreground-subtle">
+                            <p className="text-[0.6875rem] text-foreground-subtle">
                                 Change who is on it under Lists, below the settings.
                             </p>
                         </div>

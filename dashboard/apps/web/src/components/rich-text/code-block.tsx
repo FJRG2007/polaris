@@ -44,7 +44,7 @@ export function CodeBlock({ code, language }: { code: string; language: string |
             className="group/code my-1 overflow-hidden rounded-md border border-border bg-muted"
         >
             <div className="flex items-center justify-between gap-2 border-b border-border px-2.5 py-1">
-                <span className="truncate font-mono text-[10px] uppercase tracking-[0.06em] text-foreground-subtle">
+                <span className="truncate font-mono text-[0.625rem] uppercase tracking-[0.06em] text-foreground-subtle">
                     {known?.label ?? language ?? "code"}
                 </span>
                 <CopyButton code={code} />

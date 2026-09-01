@@ -11,7 +11,9 @@ import { cache } from "react";
 import { prisma } from "@polaris/db";
 import {
     AUTOMATIC_TIME_ZONE,
+    DISPLAY_DEFAULTS,
     effectiveTimeZone,
+    isTextSize,
     isThemeId,
     isTimeZone,
     parseDisplayPreferences,
@@ -141,6 +143,24 @@ export async function saveUserDisplayPreferences(
     });
 }
 
+/**
+ * Change one field and leave the rest of an account's choices alone.
+ *
+ * The formats form replaces the whole blob, which is right for it: a field left
+ * on "Platform default" has to be able to go back to being absent, and a merge
+ * cannot express that. A second form on the same page cannot work that way
+ * though - it would write back whatever the page loaded and quietly undo
+ * anything the other one had saved since - so the fields it owns are read and
+ * written here instead.
+ */
+export async function patchUserDisplayPreferences(
+    userId: string,
+    change: UserDisplayPreferences
+): Promise<void> {
+    const current = await getUserDisplayPreferences(userId);
+    await saveUserDisplayPreferences(userId, { ...current, ...change });
+}
+
 export async function savePlatformDisplayPreferences(preferences: DisplayPreferences): Promise<void> {
     await setSetting(PLATFORM_KEY, stringifyDisplayPreferences(preferences));
 }
@@ -173,6 +193,25 @@ export async function setUsersMayChooseTheme(allowed: boolean): Promise<void> {
  * a page, an instance that has not been migrated yet - and a theme is not worth
  * failing a page over.
  */
+/**
+ * The root size to serve the document at.
+ *
+ * Resolved here, on the server, for the same reason the theme is: the first
+ * paint is then already the right size, with no script to run and nothing to
+ * correct afterwards. A deployment with no database answers with the default
+ * rather than failing a page render.
+ */
+export async function resolveTextSize(userId: string | null): Promise<number> {
+    try {
+        const platform = await getPlatformDisplayPreferences();
+        const mine = userId ? await getUserDisplayPreferences(userId) : {};
+        const chosen = mine.textSize ?? platform.textSize;
+        return isTextSize(chosen) ? chosen : DISPLAY_DEFAULTS.textSize;
+    } catch {
+        return DISPLAY_DEFAULTS.textSize;
+    }
+}
+
 export async function resolveTheme(userId: string | null): Promise<ThemeId> {
     try {
         const [platform, allowed] = await Promise.all([

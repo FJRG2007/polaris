@@ -216,13 +216,13 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 >
                     {session.title}
                 </Link>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                     {others.length + 1}
                 </span>
                 {recorded && (
                     <span
                         title="This call is being recorded"
-                        className="flex shrink-0 items-center gap-1 rounded-full bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-danger"
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-danger/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-danger"
                     >
                         <span aria-hidden="true" className="size-1.5 rounded-full bg-danger" />
                         Rec

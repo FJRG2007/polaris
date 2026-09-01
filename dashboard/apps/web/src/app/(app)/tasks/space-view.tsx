@@ -103,8 +103,8 @@ export function SpaceScreen(props: SpaceScreenProps) {
     return (
         <div className="flex min-w-0 flex-1 flex-col gap-5">
             <header className="flex flex-wrap items-baseline gap-3">
-                <h1 className="text-[17px] font-semibold tracking-tight">{props.name}</h1>
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{props.name}</h1>
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">
                     {props.prefix}
                 </span>
                 <span className="text-muted-foreground text-xs">{visibilityLine(props)}</span>

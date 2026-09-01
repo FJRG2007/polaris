@@ -218,7 +218,7 @@ export function SigninDialog({
                     {ready ? (
                         <pre
                             ref={view}
-                            className="bg-elevated h-[26rem] overflow-auto rounded-md border border-border p-3 font-mono text-[11px] leading-snug"
+                            className="bg-elevated h-[26rem] overflow-auto rounded-md border border-border p-3 font-mono text-[0.6875rem] leading-snug"
                         >
                             {screen}
                         </pre>

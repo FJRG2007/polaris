@@ -242,7 +242,7 @@ function ModeTab({
             type="button"
             onClick={onClick}
             aria-pressed={active}
-            className={`flex-1 rounded border px-3 py-1 text-[13px] font-medium transition-colors duration-fast ${
+            className={`flex-1 rounded border px-3 py-1 text-[0.8125rem] font-medium transition-colors duration-fast ${
                 active
                     ? "border-border-strong bg-card-hover text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground"

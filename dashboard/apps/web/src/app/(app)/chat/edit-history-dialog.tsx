@@ -88,7 +88,7 @@ export function EditHistoryDialog({
                 ) : (
                     <ol className="flex max-h-80 flex-col gap-3 overflow-y-auto">
                         <li className="rounded-md border border-border-strong bg-card p-3">
-                            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            <p className="mb-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                                 Now
                             </p>
                             <div className="text-sm">
@@ -102,7 +102,7 @@ export function EditHistoryDialog({
                                 className="rounded-md border border-border bg-muted/40 p-3"
                             >
                                 <p
-                                    className="mb-1 text-[11px] text-muted-foreground"
+                                    className="mb-1 text-[0.6875rem] text-muted-foreground"
                                     title={format.dateTime(version.replacedAt)}
                                 >
                                     Until <RelativeTime iso={version.replacedAt} />

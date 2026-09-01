@@ -664,7 +664,7 @@ function Message({
                 <span className="w-8 shrink-0">
                     {grouped ? (
                         <span
-                            className="hidden pt-1 text-[10px] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
+                            className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
                             title={format.dateTime(message.createdAt)}
                         >
                             {format.time(message.createdAt)}
@@ -690,7 +690,7 @@ function Message({
                             </span>
                         </Writer>
                     ) : (
-                        <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+                        <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
                             ?
                         </span>
                     )}
@@ -727,7 +727,7 @@ function Message({
                                 <span className="text-sm font-medium">{author}</span>
                             )}
                             <span
-                                className="text-[11px] text-foreground-subtle"
+                                className="text-[0.6875rem] text-foreground-subtle"
                                 title={format.dateTime(message.createdAt)}
                             >
                                 <RelativeTime iso={message.createdAt} />
@@ -779,7 +779,7 @@ function Message({
                                     type="button"
                                     onClick={() => setShowingHistory(true)}
                                     title="See what it said before"
-                                    className="ml-1 rounded text-[11px] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                                    className="ml-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                                 >
                                     (edited)
                                 </button>
@@ -1359,7 +1359,7 @@ function QuotedMessageCard({
             className="block max-w-md rounded-md border-l-2 border-primary bg-primary/5 px-3 py-2 no-underline transition-colors hover:bg-primary/10"
         >
             {from && (
-                <span className="mb-0.5 block truncate text-[11px] text-foreground-subtle">
+                <span className="mb-0.5 block truncate text-[0.6875rem] text-foreground-subtle">
                     {from}
                 </span>
             )}
@@ -1368,7 +1368,7 @@ function QuotedMessageCard({
                     {reference.authorName || "Somebody who has left"}
                 </span>
                 {reference.at && (
-                    <span className="shrink-0 text-[11px] text-foreground-subtle">
+                    <span className="shrink-0 text-[0.6875rem] text-foreground-subtle">
                         <RelativeTime iso={reference.at} />
                     </span>
                 )}
@@ -1470,7 +1470,7 @@ function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["preview"]
     const details = (
         <span className="flex min-w-0 flex-col gap-0.5">
             {(preview.siteName || preview.author) && (
-                <span className="truncate text-[11px] text-muted-foreground">
+                <span className="truncate text-[0.6875rem] text-muted-foreground">
                     {[preview.siteName, preview.author].filter(Boolean).join(" - ")}
                 </span>
             )}
@@ -1579,7 +1579,7 @@ function DaySeparator({ iso }: { iso: string }) {
     return (
         <div className="flex items-center gap-3 px-4 pt-4">
             <span className="h-px flex-1 bg-border" />
-            <span className="text-[11px] font-medium text-foreground-subtle">
+            <span className="text-[0.6875rem] font-medium text-foreground-subtle">
                 {format.date(iso)}
             </span>
             <span className="h-px flex-1 bg-border" />

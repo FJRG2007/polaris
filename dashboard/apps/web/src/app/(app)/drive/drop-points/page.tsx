@@ -54,7 +54,7 @@ export default async function DropPointsPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[17px] font-semibold tracking-tight">Drop points</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">Drop points</h1>
                     <p className="text-sm text-muted-foreground">
                         Links that collect things for you: files into your folders, text into your
                         snippets.

@@ -822,7 +822,7 @@ function Split({
                                         }}
                                         className="w-full accent-primary"
                                     />
-                                    <span className="flex items-center justify-between text-[11px] text-foreground-subtle">
+                                    <span className="flex items-center justify-between text-[0.6875rem] text-foreground-subtle">
                                         <span>Least data</span>
                                         <span>Best picture</span>
                                     </span>
@@ -1133,7 +1133,7 @@ function Tile({
                     />
                 </span>
             )}
-            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[11px]">
+            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
                 {sharing && <span className="text-primary">sharing</span>}
@@ -1250,7 +1250,7 @@ function Tile({
                         type="button"
                         onClick={() => setVolume(DEFAULT_VOLUME)}
                         disabled={volume === DEFAULT_VOLUME}
-                        className="self-start text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
+                        className="self-start text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground disabled:no-underline disabled:opacity-60"
                     >
                         {volume === DEFAULT_VOLUME
                             ? "As they were sent"

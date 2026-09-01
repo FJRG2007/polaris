@@ -53,7 +53,7 @@ function Sparkline({ points, tone }: { points: { t: number; v: number | null }[]
     const present = values.filter((value): value is number => value != null);
     if (present.length < 2) {
         return (
-            <div className="flex h-10 items-center justify-center rounded bg-muted/30 text-[10px] text-muted-foreground">
+            <div className="flex h-10 items-center justify-center rounded bg-muted/30 text-[0.625rem] text-muted-foreground">
                 Not enough history yet
             </div>
         );
@@ -209,7 +209,7 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                     </div>
                 </div>
                 {card.alarms > 0 && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-[10px] font-medium text-danger">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-danger/30 bg-danger/10 px-2 py-0.5 text-[0.625rem] font-medium text-danger">
                         <Bell className="size-3" /> {card.alarms}
                     </span>
                 )}

@@ -69,7 +69,7 @@ export function PrivacyView({
                 <CardBody className="flex flex-col gap-4 p-3">
                     {core.PRIVACY_SECTIONS.map((section) => (
                         <section key={section.id} className="flex flex-col gap-1.5">
-                            <h3 className="text-[11px] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                            <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                 {section.label}
                             </h3>
                             <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
@@ -79,10 +79,10 @@ export function PrivacyView({
                                         className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2"
                                     >
                                         <span className="min-w-[12rem] flex-1">
-                                            <span className="block text-[13px]">
+                                            <span className="block text-[0.8125rem]">
                                                 {core.PRIVACY_FIELD_LABELS[field]}
                                             </span>
-                                            <span className="block text-[11px] leading-snug text-foreground-subtle">
+                                            <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                                                 {core.PRIVACY_FIELD_NOTES[field]}
                                             </span>
                                         </span>
@@ -118,7 +118,7 @@ export function PrivacyView({
                         </section>
                     ))}
 
-                    <p className="text-[11px] leading-snug text-muted-foreground">
+                    <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                         Who counts as a friend is on your{" "}
                         <a
                             href="/account/friends"
@@ -199,7 +199,7 @@ function Who({
         <div className="flex w-full flex-wrap items-center gap-1.5 pl-0 sm:pl-1">
             <Users className="size-3.5 shrink-0 text-foreground-subtle" />
             {shown.length === 0 ? (
-                <span className="text-[11px] text-warning">
+                <span className="text-[0.6875rem] text-warning">
                     {list
                         ? "That list is empty, so this names nobody."
                         : "Nobody named yet, so this does nothing."}
@@ -207,25 +207,25 @@ function Who({
             ) : (
                 <>
                     {list && (
-                        <span className="text-[11px] text-muted-foreground">{list.name}:</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">{list.name}:</span>
                     )}
                     {first.map((person) => (
                         <span
                             key={person.id}
-                            className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
+                            className="max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 text-[0.6875rem]"
                         >
                             {person.name}
                         </span>
                     ))}
                     {rest > 0 && (
-                        <span className="text-[11px] text-muted-foreground">and {rest} more</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">and {rest} more</span>
                     )}
                 </>
             )}
             <button
                 type="button"
                 onClick={onEdit}
-                className="rounded text-[11px] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                className="rounded text-[0.6875rem] text-muted-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
             >
                 Choose
             </button>

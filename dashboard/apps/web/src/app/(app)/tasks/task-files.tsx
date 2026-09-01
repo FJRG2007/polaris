@@ -184,7 +184,7 @@ export function AttachmentSection({
                             >
                                 {file.name}
                             </a>
-                            <span className="shrink-0 text-[11px] text-muted-foreground">
+                            <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                                 {readableSize(file.size)}
                             </span>
                             {canEdit && (
@@ -269,13 +269,13 @@ export function CommitSection({
                                 className="min-w-0 flex-1 truncate text-sm hover:underline"
                                 title={`${commit.repository}@${commit.sha}`}
                             >
-                                <span className="mr-2 font-mono text-[11px] text-muted-foreground">
+                                <span className="mr-2 font-mono text-[0.6875rem] text-muted-foreground">
                                     {commit.shortSha}
                                 </span>
                                 {commit.message || commit.repository}
                             </a>
                             {commit.committedAt && (
-                                <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:inline">
+                                <span className="hidden shrink-0 text-[0.6875rem] text-muted-foreground sm:inline">
                                     <RelativeTime iso={commit.committedAt} />
                                 </span>
                             )}

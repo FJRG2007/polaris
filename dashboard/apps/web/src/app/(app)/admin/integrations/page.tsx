@@ -221,7 +221,7 @@ export default async function IntegrationsPage() {
     return (
         <div className="mx-auto flex max-w-4xl flex-col gap-6">
             <div>
-                <h1 className="text-[17px] font-semibold tracking-tight">Integrations</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">Integrations</h1>
                 <p className="text-muted-foreground text-sm">
                     The outside services Polaris can use, grouped by the job connecting one does.
                     Whatever is set up here works everywhere at once - there is nothing to switch on

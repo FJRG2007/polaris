@@ -110,7 +110,7 @@ export function VideoPreview({
                 <Play className="size-6 translate-x-0.5 fill-white text-white" />
             </span>
             {(name || size !== undefined) && (
-                <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-left text-[11px] text-white/90">
+                <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-left text-[0.6875rem] text-white/90">
                     <span className="truncate" title={name}>
                         {name}
                     </span>
