@@ -4,14 +4,16 @@
 
 import { requireUser } from "@/lib/session";
 import { FriendsView } from "./friends-view";
-import { listFriends, listRequests } from "@/lib/friends-service";
+import { listFriendsPage, listRequests } from "@/lib/friends-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function FriendsPage() {
     const session = await requireUser();
+    // The first page only. The screen asks for the rest as it is scrolled, so a
+    // thousand friends is a thousand rows over time rather than in one render.
     const [friends, requests] = await Promise.all([
-        listFriends(session.id),
+        listFriendsPage(session.id),
         listRequests(session.id)
     ]);
 
@@ -23,7 +25,7 @@ export default async function FriendsPage() {
                     Who sees what you show your friends. Being friends grants nothing else.
                 </p>
             </div>
-            <FriendsView friends={friends} requests={requests} />
+            <FriendsView friends={friends.items} requests={requests} more={friends.cursor} />
         </div>
     );
 }

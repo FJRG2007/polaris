@@ -18,6 +18,7 @@
  * would take the setting away from exactly the people who cannot answer back.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -32,10 +33,14 @@ import {
 } from "@/lib/privacy-service";
 import {
     FriendError,
+    listFriendsPage,
+    listRequests,
     removeFriend,
     requestFriend,
     requestFriendByUsername,
-    respondToRequest
+    respondToRequest,
+    type FriendsPage,
+    type FriendRequestView
 } from "@/lib/friends-service";
 
 const PRIVACY_PATH = "/account/privacy";
@@ -147,6 +152,40 @@ export async function respondToRequestAction(
 export async function removeFriendAction(userId: string): Promise<{ error?: string }> {
     const user = await requireUser();
     return guard(() => removeFriend(user.id, String(userId)));
+}
+
+/** The cursor a page ended on, as it comes back from a browser. */
+const friendCursorSchema = z
+    .object({ name: z.string().max(255), id: z.string().uuid() })
+    .nullable()
+    .optional();
+
+/**
+ * The next page of friends.
+ *
+ * A list that can be anything from empty to thousands is not something to send
+ * whole on every page load, so the screen asks for more as it is scrolled. The
+ * cursor is the last person shown rather than an offset: somebody added or
+ * removed while the list is open shifts every offset behind them, and the
+ * symptom of that is a name appearing twice or not at all.
+ */
+export async function loadFriendsAction(after: unknown): Promise<FriendsPage> {
+    const user = await requireUser();
+    const parsed = friendCursorSchema.safeParse(after);
+    if (!parsed.success) return { items: [], cursor: null };
+    return listFriendsPage(user.id, { after: parsed.data ?? null });
+}
+
+/**
+ * Everything waiting, in both directions.
+ *
+ * Read again rather than pushed, because the screen asks for this when it is
+ * told something happened - somebody accepted, somebody asked - and what it
+ * needs then is the current answer rather than a description of the change.
+ */
+export async function loadFriendRequestsAction(): Promise<{ requests: FriendRequestView[] }> {
+    const user = await requireUser();
+    return { requests: await listRequests(user.id) };
 }
 
 // ---------------------------------------------------------------------------

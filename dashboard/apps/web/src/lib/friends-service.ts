@@ -50,22 +50,6 @@ export class FriendError extends Error {
     }
 }
 
-/** Everybody this account is friends with. */
-export async function listFriends(userId: string): Promise<FriendView[]> {
-    const rows = await prisma.friendship.findMany({
-        where: {
-            status: "accepted",
-            OR: [{ requesterId: userId }, { addresseeId: userId }]
-        },
-        select: {
-            requester: { select: { id: true, name: true, email: true, username: true } },
-            addressee: { select: { id: true, name: true, email: true, username: true } }
-        }
-    });
-    const people = rows.map((row) => (row.requester.id === userId ? row.addressee : row.requester));
-    return (await drawn(userId, people)).sort((left, right) => left.name.localeCompare(right.name));
-}
-
 /** The people, with whatever each of them lets this account see. */
 async function drawn(
     viewerId: string,
@@ -77,6 +61,83 @@ async function drawn(
         name: person.name,
         contact: contacts.get(person.id) ?? ""
     }));
+}
+
+/** How many friends one page carries. */
+export const FRIENDS_PAGE_SIZE = 50;
+
+/** Where a page stopped: the last person on it. Name and id together, because
+ *  two people can share a name and a cursor that named only the name would skip
+ *  one of them or repeat both. */
+export interface FriendCursor {
+    readonly name: string;
+    readonly id: string;
+}
+
+export interface FriendsPage {
+    readonly items: FriendView[];
+    /** Pass back as `after` for the next page. Null when the list ended. */
+    readonly cursor: FriendCursor | null;
+}
+
+/** Whether a person sorts after the cursor, as a Prisma filter. */
+function afterCursor(cursor: FriendCursor) {
+    return {
+        OR: [{ name: { gt: cursor.name } }, { name: cursor.name, id: { gt: cursor.id } }]
+    };
+}
+
+/** Name then id, which is the one order both halves of the list are read in. */
+function byName(left: { id: string; name: string }, right: { id: string; name: string }): number {
+    return left.name.localeCompare(right.name) || left.id.localeCompare(right.id);
+}
+
+/**
+ * One page of friends, in alphabetical order.
+ *
+ * A friendship is one row that names two people and does not say which of them
+ * is "the other one" - that depends on who is reading. So the page is two
+ * queries, one per direction, each ordered and cut by the database on the name
+ * of the person this account would see; they are then merged, which is cheap
+ * because both arrive sorted and only one page of each is asked for.
+ *
+ * The alternative - reading every friendship and sorting in memory - is what
+ * this replaces, and it is fine at ten friends and a full table scan at ten
+ * thousand.
+ */
+export async function listFriendsPage(
+    userId: string,
+    options: { after?: FriendCursor | null; limit?: number } = {}
+): Promise<FriendsPage> {
+    const limit = Math.min(Math.max(options.limit ?? FRIENDS_PAGE_SIZE, 1), 200);
+    const after = options.after ?? null;
+    const person = { select: { id: true, name: true, email: true, username: true } };
+    const beyond = after ? afterCursor(after) : {};
+
+    const [asked, wereAsked] = await Promise.all([
+        prisma.friendship.findMany({
+            where: { status: "accepted", requesterId: userId, addressee: beyond },
+            orderBy: [{ addressee: { name: "asc" } }, { addresseeId: "asc" }],
+            take: limit + 1,
+            select: { addressee: person }
+        }),
+        prisma.friendship.findMany({
+            where: { status: "accepted", addresseeId: userId, requester: beyond },
+            orderBy: [{ requester: { name: "asc" } }, { requesterId: "asc" }],
+            take: limit + 1,
+            select: { requester: person }
+        })
+    ]);
+
+    const people = [...asked.map((row) => row.addressee), ...wereAsked.map((row) => row.requester)].sort(
+        byName
+    );
+    const page = people.slice(0, limit);
+    const last = page.at(-1);
+    return {
+        items: await drawn(userId, page),
+        cursor: people.length > limit && last ? { name: last.name, id: last.id } : null
+    };
 }
 
 /** Just the ids, for the privacy check that asks about one person. */
