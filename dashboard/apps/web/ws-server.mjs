@@ -117,7 +117,7 @@ const ATTACH_TO_AGENT = [
     "-c",
     'if [ -z "$TERM" ] || [ "$TERM" = dumb ]; then TERM=xterm-256color; export TERM; fi; ' +
         "tmux attach-session -t polaris-agent || " +
-        "{ echo \"polaris: there is no agent terminal in this container to attach to. This shell is inside it.\"; exec /bin/sh; }"
+        '{ echo "polaris: there is no agent terminal in this container to attach to. This shell is inside it."; exec /bin/sh; }'
 ];
 
 async function openContainerSession(ticket, ws, attachToAgent = false) {

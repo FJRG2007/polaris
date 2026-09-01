@@ -476,9 +476,15 @@ function useMessageKeys({
             // Ctrl+Alt on Windows, so a layout that puts a character on AltGr+C -
             // and the person writing this is typing on one - would have that
             // character swallowed and a message copied instead, every time.
+            //
+            // Shift disqualifies it too, and separately from `holding`: shift
+            // makes the key "C", so Ctrl+Shift+C - which every browser gives to
+            // the developer tools - matched copy. It cannot go into `holding`,
+            // because that is also what stops a plain key firing while a
+            // modifier is down, and Ctrl+Shift+R would then reply.
             const holding = (event.ctrlKey || event.metaKey) && !event.altKey;
             const wanted =
-                holding && (event.key === "c" || event.key === "C")
+                holding && !event.shiftKey && (event.key === "c" || event.key === "C")
                     ? "copy"
                     : holding || event.altKey
                       ? null

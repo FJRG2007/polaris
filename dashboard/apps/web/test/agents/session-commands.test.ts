@@ -141,7 +141,8 @@ describe("the terminal the agent is started on", () => {
     // all. It draws nothing, reports no session start, and the prompt sent to it
     // is echoed onto the screen as plain text by a line discipline with nobody
     // behind it. None of that looks like an error anywhere.
-    const setupOf = (boot: string) => boot.split("\n").find((line) => line.includes("tmux new-session")) ?? "";
+    const setupOf = (boot: string) =>
+        boot.split("\n").find((line) => line.includes("tmux new-session")) ?? "";
 
     it("hands the setup to tmux without a pipe standing in for its terminal", () => {
         for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
@@ -224,13 +225,13 @@ describe("the tool's own first-run wizard", () => {
         // command. Nothing here comes from a person today, and that is exactly
         // why it is asserted: the next answer added to the catalogue will.
         const answers = [{ file: ".x.json", json: { note: "it's a value" } }];
-        expect(commands.firstRunScript(answers)).toContain(
-            shellQuote(JSON.stringify(answers))
-        );
+        expect(commands.firstRunScript(answers)).toContain(shellQuote(JSON.stringify(answers)));
     });
 
     it("runs in the session before the agent does, and only where the home is Polaris's", () => {
-        expect(commands.SESSION_SETUP).toContain('[ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]');
+        expect(commands.SESSION_SETUP).toContain(
+            '[ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]'
+        );
         expect(commands.SESSION_SETUP.indexOf("POLARIS_FIRST_RUN")).toBeLessThan(
             commands.SESSION_SETUP.indexOf("polaris: starting")
         );
