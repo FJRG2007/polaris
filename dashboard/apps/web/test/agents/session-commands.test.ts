@@ -223,6 +223,38 @@ describe("the home a session keeps", () => {
         expect(commands.SESSION_SETUP).toContain('[ ! -f "$POLARIS_HOME/.polaris-home" ]');
     });
 
+    it("hands the working directory over once too, for the same reason", () => {
+        // A workspace lives in that home and fills with node_modules and caches,
+        // so a recursive walk of it before every session is the same wait
+        // arriving by another door. Only a directory Polaris just made is walked.
+        const boot = commands.SESSION_SETUP;
+        expect(boot).toContain("POLARIS_WORKDIR_NEW=no");
+        expect(boot).toContain(
+            [
+                '  if [ "$POLARIS_WORKDIR_NEW" = "yes" ]; then',
+                '    chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true'
+            ].join("\n")
+        );
+        // The recursive one appears once, and it is that one.
+        expect(boot.match(/chown -R "\$POLARIS_RUNAS" "\$POLARIS_WORKDIR"/g)).toHaveLength(1);
+    });
+
+    it("still gives the agent the files Polaris wrote into a workspace it kept", () => {
+        // Written as root on every boot, so skipping the walk must not leave the
+        // hook script and the tool registration owned by somebody the agent is
+        // not.
+        expect(commands.SESSION_SETUP).toContain(
+            'chown "$POLARIS_RUNAS" "$POLARIS_WORKDIR/.claude" "$POLARIS_WORKDIR/.claude/polaris-hook.sh" "$POLARIS_WORKDIR/.claude/settings.local.json" "$POLARIS_WORKDIR/.mcp.json"'
+        );
+    });
+
+    it("marks a checkout as new, since it is a tree that was just cloned", () => {
+        const boot = commands.SESSION_SETUP;
+        expect(boot).toContain(
+            ['git checkout -b "$POLARIS_BRANCH"', "POLARIS_WORKDIR_NEW=yes"].join("\n")
+        );
+    });
+
     it("says the sign-in is only asked for once, in the terminal doing the asking", () => {
         expect(commands.SESSION_SETUP).toContain("it only asks once");
         expect(commands.SESSION_SETUP).toContain('if [ -z "$POLARIS_SIGNED_IN" ]; then');

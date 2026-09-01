@@ -23,7 +23,9 @@ import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents
 import {
     capacityRefusal,
     sessionCapacity,
-    sharedWorkspaceAllowed
+    sharedWorkspaceAllowed,
+    workspaceHolders,
+    workspaceRefusal
 } from "@/lib/agents/session-capacity";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
@@ -133,6 +135,22 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     // containers as it is set to should not be asked to check credentials first.
     const refusal = capacityRefusal(await sessionCapacity(user.id));
     if (refusal) return { error: refusal };
+
+    // A workspace opens on a directory that outlives it, and every workspace
+    // session on that machine opens on the same one. Two at once is two agents
+    // editing each other's files and, because this session's reporting token is
+    // written into that directory, the later boot's credential answering for the
+    // earlier session.
+    if (!value.repoId) {
+        const claim = {
+            userId: user.id,
+            place: value.place,
+            sharedHome: value.sharedHome,
+            hostId: value.place === "host" ? (value.hostId ?? null) : null
+        };
+        const taken = workspaceRefusal(claim, await workspaceHolders(claim));
+        if (taken) return { error: taken };
+    }
 
     // Before a row exists, because a session that could never have signed in is
     // not a record of an attempt - it is a dead row somebody has to notice and

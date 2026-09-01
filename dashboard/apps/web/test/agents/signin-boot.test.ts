@@ -16,7 +16,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SIGNIN_BOOT, canAssistSignin, assistedSignins } from "@/lib/agents/signin-runtime";
+import { AGENT_ACCOUNT_SETUP } from "@/lib/agents/session-commands";
+import {
+    SIGNIN_BOOT,
+    canAssistSignin,
+    assistedSignins,
+    whoamiScript
+} from "@/lib/agents/signin-runtime";
 
 describe("the sign-in boot script", () => {
     it("interpolates nothing", () => {
@@ -104,5 +110,40 @@ describe("which sign-ins Polaris can run for somebody", () => {
             expect(canAssistSignin(signin.env), signin.env).toBe(true);
             expect(signin.serves.length, signin.env).toBeGreaterThan(0);
         }
+    });
+});
+
+describe("asking the container who just signed in", () => {
+    const script = whoamiScript("claude auth status --json");
+
+    it("asks as the account that did the login, not as the root docker exec lands on", () => {
+        // The tool is installed into the agent's npm prefix and the credential
+        // was written into the agent's home, so root has neither: asked there it
+        // is a missing command whose output is not JSON, which is the identity
+        // silently lost on every credential this stores.
+        expect(script).toContain("as_agent 'claude auth status --json'");
+        expect(script).toContain('su -p "$POLARIS_RUNAS" -c "$1"');
+    });
+
+    it("gets that account from the same builder the boot did", () => {
+        // One definition of who the agent is and where its home is. Two would
+        // drift, and the way that shows up is a login written in one home and
+        // read from another.
+        expect(script).toContain(AGENT_ACCOUNT_SETUP);
+        expect(SIGNIN_BOOT).toContain(AGENT_ACCOUNT_SETUP);
+    });
+
+    it("throws the preamble's own output away, since the answer has to be JSON", () => {
+        // One line of setup chatter ahead of it loses the identity just as
+        // surely as no answer at all.
+        expect(script).toContain("} >/dev/null 2>&1");
+        expect(script.indexOf("} >/dev/null 2>&1")).toBeLessThan(script.indexOf("as_agent '"));
+    });
+
+    it("quotes the command, so a quote in one closes nothing", () => {
+        // It goes through `as_agent`, which hands it to `su -c` - a second shell.
+        // A single quote that got there unescaped would end the quoting and make
+        // the rest of the line something that shell runs.
+        expect(whoamiScript("say 'hi'")).toContain("as_agent 'say '\\''hi'\\'''");
     });
 });

@@ -230,9 +230,16 @@ export const AGENT_ACCOUNT_SETUP = AGENT_ACCOUNT.join("\n");
  * behind.
  */
 const PREPARE_WORKTREE = [
+    // Whether this directory is one Polaris just made. A checkout always is; a
+    // workspace is only on the session that opens it for the first time, and
+    // every one after that finds what the last one left. See the chown below.
+    "POLARIS_WORKDIR_NEW=no",
     'if [ -z "$GITHUB_REPOSITORY" ]; then',
     '  echo "polaris: opening your workspace"',
-    '  mkdir -p "$POLARIS_WORKDIR"',
+    '  if [ ! -d "$POLARIS_WORKDIR" ]; then',
+    '    mkdir -p "$POLARIS_WORKDIR"',
+    "    POLARIS_WORKDIR_NEW=yes",
+    "  fi",
     '  cd "$POLARIS_WORKDIR"',
     "else",
     'echo "polaris: fetching $GITHUB_REPOSITORY"',
@@ -251,6 +258,7 @@ const PREPARE_WORKTREE = [
     "fi",
     'cd "$POLARIS_WORKDIR"',
     'git checkout -b "$POLARIS_BRANCH"',
+    "POLARIS_WORKDIR_NEW=yes",
     "fi",
     // The agent reports what it is doing through a script Polaris registers in
     // the agent's own configuration. Written from the environment so neither the
@@ -284,10 +292,20 @@ const PREPARE_WORKTREE = [
     'if [ -d "$POLARIS_WORKDIR/.git" ]; then',
     '  printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
     "fi",
-    // Cloned as root because the image starts as root; owned by the agent,
-    // because the agent is who edits it.
+    // Made as root because the image starts as root; owned by the agent, because
+    // the agent is who edits it.
+    //
+    // Recursively only the once, for the same reason the home's is: a checkout
+    // is a fresh tree and cheap to walk, but a workspace is kept and fills with
+    // node_modules and caches, so a walk of it on every boot is minutes of
+    // exactly the wait this whole thing exists to remove. On a workspace that is
+    // already there, only the files Polaris just wrote into it change hands.
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
-    '  chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
+    '  if [ "$POLARIS_WORKDIR_NEW" = "yes" ]; then',
+    '    chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
+    "  else",
+    '    chown "$POLARIS_RUNAS" "$POLARIS_WORKDIR/.claude" "$POLARIS_WORKDIR/.claude/polaris-hook.sh" "$POLARIS_WORKDIR/.claude/settings.local.json" "$POLARIS_WORKDIR/.mcp.json" 2>/dev/null || true',
+    "  fi",
     "fi"
 ];
 

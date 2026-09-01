@@ -13,7 +13,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { capacityRefusal, DEFAULT_PER_ACCOUNT, DEFAULT_TOTAL } from "@/lib/agents/session-capacity";
+import {
+    capacityRefusal,
+    workspaceRefusal,
+    DEFAULT_PER_ACCOUNT,
+    DEFAULT_TOTAL,
+    type WorkspaceClaim
+} from "@/lib/agents/session-capacity";
 
 const room = { mine: 0, perAccount: 3, total: 0, totalCeiling: 12 };
 
@@ -58,5 +64,44 @@ describe("capacityRefusal", () => {
         expect(DEFAULT_PER_ACCOUNT).toBeGreaterThan(0);
         expect(DEFAULT_TOTAL).toBeGreaterThan(DEFAULT_PER_ACCOUNT);
         expect(DEFAULT_TOTAL).toBeLessThan(100);
+    });
+});
+
+/**
+ * The one directory a workspace opens on.
+ *
+ * A session with no checkout works in a directory that outlives it, and every
+ * workspace session on that machine opens on the same one. Two live agents there
+ * edit each other's files, and - because Polaris writes the session's own
+ * reporting token into that directory - the second to boot answers for the
+ * first: its events land on the wrong session record and its Polaris tools act
+ * as whoever booted last. On the shared machine those are two different people.
+ */
+describe("workspaceRefusal", () => {
+    const mine: WorkspaceClaim = {
+        userId: "usr_1",
+        place: "local",
+        sharedHome: false,
+        hostId: null
+    };
+
+    it("says nothing when the directory is free", () => {
+        expect(workspaceRefusal(mine, 0)).toBeNull();
+        expect(workspaceRefusal({ ...mine, sharedHome: true }, 0)).toBeNull();
+        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 0)).toBeNull();
+    });
+
+    it("refuses the second one, which is where the token would change hands", () => {
+        expect(workspaceRefusal(mine, 1)).not.toBeNull();
+        expect(workspaceRefusal({ ...mine, sharedHome: true }, 1)).not.toBeNull();
+        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 1)).not.toBeNull();
+    });
+
+    it("tells somebody what would free it, in terms of the machine they picked", () => {
+        expect(workspaceRefusal(mine, 1)).toContain("Stop that session");
+        // Not "stop it": the session holding the shared machine is somebody
+        // else's, and it is not theirs to stop.
+        expect(workspaceRefusal({ ...mine, sharedHome: true }, 1)).not.toContain("Stop that");
+        expect(workspaceRefusal({ ...mine, place: "host", hostId: "h1" }, 1)).toContain("server");
     });
 });

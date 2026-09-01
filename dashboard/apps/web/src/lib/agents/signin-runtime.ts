@@ -28,6 +28,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { agentSignins, type AgentSignin } from "./agent-signins";
@@ -363,6 +364,32 @@ export function parseSigninIdentity(output: string): SigninIdentity {
 }
 
 /**
+ * The status command, run by whoever did the login.
+ *
+ * `docker exec` enters the container as root with root's PATH and root's home,
+ * and neither of those is where any of this is: the tool was installed into the
+ * agent's own npm prefix and the credential was written into the agent's own
+ * home. Asked as root it is a command that does not exist, whose output is not
+ * JSON, which is an identity silently lost on every credential this stores.
+ *
+ * So the same preamble the boot used, then `as_agent` - one definition of who
+ * the agent is and where its home is, rather than a second copy here that can
+ * drift from it. Its own output is thrown away, and that is not tidiness: what
+ * comes back is parsed as JSON and nothing else, so one line of setup chatter
+ * ahead of it is the identity lost just as surely as no answer at all. The
+ * assignments and the `as_agent` it defines outlive the group; only what it
+ * printed does not.
+ */
+export function whoamiScript(command: string): string {
+    return [
+        "{",
+        commands.AGENT_ACCOUNT_SETUP,
+        "} >/dev/null 2>&1",
+        `as_agent ${shellQuote(command)}`
+    ].join("\n");
+}
+
+/**
  * Ask the container who just signed in.
  *
  * Best effort by design: it runs after the credential is already in somebody's
@@ -374,7 +401,7 @@ export async function identifySignin(userId: string, id: string, env: string): P
     const command = LOGIN_COMMANDS[env]?.whoami;
     if (!command) return {};
     try {
-        return parseSigninIdentity(await runIn(userId, id, command));
+        return parseSigninIdentity(await runIn(userId, id, whoamiScript(command)));
     } catch {
         return {};
     }

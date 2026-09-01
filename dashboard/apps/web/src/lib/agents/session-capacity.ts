@@ -24,6 +24,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { getSetting } from "@/lib/setting-store";
 
 /** What an administrator may change these to. */
@@ -117,4 +118,60 @@ export function capacityRefusal(capacity: Capacity): string | null {
         return "This Polaris is running as many agent sessions as it is set to allow. Try again when one finishes, or ask an administrator to raise the limit.";
     }
     return null;
+}
+
+/**
+ * Whether the persistent workspace a session would open on is already taken.
+ *
+ * A workspace has no checkout, so it is one directory that outlives the session
+ * and every workspace session on that machine opens on the same one: the
+ * account's own home, the machine everybody shares, or a single directory on an
+ * enrolled server. Two live agents in one directory is not a busy directory, it
+ * is two agents editing each other's files - and, because Polaris writes this
+ * session's own reporting token into `.claude` and `.mcp.json` there, the second
+ * one to boot also takes the first one's credential over: its events land on the
+ * wrong session and its Polaris tools act as whoever booted last. On the shared
+ * machine those two are different people.
+ *
+ * A session with a repository is not asked about. It clones into a directory of
+ * its own and nothing of it survives, which is the whole difference.
+ */
+export interface WorkspaceClaim {
+    readonly userId: string;
+    readonly place: core.AgentSessionPlace;
+    readonly sharedHome: boolean;
+    readonly hostId: string | null;
+}
+
+/** How many live sessions are already in that directory. Split from the sentence
+ *  below for the same reason `sessionCapacity` is: the count is the query and the
+ *  refusal is a pure function that can be asserted without one. */
+export async function workspaceHolders(claim: WorkspaceClaim): Promise<number> {
+    const where =
+        claim.place === "host"
+            ? { place: "host", hostId: claim.hostId }
+            : claim.sharedHome
+              ? { place: "local", sharedHome: true }
+              : { place: "local", sharedHome: false, startedById: claim.userId };
+    return prisma.agentSession.count({
+        where: { repoId: null, state: { in: ALIVE }, ...where }
+    });
+}
+
+/**
+ * Why a workspace may not be opened right now, or null.
+ *
+ * Refuses rather than queues, for the same reason the ceilings above do: the
+ * person is looking at it and can stop the session holding the directory, which
+ * is a better answer than one that arrives twenty minutes later.
+ */
+export function workspaceRefusal(claim: WorkspaceClaim, holders: number): string | null {
+    if (holders <= 0) return null;
+    if (claim.place === "host") {
+        return "That server already has a workspace session open, and a workspace is one directory. Stop that session and this will start.";
+    }
+    if (claim.sharedHome) {
+        return "Somebody already has a session open on the shared machine, and it has one workspace. Wait for that to finish, or open this one on your own machine.";
+    }
+    return "You already have a workspace session open, and it is the same directory this one would use. Stop that session and this will start.";
 }
