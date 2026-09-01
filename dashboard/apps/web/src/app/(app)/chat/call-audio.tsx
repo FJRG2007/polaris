@@ -22,11 +22,18 @@
  *
  * Anybody turned up past how they were sent is played through Web Audio instead
  * of by the element, because an element's volume stops at 1 - see `call-boost`.
+ *
+ * The room can also duck while this browser is talking. A page cannot quieten
+ * the machine's other applications the way a desktop client does - nothing in a
+ * browser reaches them - so what this turns down is Polaris's own sound, which
+ * is the half that matters when somebody is on speakers: the room coming back at
+ * you while you speak is what an echo canceller spends its life fighting.
  */
 
 import { Volume2 } from "lucide-react";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
+import { useVoiceSettings } from "./voice-settings";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -62,6 +69,20 @@ export function CallAudio({ call }: { call: CallState }) {
     const others = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted" && person.id !== call.participantId
     );
+
+    /**
+     * How much of the room is played while this browser is talking.
+     *
+     * One for everybody unless the reader asked for ducking, and then whatever
+     * they set while their own seat is in the speaking set. Worked out here
+     * rather than per person: it is one fact about this browser, and asking it
+     * once is what keeps eight people from being turned down at eight different
+     * moments.
+     */
+    const [voice] = useVoiceSettings();
+    const ducking =
+        voice.attenuate && call.participantId !== null && call.speaking.has(call.participantId);
+    const scale = ducking ? Math.max(0, 1 - voice.attenuation / 100) : 1;
 
     /**
      * Forget whoever is no longer here.
@@ -102,6 +123,7 @@ export function CallAudio({ call }: { call: CallState }) {
                     // which lasts as long as the seat.
                     volumeKey={person.userId ?? person.id}
                     muted={silent}
+                    scale={scale}
                     onPlayState={report}
                 />
             ))}
@@ -136,16 +158,23 @@ function RemoteAudio({
     stream,
     volumeKey,
     muted,
+    scale,
     onPlayState
 }: {
     id: string;
     stream: MediaStream | null;
     volumeKey: string;
     muted: boolean;
+    /** What the room is played at right now, as a multiple of what this person
+     *  is set to: 1 normally, less while this browser is talking and ducking is
+     *  on. A multiple rather than a second volume, so turning one person up
+     *  still means turning them up. */
+    scale: number;
     onPlayState: (id: string, blocked: boolean, press: () => void) => void;
 }) {
     const element = useRef<HTMLAudioElement>(null);
-    const [volume] = useCallVolume(volumeKey);
+    const [chosen] = useCallVolume(volumeKey);
+    const volume = chosen * scale;
     /** The graph playing this person, while they are turned up past 1. */
     const boost = useRef<Boost | null>(null);
     /** Whether this person is boosted at all, which decides which of the two

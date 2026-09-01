@@ -21,6 +21,8 @@
  * did not read them.
  */
 
+import { useConfirm } from "@/components/confirm-dialog";
+import { useVoiceSettings } from "./voice-settings";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
@@ -177,6 +179,11 @@ export function ChannelView({
     // their camera opened for them.
     const { call, session, enter, leave: leaveCall, withVideo } = useCallHold();
     const inCall = session?.channelId === channelId ? session.meetingId : null;
+    // Joining a room while already in a call replaces the call, which is the one
+    // thing here nobody can undo. Whether to ask first is this browser's own
+    // setting - see `voice-settings`.
+    const [voice] = useVoiceSettings();
+    const [confirm, confirmElement] = useConfirm();
     /**
      * The voice channel this browser has already walked into.
      *
@@ -1704,7 +1711,21 @@ export function ChannelView({
                         count={live?.count ?? 0}
                         off={callsOff}
                         busy={joining}
-                        onJoin={(video) => {
+                        onJoin={async (video) => {
+                            // Joining here while already in a call somewhere else
+                            // replaces that call - silently, which is fine when it
+                            // is what somebody meant and is the one thing they
+                            // cannot undo when it is not. Asked only of readers
+                            // who turned the warning on; see `voice-settings`.
+                            if (session && voice.switchWarning) {
+                                const sure = await confirm({
+                                    title: `Leave your call and join ${channel.name}?`,
+                                    description:
+                                        "You are in a call now, and Polaris holds one at a time - joining this room hangs that one up.",
+                                    confirmLabel: "Join this room"
+                                });
+                                if (!sure) return;
+                            }
                             void runAction(() => calls.startCallAction(channelId), setError).then(
                                 (result) => {
                                     if (!result || result.error) return;
@@ -1887,6 +1908,7 @@ export function ChannelView({
                     router.refresh();
                 }}
             />
+            {confirmElement}
         </div>
     );
 }
@@ -1907,7 +1929,7 @@ function VoiceStrip({
 }: {
     name: string;
     count: number;
-    onJoin: (withVideo: boolean) => void;
+    onJoin: (withVideo: boolean) => void | Promise<void>;
     /** Why nobody can walk in right now, or null. A voice room whose way in is
      *  a button that fails is a room people press twice and then give up on. */
     off: string | null;
@@ -1938,11 +1960,11 @@ function VoiceStrip({
                 </span>
             ) : (
                 <>
-                    <Button size="xs" onClick={() => onJoin(false)}>
+                    <Button size="xs" onClick={() => void onJoin(false)}>
                         <Mic className="size-3.5" />
                         Join
                     </Button>
-                    <Button size="xs" variant="secondary" onClick={() => onJoin(true)}>
+                    <Button size="xs" variant="secondary" onClick={() => void onJoin(true)}>
                         <Video className="size-3.5" />
                         With video
                     </Button>

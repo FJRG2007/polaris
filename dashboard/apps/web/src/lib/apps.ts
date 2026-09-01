@@ -45,6 +45,7 @@ import {
     ListTodo,
     Mail,
     Flag,
+    Mic,
     MessageCircle,
     MessageSquare,
     MessagesSquare,
@@ -730,7 +731,29 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Preferences",
             href: "/account/preferences",
             icon: SlidersHorizontal,
-            keywords: ["units", "language", "timezone", "week start", "calendar"]
+            keywords: ["units", "language", "timezone", "week start", "calendar", "text size", "accessibility"]
+        },
+        // The microphone, the camera and everything around them. Its own screen
+        // rather than a card under Preferences: what is answered here is a fact
+        // about the machine in front of somebody, and it is the screen people
+        // are sent to when a call goes wrong.
+        {
+            label: "Devices",
+            href: "/account/devices",
+            icon: Mic,
+            keywords: [
+                "microphone",
+                "camera",
+                "webcam",
+                "audio",
+                "video",
+                "noise",
+                "push to talk",
+                "voice activity",
+                "gain",
+                "attenuation",
+                "test"
+            ]
         },
         // Who sees what, in one place: the rules by audience, the people those
         // rules name, and the hours that answer the same question by the clock.

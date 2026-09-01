@@ -10,6 +10,7 @@
  * with nothing on screen saying why.
  */
 
+import { withCameraDevice } from "./camera-device";
 import type { CallDevice } from "./call-state";
 import { micConstraints } from "./mic-cleanup";
 
@@ -36,7 +37,11 @@ export async function openMedia(
             // from across the room, all handled by the browser before anything
             // is sent - see `mic-cleanup`.
             audio: audio ? micConstraints() : false,
-            video: video ? (camera ?? true) : false
+            // Even with no size asked for, the camera this browser was told to
+            // prefer: `true` opens whichever one the browser felt like, which on
+            // a machine with a webcam and a capture card is a coin toss nobody
+            // can see the result of until they are on screen.
+            video: video ? withCameraDevice(camera ?? {}) : false
         });
 
     try {

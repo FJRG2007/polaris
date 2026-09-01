@@ -47,6 +47,8 @@ import { NEARBY_SLOTS, nearbyEnabled, scanNearby } from "./call-nearby";
 import { DEAFENED, MUTED, RECORDING, peerState } from "./call-peer-state";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
+import { useVoiceGate } from "./voice-gate";
+import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { callDevices, openMedia, settle } from "./call-media";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -184,6 +186,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [microphoneId, setMicrophoneId] = useState<string | null>(null);
     const [cameraId, setCameraId] = useState<string | null>(null);
     const [micFilter, setMicFilter] = useState<FilteredMic["using"] | null>(null);
+    /**
+     * The microphone as something the gate can watch.
+     *
+     * A ref cannot be an effect's dependency, and the gate has to start when the
+     * device opens and stop when it closes. Held as state beside the ref rather
+     * than replacing it: everything else here reads the track synchronously, in
+     * the middle of publishing.
+     */
+    const [micTrack, setMicTrack] = useState<MediaStreamTrack | null>(null);
+    /** The same, for the track the noise model produces - what voice activity
+     *  listens to when the reader asked for the better detection. */
+    const [filteredTrack, setFilteredTrack] = useState<MediaStreamTrack | null>(null);
     const [licensedFilter, setLicensedFilter] = useState(false);
     /**
      * Everything about sharing one microphone with the people sitting next to
@@ -540,6 +554,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [say]);
 
     /**
+     * Push to talk, or voice activity, when this browser has asked for one.
+     *
+     * It only ever opens and closes the track - the same thing the mute button
+     * does, so everybody else is told either way - and it is only consulted
+     * while the microphone is on. Mute is a person saying they do not want to be
+     * heard, and a threshold that reopened them on the next word would be the
+     * product overruling them.
+     *
+     * Voice activity listens to the cleaned-up track when the reader asked for
+     * it, which is the whole of the difference: a threshold on the raw input is
+     * opened by a keyboard and a fan, and the same threshold after the noise
+     * model is opened by a voice.
+     */
+    useVoiceGate({
+        micOn,
+        track: voiceSettings().advancedActivity ? (filteredTrack ?? micTrack) : micTrack,
+        setSending: setVoiceEnabled
+    });
+
+    /**
      * Put the chosen filter between the microphone and the call, or take away
      * the one that was there.
      */
@@ -547,6 +581,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         await filtered.current?.stop();
         filtered.current = null;
         setMicFilter(null);
+        setFilteredTrack(null);
 
         const track = mic.current;
         if (!track) return;
@@ -560,6 +595,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         built.track.enabled = track.enabled;
         filtered.current = built;
         setMicFilter(built.using);
+        // The gate listens to whichever of the two the reader asked for. Told
+        // here because this is where the second one starts existing.
+        setFilteredTrack(built.track);
     }, []);
 
     /**
@@ -913,6 +951,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             }
             if (opened.stream) {
                 mic.current = opened.stream.getAudioTracks()[0] ?? null;
+                setMicTrack(mic.current);
                 camera.current = opened.stream.getVideoTracks()[0] ?? null;
                 setHasCamera(camera.current !== null);
                 setMicOn(mic.current !== null);
@@ -1034,6 +1073,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             filtered.current = null;
             for (const track of [mic.current, camera.current, screen.current]) track?.stop();
             mic.current = null;
+            setMicTrack(null);
             camera.current = null;
             screen.current = null;
             // Leaving releases the participant row, and an account has one of

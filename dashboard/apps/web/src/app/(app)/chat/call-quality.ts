@@ -28,6 +28,7 @@
  * cleanup: it is a fact about a line and a machine, not about a person.
  */
 
+import { withCameraDevice } from "./camera-device";
 import { useCallback, useEffect, useState } from "react";
 
 /** A rung, once auto has resolved to one. */
@@ -410,12 +411,16 @@ export function levelOf(setting: CallQuality, auto: CallLevel): CallLevel {
  */
 export function cameraConstraints(level: CallLevel, deviceId?: string): MediaTrackConstraints {
     const rung = CAMERA_LADDER.rungs[level];
-    return {
-        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    const size = {
         width: { ideal: rung.width },
         height: { ideal: rung.height },
         frameRate: { ideal: rung.frameRate }
     };
+    // A device named here is somebody choosing one now, and is exact. Otherwise
+    // the one this browser was told to prefer, which is `ideal` for the reason
+    // the sizes are: it may name a camera unplugged three days ago, and that
+    // must never be why a call opens with no picture.
+    return deviceId ? { ...size, deviceId: { exact: deviceId } } : withCameraDevice(size);
 }
 
 /**

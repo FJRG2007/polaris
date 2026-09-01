@@ -25,6 +25,7 @@
  */
 
 import { micDevice } from "./mic-device";
+import { voiceSettings } from "./voice-settings";
 import type { MicFilter } from "./mic-filter";
 import { useCallback, useEffect, useState } from "react";
 
@@ -108,7 +109,12 @@ function browserProcessing(level: MicFilter): boolean {
  * that must never be the reason a recording cannot start.
  */
 export function micConstraints(deviceId?: string): MediaTrackConstraints {
-    const on = browserProcessing(micCleanup());
+    const voice = voiceSettings();
+    // Bypassing takes the browser's whole input chain off together - echo,
+    // noise and level - which is the point of it: an interface or a processed
+    // feed that has already done all three is ruined by having them done twice,
+    // and turning off only one of them is not that request.
+    const on = !voice.bypassProcessing && browserProcessing(micCleanup());
     const remembered = micDevice();
     return {
         ...(deviceId
@@ -118,7 +124,11 @@ export function micConstraints(deviceId?: string): MediaTrackConstraints {
               : {}),
         echoCancellation: on,
         noiseSuppression: on,
-        autoGainControl: on
+        // Its own answer on top, because it is the one of the three people turn
+        // off on its own: a level pumped up and down between sentences is what
+        // gain control sounds like when it is wrong, and the echo canceller is
+        // still wanted.
+        autoGainControl: on && voice.autoGainControl
     };
 }
 
@@ -132,9 +142,14 @@ export function micConstraints(deviceId?: string): MediaTrackConstraints {
  */
 export async function applyMicCleanup(track: MediaStreamTrack | null): Promise<void> {
     if (!track) return;
-    const on = browserProcessing(micCleanup());
+    const voice = voiceSettings();
+    const on = !voice.bypassProcessing && browserProcessing(micCleanup());
     await track
-        .applyConstraints({ echoCancellation: on, noiseSuppression: on, autoGainControl: on })
+        .applyConstraints({
+            echoCancellation: on,
+            noiseSuppression: on,
+            autoGainControl: on && voice.autoGainControl
+        })
         .catch(() => undefined);
 }
 

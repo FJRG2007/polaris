@@ -34,6 +34,7 @@
  * is instant and nobody else is told.
  */
 
+import { NoAudioNotice } from "./no-audio-notice";
 import type { CallState } from "./use-call";
 import * as actions from "./meeting-actions";
 import { useHeldCall } from "./call-session";
@@ -323,6 +324,14 @@ export function CallRoom({
                     {call.error}
                 </p>
             )}
+
+            {/* A microphone that opened but is picking nothing up looks exactly
+                like somebody who is not talking, and the person it is happening
+                to has no way of telling. See `no-audio-notice`. */}
+            <NoAudioNotice
+                track={call.localStream?.getAudioTracks()[0] ?? null}
+                micOn={call.micOn}
+            />
 
             {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes
