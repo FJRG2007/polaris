@@ -26,6 +26,7 @@
 
 import { prisma } from "@polaris/db";
 import { blockedBetween } from "@/lib/blocks";
+import { like } from "@/lib/rich-text/mention-service";
 import { follow, unfollow, isFollowing } from "@/lib/follow/follow";
 
 /** The subject a person is, in the shared follow table. */
@@ -92,6 +93,10 @@ export async function followCounts(personId: string): Promise<{ followers: numbe
 /** How many one page of a follower list holds. */
 export const FOLLOW_PAGE_SIZE = 50;
 
+/** How many accounts a search resolves before it stops. Reached only by a term
+ *  broad enough that no list was going to help anybody. */
+const SEARCH_CEILING = 500;
+
 /**
  * The people following somebody, or the people they follow.
  *
@@ -107,13 +112,45 @@ export const FOLLOW_PAGE_SIZE = 50;
 export async function listFollow(
     personId: string,
     which: "followers" | "following",
-    options: { before?: string | null; limit?: number } = {}
+    options: { before?: string | null; limit?: number; query?: string | null } = {}
 ): Promise<{ items: FollowPerson[]; cursor: string | null }> {
     const limit = Math.min(Math.max(options.limit ?? FOLLOW_PAGE_SIZE, 1), 200);
-    const where =
+    const base =
         which === "followers"
             ? { subjectType: PERSON, subjectId: personId }
             : { subjectType: PERSON, userId: personId };
+
+    // A search has to reach the whole list rather than the page that happens to
+    // be on screen: somebody looking for one name in four hundred is exactly the
+    // person who will never scroll to it. The names are resolved first and the
+    // follow rows are then cut to them, which is one extra read and keeps the
+    // paging below untouched - the alternative, filtering after the page is
+    // taken, returns a page of two and calls it the end of the list.
+    const term = options.query?.trim() ?? "";
+    let named: string[] | null = null;
+    if (term) {
+        const matches = await prisma.user.findMany({
+            where: {
+                bannedAt: null,
+                username: { not: null },
+                OR: [{ name: like(term) }, { username: like(term) }]
+            },
+            select: { id: true },
+            // A ceiling rather than the whole table: a one-letter search matches
+            // everybody, and an `IN` of every account is a query nobody wants.
+            // It only ever cuts a search so broad that scrolling was the answer.
+            take: SEARCH_CEILING
+        });
+        named = matches.map((person) => person.id);
+        // Nothing matched, so nothing follows. Said here rather than left to an
+        // empty `IN`, which some engines read as "no constraint".
+        if (named.length === 0) return { items: [], cursor: null };
+    }
+
+    const where = {
+        ...base,
+        ...(named ? (which === "followers" ? { userId: { in: named } } : { subjectId: { in: named } }) : {})
+    };
 
     const rows = await prisma.follow.findMany({
         where: {

@@ -98,7 +98,7 @@ export const PRIVACY_FIELD_LABELS = {
     email: "Your email address",
     phone: "Your phone number",
     companies: "Where you work",
-    followers: "Who follows you, and who you follow",
+    followers: "The names behind your follower counts",
     friendRequests: "Who can ask to be your friend",
     forwarding: "Passing your messages on"
 } as const;
@@ -119,7 +119,7 @@ export const PRIVACY_FIELD_NOTES = {
     companies:
         "The company on your profile, and the organizations here you have chosen to show. Which organizations those are is picked one at a time on your profile; this decides who sees the ones you picked.",
     followers:
-        "Both lists together, on your profile. Following somebody is not a request and they are not asked, so who can read the list is the only decision there is to make about it. Your administrator sets what a new account starts on; this is yours.",
+        "Who can open the two lists of names on your profile. The counts are always shown - how many follow you is a fact about you, and it is on your page the way the day you joined is - so this is about the several other people in the lists, who never chose to be on your page. Your administrator sets what a new account starts on; this is yours.",
     friendRequests:
         "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered.",
     forwarding:

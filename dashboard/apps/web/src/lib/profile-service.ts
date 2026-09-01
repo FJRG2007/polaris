@@ -129,10 +129,24 @@ export interface PublicProfile {
     /** Their address, for the readers they show it to. */
     readonly email: string;
     readonly joinedAt: string;
-    /** How many follow them and how many they follow, or null where this reader
-     *  may not see either. The numbers and the lists are one disclosure, so one
-     *  setting decides both. */
-    readonly follows: { readonly followers: number; readonly following: number } | null;
+    /**
+     * How many follow them, how many they follow, and whether this reader may
+     * open either list.
+     *
+     * The counts are always here and the names are the setting. They are not the
+     * same disclosure: a number says how many people are interested in somebody,
+     * which is a fact about them and is on the page for the same reason the date
+     * they joined is; a list says WHO, which is a fact about several other people
+     * who never chose to appear on this page. Hiding the number along with the
+     * names took away the one part a profile is expected to carry and left a page
+     * that looked broken rather than private.
+     */
+    readonly follows: {
+        readonly followers: number;
+        readonly following: number;
+        /** Whether the names behind the two numbers may be opened. */
+        readonly showsNames: boolean;
+    };
     /** What this reader may do about them. */
     readonly standing: ProfileStanding;
     /**
@@ -331,12 +345,30 @@ export async function orgProfile(slug: string, viewer: PrivacyViewer | null): Pr
  */
 export async function publicProfile(
     username: string,
-    viewer: PrivacyViewer | null
+    session: PrivacyViewer | null
 ): Promise<PublicProfile | null> {
     const handle = username.trim().toLowerCase();
     if (!handle) return null;
 
-    if (!viewer && !(await profilesArePublic())) return null;
+    if (!session && !(await profilesArePublic())) return null;
+
+    /**
+     * Never as an administrator, the way chat already does it.
+     *
+     * Running this Polaris is not a reason to be shown a different version of
+     * somebody's public page. It IS a reason to be able to read anything in the
+     * database, but that is a deliberate, audited act performed from the
+     * administration screens - not something that happens because an admin
+     * followed a link to a colleague and found their private address printed on
+     * it, under a heading that says this is what everybody sees. It is not, and
+     * an administrator has no way to tell from the page which parts of it other
+     * people are looking at.
+     *
+     * So the privileges come off here and the page is drawn for the person
+     * behind them. Whoever needs to see more of an account than its owner
+     * publishes goes to /admin/users, where that is what the screen is for.
+     */
+    const viewer = session ? { id: session.id, isAdmin: false } : null;
 
     const user = await prisma.user.findUnique({
         where: { username: handle },
@@ -482,8 +514,8 @@ async function draw(
             : [];
 
     const full = [user.firstName ?? "", user.lastName ?? ""].join(" ").trim();
-    const [follows, standing, mutual] = await Promise.all([
-        allowed.followers ? followCounts(user.id) : Promise.resolve(null),
+    const [counts, standing, mutual] = await Promise.all([
+        followCounts(user.id),
         standingOf(user.id, viewer, own),
         // Nothing to have in common with yourself, and a reader with no account
         // shares nothing with anybody.
@@ -503,7 +535,7 @@ async function draw(
         headline: user.headline ?? "",
         pronouns: user.pronouns ?? "",
         links: profileLinks(user.links),
-        follows,
+        follows: { ...counts, showsNames: allowed.followers },
         standing,
         mutual
     };

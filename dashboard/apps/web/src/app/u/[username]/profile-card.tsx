@@ -37,7 +37,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProfileActions } from "./profile-actions";
 import { MutualPanel } from "@/components/mutual-panel";
 import { FollowLists } from "./follow-lists";
-import { linkLabel } from "@polaris/core";
+import { linkLabel, PRESENCE_WORDS } from "@polaris/core";
+import { usePresence } from "@/components/presence-store";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
 export function ProfileCard({
@@ -54,6 +55,14 @@ export function ProfileCard({
 }) {
     const format = useDisplayFormat();
     const person = { id: profile.id, name: profile.name };
+    // Where they are, and the line they are showing. The same two facts the panel
+    // beside a direct message draws, from the same store, because they are the
+    // same profile - and a page that knew somebody's name but not whether they
+    // were at their desk was the one screen in Polaris that did not.
+    //
+    // Null for a reader with no account: there is no store around a public page,
+    // and presence is not published to people who are not signed in.
+    const where = usePresence(profile.id);
 
     return (
         <Card className="overflow-hidden">
@@ -64,10 +73,15 @@ export function ProfileCard({
                         {/* Initials rather than a photo for a reader they do not
                             show it to. The same rule the rest of Polaris draws
                             them by, answered on the server. */}
+                        {/* The dot is handed over rather than looked up, so it
+                            still appears on a face drawn as initials: where
+                            somebody is has nothing to do with whether they show
+                            their photo, and asking through the face would have
+                            tied the two together. */}
                         <Avatar
                             person={profile.showsAvatar ? person : { id: null, name: profile.name }}
                             size={72}
-                            status={false}
+                            presence={where?.status}
                         />
                     </span>
                     {own ? (
@@ -109,6 +123,22 @@ export function ProfileCard({
                     ) : null}
                 </div>
 
+                {/* Where they are, and what they are showing, in that order. The
+                    word is said as well as drawn - a colour on its own is a
+                    convention somebody has to have learnt, and this page has the
+                    room - and the note is only ever there while they actually
+                    are here; see `presence-service`. */}
+                {where ? (
+                    <div className="flex flex-col gap-1">
+                        <p className="text-muted-foreground text-xs">{PRESENCE_WORDS[where.status]}</p>
+                        {where.note ? (
+                            <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+                                {where.note}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
+
                 {!own && signedIn ? (
                     <ProfileActions personId={profile.id} name={profile.name} standing={profile.standing} />
                 ) : null}
@@ -117,14 +147,13 @@ export function ProfileCard({
                     <MutualPanel friends={profile.mutual.friends} spaces={profile.mutual.spaces} />
                 ) : null}
 
-                {profile.follows ? (
-                    <FollowLists
-                        personId={profile.id}
-                        name={profile.name}
-                        followers={profile.follows.followers}
-                        following={profile.follows.following}
-                    />
-                ) : null}
+                <FollowLists
+                    personId={profile.id}
+                    name={profile.name}
+                    followers={profile.follows.followers}
+                    following={profile.follows.following}
+                    showsNames={profile.follows.showsNames}
+                />
 
                 {profile.description ? (
                     <p className="text-sm leading-relaxed text-foreground/90">{profile.description}</p>

@@ -84,7 +84,9 @@ export async function stopBeingFriendsAction(input: unknown): Promise<{ error?: 
 const listSchema = z.object({
     personId: z.string().uuid(),
     which: z.enum(["followers", "following"]),
-    before: z.string().datetime().nullable().optional()
+    before: z.string().datetime().nullable().optional(),
+    /** What is typed in the search field. Bounded because it becomes a LIKE. */
+    query: z.string().max(120).nullable().optional()
 });
 
 /**
@@ -103,14 +105,16 @@ export async function loadFollowListAction(
     if (!parsed.success) return { error: "That list could not be read" };
 
     const { maySee } = await import("@/lib/privacy-service");
-    const allowed = await maySee(parsed.data.personId, "followers", {
-        id: user.id,
-        isAdmin: user.isAdmin
-    });
+    // Never as an administrator, exactly as the page itself is drawn: running
+    // this Polaris is a reason to be able to read the database from the
+    // administration screens, not a reason for somebody's profile to quietly
+    // show more to one reader than it says it shows to anybody.
+    const allowed = await maySee(parsed.data.personId, "followers", { id: user.id, isAdmin: false });
     if (!allowed) return { error: "That list is not shown" };
 
     const page = await listFollow(parsed.data.personId, parsed.data.which, {
-        before: parsed.data.before ?? null
+        before: parsed.data.before ?? null,
+        query: parsed.data.query ?? null
     });
     return { items: [...page.items], cursor: page.cursor };
 }
