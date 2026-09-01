@@ -187,6 +187,46 @@ export interface DataDriver {
     close(): Promise<void>;
 }
 
+/**
+ * The schemas an engine hands back that nobody keeps their own tables in.
+ *
+ * Postgres returns `information_schema` and its `pg_*` catalogues alongside the
+ * one somebody actually uses, and they sort first. MySQL does the same with its
+ * own bookkeeping databases.
+ */
+const SYSTEM_NAMESPACES = new Set([
+    "information_schema",
+    "pg_catalog",
+    "pg_toast",
+    "sys",
+    "mysql",
+    "performance_schema"
+]);
+
+/**
+ * Which schema to open a database on.
+ *
+ * `public` where there is one, which is where a Postgres database keeps its
+ * tables unless somebody has deliberately arranged otherwise. Otherwise the first
+ * one that is not the engine's own bookkeeping, and only then whatever came
+ * first.
+ *
+ * **It lives here, once, and the server is the only caller.** It was briefly in
+ * the browser as well, which is the bug it now exists to prevent: the screen
+ * labelled the selector `public` while the server had read its relations from
+ * whichever schema sorted first, so the box named one schema and listed another -
+ * and opening a table from that list asked for it under the name in the box.
+ * Where a table of that name existed in both, that is rows from the wrong schema
+ * with nothing on screen saying so.
+ *
+ * Pure, so it can be reasoned about without a database.
+ */
+export function openingNamespace(namespaces: readonly DataNamespace[]): string | null {
+    const named = namespaces.map((entry) => entry.name);
+    if (named.includes("public")) return "public";
+    return named.find((name) => !SYSTEM_NAMESPACES.has(name)) ?? named[0] ?? null;
+}
+
 /** How many rows a page holds unless somebody says otherwise. A screenful of a
  *  wide table, and small enough that a mistyped filter is not a download. */
 export const PAGE_ROWS = 100;

@@ -86,8 +86,16 @@ export function DatabasesView() {
     }
 
     return (
-        <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
+        // The screen it sits in fills the window and clips what overflows - that
+        // is what lets the workbench's three panes scroll on their own. This
+        // branch is a growing list rather than a set of panes, so it has to carry
+        // its own scroller: without one it was simply cut off at the bottom of
+        // the window, and the connections past the fold could not be reached at
+        // all.
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+            {/* Above the scroller, so the way to add one does not scroll away
+                from somebody who has more connections than fit. */}
+            <div className="flex shrink-0 items-center gap-2">
                 <p className="min-w-0 flex-1 text-sm text-muted-foreground">
                     Browse and query the databases Polaris runs, and any other you have the
                     credentials for.
@@ -123,7 +131,7 @@ export function DatabasesView() {
                     }
                 />
             ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="-mx-1 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto px-1 md:grid-cols-2 xl:grid-cols-3">
                     {connections.map((connection) => (
                         <Card key={connection.id}>
                             <CardBody className="flex flex-col gap-3">

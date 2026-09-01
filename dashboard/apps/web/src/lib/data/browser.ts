@@ -52,16 +52,26 @@ export async function browse(
     shape: data.DataShape;
     namespaces: data.DataNamespace[];
     relations: data.DataRelation[];
+    /**
+     * The schema these relations were actually read from.
+     *
+     * Returned rather than left for the caller to work out, and that is the whole
+     * point: the screen used to make the same choice for itself, disagreed with
+     * this one, and ended up naming a schema in its selector while listing
+     * another's tables - which then asked for those tables under the wrong
+     * schema. One answer, sent back, and there is nothing left to drift.
+     */
+    namespace: string | null;
 }> {
     const address = await addressOf(userId, connectionId);
     return withDriver(address, async (driver) => {
         const namespaces = await driver.namespaces();
-        // The one it was asked for, or the first that looks like somebody's own
-        // data. A tree that opens on nothing is a tree somebody has to click
-        // before it says anything.
-        const chosen = namespace ?? namespaces[0]?.name ?? null;
+        // The one it was asked for, or the one a database is worth opening on -
+        // `public` before the engine's own bookkeeping. A tree that opens on
+        // nothing is a tree somebody has to click before it says anything.
+        const chosen = namespace ?? data.openingNamespace(namespaces);
         const relations = chosen === null ? [] : await driver.relations(chosen);
-        return { shape: driver.shape, namespaces, relations };
+        return { shape: driver.shape, namespaces, relations, namespace: chosen };
     });
 }
 

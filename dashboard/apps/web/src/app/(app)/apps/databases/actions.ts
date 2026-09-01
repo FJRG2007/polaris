@@ -108,6 +108,9 @@ export async function browseAction(
     shape?: string;
     namespaces?: DataNamespace[];
     relations?: DataRelation[];
+    /** The schema the relations came from, so the screen names the one it is
+     *  showing rather than choosing again and disagreeing. */
+    namespace?: string | null;
     error?: string;
 }> {
     const me = await actor();
