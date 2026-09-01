@@ -19,7 +19,7 @@ import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as taskAccess from "@/lib/tasks/access";
 import { addComment } from "@/lib/tasks/task-detail-service";
-import { agentChoicesFor, type AgentChoice } from "@/lib/agents/agent-readiness";
+import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
@@ -33,7 +33,7 @@ const SESSIONS_PATH = "/apps/agents/sessions";
  * browser is ever told which ones exist - only whether one does.
  */
 export async function sessionChoicesAction(): Promise<{
-    agents: AgentChoice[];
+    agents: AgentOption[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
 }> {
@@ -51,7 +51,7 @@ export async function sessionChoicesAction(): Promise<{
         })
     ]);
     return {
-        agents: await agentChoicesFor(user.id),
+        agents: await agentOptionsFor(user.id),
         repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
         hosts
     };
@@ -119,9 +119,13 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     // credential for, and refusing on that would be inventing a problem. A session
     // on a server the person already signed the tool in on is `missing` too, which
     // is why the message says so rather than insisting.
-    const blocked = (await agentChoicesFor(user.id)).find(
-        (agent) => agent.id === value.cli && agent.readiness === "missing"
-    );
+    // Only the tool matters here: an option that names an account is an account
+    // that exists, so it can never be the missing case.
+    const blocked = value.accountId
+        ? undefined
+        : (await agentChoicesFor(user.id)).find(
+              (agent) => agent.id === value.cli && agent.readiness === "missing"
+          );
     if (blocked) {
         const ways = blocked.missing.map((credential) => credential.label).join(" or ");
         return {
@@ -151,6 +155,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         command: value.cli === core.CUSTOM_AGENT_CLI ? (value.command ?? null) : null,
         place: value.place,
         unattended: value.unattended,
+        accountId: value.accountId,
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,

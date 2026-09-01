@@ -20,7 +20,7 @@ import { AgentLogo } from "@/components/logos";
 import Link from "next/link";
 import { Check, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import type { AgentOption } from "@/lib/agents/agent-readiness";
 
 /** What a row can be told about signing in, and how loudly.
  *
@@ -35,18 +35,19 @@ const READY_BADGE = {
 
 /** An entry for a tool that is not in the catalogue. Carried here rather than by
  *  the caller so every screen that picks an agent offers it on the same terms. */
-export const CUSTOM_CHOICE: AgentChoice = {
-    id: "custom",
+export const CUSTOM_CHOICE: AgentOption = {
+    key: "custom",
+    cli: "custom",
     label: "Something else",
     vendor: "",
-    install: null,
     docs: "",
     // Polaris knows nothing about a command somebody typed, including what signs
     // it in. Never blocks, and never claims to be ready.
     readiness: "unknown",
-    missing: [],
-    // Nothing is known about a command somebody typed, whose account included.
-    signedInAs: null
+    accountId: null,
+    account: null,
+    mine: null,
+    missing: []
 };
 
 export function AgentSelect({
@@ -55,7 +56,7 @@ export function AgentSelect({
     onChange,
     disabled
 }: {
-    options: AgentChoice[];
+    options: AgentOption[];
     value: string;
     onChange: (id: string) => void;
     disabled?: boolean;
@@ -81,11 +82,13 @@ export function AgentSelect({
         // The vendor counts: people look for Codex by typing "openai" at least as
         // often as by typing its name, and for Droid by typing "factory".
         return options.filter((option) =>
-            [option.label, option.vendor, option.id].some((term) => term.toLowerCase().includes(needle))
+            [option.label, option.vendor, option.cli, option.account ?? ""].some((term) =>
+                term.toLowerCase().includes(needle)
+            )
         );
     }, [options, query]);
 
-    const chosen = options.find((option) => option.id === value) ?? null;
+    const chosen = options.find((option) => option.key === value) ?? null;
 
     return (
         <div className="relative" ref={box}>
@@ -97,15 +100,19 @@ export function AgentSelect({
                 onClick={() => setOpen((was) => !was)}
                 className="border-border bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
-                {chosen ? <AgentLogo id={chosen.id} label={chosen.label} className="size-4 shrink-0" /> : null}
+                {chosen ? <AgentLogo id={chosen.cli} label={chosen.label} className="size-4 shrink-0" /> : null}
                 <span className="min-w-0 flex-1 truncate text-left" title={chosen?.label ?? undefined}>
                     {chosen?.label ?? "Pick an agent"}
                 </span>
-                {chosen?.signedInAs ? (
-                    <span className="text-muted-foreground shrink-0 truncate text-xs">
-                        {chosen.signedInAs.mine ? "" : "this Polaris: "}
-                        {chosen.signedInAs.label}
+                {chosen?.account ? (
+                    <span className="text-muted-foreground max-w-[12rem] shrink-0 truncate text-xs">
+                        {chosen.account}
                     </span>
+                ) : null}
+                {chosen && chosen.mine === false ? (
+                    <Badge variant="neutral" className="shrink-0">
+                        This Polaris
+                    </Badge>
                 ) : null}
                 {chosen && READY_BADGE[chosen.readiness] ? (
                     <Badge variant={READY_BADGE[chosen.readiness]!.variant} className="shrink-0">
@@ -132,22 +139,22 @@ export function AgentSelect({
                             const badge = READY_BADGE[option.readiness];
                             return (
                                 <Button
-                                    key={option.id}
+                                    key={option.key}
                                     type="button"
                                     variant="ghost"
                                     role="option"
-                                    aria-selected={option.id === value}
+                                    aria-selected={option.key === value}
                                     onClick={() => {
-                                        onChange(option.id);
+                                        onChange(option.key);
                                         setQuery("");
                                         setOpen(false);
                                     }}
                                     className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal"
                                 >
                                     <Check
-                                        className={`size-4 shrink-0 ${option.id === value ? "opacity-100" : "opacity-0"}`}
+                                        className={`size-4 shrink-0 ${option.key === value ? "opacity-100" : "opacity-0"}`}
                                     />
-                                    <AgentLogo id={option.id} label={option.label} className="size-4 shrink-0" />
+                                    <AgentLogo id={option.cli} label={option.label} className="size-4 shrink-0" />
                                     <span className="min-w-0 flex-1 truncate" title={option.label}>
                                         {option.label}
                                     </span>
@@ -158,20 +165,30 @@ export function AgentSelect({
                                         so "ready" alone left nobody able to tell
                                         whose subscription was about to do the
                                         work. */}
-                                    {option.signedInAs ? (
+                                    {/* The account, and whose it is. One row per
+                                        account rather than per tool: somebody
+                                        can hold three subscriptions and the
+                                        deployment a fourth, and a list of tools
+                                        shows one row for all four with no way to
+                                        say which it means. */}
+                                    {option.account ? (
                                         <span
                                             className="text-muted-foreground max-w-[14rem] shrink-0 truncate text-xs"
                                             title={
-                                                option.signedInAs.mine
-                                                    ? `Your account: ${option.signedInAs.label}`
-                                                    : `Provided by this Polaris: ${option.signedInAs.label}`
+                                                option.mine
+                                                    ? `Your account: ${option.account}`
+                                                    : `Provided by this Polaris: ${option.account}`
                                             }
                                         >
-                                            {option.signedInAs.mine ? "" : "this Polaris: "}
-                                            {option.signedInAs.label}
+                                            {option.account}
                                         </span>
                                     ) : option.vendor ? (
                                         <span className="text-muted-foreground shrink-0 text-xs">{option.vendor}</span>
+                                    ) : null}
+                                    {option.mine === false ? (
+                                        <Badge variant="neutral" className="shrink-0">
+                                            This Polaris
+                                        </Badge>
                                     ) : null}
                                     {badge ? (
                                         <Badge variant={badge.variant} className="shrink-0">
@@ -207,7 +224,7 @@ export function AgentSelect({
  * which the copy has to say, because insisting otherwise would be Polaris being
  * confidently wrong about somebody else's computer.
  */
-export function SignInNotice({ agent }: { agent: AgentChoice }) {
+export function SignInNotice({ agent }: { agent: AgentOption }) {
     return (
         <div className="space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3">
             <p className="text-sm">Nothing here signs {agent.label} in.</p>

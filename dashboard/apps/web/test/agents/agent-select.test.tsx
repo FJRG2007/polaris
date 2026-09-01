@@ -13,7 +13,7 @@
 import * as core from "@polaris/core";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { cleanup, render, screen } from "@testing-library/react";
 import { AgentSelect, SignInNotice } from "@/components/agents/agent-select";
 
@@ -23,14 +23,20 @@ afterEach(cleanup);
  *  Claude subscription token - so `claude` reads ready and every other tool
  *  with sourced credentials reads "Not linked", the same split the picker was
  *  built to show. */
-function choicesFor(held: Set<string>): AgentChoice[] {
+function choicesFor(held: Set<string>): AgentOption[] {
     const present = (env: string): boolean => held.has(env);
+    // One option per tool with no account named, which is the shape the picker
+    // takes for a tool signed in on the machine it runs on. The account-per-row
+    // case adds rows; it does not change any of these.
     return core.AGENT_CLIS.map((cli) => ({
-        id: cli.id,
+        key: cli.id,
+        cli: cli.id,
         label: cli.label,
         vendor: cli.vendor,
-        install: cli.install,
         docs: cli.docs,
+        accountId: null,
+        account: null,
+        mine: null,
         readiness: core.agentReadiness(cli, present),
         missing:
             core.agentReadiness(cli, present) === "missing"
@@ -111,7 +117,7 @@ describe("AgentSelect", () => {
 
 describe("SignInNotice", () => {
     it("names the credential in the vendor's own words and links to where it is linked", () => {
-        const codex = choicesFor(new Set()).find((agent) => agent.id === "codex")!;
+        const codex = choicesFor(new Set()).find((agent) => agent.cli === "codex")!;
         const { container } = render(<SignInNotice agent={codex} />);
 
         expect(screen.getByText(/Nothing here signs Codex in/i)).not.toBeNull();

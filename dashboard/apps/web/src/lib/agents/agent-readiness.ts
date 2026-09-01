@@ -16,7 +16,7 @@
 
 import * as core from "@polaris/core";
 import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
-import { keySourcesFor, signinAccountsFor, signinEnvsFor } from "@/lib/agents/model-keys";
+import { keySourcesFor, signinAccountsFor, signinEnvsFor, signinOptionsFor } from "@/lib/agents/model-keys";
 
 /**
  * Variables every session is handed whether or not anybody linked anything.
@@ -132,4 +132,79 @@ export function credentialsForAgent(
         if (value) chosen[credential.env] = value;
     }
     return chosen;
+}
+
+/**
+ * One thing somebody can pick when handing work to an agent.
+ *
+ * A tool AND an account, because those are not one choice. Somebody can hold
+ * three Claude subscriptions and the deployment can hold a fourth, and a list of
+ * tools shows one row for all four with no way to say which it means - which is
+ * exactly what a picker that named the winning account still did, since it named
+ * one and hid three.
+ *
+ * A tool with no account of its own still appears once, with `accountId` null:
+ * that is a tool signed in on the machine it will run on, or one Polaris holds
+ * no sourced credential for, and refusing to offer it would be Polaris deciding
+ * it does not work on evidence it does not have.
+ */
+export interface AgentOption {
+    readonly key: string;
+    readonly cli: string;
+    readonly label: string;
+    readonly vendor: string;
+    readonly docs: string;
+    readonly readiness: core.AgentReadiness;
+    /** The stored account this option means, or null for "whatever resolves". */
+    readonly accountId: string | null;
+    /** What to call that account: its address where the login gave one, and the
+     *  name its owner chose otherwise. Null when there is no account. */
+    readonly account: string | null;
+    /** True when it belongs to the person choosing, false when the deployment
+     *  provides it. Null when there is no account. */
+    readonly mine: boolean | null;
+    readonly missing: AgentChoice["missing"];
+}
+
+/** The catalogue crossed with the accounts, as the picker lists it. */
+export async function agentOptionsFor(userId: string | null): Promise<AgentOption[]> {
+    const [choices, accounts] = await Promise.all([agentChoicesFor(userId), signinOptionsFor(userId)]);
+    const options: AgentOption[] = [];
+    for (const choice of choices) {
+        const cli = core.agentCliById(choice.id);
+        const envs = new Set((cli?.credentials ?? []).map((credential) => credential.env));
+        const mine = accounts.filter((account) => envs.has(account.env));
+        if (mine.length === 0) {
+            options.push({
+                key: choice.id,
+                cli: choice.id,
+                label: choice.label,
+                vendor: choice.vendor,
+                docs: choice.docs,
+                readiness: choice.readiness,
+                accountId: null,
+                account: null,
+                mine: null,
+                missing: choice.missing
+            });
+            continue;
+        }
+        for (const account of mine) {
+            options.push({
+                key: `${choice.id}:${account.id}`,
+                cli: choice.id,
+                label: choice.label,
+                vendor: choice.vendor,
+                docs: choice.docs,
+                // An account exists for it, so it is signed in whatever the
+                // catalogue-wide answer was.
+                readiness: "ready",
+                accountId: account.id,
+                account: account.identity ?? account.name,
+                mine: account.source === "own",
+                missing: []
+            });
+        }
+    }
+    return options;
 }

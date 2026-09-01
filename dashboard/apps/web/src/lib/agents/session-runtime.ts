@@ -27,7 +27,7 @@ import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
 import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
-import { sessionSecretsFor } from "@/lib/agents/model-keys";
+import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import {
     addSessionMessage,
@@ -148,6 +148,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     const mcp = `${base}/api/mcp`;
     const enigma = await resolveSessionEnigma(session.id);
     const agent = agentCommandFor(session, enigma.enabled);
+    const chosen = session.accountId ? await secretForAccount(session.ownerId, session.accountId) : null;
 
     // Null is the store failing to answer, and it is not the same as an account
     // holding nothing. A session started on a blank environment because the
@@ -185,7 +186,13 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         cloneHeader: cloneAuthHeader(githubToken) ?? "",
         githubToken,
-        credentials: credentialsForAgent(agent.cli, available),
+        // The account the person picked wins over whatever would have resolved.
+        // Somebody holding three subscriptions chose one of them on the form,
+        // and a session that quietly used the first is a session doing the work
+        // on a bill they did not pick.
+        credentials: chosen
+            ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
+            : credentialsForAgent(agent.cli, available),
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
         autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)

@@ -5727,6 +5727,15 @@ model AgentSession {
     command     String?
     // local | host - a container on the Polaris box, or an enrolled server.
     place       String    @default("local")
+    // Which stored account signs the agent in, when the person picked one.
+    //
+    // Null takes whatever the resolver would pick, which is the first of their
+    // own that works and then the deployment's - and is what every session
+    // started before this existed did. A soft pointer rather than a relation:
+    // the account can be removed while the session that used it is still worth
+    // reading, and a row that vanished with its credential would take the
+    // record of the work with it.
+    accountId   String?   @db.Uuid
     // Whether the agent may run commands without asking. Null is "nobody said",
     // which resolves by place: a container Polaris made is a sandbox and a
     // server is somebody's machine. Nullable rather than defaulted so a session

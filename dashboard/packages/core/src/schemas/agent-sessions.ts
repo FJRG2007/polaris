@@ -103,6 +103,14 @@ export const startAgentSessionSchema = z
          * own server is their machine. See `agentRunsUnattended`.
          */
         unattended: z.boolean().nullable().default(null),
+        /**
+         * Which stored account signs the agent in.
+         *
+         * Null takes whatever would resolve - the first of their own that works,
+         * then the deployment's - which is what a session started before the
+         * picker offered a choice does.
+         */
+        accountId: z.string().uuid().nullable().default(null),
         enigma: enigmaSettingsSchema.optional()
     })
     .refine((value) => value.cli !== CUSTOM_AGENT_CLI || Boolean(value.command), {

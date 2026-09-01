@@ -20,7 +20,7 @@ import { Bot, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import { agentHandoffChoicesAction, handTaskToAgentAction } from "./actions";
-import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { AgentSelect, SignInNotice } from "@/components/agents/agent-select";
 import {
     Button,
@@ -76,7 +76,7 @@ function HandOffDialog({
     onClose
 }: Props & { onClose: () => void }) {
     const [repos, setRepos] = useState<{ id: string; name: string }[] | null>(null);
-    const [agents, setAgents] = useState<AgentChoice[]>([]);
+    const [agents, setAgents] = useState<AgentOption[]>([]);
     const [repoId, setRepoId] = useState("");
     const [cli, setCli] = useState("claude");
     // Seeded from the task and then editable. What a task says is usually the
@@ -106,7 +106,8 @@ function HandOffDialog({
                     handTaskToAgentAction({
                         repoId,
                         title: `${reference} ${name}`.slice(0, 80),
-                        cli,
+                        cli: agentOf(cli),
+                        accountId: accountOf(cli),
                         place: "local",
                         hostId: null,
                         baseRef: "",
@@ -127,7 +128,7 @@ function HandOffDialog({
     // session on this box, so there is no "already signed in on that server"
     // case to leave room for: it would come up at a login prompt, full stop.
     const unlinked =
-        agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
+        agents.find((agent) => agent.key === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -194,4 +195,21 @@ function HandOffDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/**
+ * The picker's value is a tool and an account, joined.
+ *
+ * One control rather than two, because they are one decision: "run this with
+ * that subscription". Split here on the way to the server, which stores them
+ * apart - the tool decides what is launched and the account decides what signs
+ * it in.
+ */
+function agentOf(value: string): string {
+    return value.split(":")[0] ?? value;
+}
+
+/** The account half, or null for "whichever would resolve". */
+function accountOf(value: string): string | null {
+    return value.split(":")[1] ?? null;
 }

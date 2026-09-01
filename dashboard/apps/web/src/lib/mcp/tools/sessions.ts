@@ -155,6 +155,9 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             // container, where the default already applies; letting a tool call
             // ask for more would be an agent widening its own permissions.
             unattended: null,
+            // Whichever resolves. Choosing between somebody's subscriptions is
+            // not a thing to hand a model.
+            accountId: null,
             // Always on the Polaris box. A session started by a model is not the
             // moment to be choosing somebody's server for them.
             place: "local",

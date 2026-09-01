@@ -87,6 +87,8 @@ export interface SessionView {
     /** Whether the agent may run commands without asking, or null for a session
      *  that predates the question. Resolved by `agentRunsUnattended`. */
     readonly unattended: boolean | null;
+    /** The account picked when the session was started, or null. */
+    readonly accountId: string | null;
     readonly hostId: string | null;
     readonly hostName: string | null;
     readonly state: core.AgentSessionState;
@@ -110,6 +112,7 @@ const VIEW_SELECT = {
     command: true,
     place: true,
     unattended: true,
+    accountId: true,
     hostId: true,
     state: true,
     detail: true,
@@ -136,6 +139,7 @@ type SessionRecord = {
     command: string | null;
     place: string;
     unattended: boolean | null;
+    accountId: string | null;
     hostId: string | null;
     state: string;
     detail: string;
@@ -171,6 +175,7 @@ function toView(record: SessionRecord): SessionView {
         command: record.command,
         place: record.place === "host" ? "host" : "local",
         unattended: record.unattended,
+        accountId: record.accountId,
         hostId: record.hostId,
         hostName: record.host?.name ?? null,
         state: readState(record.state),
@@ -222,6 +227,8 @@ export interface SessionCreateInput {
     readonly command: string | null;
     readonly place: core.AgentSessionPlace;
     readonly unattended: boolean | null;
+    /** Which stored account signs the agent in, or null for whichever resolves. */
+    readonly accountId: string | null;
     readonly hostId: string | null;
     readonly baseRef: string;
     readonly taskId: string | null;
@@ -252,6 +259,7 @@ export async function createSession(
             command: input.command,
             place: input.place,
             unattended: input.unattended,
+            accountId: input.accountId,
             hostId: input.hostId,
             baseRef: input.baseRef,
             branch: core.sessionBranchName(id, input.title),

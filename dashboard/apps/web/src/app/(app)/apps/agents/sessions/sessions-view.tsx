@@ -16,7 +16,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import type { SessionView } from "@/lib/agents/session-service";
-import type { AgentChoice } from "@/lib/agents/agent-readiness";
+import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { AgentSelect, CUSTOM_CHOICE, SignInNotice } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { sessionChoicesAction, startSessionAction, stopSessionAction } from "./actions";
@@ -64,7 +64,7 @@ const ORDER: Record<core.AgentSessionState, number> = {
 };
 
 interface Choices {
-    agents: AgentChoice[];
+    agents: AgentOption[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
 }
@@ -201,8 +201,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     startSessionAction({
                         repoId,
                         title,
-                        cli,
-                        command: cli === core.CUSTOM_AGENT_CLI ? command : undefined,
+                        cli: agentOf(cli),
+                        accountId: accountOf(cli),
+                        command: agentOf(cli) === core.CUSTOM_AGENT_CLI ? command : undefined,
                         place,
                         hostId: place === "host" ? hostId : null,
                         baseRef,
@@ -233,7 +234,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // the same thing, but finding out after the click is finding out too late to
     // do anything about it without losing the form.
     const unlinked =
-        agents.find((agent) => agent.id === cli && agent.readiness === "missing") ?? null;
+        agents.find((agent) => agent.key === cli && agent.readiness === "missing") ?? null;
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -410,4 +411,21 @@ function StartDialog({ onClose }: { onClose: () => void }) {
             </DialogContent>
         </Dialog>
     );
+}
+
+/**
+ * The picker's value is a tool and an account, joined.
+ *
+ * One control rather than two, because they are one decision: "run this with
+ * that subscription". Split here on the way to the server, which stores them
+ * apart - the tool decides what is launched and the account decides what signs
+ * it in.
+ */
+function agentOf(value: string): string {
+    return value.split(":")[0] ?? value;
+}
+
+/** The account half, or null for "whichever would resolve". */
+function accountOf(value: string): string | null {
+    return value.split(":")[1] ?? null;
 }

@@ -663,6 +663,52 @@ export async function listProviderKeys(owner: KeyOwner): Promise<ModelKeyView[]>
  *
  * Own before the deployment's, which is the order they are actually spent in.
  */
+/**
+ * Every account that would sign an agent in, not only the one that wins.
+ *
+ * The picker lists these rather than listing tools, because a person can hold
+ * three Claude subscriptions and a deployment can hold one of its own - and a
+ * list of tools can only ever show one of the four, with no way to say which.
+ *
+ * Own before the deployment's, which is the order they are spent in.
+ */
+export async function signinOptionsFor(userId: string | null): Promise<
+    Array<{ id: string; env: string; name: string; identity: string | null; source: KeySource }>
+> {
+    const options: Array<{ id: string; env: string; name: string; identity: string | null; source: KeySource }> =
+        [];
+    try {
+        const shared = await instanceKeysAreShared();
+        const rows = await prisma.userModelKey.findMany({
+            where: {
+                AND: [
+                    { OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])] },
+                    unexpired()
+                ]
+            },
+            select: { id: true, userId: true, provider: true, name: true, config: true },
+            orderBy: [...BY_PRIORITY]
+        });
+        const envOf = new Map(agentSignins().map((signin) => [signin.slug, signin.env]));
+        for (const row of rows) {
+            const env = envOf.get(row.provider);
+            if (!env) continue;
+            const config = parseConfig(row.config);
+            options.push({
+                id: row.id,
+                env,
+                name: row.name,
+                identity: typeof config.email === "string" ? config.email : null,
+                source: row.userId ? "own" : "instance"
+            });
+        }
+    } catch {
+        return options;
+    }
+    // Own first, since that is the order a session would spend them in.
+    return options.sort((left, right) => (left.source === right.source ? 0 : left.source === "own" ? -1 : 1));
+}
+
 export async function signinAccountsFor(
     userId: string | null
 ): Promise<Map<string, { name: string; identity: string | null; source: KeySource }>> {
@@ -713,4 +759,44 @@ export async function signinEnvsFor(userId: string | null): Promise<Set<string>>
         return found;
     }
     return found;
+}
+
+/**
+ * The secret behind one stored account, for a session that named it.
+ *
+ * Scoped to what the person could actually spend: their own rows, and the
+ * deployment's where it shares them. An id that is neither is not "not found by
+ * accident" - it is a row belonging to somebody else, and the answer is the same
+ * as for one that does not exist.
+ */
+export async function secretForAccount(
+    userId: string | null,
+    accountId: string
+): Promise<{ env: string; secret: string } | null> {
+    try {
+        const shared = await instanceKeysAreShared();
+        const row = await prisma.userModelKey.findFirst({
+            where: {
+                id: accountId,
+                OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+            },
+            select: {
+                id: true,
+                provider: true,
+                config: true,
+                encryptedSecret: true,
+                secretNonce: true,
+                secretKeyId: true
+            }
+        });
+        if (!row) return null;
+        const env = agentSignins().find((signin) => signin.slug === row.provider)?.env;
+        if (!env) return null;
+        const secret = readSecret(row);
+        if (!secret) return null;
+        await noteUsed([row.id]);
+        return { env, secret };
+    } catch {
+        return null;
+    }
 }
