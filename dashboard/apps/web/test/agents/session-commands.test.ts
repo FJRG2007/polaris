@@ -43,12 +43,22 @@ describe("the boot script", () => {
         // Against the exec rather than a `tmux new-session`: the agent takes
         // over the window the setup ran in, so there is no second session to
         // order against any more.
-        // Against the line that runs the agent, whichever of the two branches
-        // it takes: the credential is dropped before anything the agent could
-        // read its own environment from.
-        expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(
-            boot.indexOf("$POLARIS_AGENT_COMMAND || true")
-        );
+        // Against the line that runs the agent: the credential is dropped
+        // before anything the agent could read its own environment from.
+        const runs = boot.indexOf('as_agent "cd ');
+        expect(runs).toBeGreaterThan(0);
+        expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(runs);
+    });
+
+    it("configures Enigma before it clears the variable that says how", () => {
+        // The bug: the unset listed POLARIS_ENIGMA_CONFIGURE two lines above the
+        // `if` that tested it, so every session installed Enigma and then
+        // applied none of the settings the resolution had landed on. Silently -
+        // an empty variable is an `if` that simply does not fire.
+        expect(commands.SESSION_SETUP.indexOf("$POLARIS_ENIGMA_CONFIGURE | base64 -d")).toBe(-1);
+        expect(
+            commands.SESSION_SETUP.indexOf('printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d')
+        ).toBeLessThan(commands.SESSION_SETUP.indexOf("unset POLARIS_HOOK_SCRIPT"));
     });
 
     it("decodes the files it writes rather than carrying them raw", () => {
@@ -156,6 +166,63 @@ describe("the boot script for an enrolled server", () => {
         expect(host).toContain('git checkout -b "$POLARIS_BRANCH"');
         expect(host).toContain('"$POLARIS_WORKDIR/.claude/settings.local.json"');
         expect(host).toContain("unset GIT_AUTH_HEADER");
+    });
+});
+
+describe("the home a session keeps", () => {
+    it("is one per account, and a name the daemon will take", () => {
+        // The daemon resolves a bind source under its own volume root and
+        // refuses anything that escapes it, so what goes in has to be a name.
+        expect(commands.agentHomeSource("usr_abc123")).toBe("agent-homes/usr_abc123");
+        expect(commands.agentHomeSource("../../etc")).toBe("agent-homes/etc");
+        expect(commands.agentHomeSource("a/../b")).toBe("agent-homes/ab");
+    });
+
+    it("stops rather than give two accounts the same home", () => {
+        // An id that survives the strip as nothing would mount every session on
+        // the same directory, which is one person's sign-in in another person's
+        // terminal.
+        expect(() => commands.agentHomeSource("...")).toThrow();
+        expect(() => commands.agentHomeSource("")).toThrow();
+    });
+
+    it("installs the agent only when it is not already there", () => {
+        // The whole point. The first session installs; every one after finds it
+        // in the home that was kept and starts in seconds.
+        expect(commands.SESSION_SETUP).toContain(
+            '! command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1'
+        );
+        expect(commands.SESSION_SETUP).toContain("! command -v enigma >/dev/null 2>&1");
+    });
+
+    it("points npm and the tools at that home rather than at root's", () => {
+        // Where Enigma's ninety-three files went before: installed as root into
+        // /root while the agent read /home/node and found nothing.
+        expect(commands.SESSION_SETUP).toContain('NPM_CONFIG_PREFIX="$POLARIS_HOME/.npm-global"');
+        expect(commands.SESSION_SETUP).toContain("export HOME NPM_CONFIG_PREFIX PATH");
+    });
+
+    it("preserves the environment when it drops privileges, which plain su does not", () => {
+        // `su` without -p resets HOME and PATH, which would throw away the
+        // persistent home and the npm prefix at the moment they matter.
+        expect(commands.SESSION_SETUP).toContain('su -p "$POLARIS_RUNAS" -c "$1"');
+    });
+
+    it("hands the home over once rather than on every boot", () => {
+        // A recursive chown over an npm tree every session is minutes of exactly
+        // what this change exists to remove.
+        expect(commands.SESSION_SETUP).toContain('[ ! -f "$POLARIS_HOME/.polaris-home" ]');
+    });
+
+    it("says the sign-in is only asked for once, in the terminal doing the asking", () => {
+        expect(commands.SESSION_SETUP).toContain("it only asks once");
+        expect(commands.SESSION_SETUP).toContain('if [ -z "$POLARIS_SIGNED_IN" ]; then');
+    });
+
+    it("moves nothing into the home of somebody's own server", () => {
+        // POLARIS_HOME is empty there, and every line that touches a home is
+        // behind that test.
+        expect(commands.SESSION_SETUP).toContain('if [ -n "$POLARIS_HOME" ]; then');
     });
 });
 

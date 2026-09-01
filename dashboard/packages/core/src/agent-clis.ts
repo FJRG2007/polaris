@@ -714,3 +714,34 @@ export function polarisAppliesAutonomy(
 ): boolean {
     return !enigmaActive && agentRunsUnattended(place, chosen);
 }
+
+/**
+ * The tools Enigma will start for you, rather than only configure.
+ *
+ * `enigma claude` is not a synonym for `claude`. It is the thing that makes the
+ * settings actually apply: it syncs the skills first, stocks the account with
+ * the memory file and the mirrored bypass and attribution settings, and picks
+ * WHICH login to run under. Installing Enigma and then starting the bare binary
+ * left half of that on the floor, which is the gap this closes - Polaris drops
+ * its own autonomy flags the moment Enigma is in the session, on the
+ * understanding that Enigma has already settled them, and that is only true
+ * through this launcher.
+ *
+ * The other half is the reason this is worth a list at all: a launcher takes an
+ * ACCOUNT. `enigma account add work --login` makes a second Claude login beside
+ * the first, in its own configuration directory, and `enigma claude work` runs
+ * under it - several logins on one machine with none of them signing the others
+ * out. On a session whose home is kept between runs that is exactly the shape
+ * somebody with a personal plan and a work plan needs, and it costs Polaris no
+ * model of its own: the accounts live in the home, and the person makes them in
+ * the session's own terminal.
+ *
+ * Named rather than derived, and short on purpose. A tool Enigma does not launch
+ * gets started directly, which is what it did before.
+ */
+const ENIGMA_LAUNCHES: readonly string[] = ["claude", "codex", "opencode"];
+
+/** Whether Enigma should be the one to start this tool. */
+export function enigmaLaunches(cliId: string): boolean {
+    return ENIGMA_LAUNCHES.includes(cliId);
+}

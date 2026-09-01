@@ -16,8 +16,8 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
+import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
 import {
     interruptSessionAction,
@@ -228,6 +228,16 @@ export function SessionDetail({ session, events, messages }: Props) {
                             target={{ kind: "agent", sessionId: session.id }}
                             label={session.title}
                         />
+                        {/* Said here because this is where somebody meets it. An
+                            agent with no account linked comes up on its own login
+                            prompt, and being asked to sign in on a machine you
+                            cannot see, with no word on whether it will ask again,
+                            is the reason this looked broken. It will not: the
+                            home this runs in is kept between sessions. */}
+                        <p className="text-muted-foreground mt-3 text-xs">
+                            If the agent asks you to sign in, do it here. This machine keeps its home
+                            between sessions, so it only asks once.
+                        </p>
                     </CardBody>
                 </Card>
             ) : null}

@@ -21,14 +21,15 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
+import * as commands from "./session-commands";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
-import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
-import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
-import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { credentialsForAgent } from "@/lib/agents/agent-readiness";
+import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
+import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
+import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
 import {
     addSessionMessage,
     finishSession,
@@ -40,7 +41,6 @@ import {
     sessionPlacement,
     type SessionView
 } from "./session-service";
-import * as commands from "./session-commands";
 
 /** Stamped on every container a session starts, so the sweep finds them by label
  *  rather than by matching names it does not own. */
@@ -66,6 +66,11 @@ interface Bootstrap {
     readonly agentBinary: string;
     readonly agentCommand: string;
     readonly agentInstall: string;
+    /** What starts the agent, where something other than the shell should.
+     *  `enigma` when Enigma is in the session and starts this tool; empty
+     *  otherwise, and the boot script falls back to empty on a machine where
+     *  the launcher did not install. See `enigmaLaunches`. */
+    readonly agentLauncher: string;
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
@@ -87,6 +92,10 @@ interface Bootstrap {
     /** The unprivileged account the agent runs as, or empty where Polaris does
      *  not own the machine and choosing one would not be its call. */
     readonly runAs: string;
+    /** The home that survives this session, or empty on a server - where the
+     *  home is the person's own and moving Polaris into it would hijack every
+     *  agent they ever start there. See `AGENT_HOME`. */
+    readonly home: string;
 }
 
 /**
@@ -105,11 +114,12 @@ function agentCommandFor(
     binary: string;
     command: string;
     install: string;
+    launcher: string;
 } {
     if (session.cli === core.CUSTOM_AGENT_CLI) {
         const command = (session.command ?? "").trim();
         const cli = core.customAgentCli(command);
-        return { cli, binary: cli.binaries[0] ?? "", command, install: "" };
+        return { cli, binary: cli.binaries[0] ?? "", command, install: "", launcher: "" };
     }
     const cli = core.agentCliById(session.cli);
     if (!cli) throw new SessionRefusal(`Polaris no longer knows an agent called ${session.cli}.`);
@@ -131,7 +141,20 @@ function agentCommandFor(
     const args = core.polarisAppliesAutonomy(session.place, session.unattended, enigmaActive)
         ? cli.autonomyArgs
         : [];
-    return { cli, binary, command: [binary, ...args].join(" "), install: cli.install ?? "" };
+    // Through Enigma where Enigma starts this tool, because that launcher is
+    // what makes the settings Polaris just stepped aside for actually apply -
+    // and what lets one machine hold several logins. See `enigmaLaunches`. The
+    // boot script falls back to the bare binary if Enigma is not there, since
+    // installing it is best effort and a missing launcher would otherwise be an
+    // agent that exits in the same second it starts.
+    const launcher = enigmaActive && core.enigmaLaunches(cli.id) ? "enigma" : "";
+    return {
+        cli,
+        binary,
+        command: [binary, ...args].join(" "),
+        install: cli.install ?? "",
+        launcher
+    };
 }
 
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
@@ -169,6 +192,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         agentBinary: agent.binary,
         agentCommand: agent.command,
         agentInstall: agent.install,
+        agentLauncher: agent.launcher,
         // Empty when Enigma is off, which is what the boot script tests for.
         // One script rather than an argv and a second script: it installs the
         // package globally so the agent can invoke `enigma`, then makes the
@@ -198,7 +222,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
             ? { ...agent.cli.autonomyEnv }
             : {},
-        runAs: session.place === "host" ? "" : commands.CONTAINER_USER
+        runAs: session.place === "host" ? "" : commands.CONTAINER_USER,
+        home: session.place === "host" ? "" : commands.AGENT_HOME
     };
 }
 
@@ -238,11 +263,21 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         // server: there we already are somebody, and choosing a different
         // account on their machine is not Polaris's to do.
         POLARIS_RUNAS: boot.runAs,
+        // The home that is kept between sessions, so a sign-in done once is
+        // done and the agent installs once rather than every time. Empty on an
+        // enrolled server: there the home is somebody's own.
+        POLARIS_HOME: boot.home,
+        // Whether Polaris is carrying a credential of its own for this tool.
+        // Only decides whether the terminal says a word about signing in - a
+        // session with nothing linked still works, because the person can sign
+        // in in that terminal and the home keeps it.
+        POLARIS_SIGNED_IN: Object.keys(boot.credentials).length > 0 ? "1" : "",
         POLARIS_COLS: String(commands.TMUX_COLS),
         POLARIS_ROWS: String(commands.TMUX_ROWS),
         POLARIS_AGENT_BINARY: boot.agentBinary,
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
+        POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
@@ -327,7 +362,23 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                 image: commands.SESSION_IMAGE,
                 env: bootEnv(boot),
                 ports: [],
-                volumes: [],
+                // The one thing that outlives the session. See `AGENT_HOME`:
+                // the sign-in, the installed tools and Enigma's own settings
+                // live here, per account, so the second session starts signed in
+                // and in seconds rather than minutes.
+                volumes: [
+                    {
+                        // Whoever started it, which is whose credentials the
+                        // session spends. A session from before that was
+                        // recorded gets a home of its own rather than a shared
+                        // one: an empty key would put every such session in the
+                        // same directory, which is one person's sign-in in
+                        // another person's terminal.
+                        source: commands.agentHomeSource(session.ownerId ?? `session-${session.id}`),
+                        target: commands.AGENT_HOME,
+                        kind: "bind" as const
+                    }
+                ],
                 labels: { [LABEL_KEY]: session.id },
                 command: commands.bootArgv(commands.SESSION_BOOT),
                 networks: [],

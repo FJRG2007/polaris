@@ -67,9 +67,52 @@ export const SESSION_IMAGE = "node:24";
 
 /** The unprivileged account the agent runs as in that image, which ships it.
  *  Not root, because these tools refuse their skip-permissions flag as root -
- *  see `START_AGENT`. It is given passwordless sudo, so nothing it could reach
+ *  see `AGENT_ACCOUNT`. It is given passwordless sudo, so nothing it could reach
  *  before is out of reach now. */
 export const CONTAINER_USER = "node";
+
+/**
+ * The home a `local` session keeps between sessions.
+ *
+ * This is the difference between Polaris and a machine somebody already owns,
+ * and it was the whole of what was wrong. A desktop tool that runs agents runs
+ * them where the person already installed the tool and already signed in to it;
+ * every session here got a container with an empty home, so every session
+ * installed a hundred megabytes of npm and then sat on a login prompt. Being
+ * told to sign in to Claude, every time, on a machine you cannot see, is not a
+ * worse version of that experience - it is no experience at all.
+ *
+ * So the home is a directory on the box, mounted into the container, one per
+ * account. What lands in it is what makes the second session instant:
+ *
+ *   - `~/.claude` and its equivalents, so a sign-in done once is done. The
+ *     person signs in in the session's own terminal - the thing they would do
+ *     anyway - and never again.
+ *   - `~/.npm-global`, so the agent and Enigma install on the first session and
+ *     are simply found on every one after.
+ *   - Whatever Enigma writes for itself: its skills, its memory, its settings.
+ *
+ * Per account rather than shared, because a credential is the account's. Two
+ * people's sessions never see each other's home, and two of one person's
+ * sessions see the same one - which is exactly what two terminals on one laptop
+ * would do.
+ */
+export const AGENT_HOME = "/home/node";
+
+/**
+ * Where that home lives on the box, under the host daemon's own volume root.
+ *
+ * The daemon resolves a bind source inside that root and refuses anything that
+ * escapes it, so this is a name rather than a path: the id is stripped to the
+ * characters a directory name may have, and an id that survives that as nothing
+ * is a bug worth stopping on rather than a session quietly sharing a home called
+ * `""`.
+ */
+export function agentHomeSource(ownerId: string): string {
+    const safe = ownerId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
+    if (!safe) throw new Error("Polaris could not work out where to keep this session's home.");
+    return `agent-homes/${safe}`;
+}
 
 /** The compose project, and therefore the container, one session gets. */
 export function sessionContainerName(sessionId: string): string {
@@ -93,6 +136,58 @@ const INSTALL_TMUX = [
  *  answer: Polaris does not reach for a package manager it was never given. */
 const REQUIRE_TMUX = [
     'command -v tmux >/dev/null 2>&1 || { echo "polaris: this machine has no tmux and one could not be installed"; exit 1; }'
+];
+
+/**
+ * Who the agent will be, and the home it keeps.
+ *
+ * First, because everything after it depends on both. The account is decided
+ * once and answered from a variable rather than re-derived at each use, which is
+ * what the three copies of this test used to be; `as_agent` is the one way
+ * anything runs as the agent, so the installs land in the home the agent reads
+ * rather than in root's - which is what put ninety-three of Enigma's files in
+ * `/root` while the agent looked for them in `/home/node`.
+ *
+ * `su -p` rather than `su`, and that is the load-bearing flag: plain `su` resets
+ * HOME and PATH, so the persistent home and the npm prefix inside it would be
+ * thrown away at the exact moment they matter.
+ */
+const AGENT_ACCOUNT = [
+    "POLARIS_AS_ROOT=no",
+    'if [ "$(id -u)" = "0" ] && [ -n "$POLARIS_RUNAS" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
+    "  POLARIS_AS_ROOT=yes",
+    "fi",
+    "as_agent() {",
+    '  if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
+    '    su -p "$POLARIS_RUNAS" -c "$1"',
+    "  else",
+    '    sh -c "$1"',
+    "  fi",
+    "}",
+    // Empty on an enrolled server, where the home is the person's own and
+    // Polaris moves nothing into it.
+    'if [ -n "$POLARIS_HOME" ]; then',
+    '  mkdir -p "$POLARIS_HOME/.npm-global"',
+    '  HOME="$POLARIS_HOME"',
+    '  NPM_CONFIG_PREFIX="$POLARIS_HOME/.npm-global"',
+    '  PATH="$POLARIS_HOME/.npm-global/bin:$PATH"',
+    "  export HOME NPM_CONFIG_PREFIX PATH",
+    "fi",
+    'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
+    "  command -v sudo >/dev/null 2>&1 || apt-get install -y -qq sudo >/dev/null 2>&1 || true",
+    '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',
+    "  chmod 0440 /etc/sudoers.d/polaris-agent 2>/dev/null || true",
+    // Once, on the session that creates it. Docker makes the directory as root,
+    // so somebody has to hand it over - but doing it every session would be a
+    // recursive chown over an npm tree, which is minutes of the thing this whole
+    // change exists to remove.
+    '  if [ -n "$POLARIS_HOME" ] && [ ! -f "$POLARIS_HOME/.polaris-home" ]; then',
+    '    echo "polaris: preparing this account\'s workspace, once"',
+    '    chown -R "$POLARIS_RUNAS" "$POLARIS_HOME" 2>/dev/null || true',
+    '    : > "$POLARIS_HOME/.polaris-home"',
+    '    chown "$POLARIS_RUNAS" "$POLARIS_HOME/.polaris-home" 2>/dev/null || true',
+    "  fi",
+    "fi"
 ];
 
 /** The worktree, and everything Polaris writes into it. */
@@ -138,7 +233,12 @@ const PREPARE_WORKTREE = [
     // The Polaris tools, registered in the worktree so the agent has them on its
     // first turn without anybody configuring anything.
     'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_WORKDIR/.mcp.json"',
-    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"'
+    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
+    // Cloned as root because the image starts as root; owned by the agent,
+    // because the agent is who edits it.
+    'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
+    '  chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
+    "fi"
 ];
 
 /**
@@ -153,20 +253,27 @@ const INSTALL_ENIGMA = [
     // on the PATH afterwards, which is what the agent went looking for and could
     // not find. Every `enigma config` line after it failed for the same reason,
     // silently, so an account's gate mode and its own settings reached nothing.
-    'if [ -n "$POLARIS_ENIGMA_SETUP" ]; then',
+    //
+    // Skipped outright when it is already here, which after the first session it
+    // is: the npm prefix lives in the home that is kept.
+    'if [ -n "$POLARIS_ENIGMA_SETUP" ] && ! command -v enigma >/dev/null 2>&1; then',
     '  echo "polaris: installing Enigma"',
     // Not fatal. A session without Enigma works to weaker standards; one that
     // died because a registry was slow works to none.
-    '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d | sh || echo "polaris: Enigma did not install"',
+    '  printf %s "$POLARIS_ENIGMA_SETUP" | base64 -d > /tmp/polaris-enigma-setup.sh',
+    '  as_agent "sh /tmp/polaris-enigma-setup.sh" || echo "polaris: Enigma did not install"',
+    "  rm -f /tmp/polaris-enigma-setup.sh",
     "fi"
 ];
 
 /** The agent itself, where Polaris owns the machine. Best effort - the check that
  *  follows is what decides. */
 const INSTALL_AGENT = [
-    'if [ -n "$POLARIS_AGENT_INSTALL" ]; then',
-    '  echo "polaris: installing $POLARIS_AGENT_BINARY"',
-    '  sh -c "$POLARIS_AGENT_INSTALL" || echo "polaris: the install did not finish"',
+    'if [ -n "$POLARIS_AGENT_INSTALL" ] && ! command -v "$POLARIS_AGENT_BINARY" >/dev/null 2>&1; then',
+    '  echo "polaris: installing $POLARIS_AGENT_BINARY. This happens once - the next session starts with it already here."',
+    '  as_agent "$POLARIS_AGENT_INSTALL" || echo "polaris: the install did not finish"',
+    'elif [ -n "$POLARIS_AGENT_INSTALL" ]; then',
+    '  echo "polaris: $POLARIS_AGENT_BINARY is already installed here"',
     "fi"
 ];
 
@@ -197,8 +304,47 @@ export function agentReadyCommand(): string {
 }
 
 const START_AGENT = [
+    // Enigma's own settings, into the home the agent reads - the skills, the
+    // memory file, the commands, the trust and bypass settings.
+    //
+    // Before the unset below, which is where this used to be and is why none of
+    // it ever ran: the variable was cleared two lines above the `if` that tested
+    // it, so every session installed Enigma and then configured nothing.
+    'if [ -n "$POLARIS_ENIGMA_CONFIGURE" ]; then',
+    '  printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d > /tmp/polaris-enigma.sh',
+    "  chmod 0755 /tmp/polaris-enigma.sh",
+    '  as_agent "sh /tmp/polaris-enigma.sh" || true',
+    "  rm -f /tmp/polaris-enigma.sh",
+    "fi",
     "unset GIT_AUTH_HEADER",
     "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE",
+    // Said once, in the terminal the person is looking at, because on a machine
+    // they cannot see "please sign in" with no way to and no reason given is the
+    // whole of what was wrong with this. Only when Polaris is carrying no
+    // credential of its own - if it is, the tool comes up signed in.
+    'if [ -z "$POLARIS_SIGNED_IN" ]; then',
+    '  echo "polaris: if this asks you to sign in, do it right here. This machine keeps its home, so it only asks once."',
+    "fi",
+    // Through Enigma where Polaris asked for it AND Enigma is actually here.
+    // Both halves matter: `enigma claude` is what applies the settings Polaris
+    // stood aside for and picks which login to run under, and the install that
+    // put it there is best effort - so a launcher that did not arrive falls back
+    // to the tool itself rather than being a command not found in the same
+    // second the session starts.
+    'POLARIS_LAUNCH="$POLARIS_AGENT_COMMAND"',
+    'if [ -n "$POLARIS_AGENT_LAUNCHER" ] && command -v "$POLARIS_AGENT_LAUNCHER" >/dev/null 2>&1; then',
+    '  POLARIS_LAUNCH="$POLARIS_AGENT_LAUNCHER $POLARIS_AGENT_COMMAND"',
+    // Said where somebody will read it, because nothing else advertises this: a
+    // machine that keeps its home can hold several logins, and one command makes
+    // the next one.
+    '  echo "polaris: this machine keeps its logins. \'enigma account add <name> --login\' adds another, \'enigma account use <name>\' picks it."',
+    "fi",
+    'echo "polaris: starting $POLARIS_LAUNCH"',
+    // Written last, so anything holding a prompt knows the terminal it is about
+    // to type into belongs to the agent rather than to the installer.
+    `: > ${AGENT_READY_FLAG}`,
+    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
+    'cd "$POLARIS_WORKDIR"',
     // Not as root, and this is what "no server running" actually was.
     //
     // These tools refuse their own skip-permissions flag when they are running
@@ -211,40 +357,11 @@ const START_AGENT = [
     // installing happens as root and the agent does not. It keeps sudo: the
     // point is not to take privileges away, it is to not BE root while holding
     // them.
-    'if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
-    "  command -v sudo >/dev/null 2>&1 || apt-get install -y -qq sudo >/dev/null 2>&1 || true",
-    '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',
-    "  chmod 0440 /etc/sudoers.d/polaris-agent 2>/dev/null || true",
-    '  chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
-    "fi",
-    // Enigma's own settings, into the home of whoever will run the agent. The
-    // package went in globally as root above; this half writes the skills, the
-    // memory file, the commands and the trust and bypass settings, and it has to
-    // land in the home the agent actually reads.
-    'if [ -n "$POLARIS_ENIGMA_CONFIGURE" ]; then',
-    '  printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d > /tmp/polaris-enigma.sh',
-    "  chmod 0755 /tmp/polaris-enigma.sh",
-    '  if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
-    '    su "$POLARIS_RUNAS" -c "sh /tmp/polaris-enigma.sh" || true',
-    "  else",
-    "    sh /tmp/polaris-enigma.sh || true",
-    "  fi",
-    "  rm -f /tmp/polaris-enigma.sh",
-    "fi",
-    'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
-    // Written last, so anything holding a prompt knows the terminal it is about
-    // to type into belongs to the agent rather than to the installer.
-    `: > ${AGENT_READY_FLAG}`,
-    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
-    'cd "$POLARIS_WORKDIR"',
+    //
     // Run rather than exec, and a shell afterwards. `exec` replaced this shell,
     // so an agent that exited for any reason took the window and the session
     // with it - and every word explaining why went too.
-    'if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
-    '  su "$POLARIS_RUNAS" -c "cd \\"$POLARIS_WORKDIR\\" && $POLARIS_AGENT_COMMAND" || true',
-    "else",
-    "  $POLARIS_AGENT_COMMAND || true",
-    "fi",
+    'as_agent "cd \\"$POLARIS_WORKDIR\\" && $POLARIS_LAUNCH" || true',
     'echo "polaris: the agent exited. This terminal is still yours."',
     "exec sh"
 ];
@@ -266,6 +383,7 @@ const START_AGENT = [
  */
 export const SESSION_SETUP = [
     "set -e",
+    ...AGENT_ACCOUNT,
     ...PREPARE_WORKTREE,
     ...INSTALL_ENIGMA,
     ...INSTALL_AGENT,
