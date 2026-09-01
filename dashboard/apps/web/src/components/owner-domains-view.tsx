@@ -18,7 +18,6 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
-import { normalizeBaseDomain } from "@polaris/deploy";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useDisplayFormat } from "@/components/display-format";
@@ -62,7 +61,7 @@ export function OwnerDomainsView({
 
     // Empty until something has been typed: a field nobody has filled in yet is
     // incomplete, not wrong.
-    const reserved = value.trim() ? instanceDomainConflict(normalizeBaseDomain(value), instanceDomains) : null;
+    const reserved = value.trim() ? instanceDomainConflict(value, instanceDomains) : null;
 
     // The list is kept here rather than re-read from the server on every check,
     // so pressing Check on one domain does not blank the others while a DNS

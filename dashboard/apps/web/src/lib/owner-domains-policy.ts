@@ -61,10 +61,10 @@ export const OWNER_DOMAIN_POLICY_DEFAULTS: OwnerDomainPolicy = ownerDomainPolicy
  * same input for the same reason.
  */
 export function instanceDomainConflict(candidate: string, instanceHosts: readonly string[]): string | null {
-    const wanted = candidate.trim().toLowerCase().replace(/\.+$/, "");
+    const wanted = bareDomain(candidate);
     if (!wanted) return null;
     for (const raw of instanceHosts) {
-        const host = raw.trim().toLowerCase().replace(/\.+$/, "");
+        const host = bareDomain(raw);
         if (!host) continue;
         if (wanted === host) return `${host} is this Polaris's own domain`;
         // The claim covers a name Polaris answers on.
@@ -73,4 +73,21 @@ export function instanceDomainConflict(candidate: string, instanceHosts: readonl
         if (wanted.endsWith(`.${host}`)) return `${wanted} is part of this Polaris's own domain`;
     }
     return null;
+}
+
+/** A typed domain as the bare name to compare: no scheme, no wildcard, no port,
+ *  no path, no trailing dot.
+ *
+ *  The same shape `normalizeBaseDomain` produces, written out here rather than
+ *  imported: this module is read by the browser, and the package that owns that
+ *  helper reaches for node:crypto, which a client bundle cannot follow. */
+function bareDomain(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+        .replace(/^\*\./, "")
+        .replace(/[/?#].*$/, "")
+        .replace(/:\d+$/, "")
+        .replace(/\.+$/, "");
 }
