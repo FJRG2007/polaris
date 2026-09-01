@@ -10,7 +10,7 @@
 import { requireUser } from "@/lib/session";
 import { getPublicIp } from "@/lib/domain-service";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
-import { canAddOwnerDomain, listOwnerDomains } from "@/lib/owner-domains";
+import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +18,11 @@ export default async function AccountDomainsPage() {
     const user = await requireUser();
     const owner = { kind: "user", id: user.id } as const;
 
-    const [domains, allowed, publicIp] = await Promise.all([
+    const [domains, allowed, publicIp, reserved] = await Promise.all([
         listOwnerDomains(owner),
         canAddOwnerDomain(owner, user.isAdmin),
-        getPublicIp()
+        getPublicIp(),
+        instanceDomains()
     ]);
 
     return (
@@ -38,6 +39,7 @@ export default async function AccountDomainsPage() {
                 canAdd={allowed.ok}
                 blockedReason={allowed.ok ? "" : allowed.reason}
                 publicIp={publicIp}
+                instanceDomains={reserved}
             />
         </div>
     );

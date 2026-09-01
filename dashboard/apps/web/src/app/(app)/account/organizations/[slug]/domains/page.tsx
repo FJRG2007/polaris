@@ -10,7 +10,7 @@
 import { getPublicIp } from "@/lib/domain-service";
 import { requireOrgPage } from "@/lib/orgs/page-access";
 import { OwnerDomainsView } from "@/components/owner-domains-view";
-import { canAddOwnerDomain, listOwnerDomains } from "@/lib/owner-domains";
+import { canAddOwnerDomain, instanceDomains, listOwnerDomains } from "@/lib/owner-domains";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +19,11 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
     const { org, user } = await requireOrgPage(slug, "domains.manage");
     const owner = { kind: "org", id: org.id } as const;
 
-    const [domains, allowed, publicIp] = await Promise.all([
+    const [domains, allowed, publicIp, reserved] = await Promise.all([
         listOwnerDomains(owner),
         canAddOwnerDomain(owner, user.isAdmin),
-        getPublicIp()
+        getPublicIp(),
+        instanceDomains()
     ]);
 
     return (
@@ -40,6 +41,7 @@ export default async function OrganizationDomainsPage({ params }: { params: Prom
                 canAdd={allowed.ok}
                 blockedReason={allowed.ok ? "" : allowed.reason}
                 publicIp={publicIp}
+                instanceDomains={reserved}
             />
         </div>
     );

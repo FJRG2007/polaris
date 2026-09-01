@@ -44,3 +44,33 @@ export type OwnerDomainPolicy = z.infer<typeof ownerDomainPolicySchema>;
  *  available and uncapped, which is what somebody who has just read about it
  *  expects, and both limits are one setting away. */
 export const OWNER_DOMAIN_POLICY_DEFAULTS: OwnerDomainPolicy = ownerDomainPolicySchema.parse({});
+
+/**
+ * Whether a domain somebody wants to claim collides with one this Polaris itself
+ * occupies.
+ *
+ * The dangerous shape is a claim on the *parent* of an instance hostname: an
+ * account claiming `example.com` while the dashboard answers on
+ * `polaris.example.com` would be proving ownership of the name Polaris is reached
+ * on, and then be issued certificates for hostnames under it. A claim on the
+ * instance's own name, or on something beneath it, is the same problem in the
+ * other direction - Polaris mints hostnames there itself, and two writers of the
+ * same zone is a collision waiting for the first deploy.
+ *
+ * Pure, so the form refuses as the domain is typed and the service refuses the
+ * same input for the same reason.
+ */
+export function instanceDomainConflict(candidate: string, instanceHosts: readonly string[]): string | null {
+    const wanted = candidate.trim().toLowerCase().replace(/\.+$/, "");
+    if (!wanted) return null;
+    for (const raw of instanceHosts) {
+        const host = raw.trim().toLowerCase().replace(/\.+$/, "");
+        if (!host) continue;
+        if (wanted === host) return `${host} is this Polaris's own domain`;
+        // The claim covers a name Polaris answers on.
+        if (host.endsWith(`.${wanted}`)) return `This Polaris answers on ${host}, so ${wanted} is not yours to claim`;
+        // The claim sits inside a zone Polaris already mints hostnames in.
+        if (wanted.endsWith(`.${host}`)) return `${wanted} is part of this Polaris's own domain`;
+    }
+    return null;
+}

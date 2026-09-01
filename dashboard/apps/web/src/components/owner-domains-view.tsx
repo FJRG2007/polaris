@@ -18,7 +18,9 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { useConfirm } from "@/components/confirm-dialog";
+import { normalizeBaseDomain } from "@polaris/deploy";
 import type { OwnerDomainView } from "@/lib/owner-domains";
+import { instanceDomainConflict } from "@/lib/owner-domains-policy";
 import { useDisplayFormat } from "@/components/display-format";
 import { CheckCircle2, Clock, Globe, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
@@ -34,7 +36,8 @@ export function OwnerDomainsView({
     domains: initial,
     canAdd,
     blockedReason,
-    publicIp
+    publicIp,
+    instanceDomains
 }: {
     owner: DomainOwnerRef;
     domains: OwnerDomainView[];
@@ -46,12 +49,20 @@ export function OwnerDomainsView({
      *  rather than given - a wrong address pasted into a registrar is worse than
      *  a sentence saying to look it up. */
     publicIp: string | null;
+    /** What this Polaris itself answers on. Sent down so the field refuses as it
+     *  is typed rather than after a round trip; the service refuses the same
+     *  input for the same reason, which is what actually enforces it. */
+    instanceDomains: string[];
 }) {
     const [confirm, confirmElement] = useConfirm();
     const [domains, setDomains] = useState(initial);
     const [value, setValue] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+
+    // Empty until something has been typed: a field nobody has filled in yet is
+    // incomplete, not wrong.
+    const reserved = value.trim() ? instanceDomainConflict(normalizeBaseDomain(value), instanceDomains) : null;
 
     // The list is kept here rather than re-read from the server on every check,
     // so pressing Check on one domain does not blank the others while a DNS
@@ -103,7 +114,7 @@ export function OwnerDomainsView({
                             className="flex flex-wrap items-end gap-2"
                             onSubmit={async (event) => {
                                 event.preventDefault();
-                                if (!value.trim()) return;
+                                if (!value.trim() || reserved) return;
                                 setBusy(true);
                                 setError("");
                                 const result = await runAction(
@@ -125,16 +136,29 @@ export function OwnerDomainsView({
                                     value={value}
                                     placeholder="example.com"
                                     className="h-9"
+                                    aria-invalid={reserved ? true : undefined}
+                                    aria-describedby={reserved ? "owner-domain-reserved" : undefined}
                                     onChange={(event) => setValue(event.target.value)}
                                 />
                             </label>
-                            <Button type="submit" size="sm" disabled={busy || !value.trim()}>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                aria-disabled={busy || !value.trim() || reserved !== null}
+                                disabled={busy || !value.trim() || reserved !== null}
+                            >
                                 <Plus className="size-4 shrink-0" /> Add
                             </Button>
-                            <p className="text-muted-foreground w-full text-xs">
-                                A domain or a subdomain you have delegated - `example.com` or `apps.example.com`.
-                                Polaris will show you the two records to publish.
-                            </p>
+                            {reserved ? (
+                                <p id="owner-domain-reserved" className="text-danger w-full text-xs">
+                                    {reserved}. Pick a domain of your own.
+                                </p>
+                            ) : (
+                                <p className="text-muted-foreground w-full text-xs">
+                                    A domain or a subdomain you have delegated - `example.com` or
+                                    `apps.example.com`. Polaris will show you the two records to publish.
+                                </p>
+                            )}
                         </form>
                     </CardBody>
                 </Card>

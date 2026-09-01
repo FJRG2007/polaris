@@ -35,7 +35,12 @@ import { detectPublicIp } from "./network-service";
 import { resolve4, resolveTxt } from "node:dns/promises";
 import { getSetting, setSetting } from "./setting-store";
 import { isBaseDomain, normalizeBaseDomain, randomLabel } from "@polaris/deploy";
-import { ownerDomainPolicySchema, OWNER_DOMAIN_POLICY_DEFAULTS, type OwnerDomainPolicy } from "./owner-domains-policy";
+import {
+    ownerDomainPolicySchema,
+    instanceDomainConflict,
+    OWNER_DOMAIN_POLICY_DEFAULTS,
+    type OwnerDomainPolicy
+} from "./owner-domains-policy";
 
 // The vocabulary the settings form and this module both read. Re-exported so a
 // server caller has one import for the subject, while the form keeps importing
@@ -43,6 +48,7 @@ import { ownerDomainPolicySchema, OWNER_DOMAIN_POLICY_DEFAULTS, type OwnerDomain
 // Prisma, node:dns and the SSH stack into the bundle.
 export {
     ownerDomainPolicySchema,
+    instanceDomainConflict,
     OWNER_DOMAIN_HINTS,
     OWNER_DOMAIN_LABELS,
     OWNER_DOMAIN_MODES,
@@ -82,6 +88,63 @@ export class OwnerDomainError extends Error {
     constructor(message: string) {
         super(message);
         this.name = "OwnerDomainError";
+    }
+}
+
+/**
+ * The hostnames this Polaris itself answers on or mints under.
+ *
+ * Read straight out of the settings rather than through `domain-service` and
+ * `domain-zones`: those two ask this module which owner domains are usable when
+ * they build the deploy-zone list, so importing them back here would close the
+ * loop. The keys are the only thing duplicated, and they are the stable half.
+ *
+ * A malformed or missing value contributes nothing rather than throwing - the
+ * check is a refusal, and an instance whose own domain cannot be read must not
+ * become an instance where nobody can add a domain.
+ */
+export async function instanceDomains(): Promise<string[]> {
+    const [zonesRaw, app, sharing, extraRaw] = await Promise.all([
+        getSetting("domain.zones"),
+        getSetting("domain.app"),
+        getSetting("domain.sharing"),
+        getSetting("domain.extra")
+    ]);
+
+    const hosts: string[] = [];
+    const add = (value: string | null | undefined) => {
+        const host = normalizeBaseDomain(value ?? "");
+        if (host && isBaseDomain(host) && !hosts.includes(host)) hosts.push(host);
+    };
+
+    add(zoneBaseDomain(zonesRaw));
+    add(app);
+    add(sharing);
+    // Whatever the instance was started with, which is what a deployment that has
+    // never opened the domain settings is actually reached on.
+    add(process.env.POLARIS_APP_URL);
+    for (const entry of parseStringList(extraRaw)) add(entry);
+    return hosts;
+}
+
+function zoneBaseDomain(raw: string | null): string {
+    if (!raw) return "";
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        const base = (parsed as { baseDomain?: unknown } | null)?.baseDomain;
+        return typeof base === "string" ? base : "";
+    } catch {
+        return "";
+    }
+}
+
+function parseStringList(raw: string | null): string[] {
+    if (!raw) return [];
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+    } catch {
+        return [];
     }
 }
 
@@ -233,6 +296,12 @@ export async function addOwnerDomain(owner: DomainOwner, input: unknown, isAdmin
     if (!allowed.ok) throw new OwnerDomainError(allowed.reason);
 
     const domain = parsed.data.domain;
+    // Polaris's own name is not on offer. Claiming it - or its parent - would
+    // hand the claimant proof of ownership over the address the dashboard is
+    // reached on, and certificates for every hostname under it.
+    const reserved = instanceDomainConflict(domain, await instanceDomains());
+    if (reserved) throw new OwnerDomainError(reserved);
+
     const taken = await prisma.ownerDomain.findUnique({ where: { domain }, select: { id: true } });
     // One claim per name across the instance. Two owners both being issued
     // certificates for hostnames under one domain is not something to sort out
