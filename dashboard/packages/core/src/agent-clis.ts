@@ -245,7 +245,25 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // after that offered to sign in - on a machine where Polaris had already
         // handed it a credential, and where nobody could answer either one.
         firstRun: [
+            // The flag goes in TWO places, and that is not belt and braces - it
+            // is that Claude Code has two homes and which one it reads depends
+            // on how it was started.
+            //
+            // `CLAUDE_CONFIG_DIR` is its "configuration home", and the config
+            // file moves INSIDE it. Enigma's launcher always sets that variable
+            // (to `~/.claude` for the default account), and Polaris starts these
+            // tools through Enigma whenever it is in the session - so the file
+            // that is actually read is `.claude/.claude.json`. Writing only the
+            // one beside it, which is where a plain `claude` keeps it, is a flag
+            // set in a file nothing opens: the wizard came up anyway, and there
+            // was nothing on the screen to say why.
+            //
+            // Both are written because Polaris starts the tool both ways: with
+            // Enigma, and without it when the operator has turned it off.
+            { file: ".claude/.claude.json", json: { hasCompletedOnboarding: true } },
             { file: ".claude.json", json: { hasCompletedOnboarding: true } },
+            // Settings were always right: they live in the configuration home
+            // under their own name, which is the same path either way.
             { file: ".claude/settings.json", json: { theme: "dark" } }
         ]
     },

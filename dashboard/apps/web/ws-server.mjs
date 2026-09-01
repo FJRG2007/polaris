@@ -115,9 +115,35 @@ wss.on("connection", async (ws, req) => {
 const ATTACH_TO_AGENT = [
     "/bin/sh",
     "-c",
-    'if [ -z "$TERM" ] || [ "$TERM" = dumb ]; then TERM=xterm-256color; export TERM; fi; ' +
-        "tmux attach-session -t polaris-agent || " +
-        '{ echo "polaris: there is no agent terminal in this container to attach to. This shell is inside it."; exec /bin/sh; }'
+    [
+        // Whichever terminal description this container actually carries.
+        //
+        // Naming one was not enough. A container gets no TERM unless its image
+        // set one, and tmux will not open a terminal it cannot look up - but
+        // WHICH descriptions exist depends on what the base image's ncurses
+        // package shipped, and that is not something to assert from here. So
+        // each is tried in turn and the first that works wins: the one already
+        // set if there is one, then the two a terminal emulator would ask for,
+        // then the one tmux uses for its own panes, then the last-resort entry
+        // that every ncurses install has.
+        'for t in "$TERM" xterm-256color screen xterm ansi; do',
+        // `dumb` is a terminal with no cursor addressing, so tmux refuses it
+        // like a missing one - and it is what a stripped environment leaves
+        // behind. Skipped rather than tried, so it costs no error line.
+        '  { [ -n "$t" ] && [ "$t" != dumb ]; } || continue;',
+        '  TERM="$t" tmux attach-session -t polaris-agent && exit 0;',
+        "done;",
+        // Reached only when none of them opened. tmux has already said why on
+        // this same terminal, above this line.
+        'echo "polaris: could not attach to the agent terminal. This shell is inside the same container.";',
+        // And it is a shell somebody can work in. The agent installs into a
+        // prefix inside its own home, so a root shell with the image's PATH
+        // does not have the tool that is running two feet away - which is
+        // exactly what the last person to land here found.
+        "h=$(getent passwd node 2>/dev/null | cut -d: -f6);",
+        'if [ -n "$h" ] && [ -d "$h" ]; then HOME="$h"; PATH="$h/.npm-global/bin:$PATH"; export HOME PATH; fi;',
+        "exec /bin/sh"
+    ].join(" ")
 ];
 
 async function openContainerSession(ticket, ws, attachToAgent = false) {

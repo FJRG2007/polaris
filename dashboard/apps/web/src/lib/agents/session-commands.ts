@@ -466,6 +466,14 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         "    }",
         "    if (!changed) continue;",
         "    fs.mkdirSync(path.dirname(file), { recursive: true });",
+        // Said out loud, on the screen somebody is watching. Where a tool keeps
+        // its configuration is a thing that MOVES - Claude Code's file follows
+        // `CLAUDE_CONFIG_DIR`, so a launcher setting that variable relocates it -
+        // and the failure that causes is invisible by nature: the answer is
+        // written, nothing reads it, the wizard appears anyway, and the terminal
+        // says nothing at all. One line naming the file turns that into
+        // something a person can see the first time it happens.
+        '    console.log("polaris: answered its first run in " + file);',
         '    fs.writeFileSync(file, JSON.stringify(current, null, 2) + "\\n");',
         "}"
     ].join("\n");

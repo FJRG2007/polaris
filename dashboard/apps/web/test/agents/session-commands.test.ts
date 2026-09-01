@@ -182,14 +182,36 @@ describe("the tool's own first-run wizard", () => {
     const claude = core.agentCliById("claude")!;
 
     it("answers what a fresh Claude Code asks, in the files it asks it from", () => {
-        // Both keys were read off an installed Claude Code. The flag is the one
-        // its own startup tests before showing the wizard; the colour scheme
+        // Every key here was read off an installed Claude Code. The flag is the
+        // one its own startup tests before showing the wizard; the colour scheme
         // lives in the settings file rather than beside the flag, which is
         // exactly the sort of thing that cannot be guessed.
         expect(claude.firstRun).toEqual([
+            { file: ".claude/.claude.json", json: { hasCompletedOnboarding: true } },
             { file: ".claude.json", json: { hasCompletedOnboarding: true } },
             { file: ".claude/settings.json", json: { theme: "dark" } }
         ]);
+    });
+
+    it("answers the flag in the configuration home as well as beside it", () => {
+        // The one that was missing, and the reason the wizard came up anyway.
+        // `CLAUDE_CONFIG_DIR` is Claude Code's configuration home and the config
+        // file moves inside it; Enigma's launcher always sets that variable, and
+        // Polaris starts these tools through Enigma whenever it is in the
+        // session. So the file that gets read is the one in the directory, and
+        // the one beside it is what a plain `claude` reads when Enigma is off.
+        // Both are started by Polaris, so both are answered.
+        const flags = claude.firstRun.filter((one) => "hasCompletedOnboarding" in one.json);
+        expect(flags.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
+    });
+
+    it("says on the terminal where it wrote, because where a tool keeps this moves", () => {
+        // The failure this prevents is invisible by nature: the answer is
+        // written, nothing reads it, the wizard appears anyway, and nothing
+        // anywhere says which file was touched.
+        expect(commands.firstRunScript(claude.firstRun)).toContain(
+            "polaris: answered its first run in"
+        );
     });
 
     it("says nothing about a tool nothing has been sourced for", () => {
