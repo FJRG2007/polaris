@@ -741,6 +741,17 @@ export function polarisAppliesAutonomy(
  */
 const ENIGMA_LAUNCHES: readonly string[] = ["claude", "codex", "opencode"];
 
+/**
+ * The picker's value for "sign it in with nothing and let the machine answer".
+ *
+ * Here rather than beside the option builder because a browser reads it: that
+ * builder reaches the stored credentials and so reaches the database, and a
+ * client component importing a value out of it drags the whole server module
+ * into the bundle. A word rather than an id, so a value that ever reached a log
+ * says what it meant.
+ */
+export const MACHINE_LOGIN_KEY = "machine";
+
 /** Whether Enigma should be the one to start this tool. */
 export function enigmaLaunches(cliId: string): boolean {
     return ENIGMA_LAUNCHES.includes(cliId);

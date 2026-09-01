@@ -249,9 +249,16 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Somebody holding three subscriptions chose one of them on the form,
         // and a session that quietly used the first is a session doing the work
         // on a bill they did not pick.
-        credentials: chosen
-            ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
-            : credentialsForAgent(agent.cli, available),
+        // Nothing at all when the machine is meant to answer for itself. It is
+        // signed in already, in the home that outlives the session, and a stored
+        // token injected over that is how a credential somebody revoked months
+        // ago comes to beat a login that works - the tool reads the variable
+        // first and never looks at the home.
+        credentials: session.useMachineLogin
+            ? {}
+            : chosen
+              ? { ...credentialsForAgent(agent.cli, available), [chosen.env]: chosen.secret }
+              : credentialsForAgent(agent.cli, available),
         // The same decision, for the tools that take a variable rather than a
         // flag. Held to the same rule so the two halves cannot disagree.
         autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)

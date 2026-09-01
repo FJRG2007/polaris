@@ -86,6 +86,13 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
  * and the files one person leaves are the files the next person finds. That is
  * right for a team on one subscription and wrong for a deployment of separate
  * people, and only an administrator knows which of those this is.
+ *
+ * And it says the part that costs money rather than privacy. A personal Claude
+ * or ChatGPT subscription is licensed to one person; several people working
+ * through one of them is what account-sharing enforcement is for, and the way
+ * that ends is the subscription being suspended rather than a warning. A key or
+ * a team plan is billed for exactly this and cannot be lost this way. Nobody
+ * reads terms before flipping a switch, so the switch says it.
  */
 export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
     const [on, setOn] = useState(allowed);
@@ -125,6 +132,18 @@ export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
                         aria-label="Offer a shared machine"
                     />
                 </div>
+                {/* The part that costs the subscription rather than the privacy,
+                    said where the decision is made. A personal plan is licensed
+                    to one person and several people working through it is what
+                    account-sharing enforcement exists for - and it ends in a
+                    suspension, not a warning. */}
+                {on ? (
+                    <p className="text-xs text-amber-400">
+                        Sign it in with an API key or a team plan. A personal Claude or ChatGPT
+                        subscription is licensed to one person, and several people working through
+                        one is what gets it suspended.
+                    </p>
+                ) : null}
                 {error ? <p className="text-xs text-red-400">{error}</p> : null}
             </CardBody>
         </Card>

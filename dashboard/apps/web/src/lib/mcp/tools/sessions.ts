@@ -158,6 +158,11 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             // Whichever resolves. Choosing between somebody's subscriptions is
             // not a thing to hand a model.
             accountId: null,
+            // Whichever stored credential resolves, as it always did. Asking the
+            // machine to answer for itself is a choice a person makes on the
+            // form about a machine they signed in; a tool call has no machine in
+            // mind and would be choosing it blind.
+            useMachineLogin: false,
             // Always on the Polaris box. A session started by a model is not the
             // moment to be choosing somebody's server for them.
             place: "local",

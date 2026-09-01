@@ -85,3 +85,39 @@ describe("startAgentSessionSchema, on the machine everybody shares", () => {
         if (!parsed.success) expect(parsed.error.issues[0]?.path).toEqual(["sharedHome"]);
     });
 });
+
+describe("signing in with the machine's own login", () => {
+    it("is off unless somebody asks for it", () => {
+        const parsed = startAgentSessionSchema.safeParse(base({}));
+        expect(parsed.success).toBe(true);
+        if (parsed.success) expect(parsed.data.useMachineLogin).toBe(false);
+    });
+
+    it("is a third answer, not a shade of 'whichever resolves'", () => {
+        // Null accountId means "whichever of mine resolves". This means none of
+        // them: the machine is signed in already and a stored token injected
+        // over that is how a credential revoked months ago beats a login that
+        // works - the tool reads the variable first and never looks at the home.
+        const parsed = startAgentSessionSchema.safeParse(
+            base({ useMachineLogin: true, accountId: null })
+        );
+        expect(parsed.success).toBe(true);
+        if (parsed.success) {
+            expect(parsed.data.useMachineLogin).toBe(true);
+            expect(parsed.data.accountId).toBeNull();
+        }
+    });
+
+    it("refuses a form that asks for both", () => {
+        // Two different answers to one question. Accepting both would leave the
+        // server to pick, and whichever it picked would be wrong for somebody.
+        const parsed = startAgentSessionSchema.safeParse(
+            base({
+                useMachineLogin: true,
+                accountId: "018f2a3b-4c5d-7e8f-9012-3456789abcde"
+            })
+        );
+        expect(parsed.success).toBe(false);
+        if (!parsed.success) expect(parsed.error.issues[0]?.path).toEqual(["accountId"]);
+    });
+});

@@ -228,6 +228,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         title,
                         cli: agentOf(cli),
                         accountId: accountOf(cli),
+                        useMachineLogin: machineOf(cli),
                         command: agentOf(cli) === core.CUSTOM_AGENT_CLI ? command : undefined,
                         place,
                         sharedHome: place === "local" && sharedHome,
@@ -365,7 +366,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                                 <p className="text-sm">Use the machine everybody shares</p>
                                 <p className="text-xs text-muted-foreground">
                                     {sharedHome
-                                        ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find."
+                                        ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find. Sign it in with an API key or a team plan - a personal subscription used by several people is what gets suspended."
                                         : "It opens on a machine of your own, with your logins and your files. Nobody else reaches it."}
                                 </p>
                             </div>
@@ -483,7 +484,16 @@ function agentOf(value: string): string {
     return value.split(":")[0] ?? value;
 }
 
-/** The account half, or null for "whichever would resolve". */
+/** The account half, or null for "whichever would resolve" - and null too for
+ *  the machine's own login, which is not an account. `machineOf` is what tells
+ *  those last two apart. */
 function accountOf(value: string): string | null {
-    return value.split(":")[1] ?? null;
+    const half = value.split(":")[1] ?? null;
+    return half === core.MACHINE_LOGIN_KEY ? null : half;
+}
+
+/** Whether the picked row was "sign it in with nothing and let the machine
+ *  answer". A third answer, not a shade of the other two. */
+function machineOf(value: string): boolean {
+    return (value.split(":")[1] ?? "") === core.MACHINE_LOGIN_KEY;
 }

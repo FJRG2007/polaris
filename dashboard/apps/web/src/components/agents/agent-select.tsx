@@ -47,6 +47,7 @@ export const CUSTOM_CHOICE: AgentOption = {
     accountId: null,
     account: null,
     mine: null,
+    machine: false,
     missing: []
 };
 
@@ -175,9 +176,11 @@ export function AgentSelect({
                                         <span
                                             className="text-muted-foreground max-w-[14rem] shrink-0 truncate text-xs"
                                             title={
-                                                option.mine
-                                                    ? `Your account: ${option.account}`
-                                                    : `Provided by this Polaris: ${option.account}`
+                                                option.machine
+                                                    ? "Polaris signs it in with nothing. Whatever this machine is already signed in to answers for it - which is what you get after signing in once in a session's own terminal."
+                                                    : option.mine
+                                                      ? `Your account: ${option.account}`
+                                                      : `Provided by this Polaris: ${option.account}`
                                             }
                                         >
                                             {option.account}

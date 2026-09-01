@@ -163,17 +163,41 @@ export interface AgentOption {
     /** True when it belongs to the person choosing, false when the deployment
      *  provides it. Null when there is no account. */
     readonly mine: boolean | null;
+    /** True for the row that means "sign it in with nothing and let the machine
+     *  answer". Not an account, so `accountId` stays null - but a different
+     *  answer from null on its own, which means "whichever of mine resolves". */
+    readonly machine: boolean;
     readonly missing: AgentChoice["missing"];
 }
+
 
 /** The catalogue crossed with the accounts, as the picker lists it. */
 export async function agentOptionsFor(userId: string | null): Promise<AgentOption[]> {
     const [choices, accounts] = await Promise.all([agentChoicesFor(userId), signinOptionsFor(userId)]);
     const options: AgentOption[] = [];
     for (const choice of choices) {
+        // Offered for every tool, always, because it is the only true answer for
+        // a machine somebody signed in themselves - and the only way to stop a
+        // stored token that was revoked months ago being injected over a login
+        // that works. Its readiness is `unknown` rather than `ready`: Polaris
+        // cannot see inside that home, and claiming otherwise would be inventing
+        // evidence.
         const cli = core.agentCliById(choice.id);
         const envs = new Set((cli?.credentials ?? []).map((credential) => credential.env));
         const mine = accounts.filter((account) => envs.has(account.env));
+        options.push({
+            key: `${choice.id}:${core.MACHINE_LOGIN_KEY}`,
+            cli: choice.id,
+            label: choice.label,
+            vendor: choice.vendor,
+            docs: choice.docs,
+            readiness: "unknown",
+            accountId: null,
+            account: "This machine's own login",
+            mine: null,
+            machine: true,
+            missing: []
+        });
         if (mine.length === 0) {
             options.push({
                 key: choice.id,
@@ -185,6 +209,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 accountId: null,
                 account: null,
                 mine: null,
+                machine: false,
                 missing: choice.missing
             });
             continue;
@@ -202,6 +227,7 @@ export async function agentOptionsFor(userId: string | null): Promise<AgentOptio
                 accountId: account.id,
                 account: account.identity ?? account.name,
                 mine: account.source === "own",
+                machine: false,
                 missing: []
             });
         }

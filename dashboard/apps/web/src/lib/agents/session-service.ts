@@ -96,6 +96,10 @@ export interface SessionView {
     readonly unattended: boolean | null;
     /** The account picked when the session was started, or null. */
     readonly accountId: string | null;
+    /** Whether it was told to sign in with nothing and let the machine's own
+     *  login answer. Distinct from a null `accountId`, which is "whichever of
+     *  mine resolves". */
+    readonly useMachineLogin: boolean;
     readonly hostId: string | null;
     readonly hostName: string | null;
     readonly state: core.AgentSessionState;
@@ -121,6 +125,7 @@ const VIEW_SELECT = {
     sharedHome: true,
     unattended: true,
     accountId: true,
+    useMachineLogin: true,
     hostId: true,
     state: true,
     detail: true,
@@ -149,6 +154,7 @@ type SessionRecord = {
     sharedHome: boolean;
     unattended: boolean | null;
     accountId: string | null;
+    useMachineLogin: boolean;
     hostId: string | null;
     state: string;
     detail: string;
@@ -186,6 +192,7 @@ function toView(record: SessionRecord): SessionView {
         sharedHome: record.sharedHome,
         unattended: record.unattended,
         accountId: record.accountId,
+        useMachineLogin: record.useMachineLogin,
         hostId: record.hostId,
         hostName: record.host?.name ?? null,
         state: readState(record.state),
@@ -252,6 +259,8 @@ export interface SessionCreateInput {
     readonly unattended: boolean | null;
     /** Which stored account signs the agent in, or null for whichever resolves. */
     readonly accountId: string | null;
+    /** Sign it in with nothing, and let the machine's own login answer. */
+    readonly useMachineLogin: boolean;
     readonly hostId: string | null;
     readonly baseRef: string;
     readonly taskId: string | null;
@@ -284,6 +293,7 @@ export async function createSession(
             sharedHome: input.sharedHome,
             unattended: input.unattended,
             accountId: input.accountId,
+            useMachineLogin: input.useMachineLogin,
             hostId: input.hostId,
             baseRef: input.baseRef,
             branch: core.sessionBranchName(id, input.title),

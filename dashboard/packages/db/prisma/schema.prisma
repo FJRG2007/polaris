@@ -5745,6 +5745,17 @@ model AgentSession {
     // than something resolved later: which machine a session opened on is a fact
     // about that session, and it must not change under it.
     sharedHome  Boolean   @default(false)
+    // Whether to sign the agent in with nothing at all, and let the machine's
+    // own login answer for it.
+    //
+    // The three answers are not two. Null `accountId` is "whichever of my stored
+    // credentials resolves", which is what a session started before the picker
+    // existed does. This is "none of them" - the machine is already signed in,
+    // in the home that outlives the session, and injecting a stored token over
+    // that is how a credential somebody revoked months ago comes to beat a
+    // login that works. It is also the only honest answer for a machine Polaris
+    // holds nothing for, which is every machine somebody signed in themselves.
+    useMachineLogin Boolean @default(false)
     // Which stored account signs the agent in, when the person picked one.
     //
     // Null takes whatever the resolver would pick, which is the first of their

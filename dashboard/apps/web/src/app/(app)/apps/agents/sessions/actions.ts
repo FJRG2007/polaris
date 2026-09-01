@@ -196,6 +196,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         sharedHome: value.sharedHome,
         unattended: value.unattended,
         accountId: value.accountId,
+        useMachineLogin: value.useMachineLogin,
         hostId: value.place === "host" ? value.hostId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,

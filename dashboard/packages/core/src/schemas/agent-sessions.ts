@@ -120,6 +120,16 @@ export const startAgentSessionSchema = z
          */
         accountId: z.string().uuid().nullable().default(null),
         /**
+         * Sign it in with nothing, and let the machine's own login answer.
+         *
+         * Not the same as a null `accountId`, which is "whichever of mine
+         * resolves". This is "none of them": the machine is signed in already,
+         * in the home that outlives the session, and a stored token injected
+         * over that is how a credential revoked months ago comes to beat a
+         * login that works.
+         */
+        useMachineLogin: z.boolean().default(false),
+        /**
          * Whether it opens on the machine everybody shares rather than on this
          * account's own.
          *
@@ -154,6 +164,12 @@ export const startAgentSessionSchema = z
     // The shared machine is one of Polaris's own containers. An enrolled server
     // is already somebody's machine with its own home, so asking for both is
     // asking for two different things at once.
+    // Picking an account and asking for none of them are two different answers
+    // to one question, and a form that sent both would have the server choose.
+    .refine((value) => !value.useMachineLogin || !value.accountId, {
+        message: "Pick an account or the machine's own login, not both",
+        path: ["accountId"]
+    })
     .refine((value) => !value.sharedHome || value.place === "local", {
         message: "A server already has a home of its own",
         path: ["sharedHome"]
