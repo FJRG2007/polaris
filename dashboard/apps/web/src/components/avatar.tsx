@@ -220,7 +220,14 @@ export function Avatar({
                 backgroundColor: tintFor(person.id ?? person.name)
             }}
         >
-            {initials(person.name)}
+            {/* Underneath until there is something to put over them, and then
+                gone. Not merely covered: a logo saved as a PNG with a
+                transparent background is exactly the picture somebody uploads
+                for an organization, and the initials read straight through it -
+                "DY" printed across a mark, on every screen that draws one. A
+                picture that loaded is the answer to what this face shows, so the
+                letters stop being the answer. */}
+            {real && !failed ? null : initials(person.name)}
             {source && !failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one small image per person, no loader wanted
                 <img
