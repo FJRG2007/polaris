@@ -11,7 +11,13 @@ import { ProfilePicturesCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { CompaniesCard } from "./companies-card";
-import { organizationsOf, shownOrganizations, typedCompanies } from "@/lib/profile-service";
+import { DetailsCard } from "./details-card";
+import {
+    organizationsOf,
+    profileLinks,
+    shownOrganizations,
+    typedCompanies
+} from "@/lib/profile-service";
 import { getSetting } from "@/lib/setting-store";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import {
@@ -38,7 +44,10 @@ export default async function AccountPage() {
                 usernameChangedAt: true,
                 company: true,
                 profileCompanies: true,
-                description: true
+                description: true,
+                headline: true,
+                pronouns: true,
+                links: true
             }
         }),
         // Only whether there is one to replace or remove; the picture itself is
@@ -102,6 +111,11 @@ export default async function AccountPage() {
                 mailReady={mail.channelId !== null}
                 phone={phone}
                 canSendWhatsApp={whatsappChannel !== null}
+            />
+            <DetailsCard
+                headline={user?.headline ?? ""}
+                pronouns={user?.pronouns ?? ""}
+                links={profileLinks(user?.links ?? null)}
             />
             <CompaniesCard
                 companies={user ? typedCompanies(user) : []}

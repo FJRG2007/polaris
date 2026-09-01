@@ -24,7 +24,11 @@ import { recordAudit } from "@/lib/audit-service";
 import { getSetting } from "@/lib/setting-store";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { setProfileCompanies, setProfileOrganizations } from "@/lib/profile-service";
+import {
+    saveProfileDetails,
+    setProfileCompanies,
+    setProfileOrganizations
+} from "@/lib/profile-service";
 import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
     addUserEmail,
@@ -133,6 +137,30 @@ export async function saveCompaniesAction(input: unknown): Promise<{ error?: str
 
     await setProfileCompanies(user.id, parsed.data.companies);
     await setProfileOrganizations(user.id, parsed.data.organizationIds);
+    revalidatePath("/account");
+    return {};
+}
+
+/**
+ * The one line under somebody's name, how they want to be referred to, and the
+ * addresses they hand out with themselves.
+ *
+ * Its own action beside the companies one and apart from the profile form, for
+ * the same reason: three answers edited on one card, and a form that replaced
+ * the whole account every time one of them changed would undo whatever the other
+ * cards had saved since the page loaded.
+ */
+const detailsSchema = z.object({
+    headline: core.headlineField,
+    pronouns: core.pronounsField,
+    links: core.profileLinksSchema
+});
+
+export async function saveProfileDetailsAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = detailsSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you typed" };
+    await saveProfileDetails(user.id, parsed.data);
     revalidatePath("/account");
     return {};
 }

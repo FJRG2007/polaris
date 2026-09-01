@@ -23,8 +23,14 @@ import { prisma, type Prisma } from "@polaris/db";
  * `MetricRollup` addressed subjects this way long before these tables did, with
  * exactly this vocabulary, and two answers to "what is an Application called in
  * a subjectType column" is a question somebody would have to ask twice.
+ *
+ * `user` is here for the follow table alone: following a person is the same
+ * relationship as following a service, and a second table for it would be a
+ * second set of the same four queries. Nothing writes a history line about a
+ * person, and that is a fact about what is written rather than about the
+ * vocabulary.
  */
-export const SUBJECTS = ["task", "app", "host"] as const;
+export const SUBJECTS = ["task", "app", "host", "user"] as const;
 
 export type ActivitySubject = (typeof SUBJECTS)[number];
 

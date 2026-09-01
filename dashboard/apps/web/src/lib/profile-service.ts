@@ -33,8 +33,10 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBetween } from "@/lib/blocks";
+import { areFriends } from "@/lib/friends-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { allowedBy, type PrivacyViewer } from "@/lib/privacy-service";
+import { followCounts, followsPerson } from "@/lib/people-follow";
+import { allowedBy, defaultFollowerAudience, type PrivacyViewer } from "@/lib/privacy-service";
 
 /** Whether a profile may be read by somebody with no session. */
 const PUBLIC_KEY = "profiles.public";
@@ -62,11 +64,30 @@ export interface ProfileCompany {
 }
 
 
+/** What one reader may do about the person whose page they are on. */
+export interface ProfileStanding {
+    /** Null on your own page, where none of it applies. */
+    readonly friendship: "none" | "friends" | "sent" | "received" | null;
+    readonly following: boolean;
+    /** Whether a conversation is offered. Friends only: a message from a
+     *  stranger is what a block list exists because of, and following somebody
+     *  is not a relationship they agreed to. */
+    readonly canMessage: boolean;
+}
+
 /** A person, as their own page draws them. */
 export interface PublicProfile {
     readonly id: string;
     readonly name: string;
     readonly username: string;
+    /** The one line under the name. Empty when they have written none. */
+    readonly headline: string;
+    /** How they want to be referred to, in their own words. Empty when they have
+     *  not said, and then nothing is drawn - an empty value is a person who did
+     *  not answer, not a field waiting to be filled in. */
+    readonly pronouns: string;
+    /** The addresses they hand out with themselves. */
+    readonly links: core.ProfileLink[];
     /** Their name, both halves, when they have given either and allow this
      *  reader to see it. Empty otherwise. */
     readonly fullName: string;
@@ -89,6 +110,12 @@ export interface PublicProfile {
     /** Their address, for the readers they show it to. */
     readonly email: string;
     readonly joinedAt: string;
+    /** How many follow them and how many they follow, or null where this reader
+     *  may not see either. The numbers and the lists are one disclosure, so one
+     *  setting decides both. */
+    readonly follows: { readonly followers: number; readonly following: number } | null;
+    /** What this reader may do about them. */
+    readonly standing: ProfileStanding;
 }
 
 /** A stored JSON list of strings, out of its own column. Anything unparseable
@@ -211,6 +238,9 @@ export async function publicProfile(
             company: true,
             profileCompanies: true,
             description: true,
+            headline: true,
+            pronouns: true,
+            links: true,
             profileOrgIds: true,
             bannedAt: true,
             createdAt: true
@@ -228,7 +258,8 @@ export async function publicProfile(
         "avatar",
         "fullName",
         "email",
-        "companies"
+        "companies",
+        "followers"
     ]);
 
     // Somebody can always open their own page - a setting that hid it from its
@@ -237,10 +268,13 @@ export async function publicProfile(
     // what other people see, so showing its owner an address they have told
     // Polaris to keep private would be showing them a page that does not exist.
     if (!own && !allowed.discoverable) return null;
-    return draw(user, allowed);
+    return draw(user, allowed, viewer, own);
 }
 
-type Fields = Record<"discoverable" | "avatar" | "fullName" | "email" | "companies", boolean>;
+type Fields = Record<
+    "discoverable" | "avatar" | "fullName" | "email" | "companies" | "followers",
+    boolean
+>;
 
 /**
  * What this reader may see of each field.
@@ -263,19 +297,30 @@ async function visible(
     }
     const row = await prisma.userPrivacy.findUnique({
         where: { userId },
-        select: { discoverable: true, avatar: true, fullName: true, email: true, companies: true }
+        select: {
+            discoverable: true,
+            avatar: true,
+            fullName: true,
+            email: true,
+            companies: true,
+            followers: true
+        }
     });
     // `storedAudience` is the one way to read one off a row: a column holds a
     // string written years ago, a row may not exist at all, and neither may be
     // allowed to resolve to something more open than the field's own default.
     const open = (field: keyof Fields) =>
         core.storedAudience(field, row?.[field]) === "everyone";
+    // The follower lists are the one field whose unset answer is the operator's
+    // rather than the schema's, so it is filled in before it is read.
+    const followers = row?.followers ?? (await defaultFollowerAudience());
     return {
         discoverable: open("discoverable"),
         avatar: open("avatar"),
         fullName: open("fullName"),
         email: open("email"),
-        companies: open("companies")
+        companies: open("companies"),
+        followers: core.storedAudience("followers", followers) === "everyone"
     };
 }
 
@@ -293,10 +338,15 @@ async function draw(
         company: string | null;
         profileCompanies: string | null;
         description: string;
+        headline: string | null;
+        pronouns: string | null;
+        links: string | null;
         profileOrgIds: string | null;
         createdAt: Date;
     },
-    allowed: Fields
+    allowed: Fields,
+    viewer: PrivacyViewer | null,
+    own: boolean
 ): Promise<PublicProfile> {
     const marked = storedList(user.profileOrgIds);
     const organizations =
@@ -315,6 +365,10 @@ async function draw(
             : [];
 
     const full = [user.firstName ?? "", user.lastName ?? ""].join(" ").trim();
+    const [follows, standing] = await Promise.all([
+        allowed.followers ? followCounts(user.id) : Promise.resolve(null),
+        standingOf(user.id, viewer, own)
+    ]);
     return {
         id: user.id,
         name: user.name,
@@ -325,6 +379,82 @@ async function draw(
         organizations,
         companies: allowed.companies ? typedCompanies(user) : [],
         email: allowed.email ? user.email : "",
-        joinedAt: user.createdAt.toISOString()
+        joinedAt: user.createdAt.toISOString(),
+        headline: user.headline ?? "",
+        pronouns: user.pronouns ?? "",
+        links: profileLinks(user.links),
+        follows,
+        standing
     };
+}
+
+/** The links on a profile, out of their column. Re-validated on the way out
+ *  rather than trusted: they were checked when they were stored, and a page that
+ *  prints an address is the wrong place to find out that changed. */
+export function profileLinks(raw: string | null): core.ProfileLink[] {
+    if (!raw) return [];
+    try {
+        const parsed = core.profileLinksSchema.safeParse(JSON.parse(raw));
+        return parsed.success ? parsed.data : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * What this reader may do about the person whose page it is.
+ *
+ * A message is offered to friends and to nobody else. Following somebody is not
+ * a relationship they agreed to - that is the whole difference between the two -
+ * and a conversation opened by a stranger is what a block list exists because
+ * of.
+ */
+async function standingOf(
+    personId: string,
+    viewer: PrivacyViewer | null,
+    own: boolean
+): Promise<ProfileStanding> {
+    if (own || !viewer) return { friendship: null, following: false, canMessage: false };
+
+    const [friends, following, pending] = await Promise.all([
+        areFriends(viewer.id, personId),
+        followsPerson(viewer.id, personId),
+        prisma.friendship.findFirst({
+            where: {
+                status: "pending",
+                OR: [
+                    { requesterId: viewer.id, addresseeId: personId },
+                    { requesterId: personId, addresseeId: viewer.id }
+                ]
+            },
+            select: { requesterId: true }
+        })
+    ]);
+
+    const friendship = friends
+        ? ("friends" as const)
+        : pending
+          ? pending.requesterId === viewer.id
+              ? ("sent" as const)
+              : ("received" as const)
+          : ("none" as const);
+    return { friendship, following, canMessage: friends };
+}
+
+/** Store the one line under somebody's name, how they want to be referred to,
+ *  and the addresses they hand out. Validated here as well as in the form,
+ *  because a form is a courtesy. */
+export async function saveProfileDetails(
+    userId: string,
+    input: { headline: string; pronouns: string; links: readonly core.ProfileLink[] }
+): Promise<void> {
+    const links = core.profileLinksSchema.parse(input.links);
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            headline: core.headlineField.parse(input.headline) || null,
+            pronouns: core.pronounsField.parse(input.pronouns) || null,
+            links: links.length > 0 ? JSON.stringify(links) : null
+        }
+    });
 }

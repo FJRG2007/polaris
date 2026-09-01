@@ -21,7 +21,31 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { friendIds } from "@/lib/friends-service";
+
+/**
+ * What a new account's follower lists are visible to.
+ *
+ * The one field on this screen whose default is not written into the schema, and
+ * the reason is that only the operator can say what this instance is. A company
+ * directory and a place where people follow each other want opposite answers,
+ * and a number frozen into a column would be one of them chosen on everybody's
+ * behalf.
+ *
+ * A stored `null` on the column means nobody has chosen, and resolves to this.
+ * The moment somebody picks an audience it is theirs, and changing the default
+ * afterwards never reaches back and changes it.
+ */
+export const FOLLOWERS_DEFAULT_KEY = "profiles.followers.default";
+
+export async function defaultFollowerAudience(): Promise<core.PrivacyAudience> {
+    return core.storedAudience("followers", await getSetting(FOLLOWERS_DEFAULT_KEY));
+}
+
+export async function setDefaultFollowerAudience(audience: core.PrivacyAudience): Promise<void> {
+    await setSetting(FOLLOWERS_DEFAULT_KEY, audience);
+}
 
 /** Something the person doing it can be told about, in a sentence. */
 export class PrivacyError extends Error {
@@ -39,6 +63,7 @@ const AUDIENCE_COLUMNS = {
     email: true,
     phone: true,
     companies: true,
+    followers: true,
     lastSeen: true,
     forwarding: true,
     discoverable: true,
@@ -57,7 +82,12 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
             }
         })
     ]);
-    if (!row && links.length === 0) return core.DEFAULT_PRIVACY;
+    // Read whether or not there is a row: a `null` column and a missing row both
+    // mean nobody has chosen, and both resolve to what the operator set.
+    const followers = core.storedAudience("followers", row?.followers ?? (await defaultFollowerAudience()));
+    if (!row && links.length === 0) {
+        return { ...core.DEFAULT_PRIVACY, followers: { audience: followers, listId: null, people: [] } };
+    }
 
     // A named list comes back as the id it is; a setting's own unnamed one comes
     // back as the people on it, because that is what its row draws and the id is
@@ -74,7 +104,16 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
         Object.fromEntries(
             core.PRIVACY_FIELDS.map((field) => [
                 field,
-                { audience: core.storedAudience(field, row?.[field]), ...(linked.get(field) ?? {}) }
+                {
+                    // The follower lists are the one field whose "unset" answer
+                    // is the operator's rather than the schema's - see
+                    // `defaultFollowerAudience`.
+                    audience:
+                        field === "followers"
+                            ? core.storedAudience(field, row?.followers ?? followers)
+                            : core.storedAudience(field, row?.[field]),
+                    ...(linked.get(field) ?? {})
+                }
             ])
         )
     );
@@ -112,12 +151,16 @@ export async function allowedBy(
         select: { userId: true, ...AUDIENCE_COLUMNS }
     });
     const stored = new Map(rows.map((row) => [row.userId, row[field]]));
+    // The follower lists fall to the operator's default rather than the schema's
+    // when nobody has chosen - the one field on this screen where "unset" is an
+    // instance decision. Asked once, and only for the field it is about.
+    const unset = field === "followers" ? await defaultFollowerAudience() : null;
     // An account with no row of its own falls to the field's own default, which
     // for an address and a number is nobody. Read through `storedAudience` and
     // never by parsing a rule around it: a default on the whole rule does not
     // fire for a rule that is present with an empty audience.
     const audiences = new Map(
-        wanted.map((userId) => [userId, core.storedAudience(field, stored.get(userId))])
+        wanted.map((userId) => [userId, core.storedAudience(field, stored.get(userId) ?? unset)])
     );
     const [listed, friends] = await Promise.all([
         listingViewer(

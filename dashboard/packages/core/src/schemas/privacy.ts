@@ -77,6 +77,7 @@ export const PRIVACY_FIELD_LABELS = {
     email: "Your email address",
     phone: "Your phone number",
     companies: "Where you work",
+    followers: "Who follows you, and who you follow",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -95,6 +96,8 @@ export const PRIVACY_FIELD_NOTES = {
     phone: "The number kept for sign-in codes. Nobody is shown it unless you say so.",
     companies:
         "The company on your profile, and the organizations here you have chosen to show. Which organizations those are is picked one at a time on your profile; this decides who sees the ones you picked.",
+    followers:
+        "Both lists together, on your profile. Following somebody is not a request and they are not asked, so who can read the list is the only decision there is to make about it. Your administrator sets what a new account starts on; this is yours.",
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
 } as const;
@@ -108,6 +111,7 @@ export const PRIVACY_FIELDS = [
     "email",
     "phone",
     "companies",
+    "followers",
     "lastSeen",
     "readReceipts",
     "forwarding"
@@ -132,7 +136,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["avatar", "photoFullSize", "fullName", "email", "phone", "companies"]
+        fields: ["avatar", "photoFullSize", "fullName", "email", "phone", "companies", "followers"]
     },
     {
         id: "presence",
@@ -264,6 +268,21 @@ export const privacySettingsSchema = z.object({
      * this setting deciding something it was never asked.
      */
     companies: open,
+    /**
+     * Who may read the two lists on somebody's profile: who follows them, and
+     * who they follow.
+     *
+     * Shut in this file, and that is not the answer people get. What a new
+     * account starts on is the operator's - an instance meant as a company
+     * directory and one meant as a place people follow each other want opposite
+     * defaults, and neither is a decision this file can make. The stored column
+     * is left unset until somebody chooses, and the service fills it in from the
+     * instance setting; this is the floor for a deployment that has none.
+     *
+     * Both lists under one setting, because they are one disclosure: who you
+     * follow is exactly as much about you as who follows you.
+     */
+    followers: closed,
     /**
      * Who is shown the address the account signs in with.
      *

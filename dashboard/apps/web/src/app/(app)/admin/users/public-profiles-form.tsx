@@ -21,11 +21,21 @@
  */
 
 import { useState, useTransition } from "react";
-import { Card, CardBody, Switch } from "@polaris/ui";
-import { setPublicProfilesAction } from "./actions";
+import { Card, CardBody, Select, Switch } from "@polaris/ui";
+import { PRIVACY_AUDIENCES, PRIVACY_AUDIENCE_LABELS, type PrivacyAudience } from "@polaris/core";
+import { setFollowerDefaultAction, setPublicProfilesAction } from "./actions";
 
-export function PublicProfilesForm({ enabled }: { enabled: boolean }) {
+export function PublicProfilesForm({
+    enabled,
+    followerDefault
+}: {
+    enabled: boolean;
+    /** What a new account's follower lists are shown to, until it says
+     *  otherwise. */
+    followerDefault: PrivacyAudience;
+}) {
     const [on, setOn] = useState(enabled);
+    const [audience, setAudience] = useState<PrivacyAudience>(followerDefault);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
@@ -63,6 +73,43 @@ export function PublicProfilesForm({ enabled }: { enabled: boolean }) {
                         }}
                     />
                 </div>
+                <div className="flex flex-col gap-1 border-t border-border pt-3">
+                    <label className="flex flex-col gap-1 text-sm">
+                        Who a new account&rsquo;s followers are shown to
+                        <Select
+                            value={audience}
+                            disabled={pending}
+                            aria-label="Who a new account's followers are shown to"
+                            options={PRIVACY_AUDIENCES.filter(
+                                // The two that name a list of people cannot be a
+                                // default: the list belongs to an account, and
+                                // there is no account yet to have one.
+                                (value) => value === "everyone" || value === "friends" || value === "nobody"
+                            ).map((value) => ({ value, label: PRIVACY_AUDIENCE_LABELS[value] }))}
+                            onValueChange={(value) => {
+                                const next = value as PrivacyAudience;
+                                const before = audience;
+                                setAudience(next);
+                                setError(null);
+                                startTransition(async () => {
+                                    const result = await setFollowerDefaultAction(next);
+                                    if (result.error) {
+                                        setAudience(before);
+                                        setError(result.error);
+                                    }
+                                });
+                            }}
+                        />
+                    </label>
+                    <p className="max-w-xl text-xs text-muted-foreground">
+                        Who follows somebody and who they follow are one disclosure and one setting on their
+                        own privacy screen. This is what it says before anybody touches it - a directory for
+                        one company and a place where people follow each other want opposite answers, and
+                        only you can say which this is. Changing it never reaches back into an account that
+                        has already chosen.
+                    </p>
+                </div>
+
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>

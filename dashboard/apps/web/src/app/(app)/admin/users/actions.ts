@@ -16,6 +16,7 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setSetting } from "@/lib/setting-store";
 import { setProfilesPublic } from "@/lib/profile-service";
+import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
 import { setSharingPolicy } from "@/lib/sharing-policy";
 import {
     accessRulesSchema,
@@ -227,6 +228,29 @@ export async function setPublicProfilesAction(allowed: unknown): Promise<{ error
         targetType: "setting",
         targetId: "profiles.public",
         metadata: { enabled: on }
+    });
+    revalidatePath("/admin/users");
+    return {};
+}
+
+/**
+ * What a new account's follower lists are shown to.
+ *
+ * Only the three that name nobody in particular. "Everybody except" and "only"
+ * each carry a list of people, and a list belongs to an account - there is no
+ * account yet for a default to have one of.
+ */
+export async function setFollowerDefaultAction(audience: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.enum(["everyone", "friends", "nobody"]).safeParse(audience);
+    if (!parsed.success) return { error: "That is not an audience a default can be." };
+    await setDefaultFollowerAudience(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.follower-default",
+        targetType: "setting",
+        targetId: FOLLOWERS_DEFAULT_KEY,
+        metadata: { audience: parsed.data }
     });
     revalidatePath("/admin/users");
     return {};

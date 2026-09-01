@@ -76,6 +76,16 @@ model User {
     // profile is opened - the panel beside a direct message, the card on a name -
     // and nowhere it would be mistaken for something Polaris asserts.
     description   String   @default("")
+    // The one line under the name. Not the same thing as the description above
+    // it: this is read in a list, where a paragraph is not.
+    headline      String?
+    // How this account wants to be referred to, in its own words. Empty is not
+    // "unset waiting to be filled in" - it is somebody who has not said, and
+    // nothing is drawn for them.
+    pronouns      String?
+    // Addresses to hand out with the profile - a portfolio, a site, a linktree -
+    // as a stringified JSON array of `{ label, url }`.
+    links         String?
     // How this account wants dates, times, temperatures and money written, as
     // stringified JSON holding only the fields it actually chose. Absent fields
     // (and a null column) follow the platform default.
@@ -7115,6 +7125,12 @@ model UserPrivacy {
     // the one thing on this list that exists in order to be seen - and which
     // organizations it covers is a separate choice nobody has made yet.
     companies    String   @default("everyone")
+    // Who may read the two follower lists on a profile. Nullable, and that is
+    // the point: null is "nobody has chosen", and what that resolves to is the
+    // operator's setting rather than a number frozen into this column. An
+    // instance meant as a company directory and one meant as a place people
+    // follow each other want opposite answers.
+    followers    String?
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

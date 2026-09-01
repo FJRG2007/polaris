@@ -19,6 +19,13 @@
  * The owner of a page sees exactly what everybody else sees, and a way to change
  * it. Anything else and the one person who cannot check what their own page says
  * is the person it is about.
+ *
+ * A name carries three things beside it and each is a different question. The
+ * headline is what somebody does, in one line. The pronouns are how they want to
+ * be referred to and are drawn only when they have said - an empty value is a
+ * person who did not answer, not a field waiting to be filled in. The bio is a
+ * paragraph, and it goes underneath, because a paragraph beside a name is a
+ * paragraph nobody reads.
  */
 
 import Link from "next/link";
@@ -27,7 +34,10 @@ import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
-import { AtSign, BadgeCheck, Building2, CalendarDays, Mail, Pencil } from "lucide-react";
+import { ProfileActions } from "./profile-actions";
+import { FollowLists } from "./follow-lists";
+import { linkLabel } from "@polaris/core";
+import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
 export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boolean }) {
     const format = useDisplayFormat();
@@ -65,7 +75,16 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                 </div>
 
                 <div className="flex flex-col gap-0.5">
-                    <h1 className="text-lg font-semibold leading-tight tracking-tight">{profile.name}</h1>
+                    <h1 className="flex flex-wrap items-baseline gap-2 text-lg font-semibold leading-tight tracking-tight">
+                        {profile.name}
+                        {/* Beside the name, because that is what it is about -
+                            and only when they have said. */}
+                        {profile.pronouns ? (
+                            <span className="text-muted-foreground text-sm font-normal">
+                                {profile.pronouns}
+                            </span>
+                        ) : null}
+                    </h1>
                     {profile.fullName && profile.fullName !== profile.name ? (
                         <p className="text-muted-foreground text-sm">{profile.fullName}</p>
                     ) : null}
@@ -73,7 +92,23 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                         <AtSign className="size-3.5 shrink-0" />
                         {profile.username}
                     </p>
+                    {profile.headline ? (
+                        <p className="mt-1 text-sm text-foreground/90">{profile.headline}</p>
+                    ) : null}
                 </div>
+
+                {!own ? (
+                    <ProfileActions personId={profile.id} name={profile.name} standing={profile.standing} />
+                ) : null}
+
+                {profile.follows ? (
+                    <FollowLists
+                        personId={profile.id}
+                        name={profile.name}
+                        followers={profile.follows.followers}
+                        following={profile.follows.following}
+                    />
+                ) : null}
 
                 {profile.description ? (
                     <p className="text-sm leading-relaxed text-foreground/90">{profile.description}</p>
@@ -112,6 +147,29 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                                 </span>
                                 {company}
                             </p>
+                        ))}
+                    </div>
+                ) : null}
+
+                {profile.links.length > 0 ? (
+                    <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+                        {profile.links.map((link) => (
+                            <a
+                                key={link.url}
+                                href={link.url}
+                                target="_blank"
+                                // Somebody else's address, opened from a page
+                                // anybody can publish: the tab it opens gets no
+                                // handle on this one, and no referrer goes with
+                                // it.
+                                rel="noreferrer noopener nofollow"
+                                className="text-muted-foreground flex items-center gap-2 text-sm hover:text-foreground"
+                            >
+                                <LinkIcon className="size-3.5 shrink-0" />
+                                <span className="min-w-0 truncate" title={link.url}>
+                                    {linkLabel(link)}
+                                </span>
+                            </a>
                         ))}
                     </div>
                 ) : null}
