@@ -60,10 +60,13 @@ import {
 import {
     Card,
     CardBody,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuTrigger,
+    Dialog,
+    DialogContent,
+    DialogTitle,
     cn
 } from "@polaris/ui";
 
@@ -220,7 +223,67 @@ const HANDLE_RADIUS = {
 } as const;
 
 /**
+ * What can be done to one picture, declared once.
+ *
+ * Rendered two ways from this one list - as rows in a dialog and as lines in a
+ * right-click menu - so the two can never come to offer different things. Which
+ * of them exist depends only on whether there is a picture: nothing to reframe
+ * and nothing to remove until there is one.
+ */
+interface PictureAction {
+    readonly label: string;
+    readonly note: string;
+    readonly Icon: LucideIcon;
+    readonly onSelect: () => void;
+    readonly danger?: boolean;
+}
+
+function actionsFor(label: string, picture: Picture, exists: boolean): PictureAction[] {
+    return [
+        ...(exists
+            ? [
+                  {
+                      label: "Reframe",
+                      note: "Move and scale what is already there",
+                      Icon: Crop,
+                      onSelect: picture.reframe
+                  }
+              ]
+            : []),
+        {
+            label: exists ? "Replace" : `Upload ${label}`,
+            note: "Choose a picture from this device",
+            Icon: Upload,
+            onSelect: picture.choose
+        },
+        ...(exists
+            ? [
+                  {
+                      label: "Remove",
+                      note: `Go back to the default ${label}`,
+                      Icon: Trash2,
+                      onSelect: picture.remove,
+                      danger: true
+                  }
+              ]
+            : [])
+    ];
+}
+
+/**
  * The editing handle that sits on a picture.
+ *
+ * Pressing the picture opens a dialog; right-clicking it opens the menu. That is
+ * the way round every client that does this has settled on, and it was the wrong
+ * way round here: a left-click - the ordinary press, the one somebody makes
+ * without deciding to - dropped a small menu out of the corner of the picture,
+ * which is the shape of a thing you asked for on purpose. The dialog is what an
+ * ordinary press deserves: it names the picture, it gives each choice a line
+ * saying what it does, and its rows are big enough to hit on a phone, where a
+ * menu hanging off a 72-pixel circle is not.
+ *
+ * The menu is still there for the press that means "just the options", and both
+ * are built from one list of actions so they cannot drift.
  *
  * The whole picture is the button, and over a picture that is there it shows
  * nothing until the pointer is: a preview whose job is to show what everybody
@@ -258,16 +321,32 @@ function PictureEditor({
     exists: boolean;
     radius: keyof typeof HANDLE_RADIUS;
 }) {
+    const [open, setOpen] = useState(false);
+    const actions = actionsFor(label, picture, exists);
+
+    /** Chosen from the dialog: it goes, then the work starts. A dialog left
+     *  standing over a file picker is one somebody has to dismiss before they
+     *  can see what they picked. */
+    const run = (action: PictureAction) => {
+        setOpen(false);
+        action.onSelect();
+    };
+
     return (
         <>
             {picture.field}
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+            <ContextMenu>
+                <ContextMenuTrigger asChild>
                     <button
                         type="button"
                         aria-label={`Edit ${label}`}
                         title={`Edit ${label}`}
                         disabled={picture.sending}
+                        // The sheet and the chip used to read the menu's own open
+                        // state off this button. The dialog is not attached to
+                        // it, so it says so itself.
+                        data-open={open ? "" : undefined}
+                        onClick={() => setOpen(true)}
                         className={cn(
                             "group/handle absolute inset-0 flex items-center justify-center",
                             HANDLE_RADIUS[radius]
@@ -277,14 +356,14 @@ function PictureEditor({
                             aria-hidden
                             className={cn(
                                 "absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-fast",
-                                "group-hover/handle:opacity-100 group-focus-visible/handle:opacity-100 group-data-[state=open]/handle:opacity-100",
+                                "group-hover/handle:opacity-100 group-focus-visible/handle:opacity-100 group-data-[open]/handle:opacity-100",
                                 HANDLE_RADIUS[radius]
                             )}
                         />
                         <span
                             className={cn(
                                 "relative flex size-8 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity duration-fast",
-                                "group-hover/handle:opacity-100 group-focus-visible/handle:opacity-100 group-data-[state=open]/handle:opacity-100",
+                                "group-hover/handle:opacity-100 group-focus-visible/handle:opacity-100 group-data-[open]/handle:opacity-100",
                                 // Nothing here can hover, so the chip is the only
                                 // sign there is anything to press.
                                 "[@media(hover:none)]:opacity-100",
@@ -306,26 +385,52 @@ function PictureEditor({
                             )}
                         </span>
                     </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[9rem]">
-                    {exists && (
-                        <DropdownMenuItem onSelect={picture.reframe}>
-                            <Crop />
-                            Reframe
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onSelect={picture.choose}>
-                        <Upload />
-                        {exists ? "Replace" : `Upload ${label}`}
-                    </DropdownMenuItem>
-                    {exists && (
-                        <DropdownMenuItem variant="danger" onSelect={picture.remove}>
-                            <Trash2 />
-                            Remove
-                        </DropdownMenuItem>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="min-w-[9rem]">
+                    {actions.map((action) => (
+                        <ContextMenuItem
+                            key={action.label}
+                            variant={action.danger ? "danger" : "default"}
+                            onSelect={action.onSelect}
+                        >
+                            <action.Icon className="size-3.5" />
+                            {action.label}
+                        </ContextMenuItem>
+                    ))}
+                </ContextMenuContent>
+            </ContextMenu>
+
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="max-w-xs">
+                    <DialogTitle className="capitalize">{label}</DialogTitle>
+                    <div className="flex flex-col gap-1">
+                        {actions.map((action) => (
+                            <button
+                                key={action.label}
+                                type="button"
+                                onClick={() => run(action)}
+                                className={cn(
+                                    "flex items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted",
+                                    action.danger && "text-danger hover:bg-danger/10"
+                                )}
+                            >
+                                <action.Icon className="size-4 shrink-0" />
+                                <span className="flex min-w-0 flex-col">
+                                    <span className="text-sm font-medium">{action.label}</span>
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            action.danger ? "text-danger/80" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {action.note}
+                                    </span>
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

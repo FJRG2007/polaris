@@ -11,13 +11,33 @@
  */
 
 import { PhoneCard } from "./phone-card";
+import { UsernameField } from "./username-field";
 import { EmailsView } from "./emails-view";
 import { useRouter } from "next/navigation";
 import { updateProfileAction } from "./actions";
 import { Card, CardBody, Button, Input, Textarea } from "@polaris/ui";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import type { UserEmailView, UserPhoneView } from "@polaris/auth";
-import { MAX_DESCRIPTION, normalizePersonName } from "@polaris/core";
+
+/**
+ * What a name field should hold after one keystroke.
+ *
+ * Capitalized as it is typed, because every word of a person's name is
+ * capitalized and correcting it only when they leave the field means watching
+ * their own name be typed wrong and then quietly fixed. It never changes the
+ * length of what was typed, so the caret does not move.
+ *
+ * Except mid-composition. An IME builds a word out of several keystrokes and
+ * publishes an unfinished string on each one; rewriting that string is how a
+ * Japanese or Korean name comes out mangled. Those are left alone and the blur
+ * catches them, which is what every field that does this has to do.
+ */
+function typedName(event: ChangeEvent<HTMLInputElement>): string {
+    const typed = event.target.value;
+    const composing = (event.nativeEvent as { isComposing?: boolean }).isComposing === true;
+    return composing ? typed : capitalizeWords(typed);
+}
+import { MAX_DESCRIPTION, capitalizeWords, normalizePersonName } from "@polaris/core";
 
 type Result = { ok?: string; error?: string } | null;
 
@@ -165,12 +185,19 @@ export function AccountView({
                                 autoCapitalize="words"
                                 autoCorrect="off"
                                 spellCheck={false}
+                                // Capitalized as it is typed. It cannot change the
+                                // length of what was typed, so the caret stays
+                                // where it was - which is why this is safe here
+                                // and the trimming below is not.
                                 onChange={(event) =>
-                                    setProfile({ ...profile, firstName: event.target.value })
+                                    setProfile({
+                                        ...profile,
+                                        firstName: typedName(event)
+                                    })
                                 }
-                                // On blur rather than on every keystroke: normalizing as
-                                // somebody types moves the caret and breaks composing a
-                                // name on an IME. The server normalizes it again.
+                                // The spacing is tidied on the way out, where a
+                                // caret that moves costs nobody anything. The
+                                // server does both again.
                                 onBlur={() =>
                                     setProfile((current) => ({
                                         ...current,
@@ -189,7 +216,7 @@ export function AccountView({
                                 autoCorrect="off"
                                 spellCheck={false}
                                 onChange={(event) =>
-                                    setProfile({ ...profile, lastName: event.target.value })
+                                    setProfile({ ...profile, lastName: typedName(event) })
                                 }
                                 onBlur={() =>
                                     setProfile((current) => ({
@@ -208,22 +235,19 @@ export function AccountView({
                             Privacy. Your display name is what appears everywhere.
                         </p>
                     </div>
-                    <label className="flex flex-col gap-1 text-sm">
-                        Username
-                        <Input
-                            value={profile.username}
-                            placeholder="Optional"
-                            autoComplete="off"
-                            disabled={usernameLocked}
-                            aria-describedby="username-hint"
-                            onChange={(event) => setProfile({ ...profile, username: event.target.value })}
-                        />
-                        <span id="username-hint" className="text-xs text-muted-foreground">
-                            {usernameLocked
-                                ? `Other people find and address you by this, so it can only be changed once in a while. You can change it again in ${usernameChangeIn}.`
-                                : "3-32 characters: letters, numbers, and . _ - Used to sign in."}
-                        </span>
-                    </label>
+                    {/* Answered while it is typed, with a way out when the name
+                        is taken - see `UsernameField`. It is the one field here
+                        that can be refused for a reason the person cannot see. */}
+                    <UsernameField
+                        value={profile.username}
+                        current={username}
+                        display={profile.name}
+                        firstName={profile.firstName}
+                        lastName={profile.lastName}
+                        locked={usernameLocked}
+                        lockedNote={`Other people find and address you by this, so it can only be changed once in a while. You can change it again in ${usernameChangeIn}.`}
+                        onChange={(next) => setProfile({ ...profile, username: next })}
+                    />
                     <label className="flex flex-col gap-1 text-sm">
                         About you
                         <Textarea

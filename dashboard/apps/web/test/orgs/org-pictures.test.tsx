@@ -38,10 +38,10 @@ function sources(): string[] {
     return [...document.querySelectorAll("img")].map((image) => image.getAttribute("src") ?? "");
 }
 
-/** What one handle offers, once it has been opened. */
-async function optionsOf(label: string): Promise<string[]> {
+/** What the right-click menu on a picture offers. */
+async function menuFor(label: string): Promise<string[]> {
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: label }));
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: label }) });
     const menu = await screen.findByRole("menu");
     return within(menu)
         .getAllByRole("menuitem")
@@ -59,12 +59,12 @@ describe("editing an organization's pictures", () => {
 
     it("offers a handle on each", async () => {
         render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto hasBanner />);
-        expect(await optionsOf(/banner/i)).toEqual(["Reframe", "Replace", "Remove"]);
+        expect(await menuFor(/banner/i)).toEqual(["Reframe", "Replace", "Remove"]);
     });
 
     it("offers no Remove for a picture that is not there", async () => {
         render(<OrgPicturesCard orgId={ORG.id} name={ORG.name} hasPhoto={false} hasBanner={false} />);
-        expect(await optionsOf(/banner/i)).toEqual(["Upload banner"]);
+        expect(await menuFor(/banner/i)).toEqual(["Upload banner"]);
     });
 
     it("names the organization under its mark, the way the page will", () => {

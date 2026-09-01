@@ -27,14 +27,35 @@ vi.mock("@/components/presence-store", () => ({ usePresence: () => null }));
 
 const PERSON = { userId: "018f2b7a-0000-7000-8000-00000000000a", name: "Ada Lovelace" };
 
-/** What one handle offers, once it has been opened. */
-async function optionsOf(label: string): Promise<string[]> {
+/** What the dialog behind an ordinary press offers. */
+async function dialogFor(label: string): Promise<string[]> {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: label }));
+    const dialog = await screen.findByRole("dialog");
+    return within(dialog)
+        .getAllByRole("button")
+        // The dialog's own dismiss button is chrome, not a choice.
+        .filter((button) => button.getAttribute("type") === "button")
+        .map((item) => item.textContent?.trim() ?? "")
+        .filter((text) => text.length > 0);
+}
+
+/** What the right-click menu offers, which has to be the same set. */
+async function menuFor(label: string): Promise<string[]> {
+    const user = userEvent.setup();
+    await user.pointer({ keys: "[MouseRight]", target: screen.getByRole("button", { name: label }) });
     const menu = await screen.findByRole("menu");
     return within(menu)
         .getAllByRole("menuitem")
         .map((item) => item.textContent?.trim() ?? "");
+}
+
+/** Open the dialog and press one of its rows. */
+async function chooseInDialog(label: string, option: RegExp): Promise<void> {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: label }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: option }));
 }
 
 /**
@@ -114,14 +135,32 @@ describe("the profile pictures card", () => {
         expect(screen.getByRole("button", { name: "Edit banner" })).toBeDefined();
     });
 
-    it("offers to move, swap or take away a picture that is there", async () => {
+    // Pressing a picture opens a dialog and right-clicking it opens the menu,
+    // which is the way round every client that does this settled on - and the
+    // opposite of what this card shipped with, where the ordinary press dropped
+    // a menu out of the corner of a 72-pixel circle.
+    it("opens a dialog when the picture is pressed", async () => {
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
-        expect(await optionsOf("Edit photo")).toEqual(["Reframe", "Replace", "Remove"]);
+        const rows = await dialogFor("Edit photo");
+        expect(rows.some((row) => row.startsWith("Reframe"))).toBe(true);
+        expect(rows.some((row) => row.startsWith("Replace"))).toBe(true);
+        expect(rows.some((row) => row.startsWith("Remove"))).toBe(true);
     });
 
-    it("offers only to upload the one that is not there", async () => {
+    it("opens the menu when the picture is right-clicked", async () => {
+        render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
+        expect(await menuFor("Edit photo")).toEqual(["Reframe", "Replace", "Remove"]);
+    });
+
+    it("offers only to upload the one that is not there, on both surfaces", async () => {
         render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />);
-        expect(await optionsOf("Edit banner")).toEqual(["Upload banner"]);
+        expect(await menuFor("Edit banner")).toEqual(["Upload banner"]);
+        cleanup();
+
+        render(<ProfilePicturesCard {...PERSON} hasPhoto={false} hasBanner={false} />);
+        const rows = await dialogFor("Edit banner");
+        expect(rows.filter((row) => row.startsWith("Upload banner"))).toHaveLength(1);
+        expect(rows.some((row) => row.startsWith("Remove"))).toBe(false);
     });
 
     it("reframes the picture that is already there, without asking for a file", async () => {
@@ -131,9 +170,7 @@ describe("the profile pictures card", () => {
         const asked = stubTheBrowser(() => pictureReply());
 
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
-        const user = userEvent.setup();
-        await user.click(screen.getByRole("button", { name: "Edit photo" }));
-        await user.click(await screen.findByRole("menuitem", { name: "Reframe" }));
+        await chooseInDialog("Edit photo", /^Reframe/);
 
         expect(await screen.findByText("Frame the picture")).toBeDefined();
         expect(asked).toEqual([`/api/avatar/${PERSON.userId}`]);
@@ -147,9 +184,7 @@ describe("the profile pictures card", () => {
         stubTheBrowser(() => pictureReply(BLANK_AVATAR_ETAG));
 
         render(<ProfilePicturesCard {...PERSON} hasPhoto hasBanner />);
-        const user = userEvent.setup();
-        await user.click(screen.getByRole("button", { name: "Edit photo" }));
-        await user.click(await screen.findByRole("menuitem", { name: "Reframe" }));
+        await chooseInDialog("Edit photo", /^Reframe/);
 
         expect(await screen.findByText("Could not open that picture again")).toBeDefined();
         expect(screen.queryByText("Frame the picture")).toBeNull();

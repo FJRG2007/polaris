@@ -78,6 +78,64 @@ async function changesUsername(userId: string, username: string | null | undefin
     return (username ?? "").trim().toLowerCase() !== (row?.username ?? "").trim().toLowerCase();
 }
 
+const usernameCheckSchema = z.object({
+    username: z.string().max(64),
+    /** What the form currently holds, so a suggestion is built out of what
+     *  somebody has just typed rather than out of what was saved last week. */
+    display: z.string().max(120).optional(),
+    firstName: z.string().max(120).optional(),
+    lastName: z.string().max(120).optional()
+});
+
+/** How many handles one account may ask about in a minute. Generous enough that
+ *  typing a name never reaches it - the field waits for a pause before it asks -
+ *  and low enough that this is not a way to walk the namespace. */
+const USERNAME_CHECKS_PER_MINUTE = 40;
+
+/**
+ * Whether a username is free, and what to take instead when it is not.
+ *
+ * Answered while somebody types, because a handle field that says nothing until
+ * Save is a field they fill in, wait on, and are then told to try again with no
+ * idea what would work.
+ *
+ * The shape of the handle is judged by `usernameField`, here and in the form, so
+ * a name that is too short or has a space in it never reaches the database at
+ * all. What this adds is the one question a schema cannot answer.
+ *
+ * It does reveal whether a handle exists, and that cannot be avoided: a field
+ * that would not say so is a field that lets two people take the same name. It
+ * is kept narrow - one handle per call, nothing about the account behind it, a
+ * session required, and a ceiling per account per minute.
+ */
+export async function checkUsernameAction(
+    input: unknown
+): Promise<{ free?: boolean; problem?: string; suggestions?: string[]; error?: string }> {
+    const user = await requireUser();
+    const parsed = usernameCheckSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not a username" };
+
+    const shape = core.usernameField.safeParse(parsed.data.username);
+    if (!shape.success) {
+        // The schema's own sentence, which is the one the form is already
+        // showing. Answered rather than refused, so the field has one place to
+        // read its verdict from.
+        return { free: false, problem: shape.error.issues[0]?.message ?? "That username cannot be used", suggestions: [] };
+    }
+
+    const allowed = await rateLimit(`username-check:${user.id}`, USERNAME_CHECKS_PER_MINUTE, 60_000);
+    if (!allowed.ok) return { error: "Too many checks. Wait a moment." };
+
+    const { checkUsername } = await import("@/lib/username-availability");
+    const verdict = await checkUsername(user.id, shape.data, {
+        display: parsed.data.display,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        email: user.email
+    });
+    return { free: verdict.free, problem: verdict.problem, suggestions: [...verdict.suggestions] };
+}
+
 export async function updateProfileAction(input: {
     name?: string;
     firstName?: string | null;
