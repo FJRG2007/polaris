@@ -13,11 +13,10 @@
  */
 
 import type { Metadata } from "next";
-import { Card, CardBody } from "@polaris/ui";
-import { resolveSession } from "@/lib/session";
+import { guardedUser } from "@/lib/session";
 import { OrgProfileCard } from "./org-profile-card";
-import { PublicShell } from "@/components/public-shell";
 import { orgProfile, profilesArePublic } from "@/lib/profile-service";
+import { NothingToShow, ProfileFrame } from "@/components/profile-frame";
 
 export const dynamic = "force-dynamic";
 
@@ -28,31 +27,24 @@ export const metadata: Metadata = { title: "Organization - Polaris" };
 
 export default async function OrganizationPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
-    const session = await resolveSession().catch(() => null);
-    const viewer = session ? { id: session.id, isAdmin: Boolean(session.isAdmin) } : null;
-    const org = await orgProfile(decodeURIComponent(slug), viewer);
+    const viewer = await guardedUser().catch(() => null);
+    const org = await orgProfile(
+        decodeURIComponent(slug),
+        viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
+    );
 
     if (!org) {
         const closed = !viewer && !(await profilesArePublic());
         return (
-            <PublicShell signedIn={viewer !== null}>
-                <Card>
-                    <CardBody className="flex flex-col gap-2 py-10 text-center">
-                        <p className="text-sm font-medium">Nothing to show here</p>
-                        <p className="text-muted-foreground mx-auto max-w-md text-sm">
-                            {closed
-                                ? "This Polaris does not show profiles to people who are not signed in."
-                                : "There is no organization at this address."}
-                        </p>
-                    </CardBody>
-                </Card>
-            </PublicShell>
+            <ProfileFrame viewer={viewer}>
+                <NothingToShow closed={closed} subject="organization" />
+            </ProfileFrame>
         );
     }
 
     return (
-        <PublicShell signedIn={viewer !== null}>
+        <ProfileFrame viewer={viewer}>
             <OrgProfileCard org={org} />
-        </PublicShell>
+        </ProfileFrame>
     );
 }

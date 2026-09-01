@@ -14,7 +14,7 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { guardSession } from "@/lib/session-guard";
+import { guardSession, type SessionVerdict } from "@/lib/session-guard";
 import { canAny, userHasPermission } from "@polaris/auth";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import { hasPermission, type Permission } from "@polaris/core";
@@ -69,16 +69,49 @@ export async function requireUser(): Promise<SessionUser> {
         sessionCreatedAt: resolved.sessionCreatedAt
     });
     if (!verdict.ok) redirect(verdict.redirect);
+    return identityFor(resolved, verdict.view);
+}
 
-    const view = await resolveViewAs(resolved, verdict.view);
-    if (!view) return resolved;
+/**
+ * The same answer as requireUser, but null instead of a redirect.
+ *
+ * For the handful of pages that are readable without an account and only want to
+ * know whether to draw the signed-in chrome around themselves - a public profile
+ * is the whole of it today. Sending that reader to sign in would be turning them
+ * away from a page built to be handed out, and drawing the app's navigation for
+ * somebody whose session is locked or still waiting for approval would be a rail
+ * full of links that all bounce them back to the gate.
+ *
+ * So a gate that requireUser would redirect on reads as "no chrome" here, not as
+ * "no session": who the page is shown to is still resolveSession's answer and is
+ * decided by each account's privacy, exactly as it is for a signed-out reader.
+ */
+export async function guardedUser(): Promise<SessionUser | null> {
+    const resolved = await resolveSession();
+    if (!resolved) return null;
+    const verdict = await guardSession({
+        userId: resolved.id,
+        sessionId: resolved.sessionId,
+        sessionCreatedAt: resolved.sessionCreatedAt
+    });
+    if (!verdict.ok) return null;
+    return identityFor(resolved, verdict.view);
+}
+
+/** Which identity a cleared session is acting as. */
+async function identityFor(
+    resolved: SessionUser & { sessionCreatedAt: Date },
+    view: Extract<SessionVerdict, { ok: true }>["view"]
+): Promise<SessionUser> {
+    const resolvedView = await resolveViewAs(resolved, view);
+    if (!resolvedView) return resolved;
     // A user view swaps the identity outright; a role view keeps the
     // administrator's own and only takes their grants away, admin flag included -
     // a preview that still passed every check would not be a preview.
-    if (view.mode === "user" && view.user) {
-        return { ...view.user, sessionId: resolved.sessionId, viewingAs: view };
+    if (resolvedView.mode === "user" && resolvedView.user) {
+        return { ...resolvedView.user, sessionId: resolved.sessionId, viewingAs: resolvedView };
     }
-    return { ...resolved, isAdmin: false, viewingAs: view };
+    return { ...resolved, isAdmin: false, viewingAs: resolvedView };
 }
 
 /** The signed-in user with no security gate applied, or null. Only the screens
