@@ -16,7 +16,7 @@
 
 import * as core from "@polaris/core";
 import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
-import { keySourcesFor, signinEnvsFor } from "@/lib/agents/model-keys";
+import { keySourcesFor, signinAccountsFor, signinEnvsFor } from "@/lib/agents/model-keys";
 
 /**
  * Variables every session is handed whether or not anybody linked anything.
@@ -53,14 +53,31 @@ export interface AgentChoice {
     /** What would sign it in, when nothing has. Empty otherwise, so the screen
      *  has nothing to say about a tool that is ready. */
     readonly missing: readonly { env: string; label: string; url: string; howto: string | null }[];
+    /**
+     * Which account it would actually use, named.
+     *
+     * The question a screen handing work to an agent was not answering at all.
+     * A deployment can hold accounts of its own and a person can hold several,
+     * so "ready" on its own leaves somebody unable to tell whose subscription is
+     * about to do the work - or whether it is theirs at all.
+     *
+     * Null where nothing signs it in, and null for a tool Polaris holds no
+     * sourced credential for, where saying anything would be inventing it.
+     */
+    readonly signedInAs: { label: string; mine: boolean } | null;
 }
 
 /** The catalogue, answered for this person. */
 export async function agentChoicesFor(userId: string | null): Promise<AgentChoice[]> {
-    const held = await credentialsHeldBy(userId);
+    const [held, accounts] = await Promise.all([credentialsHeldBy(userId), signinAccountsFor(userId)]);
     const present = (env: string): boolean => held.has(env);
     return core.AGENT_CLIS.map((cli) => {
         const readiness = core.agentReadiness(cli, present);
+        // The credential it would actually pick, which is the first of its own
+        // that is held - the same order the runtime resolves in, so the screen
+        // cannot name one account and the session use another.
+        const using = readiness === "ready" ? core.credentialInPlace(cli, present) : null;
+        const account = using ? (accounts.get(using.env) ?? null) : null;
         return {
             id: cli.id,
             label: cli.label,
@@ -68,6 +85,15 @@ export async function agentChoicesFor(userId: string | null): Promise<AgentChoic
             install: cli.install,
             docs: cli.docs,
             readiness,
+            signedInAs: account
+                ? {
+                      // The address where the login gave one, since that is what
+                      // tells two subscriptions apart; the name its owner chose
+                      // otherwise.
+                      label: account.identity ?? account.name,
+                      mine: account.source === "own"
+                  }
+                : null,
             missing:
                 readiness === "missing"
                     ? cli.credentials.map((credential) => ({

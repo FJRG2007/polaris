@@ -43,8 +43,11 @@ describe("the boot script", () => {
         // Against the exec rather than a `tmux new-session`: the agent takes
         // over the window the setup ran in, so there is no second session to
         // order against any more.
+        // Against the line that runs the agent, whichever of the two branches
+        // it takes: the credential is dropped before anything the agent could
+        // read its own environment from.
         expect(boot.indexOf("unset GIT_AUTH_HEADER")).toBeLessThan(
-            boot.indexOf("exec $POLARIS_AGENT_COMMAND")
+            boot.indexOf("$POLARIS_AGENT_COMMAND || true")
         );
     });
 

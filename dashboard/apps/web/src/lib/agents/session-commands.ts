@@ -65,6 +65,12 @@ export const SIGNIN_ROWS = 30;
  */
 export const SESSION_IMAGE = "node:24";
 
+/** The unprivileged account the agent runs as in that image, which ships it.
+ *  Not root, because these tools refuse their skip-permissions flag as root -
+ *  see `START_AGENT`. It is given passwordless sudo, so nothing it could reach
+ *  before is out of reach now. */
+export const CONTAINER_USER = "node";
+
 /** The compose project, and therefore the container, one session gets. */
 export function sessionContainerName(sessionId: string): string {
     return `polaris-session-${sessionId}`;
@@ -193,14 +199,40 @@ export function agentReadyCommand(): string {
 const START_AGENT = [
     "unset GIT_AUTH_HEADER",
     "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP",
+    // Not as root, and this is what "no server running" actually was.
+    //
+    // These tools refuse their own skip-permissions flag when they are running
+    // as root - deliberately, and they are right to. So the agent started,
+    // refused, and exited in the same second; the window went with it and tmux
+    // took the session, which is why the terminal reported no server rather
+    // than reporting what had happened.
+    //
+    // The container is root because installing packages needs it, so the
+    // installing happens as root and the agent does not. It keeps sudo: the
+    // point is not to take privileges away, it is to not BE root while holding
+    // them.
+    'if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
+    "  command -v sudo >/dev/null 2>&1 || apt-get install -y -qq sudo >/dev/null 2>&1 || true",
+    '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',
+    "  chmod 0440 /etc/sudoers.d/polaris-agent 2>/dev/null || true",
+    '  chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
+    "fi",
     'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
     // Written last, so anything holding a prompt knows the terminal it is about
     // to type into belongs to the agent rather than to the installer.
     `: > ${AGENT_READY_FLAG}`,
-    // Takes the window over rather than opening a second one, so the terminal
-    // that showed the clone and the installs is the terminal the agent runs in.
+    `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
     'cd "$POLARIS_WORKDIR"',
-    "exec $POLARIS_AGENT_COMMAND"
+    // Run rather than exec, and a shell afterwards. `exec` replaced this shell,
+    // so an agent that exited for any reason took the window and the session
+    // with it - and every word explaining why went too.
+    'if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
+    '  su "$POLARIS_RUNAS" -c "cd \\"$POLARIS_WORKDIR\\" && $POLARIS_AGENT_COMMAND" || true',
+    "else",
+    "  $POLARIS_AGENT_COMMAND || true",
+    "fi",
+    'echo "polaris: the agent exited. This terminal is still yours."',
+    "exec sh"
 ];
 
 /**

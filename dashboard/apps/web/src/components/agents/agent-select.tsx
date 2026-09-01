@@ -44,7 +44,9 @@ export const CUSTOM_CHOICE: AgentChoice = {
     // Polaris knows nothing about a command somebody typed, including what signs
     // it in. Never blocks, and never claims to be ready.
     readiness: "unknown",
-    missing: []
+    missing: [],
+    // Nothing is known about a command somebody typed, whose account included.
+    signedInAs: null
 };
 
 export function AgentSelect({
@@ -99,6 +101,12 @@ export function AgentSelect({
                 <span className="min-w-0 flex-1 truncate text-left" title={chosen?.label ?? undefined}>
                     {chosen?.label ?? "Pick an agent"}
                 </span>
+                {chosen?.signedInAs ? (
+                    <span className="text-muted-foreground shrink-0 truncate text-xs">
+                        {chosen.signedInAs.mine ? "" : "this Polaris: "}
+                        {chosen.signedInAs.label}
+                    </span>
+                ) : null}
                 {chosen && READY_BADGE[chosen.readiness] ? (
                     <Badge variant={READY_BADGE[chosen.readiness]!.variant} className="shrink-0">
                         {READY_BADGE[chosen.readiness]!.label}
@@ -143,7 +151,26 @@ export function AgentSelect({
                                     <span className="min-w-0 flex-1 truncate" title={option.label}>
                                         {option.label}
                                     </span>
-                                    {option.vendor ? (
+                                    {/* Whose account it would use, which is the
+                                        question a list of agents was not
+                                        answering: a deployment can hold accounts
+                                        of its own and a person can hold several,
+                                        so "ready" alone left nobody able to tell
+                                        whose subscription was about to do the
+                                        work. */}
+                                    {option.signedInAs ? (
+                                        <span
+                                            className="text-muted-foreground max-w-[14rem] shrink-0 truncate text-xs"
+                                            title={
+                                                option.signedInAs.mine
+                                                    ? `Your account: ${option.signedInAs.label}`
+                                                    : `Provided by this Polaris: ${option.signedInAs.label}`
+                                            }
+                                        >
+                                            {option.signedInAs.mine ? "" : "this Polaris: "}
+                                            {option.signedInAs.label}
+                                        </span>
+                                    ) : option.vendor ? (
                                         <span className="text-muted-foreground shrink-0 text-xs">{option.vendor}</span>
                                     ) : null}
                                     {badge ? (

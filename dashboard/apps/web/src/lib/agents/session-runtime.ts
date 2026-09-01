@@ -81,6 +81,9 @@ interface Bootstrap {
     /** What stops it waiting on a menu, where the tool reads a variable for that
      *  rather than taking a flag. */
     readonly autonomyEnv: Record<string, string>;
+    /** The unprivileged account the agent runs as, or empty where Polaris does
+     *  not own the machine and choosing one would not be its call. */
+    readonly runAs: string;
 }
 
 /**
@@ -183,7 +186,8 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // flag. Held to the same rule so the two halves cannot disagree.
         autonomyEnv: core.polarisAppliesAutonomy(session.place, session.unattended, enigma.enabled)
             ? { ...agent.cli.autonomyEnv }
-            : {}
+            : {},
+        runAs: session.place === "host" ? "" : commands.CONTAINER_USER
     };
 }
 
@@ -217,6 +221,12 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_BRANCH: boot.branch,
         POLARIS_BASE_REF: boot.baseRef,
         POLARIS_TMUX: commands.TMUX_SESSION,
+        // Who the agent runs as where Polaris owns the machine. The stock Node
+        // image ships this account, and every one of these tools refuses its own
+        // skip-permissions flag while running as root. Empty on an enrolled
+        // server: there we already are somebody, and choosing a different
+        // account on their machine is not Polaris's to do.
+        POLARIS_RUNAS: boot.runAs,
         POLARIS_COLS: String(commands.TMUX_COLS),
         POLARIS_ROWS: String(commands.TMUX_ROWS),
         POLARIS_AGENT_BINARY: boot.agentBinary,

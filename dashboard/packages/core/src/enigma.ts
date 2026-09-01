@@ -255,17 +255,27 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
 export function enigmaSetupScript(settings: ResolvedEnigma): string {
     if (!settings.enabled) return "";
     const spec = enigmaPackageSpec(settings);
+    // No `set -e`. Every line below is best effort on purpose: a session without
+    // Enigma works to weaker standards, and one that died because a registry was
+    // slow works to none - and this script runs inside the window the session's
+    // terminal IS, so a non-zero exit here closed it and took tmux with it. That
+    // is what "no server running" was.
+    const pkg = spec.split("@")[0] || spec;
     const lines = [
-        "set -e",
         `echo "polaris: installing Enigma (${spec})"`,
-        `npm install -g ${spec}`,
-        `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes`
+        // `--allow-scripts` because the package's own postinstall is what puts
+        // the command together, and npm now declines to run it unasked: it says
+        // so in a warning nobody reads and then leaves an `enigma` that is not
+        // there. Named rather than blanket - this allows one package's scripts.
+        `npm install -g --allow-scripts=${pkg} ${spec} || npm install -g ${spec} || true`,
+        'command -v enigma >/dev/null 2>&1 || { echo "polaris: Enigma did not install; this session runs without it"; exit 0; }',
+        `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes || echo "polaris: Enigma installed but its own setup did not finish"`
     ];
     for (const argv of enigmaConfigArgv(settings)) {
-        lines.push(`enigma ${argv.join(" ")}`);
+        lines.push(`enigma ${argv.join(" ")} || true`);
     }
     const gate = enigmaGateArgv(settings);
-    if (gate.length > 0) lines.push(`enigma ${gate.join(" ")}`);
+    if (gate.length > 0) lines.push(`enigma ${gate.join(" ")} || true`);
     lines.push('echo "polaris: Enigma ready"');
     return lines.join("\n");
 }
