@@ -2809,6 +2809,9 @@ model AuditLog {
     // The firewall asks this table what an address did, by hashing the address and
     // matching. Without the index that is a scan of every action ever taken.
     @@index([ipHash])
+    // And the retention sweep asks by age, which is the other whole-table
+    // question this answers on a schedule.
+    @@index([at])
 }
 
 model Setting {
@@ -2901,6 +2904,10 @@ model Notification {
 
     @@index([userId, readAt])
     @@index([userId, createdAt])
+    // The retention sweep walks this table by age alone. Without this it is the
+    // one query in Polaris that scans every notification ever written, on a
+    // schedule.
+    @@index([createdAt])
 }
 
 // Somewhere an alert can be sent besides the bell and the account's mailbox: a
@@ -4892,6 +4899,8 @@ model Activity {
 
     @@index([subjectType, subjectId, createdAt])
     @@index([userId, createdAt])
+    // For the retention sweep, which asks by age and by nothing else.
+    @@index([createdAt])
 }
 
 // A saved way of looking at work: which tasks, grouped how, sorted how. Bound to

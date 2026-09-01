@@ -29,6 +29,7 @@ import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
+import { sweepRetention } from "@/lib/retention-service";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
@@ -205,6 +206,18 @@ async function runInventories(): Promise<{ servers: number; snapshots: number; a
  * choose, and a deletion scheduled for a date does not care about ten.
  */
 export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
+    {
+        key: "retention",
+        // Hourly. What this removes is a record nobody is waiting on, and the
+        // periods are measured in days - a pass that runs an hour late has
+        // removed exactly the same rows.
+        everyMs: Number(process.env.POLARIS_RETENTION_SWEEP_MS) || HOUR,
+        // Unleased. Each pass names the rows it is deleting by id, so two
+        // runners doing it at once delete the same rows and one of them counts
+        // zero. Nothing is written twice and nothing is lost.
+        leaseMs: null,
+        run: sweepRetention
+    },
     {
         key: "backups",
         everyMs: Number(process.env.POLARIS_BACKUP_SWEEP_MS) || 5 * MINUTE,

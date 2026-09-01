@@ -1074,6 +1074,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
+            label: "Keeping records",
+            href: "/admin/retention",
+            icon: Trash2,
+            keywords: [
+                "retention",
+                "logs",
+                "notifications",
+                "activity",
+                "audit",
+                "history",
+                "delete old",
+                "purge",
+                "prune",
+                "how long",
+                "days",
+                "gdpr",
+                "cleanup",
+                "disk"
+            ],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
             label: "Uploads",
             href: "/admin/uploads",
             icon: HardDrive,
