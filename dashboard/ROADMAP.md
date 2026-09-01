@@ -249,10 +249,30 @@ Agents (coding sessions):
       session in a container on the box or on an enrolled server, in a git
       worktree of its own - so it authenticates the way it already does on that
       machine and nothing is re-entered into or held by Polaris
+- [x] Signing in an agent runs against the person's own persistent home rather
+      than a throwaway container that gets destroyed after: the same account a
+      session runs as, so the login itself is the result and not just a token
+      pasted back (still offered, for a place that home does not reach). It
+      installs into that home's npm prefix, so the tool is already there for the
+      first session, and keeps a shell open after the login exits instead of
+      closing the one window somebody was there to read
 - [x] What a session is doing is read from its own lifecycle hooks where the
       tool supports them (written into the worktree rather than the machine's
       home directory), and from its terminal output otherwise; steering it is a
       bracketed paste and a newline into that terminal
+- [x] A starting session shows a progress bar and step list read off that same
+      terminal output rather than a bare spinner, so a slow clone reads
+      differently from a machine that has given up; it stops once the agent has
+      the terminal
+- [x] A session may open with no repository - an agent on a machine of one's
+      own with nothing checked out, which is what a person does on their own
+      laptop. It authorizes through the account that started it rather than a
+      repository's owner, and its working directory lives inside the persistent
+      home so files survive between sessions, unlike a checkout
+- [x] A machine everybody shares, off unless an administrator turns it on under
+      `/admin/agents`: one shared home rather than one per account, so anybody
+      opening it is signed in with what the last person signed in there, and
+      finds what the last person left
 - [x] Sessions list sorted by what needs a person, a session page with the
       transcript, the activity and the prompt box, and a terminal that attaches
       to the agent's own tmux rather than opening a shell beside it
@@ -263,7 +283,9 @@ Agents (coding sessions):
 - [x] Enigma - the operator's policy skills, operating contract, slash commands
       and post-edit guardrails - installed into every session by default,
       resolved as one setting down instance/account/repository/session tiers
-      where null means inherit and only a fully resolved value is ever used
+      where null means inherit and only a fully resolved value is ever used; a
+      workspace session has no repository to resolve through, so it sees only
+      the account's own tier and the instance's
 - [ ] Live end-to-end run against a real container or enrolled server (built +
       unit-tested; this dev machine has no Docker, so the container and SSH
       runtime paths are exercised only through their pure parts)
@@ -467,7 +489,9 @@ Code (pull requests and issues):
   setting anything at all on a session must never silently drop the
   instance-wide policy underneath it. A resolved value is never the one
   stored - only null ("inherit") and explicit choices are, so raising the
-  instance default keeps reaching every tier that never overrode it.
+  instance default keeps reaching every tier that never overrode it. A
+  workspace session (no `repoId`) has no repository tier to resolve through,
+  so it resolves down session, account, instance and skips the middle one.
 - Accepted dependency risk: two moderate advisories remain against `postcss@8.4.31`
   bundled inside Next.js's private build toolchain (an XSS-in-CSS-stringify path
   that our app never exercises - build-time only, no untrusted CSS). The direct
