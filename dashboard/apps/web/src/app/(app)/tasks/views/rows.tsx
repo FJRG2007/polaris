@@ -20,6 +20,7 @@ import { PriorityMark } from "@/components/priority-mark";
 import { useDisplayFormat } from "@/components/display-format";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
+import { columnStatusIds, reorderColumns } from "./board";
 import {
     commandsFor,
     TaskControls,
@@ -204,12 +205,65 @@ function TaskLine({
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } =
+    const { groups, canEdit, context, groupBy, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } =
         props;
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
+
+    /**
+     * Arranging the sections, which the board has always allowed and this did
+     * not.
+     *
+     * They are the same sections. A board draws them left to right and a list
+     * draws them top to bottom, and somebody who has put their columns in the
+     * order their team works in should not find that order thrown away by
+     * switching how the same work is drawn. So the heading is the handle, the
+     * same way the column heading is, and it writes the same order to the same
+     * place - it belongs to the space, so everybody on it opens in it.
+     *
+     * Only where the sections stand for something the space owns. Grouped by
+     * assignee or by priority they are slices of the data rather than columns,
+     * and there is nothing to write down.
+     */
+    const [draggingGroup, setDraggingGroup] = useState<string | null>(null);
+    const [groupOver, setGroupOver] = useState<string | null>(null);
+    /** The order a drop asked for, held while the write is in flight so the
+     *  sections do not spring back for the length of a round trip. */
+    const [pendingOrder, setPendingOrder] = useState<readonly string[] | null>(null);
+
+    const columns = useMemo(() => core.statusColumns(context.statuses), [context.statuses]);
+    const byStatus = (groupBy ?? "status") === "status";
+    const canOrderGroups = byStatus && props.onReorderStatuses !== undefined && groups.length > 1;
+
+    /** The sections in the order they are drawn: what the space says, with a
+     *  drop that has not landed yet applied over it. */
+    const shown = useMemo(() => {
+        if (!pendingOrder) return groups;
+        const byKey = new Map(groups.map((group) => [group.key, group]));
+        const moved = pendingOrder
+            .map((key) => byKey.get(key))
+            .filter((group): group is (typeof groups)[number] => group !== undefined);
+        // Anything the held order does not name - the pile with no status, a
+        // section that arrived while the write was in flight - keeps its place at
+        // the end rather than disappearing.
+        const named = new Set(pendingOrder);
+        return [...moved, ...groups.filter((group) => !named.has(group.key))];
+    }, [groups, pendingOrder]);
+
+    const dropGroup = async (targetKey: string) => {
+        const dragged = draggingGroup;
+        setDraggingGroup(null);
+        setGroupOver(null);
+        if (!dragged || !props.onReorderStatuses || !targetKey || dragged === targetKey) return;
+        const order = reorderColumns(shown.map((group) => group.key), dragged, targetKey);
+        setPendingOrder(order);
+        // A section can stand for more than one status - two statuses sharing a
+        // name are read as one - so the order written down is every status
+        // behind every section, in the order the sections now sit in.
+        await props.onReorderStatuses(order.flatMap((key) => columnStatusIds(columns, key)));
+    };
 
     const toggleGroup = (key: string) => {
         const next = new Set(collapsed);
@@ -240,7 +294,7 @@ export function ListView(props: ViewProps) {
 
     return (
         <div className="flex flex-col gap-4">
-            {groups.map((group) => {
+            {shown.map((group) => {
                 const isCollapsed = collapsed.has(group.key);
                 // Nest subtasks under the parent they belong to, when both are in
                 // this group. The engine works in facts, so the rows are mapped
@@ -248,12 +302,49 @@ export function ListView(props: ViewProps) {
                 const byId = new Map(group.tasks.map((task) => [task.id, task]));
                 const rows = core.flattenTree(core.buildTaskTree(group.tasks.map(toFacts)));
 
+                // The pile of work with no status is not a section of the space:
+                // there is nothing there to move.
+                const movable = canOrderGroups && group.key !== "";
+
                 return (
                     <section key={group.key} className="rounded-lg border border-border">
                         {/* Sticky, because a long group scrolls past its own
                             heading and "which status am I looking at" is the one
                             question the heading exists to answer. */}
-                        <header className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-surface px-3 py-2">
+                        <header
+                            draggable={movable}
+                            onDragStart={(event) => {
+                                if (!movable) return;
+                                // Its own kind, so a section being moved is never
+                                // mistaken for a card being moved into it.
+                                event.dataTransfer.setData("text/x-polaris-group", group.key);
+                                event.dataTransfer.effectAllowed = "move";
+                                setDraggingGroup(group.key);
+                            }}
+                            onDragEnd={() => {
+                                setDraggingGroup(null);
+                                setGroupOver(null);
+                            }}
+                            onDragOver={(event) => {
+                                if (!draggingGroup || draggingGroup === group.key) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setGroupOver(group.key);
+                            }}
+                            onDragLeave={() => setGroupOver((at) => (at === group.key ? null : at))}
+                            onDrop={(event) => {
+                                if (!draggingGroup) return;
+                                event.preventDefault();
+                                event.stopPropagation();
+                                void dropGroup(group.key);
+                            }}
+                            className={cn(
+                                "sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-surface px-3 py-2",
+                                movable && "cursor-grab active:cursor-grabbing",
+                                draggingGroup === group.key && "opacity-50",
+                                groupOver === group.key && "ring-2 ring-inset ring-primary"
+                            )}
+                        >
                             <button
                                 type="button"
                                 onClick={() => toggleGroup(group.key)}

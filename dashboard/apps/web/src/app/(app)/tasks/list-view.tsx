@@ -721,7 +721,8 @@ export function ListScreen({
     };
 
     /**
-     * The screen's own keys: N starts a task, Escape drops the selection.
+     * The screen's own keys: N starts a task, Escape drops the selection, Delete
+     * takes the selected ones away.
      *
      * They listen on the window so they work wherever the focus sits on the
      * board, and stand down whenever something else owns the keyboard - a field
@@ -775,6 +776,16 @@ export function ListScreen({
             // Any other modifier means the press belongs to the browser or to an
             // editing shortcut (Ctrl+N opens a window), never to this one.
             if (event.altKey || event.shiftKey) return;
+            // What the bin in the selection bar does, and what the menu's Delete
+            // does: it opens the confirmation rather than deleting. A key that
+            // removed work on a single press would be the one gesture on this
+            // screen with no undo, reachable by leaning on a keyboard - and it is
+            // several tasks at once, which is worse.
+            if (event.key === "Delete" && selected.length > 0 && context.canEdit) {
+                event.preventDefault();
+                setDeleting(selected);
+                return;
+            }
             if (event.key.toLowerCase() !== "n" || !context.canEdit || !createTarget) return;
             event.preventDefault();
             setCreating({ name: "", dueDate: null });

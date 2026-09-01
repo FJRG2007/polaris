@@ -579,13 +579,32 @@ async function statusInSpace(
     return { id: sameName.id, type: sameName.type };
 }
 
+/**
+ * Where a task just created lands in a list somebody has arranged by hand.
+ *
+ * At the top, which is the opposite of where it used to go. A manual order is
+ * read top-down as "what to do next", so appending puts the thing somebody has
+ * this second decided to do at the bottom of a list of everything they decided
+ * earlier - and on a column of any length it lands off the screen entirely, which
+ * reads as the task not having been created at all.
+ *
+ * Every board that has both a manual order and a create button does it this way,
+ * and for the same reason: what you just typed is the thing you are looking at.
+ *
+ * Orders can go negative, and that is fine - the column is an integer and
+ * `arrangeAround` already produces values below the first row when something is
+ * dropped above it. Nothing reads the sign.
+ */
 async function nextOrderInList(listId: string): Promise<number> {
-    const last = await prisma.task.findFirst({
+    const first = await prisma.task.findFirst({
         where: { listId },
-        orderBy: { order: "desc" },
+        orderBy: { order: "asc" },
         select: { order: true }
     });
-    return (last?.order ?? 0) + core.ORDER_STEP;
+    // An empty list starts at one step rather than at zero, so there is room
+    // below the first row for something to be dropped under it later.
+    if (!first) return core.ORDER_STEP;
+    return first.order - core.ORDER_STEP;
 }
 
 /**

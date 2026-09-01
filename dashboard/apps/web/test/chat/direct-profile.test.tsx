@@ -118,12 +118,22 @@ describe("how the person is drawn", () => {
         expect(container.querySelectorAll("[aria-hidden='true'].rounded-full")).toHaveLength(0);
     });
 
-    it("says the name, then the handle, then where they are and what they are showing", async () => {
+    it("says the name, then the handle, then what they are showing", async () => {
         panel();
         expect(await screen.findByText("Grace Hopper")).toBeDefined();
         expect(screen.getByText("grace")).toBeDefined();
-        expect(screen.getAllByText("Away").length).toBeGreaterThan(0);
         expect(screen.getByText("Reading the manual")).toBeDefined();
+    });
+
+    it("does not spell out where they are underneath the face that already says it", async () => {
+        // The dot carries it, in the colour it carries it in everywhere else, and
+        // a line of the panel saying "Away" underneath is the same fact twice.
+        // It survives where a colour cannot be read - the dot's own label and
+        // tooltip - and nowhere else, which is what the count below asserts.
+        panel();
+        await screen.findByText("Grace Hopper");
+        expect(screen.queryAllByText("Away")).toHaveLength(0);
+        expect((await screen.findAllByTitle("Away")).length).toBeGreaterThan(0);
     });
 
     it("draws the band across the top, whether or not they uploaded one", async () => {

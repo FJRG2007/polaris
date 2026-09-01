@@ -18,10 +18,11 @@
  *
  * It is drawn the way a person is drawn everywhere else in Polaris, and that is
  * the point rather than a detail: the dot rides on the face, where every other
- * screen puts it, instead of being spelled out as a line of its own under the
- * name. Somewhere with room to say it, the word goes beside what they are
- * showing today; the colour still has to mean the same thing here as it does in
- * the roster, or it means nothing anywhere.
+ * screen puts it, and it is the only thing that says where they are. The word
+ * used to be printed underneath as well, which was the same fact twice - and the
+ * second one cost a line of a narrow panel to tell somebody what the colour on
+ * the face had already told them. It survives on the dot's own label and
+ * tooltip, so nobody who cannot read a colour loses it.
  *
  * The shape is a profile rather than a centred card: a band across the top, the
  * face cut out of its lower edge on the left, and everything about them reading
@@ -37,9 +38,9 @@
  * unreachable from the one place devoted to them. It is the same menu, opened by
  * a press instead of a right-click, not a second copy of it.
  *
- * The dot and the words come from the presence store, which is already asking
- * about this person for the avatar in the header. So this costs one request for
- * the profile itself, once, and nothing after that.
+ * The line they are showing comes from the presence store, which is already
+ * asking about this person for the avatar in the header. So this costs one
+ * request for the profile itself, once, and nothing after that.
  */
 
 import Link from "next/link";
@@ -49,7 +50,6 @@ import { useChat } from "./chat-context";
 import { useWideScreen } from "./use-wide-screen";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
-import { PRESENCE_WORDS } from "@polaris/core";
 import { NicknameDialog } from "./nickname-dialog";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import { MutualPanel } from "@/components/mutual-panel";
@@ -171,21 +171,20 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                     ) : null}
                 </div>
 
-                {/* Where they are and what they are showing, in that order and in
-                    one place. The word is still said - a colour on its own is a
-                    convention somebody has to have learnt, and this is the one
-                    screen with room to spell it out - but it sits with the note
-                    rather than standing in for the dot. The note is only ever
-                    there while they are actually here; see `presence-service`. */}
-                {where && (
-                    <div className="flex w-full flex-col gap-1">
-                        <p className="text-xs text-muted-foreground">{PRESENCE_WORDS[where.status]}</p>
-                        {where.note && (
-                            <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
-                                {where.note}
-                            </p>
-                        )}
-                    </div>
+                {/* What they are showing, and only that. Where they are is
+                    already on the face above: the dot says it, in the colour it
+                    says it in everywhere else in Polaris, and spelling "Online"
+                    out underneath is the same fact twice. The word is still on
+                    the dot's own label and tooltip, so it is not lost to anybody
+                    who cannot read a colour.
+
+                    The note is a different fact - it is what this person chose to
+                    say - and it is only ever there while they are actually here;
+                    see `presence-service`. */}
+                {where?.note && (
+                    <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+                        {where.note}
+                    </p>
                 )}
 
                 {/* What the two of them have in common, drawn from the same

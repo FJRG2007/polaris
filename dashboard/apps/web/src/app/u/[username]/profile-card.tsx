@@ -37,7 +37,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProfileActions } from "./profile-actions";
 import { MutualPanel } from "@/components/mutual-panel";
 import { FollowLists } from "./follow-lists";
-import { linkLabel, PRESENCE_WORDS } from "@polaris/core";
+import { linkLabel } from "@polaris/core";
 import { usePresence } from "@/components/presence-store";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
@@ -123,20 +123,21 @@ export function ProfileCard({
                     ) : null}
                 </div>
 
-                {/* Where they are, and what they are showing, in that order. The
-                    word is said as well as drawn - a colour on its own is a
-                    convention somebody has to have learnt, and this page has the
-                    room - and the note is only ever there while they actually
-                    are here; see `presence-service`. */}
-                {where ? (
-                    <div className="flex flex-col gap-1">
-                        <p className="text-muted-foreground text-xs">{PRESENCE_WORDS[where.status]}</p>
-                        {where.note ? (
-                            <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
-                                {where.note}
-                            </p>
-                        ) : null}
-                    </div>
+                {/* The line they are showing, and only that. Where they are is
+                    already on their face: the dot says it, in the colour it says
+                    it in everywhere else, and printing "Online" underneath is the
+                    same fact twice - the second one taking a line of the page to
+                    tell somebody what the first already told them. The word is
+                    still on the dot's own label and tooltip, so a reader who
+                    cannot see a colour still gets it.
+
+                    The note is not the same fact. It is what this person chose to
+                    say, and nothing else on screen carries it. It is only ever
+                    there while they actually are here; see `presence-service`. */}
+                {where?.note ? (
+                    <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
+                        {where.note}
+                    </p>
                 ) : null}
 
                 {!own && signedIn ? (

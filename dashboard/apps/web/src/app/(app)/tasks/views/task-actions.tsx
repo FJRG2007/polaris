@@ -51,6 +51,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    MenuShortcut,
     ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuSub,
@@ -690,6 +691,10 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                             <ContextMenuItem variant="danger" onSelect={commands.onDelete}>
                                 <Trash2 className="size-3.5" />
                                 {many ? `Delete ${targets.length} tasks` : "Delete"}
+                                {/* The key that does the same thing to the same
+                                    selection, said out loud - the way chat says
+                                    it, and drawn by the same component. */}
+                                <MenuShortcut>Del</MenuShortcut>
                             </ContextMenuItem>
                         </>
                     )}
