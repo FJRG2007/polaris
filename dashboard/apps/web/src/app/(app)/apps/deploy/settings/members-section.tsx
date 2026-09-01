@@ -14,6 +14,7 @@
  */
 
 import { SettingsCard } from "../project-settings";
+import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useDisplayFormat } from "@/components/display-format";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ProjectAccessCandidates, ProjectMemberView } from "@/lib/deploy-project-service";
@@ -88,6 +89,32 @@ const PRINCIPAL_ICONS: Record<ProjectPrincipalKind, typeof Users> = {
     org: Building2,
     everyone: Globe2
 };
+
+/**
+ * Who an entry is for, drawn.
+ *
+ * A person is their face and an organization is its mark, the way they are
+ * everywhere else here - a list of people that draws the same grey outline
+ * against every name reads as a list of rows rather than of colleagues, and it
+ * is the one screen where telling two of them apart at a glance matters.
+ *
+ * A team and the everyone entry keep the icon: neither has a picture, and
+ * initials from "Everyone" would be a face for something that is not a person.
+ */
+function PrincipalFace({ entry }: { entry: ProjectMemberView }) {
+    if (entry.principal === "user" && entry.principalId) {
+        return <Avatar person={{ id: entry.principalId, name: entry.name }} size={28} />;
+    }
+    if (entry.principal === "org" && entry.principalId) {
+        return <OrgAvatar org={{ id: entry.principalId, name: entry.name }} size={28} />;
+    }
+    const Icon = PRINCIPAL_ICONS[entry.principal];
+    return (
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Icon className="size-4 shrink-0 text-muted-foreground" />
+        </span>
+    );
+}
 
 interface Environment {
     id: string;
@@ -268,14 +295,13 @@ export function MembersSection({ projectId }: { projectId: string }) {
                         </div>
                     ) : (
                         members.map((entry) => {
-                            const Icon = PRINCIPAL_ICONS[entry.principal];
                             return (
                                 <div
                                     key={entry.id}
                                     className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-0"
                                 >
                                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                                        <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                        <PrincipalFace entry={entry} />
                                         <div className="min-w-0">
                                             <p className="flex items-center gap-2 truncate text-sm font-medium">
                                                 {entry.name}
