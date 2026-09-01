@@ -941,6 +941,38 @@ export async function bulkUpdateAction(
     }
 }
 
+/**
+ * Paste a selection into a list.
+ *
+ * Two permissions, not one: whoever pastes has to be able to read every task
+ * they copied and to write to the list they are putting it in. The read is the
+ * narrowing every other selection goes through - an id that moved out of reach
+ * since the screen loaded is left out rather than failing the paste - and the
+ * write on the destination is checked outright, because that one is a single
+ * place somebody either may or may not put work.
+ */
+export async function copyTasksAction(
+    input: unknown
+): Promise<{ report?: tasks.TaskCopyReport; error?: string }> {
+    const caller = await actor();
+    const parsed = core.taskCopySchema.safeParse(input);
+    if (!parsed.success) return { error: "Check the selection and try again" };
+    try {
+        const destination = await access.requireList(caller, parsed.data.listId, "member");
+        const readable = await access.writableTasks(caller, parsed.data.taskIds, "guest");
+        if (readable.length === 0) return { error: "None of those tasks are yours to copy" };
+        const report = await tasks.copyTasks(
+            caller.id,
+            readable.map((task) => task.id),
+            parsed.data.listId
+        );
+        refresh(caller, destination.spaceId);
+        return { report };
+    } catch (caught) {
+        return failure(caught, "Could not paste those tasks");
+    }
+}
+
 /** Delete a selection. The ids arrive from the browser like any other list, so
  *  what is actually deleted is the part of it the caller was cleared to write -
  *  the same narrowing a bulk edit goes through. */

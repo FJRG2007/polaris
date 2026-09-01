@@ -25,6 +25,7 @@ import { runAction } from "@/lib/run-action";
 import { GanttView } from "./views/schedule";
 import { CalendarView } from "./views/calendar";
 import { keyboardIsBusy } from "@/lib/keyboard";
+import { readTaskClipboard, writeTaskClipboard } from "./clipboard";
 import { useStableOrder } from "./stable-order";
 import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
@@ -36,7 +37,7 @@ import { bulkOverlay, taskOverlay, useLatest } from "./optimistic";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
-import { Button, ConfirmDeleteDialog, EmptyState, Select, cn } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, EmptyState, Select, cn, useToast } from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
 import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
 import type {
@@ -100,6 +101,7 @@ export function ListScreen({
     initialFilter
 }: ListScreenProps) {
     const router = useRouter();
+    const toast = useToast();
     const format = useDisplayFormat();
     const [, startRefresh] = useTransition();
 
@@ -667,6 +669,58 @@ export function ListScreen({
     };
 
     /**
+     * Put the selection on the clipboard.
+     *
+     * Ids only - what a paste actually copies is read on the server when it
+     * lands, so a clipboard left sitting pastes what the task says now.
+     */
+    const copySelection = (targets: readonly TaskRow[]) => {
+        if (targets.length === 0) return;
+        const label = targets.length === 1 ? targets[0]!.name : `${targets.length} tasks`;
+        writeTaskClipboard({ taskIds: targets.map((task) => task.id), label });
+        toast.show({ key: "tasks-copy", title: `Copied ${label}` });
+    };
+
+    /**
+     * Paste what was copied into this screen's list.
+     *
+     * The destination is the list a new task would go in, which is the list on a
+     * list screen and the first one in reach on a screen that spans several - the
+     * same answer "New task" gives, so paste never lands somewhere the reader
+     * could not have created work by hand.
+     *
+     * Across spaces a status, a tag and an assignee are all rows the destination
+     * may not have. They are matched by name over there and left off when there
+     * is no match, and what was left off is said rather than absorbed: a card
+     * that quietly arrived without its label is one somebody acts on believing it
+     * still has it.
+     */
+    const pasteClipboard = async () => {
+        const held = readTaskClipboard();
+        if (!held || !createTarget) return;
+        const result = await runAction(
+            () => actions.copyTasksAction({ taskIds: held.taskIds, listId: createTarget }),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            return;
+        }
+        const report = result.report;
+        if (!report) return;
+        const left: string[] = [];
+        if (report.droppedStatuses > 0) left.push("a status");
+        if (report.droppedTags > 0) left.push(report.droppedTags === 1 ? "a tag" : "tags");
+        if (report.droppedAssignees > 0) left.push("people");
+        toast.show({
+            key: "tasks-paste",
+            title: report.created === 1 ? "Pasted one task" : `Pasted ${report.created} tasks`,
+            body: left.length > 0 ? `This space has no ${left.join(", no ")} to match, so that was left off.` : undefined
+        });
+        refresh();
+    };
+
+    /**
      * The screen's own keys: N starts a task, Escape drops the selection.
      *
      * They listen on the window so they work wherever the focus sits on the
@@ -689,9 +743,38 @@ export function ListScreen({
                 clearSelection();
                 return;
             }
-            // A modifier means the press belongs to the browser or to an editing
-            // shortcut (Ctrl+N opens a window), never to this one.
-            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+            // The clipboard three, read the way every list of things reads them:
+            // select everything on screen, copy what is selected, paste it where
+            // you are now. `keyboardIsBusy` has already stood these down while a
+            // field or a dialog has the keyboard, so copying text out of a task
+            // name still works.
+            if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
+                const pressed = event.key.toLowerCase();
+                if (pressed === "a" && visible.length > 0) {
+                    event.preventDefault();
+                    hold(new Set(visible.map((task) => task.id)));
+                    setAnchor(null);
+                    return;
+                }
+                if (pressed === "c" && selected.length > 0) {
+                    event.preventDefault();
+                    copySelection(selected);
+                    return;
+                }
+                if (pressed === "v" && context.canEdit && createTarget) {
+                    // Nothing copied is not an error and not a swallowed key: the
+                    // browser keeps the press, which is what somebody pasting into
+                    // this screen from elsewhere would expect.
+                    if (!readTaskClipboard()) return;
+                    event.preventDefault();
+                    void pasteClipboard();
+                    return;
+                }
+                return;
+            }
+            // Any other modifier means the press belongs to the browser or to an
+            // editing shortcut (Ctrl+N opens a window), never to this one.
+            if (event.altKey || event.shiftKey) return;
             if (event.key.toLowerCase() !== "n" || !context.canEdit || !createTarget) return;
             event.preventDefault();
             setCreating({ name: "", dueDate: null });
@@ -699,9 +782,11 @@ export function ListScreen({
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
         // `clearSelection` only ever calls setState, which React keeps stable, so
-        // what the handler actually reads is the three below.
+        // what the handler actually reads is the list below. `visible` and
+        // `selected` are memoized, so this re-binds when the rows or the
+        // selection change rather than on every render.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selection.size, context.canEdit, createTarget]);
+    }, [selection.size, visible, selected, context.canEdit, createTarget]);
 
     /**
      * Whether this screen may change the columns at all.

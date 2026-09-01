@@ -1143,6 +1143,21 @@ export const taskSelectionSchema = z.object({
 
 export type TaskSelectionInput = z.infer<typeof taskSelectionSchema>;
 
+/**
+ * A paste: a selection copied into one list, which may belong to another space
+ * entirely.
+ *
+ * The destination is a list rather than a space because that is what a screen
+ * knows - somebody pressing paste is looking at a list, a space or a board, and
+ * every one of those resolves to one list to put the work in.
+ */
+export const taskCopySchema = z.object({
+    taskIds: z.array(uuid).min(1).max(TASK_SELECTION_MAX),
+    listId: uuid
+});
+
+export type TaskCopyInput = z.infer<typeof taskCopySchema>;
+
 export const commentSchema = z.object({
     taskId: uuid,
     body: commentBody,

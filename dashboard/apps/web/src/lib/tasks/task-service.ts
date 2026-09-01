@@ -23,6 +23,7 @@ import * as comments from "@/lib/comments/comments";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
 import { notifyMentions } from "@/lib/rich-text/mention-notify";
+import { spacePeople } from "./space-service";
 import { listCommits, type CommitLink } from "./commit-service";
 import { listAttachments, type AttachmentView } from "./attachment-service";
 import { hasAutomationsFor, runAutomations, runAutomationsFor } from "./automation-service";
@@ -1502,4 +1503,165 @@ export async function duplicateTask(actorId: string, taskId: string): Promise<st
         });
     }
     return created.id;
+}
+/**
+ * What a paste carried and what it could not.
+ *
+ * A copy into another space cannot take everything with it: a status, a tag and
+ * a person are all things that belong to a space, and the destination may have
+ * no equivalent. What is dropped is counted rather than silently absorbed,
+ * because a card that quietly arrived without its label is one somebody acts on
+ * believing it still has it.
+ */
+export interface TaskCopyReport {
+    readonly created: number;
+    readonly droppedTags: number;
+    readonly droppedAssignees: number;
+    readonly droppedStatuses: number;
+}
+
+/** A name matched the way a person would match it: case and edge spaces are not
+ *  the difference between "Done" and "done". */
+function nameKey(value: string): string {
+    return value.trim().toLowerCase();
+}
+
+/**
+ * Copy a set of tasks into one list, which may belong to another space.
+ *
+ * This is the paste behind Ctrl+V, and the reason it is not `duplicateTask` in a
+ * loop: everything hanging off a task is scoped to its space. A status, a tag
+ * and an assignee are rows of the space the task came from, so carrying their
+ * ids across would either fail the write or file the copy under another space's
+ * data. Each is matched by name into the destination instead - a tag called
+ * "urgent" over there is the same label to whoever pasted it - and what has no
+ * match is left off and counted.
+ *
+ * Subtasks and checklists come along, however deep, for the same reason a
+ * duplicate takes them: a copy that drops half the work is worse than no copy.
+ * An id whose parent is also in the set is skipped at the top level, so
+ * selecting a task and its subtask pastes one tree rather than two copies of the
+ * child.
+ */
+export async function copyTasks(
+    actorId: string,
+    taskIds: readonly string[],
+    listId: string
+): Promise<TaskCopyReport> {
+    const list = await prisma.taskList.findUnique({
+        where: { id: listId },
+        select: { id: true, spaceId: true }
+    });
+    if (!list) throw new Error("That list no longer exists");
+
+    const sources = await prisma.task.findMany({
+        where: { id: { in: [...taskIds] } },
+        select: { id: true, parentId: true }
+    });
+    const given = new Set(sources.map((task) => task.id));
+    // A subtask whose parent is being pasted travels with the parent; pasting it
+    // again at the top level would put the same work on the board twice.
+    const roots = sources.filter((task) => !task.parentId || !given.has(task.parentId));
+    if (roots.length === 0) return { created: 0, droppedTags: 0, droppedAssignees: 0, droppedStatuses: 0 };
+
+    const [statuses, tags, people] = await Promise.all([
+        prisma.taskStatus.findMany({ where: { spaceId: list.spaceId }, select: { id: true, name: true } }),
+        prisma.taskTag.findMany({ where: { spaceId: list.spaceId }, select: { id: true, name: true } }),
+        spacePeople(list.spaceId)
+    ]);
+    const statusByName = new Map(statuses.map((status) => [nameKey(status.name), status.id]));
+    const tagByName = new Map(tags.map((tag) => [nameKey(tag.name), tag.id]));
+    const canAssign = new Set(people.map((person) => person.id));
+    const fallbackStatus = await defaultStatusId(list.spaceId);
+
+    const report = { created: 0, droppedTags: 0, droppedAssignees: 0, droppedStatuses: 0 };
+
+    /** Copy one task and everything under it, returning the new id. */
+    const copyOne = async (sourceId: string, parentId: string | null): Promise<string | null> => {
+        const source = await prisma.task.findUnique({
+            where: { id: sourceId },
+            select: {
+                spaceId: true,
+                sprintId: true,
+                name: true,
+                description: true,
+                priority: true,
+                startDate: true,
+                dueDate: true,
+                timed: true,
+                timeEstimate: true,
+                points: true,
+                milestone: true,
+                blockedUntil: true,
+                blockedNote: true,
+                status: { select: { name: true } },
+                assignees: { select: { userId: true } },
+                tags: { select: { tag: { select: { name: true } } } },
+                checklists: {
+                    select: { name: true, order: true, items: { select: { name: true, order: true } } }
+                },
+                subtasks: { select: { id: true } }
+            }
+        });
+        if (!source) return null;
+
+        const statusId = source.status ? statusByName.get(nameKey(source.status.name)) ?? null : null;
+        if (source.status && !statusId) report.droppedStatuses += 1;
+
+        const tagIds: string[] = [];
+        for (const entry of source.tags) {
+            const id = tagByName.get(nameKey(entry.tag.name));
+            if (id) tagIds.push(id);
+            else report.droppedTags += 1;
+        }
+
+        const assigneeIds: string[] = [];
+        for (const entry of source.assignees) {
+            if (canAssign.has(entry.userId)) assigneeIds.push(entry.userId);
+            else report.droppedAssignees += 1;
+        }
+
+        const created = await createTask(actorId, list.spaceId, {
+            listId: list.id,
+            name: source.name,
+            description: source.description,
+            parentId,
+            statusId: statusId ?? fallbackStatus,
+            priority: source.priority as core.TaskPriority,
+            assigneeIds,
+            tagIds,
+            startDate: source.startDate?.toISOString() ?? null,
+            dueDate: source.dueDate?.toISOString() ?? null,
+            timed: source.timed,
+            timeEstimate: source.timeEstimate,
+            points: source.points,
+            // A sprint belongs to a space, so it follows the copy only when the
+            // copy stays put. Across spaces it is dropped rather than pointed at
+            // a window the destination has never heard of.
+            sprintId: source.spaceId === list.spaceId ? source.sprintId : null,
+            milestone: source.milestone,
+            blockedUntil: source.blockedUntil?.toISOString() ?? null,
+            blockedNote: source.blockedNote,
+            recurrence: null
+        });
+        report.created += 1;
+
+        for (const checklist of source.checklists) {
+            await prisma.taskChecklist.create({
+                data: {
+                    taskId: created.id,
+                    name: checklist.name,
+                    order: checklist.order,
+                    items: {
+                        create: checklist.items.map((item) => ({ name: item.name, order: item.order }))
+                    }
+                }
+            });
+        }
+        for (const subtask of source.subtasks) await copyOne(subtask.id, created.id);
+        return created.id;
+    };
+
+    for (const root of roots) await copyOne(root.id, null);
+    return report;
 }
