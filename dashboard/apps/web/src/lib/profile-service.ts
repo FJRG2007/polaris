@@ -32,11 +32,17 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { blockedBetween } from "@/lib/blocks";
+import { blockedBy, blockersOf } from "@/lib/blocks";
 import { areFriends } from "@/lib/friends-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { mutualsBetween } from "@/lib/mutuals";
 import { followCounts, followsPerson } from "@/lib/people-follow";
-import { allowedBy, defaultFollowerAudience, type PrivacyViewer } from "@/lib/privacy-service";
+import {
+    allowedBy,
+    defaultFollowerAudience,
+    maySee,
+    type PrivacyViewer
+} from "@/lib/privacy-service";
 
 /** Whether a profile may be read by somebody with no session. */
 const PUBLIC_KEY = "profiles.public";
@@ -73,6 +79,19 @@ export interface ProfileStanding {
      *  stranger is what a block list exists because of, and following somebody
      *  is not a relationship they agreed to. */
     readonly canMessage: boolean;
+    /**
+     * Whether this reader has blocked them.
+     *
+     * Their page still opens - that is the whole reason this is here. Somebody
+     * who blocks from a profile and is then shown "nothing to show here" has no
+     * way back to the one control that would undo it, and the page they cannot
+     * see is the page with Unblock on it. Somebody who blocked THEM is a
+     * different question and is answered by the page not existing.
+     */
+    readonly blocked: boolean;
+    /** Whether this reader may ask at all. Their setting decides, and somebody
+     *  it turns down is not told: the button is simply not drawn. */
+    readonly canAskToBeFriends: boolean;
 }
 
 /** A person, as their own page draws them. */
@@ -116,6 +135,19 @@ export interface PublicProfile {
     readonly follows: { readonly followers: number; readonly following: number } | null;
     /** What this reader may do about them. */
     readonly standing: ProfileStanding;
+    /**
+     * What the two of them have in common, or null on your own page and for a
+     * reader with no account.
+     *
+     * Neither half is a disclosure either side has not already made: a friend in
+     * common is somebody both are friends with, and a space in common is a room
+     * both are standing in. What is not answered here is the rest of either
+     * list - that is the follower setting's business.
+     */
+    readonly mutual: {
+        readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
+        readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
+    } | null;
 }
 
 /** A stored JSON list of strings, out of its own column. Anything unparseable
@@ -331,7 +363,12 @@ export async function publicProfile(
     if (!user || !user.username || user.bannedAt) return null;
 
     const own = viewer?.id === user.id;
-    if (!own && viewer && (await blockedBetween(viewer.id, [user.id])).has(user.id)) return null;
+    // Somebody who blocked this reader has no page for them. Somebody this
+    // reader blocked still does: it is where Unblock is, and hiding it would
+    // make the block the one thing here that cannot be undone from where it was
+    // made. `blockersOf` and `blockedBy` are one query apart and confusing them
+    // is silent in both directions - see `lib/blocks`.
+    if (!own && viewer && (await blockersOf(viewer.id, [user.id])).has(user.id)) return null;
 
     const allowed = await visible(user.id, viewer, [
         "discoverable",
@@ -445,9 +482,12 @@ async function draw(
             : [];
 
     const full = [user.firstName ?? "", user.lastName ?? ""].join(" ").trim();
-    const [follows, standing] = await Promise.all([
+    const [follows, standing, mutual] = await Promise.all([
         allowed.followers ? followCounts(user.id) : Promise.resolve(null),
-        standingOf(user.id, viewer, own)
+        standingOf(user.id, viewer, own),
+        // Nothing to have in common with yourself, and a reader with no account
+        // shares nothing with anybody.
+        viewer && !own ? mutualsBetween(viewer.id, user.id) : Promise.resolve(null)
     ]);
     return {
         id: user.id,
@@ -464,7 +504,8 @@ async function draw(
         pronouns: user.pronouns ?? "",
         links: profileLinks(user.links),
         follows,
-        standing
+        standing,
+        mutual
     };
 }
 
@@ -494,9 +535,17 @@ async function standingOf(
     viewer: PrivacyViewer | null,
     own: boolean
 ): Promise<ProfileStanding> {
-    if (own || !viewer) return { friendship: null, following: false, canMessage: false };
+    if (own || !viewer) {
+        return {
+            friendship: null,
+            following: false,
+            canMessage: false,
+            blocked: false,
+            canAskToBeFriends: false
+        };
+    }
 
-    const [friends, following, pending] = await Promise.all([
+    const [friends, following, pending, blocked, mayAsk] = await Promise.all([
         areFriends(viewer.id, personId),
         followsPerson(viewer.id, personId),
         prisma.friendship.findFirst({
@@ -508,7 +557,12 @@ async function standingOf(
                 ]
             },
             select: { requesterId: true }
-        })
+        }),
+        blockedBy(viewer.id, [personId]).then((set) => set.has(personId)),
+        // Never as an administrator: this one is about putting something on
+        // somebody's screen rather than about reading, and a "nobody" an
+        // administrator walks through is not the setting it says it is.
+        maySee(personId, "friendRequests", { id: viewer.id, isAdmin: false })
     ]);
 
     const friendship = friends
@@ -518,7 +572,18 @@ async function standingOf(
               ? ("sent" as const)
               : ("received" as const)
           : ("none" as const);
-    return { friendship, following, canMessage: friends };
+    // Nothing is offered about somebody this reader has shut out, beyond letting
+    // them back in. Answering "you could message them" about a person you
+    // blocked is the product arguing with a decision it was told about.
+    return {
+        friendship,
+        following,
+        canMessage: friends && !blocked,
+        blocked,
+        // Only where there is something to ask for. Somebody already asked, or
+        // already a friend, is not being turned down by a setting.
+        canAskToBeFriends: friendship === "none" ? mayAsk && !blocked : true
+    };
 }
 
 /** Store the one line under somebody's name, how they want to be referred to,

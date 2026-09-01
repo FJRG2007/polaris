@@ -3,33 +3,50 @@
 /**
  * What one person can do about another, from their page.
  *
- * Three buttons, and the whole design is in which is which. Following is
- * one-sided and instant: nobody is asked, nothing is granted, and it is the
- * thing somebody does when they want to see what another person puts out.
- * Adding as a friend is a request the other side answers, and it changes what
- * each of them may see of the other. A message is offered to friends and to
- * nobody else - somebody following you has not entered into anything you agreed
- * to, and a conversation opened by a stranger is what a block list exists
- * because of.
+ * One thing to press, one thing beside it, and everything else behind three
+ * dots. Which is which is the whole design, and it changed once because the
+ * first version had it wrong: "Friends" sat there as a button of its own, so the
+ * most prominent control on somebody's page was the one that stops being their
+ * friend. Nobody opens a profile to do that.
  *
- * Every one of them is a way into something that already exists elsewhere in
- * Polaris. Nothing here re-decides a refusal, a block or a rate limit.
+ * So the front of the card carries what somebody came to do - ask to be added,
+ * and once they are, write to them - and Follow beside it, which is the smaller,
+ * one-sided version of the same intent. Removing a friend, blocking and
+ * reporting go under the menu, where the heavy things live in every other list
+ * of people here.
+ *
+ * A message is offered to friends and nobody else: following somebody is not a
+ * relationship they agreed to, and a conversation opened by a stranger is what a
+ * block list exists because of.
+ *
+ * Every one of these is a way into something that already exists in Polaris -
+ * the friends service, the block list, the report dialog the chat uses - so no
+ * refusal, rate limit or block is re-decided here.
  */
 
-import { Button } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { openDirectAction } from "@/app/(app)/chat/actions";
 import type { ProfileStanding } from "@/lib/profile-service";
-import { Check, MessageSquare, UserMinus, UserPlus } from "lucide-react";
+import { ReportPersonDialog } from "@/components/report-person-dialog";
+import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import {
     askToBeFriendsAction,
     followAction,
     stopBeingFriendsAction,
     unfollowAction
 } from "./actions";
+import { Check, Flag, MessageSquare, MoreHorizontal, ShieldBan, UserMinus, UserPlus } from "lucide-react";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
+} from "@polaris/ui";
 
 export function ProfileActions({
     personId,
@@ -44,11 +61,13 @@ export function ProfileActions({
     const [confirm, confirmElement] = useConfirm();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState("");
-    // Applied on the press and put back if the server refuses: following is a
-    // toggle, and a button that waits for a round trip before it changes reads
-    // as a button that did not work.
+    const [reporting, setReporting] = useState(false);
+    // Applied on the press and put back if the server refuses: these are toggles,
+    // and one that waits for a round trip before it changes reads as one that did
+    // not work.
     const [following, setFollowing] = useState(standing.following);
     const [friendship, setFriendship] = useState(standing.friendship);
+    const [blocked, setBlocked] = useState(standing.blocked);
 
     const run = (job: () => Promise<{ error?: string }>, undo: () => void) => {
         setError("");
@@ -96,6 +115,32 @@ export function ProfileActions({
         );
     };
 
+    /**
+     * Shut them out, or let them back in.
+     *
+     * Blocking is confirmed and unblocking is not: one of them takes something
+     * away and the other gives it back, and asking twice about the harmless
+     * direction is how a confirmation stops being read.
+     */
+    const toggleBlock = async () => {
+        if (!blocked) {
+            const sure = await confirm({
+                title: `Block ${name}?`,
+                description:
+                    "They stop being able to reach you here, and they are not told. You can undo it from this page.",
+                confirmLabel: "Block them",
+                danger: true
+            });
+            if (!sure) return;
+        }
+        const next = !blocked;
+        setBlocked(next);
+        run(
+            () => (next ? blockPersonAction({ userId: personId }) : unblockPersonAction({ userId: personId })),
+            () => setBlocked(!next)
+        );
+    };
+
     const message = () => {
         setError("");
         startTransition(async () => {
@@ -107,45 +152,99 @@ export function ProfileActions({
     return (
         <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant={following ? "secondary" : "primary"} disabled={pending} onClick={toggleFollow}>
-                    {following ? (
-                        <>
-                            <Check className="size-3.5 shrink-0" />
-                            Following
-                        </>
-                    ) : (
-                        "Follow"
-                    )}
-                </Button>
-
-                {friendship === "friends" ? (
-                    <Button size="sm" variant="outline" disabled={pending} onClick={() => void drop()}>
-                        <UserMinus className="size-3.5 shrink-0" />
-                        Friends
-                    </Button>
-                ) : friendship === "sent" ? (
-                    // Not a button. The request is out and only they can answer
-                    // it, so a control here would be a control that does nothing.
-                    <span className="text-muted-foreground text-xs">Friend request sent</span>
-                ) : friendship === "received" ? (
-                    <Button size="sm" variant="outline" asChild>
-                        <a href="/account/friends">They asked to be added - answer it</a>
-                    </Button>
+                {/* Blocked: nothing is offered about somebody this reader shut
+                    out beyond letting them back in, so the row says that and
+                    stops. */}
+                {blocked ? (
+                    <span className="text-muted-foreground text-sm">You blocked {name}.</span>
                 ) : (
-                    <Button size="sm" variant="outline" disabled={pending} onClick={ask}>
-                        <UserPlus className="size-3.5 shrink-0" />
-                        Add as a friend
-                    </Button>
+                    <>
+                        {friendship === "friends" ? (
+                            <Button size="sm" disabled={pending} onClick={message}>
+                                <MessageSquare className="size-3.5 shrink-0" />
+                                Message
+                            </Button>
+                        ) : friendship === "sent" ? (
+                            // Not a button: the request is out and only they can
+                            // answer it, so a control here would do nothing.
+                            <span className="text-muted-foreground text-sm">Friend request sent</span>
+                        ) : friendship === "received" ? (
+                            <Button size="sm" asChild>
+                                <a href="/account/friends">Answer their request</a>
+                            </Button>
+                        ) : standing.canAskToBeFriends ? (
+                            <Button size="sm" disabled={pending} onClick={ask}>
+                                <UserPlus className="size-3.5 shrink-0" />
+                                Add friend
+                            </Button>
+                        ) : null}
+
+                        <Button
+                            size="sm"
+                            variant={following ? "secondary" : "outline"}
+                            disabled={pending}
+                            onClick={toggleFollow}
+                        >
+                            {following ? (
+                                <>
+                                    <Check className="size-3.5 shrink-0" />
+                                    Following
+                                </>
+                            ) : (
+                                "Follow"
+                            )}
+                        </Button>
+                    </>
                 )}
 
-                {standing.canMessage ? (
-                    <Button size="sm" variant="ghost" disabled={pending} onClick={message}>
-                        <MessageSquare className="size-3.5 shrink-0" />
-                        Message
-                    </Button>
-                ) : null}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={`More about ${name}`}
+                            title="More"
+                            disabled={pending}
+                        >
+                            <MoreHorizontal className="size-4 shrink-0" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                        {friendship === "friends" && !blocked ? (
+                            <>
+                                <DropdownMenuItem className="gap-2" onSelect={() => void drop()}>
+                                    <UserMinus className="size-3.5" />
+                                    Remove friend
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                            </>
+                        ) : null}
+                        <DropdownMenuItem
+                            variant={blocked ? undefined : "danger"}
+                            className="gap-2"
+                            onSelect={() => void toggleBlock()}
+                        >
+                            <ShieldBan className="size-3.5" />
+                            {blocked ? "Unblock" : "Block"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            variant="danger"
+                            className="gap-2"
+                            onSelect={() => setReporting(true)}
+                        >
+                            <Flag className="size-3.5" />
+                            Report this account
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
+
             {error ? <p className="text-danger text-xs">{error}</p> : null}
+            <ReportPersonDialog
+                open={reporting}
+                person={{ id: personId, name }}
+                onOpenChange={setReporting}
+            />
             {confirmElement}
         </div>
     );
