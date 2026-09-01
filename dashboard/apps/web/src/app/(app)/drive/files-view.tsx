@@ -1215,6 +1215,40 @@ export function FilesView({
         return () => controller.abort();
     }, [connectionId, singleSelectedPath]);
 
+    /**
+     * How far the listing has to reach for the empty space under the last file to
+     * still belong to the folder.
+     *
+     * In a file manager a right press below the rows offers "new folder", not the
+     * browser's menu - and a drop there uploads. This page scrolls as a document,
+     * so the listing was only as tall as its rows: with four files in a folder,
+     * everything below the fourth row was outside the region entirely, and the
+     * gesture people reach for first did nothing.
+     *
+     * Measured rather than written as a fraction of the viewport, because where
+     * the listing starts depends on how many lines the breadcrumb and the toolbar
+     * above it wrapped onto - which changes with the window and with the path.
+     * The document position is what is measured (viewport top plus how far the
+     * page is scrolled), so the answer does not move as the page scrolls under
+     * it.
+     */
+    const listingRef = useRef<HTMLDivElement>(null);
+    const [listingFloor, setListingFloor] = useState(0);
+    useEffect(() => {
+        const measure = () => {
+            const element = listingRef.current;
+            if (!element) return;
+            const top = element.getBoundingClientRect().top + window.scrollY;
+            setListingFloor(Math.max(0, Math.round(window.innerHeight - top - 16)));
+        };
+        measure();
+        window.addEventListener("resize", measure);
+        return () => window.removeEventListener("resize", measure);
+        // Re-measured whenever the rows above it can have reflowed. The value only
+        // ever decides how much empty space the folder owns, so a stale one costs
+        // nothing until the next of these.
+    }, [path, viewMode, loading, visible.length, selectedEntries.length]);
+
     // Windowed rendering: only the rows in view (plus a small overscan) are in the
     // DOM, so a folder with millions of entries scrolls smoothly - rows that leave
     // the viewport are removed and new ones added as you scroll.
@@ -1934,8 +1968,10 @@ export function FilesView({
                 <ContextMenu>
                     <ContextMenuTrigger asChild>
                         <div
+                            ref={listingRef}
                             tabIndex={0}
                             onKeyDown={onListKeyDown}
+                            style={listingFloor > 0 ? { minHeight: listingFloor } : undefined}
                             className={cn(
                                 "relative min-w-0 flex-1 rounded-lg ",
                                 dragUpload && "ring-2 ring-primary ring-offset-2 "
