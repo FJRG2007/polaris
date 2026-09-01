@@ -236,6 +236,19 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "account.link.suggested",
+        group: "security",
+        label: "Linking an account you already have",
+        description:
+            "Your address belongs to a service Polaris can sign you in with, and linking it would prove the address and give you a way in that is not a password.",
+        // A suggestion, not a problem. It is raised once, when the account is
+        // created, and goes away the moment it is acted on or dismissed - so
+        // mailing it as well would be mailing somebody about something they are
+        // about to see anyway.
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.friend",
         group: "people",
         // One entry for both halves of the same exchange: being asked, and

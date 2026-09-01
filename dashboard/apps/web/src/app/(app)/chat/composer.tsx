@@ -22,7 +22,6 @@
  */
 
 import * as core from "@polaris/core";
-import { typingAction } from "./actions";
 import { EmojiPicker } from "./emoji-picker";
 import { ClipDialog } from "./clip-dialog";
 import { MicSettings } from "./mic-settings";
@@ -87,6 +86,7 @@ export function Composer({
     replyingFrom,
     insert,
     onCancelReply,
+    onTyping,
     onSend,
     onSchedule,
     onPoll,
@@ -143,6 +143,19 @@ export function Composer({
      * the table - the room is the recording.
      */
     inCall?: boolean;
+    /**
+     * Say that somebody is writing.
+     *
+     * Passed in rather than reached for, and for the same reason `attachable` is:
+     * this box is also the one under a task, where there is no conversation to
+     * announce into and nothing that would draw the answer. Reaching for the
+     * chat's own actions here would put the chat's server module in the import
+     * graph of every surface that draws this box.
+     *
+     * `kind` is "recording" while a voice note is being made, which the other
+     * side reads differently to typing.
+     */
+    onTyping?: (kind?: "recording") => void;
     placeholder: string;
     /** The message being rewritten, if any. */
     editing?: ChatMessageView | null;
@@ -527,12 +540,12 @@ export function Composer({
         // Nobody to tell, and nobody to tell them as. A call has no typing
         // indicator, and half the people in one have no session for an action
         // that starts with `requirePermission` to run under. A comment box has
-        // no conversation at all.
-        if (inCall || !channelId) return;
+        // no conversation at all, and hands in no way to announce one.
+        if (inCall || !onTyping) return;
         const now = Date.now();
         if (now - lastAnnounced.current < TYPING_EVERY_MS) return;
         lastAnnounced.current = now;
-        void typingAction(channelId);
+        onTyping();
     };
 
     /**
@@ -544,15 +557,15 @@ export function Composer({
      * lapses after a few seconds by design, and a recording runs for minutes.
      */
     useEffect(() => {
-        if (!voice.recording || disabled || inCall || !channelId) return;
+        if (!voice.recording || disabled || inCall || !onTyping) return;
         const say = () => {
             lastAnnounced.current = Date.now();
-            void typingAction(channelId, "recording");
+            onTyping("recording");
         };
         say();
         const timer = setInterval(say, TYPING_EVERY_MS);
         return () => clearInterval(timer);
-    }, [voice.recording, disabled, inCall, channelId]);
+    }, [voice.recording, disabled, inCall, onTyping]);
 
     return (
         <div

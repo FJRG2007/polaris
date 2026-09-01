@@ -4,6 +4,13 @@ import type { SpaceContext, TaskRow } from "@/lib/tasks/facts";
 
 // The screen calls server actions and the router on interaction only; rendering
 // it needs them to exist, not to work.
+// The task screen's comment box is the one from Chat, whose emoji picker reaches
+// Chat's own server actions - and that module reads Polaris' configuration as it
+// is imported. A running server has all of this; a test process has to say so.
+vi.stubEnv("POLARIS_DATABASE_URL", "postgresql://polaris:polaris@localhost:5432/polaris");
+vi.stubEnv("POLARIS_AUTH_SECRET", "a-long-enough-string-for-the-schema");
+vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh() {}, push() {} }),
     usePathname: () => "/tasks/everything"

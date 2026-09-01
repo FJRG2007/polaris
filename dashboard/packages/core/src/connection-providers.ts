@@ -13,6 +13,35 @@
  * will one day be half added.
  */
 
+/**
+ * The service that already runs an address, where the address itself says so.
+ *
+ * Somebody signing up as `someone@gmail.com` has a Google account by
+ * definition, and linking it proves the address, gives them a way in that is not
+ * a password, and makes them harder to impersonate. Suggesting that is worth
+ * doing; requiring it is not, which is why this feeds a notification rather than
+ * a gate.
+ *
+ * Consumer domains only. A company on Google Workspace signs in at its own
+ * domain and there is no way to tell that from the name - only its MX records
+ * say so, and looking those up for every account created would be guessing at a
+ * person's employer from a lookup they never asked for.
+ */
+const MAILBOX_PROVIDERS: Readonly<Record<string, ConnectionProviderSlug>> = {
+    "gmail.com": "google",
+    "googlemail.com": "google",
+    "outlook.com": "microsoft",
+    "hotmail.com": "microsoft",
+    "live.com": "microsoft",
+    "msn.com": "microsoft"
+};
+
+/** Which service runs this address, or null when the domain does not say. */
+export function providerForMailbox(email: string): ConnectionProviderSlug | null {
+    const domain = email.trim().toLowerCase().split("@").at(-1) ?? "";
+    return MAILBOX_PROVIDERS[domain] ?? null;
+}
+
 export type ConnectionProviderSlug =
     | "github"
     | "google"

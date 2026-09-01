@@ -25,6 +25,13 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 
 const refreshed = vi.fn();
 
+// The task screen's comment box is the one from Chat, whose emoji picker reaches
+// Chat's own server actions - and that module reads Polaris' configuration as it
+// is imported. A running server has all of this; a test process has to say so.
+vi.stubEnv("POLARIS_DATABASE_URL", "postgresql://polaris:polaris@localhost:5432/polaris");
+vi.stubEnv("POLARIS_AUTH_SECRET", "a-long-enough-string-for-the-schema");
+vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: refreshed, push() {} }),
     usePathname: () => "/tasks/l/l1"

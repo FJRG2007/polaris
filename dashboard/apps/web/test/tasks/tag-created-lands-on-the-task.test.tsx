@@ -18,6 +18,13 @@ import type { StatusView } from "@/lib/tasks/space-service";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
+// The task screen's comment box is the one from Chat, whose emoji picker reaches
+// Chat's own server actions - and that module reads Polaris' configuration as it
+// is imported. A running server has all of this; a test process has to say so.
+vi.stubEnv("POLARIS_DATABASE_URL", "postgresql://polaris:polaris@localhost:5432/polaris");
+vi.stubEnv("POLARIS_AUTH_SECRET", "a-long-enough-string-for-the-schema");
+vi.stubEnv("POLARIS_MASTER_KEY", Buffer.alloc(32, 7).toString("base64"));
+
 /** The creation, held open so the screen can be read while it is still in flight. */
 let answer: (result: { tag?: { id: string; name: string; color: string }; error?: string }) => void = () => undefined;
 const createTagAction = vi.fn(

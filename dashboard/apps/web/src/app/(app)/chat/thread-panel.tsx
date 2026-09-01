@@ -162,6 +162,7 @@ export function ThreadPanel({
 
             <Composer
                 channelId={root.channelId}
+                onTyping={(kind) => void actions.typingAction(root.channelId, kind)}
                 // Its own, under the message it answers: a half-written reply
                 // to a thread belongs to that thread and not to the channel it
                 // hangs off.

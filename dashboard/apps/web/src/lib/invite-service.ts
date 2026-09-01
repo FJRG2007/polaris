@@ -24,6 +24,7 @@ import { sendAuthEmail } from "@/lib/auth-mail";
 import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { suggestConnectionLink } from "@/lib/connections/suggest-link";
 import { evaluateNetworkRules } from "@/lib/network-rules";
 import { generateShortCode, generateToken, hashToken } from "@polaris/core/tokens";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
@@ -398,6 +399,10 @@ export async function claimInvite(input: ClaimInput): Promise<{ email?: string; 
         const role = await prisma.role.findUnique({ where: { id: invite.roleId }, select: { name: true } });
         if (role) await assignRole(user.id, role.name);
     }
+
+    // An address that belongs to a service Polaris can sign them in with is
+    // worth one sentence, once, on the account it has just made.
+    await suggestConnectionLink(user.id, invite.email);
 
     const rules = enforcedFromInvite(invite);
     const restricted =

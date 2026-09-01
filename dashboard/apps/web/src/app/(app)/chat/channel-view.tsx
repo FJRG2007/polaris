@@ -1576,6 +1576,9 @@ export function ChannelView({
                     />
                     <Composer
                         channelId={channelId}
+                        // The chat's own announcement, handed in: the box is also
+                        // the one under a task, where there is nobody to tell.
+                        onTyping={(kind) => void actions.typingAction(channelId, kind)}
                         // Kept for next time. A conversation is still here
                         // tomorrow, whether it is a channel, a group or one
                         // person - see `drafts`.
