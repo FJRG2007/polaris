@@ -14,7 +14,8 @@
  * Signed in only, like every other picture here.
  */
 
-import { requireUser } from "@/lib/session";
+import { resolveSession } from "@/lib/session";
+import { profilesArePublic } from "@/lib/profile-service";
 import { maySee } from "@/lib/privacy-service";
 import { resolveBanner } from "@/lib/avatar-service";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
@@ -32,10 +33,21 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ userId: string }> }
 ): Promise<Response> {
-    const viewer = await requireUser();
     const { userId } = await params;
 
-    const visible = await maySee(userId, "avatar", { id: viewer.id, isAdmin: Boolean(viewer.isAdmin) });
+    // A reader with no session, on an instance that publishes profiles, is
+    // answered as nobody: an empty id is on no friend list and in no privacy
+    // list, so only a banner shown to everybody reaches them - the same rule the
+    // page itself applies, and the same one the face beside it follows.
+    const session = await resolveSession();
+    const viewer = session
+        ? { id: session.id, isAdmin: Boolean(session.isAdmin) }
+        : (await profilesArePublic())
+          ? { id: "", isAdmin: false }
+          : null;
+    if (!viewer) return new Response("Unauthorized", { status: 401 });
+
+    const visible = await maySee(userId, "avatar", viewer);
     if (!visible) return blankAvatarResponse(CACHE);
 
     const picture = await resolveBanner(userId);

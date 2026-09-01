@@ -22,6 +22,7 @@
 
 import { maySee } from "@/lib/privacy-service";
 import { resolveSession } from "@/lib/session";
+import { profilesArePublic } from "@/lib/profile-service";
 import { resolveAvatar } from "@/lib/avatar-service";
 import { inCallTogether } from "@/lib/chat/meetings";
 import { resolveGuestSeat } from "@/lib/chat/meeting-seat";
@@ -73,9 +74,18 @@ async function whoIsAsking(subjectId: string): Promise<{ id: string; isAdmin: bo
     if (session) return { id: session.id, isAdmin: Boolean(session.isAdmin) };
 
     const seat = await resolveGuestSeat();
-    if (!seat || seat.admission !== "admitted") return null;
-    if (!(await inCallTogether(seat.meetingId, subjectId))) return null;
-    return { id: "", isAdmin: false };
+    if (seat && seat.admission === "admitted" && (await inCallTogether(seat.meetingId, subjectId))) {
+        return { id: "", isAdmin: false };
+    }
+
+    // A reader with no session at all, on an instance that publishes profiles.
+    // Answered as nobody, exactly as a guest is: an empty id is on no friend
+    // list and in no privacy list, so the only audience that lets it through is
+    // everybody - which is the same rule the page itself applies. Without this a
+    // published profile is a page of initials, and the setting that published it
+    // reads as broken.
+    if (await profilesArePublic()) return { id: "", isAdmin: false };
+    return null;
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }): Promise<Response> {

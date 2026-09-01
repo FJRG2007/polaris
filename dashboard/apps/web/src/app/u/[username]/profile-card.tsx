@@ -130,7 +130,11 @@ export function ProfileCard({
                         {profile.organizations.map((org) => (
                             <Link
                                 key={org.id}
-                                href={`/account/organizations/${org.slug}`}
+                                // Its own page, not the screen that runs it: a
+                                // reader following this may not be on its roster
+                                // at all, and the management screen would turn
+                                // them away from a name they were only reading.
+                                href={`/o/${org.slug}`}
                                 className="flex items-center gap-2 text-sm hover:underline"
                             >
                                 {/* Its own mark, the way an organization is drawn

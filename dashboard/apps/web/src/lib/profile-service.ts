@@ -209,6 +209,86 @@ export async function shownOrganizations(userId: string): Promise<ProfileCompany
 }
 
 /**
+ * An organization's own page.
+ *
+ * The same idea as a person's and at the same kind of address - `/o/<slug>`,
+ * beside `/u/<username>` - because a handle here addresses a page whoever it
+ * belongs to. The two share one namespace and always have: an organization
+ * cannot take a handle somebody signs in with, which is what makes the two
+ * prefixes a convenience rather than the thing keeping them apart.
+ *
+ * The people on it are exactly those who marked it on their own profile, and
+ * that is the whole membership rule. A roster is the organization's private
+ * business - being on one is not a statement anybody made about themselves - so
+ * publishing it would be publishing a list of employees none of them agreed to.
+ * What is published is the set of people who said "I work here", one at a time,
+ * on their own screen.
+ */
+export interface OrgProfile {
+    readonly id: string;
+    readonly slug: string;
+    readonly name: string;
+    readonly description: string;
+    /** The people who show this organization on their own profile. */
+    readonly people: { id: string; name: string; username: string }[];
+    readonly createdAt: string;
+    /** Whether the reader may open the organization's own screens - they are on
+     *  its roster, or they run this Polaris. */
+    readonly manageable: boolean;
+}
+
+export async function orgProfile(slug: string, viewer: PrivacyViewer | null): Promise<OrgProfile | null> {
+    const handle = slug.trim().toLowerCase();
+    if (!handle) return null;
+    if (!viewer && !(await profilesArePublic())) return null;
+
+    const org = await prisma.organization.findUnique({
+        where: { slug: handle },
+        select: { id: true, slug: true, name: true, description: true, createdAt: true, ownerId: true }
+    });
+    if (!org) return null;
+
+    // Everybody who has marked it, resolved in one query rather than by walking
+    // the roster: the roster is not what is being published, and reading it here
+    // would be reading the thing this page deliberately does not show.
+    const marked = await prisma.user.findMany({
+        where: {
+            bannedAt: null,
+            username: { not: null },
+            // A JSON array in a text column, so the id is matched as a substring
+            // and then confirmed exactly below - `contains` is the widest thing
+            // both Postgres and SQLite agree on.
+            profileOrgIds: { contains: org.id }
+        },
+        select: { id: true, name: true, username: true, profileOrgIds: true }
+    });
+
+    const people = marked
+        .filter((person) => storedList(person.profileOrgIds).includes(org.id))
+        .map((person) => ({ id: person.id, name: person.name, username: person.username ?? "" }))
+        .sort((left, right) => left.name.localeCompare(right.name));
+
+    const manageable = viewer
+        ? viewer.isAdmin ||
+          org.ownerId === viewer.id ||
+          (await prisma.organizationMember.findUnique({
+              where: { orgId_userId: { orgId: org.id, userId: viewer.id } },
+              select: { id: true }
+          })) !== null
+        : false;
+
+    return {
+        id: org.id,
+        slug: org.slug,
+        name: org.name,
+        description: org.description,
+        people,
+        createdAt: org.createdAt.toISOString(),
+        manageable
+    };
+}
+
+/**
  * A profile by username, as this reader may see it, or null.
  *
  * Null covers every reason at once - no such account, an account that has taken

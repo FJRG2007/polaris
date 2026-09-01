@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { isReservedUsername, RESERVED_USERNAME_MESSAGE } from "./usernames.js";
 
 // ---------------------------------------------------------------------------
 // Handles
@@ -36,7 +37,12 @@ export const orgSlugField = z
     .refine(
         (value) => !value.startsWith("-") && !value.endsWith("-"),
         "Cannot start or end with -"
-    );
+    )
+    // The same names an account cannot take, for the same reason and out of the
+    // same list. A handle addresses a public page here whether it belongs to a
+    // person or to a company, and `@polaris-support` is exactly as convincing
+    // signed by one as by the other.
+    .refine((value) => !isReservedUsername(value), RESERVED_USERNAME_MESSAGE);
 
 /**
  * A handle suggested from a name, so somebody typing "Acme Design Co." is

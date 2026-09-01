@@ -13,7 +13,8 @@
  * a claim, and the type a file is served back as is what a browser acts on.
  */
 
-import { requireUser } from "@/lib/session";
+import { requireUser, resolveSession } from "@/lib/session";
+import { profilesArePublic } from "@/lib/profile-service";
 import { recordAudit } from "@/lib/audit-service";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
@@ -40,7 +41,13 @@ const CACHE = "private, no-cache";
 const NO_CACHE = "private, no-store";
 
 export async function GET(request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
-    await requireUser();
+    // An organization's mark is on its own public page, so a reader with no
+    // session is answered when this instance publishes profiles. Nothing here is
+    // per-viewer: an organization has one picture and everybody who can reach
+    // the page sees the same one.
+    if (!(await resolveSession()) && !(await profilesArePublic())) {
+        return new Response("Unauthorized", { status: 401 });
+    }
     const { orgId } = await params;
 
     const picture = await resolveOrgAvatar(orgId);
