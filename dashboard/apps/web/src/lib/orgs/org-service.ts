@@ -18,7 +18,7 @@ import { ensureSystemRoles } from "./role-service";
 import { OrgAccessError, OrgError } from "./errors";
 import { contactLines } from "@/lib/privacy-service";
 import { discardAvatars } from "@/lib/avatar-service";
-import { isSuccessorOf } from "@/lib/successor-service";
+import { isOrgSuccessor } from "@/lib/successor-service";
 
 export { OrgAccessError, OrgError } from "./errors";
 
@@ -81,7 +81,10 @@ export async function resolveOrgAccess(
         // `org.read`, so a successor gets the frame and the settings screen and
         // not the roster. Naming somebody to close your organizations when you
         // die is not handing them the list of who works in them today.
-        return (await isSuccessorOf(actor.id, org.ownerId))
+        // Asked of the organization rather than of its owner: an organization
+        // that has named its own successor is answered by that person, and one
+        // that has not still falls back to the owner's - see `isOrgSuccessor`.
+        return (await isOrgSuccessor(actor.id, orgId))
             ? { orgId, role: "successor", roleName: "Successor", isOwner: false, permissions: [] }
             : null;
     }
@@ -174,11 +177,12 @@ export async function requireOrgOwner(actor: OrgActor, orgId: string): Promise<v
  *
  * Three names, and deliberately not the same three as everything else here. The
  * owner, because it is theirs. An instance administrator, because somebody has
- * to be able to clear up after an account that is gone. And the successor the
- * owner named on their own account - which is the whole point of naming one: an
- * organization whose only owner has died is otherwise permanent, and asking an
- * administrator to guess at the family's intentions is worse than letting the
- * person the owner actually chose decide.
+ * to be able to clear up after an account that is gone. And the successor - the
+ * one this organization named, or failing that the one its owner named on their
+ * own account - which is the whole point of naming one: an organization whose
+ * only owner has died is otherwise permanent, and asking an administrator to
+ * guess at the family's intentions is worse than letting the person the owner
+ * actually chose decide.
  *
  * A permission cannot reach this and never will. Everything else about an
  * organization is recoverable by whoever comes next; this is the one act that
@@ -191,7 +195,7 @@ export async function canDeleteOrg(actor: OrgActor, orgId: string): Promise<bool
     });
     if (!org) return false;
     if (actor.isAdmin || org.ownerId === actor.id) return true;
-    return isSuccessorOf(actor.id, org.ownerId);
+    return isOrgSuccessor(actor.id, orgId);
 }
 
 export async function requireOrgDeletion(actor: OrgActor, orgId: string): Promise<void> {
@@ -335,10 +339,17 @@ export interface OrgSummary {
 /**
  * The organizations this account is part of, owned ones first.
  *
- * Organizations whose owner named this account their successor are in the list
- * too, marked as such. They are not somewhere this person works - they cannot
- * change anything in one - but leaving them out would mean the one act a
- * successor exists to perform has nowhere to be reached from.
+ * Organizations this account is the successor for are in the list too, marked as
+ * such. They are not somewhere this person works - they cannot change anything in
+ * one - but leaving them out would mean the one act a successor exists to
+ * perform has nowhere to be reached from.
+ *
+ * Two ways to be that successor and the second has to exclude the first: named
+ * by the organization itself, or named by its owner on their own account *and*
+ * the organization having named nobody. Without that second condition an owner's
+ * personal successor would keep seeing an organization that has since chosen
+ * somebody else - which is not a leak, but it is a list that disagrees with what
+ * `isOrgSuccessor` will actually allow them to do when they open it.
  */
 export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
     const orgs = await prisma.organization.findMany({
@@ -346,7 +357,13 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
             OR: [
                 { ownerId: userId },
                 { members: { some: { userId } } },
-                { owner: { successor: { successorId: userId } } }
+                { successor: { successorId: userId } },
+                {
+                    AND: [
+                        { successor: null },
+                        { owner: { successor: { successorId: userId } } }
+                    ]
+                }
             ]
         },
         orderBy: { name: "asc" },

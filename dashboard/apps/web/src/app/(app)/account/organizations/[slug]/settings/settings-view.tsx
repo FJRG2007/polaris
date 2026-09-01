@@ -24,6 +24,7 @@ import type { OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepUpFields } from "@/components/step-up-fields";
 import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
+import { OrgSuccessorCard, type OrgSuccessorPerson } from "./successor-card";
 import {
     changeOrgSlugAction,
     deleteOrgAction,
@@ -48,6 +49,7 @@ export function SettingsView({
     canManage,
     canDelete,
     candidates,
+    successor,
     impact
 }: {
     org: OrgDetail;
@@ -59,6 +61,10 @@ export function SettingsView({
      *  otherwise permanent. */
     canDelete: boolean;
     candidates: { userId: string; name: string }[];
+    /** Who answers for this organization when its owner is gone - named here, or
+     *  inherited from the owner's own account. Null for anybody but the owner,
+     *  who is the only person shown or asked. */
+    successor: OrgSuccessorPerson | null;
     impact: { spaces: number; tasks: number; projects: number };
 }) {
     const router = useRouter();
@@ -97,6 +103,12 @@ export function SettingsView({
                 </>
             )}
 
+            {/* Beside Transfer, because they are the two halves of the same
+                question - who has this organization now, and who has it when
+                you are gone - and both are the owner's alone. */}
+            {isOwner && (
+                <OrgSuccessorCard orgId={org.id} orgName={org.name} successor={successor} />
+            )}
             {isOwner && <TransferCard org={org} candidates={candidates} confirm={confirm} onRun={run} />}
             {canDelete && <DangerCard org={org} impact={impact} />}
             {confirmElement}

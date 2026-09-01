@@ -23,13 +23,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const orgFindUnique = vi.fn();
 const roleFindUnique = vi.fn();
 const successorFindUnique = vi.fn();
+const orgSuccessorFindUnique = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         organization: { findUnique: orgFindUnique, findMany: vi.fn() },
         orgRole: { findUnique: roleFindUnique, findMany: vi.fn(), createMany: vi.fn() },
         organizationMember: { findMany: vi.fn() },
-        accountSuccessor: { findUnique: successorFindUnique }
+        accountSuccessor: { findUnique: successorFindUnique },
+        organizationSuccessor: { findUnique: orgSuccessorFindUnique }
     }
 }));
 
@@ -47,8 +49,13 @@ describe("resolveOrgAccess", () => {
         orgFindUnique.mockReset();
         roleFindUnique.mockReset();
         successorFindUnique.mockReset();
+        orgSuccessorFindUnique.mockReset();
         roleFindUnique.mockResolvedValue(null);
         successorFindUnique.mockResolvedValue(null);
+        // Nothing named by the organization itself, so every case below is
+        // answered by the owner's own successor - which is what these have
+        // always been about.
+        orgSuccessorFindUnique.mockResolvedValue(null);
     });
 
     it("answers nothing for an organization that does not exist", async () => {

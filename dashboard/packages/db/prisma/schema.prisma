@@ -255,6 +255,7 @@ model User {
     ownedDomains        OwnerDomain[]
     successor           AccountSuccessor?    @relation("AccountSuccessorHolder")
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
+    orgSuccessorTo      OrganizationSuccessor[] @relation("OrganizationSuccessorHeir")
     notes               Note[]
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
@@ -4162,6 +4163,7 @@ model Organization {
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?
     banner   OrganizationBanner?
+    successor OrganizationSuccessor?
     vault    VaultOrganization?
 
     @@index([ownerId])
@@ -4201,6 +4203,29 @@ model OrganizationBanner {
     updatedAt    DateTime @updatedAt
 
     org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// The account an organization's owner named to take it over if they are gone.
+//
+// Beside AccountSuccessor and deliberately not the same row. A person's successor
+// is who takes over *their account*, and an owner of four organizations may want
+// a different person to close each one - the colleague who ran it, rather than
+// their brother. Without this the only answer was the owner's own successor,
+// which is right for a household and wrong for anywhere with more than one team.
+//
+// Falling back to the owner's is still what happens when this is unset: see
+// `orgSuccessorId`. That is the arrangement most owners will never have to think
+// about, and it is why this table is small.
+model OrganizationSuccessor {
+    orgId          String   @id @db.Uuid
+    successorId    String   @db.Uuid
+    acknowledgedAt DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    successor User         @relation("OrganizationSuccessorHeir", fields: [successorId], references: [id], onDelete: Cascade)
+
+    @@index([successorId])
 }
 
 // What one of an organization's roles may do.

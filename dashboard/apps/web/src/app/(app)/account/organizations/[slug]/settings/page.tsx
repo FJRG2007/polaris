@@ -19,6 +19,7 @@ import { SettingsView } from "./settings-view";
 import { hasOrgPermission } from "@polaris/core";
 import { requireOrgFrame } from "@/lib/orgs/page-access";
 import { canDeleteOrg, listOrgMembers, orgDeletionImpact } from "@/lib/orgs/org-service";
+import { effectiveOrgSuccessor } from "@/lib/successor-service";
 
 export const dynamic = "force-dynamic";
 
@@ -39,13 +40,17 @@ export default async function OrganizationSettingsPage({
     if (!canManage && !canDelete) notFound();
 
     // Each half's inputs are only fetched for somebody who will be shown it.
-    const [members, impact] = await Promise.all([
+    const [members, impact, successor] = await Promise.all([
         access.isOwner
             ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
             : Promise.resolve([]),
         canDelete
             ? orgDeletionImpact(org.id)
-            : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 })
+            : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 }),
+        // The owner alone. Who answers for an organization when its owner is gone
+        // is the owner's decision and nobody else's business - a member holding
+        // `settings.manage` is not shown the name, let alone offered the field.
+        access.isOwner ? effectiveOrgSuccessor(org.id) : Promise.resolve(null)
     ]);
 
     return (
@@ -57,6 +62,7 @@ export default async function OrganizationSettingsPage({
             candidates={members
                 .filter((member) => member.role !== "owner")
                 .map((member) => ({ userId: member.userId, name: member.name }))}
+            successor={successor}
             impact={impact}
         />
     );
