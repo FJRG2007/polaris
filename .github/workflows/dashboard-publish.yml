@@ -117,10 +117,18 @@ jobs:
           has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
           # The relay is go2rtc plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
-          # The worker bundles @polaris/core - the zone geometry, the detector's
-          # decoder and the tracker all live there and are shared with the
-          # dashboard - so a change there is a change to the worker.
-          has '^dashboard/services/vision/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out vision true || out vision false
+          # The worker bundles part of @polaris/core - the zone geometry, the
+          # detector's decoder and the tracker - so a change to those is a change
+          # to the worker. The whole of core was the pattern here, and core is
+          # where everything else in the dashboard lives too: editing a task
+          # schema rebuilt the vision worker, which is a multi-arch build that
+          # emulates arm64 and takes eight minutes when it works.
+          #
+          # Narrowed to `camera-*` because those four modules import nothing from
+          # core but each other - checked, and the reason this is safe rather
+          # than merely cheaper. The barrel and the packaging go in too, since a
+          # change to either changes what the bundle resolves.
+          has '^dashboard/services/vision/|^dashboard/packages/core/src/camera-|^dashboard/packages/core/(package\.json|tsconfig\.json|src/index\.ts)$|^dashboard/package(-lock)?\.json$' && out vision true || out vision false
           # The recognizer is one Python file, its pins, and the weights the
           # Dockerfile bakes in.
           has '^dashboard/services/face/' && out face true || out face false
