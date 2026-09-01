@@ -76,11 +76,13 @@ import {
     DropdownMenuTrigger,
     ContextMenuSeparator,
     ContextMenuSubContent,
-    ContextMenuSubTrigger
+    ContextMenuSubTrigger,
+    MenuShortcut
 } from "@polaris/ui";
 import {
-    ArrowDownAZ,
-    ArrowUpAZ,
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
     CalendarClock,
     ChevronLeft,
     ChevronRight,
@@ -128,8 +130,77 @@ function depthOf(path: string): number {
     return path === "" ? 0 : path.split("/").length;
 }
 
-type SortKey = "name" | "created" | "modified" | "size";
+const SORT_KEYS = ["name", "created", "modified", "size"] as const;
+type SortKey = (typeof SORT_KEYS)[number];
 type SortDir = "asc" | "desc";
+
+/** What each column is called, in the heading and in the grid's menu, so the two
+ *  cannot come to call the same thing different things. */
+const SORT_LABELS: Record<SortKey, string> = {
+    name: "Name",
+    created: "Created on",
+    modified: "Last Modified",
+    size: "Size"
+};
+
+/**
+ * A column heading that sorts by itself.
+ *
+ * The arrow is drawn on the column being sorted by and appears under the pointer
+ * on the others, which is the idiom every file list uses: it says which column
+ * decides the order without printing an arrow four times, and it still says the
+ * other three are pressable to anybody who goes looking.
+ *
+ * Pressing the column already being sorted by turns the order round. That is the
+ * whole of "choosing the direction here" - a second control for it would be a
+ * second thing to hit on a heading that is 24 pixels tall.
+ */
+function SortHeading({
+    column,
+    sortKey,
+    sortDir,
+    onChoose,
+    className
+}: {
+    column: SortKey;
+    sortKey: SortKey;
+    sortDir: SortDir;
+    onChoose: (column: SortKey) => void;
+    className?: string;
+}) {
+    const active = sortKey === column;
+    return (
+        <div className={cn("flex items-center", className)}>
+            <button
+                type="button"
+                onClick={() => onChoose(column)}
+                aria-label={
+                    active
+                        ? `Sorted by ${SORT_LABELS[column].toLowerCase()}, ${sortDir === "asc" ? "ascending" : "descending"}. Reverse it.`
+                        : `Sort by ${SORT_LABELS[column].toLowerCase()}`
+                }
+                className={cn(
+                    "group/sort flex min-w-0 items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-muted hover:text-foreground",
+                    active && "text-foreground"
+                )}
+            >
+                <span className="truncate">{SORT_LABELS[column]}</span>
+                {active ? (
+                    sortDir === "asc" ? (
+                        <ArrowUp className="size-3 shrink-0" />
+                    ) : (
+                        <ArrowDown className="size-3 shrink-0" />
+                    )
+                ) : (
+                    // Held in the layout rather than appearing on hover, so a
+                    // heading does not change width the moment a pointer crosses
+                    // it and shove the three beside it sideways.
+                    <ArrowUpDown className="size-3 shrink-0 opacity-0 transition-opacity group-hover/sort:opacity-60" />
+                )}
+            </button>
+        </div>
+    );
+}
 
 interface ActivityItem {
     id: string;
@@ -311,6 +382,23 @@ export function FilesView({
     const [searchTruncated, setSearchTruncated] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>("name");
     const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+    /**
+     * What pressing a column means.
+     *
+     * A different column sorts by it, ascending, because that is what somebody
+     * asking for a column they were not sorted by means. The same column turns
+     * the order round, which is how the direction is chosen without a control of
+     * its own.
+     */
+    const chooseSort = (column: SortKey) => {
+        if (column === sortKey) {
+            setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+            return;
+        }
+        setSortKey(column);
+        setSortDir("asc");
+    };
     const [filtersOpen, setFiltersOpen] = useState(false);
     const [starredOnly, setStarredOnly] = useState(false);
     const [categories, setCategories] = useState<Set<FileCategory>>(new Set());
@@ -1045,18 +1133,18 @@ export function FilesView({
                     <ContextMenuItem onSelect={() => startRename(entry)}>
                         <Pencil className="size-4" />
                         Rename
-                        <span className="ml-auto pl-6 text-xs text-muted-foreground">F2</span>
+                        <MenuShortcut>F2</MenuShortcut>
                     </ContextMenuItem>
                 )}
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
                     {many ? `Copy ${targets.length} items` : "Copy"}
-                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+C</span>
+                    <MenuShortcut>Ctrl+C</MenuShortcut>
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
                     {many ? `Cut ${targets.length} items` : "Cut"}
-                    <span className="ml-auto pl-6 text-xs text-muted-foreground">Ctrl+X</span>
+                    <MenuShortcut>Ctrl+X</MenuShortcut>
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() => {
@@ -1143,7 +1231,7 @@ export function FilesView({
                         <ContextMenuItem onSelect={() => onDelete(targets)}>
                             <Trash2 className="size-4" />
                             Move to Trash
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">Del</span>
+                            <MenuShortcut>Del</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem
                             variant="danger"
@@ -1632,16 +1720,12 @@ export function FilesView({
                                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                                     <Upload className="size-4" />
                                     Files
-                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                        {SHORTCUT_HINTS["upload-files"]}
-                                    </span>
+                                    <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => void pickFolder()}>
                                     <FolderUp className="size-4" />
                                     Folder
-                                    <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                        {SHORTCUT_HINTS["upload-folder"]}
-                                    </span>
+                                    <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -1707,33 +1791,47 @@ export function FilesView({
                             )}
                         </button>
                     </div>
-                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                        {(["name", "created", "modified", "size"] as const).map((key) => (
-                            <button
-                                key={key}
-                                type="button"
-                                onClick={() => setSortKey(key)}
-                                className={cn(
-                                    "rounded px-2 py-1 text-xs capitalize transition-colors hover:bg-muted",
-                                    sortKey === key && "bg-muted font-medium"
-                                )}
-                            >
-                                {key}
-                            </button>
-                        ))}
-                        <button
-                            type="button"
-                            onClick={() => setSortDir((prev) => (prev === "asc" ? "desc" : "asc"))}
-                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted"
-                            aria-label={`Sort ${sortDir === "asc" ? "descending" : "ascending"}`}
-                        >
-                            {sortDir === "asc" ? (
-                                <ArrowDownAZ className="size-4" />
-                            ) : (
-                                <ArrowUpAZ className="size-4" />
-                            )}
-                        </button>
-                    </div>
+                    {/* Four buttons naming the columns, beside a table whose
+                        columns are already named, is the same four words twice -
+                        and the toolbar is where everything else that has nowhere
+                        better to be already lives. In the list the sort belongs
+                        on the heading of the column it sorts, which is where
+                        every table anybody has used puts it.
+
+                        The grid has no headings, so it keeps a control - one
+                        menu rather than a row of buttons, since there is nothing
+                        on screen for it to be redundant with. */}
+                    {viewMode === "grid" ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-label={`Sorted by ${SORT_LABELS[sortKey].toLowerCase()}, ${sortDir === "asc" ? "ascending" : "descending"}`}
+                                    title="Sort"
+                                    className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <ArrowUpDown className="size-4 shrink-0" />
+                                    {SORT_LABELS[sortKey]}
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="min-w-[11rem]">
+                                {SORT_KEYS.map((key) => (
+                                    <DropdownMenuItem
+                                        key={key}
+                                        onSelect={() => chooseSort(key)}
+                                        className="gap-2"
+                                    >
+                                        {SORT_LABELS[key]}
+                                        {sortKey === key ? (
+                                            <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
+                                                {sortDir === "asc" ? "A-Z" : "Z-A"}
+                                            </span>
+                                        ) : null}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
                     <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
                         <button
                             type="button"
@@ -2003,14 +2101,34 @@ export function FilesView({
                                                     />
                                                 </label>
                                             </div>
-                                            <div className="min-w-0 flex-1 px-1">Name</div>
-                                            <div className="hidden w-44 shrink-0 px-2 lg:block">
-                                                Created on
-                                            </div>
-                                            <div className="hidden w-44 shrink-0 px-2 sm:block">
-                                                Last Modified
-                                            </div>
-                                            <div className="w-24 shrink-0 px-2">Size</div>
+                                            <SortHeading
+                                                column="name"
+                                                sortKey={sortKey}
+                                                sortDir={sortDir}
+                                                onChoose={chooseSort}
+                                                className="min-w-0 flex-1 px-1"
+                                            />
+                                            <SortHeading
+                                                column="created"
+                                                sortKey={sortKey}
+                                                sortDir={sortDir}
+                                                onChoose={chooseSort}
+                                                className="hidden w-44 shrink-0 px-2 lg:flex"
+                                            />
+                                            <SortHeading
+                                                column="modified"
+                                                sortKey={sortKey}
+                                                sortDir={sortDir}
+                                                onChoose={chooseSort}
+                                                className="hidden w-44 shrink-0 px-2 sm:flex"
+                                            />
+                                            <SortHeading
+                                                column="size"
+                                                sortKey={sortKey}
+                                                sortDir={sortDir}
+                                                onChoose={chooseSort}
+                                                className="w-24 shrink-0 px-2"
+                                            />
                                             <div className="w-12 shrink-0 px-2" />
                                         </div>
                                     ) : null}
@@ -2455,31 +2573,23 @@ export function FilesView({
                         <ContextMenuItem onSelect={onNewFolder}>
                             <FolderPlus className="size-4" />
                             New folder
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                {SHORTCUT_HINTS["new-folder"]}
-                            </span>
+                            <MenuShortcut>{SHORTCUT_HINTS["new-folder"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onNewFile}>
                             <FilePlus className="size-4" />
                             New file
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                {SHORTCUT_HINTS["new-file"]}
-                            </span>
+                            <MenuShortcut>{SHORTCUT_HINTS["new-file"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={() => fileInput.current?.click()}>
                             <Upload className="size-4" />
                             Upload files
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                {SHORTCUT_HINTS["upload-files"]}
-                            </span>
+                            <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => void pickFolder()}>
                             <FolderUp className="size-4" />
                             Upload folder
-                            <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                {SHORTCUT_HINTS["upload-folder"]}
-                            </span>
+                            <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
                         </ContextMenuItem>
                         {onSharePeopleFolder ? (
                             <ContextMenuItem onSelect={onSharePeopleFolder}>
@@ -2499,9 +2609,7 @@ export function FilesView({
                             >
                                 <Inbox className="size-4" />
                                 Request files here
-                                <span className="ml-auto pl-6 text-xs text-muted-foreground">
-                                    {SHORTCUT_HINTS["request-files"]}
-                                </span>
+                                <MenuShortcut>{SHORTCUT_HINTS["request-files"]}</MenuShortcut>
                             </ContextMenuItem>
                         ) : null}
                         {clipboard ? (
