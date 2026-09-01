@@ -11,6 +11,7 @@ import { cn } from "../lib/cn";
 import type { ReactNode } from "react";
 
 export function AppShell({
+    mark,
     switcher,
     navButton,
     search,
@@ -18,6 +19,10 @@ export function AppShell({
     sidebar,
     children
 }: {
+    /** The wordmark in the top-left. Callers pass it wrapped in their router's
+     *  link so pressing it goes home the way a logo does everywhere else; the
+     *  bare mark is the fallback for chrome with nowhere to go. */
+    mark?: ReactNode;
     switcher: ReactNode;
     /** Opens the rail on viewports too narrow to show it beside the content
      *  (see MobileNav). Callers pass nothing for a section-less app. */
@@ -33,7 +38,7 @@ export function AppShell({
             <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
-                    <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />
+                    {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
                     {switcher}
                     {/* Pages portal contextual controls here (e.g. the Deploy project +
                         environment selectors), to the right of the app switcher. */}

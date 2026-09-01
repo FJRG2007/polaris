@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -26,7 +27,7 @@ import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
-import { AppShell, CapabilityProvider, ToastProvider } from "@polaris/ui";
+import { AppShell, CapabilityProvider, PolarisMark, ToastProvider } from "@polaris/ui";
 import { TimeZoneReporter } from "@/components/time-zone-reporter";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
@@ -149,6 +150,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
                                     message would bury the four that are. */}
                                             {apps.ids.includes("chat") ? <MessageToasts /> : null}
                                             <AppShell
+                                                mark={
+                                                    <Link
+                                                        href="/home"
+                                                        aria-label="Polaris overview"
+                                                        className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                    >
+                                                        <PolarisMark nameClassName="hidden sm:inline" />
+                                                    </Link>
+                                                }
                                                 switcher={
                                                     <>
                                                         <AppNav

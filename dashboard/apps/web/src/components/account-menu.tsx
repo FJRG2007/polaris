@@ -293,6 +293,13 @@ export function AccountMenu({
                         setOpen(false);
                         router.push("/account");
                     }}
+                    // A right press on your own face is aimed at the same menu the
+                    // left one opens - there is no second, different menu here to
+                    // reach for - so it opens that one instead of the browser's.
+                    onContextMenu={(event) => {
+                        event.preventDefault();
+                        setOpen(true);
+                    }}
                     className="rounded-full "
                 >
                     <Avatar person={{ id, name }} size={32} />
