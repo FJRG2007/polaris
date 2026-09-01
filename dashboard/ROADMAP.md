@@ -272,7 +272,16 @@ Agents (coding sessions):
 - [x] A machine everybody shares, off unless an administrator turns it on under
       `/admin/agents`: one shared home rather than one per account, so anybody
       opening it is signed in with what the last person signed in there, and
-      finds what the last person left
+      finds what the last person left. The toggle and the session form both
+      warn that a personal Claude or ChatGPT subscription is licensed to one
+      person and several people through it is what gets it suspended - use an
+      API key or a team plan there instead
+- [x] A third answer on the picker besides an account or "whichever of mine
+      resolves": sign the agent in with nothing and let the machine's own login
+      answer. It is what a machine somebody signed in themselves needs, since
+      every tool reads its credential environment variable before it ever looks
+      at its own home, and a stored token from months ago would otherwise beat
+      a login that already works
 - [x] Sessions list sorted by what needs a person, a session page with the
       transcript, the activity and the prompt box, and a terminal that attaches
       to the agent's own tmux rather than opening a shell beside it
