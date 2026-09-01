@@ -84,7 +84,13 @@ export async function POST(request: Request): Promise<Response> {
 async function mintSessionTicket(sessionId: string): Promise<Response> {
     const user = await requirePermission("agents.manage");
     const session = await prisma.agentSession.findFirst({
-        where: { id: sessionId, repo: { ownerId: user.id } },
+        // The same two ways of reaching a session the list uses: through the
+        // repository's owner, or - for a workspace, which has no repository to
+        // resolve through - through whoever started it.
+        where: {
+            id: sessionId,
+            OR: [{ repo: { ownerId: user.id } }, { repoId: null, startedById: user.id }]
+        },
         select: { containerId: true, place: true, state: true }
     });
     if (!session) return NextResponse.json({ error: "session not found" }, { status: 404 });

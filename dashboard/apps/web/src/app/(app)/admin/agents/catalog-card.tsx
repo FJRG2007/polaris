@@ -15,7 +15,11 @@ import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
 import { Button, Card, CardBody, Switch } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
-import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./actions";
+import {
+    refreshModelCatalogAction,
+    setInstanceKeySharingAction,
+    setSharedWorkspaceAction
+} from "./actions";
 
 /**
  * Whether an account with no key of its own runs on the deployment's.
@@ -56,6 +60,60 @@ export function KeySharingCard({ shared }: { shared: boolean }) {
                         </p>
                     </div>
                     <Switch checked={on} onChange={toggle} disabled={pending} aria-label="Share provider keys" />
+                </div>
+                {error ? <p className="text-xs text-red-400">{error}</p> : null}
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * Whether this deployment offers a machine everybody shares.
+ *
+ * The copy says what it actually means rather than what it is called, because
+ * what it is called sounds administrative and what it means is not: one home,
+ * so a subscription signed in there is signed in for everybody who can open it,
+ * and the files one person leaves are the files the next person finds. That is
+ * right for a team on one subscription and wrong for a deployment of separate
+ * people, and only an administrator knows which of those this is.
+ */
+export function SharedWorkspaceCard({ allowed }: { allowed: boolean }) {
+    const [on, setOn] = useState(allowed);
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const toggle = (next: boolean) => {
+        setError(null);
+        setOn(next);
+        startTransition(() => {
+            void (async () => {
+                const result = await runAction(
+                    () => setSharedWorkspaceAction({ allowed: next }),
+                    setError
+                );
+                if (!result || result.error) setOn(!next);
+            })();
+        });
+    };
+
+    return (
+        <Card>
+            <CardBody className="space-y-3">
+                <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-medium">Offer a machine everybody shares</p>
+                        <p className="text-muted-foreground text-xs">
+                            {on
+                                ? "Anybody who can start a session can open the shared machine. It has one home: what is signed in there is signed in for all of them, and the files one person leaves are the files the next one finds."
+                                : "Every session opens on a machine of its own account, with its own logins and its own files. Nobody can reach anybody else's."}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={on}
+                        onChange={toggle}
+                        disabled={pending}
+                        aria-label="Offer a shared machine"
+                    />
                 </div>
                 {error ? <p className="text-xs text-red-400">{error}</p> : null}
             </CardBody>

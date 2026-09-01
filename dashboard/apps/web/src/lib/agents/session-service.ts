@@ -79,11 +79,18 @@ export interface SessionView {
      *  spends the account of the person who asked for it, never the
      *  repository's, and null on one started before this was recorded. */
     readonly ownerId: string | null;
-    readonly repoId: string;
+    /** The repository it works in, or null for a workspace - an agent opened on
+     *  a machine of its own with nothing checked out. */
+    readonly repoId: string | null;
+    /** Its `owner/name`, or empty for a workspace. Empty rather than null so
+     *  every screen that prints it prints nothing rather than "null". */
     readonly repoFullName: string;
     readonly cli: string;
     readonly command: string | null;
     readonly place: core.AgentSessionPlace;
+    /** Whether it runs on the machine everybody shares rather than on this
+     *  account's own. Only meaningful where Polaris owns the machine. */
+    readonly sharedHome: boolean;
     /** Whether the agent may run commands without asking, or null for a session
      *  that predates the question. Resolved by `agentRunsUnattended`. */
     readonly unattended: boolean | null;
@@ -111,6 +118,7 @@ const VIEW_SELECT = {
     cli: true,
     command: true,
     place: true,
+    sharedHome: true,
     unattended: true,
     accountId: true,
     hostId: true,
@@ -134,10 +142,11 @@ type SessionRecord = {
     id: string;
     title: string;
     startedById: string | null;
-    repoId: string;
+    repoId: string | null;
     cli: string;
     command: string | null;
     place: string;
+    sharedHome: boolean;
     unattended: boolean | null;
     accountId: string | null;
     hostId: string | null;
@@ -151,7 +160,7 @@ type SessionRecord = {
     startedAt: Date | null;
     finishedAt: Date | null;
     createdAt: Date;
-    repo: { repoFullName: string };
+    repo: { repoFullName: string } | null;
     host: { name: string } | null;
 };
 
@@ -170,10 +179,11 @@ function toView(record: SessionRecord): SessionView {
         title: record.title,
         ownerId: record.startedById,
         repoId: record.repoId,
-        repoFullName: record.repo.repoFullName,
+        repoFullName: record.repo?.repoFullName ?? "",
         cli: record.cli,
         command: record.command,
         place: record.place === "host" ? "host" : "local",
+        sharedHome: record.sharedHome,
         unattended: record.unattended,
         accountId: record.accountId,
         hostId: record.hostId,
@@ -191,14 +201,22 @@ function toView(record: SessionRecord): SessionView {
     };
 }
 
-/** Every session in the repositories this account holds, newest first. */
+/**
+ * Every session this account reaches, newest first.
+ *
+ * Two ways to reach one, because there are two kinds. A session about a
+ * repository belongs to whoever owns that repository, as it always did. A
+ * workspace has no repository to resolve through, so it belongs to the person
+ * who started it and to nobody else - which is also the only thing it was ever
+ * about.
+ */
 export async function listSessions(
     ownerId: string,
     options: { repoId?: string; live?: boolean } = {}
 ): Promise<SessionView[]> {
     const records = await prisma.agentSession.findMany({
         where: {
-            repo: { ownerId },
+            OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }],
             ...(options.repoId ? { repoId: options.repoId } : {}),
             ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {})
         },
@@ -213,19 +231,24 @@ export async function listSessions(
  *  same answer for "no such session" and "not yours". */
 export async function getSession(sessionId: string, ownerId: string): Promise<SessionView | null> {
     const record = await prisma.agentSession.findFirst({
-        where: { id: sessionId, repo: { ownerId } },
+        where: {
+            id: sessionId,
+            OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }]
+        },
         select: VIEW_SELECT
     });
     return record ? toView(record as unknown as SessionRecord) : null;
 }
 
 export interface SessionCreateInput {
-    readonly repoId: string;
+    /** The repository, or null for a workspace with nothing checked out. */
+    readonly repoId: string | null;
     readonly startedById: string;
     readonly title: string;
     readonly cli: string;
     readonly command: string | null;
     readonly place: core.AgentSessionPlace;
+    readonly sharedHome: boolean;
     readonly unattended: boolean | null;
     /** Which stored account signs the agent in, or null for whichever resolves. */
     readonly accountId: string | null;
@@ -258,6 +281,7 @@ export async function createSession(
             cli: input.cli,
             command: input.command,
             place: input.place,
+            sharedHome: input.sharedHome,
             unattended: input.unattended,
             accountId: input.accountId,
             hostId: input.hostId,
@@ -295,14 +319,15 @@ export async function sessionForToken(
 }
 
 /** Whose work a session is doing: the account that owns the repository it runs
- *  in. What the tools it is given act as, so a session can never reach past the
- *  person who started it. */
+ *  in, or - for a workspace, which has no repository to resolve through - the
+ *  person who started it. What the tools it is given act as, so a session can
+ *  never reach past the account it belongs to. */
 export async function sessionOwner(sessionId: string): Promise<string | null> {
     const record = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { repo: { select: { ownerId: true } } }
+        select: { startedById: true, repo: { select: { ownerId: true } } }
     });
-    return record?.repo.ownerId ?? null;
+    return record?.repo?.ownerId ?? record?.startedById ?? null;
 }
 
 /**
@@ -503,16 +528,21 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
         where: { id: sessionId },
         select: {
             enigma: true,
+            startedById: true,
             repo: { select: { enigma: true, gate: true, ownerId: true, repoFullName: true } }
         }
     });
     if (!session) return core.resolveEnigma();
 
-    const owner = session.repo.ownerId;
+    // A workspace has no repository to resolve through, so the tiers it sees are
+    // the account's own and the instance's. Which is the right answer rather
+    // than a fallback: those are the only two anybody set for it.
+    const owner = session.repo?.ownerId ?? session.startedById;
+    if (!owner) return core.resolveEnigma();
     // Through the same helper the defaults screens use: organization tiers are
     // stored under a lowercased login, and a row looked up by the repository's own
     // casing is a tier that silently decides nothing.
-    const account = scopeOf(session.repo.repoFullName);
+    const account = session.repo ? scopeOf(session.repo.repoFullName) : GENERAL_SCOPE;
     const [tiers, platform] = await Promise.all([
         prisma.agentDefaults.findMany({
             where: { ownerId: owner, scope: { in: [account, GENERAL_SCOPE] } },
@@ -531,9 +561,9 @@ export async function resolveSessionEnigma(sessionId: string): Promise<core.Reso
             : parsed;
     };
 
-    const repoSettings = core.parseEnigmaSettings(session.repo.enigma);
+    const repoSettings = core.parseEnigmaSettings(session.repo?.enigma ?? null);
     const repoTier: core.EnigmaSettings =
-        repoSettings.gate === null && session.repo.gate && core.isEnigmaGateMode(session.repo.gate)
+        repoSettings.gate === null && session.repo?.gate && core.isEnigmaGateMode(session.repo.gate)
             ? { ...repoSettings, gate: session.repo.gate }
             : repoSettings;
 

@@ -71,7 +71,10 @@ function containerName(id: string): string {
  */
 const LOGIN_COMMANDS: Readonly<Record<string, { install: string; command: string; whoami?: string }>> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
-        install: "npm install -g @anthropic-ai/claude-code",
+        // The same install line the catalogue uses, --allow-scripts and all:
+        // npm now declines a package's postinstall unless it is named, and this
+        // one's postinstall is what puts the binary on the PATH.
+        install: "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         command: "claude setup-token",
         // Asked once, after the login, in the same container. It is the only way
         // a stored credential can say whose it is - and without that, an account
@@ -106,8 +109,29 @@ export const SIGNIN_BOOT = [
     "  apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq tmux >/dev/null 2>&1 || true",
     "fi",
     'command -v tmux >/dev/null 2>&1 || { echo "polaris: this machine has no tmux and one could not be installed"; exit 1; }',
-    'sh -c "$POLARIS_INSTALL" >/dev/null 2>&1 || true',
-    'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" "$POLARIS_LOGIN"',
+    // The same account and the same home a session gets, from the same builder.
+    // This is what makes the dialog worth opening at all: what the login writes
+    // lands in the home the sessions read, so it is not a string to copy back -
+    // it is the machine being signed in. The paste is still offered, because a
+    // token is also useful somewhere this home does not reach, but it stopped
+    // being the only thing this produces.
+    commands.AGENT_ACCOUNT_SETUP,
+    // Into that home's npm prefix, so a tool installed here is one the next
+    // session finds already installed.
+    'as_agent "$POLARIS_INSTALL" >/dev/null 2>&1 || true',
+    // Through a file rather than nested quoting: the login is a value from the
+    // catalogue, and `su -p node -c "<it>"` inside a tmux argument is three
+    // levels of quoting to get wrong once.
+    "printf '%s' \"$POLARIS_LOGIN\" > /tmp/polaris-login.sh",
+    "chmod 0755 /tmp/polaris-login.sh",
+    // A shell after it, so the screen survives the command. Without that the
+    // window closed the moment the login printed its result, which is the one
+    // moment somebody needed to be reading it.
+    "POLARIS_RUN='sh /tmp/polaris-login.sh; exec sh'",
+    'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
+    "  POLARIS_RUN=\"su -p $POLARIS_RUNAS -c 'sh /tmp/polaris-login.sh; exec sh'\"",
+    "fi",
+    'tmux new-session -d -s "$POLARIS_TMUX" -x "$POLARIS_COLS" -y "$POLARIS_ROWS" "$POLARIS_RUN"',
     "exec tail -f /dev/null"
 ].join("\n");
 
@@ -151,10 +175,22 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                         POLARIS_COLS: String(commands.SIGNIN_COLS),
                         POLARIS_ROWS: String(commands.SIGNIN_ROWS),
                         POLARIS_INSTALL: login.install,
-                        POLARIS_LOGIN: login.command
+                        POLARIS_LOGIN: login.command,
+                        POLARIS_RUNAS: commands.CONTAINER_USER,
+                        POLARIS_HOME: commands.AGENT_HOME
                     },
                     ports: [],
-                    volumes: [],
+                    // This person's own home, the one their sessions run in.
+                    // Nothing else is mounted and no credential is carried in:
+                    // what the login writes is the only thing that leaves here,
+                    // and it leaves by already being in the home.
+                    volumes: [
+                        {
+                            source: commands.agentHomeSource(userId),
+                            target: commands.AGENT_HOME,
+                            kind: "bind" as const
+                        }
+                    ],
                     labels: { [LABEL_KEY]: attempt.id },
                     command: commands.bootArgv(SIGNIN_BOOT),
                     networks: [],

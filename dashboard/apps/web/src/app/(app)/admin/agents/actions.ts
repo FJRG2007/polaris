@@ -11,6 +11,8 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { setSetting } from "@/lib/setting-store";
+import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
 import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
@@ -60,6 +62,30 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
         actorId: admin.id,
         action: "agents.keys.share",
         metadata: { shared: parsed.data.shared }
+    });
+    revalidatePath("/admin/agents");
+    return {};
+}
+
+/**
+ * Whether this deployment offers a machine everybody shares.
+ *
+ * Off by default and only ever turned on here, because it is the one setting
+ * that puts several accounts on one home: what is signed in on that machine is
+ * signed in for everybody who can open it. Right for a team on one
+ * subscription, wrong for a deployment of separate people, and only an
+ * administrator knows which of those this is.
+ */
+export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ allowed: z.boolean() }).safeParse(input);
+    if (!parsed.success) return { error: "Pick a setting" };
+
+    await setSetting(SHARED_WORKSPACE_KEY, parsed.data.allowed ? "true" : "false");
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.sessions.sharedWorkspace",
+        metadata: { allowed: parsed.data.allowed }
     });
     revalidatePath("/admin/agents");
     return {};

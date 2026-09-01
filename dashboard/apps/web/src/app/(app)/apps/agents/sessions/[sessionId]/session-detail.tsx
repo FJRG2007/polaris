@@ -17,7 +17,8 @@ import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
-import { CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
+import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
+import { Check, CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
 import {
     interruptSessionAction,
@@ -78,6 +79,15 @@ export function SessionDetail({ session, events, messages }: Props) {
     const [pending, setPending] = useState<{ key: number; body: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [screen, setScreen] = useState<string | null>(null);
+    /**
+     * Where the boot has got to, while it is still booting.
+     *
+     * Read off the session's own terminal rather than reported: every step of it
+     * happens before there is an agent to run a hook. What it replaces is a word
+     * and a spinner for anything between twenty seconds and five minutes, with
+     * no way to tell a slow clone from a machine that had already given up.
+     */
+    const [boot, setBoot] = useState<BootStep[] | null>(null);
     const [attached, setAttached] = useState(false);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
@@ -94,6 +104,34 @@ export function SessionDetail({ session, events, messages }: Props) {
     useEffect(() => {
         bottom.current?.scrollIntoView({ block: "end" });
     }, [messages.length, events.length]);
+
+    // Only while it is starting. After that the terminal belongs to the agent
+    // and reading it on a timer would be polling somebody's session for a bar
+    // that has nothing left to say.
+    useEffect(() => {
+        if (session.state !== "starting") {
+            setBoot(null);
+            return;
+        }
+        let stopped = false;
+        const read = () => {
+            void sessionScreenAction(session.id)
+                .then((result) => {
+                    if (stopped) return;
+                    setBoot(bootProgress(result?.screen ?? ""));
+                })
+                // A machine part way through its boot refuses the probe as often
+                // as it answers, and neither is a reason to show an error over a
+                // progress readout.
+                .catch(() => undefined);
+        };
+        read();
+        const timer = setInterval(read, REFRESH_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [session.id, session.state]);
 
     // The server's copy has landed, so the local one goes. Matched on the body
     // rather than an id, because the row the server writes has one of its own
@@ -206,6 +244,62 @@ export function SessionDetail({ session, events, messages }: Props) {
                     </>
                 )}
             </div>
+
+            {boot ? (
+                <Card>
+                    <CardBody className="space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                            <p className="text-sm">Getting the machine ready.</p>
+                        </div>
+                        {/* The bar and the list say different things, and both
+                            are wanted: the bar is "how much longer", the list is
+                            "what is it doing", and the second is what makes a
+                            stuck step legible instead of a bar that stopped. */}
+                        <div className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full">
+                            <div
+                                className="bg-primary h-full rounded-full transition-all duration-500"
+                                style={{
+                                    width: `${Math.round(
+                                        (boot.filter((step) => step.state === "done").length /
+                                            boot.length) *
+                                            100
+                                    )}%`
+                                }}
+                            />
+                        </div>
+                        <ul className="space-y-1">
+                            {boot.map((step) => (
+                                <li key={step.key} className="flex items-center gap-2 text-xs">
+                                    {step.state === "done" ? (
+                                        <Check className="size-3.5 shrink-0 text-emerald-400" />
+                                    ) : step.state === "doing" ? (
+                                        <Loader2 className="text-primary size-3.5 shrink-0 animate-spin" />
+                                    ) : (
+                                        <span className="bg-border size-1.5 shrink-0 rounded-full" />
+                                    )}
+                                    <span
+                                        className={
+                                            step.state === "waiting"
+                                                ? "text-muted-foreground"
+                                                : undefined
+                                        }
+                                    >
+                                        {step.label}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                        {/* Said here rather than only in the terminal, because
+                            this is the screen somebody is on while they wonder
+                            whether it is always going to be this slow. */}
+                        <p className="text-muted-foreground text-xs">
+                            The installs happen once. This machine keeps its home, so your next
+                            session skips them and starts in seconds.
+                        </p>
+                    </CardBody>
+                </Card>
+            ) : null}
 
             {session.error ? (
                 <div className="flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-300">

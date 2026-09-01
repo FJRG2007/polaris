@@ -5711,11 +5711,19 @@ model AgentRun {
 // vendor's permission prompts, its sandboxing or its context handling.
 model AgentSession {
     id          String    @id @default(uuid(7)) @db.Uuid
-    // The repository it works in. What carries the GitHub installation the
-    // checkout uses, and what the session's access is resolved through - a
-    // session may not name a URL to clone, because the credential that would
-    // clone it belongs to the instance rather than to whoever asked.
-    repoId      String    @db.Uuid
+    // The repository it works in, or null for a workspace.
+    //
+    // When it is set it carries the GitHub installation the checkout uses, and
+    // the session's access resolves through it - a session may not name a URL to
+    // clone, because the credential that would clone it belongs to the instance
+    // rather than to whoever asked.
+    //
+    // Null is somebody opening an agent on a machine of their own with nothing
+    // checked out: no task, no repository, no branch. That is a real way to work
+    // - it is what a person does on their own laptop - and it was the one shape
+    // this could not express. Such a session resolves its access through
+    // `startedById` instead, which is the only account it was ever about.
+    repoId      String?   @db.Uuid
     // Who started it. Not a relation, the same way a run's is not: a session is a
     // record of work that happened, and it has to survive the account closing.
     startedById String?   @db.Uuid
@@ -5727,6 +5735,16 @@ model AgentSession {
     command     String?
     // local | host - a container on the Polaris box, or an enrolled server.
     place       String    @default("local")
+    // Whether it runs on the machine everybody shares rather than on this
+    // account's own.
+    //
+    // A shared machine has one home: one set of logins, one npm prefix, one set
+    // of files, and everybody who can open it sees all of them. That is the
+    // point of it - a team with one subscription - and it is also why it is off
+    // unless an administrator turns it on, and why it is a stored column rather
+    // than something resolved later: which machine a session opened on is a fact
+    // about that session, and it must not change under it.
+    sharedHome  Boolean   @default(false)
     // Which stored account signs the agent in, when the person picked one.
     //
     // Null takes whatever the resolver would pick, which is the first of their
@@ -5784,7 +5802,7 @@ model AgentSession {
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 
-    repo     AgentRepo             @relation(fields: [repoId], references: [id], onDelete: Cascade)
+    repo     AgentRepo?            @relation(fields: [repoId], references: [id], onDelete: Cascade)
     host     Host?                 @relation(fields: [hostId], references: [id], onDelete: SetNull)
     events   AgentSessionEvent[]
     messages AgentSessionMessage[]

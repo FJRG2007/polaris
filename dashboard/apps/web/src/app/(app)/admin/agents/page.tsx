@@ -7,18 +7,20 @@ import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { UsageLimitsCard } from "./usage-limits-card";
-import { CatalogCard, KeySharingCard } from "./catalog-card";
+import { CatalogCard, KeySharingCard, SharedWorkspaceCard } from "./catalog-card";
 import { PlatformDefaultsView } from "./platform-defaults-view";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
 import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
 import { getPlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
 import { connectedProviders, instanceKeysAreShared } from "@/lib/agents/model-keys";
+import { sharedWorkspaceAllowed } from "@/lib/agents/session-capacity";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentDefaultsAdminPage() {
     await requireAdmin();
-    const [platform, pools, providers, catalogModels, catalogAt, keysShared, limits] = await Promise.all([
+    const [platform, pools, providers, catalogModels, catalogAt, keysShared, limits, sharedMachine] =
+        await Promise.all([
         getPlatformAgentDefaults(),
         // Every pool on the deployment, not one person's: a default here applies
         // to everybody.
@@ -31,8 +33,9 @@ export default async function AgentDefaultsAdminPage() {
         prisma.agentModel.count(),
         catalogRefreshedAt(),
         instanceKeysAreShared(),
-        listUsageLimits()
-    ]);
+            listUsageLimits(),
+            sharedWorkspaceAllowed()
+        ]);
 
     return (
         // Narrow page: centre the column in the content area, header included, so
@@ -44,6 +47,7 @@ export default async function AgentDefaultsAdminPage() {
             />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />
+                <SharedWorkspaceCard allowed={sharedMachine} />
                 <UsageLimitsCard limits={limits} />
                 <CatalogCard models={catalogModels} refreshedAt={catalogAt?.toISOString() ?? null} />
                 <PlatformDefaultsView platform={platform} pools={pools} providers={providers} />

@@ -58,12 +58,29 @@ describe("the sign-in boot script", () => {
         expect(SIGNIN_BOOT.trimEnd().endsWith("exec tail -f /dev/null")).toBe(true);
     });
 
-    it("carries no credential and mounts nothing", () => {
-        // Nothing of anybody's goes into this container. It exists to run one
-        // vendor's login and be thrown away.
+    it("carries no credential in", () => {
+        // Nothing of anybody's is handed to this container. The one thing
+        // mounted is the person's own home, which is where the login is meant
+        // to land - and the only thing that leaves here, by already being in it.
         expect(SIGNIN_BOOT).not.toContain("GIT_AUTH_HEADER");
         expect(SIGNIN_BOOT).not.toContain("GH_TOKEN");
         expect(SIGNIN_BOOT).not.toContain("ANTHROPIC");
+    });
+
+    it("signs in as the account the sessions run as, into the home they read", () => {
+        // The failure this prevents is quiet and total: a login written into
+        // root's home by the dialog and looked for in the agent's home by every
+        // session afterwards is a dialog that says it worked and a tool that
+        // asks again.
+        expect(SIGNIN_BOOT).toContain("$POLARIS_HOME");
+        expect(SIGNIN_BOOT).toContain("$POLARIS_RUNAS");
+        expect(SIGNIN_BOOT).toContain("su -p");
+    });
+
+    it("keeps the screen after the login command finishes", () => {
+        // It prints its result and exits, and the window used to go with it -
+        // taking the one line somebody was there to read.
+        expect(SIGNIN_BOOT).toContain("exec sh");
     });
 });
 

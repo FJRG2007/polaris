@@ -67,6 +67,8 @@ interface Choices {
     agents: AgentOption[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
+    /** Whether this deployment offers a machine everybody shares. */
+    sharedWorkspace: boolean;
 }
 
 export function SessionsView({ sessions }: { sessions: SessionView[] }) {
@@ -123,7 +125,7 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                         {session.title}
                                     </Link>
                                     <p className="truncate text-xs text-muted-foreground">
-                                        {session.detail || session.repoFullName}
+                                        {session.detail || session.repoFullName || "A workspace"}
                                     </p>
                                 </div>
                                 <Badge variant="neutral" className="shrink-0">
@@ -169,6 +171,15 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
  * is "give this to Claude", and a session without one comes up at its prompt,
  * which is "open me a terminal on a branch". Both are ordinary.
  */
+/**
+ * The repository picker's answer for "none".
+ *
+ * A sentinel rather than an empty string because the select cannot hold one, and
+ * a word rather than a dash so a stored value that ever leaked into a log says
+ * what it meant.
+ */
+const NO_REPO = "workspace";
+
 function StartDialog({ onClose }: { onClose: () => void }) {
     const [choices, setChoices] = useState<Choices | null>(null);
     const [repoId, setRepoId] = useState("");
@@ -176,6 +187,10 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     const [cli, setCli] = useState("claude");
     const [command, setCommand] = useState("");
     const [place, setPlace] = useState<core.AgentSessionPlace>("local");
+    // The machine everybody shares, where the deployment offers one. Off unless
+    // somebody picks it: it holds other people's logins and other people's
+    // files, and nothing should land there by default.
+    const [sharedHome, setSharedHome] = useState(false);
     const [hostId, setHostId] = useState("");
     const [baseRef, setBaseRef] = useState("");
     const [prompt, setPrompt] = useState("");
@@ -190,23 +205,31 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         void sessionChoicesAction().then((loaded) => {
             setChoices(loaded);
-            setRepoId((current) => current || (loaded.repos[0]?.id ?? ""));
+            // A workspace when there is nothing connected, which is now a real
+            // answer rather than a dead end: an agent on a machine of your own
+            // with nothing checked out needs no repository at all.
+            setRepoId((current) => current || (loaded.repos[0]?.id ?? NO_REPO));
         });
     }, []);
+
+    // No repository named. Everything a checkout implies - a branch, a task, a
+    // clone - goes with it.
+    const workspace = repoId === NO_REPO;
 
     const submit = () => {
         startTransition(() => {
             void runAction(
                 () =>
                     startSessionAction({
-                        repoId,
+                        repoId: workspace ? null : repoId,
                         title,
                         cli: agentOf(cli),
                         accountId: accountOf(cli),
                         command: agentOf(cli) === core.CUSTOM_AGENT_CLI ? command : undefined,
                         place,
+                        sharedHome: place === "local" && sharedHome,
                         hostId: place === "host" ? hostId : null,
-                        baseRef,
+                        baseRef: workspace ? "" : baseRef,
                         prompt,
                         taskId: null,
                         unattended,
@@ -243,17 +266,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     <DialogTitle>Start a session</DialogTitle>
                 </DialogHeader>
 
-                {noRepos ? (
-                    <p className="text-sm text-muted-foreground">
-                        A session works in a repository the Agents app already reaches. Connect one
-                        under{" "}
-                        <Link href="/apps/agents/repos" className="underline">
-                            Repositories
-                        </Link>{" "}
-                        first.
-                    </p>
-                ) : (
-                    <div className="space-y-3">
+                <div className="space-y-3">
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
                                 What is it working on
@@ -270,13 +283,37 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <Select
                                 value={repoId}
                                 onValueChange={setRepoId}
-                                options={(choices?.repos ?? []).map((repo) => ({
-                                    value: repo.id,
-                                    label: repo.name
-                                }))}
+                                options={[
+                                    // First, because it is the answer that needs
+                                    // nothing set up. Somebody who just wants an
+                                    // agent should not have to connect a
+                                    // repository to get one.
+                                    { value: NO_REPO, label: "No repository - just open the agent" },
+                                    ...(choices?.repos ?? []).map((repo) => ({
+                                        value: repo.id,
+                                        label: repo.name
+                                    }))
+                                ]}
                                 placeholder="Pick a repository"
                             />
                         </label>
+
+                        {workspace ? (
+                            <p className="text-xs text-muted-foreground">
+                                It opens on a machine of your own with an empty directory and
+                                nothing checked out. The machine keeps its home, so what you
+                                install and sign in to stays there for next time.
+                            </p>
+                        ) : null}
+                        {noRepos ? (
+                            <p className="text-xs text-muted-foreground">
+                                Nothing is connected yet. Add one under{" "}
+                                <Link href="/apps/agents/repos" className="underline">
+                                    Repositories
+                                </Link>{" "}
+                                to have an agent work in it.
+                            </p>
+                        ) : null}
 
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">Agent</span>
@@ -316,6 +353,25 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             />
                         </label>
 
+                        {/* Only where the deployment offers one, and only for a
+                            container Polaris owns - an enrolled server already
+                            has a home of its own. The copy says what it means
+                            rather than what it is called: one home, so the
+                            logins and the files are everybody's. */}
+                        {place === "local" && choices?.sharedWorkspace ? (
+                            <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+                                <div className="min-w-0">
+                                    <p className="text-sm">Use the machine everybody shares</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {sharedHome
+                                            ? "One home for the whole deployment: whatever is signed in there signs you in, and the files anybody leaves are the files you find."
+                                            : "It opens on a machine of your own, with your logins and your files. Nobody else reaches it."}
+                                    </p>
+                                </div>
+                                <Switch checked={sharedHome} onChange={setSharedHome} />
+                            </div>
+                        ) : null}
+
                         {place === "host" ? (
                             <label className="block space-y-1">
                                 <span className="text-xs text-muted-foreground">Which server</span>
@@ -331,17 +387,19 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             </label>
                         ) : null}
 
-                        <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">
-                                Branch to start from. Leave it empty for the repository&apos;s
-                                default.
-                            </span>
-                            <Input
-                                value={baseRef}
-                                onChange={(event) => setBaseRef(event.target.value)}
-                                placeholder="main"
-                            />
-                        </label>
+                        {workspace ? null : (
+                            <label className="block space-y-1">
+                                <span className="text-xs text-muted-foreground">
+                                    Branch to start from. Leave it empty for the repository&apos;s
+                                    default.
+                                </span>
+                                <Input
+                                    value={baseRef}
+                                    onChange={(event) => setBaseRef(event.target.value)}
+                                    placeholder="main"
+                                />
+                            </label>
+                        )}
 
                         <label className="block space-y-1">
                             <span className="text-xs text-muted-foreground">
@@ -392,9 +450,8 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <Switch checked={enigma} onChange={setEnigma} />
                         </div>
 
-                        {error ? <p className="text-sm text-red-400">{error}</p> : null}
-                    </div>
-                )}
+                    {error ? <p className="text-sm text-red-400">{error}</p> : null}
+                </div>
 
                 <DialogFooter>
                     <Button variant="ghost" onClick={onClose}>
@@ -402,7 +459,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     </Button>
                     <Button
                         onClick={submit}
-                        disabled={busy || noRepos || !title || !repoId || unlinked !== null}
+                        disabled={busy || !title || !repoId || unlinked !== null}
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         Start

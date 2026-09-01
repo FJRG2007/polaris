@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as commands from "@/lib/agents/session-commands";
+import { bootProgress } from "@/lib/agents/boot-progress";
 import {
     claudeHookSettings,
     hookEventFailed,
@@ -173,9 +174,17 @@ describe("the home a session keeps", () => {
     it("is one per account, and a name the daemon will take", () => {
         // The daemon resolves a bind source under its own volume root and
         // refuses anything that escapes it, so what goes in has to be a name.
-        expect(commands.agentHomeSource("usr_abc123")).toBe("agent-homes/usr_abc123");
-        expect(commands.agentHomeSource("../../etc")).toBe("agent-homes/etc");
-        expect(commands.agentHomeSource("a/../b")).toBe("agent-homes/ab");
+        expect(commands.agentHomeSource("usr_abc123")).toBe("agent-homes/u-usr_abc123");
+        expect(commands.agentHomeSource("../../etc")).toBe("agent-homes/u-etc");
+        expect(commands.agentHomeSource("a/../b")).toBe("agent-homes/u-ab");
+    });
+
+    it("can never put an account in the machine everybody shares", () => {
+        // The one mistake here that noticing later does not undo: an id that
+        // happened to be the shared name would be one person's session opening
+        // in the shared one, with everybody's logins in it.
+        expect(commands.agentHomeSource("shared")).not.toBe(commands.SHARED_HOME_SOURCE);
+        expect(commands.SHARED_HOME_SOURCE.startsWith("agent-homes/")).toBe(true);
     });
 
     it("stops rather than give two accounts the same home", () => {
@@ -223,6 +232,56 @@ describe("the home a session keeps", () => {
         // POLARIS_HOME is empty there, and every line that touches a home is
         // behind that test.
         expect(commands.SESSION_SETUP).toContain('if [ -n "$POLARIS_HOME" ]; then');
+    });
+});
+
+describe("how far a session is through coming up", () => {
+    it("says the first step is under way before anything has printed", () => {
+        // The container is up and installing a terminal to run in. A readout
+        // that showed nothing there would be the spinner this replaced.
+        const steps = bootProgress("")!;
+        expect(steps[0]?.state).toBe("doing");
+        expect(steps.every((step) => step.state !== "done")).toBe(true);
+    });
+
+    it("moves as the boot says what it is doing", () => {
+        const steps = bootProgress("polaris: fetching FJRG2007/polaris")!;
+        expect(steps.find((step) => step.key === "workspace")?.state).toBe("done");
+        expect(steps.find((step) => step.key === "fetch")?.state).toBe("doing");
+        expect(steps.find((step) => step.key === "agent")?.state).toBe("waiting");
+    });
+
+    it("runs straight through the steps a second session does not pay", () => {
+        // The whole point of the home that is kept: no install, so no wait. A
+        // step that never printed is finished rather than stuck, because a later
+        // one has spoken.
+        const steps = bootProgress(
+            ["polaris: fetching a/b", "polaris: claude is already installed here"].join("\n")
+        )!;
+        expect(steps.find((step) => step.key === "enigma")?.state).toBe("done");
+        expect(steps.find((step) => step.key === "agent")?.state).toBe("doing");
+    });
+
+    it("stops once the agent has the terminal", () => {
+        // Past that point a progress readout is clutter over the thing somebody
+        // actually came to read.
+        expect(bootProgress("polaris: starting claude")).toBeNull();
+    });
+
+    it("matches lines this file actually prints", () => {
+        // The failure it guards is silent: reword an echo and the bar stops
+        // moving, with nothing anywhere saying why.
+        const boot = commands.SESSION_SETUP;
+        for (const mark of [
+            "polaris: preparing this account",
+            "polaris: fetching ",
+            "polaris: installing Enigma",
+            "This happens once",
+            "is already installed here",
+            "polaris: starting "
+        ]) {
+            expect(boot, mark).toContain(mark);
+        }
     });
 });
 

@@ -161,6 +161,10 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
             // Always on the Polaris box. A session started by a model is not the
             // moment to be choosing somebody's server for them.
             place: "local",
+            // Never the shared machine. A tool call is an agent acting for one
+            // person, and putting that on a container holding everybody's logins
+            // is not something an agent gets to decide.
+            sharedHome: false,
             hostId: null,
             baseRef: input.baseRef,
             taskId: null,

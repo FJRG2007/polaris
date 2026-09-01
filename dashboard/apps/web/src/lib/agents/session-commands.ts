@@ -111,8 +111,25 @@ export const AGENT_HOME = "/home/node";
 export function agentHomeSource(ownerId: string): string {
     const safe = ownerId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
     if (!safe) throw new Error("Polaris could not work out where to keep this session's home.");
-    return `agent-homes/${safe}`;
+    // Prefixed, so no account id can ever land on the shared name below. An id
+    // that happened to be the word would put one person's session in the machine
+    // everybody shares, which is the one mistake here that cannot be undone by
+    // noticing it later.
+    return `agent-homes/u-${safe}`;
 }
+
+/**
+ * The home a SHARED workspace keeps, which is nobody's in particular.
+ *
+ * One machine several people work on, with one set of logins and one set of
+ * files - which is the point of it, and also the whole of what has to be said
+ * out loud before anybody opens one. It is off unless an administrator turns it
+ * on, and the screen that offers it says plainly that what is signed in there is
+ * signed in for everybody who can reach it.
+ *
+ * Never derived from an account, so it cannot accidentally become somebody's.
+ */
+export const SHARED_HOME_SOURCE = "agent-homes/shared";
 
 /** The compose project, and therefore the container, one session gets. */
 export function sessionContainerName(sessionId: string): string {
@@ -152,7 +169,7 @@ const REQUIRE_TMUX = [
  * HOME and PATH, so the persistent home and the npm prefix inside it would be
  * thrown away at the exact moment they matter.
  */
-const AGENT_ACCOUNT = [
+const AGENT_ACCOUNT: readonly string[] = [
     "POLARIS_AS_ROOT=no",
     'if [ "$(id -u)" = "0" ] && [ -n "$POLARIS_RUNAS" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
     "  POLARIS_AS_ROOT=yes",
@@ -190,8 +207,34 @@ const AGENT_ACCOUNT = [
     "fi"
 ];
 
-/** The worktree, and everything Polaris writes into it. */
+/**
+ * The same preamble, for anything else Polaris starts in one of these
+ * containers.
+ *
+ * Shared rather than copied because a sign-in and a session have to agree about
+ * WHERE the login lands, exactly: a login written into root's home by one and
+ * read from the agent's home by the other is a dialog that says it worked and a
+ * session that asks again.
+ */
+export const AGENT_ACCOUNT_SETUP = AGENT_ACCOUNT.join("\n");
+
+/**
+ * The worktree, and everything Polaris writes into it.
+ *
+ * Or no worktree at all. A session with no repository is somebody opening an
+ * agent on a machine of their own with nothing checked out - which is what a
+ * person does on their own laptop, and was the one shape this could not express.
+ * That directory lives inside the home that is kept, so what they make in it is
+ * still there next time; a checkout does not, because a session about a
+ * repository starts from the repository rather than from what the last one left
+ * behind.
+ */
 const PREPARE_WORKTREE = [
+    'if [ -z "$GITHUB_REPOSITORY" ]; then',
+    '  echo "polaris: opening your workspace"',
+    '  mkdir -p "$POLARIS_WORKDIR"',
+    '  cd "$POLARIS_WORKDIR"',
+    "else",
     'echo "polaris: fetching $GITHUB_REPOSITORY"',
     // The credential goes to git as a config value read from the environment,
     // never as part of the URL - which would put it in the reflog and in every
@@ -208,6 +251,7 @@ const PREPARE_WORKTREE = [
     "fi",
     'cd "$POLARIS_WORKDIR"',
     'git checkout -b "$POLARIS_BRANCH"',
+    "fi",
     // The agent reports what it is doing through a script Polaris registers in
     // the agent's own configuration. Written from the environment so neither the
     // URL nor the token is ever an argument.
@@ -233,7 +277,13 @@ const PREPARE_WORKTREE = [
     // The Polaris tools, registered in the worktree so the agent has them on its
     // first turn without anybody configuring anything.
     'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_WORKDIR/.mcp.json"',
-    'printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
+    // Only where there is a checkout to exclude them from. A workspace has no
+    // git directory, and appending into one that is not there fails the whole
+    // setup under `set -e` - a session that dies on its way up for want of a
+    // file nobody asked for.
+    'if [ -d "$POLARIS_WORKDIR/.git" ]; then',
+    '  printf "%s\n%s\n" ".claude/" ".mcp.json" >> "$POLARIS_WORKDIR/.git/info/exclude"',
+    "fi",
     // Cloned as root because the image starts as root; owned by the agent,
     // because the agent is who edits it.
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',

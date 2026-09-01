@@ -25,7 +25,14 @@ export default async function AgentSessionPage({
         <>
             <PageHeader
                 title={session.title}
-                description={`${session.repoFullName} on ${session.branch}`}
+                // A workspace has no repository and no branch, and printing
+                // " on <branch>" for a session that checked nothing out is a
+                // header describing something that is not there.
+                description={
+                    session.repoFullName
+                        ? `${session.repoFullName} on ${session.branch}`
+                        : "A workspace of your own, with nothing checked out"
+                }
             />
             <SessionDetail session={session} events={events} messages={messages} />
         </>

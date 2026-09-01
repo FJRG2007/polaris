@@ -20,7 +20,11 @@ import * as sessions from "@/lib/agents/session-service";
 import * as taskAccess from "@/lib/tasks/access";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
-import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
+import {
+    capacityRefusal,
+    sessionCapacity,
+    sharedWorkspaceAllowed
+} from "@/lib/agents/session-capacity";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
 
@@ -36,9 +40,11 @@ export async function sessionChoicesAction(): Promise<{
     agents: AgentOption[];
     repos: { id: string; name: string }[];
     hosts: { id: string; name: string }[];
+    /** Whether this deployment offers a machine everybody shares. */
+    sharedWorkspace: boolean;
 }> {
     const user = await requirePermission("agents.manage");
-    const [repos, hosts] = await Promise.all([
+    const [repos, hosts, sharedWorkspace] = await Promise.all([
         prisma.agentRepo.findMany({
             where: { ownerId: user.id, enabled: true },
             select: { id: true, repoFullName: true },
@@ -48,9 +54,11 @@ export async function sessionChoicesAction(): Promise<{
             where: { ownerId: user.id, status: "active" },
             select: { id: true, name: true },
             orderBy: { name: "asc" }
-        })
+        }),
+        sharedWorkspaceAllowed()
     ]);
     return {
+        sharedWorkspace,
         agents: await agentOptionsFor(user.id),
         repos: repos.map((repo) => ({ id: repo.id, name: repo.repoFullName })),
         hosts
@@ -90,11 +98,24 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the form" };
     const value = parsed.data;
 
-    const repo = await prisma.agentRepo.findFirst({
-        where: { id: value.repoId, ownerId: user.id },
-        select: { id: true }
-    });
-    if (!repo) return { error: "That repository is not connected to the Agents app." };
+    // Only when one was named. A workspace checks nothing out, so there is no
+    // repository to own and nothing to verify - what it is allowed to be is
+    // settled by who is asking, which `requirePermission` already answered.
+    if (value.repoId) {
+        const repo = await prisma.agentRepo.findFirst({
+            where: { id: value.repoId, ownerId: user.id },
+            select: { id: true }
+        });
+        if (!repo) return { error: "That repository is not connected to the Agents app." };
+    }
+
+    // The machine everybody shares only exists where an administrator said so.
+    // Checked here rather than trusted from the form: it is the one option that
+    // opens a container holding other people's logins, so a client that asked
+    // for it without the deployment offering it is refused rather than served.
+    if (value.sharedHome && !(await sharedWorkspaceAllowed())) {
+        return { error: "This Polaris does not offer a shared machine." };
+    }
 
     // Which server a session may run on is settled here, once. The runtime reads
     // the host without an owner check afterwards, and this is the check it is
@@ -154,6 +175,7 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         cli: value.cli,
         command: value.cli === core.CUSTOM_AGENT_CLI ? (value.command ?? null) : null,
         place: value.place,
+        sharedHome: value.sharedHome,
         unattended: value.unattended,
         accountId: value.accountId,
         hostId: value.place === "host" ? value.hostId : null,

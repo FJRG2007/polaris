@@ -49,6 +49,17 @@ const LABEL_KEY = "polaris.agent-session";
 /** Where a `local` session's worktree lives inside its own container. */
 const CONTAINER_WORKDIR = "/session/repo";
 
+/**
+ * Where a WORKSPACE works, which is inside the home that is kept.
+ *
+ * Deliberately not `/session/repo`. A checkout is disposable - the next session
+ * clones it again - and a workspace is the opposite: it is somebody's own
+ * directory on their own machine, and files they made there have to still be
+ * there tomorrow. The home is the only thing in a session that outlives it, so
+ * that is where it goes.
+ */
+const CONTAINER_WORKSPACE = `${commands.AGENT_HOME}/workspace`;
+
 /** Where a `host` session's worktree lives on an enrolled server. Under one
  *  directory with everything else Polaris puts on a machine, so removing a server
  *  from Polaris leaves one thing to delete. */
@@ -157,10 +168,30 @@ function agentCommandFor(
     };
 }
 
+/**
+ * Where the agent works.
+ *
+ * Three answers rather than two: a checkout on a server, a checkout in a
+ * container, and - for a session with no repository - a directory inside the
+ * home that is kept, so it is still there the next time.
+ */
+function workdirFor(session: SessionView): string {
+    if (session.place === "host") {
+        // On somebody's own server the home already persists, so a workspace
+        // there is one directory rather than one per session - otherwise every
+        // session would open on an empty one and leave another behind.
+        return session.repoFullName ? hostWorkdir(session.id) : "$HOME/.polaris/workspace";
+    }
+    return session.repoFullName ? CONTAINER_WORKDIR : CONTAINER_WORKSPACE;
+}
+
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
+    // A workspace checks nothing out, so it needs no installation and asks for
+    // no token. Refusing to start one because an organization has not connected
+    // GitHub would be refusing over a repository nobody named.
     const owner = session.repoFullName.split("/")[0] ?? "";
-    const githubToken = await githubAppInstallationToken(owner);
-    if (!githubToken) {
+    const githubToken = session.repoFullName ? ((await githubAppInstallationToken(owner)) ?? "") : "";
+    if (session.repoFullName && !githubToken) {
         throw new SessionRefusal(
             `Polaris has no GitHub App installation for ${owner}, so it cannot check the repository out. Connect it again under Agents settings.`
         );
@@ -188,7 +219,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         repoFullName: session.repoFullName,
         branch: session.branch,
         baseRef: session.baseRef,
-        workdir: session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR,
+        workdir: workdirFor(session),
         agentBinary: agent.binary,
         agentCommand: agent.command,
         agentInstall: agent.install,
@@ -203,12 +234,12 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         enigmaConfigure: enigma.enabled ? asFile(core.enigmaConfigureScript(enigma)) : "",
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(
-            claudeHookSettings(
-                `${session.place === "host" ? hostWorkdir(session.id) : CONTAINER_WORKDIR}/.claude/polaris-hook.sh`
-            )
+            claudeHookSettings(`${workdirFor(session)}/.claude/polaris-hook.sh`)
         ),
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
-        cloneHeader: cloneAuthHeader(githubToken) ?? "",
+        // Empty for a workspace, which clones nothing. A header built around an
+        // empty token is a header git would send.
+        cloneHeader: githubToken ? (cloneAuthHeader(githubToken) ?? "") : "",
         githubToken,
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
@@ -368,13 +399,22 @@ async function startLocally(session: SessionView, boot: Bootstrap): Promise<void
                 // and in seconds rather than minutes.
                 volumes: [
                     {
-                        // Whoever started it, which is whose credentials the
-                        // session spends. A session from before that was
-                        // recorded gets a home of its own rather than a shared
-                        // one: an empty key would put every such session in the
-                        // same directory, which is one person's sign-in in
-                        // another person's terminal.
-                        source: commands.agentHomeSource(session.ownerId ?? `session-${session.id}`),
+                        // The machine everybody shares, or this account's own.
+                        // Which of the two was settled when the session was
+                        // created and is stored on it, so it cannot change
+                        // under a session that is already running.
+                        //
+                        // Otherwise: whoever started it, which is whose
+                        // credentials the session spends. A session from before
+                        // that was recorded gets a home of its own rather than
+                        // joining a shared one - an empty key would put every
+                        // such session in the same directory, which is one
+                        // person's sign-in in another person's terminal.
+                        source: session.sharedHome
+                            ? commands.SHARED_HOME_SOURCE
+                            : commands.agentHomeSource(
+                                  session.ownerId ?? `session-${session.id}`
+                              ),
                         target: commands.AGENT_HOME,
                         kind: "bind" as const
                     }

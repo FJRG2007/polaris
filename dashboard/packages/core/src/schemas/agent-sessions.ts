@@ -78,7 +78,15 @@ export const enigmaSettingsSchema = z.object({
  */
 export const startAgentSessionSchema = z
     .object({
-        repoId: z.string().uuid(),
+        /**
+         * The repository it works in, or null to open a workspace.
+         *
+         * Null is somebody asking for an agent on a machine of their own with
+         * nothing checked out - no task, no repository, no branch. It is what a
+         * person does on their own laptop, and it was the one shape this could
+         * not express.
+         */
+        repoId: z.string().uuid().nullable().default(null),
         title: z.string().trim().min(1, "Give the session a name").max(80),
         cli: agentCliIdSchema,
         command: customAgentCommandSchema.optional(),
@@ -111,6 +119,15 @@ export const startAgentSessionSchema = z
          * picker offered a choice does.
          */
         accountId: z.string().uuid().nullable().default(null),
+        /**
+         * Whether it opens on the machine everybody shares rather than on this
+         * account's own.
+         *
+         * Only ever true when an administrator has turned that on, which the
+         * server checks - a form cannot talk its way onto a machine holding
+         * other people's logins.
+         */
+        sharedHome: z.boolean().default(false),
         enigma: enigmaSettingsSchema.optional()
     })
     .refine((value) => value.cli !== CUSTOM_AGENT_CLI || Boolean(value.command), {
@@ -120,6 +137,26 @@ export const startAgentSessionSchema = z
     .refine((value) => value.place !== "host" || Boolean(value.hostId), {
         message: "Pick the server it runs on",
         path: ["hostId"]
+    })
+    // A branch is a thing a checkout has. Asking for one without a repository is
+    // a form filled in wrong rather than a value to quietly drop, and dropping it
+    // would be a session that started somewhere the person did not mean.
+    .refine((value) => Boolean(value.repoId) || !value.baseRef, {
+        message: "A workspace has nothing checked out, so it starts from no branch",
+        path: ["baseRef"]
+    })
+    // Same reasoning, and it matters more: a task is work in a repository, and a
+    // session with no checkout cannot do it.
+    .refine((value) => Boolean(value.repoId) || !value.taskId, {
+        message: "Pick the repository this task's work happens in",
+        path: ["repoId"]
+    })
+    // The shared machine is one of Polaris's own containers. An enrolled server
+    // is already somebody's machine with its own home, so asking for both is
+    // asking for two different things at once.
+    .refine((value) => !value.sharedHome || value.place === "local", {
+        message: "A server already has a home of its own",
+        path: ["sharedHome"]
     });
 
 export type StartAgentSessionInput = z.infer<typeof startAgentSessionSchema>;

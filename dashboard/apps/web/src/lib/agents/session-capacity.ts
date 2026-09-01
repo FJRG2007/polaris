@@ -31,6 +31,25 @@ export const PER_ACCOUNT_KEY = "agents.sessions.perAccount";
 export const INSTANCE_KEY = "agents.sessions.total";
 
 /**
+ * Whether this deployment offers a machine everybody shares.
+ *
+ * Off unless an administrator turns it on, and off is the honest default: a
+ * shared machine has one home, so a subscription signed in there is signed in
+ * for everybody who can open it, and the files one person leaves are the files
+ * the next person finds. That is exactly what a team with one subscription
+ * wants and exactly what a deployment of separate people does not, and nobody
+ * but an administrator knows which of those this is.
+ */
+export const SHARED_WORKSPACE_KEY = "agents.sessions.sharedWorkspace";
+
+/** Whether it is on. Anything but a stored "true" is off - a setting nobody can
+ *  read must not open a shared machine by accident. */
+export async function sharedWorkspaceAllowed(): Promise<boolean> {
+    const stored = await getSetting(SHARED_WORKSPACE_KEY).catch(() => null);
+    return stored === "true";
+}
+
+/**
  * The defaults.
  *
  * Chosen for the machine most Polaris deployments actually are - one box that is
