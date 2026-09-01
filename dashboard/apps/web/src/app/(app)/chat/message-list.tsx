@@ -468,14 +468,17 @@ function useMessageKeys({
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            // Copy is the only one that wants a modifier, and the only one that
-            // is refused when the others are held. Worked out first so the plain
-            // keys below can go on rejecting every modifier there is.
-            const holding = event.ctrlKey || event.metaKey;
+            // Copy is the only one that wants a modifier, and it wants that one
+            // on its own: Alt is held for AltGr on a Spanish or a German
+            // keyboard, where it is reported as Ctrl+Alt and is somebody typing
+            // a character, and Ctrl+Shift+C is the browser's own. Worked out
+            // first so the plain keys below can go on rejecting every modifier
+            // there is.
+            const holding = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
             const wanted =
                 holding && (event.key === "c" || event.key === "C")
                     ? "copy"
-                    : holding || event.altKey
+                    : event.ctrlKey || event.metaKey || event.altKey
                       ? null
                       : event.key === "F2"
                         ? "edit"

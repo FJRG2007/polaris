@@ -16,7 +16,6 @@ import { useReopenElsewhere } from "../lib/menu-reopen";
 import {
     forwardRef,
     useMemo,
-    useRef,
     useState,
     type ComponentPropsWithoutRef,
     type ElementRef,
@@ -68,17 +67,15 @@ export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
 >(({ className, onFocus, ...props }, ref) => {
-    // The surface itself, so a right-click landing on it is told apart from one
-    // landing on the page behind it - see `useReopenElsewhere`, which is what
-    // makes a second right-click open the menu where the pointer now is instead
-    // of doing nothing at all.
-    const surface = useRef<HTMLDivElement | null>(null);
-    useReopenElsewhere(surface);
+    // While this is on screen, a right-click on the page behind it opens the
+    // menu where the pointer now is instead of doing nothing at all - see
+    // `useReopenElsewhere`.
+    useReopenElsewhere();
 
     return (
         <RadixMenu.Portal>
             <RadixMenu.Content
-                ref={mergeRefs(ref, surface)}
+                ref={ref}
                 className={cn(
                     "z-50 min-w-[11rem] overflow-hidden rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                     className
@@ -104,24 +101,6 @@ export const ContextMenuContent = forwardRef<
     );
 });
 ContextMenuContent.displayName = "ContextMenuContent";
-
-/**
- * Two refs on one node.
- *
- * The caller's, which a screen may be using to measure or focus the menu, and
- * this file's, which tells a right-click on the menu from a right-click on the
- * page behind it. Dropping either one is silent, so neither is dropped.
- */
-function mergeRefs<T>(
-    ...refs: (((value: T | null) => void) | { current: T | null } | null | undefined)[]
-): (value: T | null) => void {
-    return (value) => {
-        for (const ref of refs) {
-            if (typeof ref === "function") ref(value);
-            else if (ref) ref.current = value;
-        }
-    };
-}
 
 /**
  * The keys that do the same thing as the option beside them.

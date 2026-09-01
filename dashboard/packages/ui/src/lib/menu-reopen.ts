@@ -26,20 +26,76 @@
  * exactly like the bug this replaces.
  */
 
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
+import { MENU_SURFACE } from "./menu-press";
 
 /** The button a right-click reports, which is what a re-aimed one has to say. */
 const RIGHT_BUTTON = 2;
+
+/** The gesture this dispatched, so the handler is never handed its own work
+ *  back. Without it, a right-click the aim cannot resolve away from - one inside
+ *  a surface this listener does not recognise - re-enters here two frames later,
+ *  and again two frames after that, for as long as the menu is open. */
+let reaimed: MouseEvent | null = null;
+
+/** How many menus are open. One listener serves all of them, and it goes when
+ *  the last one does rather than when the first one does. */
+let watching = 0;
+
+/**
+ * What the document does with a right-click while a menu is open.
+ *
+ * Exported so it can be asked the question directly: the branch that matters is
+ * one gesture landing on one element, and rendering a menu to produce it would
+ * pin the framework rather than the rule.
+ */
+export function reaimContextMenu(event: MouseEvent): void {
+    // The one this dispatched. It comes back through here because it is
+    // dispatched on the document's own tree, and acting on it would be acting
+    // on nothing but this function.
+    if (event === reaimed) return;
+
+    // Inside a menu: its own business. A menu that re-opened itself when
+    // somebody right-clicked one of its own options would be a menu that cannot
+    // be used with the right button at all. Asked of the document rather than of
+    // one content node, because a submenu is a portal of its own and is not
+    // underneath the menu that opened it - measured against the root content
+    // alone, every option of an open submenu reads as the page behind it.
+    const target = event.target;
+    if (target instanceof Element && target.closest(MENU_SURFACE)) return;
+
+    // The browser's own menu must not appear: the press underneath this one has
+    // already started closing ours, and two menus arriving from one gesture is
+    // worse than none.
+    event.preventDefault();
+
+    const x = event.clientX;
+    const y = event.clientY;
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            const under = document.elementFromPoint(x, y);
+            if (!under) return;
+            reaimed = new MouseEvent("contextmenu", {
+                bubbles: true,
+                cancelable: true,
+                clientX: x,
+                clientY: y,
+                button: RIGHT_BUTTON,
+                buttons: 0
+            });
+            under.dispatchEvent(reaimed);
+            reaimed = null;
+        });
+    });
+}
 
 /**
  * Re-aim a right-click at whatever is under it, once this menu has closed.
  *
  * Mounted by the menu's content, which exists only while the menu is open, so
  * the watch lasts exactly as long as there is something to dismiss.
- *
- * @param content - The menu surface, so a right-click inside it is left alone.
  */
-export function useReopenElsewhere(content: RefObject<HTMLElement | null>): void {
+export function useReopenElsewhere(): void {
     useEffect(() => {
         // `elementFromPoint` is what aims the second gesture, and it is not
         // everywhere: a server render has no document at all, and a headless DOM
@@ -50,41 +106,13 @@ export function useReopenElsewhere(content: RefObject<HTMLElement | null>): void
             return;
         }
 
-        const onContextMenu = (event: MouseEvent) => {
-            // Inside the menu: its own business. A menu that re-opened itself
-            // when somebody right-clicked one of its own options would be a menu
-            // that cannot be used with the right button at all.
-            const target = event.target;
-            if (target instanceof Node && content.current?.contains(target)) return;
-
-            // The browser's own menu must not appear: the press underneath this
-            // one has already started closing ours, and two menus arriving from
-            // one gesture is worse than none.
-            event.preventDefault();
-
-            const x = event.clientX;
-            const y = event.clientY;
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    const under = document.elementFromPoint(x, y);
-                    if (!under) return;
-                    under.dispatchEvent(
-                        new MouseEvent("contextmenu", {
-                            bubbles: true,
-                            cancelable: true,
-                            clientX: x,
-                            clientY: y,
-                            button: RIGHT_BUTTON,
-                            buttons: 0
-                        })
-                    );
-                });
-            });
-        };
-
         // Capture, because the layer stops these before they bubble anywhere
         // useful.
-        document.addEventListener("contextmenu", onContextMenu, true);
-        return () => document.removeEventListener("contextmenu", onContextMenu, true);
-    }, [content]);
+        if (watching++ === 0) document.addEventListener("contextmenu", reaimContextMenu, true);
+        return () => {
+            if (--watching === 0) {
+                document.removeEventListener("contextmenu", reaimContextMenu, true);
+            }
+        };
+    }, []);
 }

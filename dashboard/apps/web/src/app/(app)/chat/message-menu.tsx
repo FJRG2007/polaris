@@ -243,9 +243,7 @@ export function MessageMenu({
                             <ContextMenuItem onSelect={() => actions.onReply?.(message)}>
                                 <CornerUpLeft className="size-3.5" />
                                 Reply
-                                <span className="ml-auto pl-6 text-[0.6875rem] text-foreground-subtle">
-                                    R
-                                </span>
+                                <MenuShortcut>R</MenuShortcut>
                             </ContextMenuItem>
                         )}
                         {/* Only where there is somebody to answer and it is not
@@ -308,6 +306,7 @@ export function MessageMenu({
                     <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
                         <Copy className="size-3.5" />
                         Copy text
+                        <MenuShortcut>Ctrl+C</MenuShortcut>
                     </ContextMenuItem>
                 )}
                 {!message.deleted &&

@@ -72,9 +72,14 @@ function containerName(id: string): string {
  * somebody through is still a credential they can paste.
  */
 const LOGIN_COMMANDS: Readonly<
-    Record<string, { install: string; command: string; whoami?: string }>
+    Record<string, { cli: string; install: string; command: string; whoami?: string }>
 > = {
     CLAUDE_CODE_OAUTH_TOKEN: {
+        // Which catalogue entry this login is of. Named rather than looked up
+        // by credential: an environment variable belongs to as many tools as
+        // declare it - ANTHROPIC_API_KEY to seven of them - so the tool is the
+        // only thing a credential's first-run answers can honestly come from.
+        cli: "claude",
         // The same install line the catalogue uses, --allow-scripts and all:
         // npm now declines a package's postinstall unless it is named, and this
         // one's postinstall is what puts the binary on the PATH.
@@ -90,18 +95,20 @@ const LOGIN_COMMANDS: Readonly<
 };
 
 /**
- * The first-run answers for whichever tool this credential signs in.
+ * The first-run answers for the tool this login runs.
  *
- * Resolved through the catalogue rather than listed again here: a credential
- * belongs to exactly one tool's entry, and that entry is where what its first
- * run asks was written down. Empty for a credential no catalogued tool claims,
- * which is the same "nothing sourced" answer as everywhere else.
+ * Resolved through the catalogue rather than listed again here: the entry above
+ * names the tool, and that tool's entry is where what its first run asks was
+ * written down. Empty for a tool the catalogue does not hold, which is the same
+ * "nothing sourced" answer as everywhere else.
  */
+export function signinFirstRun(env: string): readonly core.AgentFirstRunAnswer[] {
+    const cli = core.AGENT_CLIS.find((one) => one.id === LOGIN_COMMANDS[env]?.cli);
+    return cli?.firstRun ?? [];
+}
+
 function firstRunFor(env: string): string {
-    const cli = core.AGENT_CLIS.find((one) =>
-        one.credentials.some((credential) => credential.env === env)
-    );
-    return Buffer.from(commands.firstRunScript(cli?.firstRun ?? []), "utf8").toString("base64");
+    return Buffer.from(commands.firstRunScript(signinFirstRun(env)), "utf8").toString("base64");
 }
 
 /** Whether Polaris can run this one's login for somebody, or only take a paste. */

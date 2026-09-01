@@ -20,8 +20,14 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 let pressedInsideMenu = false;
 let watching = false;
 
-/** Radix marks every menu surface with this, dropdowns and context menus alike. */
-const MENU_SURFACE = "[data-radix-menu-content], [data-radix-popper-content-wrapper]";
+/**
+ * Radix marks every menu surface with this, dropdowns and context menus alike.
+ *
+ * A selector rather than the content node itself, because a submenu is a portal
+ * of its own rather than a descendant of the menu that owns it: anything that
+ * asks "is this inside a menu" has to ask the document, not one element.
+ */
+export const MENU_SURFACE = "[data-radix-menu-content], [data-radix-popper-content-wrapper]";
 
 function watchPresses(): void {
     if (watching || typeof document === "undefined") return;

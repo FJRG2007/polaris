@@ -15,12 +15,14 @@
  * matters more here than there.
  */
 
+import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
 import { AGENT_ACCOUNT_SETUP } from "@/lib/agents/session-commands";
 import {
     SIGNIN_BOOT,
     canAssistSignin,
     assistedSignins,
+    signinFirstRun,
     whoamiScript
 } from "@/lib/agents/signin-runtime";
 
@@ -110,6 +112,31 @@ describe("which sign-ins Polaris can run for somebody", () => {
             expect(canAssistSignin(signin.env), signin.env).toBe(true);
             expect(signin.serves.length, signin.env).toBeGreaterThan(0);
         }
+    });
+});
+
+describe("the first-run answers the sign-in container writes", () => {
+    it("are the ones belonging to the tool whose login this is", () => {
+        const claude = core.AGENT_CLIS.find((cli) => cli.id === "claude");
+        expect(signinFirstRun("CLAUDE_CODE_OAUTH_TOKEN")).toEqual(claude?.firstRun);
+        expect(signinFirstRun("CLAUDE_CODE_OAUTH_TOKEN").length).toBeGreaterThan(0);
+    });
+
+    it("are nothing at all for a credential no login command claims", () => {
+        // An environment variable belongs to as many tools as declare it -
+        // ANTHROPIC_API_KEY to seven of them - so resolving the answers through
+        // the credential wrote whichever entry happened to come first in the
+        // catalogue into somebody else's home.
+        expect(signinFirstRun("ANTHROPIC_API_KEY")).toEqual([]);
+        expect(signinFirstRun("OPENAI_API_KEY")).toEqual([]);
+        expect(signinFirstRun("")).toEqual([]);
+    });
+
+    it("reach the container, which is the same home a session prepares", () => {
+        // Whichever of the two gets there first has to answer the wizard: a
+        // four-line dialog is a worse place to meet a full-screen colour picker
+        // than a session's terminal is.
+        expect(SIGNIN_BOOT).toContain("$POLARIS_FIRST_RUN");
     });
 });
 
