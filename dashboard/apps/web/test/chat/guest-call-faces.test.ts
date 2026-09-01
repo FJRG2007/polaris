@@ -13,6 +13,11 @@
  * than waiting at the door, and it only covers the people in that same call. A
  * guest link that could be turned into a face lookup for the whole instance would
  * be a worse bug than the one being fixed.
+ *
+ * The second reader with no session is somebody on a published profile, and the
+ * two must not be confused: a guest is answered by the guest rules and by
+ * nothing else, so a seat that is refused stays refused whatever the instance
+ * publishes.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +30,8 @@ interface Seat {
 
 let session: { id: string; isAdmin: boolean } | null = null;
 let seat: Seat | null = null;
+/** Whether this instance shows profiles to people who are not signed in. */
+let published = false;
 /** Who is admitted to which call, as `inCallTogether` answers it. */
 const room = new Map<string, Set<string>>([["m1", new Set(["ada"])]]);
 
@@ -43,6 +50,7 @@ vi.mock("@/lib/chat/meetings", () => ({
         room.get(meetingId)?.has(userId) === true
 }));
 vi.mock("@/lib/privacy-service", () => ({ maySee }));
+vi.mock("@/lib/profile-service", () => ({ profilesArePublic: async () => published }));
 vi.mock("@/lib/avatar-service", () => ({
     resolveAvatar: async () => ({
         certain: true,
@@ -67,6 +75,7 @@ async function ask(userId: string): Promise<Response> {
 beforeEach(() => {
     session = null;
     seat = { meetingId: "m1", participantId: "p-guest", admission: "admitted" };
+    published = false;
     maySee.mockClear();
 });
 
@@ -99,6 +108,40 @@ describe("a guest sitting in the call", () => {
 
     it("is refused once the seat is gone", async () => {
         seat = null;
+        expect((await ask("ada")).status).toBe(401);
+    });
+});
+
+describe("nobody at all", () => {
+    it("is refused while this instance keeps its profiles behind the login", async () => {
+        seat = null;
+        expect((await ask("ada")).status).toBe(401);
+    });
+
+    it("asks as nobody once profiles are published, so only a public face reaches them", async () => {
+        seat = null;
+        published = true;
+        const answer = await ask("ada");
+        expect(answer.status).toBe(200);
+        expect(maySee).toHaveBeenCalledWith("ada", "avatar", { id: "", isAdmin: false });
+    });
+
+    it("still gets the blank pixel for a face its owner keeps back", async () => {
+        seat = null;
+        published = true;
+        const answer = await ask("grace");
+        expect(answer.status).toBe(200);
+        expect(answer.headers.get("ETag")).toBe(BLANK_AVATAR_ETAG);
+    });
+});
+
+describe("a refused seat", () => {
+    it("stays refused even where profiles are published", async () => {
+        // The guest rules answer, and they answer no. Falling through to the
+        // published-profile rule would make a waiting seat wider than an
+        // admitted one is.
+        seat = { meetingId: "m1", participantId: "p-guest", admission: "waiting" };
+        published = true;
         expect((await ask("ada")).status).toBe(401);
     });
 });

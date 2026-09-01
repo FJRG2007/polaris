@@ -73,17 +73,23 @@ async function whoIsAsking(subjectId: string): Promise<{ id: string; isAdmin: bo
     const session = await resolveSession();
     if (session) return { id: session.id, isAdmin: Boolean(session.isAdmin) };
 
+    // A guest is answered by the guest rules and by nothing else. Falling from a
+    // refused seat through to the rule below would turn "your seat is not
+    // admitted" into "the instance publishes profiles, so here it is anyway",
+    // which is not the same sentence and is a wider door than a call link was
+    // ever meant to open.
     const seat = await resolveGuestSeat();
-    if (seat && seat.admission === "admitted" && (await inCallTogether(seat.meetingId, subjectId))) {
+    if (seat) {
+        if (seat.admission !== "admitted") return null;
+        if (!(await inCallTogether(seat.meetingId, subjectId))) return null;
         return { id: "", isAdmin: false };
     }
 
-    // A reader with no session at all, on an instance that publishes profiles.
-    // Answered as nobody, exactly as a guest is: an empty id is on no friend
-    // list and in no privacy list, so the only audience that lets it through is
-    // everybody - which is the same rule the page itself applies. Without this a
-    // published profile is a page of initials, and the setting that published it
-    // reads as broken.
+    // Nobody at all, on an instance that publishes profiles. Answered as nobody,
+    // exactly as a guest is: an empty id is on no friend list and in no privacy
+    // list, so the only audience that lets it through is everybody - the same
+    // rule the page itself applies. Without this a published profile is a page
+    // of initials and the setting that published it reads as broken.
     if (await profilesArePublic()) return { id: "", isAdmin: false };
     return null;
 }
