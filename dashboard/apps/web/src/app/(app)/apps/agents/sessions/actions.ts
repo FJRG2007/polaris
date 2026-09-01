@@ -305,6 +305,10 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
     if (!session) return { error: "That session no longer exists." };
     await runtime.stopSession(sessionId);
     revalidatePath(SESSIONS_PATH);
+    // And the session's own page, which is where the button was pressed. Only
+    // the list was revalidated, so the screen somebody was actually looking at
+    // waited for its next poll to notice.
+    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
 }
 

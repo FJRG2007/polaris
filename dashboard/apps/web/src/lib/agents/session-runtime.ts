@@ -525,11 +525,17 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
 /** Run one of the built commands wherever the session lives. */
 async function runInSession(
     sessionId: string,
-    command: string
+    command: string,
+    /** Whether to reach a session Polaris has already written off. Only the
+     *  teardown does: it records the stop before it takes the machine down, so
+     *  the one command that has to run after that would otherwise be refused by
+     *  the guard that exists to stop somebody steering a dead session. */
+    { evenIfFinished = false }: { evenIfFinished?: boolean } = {}
 ): Promise<{ code: number; output: string }> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
-    if (core.isSessionOver(placement.state)) throw new Error("That session has ended.");
+    if (!evenIfFinished && core.isSessionOver(placement.state))
+        throw new Error("That session has ended.");
 
     if (placement.place === "host") {
         if (!placement.hostId) throw new Error("That session names no server to run on.");
@@ -688,15 +694,28 @@ export async function captureSession(sessionId: string, lines = 200): Promise<st
 export async function stopSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
     if (!placement) return;
+    // The decision is recorded before the machine is touched, and that ordering
+    // is the whole of why Stop appeared to need pressing twice.
+    //
+    // Taking a container down is not instant - a stop signal, the grace period
+    // it is entitled to, then the network and the volumes - and while that ran,
+    // the row still said the session was running. So the screen kept showing a
+    // live session and a Stop button for another half a minute after somebody
+    // had pressed it, and pressing again was the reasonable thing to do.
+    //
+    // Nothing is lost by going first. The teardown's failure was already
+    // swallowed either way, so this changes when the person is answered rather
+    // than whether the machine goes.
+    await finishSession(sessionId, "stopped");
     if (placement.place === "host") {
         await runInSession(
             sessionId,
-            `tmux kill-session -t ${shellQuote(commands.TMUX_SESSION)} || true`
+            `tmux kill-session -t ${shellQuote(commands.TMUX_SESSION)} || true`,
+            { evenIfFinished: true }
         ).catch(() => undefined);
     } else if (placement.containerId) {
         await new HostdPorts().composeDown(placement.containerId).catch(() => undefined);
     }
-    await finishSession(sessionId, "stopped");
 }
 
 /**

@@ -188,6 +188,11 @@ export function SessionDetail({ session, events, messages }: Props) {
         startTransition(() => {
             void runAction(() => stopSessionAction(session.id), setError).then((result) => {
                 if (result?.error) setError(result.error);
+                // Asked for rather than waited for. The poll would get here on
+                // its own within a few seconds, and a few seconds of a button
+                // that looks like it did nothing is what had people pressing it
+                // again.
+                else router.refresh();
             });
         });
     };

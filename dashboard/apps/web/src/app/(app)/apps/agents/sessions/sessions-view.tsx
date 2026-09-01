@@ -97,6 +97,9 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
         startTransition(() => {
             void runAction(() => stopSessionAction(session.id), setError).then((result) => {
                 if (result?.error) setError(result.error);
+                // See the session page's own Stop: the row is answered now
+                // rather than on the next poll.
+                else router.refresh();
             });
         });
     };
