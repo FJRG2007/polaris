@@ -74,6 +74,10 @@ export const passwordField = z
     .max(256, "Too long");
 /** Long enough for a legal name, short enough that the field stays a label. */
 export const MAX_COMPANY_LENGTH = 80;
+/** How many places one person may say they work. Past this it is not a career,
+ *  it is a list. Here rather than beside the service that stores them, because
+ *  the form has to know the same number the server enforces. */
+export const MOST_COMPANIES = 10;
 export const companyField = z.string().trim().max(MAX_COMPANY_LENGTH, `At most ${MAX_COMPANY_LENGTH} characters`);
 
 export const loginSchema = z.object({

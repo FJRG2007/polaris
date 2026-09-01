@@ -11,7 +11,7 @@ import { ProfilePicturesCard } from "./avatar-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { CompaniesCard } from "./companies-card";
-import { organizationsOf, shownOrganizations } from "@/lib/profile-service";
+import { organizationsOf, shownOrganizations, typedCompanies } from "@/lib/profile-service";
 import { getSetting } from "@/lib/setting-store";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import {
@@ -37,6 +37,7 @@ export default async function AccountPage() {
                 username: true,
                 usernameChangedAt: true,
                 company: true,
+                profileCompanies: true,
                 description: true
             }
         }),
@@ -103,7 +104,7 @@ export default async function AccountPage() {
                 canSendWhatsApp={whatsappChannel !== null}
             />
             <CompaniesCard
-                company={user?.company ?? ""}
+                companies={user ? typedCompanies(user) : []}
                 organizations={organizations}
                 shown={shown.map((org) => org.id)}
                 username={user?.username ?? ""}

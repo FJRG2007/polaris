@@ -66,6 +66,12 @@ model User {
     // the default on purpose: being on a roster is a fact about an organization,
     // not a statement somebody made about themselves.
     profileOrgIds String?
+    // The places it says it works that are not organizations here, as a
+    // stringified JSON array of names. A person can hold several at once, the
+    // way they can on GitHub or LinkedIn, and `company` above is kept as the
+    // first of them so everything that reads one name still reads a real one.
+    // One writer, so the two cannot disagree.
+    profileCompanies String?
     // What this account says about itself, in its own words. Shown wherever a
     // profile is opened - the panel beside a direct message, the card on a name -
     // and nowhere it would be mistaken for something Polaris asserts.

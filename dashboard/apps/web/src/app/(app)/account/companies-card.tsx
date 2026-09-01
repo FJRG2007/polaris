@@ -16,28 +16,30 @@
  * works - which is exactly the disclosure a default of "show them all" would
  * have made on everybody's behalf.
  *
- * A person can be in several at once, and show any subset: that is what the
- * checkboxes are, and it is why this is a list rather than the single field it
- * replaced.
+ * A person can be in several at once and show any subset - that is what the
+ * checkboxes are - and can type several more. Both halves are lists for the same
+ * reason: somebody who has worked in two places has worked in two places, and a
+ * single field made them pick one.
  */
 
 import Link from "next/link";
 import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveCompaniesAction } from "./actions";
-import { MAX_COMPANY_LENGTH } from "@polaris/core";
-import type { ProfileCompany } from "@/lib/profile-service";
-import { BadgeCheck, Building2, ExternalLink } from "lucide-react";
+import { OrgAvatar } from "@/components/avatar";
+import { MAX_COMPANY_LENGTH, MOST_COMPANIES } from "@polaris/core";
+import { BadgeCheck, ExternalLink, Plus, X } from "lucide-react";
 import { Button, Card, CardBody, Checkbox, Input } from "@polaris/ui";
+import type { ProfileCompany } from "@/lib/profile-service";
 
 export function CompaniesCard({
-    company,
+    companies,
     organizations,
     shown,
     username
 }: {
-    /** The line they typed, which Polaris knows nothing about. */
-    company: string;
+    /** The places they typed, which Polaris knows nothing about. */
+    companies: readonly string[];
     /** Every organization here they belong to, owned or joined. */
     organizations: readonly ProfileCompany[];
     /** The ids of the ones they have chosen to show. */
@@ -46,18 +48,33 @@ export function CompaniesCard({
      *  an account that has not taken one, and then there is no page to link to. */
     username: string;
 }) {
-    const [typed, setTyped] = useState(company);
+    // Always one empty row at the end, so adding a second place is typing into
+    // the field that is already there rather than finding a button first.
+    const [typed, setTyped] = useState<string[]>([...companies, ""]);
     const [picked, setPicked] = useState<ReadonlySet<string>>(new Set(shown));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
 
-    const [savedTyped, setSavedTyped] = useState(company);
+    const [savedTyped, setSavedTyped] = useState<readonly string[]>(companies);
     const [savedPicked, setSavedPicked] = useState<readonly string[]>(shown);
+
+    /** What would actually be stored: trimmed, empty rows dropped, no repeats. */
+    const settled = typed
+        .map((entry) => entry.trim())
+        .filter((entry, index, all) => entry !== "" && all.indexOf(entry) === index);
     const changed =
-        typed.trim() !== savedTyped.trim() ||
+        settled.length !== savedTyped.length ||
+        settled.some((entry, index) => entry !== savedTyped[index]) ||
         picked.size !== savedPicked.length ||
         savedPicked.some((id) => !picked.has(id));
+
+    /** Keep exactly one empty row at the end, however the list was edited. */
+    const write = (next: string[]) => {
+        setDone(false);
+        const trimmedTail = next.filter((entry, index) => entry !== "" || index === next.length - 1);
+        setTyped(trimmedTail.at(-1) === "" ? trimmedTail : [...trimmedTail, ""]);
+    };
 
     const toggle = (id: string) => {
         setDone(false);
@@ -100,7 +117,10 @@ export function CompaniesCard({
                         {organizations.map((org) => (
                             <label key={org.id} className="flex items-center gap-2 text-sm">
                                 <Checkbox checked={picked.has(org.id)} onChange={() => toggle(org.id)} />
-                                <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
+                                {/* Its own mark, the way an organization is drawn
+                                    everywhere else here and on the page this
+                                    decides the contents of. */}
+                                <OrgAvatar org={org} size={20} />
                                 <span className="min-w-0 flex-1 truncate" title={org.name}>{org.name}</span>
                                 {picked.has(org.id) ? (
                                     <BadgeCheck className="text-primary size-3.5 shrink-0" aria-hidden />
@@ -110,22 +130,61 @@ export function CompaniesCard({
                     </fieldset>
                 ) : null}
 
-                <label className="flex flex-col gap-1 text-sm">
-                    Somewhere else
-                    <Input
-                        value={typed}
-                        placeholder="Optional"
-                        maxLength={MAX_COMPANY_LENGTH}
-                        autoComplete="organization"
-                        onChange={(event) => {
-                            setDone(false);
-                            setTyped(event.target.value);
-                        }}
-                    />
+                <div className="flex flex-col gap-2 text-sm">
+                    <span>Somewhere else</span>
+                    {typed.map((entry, index) => (
+                        // Keyed by position, deliberately: these are the same few
+                        // fields being edited, and keying by their contents would
+                        // rebuild the input somebody is typing into on every
+                        // keystroke.
+                        <div key={index} className="flex items-center gap-2">
+                            <Input
+                                value={entry}
+                                placeholder={index === 0 ? "Optional" : "Add another"}
+                                maxLength={MAX_COMPANY_LENGTH}
+                                autoComplete="organization"
+                                aria-label={`Company ${index + 1}`}
+                                onChange={(event) => {
+                                    const next = [...typed];
+                                    next[index] = event.target.value;
+                                    write(next);
+                                }}
+                            />
+                            {entry.trim() ? (
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label={`Remove ${entry.trim()}`}
+                                    title="Remove"
+                                    onClick={() => write(typed.filter((_, at) => at !== index))}
+                                >
+                                    <X className="size-4 shrink-0" />
+                                </Button>
+                            ) : (
+                                // A spacer, so the fields line up whether or not
+                                // the row has anything to remove.
+                                <span className="size-8 shrink-0" />
+                            )}
+                        </div>
+                    ))}
+                    {settled.length < MOST_COMPANIES && typed.at(-1)?.trim() ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="self-start"
+                            onClick={() => write([...typed, ""])}
+                        >
+                            <Plus className="size-4 shrink-0" />
+                            Add another
+                        </Button>
+                    ) : null}
                     <span className="text-muted-foreground text-xs">
-                        Drawn without a tick, because Polaris knows nothing about it beyond that you typed it.
+                        Drawn without a tick, because Polaris knows nothing about these beyond that you typed
+                        them.
                     </span>
-                </label>
+                </div>
 
                 <div className="flex items-center justify-between gap-2">
                     {error ? <p className="text-danger text-sm">{error}</p> : null}
@@ -140,7 +199,7 @@ export function CompaniesCard({
                             setDone(false);
                             const ids = [...picked];
                             const result = await runAction(
-                                () => saveCompaniesAction({ company: typed, organizationIds: ids }),
+                                () => saveCompaniesAction({ companies: settled, organizationIds: ids }),
                                 setError
                             );
                             setBusy(false);
@@ -148,7 +207,8 @@ export function CompaniesCard({
                                 if (result?.error) setError(result.error);
                                 return;
                             }
-                            setSavedTyped(typed);
+                            setSavedTyped(settled);
+                            setTyped([...settled, ""]);
                             setSavedPicked(ids);
                             setDone(true);
                         }}

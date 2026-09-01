@@ -112,7 +112,7 @@ export function EnrollView({
     return (
         <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
             <header className="flex flex-col gap-3">
-                <PolarisMark className="size-8" />
+                <PolarisMark />
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">Add a second step to signing in</h1>
                 <p className="text-sm text-muted-foreground">
                     This Polaris asks every account for one. Your password stays as it is; from now on

@@ -24,7 +24,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { getSetting } from "@/lib/setting-store";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
-import { setProfileOrganizations } from "@/lib/profile-service";
+import { setProfileCompanies, setProfileOrganizations } from "@/lib/profile-service";
 import { requestEmailVerification } from "@/lib/email-verification-service";
 import {
     addUserEmail,
@@ -120,7 +120,9 @@ export async function updateProfileAction(input: {
  * to do with.
  */
 const companiesSchema = z.object({
-    company: core.companyField,
+    // Several, because a person holds several at a time. Each is the same field
+    // the single one was, so nothing about what one may say has changed.
+    companies: z.array(core.companyField).max(core.MOST_COMPANIES),
     organizationIds: z.array(z.string().uuid()).max(50)
 });
 
@@ -129,12 +131,7 @@ export async function saveCompaniesAction(input: unknown): Promise<{ error?: str
     const parsed = companiesSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you typed" };
 
-    const result = await updateUserProfile(
-        user.id,
-        { company: parsed.data.company },
-        { cooldownDays: usernameCooldownDays(await getSetting(USERNAME_COOLDOWN_KEY)) }
-    );
-    if (result.error) return result;
+    await setProfileCompanies(user.id, parsed.data.companies);
     await setProfileOrganizations(user.id, parsed.data.organizationIds);
     revalidatePath("/account");
     return {};

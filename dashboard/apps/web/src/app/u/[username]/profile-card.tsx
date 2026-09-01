@@ -10,18 +10,24 @@
  * where that shape already lives.
  *
  * Where somebody works reads as two different claims and is drawn as two. An
- * organization on this Polaris carries a tick: it is a roster Polaris holds and
- * the person is on it, which is the only thing Polaris can actually vouch for. A
- * typed line carries none - it is a sentence somebody wrote about themselves,
- * and drawing it identically would make Polaris appear to confirm it.
+ * organization on this Polaris carries its own mark and a tick, and its name
+ * leads to it: it is a roster Polaris holds and the person is on it, which is
+ * the only thing Polaris can actually vouch for. A typed line carries neither -
+ * it is a sentence somebody wrote about themselves, and drawing it identically
+ * would make Polaris appear to confirm it.
+ *
+ * The owner of a page sees exactly what everybody else sees, and a way to change
+ * it. Anything else and the one person who cannot check what their own page says
+ * is the person it is about.
  */
 
-import { Avatar } from "@/components/avatar";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import Link from "next/link";
+import { Avatar, OrgAvatar } from "@/components/avatar";
+import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
-import { AtSign, BadgeCheck, Building2, CalendarDays, Mail } from "lucide-react";
+import { AtSign, BadgeCheck, Building2, CalendarDays, Mail, Pencil } from "lucide-react";
 
 export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boolean }) {
     const format = useDisplayFormat();
@@ -43,9 +49,18 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                         />
                     </span>
                     {own ? (
-                        <Badge variant="neutral" className="mb-1">
-                            This is your page
-                        </Badge>
+                        <span className="mb-1 flex flex-wrap items-center gap-2">
+                            <Badge variant="neutral">This is your page</Badge>
+                            {/* What everybody else sees, which is why there is a
+                                way to change it right here: the page is the
+                                preview and Account is where it is written. */}
+                            <Button asChild size="xs" variant="outline">
+                                <Link href="/account">
+                                    <Pencil className="size-3 shrink-0" />
+                                    Edit
+                                </Link>
+                            </Button>
+                        </span>
                     ) : null}
                 </div>
 
@@ -64,30 +79,40 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                     <p className="text-sm leading-relaxed text-foreground/90">{profile.description}</p>
                 ) : null}
 
-                {profile.organizations.length > 0 || profile.company ? (
-                    <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+                {profile.organizations.length > 0 || profile.companies.length > 0 ? (
+                    <div className="flex flex-col gap-2 border-t border-border pt-4">
                         {profile.organizations.map((org) => (
-                            <p key={org.id} className="flex items-center gap-1.5 text-sm">
-                                <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
+                            <Link
+                                key={org.id}
+                                href={`/account/organizations/${org.slug}`}
+                                className="flex items-center gap-2 text-sm hover:underline"
+                            >
+                                {/* Its own mark, the way an organization is drawn
+                                    everywhere else here - a row of identical grey
+                                    outlines is a row nobody scans. */}
+                                <OrgAvatar org={org} size={20} />
                                 {org.name}
                                 <BadgeCheck
-                                    className="size-3.5 shrink-0 text-primary"
+                                    className="text-primary size-3.5 shrink-0"
                                     aria-label="An organization on this Polaris"
                                 />
-                            </p>
+                            </Link>
                         ))}
-                        {profile.company ? (
+                        {profile.companies.map((company) => (
                             <p
-                                className="text-muted-foreground flex items-center gap-1.5 text-sm"
+                                key={company}
+                                className="text-muted-foreground flex items-center gap-2 text-sm"
                                 // Said rather than implied: the tick above means
                                 // Polaris holds the roster, and its absence has to
                                 // mean something legible.
                                 title="Typed by them. Polaris knows nothing about it."
                             >
-                                <Building2 className="size-3.5 shrink-0" />
-                                {profile.company}
+                                <span className="flex size-5 shrink-0 items-center justify-center">
+                                    <Building2 className="size-3.5 shrink-0" />
+                                </span>
+                                {company}
                             </p>
-                        ) : null}
+                        ))}
                     </div>
                 ) : null}
 

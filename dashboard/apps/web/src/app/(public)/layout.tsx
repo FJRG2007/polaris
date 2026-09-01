@@ -32,7 +32,9 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
                     aria-label="Polaris"
                     className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
                 >
-                    <PolarisMark className="size-6" />
+                    {/* The glyph alone, said as such: a size on the row squashed
+                        the name under the star rather than removing it. */}
+                    <PolarisMark nameClassName="hidden" />
                 </Link>
                 <Button asChild size="sm" variant="ghost">
                     <Link href="/oauth/login">

@@ -119,7 +119,12 @@ export const PAGE_BLEED =
  *
  *  The glyph is drawn in the accent colour rather than set on a gradient tile:
  *  the star IS the mark, and a coloured square behind every logo is the house
- *  style of no house in particular. */
+ *  style of no house in particular.
+ *
+ *  `className` styles the row, not the star. A size utility on it - `size-6`,
+ *  `size-8` - sets the width and height of a box holding both the glyph and the
+ *  word, which does not shrink the mark: it prints the name on top of the star.
+ *  A caller that wants the glyph alone says `nameClassName="hidden"`. */
 export function PolarisMark({ className, nameClassName }: { className?: string; nameClassName?: string }) {
     return (
         <span className={cn("flex items-center gap-2", className)}>

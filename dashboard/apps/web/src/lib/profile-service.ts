@@ -61,6 +61,7 @@ export interface ProfileCompany {
     readonly slug: string;
 }
 
+
 /** A person, as their own page draws them. */
 export interface PublicProfile {
     readonly id: string;
@@ -78,24 +79,44 @@ export interface PublicProfile {
      * the person is on them.
      */
     readonly organizations: ProfileCompany[];
-    /** The line they typed, which Polaris knows nothing about. Empty when they
-     *  typed none, or when this reader may not see where they work. */
-    readonly company: string;
+    /**
+     * The places they typed, which Polaris knows nothing about beyond that
+     * somebody typed them. Several, because a person holds several at a time -
+     * and empty when they typed none, or when this reader may not see where they
+     * work.
+     */
+    readonly companies: string[];
     /** Their address, for the readers they show it to. */
     readonly email: string;
     readonly joinedAt: string;
 }
 
-/** The org ids an account has marked, out of its own column. Anything
- *  unparseable reads as none rather than failing a page. */
-function markedOrgIds(raw: string | null): string[] {
+/** A stored JSON list of strings, out of its own column. Anything unparseable
+ *  reads as none rather than failing a page. */
+function storedList(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
     } catch {
         return [];
     }
+}
+
+/**
+ * The places somebody typed.
+ *
+ * `profileCompanies` is the list; `company` is the single column that existed
+ * before there could be more than one, and is still what the administration
+ * screens read. An account that has never opened the new screen has only the
+ * second, so it stands in - which is what keeps a name typed a year ago on the
+ * page it was typed for.
+ */
+export function typedCompanies(row: { profileCompanies: string | null; company: string | null }): string[] {
+    const list = storedList(row.profileCompanies);
+    if (list.length > 0) return list;
+    const single = (row.company ?? "").trim();
+    return single ? [single] : [];
 }
 
 /** Store the marks, keeping only ids the account is actually on a roster for -
@@ -106,6 +127,32 @@ export async function setProfileOrganizations(userId: string, ids: readonly stri
     await prisma.user.update({
         where: { id: userId },
         data: { profileOrgIds: kept.length > 0 ? JSON.stringify(kept) : null }
+    });
+}
+
+/**
+ * Store the places somebody typed.
+ *
+ * `company` is written with the first of them, deliberately: the administration
+ * screens and the user directory read that one column, and leaving it holding
+ * last year's answer while the profile showed this year's is exactly the drift a
+ * second source of truth causes. One writer, so they cannot disagree.
+ */
+export async function setProfileCompanies(userId: string, names: readonly string[]): Promise<void> {
+    const kept: string[] = [];
+    for (const name of names) {
+        const trimmed = name.trim();
+        // The same name twice is one place, and an empty row is somebody who
+        // added a field and did not fill it in.
+        if (trimmed && !kept.includes(trimmed)) kept.push(trimmed);
+        if (kept.length >= core.MOST_COMPANIES) break;
+    }
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            profileCompanies: kept.length > 0 ? JSON.stringify(kept) : null,
+            company: kept[0] ?? null
+        }
     });
 }
 
@@ -130,7 +177,7 @@ export async function shownOrganizations(userId: string): Promise<ProfileCompany
         prisma.user.findUnique({ where: { id: userId }, select: { profileOrgIds: true } }),
         organizationsOf(userId)
     ]);
-    const marked = new Set(markedOrgIds(user?.profileOrgIds ?? null));
+    const marked = new Set(storedList(user?.profileOrgIds ?? null));
     return orgs.filter((org) => marked.has(org.id));
 }
 
@@ -162,6 +209,7 @@ export async function publicProfile(
             lastName: true,
             email: true,
             company: true,
+            profileCompanies: true,
             description: true,
             profileOrgIds: true,
             bannedAt: true,
@@ -172,28 +220,24 @@ export async function publicProfile(
     // as its state, which is nobody else's business.
     if (!user || !user.username || user.bannedAt) return null;
 
-    // Their own page always answers, whatever their settings say - it is what
-    // shows somebody what everybody else is being shown.
     const own = viewer?.id === user.id;
-    if (!own) {
-        if (viewer && (await blockedBetween(viewer.id, [user.id])).has(user.id)) return null;
-        const allowed = await visible(user.id, viewer, [
-            "discoverable",
-            "avatar",
-            "fullName",
-            "email",
-            "companies"
-        ]);
-        if (!allowed.discoverable) return null;
-        return draw(user, allowed);
-    }
-    return draw(user, {
-        discoverable: true,
-        avatar: true,
-        fullName: true,
-        email: true,
-        companies: true
-    });
+    if (!own && viewer && (await blockedBetween(viewer.id, [user.id])).has(user.id)) return null;
+
+    const allowed = await visible(user.id, viewer, [
+        "discoverable",
+        "avatar",
+        "fullName",
+        "email",
+        "companies"
+    ]);
+
+    // Somebody can always open their own page - a setting that hid it from its
+    // own owner would be a setting nobody could find. Everything else on it
+    // stays exactly as they have set it, and that is the point: this page is
+    // what other people see, so showing its owner an address they have told
+    // Polaris to keep private would be showing them a page that does not exist.
+    if (!own && !allowed.discoverable) return null;
+    return draw(user, allowed);
 }
 
 type Fields = Record<"discoverable" | "avatar" | "fullName" | "email" | "companies", boolean>;
@@ -247,13 +291,14 @@ async function draw(
         lastName: string | null;
         email: string;
         company: string | null;
+        profileCompanies: string | null;
         description: string;
         profileOrgIds: string | null;
         createdAt: Date;
     },
     allowed: Fields
 ): Promise<PublicProfile> {
-    const marked = markedOrgIds(user.profileOrgIds);
+    const marked = storedList(user.profileOrgIds);
     const organizations =
         allowed.companies && marked.length > 0
             ? await prisma.organization.findMany({
@@ -278,7 +323,7 @@ async function draw(
         description: user.description,
         showsAvatar: allowed.avatar,
         organizations,
-        company: allowed.companies ? (user.company ?? "") : "",
+        companies: allowed.companies ? typedCompanies(user) : [],
         email: allowed.email ? user.email : "",
         joinedAt: user.createdAt.toISOString()
     };

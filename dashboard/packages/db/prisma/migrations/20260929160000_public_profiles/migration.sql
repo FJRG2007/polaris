@@ -14,3 +14,9 @@
 ALTER TABLE "User" ADD COLUMN "profileOrgIds" TEXT;
 
 ALTER TABLE "UserPrivacy" ADD COLUMN "companies" TEXT NOT NULL DEFAULT 'everyone';
+
+-- Somewhere else somebody works, and there can be more than one: a person holds
+-- several at a time the way they do on GitHub or LinkedIn. A JSON array of
+-- names; `company` is kept as the first of them, so everything that reads one
+-- name still reads a real one.
+ALTER TABLE "User" ADD COLUMN "profileCompanies" TEXT;
