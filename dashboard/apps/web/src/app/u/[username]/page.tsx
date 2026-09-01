@@ -60,7 +60,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
 
     return (
         <PublicShell signedIn={viewer !== null}>
-            <ProfileCard profile={profile} own={viewer?.id === profile.id} />
+            <ProfileCard
+                profile={profile}
+                own={viewer?.id === profile.id}
+                signedIn={viewer !== null}
+            />
         </PublicShell>
     );
 }

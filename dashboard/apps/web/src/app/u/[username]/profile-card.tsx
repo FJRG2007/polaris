@@ -39,7 +39,18 @@ import { FollowLists } from "./follow-lists";
 import { linkLabel } from "@polaris/core";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
-export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boolean }) {
+export function ProfileCard({
+    profile,
+    own,
+    signedIn
+}: {
+    profile: PublicProfile;
+    own: boolean;
+    /** Whether the reader has an account here. Everything a reader can DO about
+     *  somebody needs one, so a stranger is shown the page and no buttons rather
+     *  than buttons that send them to a sign-in screen. */
+    signedIn: boolean;
+}) {
     const format = useDisplayFormat();
     const person = { id: profile.id, name: profile.name };
 
@@ -97,7 +108,7 @@ export function ProfileCard({ profile, own }: { profile: PublicProfile; own: boo
                     ) : null}
                 </div>
 
-                {!own ? (
+                {!own && signedIn ? (
                     <ProfileActions personId={profile.id} name={profile.name} standing={profile.standing} />
                 ) : null}
 
