@@ -133,6 +133,71 @@ describe("the boot script", () => {
     });
 });
 
+describe("the terminal the agent is started on", () => {
+    // The one property everything else in a session rests on, and the one that
+    // was quietly missing: a coding agent IS a full-screen terminal program, so
+    // a session that starts it without a readable terminal has not started it at
+    // all. It draws nothing, reports no session start, and the prompt sent to it
+    // is echoed onto the screen as plain text by a line discipline with nobody
+    // behind it. None of that looks like an error anywhere.
+    const setupOf = (boot: string) => boot.split("\n").find((line) => line.includes("tmux new-session")) ?? "";
+
+    it("hands the setup to tmux without a pipe standing in for its terminal", () => {
+        for (const boot of [commands.SESSION_BOOT, commands.SESSION_BOOT_FOR_HOST]) {
+            const line = setupOf(boot);
+            expect(line).toContain("tmux new-session -d");
+            // `... | base64 -d | sh` is the shape that broke it: that shell's
+            // standard input is the pipe, already at end of file, and every
+            // process it starts inherits it - the agent included.
+            expect(line).not.toMatch(/base64 -d \s*\|\s*sh/);
+            expect(line).toContain("base64 -d)");
+        }
+    });
+
+    it("decodes the setup through a substitution, so only the decoding reads a pipe", () => {
+        const line = setupOf(commands.SESSION_BOOT);
+        expect(line).toMatch(/sh -c 'eval "\$\(echo [A-Za-z0-9+/=]+ \| base64 -d\)"'/);
+    });
+
+    it("never asks a person on a machine they cannot see for a password", () => {
+        // A real terminal is what makes this necessary. Given one, git asks for
+        // a username the moment a credential is refused and then waits forever,
+        // behind a screen that says the session is starting.
+        expect(commands.SESSION_SETUP).toContain("GIT_TERMINAL_PROMPT=0");
+        expect(commands.SESSION_SETUP.indexOf("GIT_TERMINAL_PROMPT=0")).toBeLessThan(
+            commands.SESSION_SETUP.indexOf("git clone")
+        );
+    });
+});
+
+describe("knowing there is an agent to type into", () => {
+    it("asks the terminal and not only the flag", () => {
+        const ready = commands.agentReadyCommand();
+        expect(ready).toContain(commands.AGENT_READY_FLAG);
+        // Canonical mode off is the terminal saying something is reading it as
+        // keys rather than a shell buffering a line nobody will collect. It is
+        // true of every one of these tools and of no shell, which is what a list
+        // of process names could never be.
+        expect(ready).toContain("-icanon");
+        expect(ready).toContain("#{pane_tty}");
+    });
+
+    it("still answers for an agent whose terminal cannot be recognised", () => {
+        // An operator's own command may be a script that reads a line at a time
+        // and is perfectly ready. The flag going stale is the second answer, so
+        // that session gets its prompt a minute in rather than never.
+        expect(commands.agentReadyCommand()).toContain("-mmin +1");
+    });
+
+    it("is one line, because the host daemon refuses an argument with a newline in it", () => {
+        expect(commands.agentReadyCommand()).not.toContain("\n");
+    });
+
+    it("quotes the session it asks about", () => {
+        expect(commands.agentReadyCommand("polaris-agent")).toContain("'polaris-agent'");
+    });
+});
+
 describe("the boot script for an enrolled server", () => {
     const host = commands.SESSION_SETUP;
 

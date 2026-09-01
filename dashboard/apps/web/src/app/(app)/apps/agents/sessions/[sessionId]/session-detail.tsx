@@ -79,6 +79,7 @@ export function SessionDetail({ session, events, messages }: Props) {
     const [pending, setPending] = useState<{ key: number; body: string }[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [screen, setScreen] = useState<string | null>(null);
+    const screenRef = useRef<HTMLPreElement>(null);
     /**
      * Where the boot has got to, while it is still booting.
      *
@@ -190,6 +191,15 @@ export function SessionDetail({ session, events, messages }: Props) {
             });
         });
     };
+
+    // A terminal is read from the bottom. What was captured is a scrollback with
+    // the interesting part - what it is doing now, or the line it died on - at
+    // the very end, and a panel that opens at the top hands somebody a wall of
+    // an npm install and asks them to scroll past it every single time.
+    useEffect(() => {
+        const pane = screenRef.current;
+        if (pane) pane.scrollTop = pane.scrollHeight;
+    }, [screen]);
 
     const look = () => {
         startTransition(() => {
@@ -345,7 +355,10 @@ export function SessionDetail({ session, events, messages }: Props) {
                         <CardTitle>What the agent&apos;s terminal shows</CardTitle>
                     </CardHeader>
                     <CardBody>
-                        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed">
+                        <pre
+                            ref={screenRef}
+                            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
+                        >
                             {screen || "Nothing on it yet."}
                         </pre>
                     </CardBody>

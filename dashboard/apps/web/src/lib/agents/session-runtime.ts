@@ -607,8 +607,11 @@ async function waitForAgent(
         // answers no, and neither one is a reason to stop waiting.
         // Not `tmux has-session`: the setup runs inside that session now, so it
         // exists from the first second and answering on it delivered the prompt
-        // into the middle of an install. The flag is written immediately before
-        // the agent takes the window over.
+        // into the middle of an install. Not the flag alone either: it is
+        // written one line before the launch, and the launcher and the tool's
+        // own startup are seconds in which it says yes and there is nothing to
+        // type into - which is how a first prompt came to be echoed onto the
+        // screen as text. The probe asks the terminal itself.
         const ready = await runInSession(sessionId, commands.agentReadyCommand()).catch(() => null);
         if (ready?.code === 0) return true;
         if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;

@@ -230,6 +230,16 @@ export const AGENT_ACCOUNT_SETUP = AGENT_ACCOUNT.join("\n");
  * behind.
  */
 const PREPARE_WORKTREE = [
+    // Nothing in this session may ever stop to ask a person for a password.
+    //
+    // Not a tidying flag: the setup runs on a real terminal now, and a git that
+    // is handed one asks for a username the moment a credential is refused -
+    // then waits, forever, on a machine whose owner is looking at a screen that
+    // says "Starting". The failure has to be a failure, immediately, with the
+    // reason on the screen. It stays exported for the agent's own git too, which
+    // needs the same thing for the same reason.
+    "GIT_TERMINAL_PROMPT=0",
+    "export GIT_TERMINAL_PROMPT",
     // Whether this directory is one Polaris just made. A checkout always is; a
     // workspace is only on the session that opens it for the first time, and
     // every one after that finds what the last one left. See the chown below.
@@ -353,7 +363,7 @@ const REQUIRE_AGENT = [
  *  and can read its own environment. The token the agent's own git and GitHub
  *  tools need stays. */
 /**
- * The file the setup touches immediately before the agent replaces it.
+ * The file the setup touches immediately before it launches the agent.
  *
  * "Is the agent up" used to be answered by asking whether the tmux session
  * existed, and that stopped being an answer the moment the setup moved inside
@@ -363,12 +373,54 @@ const REQUIRE_AGENT = [
  * A file rather than the pane's current command, which is what a vendor's
  * launcher happens to be called - `node` for one of these, a shell for another -
  * and would need a list nobody can keep right.
+ *
+ * On its own it is a floor and not an answer, because the setup writes it and
+ * then still has to get through Enigma's launcher and the tool's own startup -
+ * seconds in which the flag says yes and there is nothing there to type into.
+ * See `agentReadyCommand`.
  */
 export const AGENT_READY_FLAG = "/tmp/polaris-agent-started";
 
-/** Whether the agent is actually up, for the caller holding a prompt. */
-export function agentReadyCommand(): string {
-    return `test -f ${AGENT_READY_FLAG}`;
+/**
+ * A settled agent that never took the terminal, and the wait after which Polaris
+ * types at it anyway.
+ *
+ * The raw-mode test below is the right question for the tools this is built for
+ * and the wrong one for an operator's own command, which may be a script that
+ * reads a line at a time and is perfectly ready. So the flag being a minute old
+ * is accepted as an answer too: a full-screen tool has taken the terminal long
+ * before that, and anything that has not is something the test cannot recognise
+ * rather than something still starting.
+ */
+const AGENT_SETTLED_MINUTES = 1;
+
+/**
+ * Whether the agent is actually up, for the caller holding a prompt.
+ *
+ * The flag, and then the terminal itself. A full-screen tool takes the pane out
+ * of the line discipline's hands the moment it starts - no canonical mode, no
+ * echo - and that is exactly the property a paste depends on: something is
+ * reading this terminal as keys rather than a shell buffering a line nobody will
+ * collect. Asking `stty` about the pane's own tty answers it for every one of
+ * these tools without naming any of them, which is what a list of process names
+ * could never do.
+ *
+ * It is what the first prompt of every session was missing. The flag is written
+ * one line before the launch, so it was true several seconds before there was an
+ * agent, and the prompt went to the shell - where the terminal echoed it as text
+ * and it was never delivered to anything.
+ *
+ * One thing this rests on, so it is written down rather than rediscovered: the
+ * shells in these scripts are `sh`, which reads a line the terminal's own way
+ * and leaves canonical mode alone. A shell with readline - bash, zsh - takes the
+ * terminal exactly as a full-screen tool does, and swapping one in anywhere
+ * around the launch would make this answer yes for a shell.
+ */
+export function agentReadyCommand(session = TMUX_SESSION): string {
+    const tty = `$(tmux display-message -p -t ${shellQuote(session)} '#{pane_tty}' 2>/dev/null)`;
+    const raw = `stty -F "${tty}" -a 2>/dev/null | grep -q -- -icanon`;
+    const settled = `[ -n "$(find ${AGENT_READY_FLAG} -mmin +${AGENT_SETTLED_MINUTES} 2>/dev/null)" ]`;
+    return `test -f ${AGENT_READY_FLAG} && { ${raw} || ${settled}; }`;
 }
 
 const START_AGENT = [
@@ -459,10 +511,30 @@ export const SESSION_SETUP = [
     ...START_AGENT
 ].join("\n");
 
-/** The setup as one argument tmux can be handed. Encoded for the reason every
- *  script here is: a command argument may not carry a control character, and a
- *  script is a line per statement. */
-const SETUP_COMMAND = `sh -c 'echo ${Buffer.from(SESSION_SETUP, "utf8").toString("base64")} | base64 -d | sh'`;
+/**
+ * The setup as one argument tmux can be handed.
+ *
+ * Encoded for the reason every script here is: a command argument may not carry
+ * a control character, and a script is a line per statement.
+ *
+ * Decoded with `eval` rather than piped into `sh`, and that is the whole of why
+ * a session used to sit on "Starting" forever with an empty terminal.
+ * `... | base64 -d | sh` hands that shell a PIPE as its standard input, and
+ * every process it starts inherits it - so the agent was launched onto a
+ * terminal it could write to and could not read from, with the pipe already at
+ * end of file. A tool whose entire interface is a full-screen terminal cannot
+ * come up like that: it drew nothing, no session-start ever reached Polaris, and
+ * the first prompt was echoed onto the screen as plain text by a line discipline
+ * with nobody behind it. That echoed prompt is the symptom to recognise - it
+ * means the terminal reached a shell instead of an agent.
+ *
+ * The sign-in container never had this, and the difference is the whole
+ * diagnosis: it hands its command to `tmux new-session` as an argument, so tmux
+ * runs it on the pane's own terminal. `eval` gets the setup the same thing - the
+ * pipe is confined to the substitution that decodes it, and the shell that then
+ * runs it keeps the terminal on all three descriptors.
+ */
+const SETUP_COMMAND = `sh -c 'eval "$(echo ${Buffer.from(SESSION_SETUP, "utf8").toString("base64")} | base64 -d)"'`;
 
 /**
  * What a `local` session's container does when it starts.
