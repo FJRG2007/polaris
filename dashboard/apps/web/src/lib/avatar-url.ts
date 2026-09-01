@@ -28,6 +28,13 @@ export function orgAvatarUrl(orgId: string): string {
     return `/api/avatar/org/${orgId}`;
 }
 
+/** The band across the top of an organization's page. Its own path beside the
+ *  mark's, for the same reason a person's banner has one: they are two pictures
+ *  of one subject and a single URL could only serve one of them. */
+export function orgBannerUrl(orgId: string): string {
+    return `/api/banner/org/${orgId}`;
+}
+
 /** The picture on a space or a conversation. Answers a transparent pixel when
  *  there is none, and the same pixel when the reader is not in it - so what is
  *  drawn underneath shows through either way. */

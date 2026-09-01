@@ -21,7 +21,11 @@
  */
 
 import { useEffect, useState } from "react";
-import { avatarUrl } from "@/lib/avatar-url";
+import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
+
+/** Whose picture the colour is taken from. An organization has a mark where a
+ *  person has a face, and both are asked for the same way. */
+export type AccentSubject = "user" | "org";
 
 /** A colour, the way CSS wants to be handed one. */
 export interface Accent {
@@ -159,11 +163,14 @@ const SAMPLE = 16;
  * URL the avatar draws - so this is a cache hit and a decode rather than a
  * request. Same origin, so the canvas is not tainted and the pixels can be read.
  */
-export function useAccent(userId: string | null): Accent | null {
+export function useAccent(id: string | null, kind: AccentSubject = "user"): Accent | null {
+    // Keyed by kind as well as by id. The two are different tables with their own
+    // uuids, and a shared key would be a collision nobody could reproduce.
+    const userId = id ? `${kind}:${id}` : null;
     const [accent, setAccent] = useState<Accent | null>(() => (userId ? (known.get(userId) ?? null) : null));
 
     useEffect(() => {
-        if (!userId) {
+        if (!id || !userId) {
             setAccent(null);
             return;
         }
@@ -187,11 +194,11 @@ export function useAccent(userId: string | null): Accent | null {
             known.set(userId, null);
             if (live) setAccent(null);
         };
-        picture.src = avatarUrl(userId);
+        picture.src = kind === "org" ? orgAvatarUrl(id) : avatarUrl(id);
         return () => {
             live = false;
         };
-    }, [userId]);
+    }, [id, kind, userId]);
 
     return accent;
 }

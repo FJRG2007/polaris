@@ -144,6 +144,9 @@ export type AvatarOwner =
      */
     | { readonly kind: "banner"; readonly id: string }
     | { readonly kind: "org"; readonly id: string }
+    /** The wide picture across the top of an organization's page - the same
+     *  relationship to `org` that `banner` has to `user`. */
+    | { readonly kind: "orgBanner"; readonly id: string }
     /** A chat space - what a Discord server calls its icon. */
     | { readonly kind: "space"; readonly id: string }
     /** One conversation: a group, or a channel inside a space. */
@@ -161,6 +164,9 @@ async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
     if (owner.kind === "banner") return prisma.userBanner.findUnique({ where: { userId: owner.id } });
     if (owner.kind === "org") {
         return prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
+    }
+    if (owner.kind === "orgBanner") {
+        return prisma.organizationBanner.findUnique({ where: { orgId: owner.id } });
     }
     if (owner.kind === "space") {
         return prisma.chatSpaceAvatar.findUnique({ where: { spaceId: owner.id } });
@@ -242,6 +248,12 @@ async function writeRow(
             create: { orgId: owner.id, ...stored },
             update: stored
         });
+    } else if (owner.kind === "orgBanner") {
+        await prisma.organizationBanner.upsert({
+            where: { orgId: owner.id },
+            create: { orgId: owner.id, ...stored },
+            update: stored
+        });
     } else if (owner.kind === "space") {
         await prisma.chatSpaceAvatar.upsert({
             where: { spaceId: owner.id },
@@ -266,6 +278,8 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
     else if (owner.kind === "banner") await prisma.userBanner.delete({ where: { userId: owner.id } });
     else if (owner.kind === "org") {
         await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
+    } else if (owner.kind === "orgBanner") {
+        await prisma.organizationBanner.delete({ where: { orgId: owner.id } });
     } else if (owner.kind === "space") {
         await prisma.chatSpaceAvatar.delete({ where: { spaceId: owner.id } });
     } else {
@@ -296,13 +310,22 @@ export type AvatarSubject = "user" | "org" | "space" | "channel";
  * removed must not be able to stop an account from being deleted.
  */
 export async function discardAvatars(subject: AvatarSubject, id: string): Promise<string[]> {
+    // An account and an organization each have two pictures and one id, so both
+    // are two owners. Missing the second one is exactly the leftover this
+    // function exists to prevent, and it is invisible: the row cascades away and
+    // the bytes stay on the disk with nothing left that knows where they are.
     const owners: AvatarOwner[] =
         subject === "user"
             ? [
                   { kind: "user", id },
                   { kind: "banner", id }
               ]
-            : [{ kind: subject, id }];
+            : subject === "org"
+              ? [
+                    { kind: "org", id },
+                    { kind: "orgBanner", id }
+                ]
+              : [{ kind: subject, id }];
 
     const left: string[] = [];
     for (const owner of owners) {
@@ -575,6 +598,12 @@ export async function resolveBanner(userId: string): Promise<AvatarRef | null> {
  */
 export async function resolveOrgAvatar(orgId: string): Promise<AvatarRef | null> {
     return uploadedAvatar({ kind: "org", id: orgId });
+}
+
+/** The band across the top of an organization's page, or null when it has none.
+ *  Like a person's, the colour drawn underneath is the answer when it does. */
+export async function resolveOrgBanner(orgId: string): Promise<AvatarRef | null> {
+    return uploadedAvatar({ kind: "orgBanner", id: orgId });
 }
 
 /**

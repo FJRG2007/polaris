@@ -44,6 +44,7 @@ vi.mock("@polaris/db", () => {
             userAvatar: table("user"),
             userBanner: table("banner"),
             organizationAvatar: table("org"),
+            organizationBanner: table("orgBanner"),
             chatSpaceAvatar: table("space"),
             chatChannelAvatar: table("channel"),
             user: { findUnique: async () => ({ email: "ada@example.com" }) }
@@ -84,7 +85,9 @@ beforeEach(() => {
 });
 
 /** Give a subject a photo, and answer with where it went. */
-async function give(kind: "user" | "banner" | "org" | "space" | "channel"): Promise<string> {
+async function give(
+    kind: "user" | "banner" | "org" | "orgBanner" | "space" | "channel"
+): Promise<string> {
     await storeAvatar({ kind, id: "ada" }, PNG, "image/png");
     const row = rows[kind];
     if (!row) throw new Error(`no ${kind} row was written`);
@@ -102,8 +105,22 @@ describe("deleting the thing a photo is of", () => {
         expect(deleted).toContain(banner);
     });
 
-    it("takes an organization's, a space's and a channel's", async () => {
-        for (const kind of ["org", "space", "channel"] as const) {
+    it("takes an organization's mark and its banner with it", async () => {
+        // An organization has two pictures and one id, exactly as an account
+        // does. Sweeping only the mark left the banner on the disk with nothing
+        // left that knew where it was - invisible, because the row cascaded away
+        // and took the path with it.
+        const mark = await give("org");
+        const banner = await give("orgBanner");
+
+        await expect(discardAvatars("org", "ada")).resolves.toEqual([]);
+
+        expect(deleted).toContain(mark);
+        expect(deleted).toContain(banner);
+    });
+
+    it("takes a space's and a channel's", async () => {
+        for (const kind of ["space", "channel"] as const) {
             const path = await give(kind);
             await discardAvatars(kind, "ada");
             expect(deleted).toContain(path);

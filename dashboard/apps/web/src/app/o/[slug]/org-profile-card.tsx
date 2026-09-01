@@ -20,17 +20,19 @@ import type { OrgProfile } from "@/lib/profile-service";
 import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { AtSign, CalendarDays, Settings2 } from "lucide-react";
-import { Avatar, OrgAvatar, tintFor } from "@/components/avatar";
+import { Avatar, OrgAvatar } from "@/components/avatar";
+import { ProfileBanner } from "@/components/profile-banner";
 
 export function OrgProfileCard({ org }: { org: OrgProfile }) {
     const format = useDisplayFormat();
 
     return (
         <Card className="overflow-hidden">
-            {/* The organization's own colour rather than a banner: there is no
-                banner to upload for one, and a grey strip on every company page
-                would be a placeholder waiting for a feature nobody asked for. */}
-            <div className="h-28 w-full" style={{ background: tintFor(org.id) }} />
+            {/* The same band a person's page has, from the organization's own
+                two pictures: its banner over a colour taken from its mark. An
+                organization that can be sent a link to is a profile, and it gets
+                the page a profile gets. */}
+            <ProfileBanner person={{ id: org.id, name: org.name }} kind="org" className="h-28" />
             <CardBody className="flex flex-col gap-4">
                 <div className="-mt-12 flex items-end gap-3">
                     <span className="rounded-lg ring-4 ring-card">

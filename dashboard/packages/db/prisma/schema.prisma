@@ -4154,6 +4154,7 @@ model Organization {
     projectGrants ProjectMember[]
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?
+    banner   OrganizationBanner?
     vault    VaultOrganization?
 
     @@index([ownerId])
@@ -4166,6 +4167,24 @@ model Organization {
 // ever set. An upload always wins over it, so the two never disagree about what
 // is on screen.
 model OrganizationAvatar {
+    orgId        String   @id @db.Uuid
+    // Null when the bytes are on the disk Polaris runs on.
+    connectionId String?
+    path         String
+    mime         String
+    size         Int      @default(0)
+    updatedAt    DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// The wide picture across the top of an organization's page.
+//
+// The same owner as OrganizationAvatar and a different picture, kept in its own
+// table for the same reason a person's banner is: everything about keeping it -
+// the storage, the formats, the one-row-replaces-the-last rule - is shared, and
+// only the row differs.
+model OrganizationBanner {
     orgId        String   @id @db.Uuid
     // Null when the bytes are on the disk Polaris runs on.
     connectionId String?

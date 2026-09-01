@@ -423,6 +423,8 @@ export interface OrgDetail {
     /** Whether a photo has been uploaded, which is what the settings card offers
      *  to replace rather than to add. */
     readonly hasPhoto: boolean;
+    /** The same, for the band across the top of its page. */
+    readonly hasBanner: boolean;
 }
 
 export async function getOrg(orgId: string): Promise<OrgDetail | null> {
@@ -437,7 +439,8 @@ export async function getOrg(orgId: string): Promise<OrgDetail | null> {
             ownerId: true,
             createdAt: true,
             owner: { select: { name: true } },
-            avatar: { select: { orgId: true } }
+            avatar: { select: { orgId: true } },
+            banner: { select: { orgId: true } }
         }
     });
     if (!org) return null;
@@ -450,7 +453,8 @@ export async function getOrg(orgId: string): Promise<OrgDetail | null> {
         ownerId: org.ownerId,
         ownerName: org.owner.name,
         createdAt: org.createdAt.toISOString(),
-        hasPhoto: org.avatar !== null
+        hasPhoto: org.avatar !== null,
+        hasBanner: org.banner !== null
     };
 }
 

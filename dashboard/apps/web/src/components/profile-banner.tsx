@@ -17,18 +17,29 @@
 
 import { cn } from "@polaris/ui";
 import { useState } from "react";
-import { bannerUrl } from "@/lib/avatar-url";
+import { bannerUrl, orgBannerUrl } from "@/lib/avatar-url";
 import { tintFor } from "@/components/avatar";
-import { accentGradient, useAccent } from "@/lib/profile-accent";
+import { accentGradient, useAccent, type AccentSubject } from "@/lib/profile-accent";
 
 export function ProfileBanner({
     person,
+    kind = "user",
     className
 }: {
     person: { readonly id: string; readonly name: string };
+    /**
+     * Whose page this band is across.
+     *
+     * An organization gets the same band, from its own two pictures: its mark
+     * stands where a face does and its banner where a person's does. One
+     * component rather than two, because a company page that looked like a
+     * different product from a person page is exactly the drift this repeats
+     * everywhere else to avoid.
+     */
+    kind?: AccentSubject;
     className?: string;
 }) {
-    const accent = useAccent(person.id);
+    const accent = useAccent(person.id, kind);
     // A face with no colour in it - initials, a black and white photograph - is
     // still that person's colour: the tint their initials are drawn on is
     // already stable per account and already what everybody has learnt to
@@ -41,7 +52,7 @@ export function ProfileBanner({
             {!failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one picture per profile, no loader wanted
                 <img
-                    src={bannerUrl(person.id)}
+                    src={kind === "org" ? orgBannerUrl(person.id) : bannerUrl(person.id)}
                     alt=""
                     onError={() => setFailed(true)}
                     className="absolute inset-0 size-full object-cover"

@@ -23,7 +23,7 @@ import { runAction } from "@/lib/run-action";
 import type { OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepUpFields } from "@/components/step-up-fields";
-import { OrgPhotoCard } from "@/app/(app)/account/avatar-card";
+import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
 import {
     changeOrgSlugAction,
     deleteOrgAction,
@@ -86,7 +86,12 @@ export function SettingsView({
 
             {canManage && (
                 <>
-                    <OrgPhotoCard orgId={org.id} name={org.name} hasPhoto={org.hasPhoto} />
+                    <OrgPicturesCard
+                        orgId={org.id}
+                        name={org.name}
+                        hasPhoto={org.hasPhoto}
+                        hasBanner={org.hasBanner}
+                    />
                     <ProfileCard org={org} onRun={run} />
                     <HandleCard org={org} confirm={confirm} onError={setError} />
                 </>

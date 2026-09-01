@@ -39,7 +39,7 @@ import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { useRef, useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
-import { avatarUrl, bannerUrl, orgAvatarUrl } from "@/lib/avatar-url";
+import { avatarUrl, bannerUrl, orgAvatarUrl, orgBannerUrl } from "@/lib/avatar-url";
 import {
     Camera,
     Crop,
@@ -407,39 +407,84 @@ export function ProfilePicturesCard({
     );
 }
 
-/** An organization's face. One picture, and the same handle on it. */
-export function OrgPhotoCard({
+/**
+ * An organization's mark and its banner, drawn the way everybody else sees them.
+ *
+ * The same card as a person's, deliberately and down to the layout: the preview
+ * is the organization's own page rather than a picture of one, the band is the
+ * band, the mark is cut out of its lower edge, and each picture carries the
+ * handle that replaces, reframes or removes it. An organization is a profile
+ * here - it has a page at `/o/<slug>` that anybody can be sent to - so a settings
+ * screen that offered one small square while a person got a page to design would
+ * be two products in one application.
+ *
+ * The only difference is the shape the mark is cut to. A square is what tells a
+ * group from a person before either name is read, and it is the shape the mark
+ * has in every list, so it is the shape it is cropped and previewed at.
+ */
+export function OrgPicturesCard({
     orgId,
     name,
-    hasPhoto
+    hasPhoto,
+    hasBanner
 }: {
     orgId: string;
     name: string;
     hasPhoto: boolean;
+    hasBanner: boolean;
 }) {
     const photo = usePicture(`/api/avatar/org/${orgId}`, orgAvatarUrl(orgId), TILE_CROP);
+    const banner = usePicture(`/api/banner/org/${orgId}`, orgBannerUrl(orgId), BAND_CROP);
+    const error = photo.error || banner.error;
 
     return (
         <Card>
-            <CardBody className="flex flex-col gap-3">
+            <CardBody className="flex flex-col gap-4">
                 <div>
-                    <h2 className="text-sm font-medium">Photo</h2>
+                    <h2 className="text-sm font-medium">Photo and banner</h2>
                     <p className="text-xs text-muted-foreground">
-                        Shown wherever this organization appears - the switcher, its people&apos;s
-                        rosters, and any list it is in. Without one, Polaris draws its initials.
+                        How this organization looks wherever it appears - the switcher, its
+                        people&apos;s rosters, and its own page. Without a photo, Polaris draws its
+                        initials; without a banner, a colour taken from the photo.
                     </p>
                 </div>
-                <div className="relative w-fit">
-                    <OrgAvatar org={{ id: orgId, name }} size={64} />
-                    <PictureEditor
-                        label="photo"
-                        icon={Camera}
-                        picture={photo}
-                        exists={hasPhoto}
-                        radius="md"
-                    />
+
+                <div className="overflow-hidden rounded-lg border border-border">
+                    <div className="relative">
+                        <ProfileBanner person={{ id: orgId, name }} kind="org" className="h-24" />
+                        <PictureEditor
+                            label="banner"
+                            icon={ImageIcon}
+                            picture={banner}
+                            exists={hasBanner}
+                            radius="none"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-3 px-4 pb-4">
+                        {/* Positioned, so the handle can be laid over the mark -
+                            and so the mark keeps sitting over the band it
+                            overlaps rather than being painted under it. */}
+                        <div className="relative -mt-8 w-fit">
+                            <OrgAvatar
+                                org={{ id: orgId, name }}
+                                size={72}
+                                className="ring-[3px] ring-card"
+                            />
+                            <PictureEditor
+                                label="photo"
+                                icon={Camera}
+                                picture={photo}
+                                exists={hasPhoto}
+                                radius="md"
+                            />
+                        </div>
+                        <p className="truncate text-sm font-medium" title={name}>
+                            {name}
+                        </p>
+                    </div>
                 </div>
-                {photo.error && <p className="text-sm text-danger">{photo.error}</p>}
+
+                {error && <p className="text-sm text-danger">{error}</p>}
             </CardBody>
         </Card>
     );
