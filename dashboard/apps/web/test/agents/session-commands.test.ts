@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as core from "@polaris/core";
 import * as commands from "@/lib/agents/session-commands";
 import { bootProgress } from "@/lib/agents/boot-progress";
 import {
@@ -167,6 +168,80 @@ describe("the terminal the agent is started on", () => {
         expect(commands.SESSION_SETUP.indexOf("GIT_TERMINAL_PROMPT=0")).toBeLessThan(
             commands.SESSION_SETUP.indexOf("git clone")
         );
+    });
+});
+
+describe("the tool's own first-run wizard", () => {
+    // Reported from a real session: the terminal fix got Claude Code as far as
+    // drawing, and what it drew was "choose the text style that looks best with
+    // your terminal", then "select login method" - on a machine where Polaris
+    // had already handed it a credential, and where nobody could answer either
+    // screen. Both read single keystrokes, so the prompt that arrived next was
+    // eaten rather than answered.
+    const claude = core.agentCliById("claude")!;
+
+    it("answers what a fresh Claude Code asks, in the files it asks it from", () => {
+        // Both keys were read off an installed Claude Code. The flag is the one
+        // its own startup tests before showing the wizard; the colour scheme
+        // lives in the settings file rather than beside the flag, which is
+        // exactly the sort of thing that cannot be guessed.
+        expect(claude.firstRun).toEqual([
+            { file: ".claude.json", json: { hasCompletedOnboarding: true } },
+            { file: ".claude/settings.json", json: { theme: "dark" } }
+        ]);
+    });
+
+    it("says nothing about a tool nothing has been sourced for", () => {
+        // The same rule as `credentials`: an empty list is an answer. A guessed
+        // key is written, ignored, and leaves the session in front of the wizard
+        // with nothing anywhere saying why.
+        for (const cli of core.AGENT_CLIS) {
+            if (cli.id === "claude") continue;
+            expect(cli.firstRun, cli.id).toEqual([]);
+        }
+        expect(core.customAgentCli("whatever").firstRun).toEqual([]);
+    });
+
+    it("writes nothing at all when there is nothing to answer", () => {
+        expect(commands.firstRunScript([])).toBe("");
+    });
+
+    it("fills a key in only when it is absent, so a choice already made stands", () => {
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("current[key] === undefined");
+        expect(script).not.toContain("current[key] = value;\n");
+    });
+
+    it("treats a file it cannot read as one that was not there", () => {
+        // A half-written cache the tool owns must not be the reason a session
+        // does not start.
+        expect(commands.firstRunScript(claude.firstRun)).toContain("catch { current = {}; }");
+    });
+
+    it("quotes the answers rather than pasting them into a shell", () => {
+        // Through the one quoting function, so an apostrophe in a value is a
+        // character rather than the end of the string and the start of a
+        // command. Nothing here comes from a person today, and that is exactly
+        // why it is asserted: the next answer added to the catalogue will.
+        const answers = [{ file: ".x.json", json: { note: "it's a value" } }];
+        expect(commands.firstRunScript(answers)).toContain(
+            shellQuote(JSON.stringify(answers))
+        );
+    });
+
+    it("runs in the session before the agent does, and only where the home is Polaris's", () => {
+        expect(commands.SESSION_SETUP).toContain('[ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]');
+        expect(commands.SESSION_SETUP.indexOf("POLARIS_FIRST_RUN")).toBeLessThan(
+            commands.SESSION_SETUP.indexOf("polaris: starting")
+        );
+        // After Enigma, which writes into one of the same files.
+        expect(commands.SESSION_SETUP.indexOf("$POLARIS_ENIGMA_CONFIGURE")).toBeLessThan(
+            commands.SESSION_SETUP.indexOf("$POLARIS_FIRST_RUN")
+        );
+    });
+
+    it("is not left in the environment for the agent to read", () => {
+        expect(commands.SESSION_SETUP).toContain("POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN");
     });
 });
 

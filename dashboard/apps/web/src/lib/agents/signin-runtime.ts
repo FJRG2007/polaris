@@ -27,6 +27,7 @@
  * covered by that one's tests; the container lifecycle below is not.
  */
 
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
@@ -88,6 +89,21 @@ const LOGIN_COMMANDS: Readonly<
     }
 };
 
+/**
+ * The first-run answers for whichever tool this credential signs in.
+ *
+ * Resolved through the catalogue rather than listed again here: a credential
+ * belongs to exactly one tool's entry, and that entry is where what its first
+ * run asks was written down. Empty for a credential no catalogued tool claims,
+ * which is the same "nothing sourced" answer as everywhere else.
+ */
+function firstRunFor(env: string): string {
+    const cli = core.AGENT_CLIS.find((one) =>
+        one.credentials.some((credential) => credential.env === env)
+    );
+    return Buffer.from(commands.firstRunScript(cli?.firstRun ?? []), "utf8").toString("base64");
+}
+
 /** Whether Polaris can run this one's login for somebody, or only take a paste. */
 export function canAssistSignin(env: string): boolean {
     return env in LOGIN_COMMANDS;
@@ -123,6 +139,17 @@ export const SIGNIN_BOOT = [
     // Into that home's npm prefix, so a tool installed here is one the next
     // session finds already installed.
     'as_agent "$POLARIS_INSTALL" >/dev/null 2>&1 || true',
+    // And the tool's first-run wizard, answered here as well as in a session -
+    // because the home is the same one, and whichever of the two reaches it
+    // first is the one that has to prepare it. A dialog four lines tall is a
+    // worse place to meet a full-screen "choose your colour scheme" than a
+    // session's terminal is.
+    'if [ -n "$POLARIS_FIRST_RUN" ]; then',
+    '  printf %s "$POLARIS_FIRST_RUN" | base64 -d > /tmp/polaris-first-run.sh',
+    "  chmod 0755 /tmp/polaris-first-run.sh",
+    '  as_agent "sh /tmp/polaris-first-run.sh" >/dev/null 2>&1 || true',
+    "  rm -f /tmp/polaris-first-run.sh",
+    "fi",
     // Through a file rather than nested quoting: the login is a value from the
     // catalogue, and `su -p node -c "<it>"` inside a tmux argument is three
     // levels of quoting to get wrong once.
@@ -179,6 +206,7 @@ export async function beginSignin(userId: string, env: string): Promise<SigninAt
                         POLARIS_COLS: String(commands.SIGNIN_COLS),
                         POLARIS_ROWS: String(commands.SIGNIN_ROWS),
                         POLARIS_INSTALL: login.install,
+                        POLARIS_FIRST_RUN: firstRunFor(attempt.env),
                         POLARIS_LOGIN: login.command,
                         POLARIS_RUNAS: commands.CONTAINER_USER,
                         POLARIS_HOME: commands.AGENT_HOME

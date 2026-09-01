@@ -27,7 +27,7 @@
  */
 
 import { shellQuote } from "./session-hooks";
-import { promptSubmitDelayMs, sanitizeAgentPrompt } from "@polaris/core";
+import { promptSubmitDelayMs, sanitizeAgentPrompt, type AgentFirstRunAnswer } from "@polaris/core";
 
 /** The tmux session every agent runs in, inside its own container or its own
  *  directory on a server. Fixed rather than derived: there is one agent per
@@ -423,6 +423,63 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
     return `test -f ${AGENT_READY_FLAG} && { ${raw} || ${settled}; }`;
 }
 
+/**
+ * The tool's own first-run wizard, answered before it can be asked.
+ *
+ * A fresh home is a machine the tool has never run on, so it does what it does
+ * for anybody: it opens on "choose the text style that looks best with your
+ * terminal", and then on "select login method" - and both of them read single
+ * keystrokes, so the prompt Polaris pastes next is eaten rather than answered.
+ * From outside, a session sitting on that menu is indistinguishable from an
+ * agent thinking hard. It is `autonomyArgs` all over again, one screen earlier
+ * and holding a login this instance had already been given.
+ *
+ * Only where Polaris owns the home. On somebody's own server the home is theirs,
+ * the tool ran there long before Polaris did, and writing our answers into their
+ * configuration is exactly what this file refuses to do everywhere else.
+ *
+ * Absent keys only. A person who opens the session and picks a light theme keeps
+ * it - the question is answered once, and the answer is never overruled.
+ */
+export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
+    if (answers.length === 0) return "";
+    // Node rather than a shell: these are JSON documents the tool wrote and will
+    // rewrite, and every other way of editing one from a shell corrupts it the
+    // first time a value contains something interesting. The image the container
+    // runs is a Node image, and this only ever runs there.
+    const program = [
+        'const fs = require("node:fs");',
+        'const path = require("node:path");',
+        "const home = process.env.HOME;",
+        "if (!home) process.exit(0);",
+        'for (const answer of JSON.parse(fs.readFileSync(process.argv[1], "utf8"))) {',
+        "    const file = path.join(home, answer.file);",
+        "    let current = {};",
+        // A file that is not there, or is half-written, is answered the same way
+        // as an empty one. The alternative is a session that will not start
+        // because a cache file the tool owns had a byte out of place.
+        '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
+        '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
+        "    let changed = false;",
+        "    for (const [key, value] of Object.entries(answer.json)) {",
+        "        if (current[key] === undefined) { current[key] = value; changed = true; }",
+        "    }",
+        "    if (!changed) continue;",
+        "    fs.mkdirSync(path.dirname(file), { recursive: true });",
+        '    fs.writeFileSync(file, JSON.stringify(current, null, 2) + "\\n");',
+        "}"
+    ].join("\n");
+    return [
+        `printf %s ${shellQuote(JSON.stringify(answers))} > ${FIRST_RUN_FILE}`,
+        `node -e ${shellQuote(program)} ${FIRST_RUN_FILE}`,
+        `rm -f ${FIRST_RUN_FILE}`
+    ].join("\n");
+}
+
+/** Where the answers land on the way in. Beside the other scripts the setup
+ *  writes and removes, and holding nothing secret - the tool's own defaults. */
+const FIRST_RUN_FILE = "/tmp/polaris-first-run.json";
+
 const START_AGENT = [
     // Enigma's own settings, into the home the agent reads - the skills, the
     // memory file, the commands, the trust and bypass settings.
@@ -436,8 +493,19 @@ const START_AGENT = [
     '  as_agent "sh /tmp/polaris-enigma.sh" || true',
     "  rm -f /tmp/polaris-enigma.sh",
     "fi",
+    // After Enigma, which writes into the same files, and before the launch,
+    // which is the last moment anything can answer a question the tool is about
+    // to ask on a screen nobody can reach. Only where Polaris owns the home.
+    'if [ -n "$POLARIS_FIRST_RUN" ] && [ -n "$POLARIS_HOME" ]; then',
+    '  printf %s "$POLARIS_FIRST_RUN" | base64 -d > /tmp/polaris-first-run.sh',
+    "  chmod 0755 /tmp/polaris-first-run.sh",
+    // Best effort, like everything else that prepares the home: a session that
+    // has to answer its own theme menu is worse than one that does not start.
+    '  as_agent "sh /tmp/polaris-first-run.sh" || true',
+    "  rm -f /tmp/polaris-first-run.sh",
+    "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

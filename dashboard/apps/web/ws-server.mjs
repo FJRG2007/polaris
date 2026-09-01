@@ -96,11 +96,34 @@ wss.on("connection", async (ws, req) => {
  * doing right now and lets somebody type at it, and detaching leaves it running.
  * The name is fixed by Polaris when the session starts, so it is not something a
  * client gets to name.
+ *
+ * It is attached through a shell, for one reason: TERM.
+ *
+ * An exec on a container inherits the container's environment, and a container
+ * has no TERM unless its image set one - which the Node image does not. `tmux
+ * attach-session` will not open a terminal it cannot look up, so it refused,
+ * exited, and took the socket with it. What somebody saw was an empty black box
+ * where the agent should have been, on a session whose agent was running the
+ * whole time - and "See its screen", which reads the pane rather than attaching
+ * to it, kept working and made it look like the terminal alone was broken.
+ *
+ * Only when there is nothing usable there already, so a container that does set
+ * one keeps it. And a failure to attach ends in a shell with a sentence in it
+ * rather than in a closed socket: standing in the container is worth more than
+ * a box that goes away.
  */
+const ATTACH_TO_AGENT = [
+    "/bin/sh",
+    "-c",
+    'if [ -z "$TERM" ] || [ "$TERM" = dumb ]; then TERM=xterm-256color; export TERM; fi; ' +
+        "tmux attach-session -t polaris-agent || " +
+        "{ echo \"polaris: there is no agent terminal in this container to attach to. This shell is inside it.\"; exec /bin/sh; }"
+];
+
 async function openContainerSession(ticket, ws, attachToAgent = false) {
     const client = new HostdClient();
     try {
-        const cmd = attachToAgent ? ["tmux", "attach-session", "-t", "polaris-agent"] : ["/bin/sh"];
+        const cmd = attachToAgent ? ATTACH_TO_AGENT : ["/bin/sh"];
         const execId = await client.execCreate({ container: ticket.containerRef, cmd, tty: true });
         const stream = await client.execStart(execId);
         console.error(`polaris ws: terminal open for ${ticket.containerRef}`);

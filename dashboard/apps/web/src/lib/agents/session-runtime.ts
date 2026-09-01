@@ -88,6 +88,10 @@ interface Bootstrap {
     /** The half that writes into the agent's own home, run as the agent's own
      *  account. Empty when Enigma is off. */
     readonly enigmaConfigure: string;
+    /** The tool's own first-run wizard, answered in advance. Empty where the
+     *  home is not Polaris's to write into, or where nothing has been sourced
+     *  about what the tool asks. See `firstRunScript`. */
+    readonly firstRun: string;
     readonly hookScript: string;
     readonly hookSettings: string;
     readonly mcpConfig: string;
@@ -241,6 +245,11 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // a command that was not there.
         enigmaSetup: enigma.enabled ? asFile(core.enigmaSetupScript(enigma)) : "",
         enigmaConfigure: enigma.enabled ? asFile(core.enigmaConfigureScript(enigma)) : "",
+        // Only into a home Polaris made. A server's home is the person's own,
+        // and the tool has been answering these questions there since long
+        // before Polaris arrived.
+        firstRun:
+            session.place === "host" ? "" : asFile(commands.firstRunScript(agent.cli.firstRun)),
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(
             claudeHookSettings(`${workdirFor(session)}/.claude/polaris-hook.sh`)
@@ -327,6 +336,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_LAUNCHER: boot.agentLauncher,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
         POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
+        POLARIS_FIRST_RUN: boot.firstRun,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),

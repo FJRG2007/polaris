@@ -92,6 +92,35 @@ export interface AgentCredential {
  * and no capability that is only ever displayed: an entry that cannot be checked
  * on a machine is an entry that will be wrong without anybody noticing.
  */
+/**
+ * One of the questions a tool asks the first time it is ever run, and the answer
+ * written into its own configuration before it can ask.
+ *
+ * These are not settings Polaris has an opinion about. They are the wizard a
+ * tool walks somebody through on a fresh machine - pick a colour scheme, pick a
+ * login method - and on a machine nobody can see, that wizard is a session that
+ * has stopped. It stopped in front of a menu that reads single keystrokes, so
+ * the prompt Polaris then pasted was eaten by it rather than answered, and the
+ * session sat there looking like an agent thinking hard. `autonomyArgs` says the
+ * same thing about the trust menu; this is the same problem one screen earlier.
+ *
+ * Every key here has to be READ OFF a real installation of the tool - the file
+ * it writes and the name it writes - never inferred from what a setting ought to
+ * be called. A guessed key is silently ignored, which puts the session back in
+ * front of the wizard with nothing to show why.
+ *
+ * They are filled in only where absent, so a person who later picks a light
+ * theme keeps it: Polaris answers the question once and never overrules the
+ * answer.
+ */
+export interface AgentFirstRunAnswer {
+    /** The file, relative to the home of whoever runs the tool. JSON, and
+     *  created if it is not there yet. */
+    readonly file: string;
+    /** The keys merged into it. */
+    readonly json: Readonly<Record<string, string | number | boolean>>;
+}
+
 export interface AgentCli {
     /** Stable id. Stored on a session, so it never changes once shipped. */
     readonly id: string;
@@ -154,6 +183,12 @@ export interface AgentCli {
     readonly autonomyArgs: readonly string[];
     /** The same job where the tool takes a variable rather than a flag. */
     readonly autonomyEnv: Readonly<Record<string, string>>;
+    /**
+     * What its first run asks, answered in advance. Empty where nothing has been
+     * sourced, which is a real answer and not a gap to fill in from memory - see
+     * `AgentFirstRunAnswer`.
+     */
+    readonly firstRun: readonly AgentFirstRunAnswer[];
 }
 
 /**
@@ -197,7 +232,22 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: ["--dangerously-skip-permissions"],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        // Read off an installed Claude Code, not inferred: the flag is the one
+        // its own onboarding writes when somebody finishes the wizard, and it is
+        // the one the startup path tests before showing it. The colour scheme is
+        // the other half of that wizard and lives in the settings file rather
+        // than beside the flag, which is exactly the kind of thing that has to be
+        // looked up rather than assumed.
+        //
+        // Both screens were reported from a real session: it came up on "choose
+        // the text style that looks best with your terminal", and the screen
+        // after that offered to sign in - on a machine where Polaris had already
+        // handed it a credential, and where nobody could answer either one.
+        firstRun: [
+            { file: ".claude.json", json: { hasCompletedOnboarding: true } },
+            { file: ".claude/settings.json", json: { theme: "dark" } }
+        ]
     },
     {
         id: "codex",
@@ -218,7 +268,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: ["--dangerously-bypass-approvals-and-sandbox"],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "opencode",
@@ -248,7 +299,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "gemini",
@@ -269,7 +321,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: ["--yolo"],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "copilot",
@@ -293,7 +346,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: ["--yolo"],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "cursor",
@@ -314,7 +368,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: ["--yolo"],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "amp",
@@ -335,7 +390,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "goose",
@@ -363,7 +419,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: { GOOSE_MODE: "auto" }
+        autonomyEnv: { GOOSE_MODE: "auto" },
+        firstRun: []
     },
     {
         id: "aider",
@@ -391,7 +448,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "droid",
@@ -412,7 +470,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "qwen",
@@ -428,7 +487,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // guessed: see the field.
         credentials: [],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "crush",
@@ -456,7 +516,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "cline",
@@ -486,7 +547,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "openhands",
@@ -517,7 +579,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             }
         ],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     },
     {
         id: "openclaw",
@@ -530,7 +593,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         docs: "https://github.com/openclaw/openclaw",
         credentials: [],
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     }
 ];
 
@@ -554,10 +618,12 @@ export function customAgentCli(command: string): AgentCli {
         // Nothing is known about a command somebody typed, including what signs
         // it in. Empty means Polaris will not judge it - see the field.
         credentials: [],
-        // Nor what it asks on startup. Whoever typed the command puts whatever
-        // flags it needs into it themselves.
+        // Nor what it asks on startup, nor what it writes the answer into.
+        // Whoever typed the command puts whatever flags it needs into it
+        // themselves.
         autonomyArgs: [],
-        autonomyEnv: {}
+        autonomyEnv: {},
+        firstRun: []
     };
 }
 
