@@ -198,7 +198,7 @@ export function agentReadyCommand(): string {
 
 const START_AGENT = [
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE",
     // Not as root, and this is what "no server running" actually was.
     //
     // These tools refuse their own skip-permissions flag when they are running
@@ -216,6 +216,20 @@ const START_AGENT = [
     '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',
     "  chmod 0440 /etc/sudoers.d/polaris-agent 2>/dev/null || true",
     '  chown -R "$POLARIS_RUNAS" "$POLARIS_WORKDIR" 2>/dev/null || true',
+    "fi",
+    // Enigma's own settings, into the home of whoever will run the agent. The
+    // package went in globally as root above; this half writes the skills, the
+    // memory file, the commands and the trust and bypass settings, and it has to
+    // land in the home the agent actually reads.
+    'if [ -n "$POLARIS_ENIGMA_CONFIGURE" ]; then',
+    '  printf %s "$POLARIS_ENIGMA_CONFIGURE" | base64 -d > /tmp/polaris-enigma.sh',
+    "  chmod 0755 /tmp/polaris-enigma.sh",
+    '  if [ "$(id -u)" = "0" ] && id "$POLARIS_RUNAS" >/dev/null 2>&1; then',
+    '    su "$POLARIS_RUNAS" -c "sh /tmp/polaris-enigma.sh" || true',
+    "  else",
+    "    sh /tmp/polaris-enigma.sh || true",
+    "  fi",
+    "  rm -f /tmp/polaris-enigma.sh",
     "fi",
     'echo "polaris: starting $POLARIS_AGENT_COMMAND"',
     // Written last, so anything holding a prompt knows the terminal it is about

@@ -69,6 +69,9 @@ interface Bootstrap {
     /** The whole of what installing Enigma means, base64 so it survives the
      *  daemon's rule about control characters. Empty when Enigma is off. */
     readonly enigmaSetup: string;
+    /** The half that writes into the agent's own home, run as the agent's own
+     *  account. Empty when Enigma is off. */
+    readonly enigmaConfigure: string;
     readonly hookScript: string;
     readonly hookSettings: string;
     readonly mcpConfig: string;
@@ -172,6 +175,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // - npx threw the download away and every config line after it failed on
         // a command that was not there.
         enigmaSetup: enigma.enabled ? asFile(core.enigmaSetupScript(enigma)) : "",
+        enigmaConfigure: enigma.enabled ? asFile(core.enigmaConfigureScript(enigma)) : "",
         hookScript: hookScript(ingest, token),
         hookSettings: JSON.stringify(
             claudeHookSettings(
@@ -233,6 +237,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_AGENT_COMMAND: boot.agentCommand,
         POLARIS_AGENT_INSTALL: boot.agentInstall,
         POLARIS_ENIGMA_SETUP: boot.enigmaSetup,
+        POLARIS_ENIGMA_CONFIGURE: boot.enigmaConfigure,
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),

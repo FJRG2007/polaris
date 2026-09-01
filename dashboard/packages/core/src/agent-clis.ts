@@ -171,7 +171,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         label: "Claude Code",
         vendor: "Anthropic",
         binaries: ["claude"],
-        install: "npm install -g @anthropic-ai/claude-code",
+        install: "npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code",
         home: ".claude",
         observe: "hooks",
         docs: "https://docs.claude.com/en/docs/claude-code",

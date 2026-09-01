@@ -255,25 +255,47 @@ export function parseEnigmaSettings(raw: string | null | undefined): EnigmaSetti
 export function enigmaSetupScript(settings: ResolvedEnigma): string {
     if (!settings.enabled) return "";
     const spec = enigmaPackageSpec(settings);
+    const pkg = spec.split("@")[0] || spec;
     // No `set -e`. Every line below is best effort on purpose: a session without
     // Enigma works to weaker standards, and one that died because a registry was
-    // slow works to none - and this script runs inside the window the session's
-    // terminal IS, so a non-zero exit here closed it and took tmux with it. That
-    // is what "no server running" was.
-    const pkg = spec.split("@")[0] || spec;
+    // slow works to none - and this runs inside the window the session's terminal
+    // IS, so a non-zero exit here closed it and took tmux with it.
+    //
+    // Two halves, and the split matters. Installing the PACKAGE is a global npm
+    // install and needs root. Everything after it writes into a home directory -
+    // the skills, the memory file, the commands, the trust and bypass settings -
+    // and it has to be the home of whoever will actually run the agent. Doing it
+    // all as root put ninety-three files in /root while the agent read
+    // /home/node, so the session came up with none of them.
     const lines = [
         `echo "polaris: installing Enigma (${spec})"`,
         // `--allow-scripts` because the package's own postinstall is what puts
-        // the command together, and npm now declines to run it unasked: it says
-        // so in a warning nobody reads and then leaves an `enigma` that is not
-        // there. Named rather than blanket - this allows one package's scripts.
+        // the command together, and npm declines to run it unasked: it says so
+        // in a warning nobody reads and then leaves an `enigma` that is not
+        // there. Named, so this allows one package's scripts and nothing else's.
         `npm install -g --allow-scripts=${pkg} ${spec} || npm install -g ${spec} || true`,
-        'command -v enigma >/dev/null 2>&1 || { echo "polaris: Enigma did not install; this session runs without it"; exit 0; }',
+        'command -v enigma >/dev/null 2>&1 || { echo "polaris: Enigma did not install; this session runs without it"; exit 0; }'
+    ];
+    return lines.join("\n");
+}
+
+/**
+ * The half of Enigma's setup that belongs to whoever runs the agent.
+ *
+ * Everything that writes into a home directory: the skills, the memory file, the
+ * commands, and the settings that pre-answer the trust prompt and turn the
+ * approval prompts off. Run as the agent's own account rather than as root,
+ * because that is whose home the agent will read.
+ *
+ * Empty when Enigma is off, which is what the boot script tests for.
+ */
+export function enigmaConfigureScript(settings: ResolvedEnigma): string {
+    if (!settings.enabled) return "";
+    const lines = [
+        'command -v enigma >/dev/null 2>&1 || exit 0',
         `enigma install ${settings.scope === "all" ? "--all" : "--policies"} --yes || echo "polaris: Enigma installed but its own setup did not finish"`
     ];
-    for (const argv of enigmaConfigArgv(settings)) {
-        lines.push(`enigma ${argv.join(" ")} || true`);
-    }
+    for (const argv of enigmaConfigArgv(settings)) lines.push(`enigma ${argv.join(" ")} || true`);
     const gate = enigmaGateArgv(settings);
     if (gate.length > 0) lines.push(`enigma ${gate.join(" ")} || true`);
     lines.push('echo "polaris: Enigma ready"');
