@@ -23,8 +23,12 @@ import type { ActivitySubject } from "@/lib/activity/activity";
 /** The same vocabulary of subjects the history and the discussion use. */
 export type FollowSubject = ActivitySubject;
 
-/** How somebody came to be following. Shown, never acted on. */
-export type FollowReason = "explicit" | "commented" | "assigned" | "created";
+/** How somebody came to be following. Shown, never acted on.
+ *
+ *  `friend` is the one that is not about a subject somebody worked on: accepting
+ *  a friendship makes the two of them follow each other, and recording that as
+ *  `explicit` would say they pressed a button neither of them pressed. */
+export type FollowReason = "explicit" | "commented" | "assigned" | "created" | "friend";
 
 /** Start following, or confirm that they already are. */
 export async function follow(

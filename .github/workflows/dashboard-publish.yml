@@ -188,6 +188,15 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   mdns:
     needs: changes
@@ -247,6 +256,15 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }}
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }},mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-hostd,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
       - name: Export digest
         run: |
           mkdir -p "${{ runner.temp }}/digests"
@@ -334,6 +352,15 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge,mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-messaging-bridge,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   # WAF sidecar that sits at each server's edge. Published for the same reason the
   # bridge is: it was build-only, so an update pulled a newer dashboard and left the
@@ -361,6 +388,15 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard
           cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard,mode=max
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-edge-guard,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   # The camera relay: go2rtc with credentials on its API, which the stock image
   # has no way to arrive with. Published rather than built on the operator's
@@ -389,6 +425,15 @@ jobs:
           # relay follows the servers people actually have.
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-camera-relay,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   # The vision worker: ffmpeg and one bundled file. Published so a house does not
   # build a video pipeline the first time somebody asks a camera to watch for
@@ -416,6 +461,15 @@ jobs:
           # cupboard, so it follows the servers people actually have.
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-vision,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   # The recognizer. Its own image because the alternative was telling people to go
   # and run a five-container stack by hand, which is not something Home can install
@@ -446,6 +500,15 @@ jobs:
           # recognition beside it rather than send frames across the network.
           platforms: linux/amd64,linux/arm64
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-face,push-by-digest=true,name-canonical=true,push=true
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
 
   # The gate. The images above are already in the registry by the time this
   # runs; what it does is give them the name every deployment pulls, and only if the

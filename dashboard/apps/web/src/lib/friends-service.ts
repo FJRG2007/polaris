@@ -14,6 +14,7 @@
  */
 
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import { follow } from "@/lib/follow/follow";
 import { blockedEitherWay } from "@/lib/blocks";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
@@ -358,6 +359,30 @@ export async function respondToRequest(
         where: { id: requestId },
         data: { status: "accepted", respondedAt: new Date() }
     });
+
+    /**
+     * Friends follow each other.
+     *
+     * Two people who have just agreed to be friends have said the smaller thing
+     * following says as well, so asking them to press it again would be asking
+     * them to confirm something they have already answered. Both directions,
+     * because a friendship is mutual and a one-way follow out of it would be an
+     * asymmetry neither of them chose.
+     *
+     * Recorded as `friend` rather than `explicit`: neither of them pressed
+     * Follow, and the row should not claim they did.
+     *
+     * Never fails the friendship. The friendship is the thing that happened; a
+     * follow row that did not write is a button on a profile away from being put
+     * right, and unfriending later leaves the follow alone - by then it is an
+     * ordinary follow like any other, and taking it away silently would be the
+     * product undoing something on somebody's behalf.
+     */
+    await Promise.all([
+        follow("user", request.requesterId, userId, "friend"),
+        follow("user", userId, request.requesterId, "friend")
+    ]).catch(() => undefined);
+
     // The one who asked is the one waiting to hear.
     await announce(request.requesterId, userId, "accepted");
 }
