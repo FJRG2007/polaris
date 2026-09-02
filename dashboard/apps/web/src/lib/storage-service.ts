@@ -673,11 +673,64 @@ export async function listConnections(ownerId: string, options?: { readonly pers
  * Shared connections are flagged so the UI can distinguish them; the actual
  * per-path enforcement still happens in the Drive routes and actions.
  */
+/**
+ * The Drive of every organization this account is on the roster of.
+ *
+ * Listed rather than looked up one at a time, and made on the way: an
+ * organization's shelf should be there the first time somebody opens Drive
+ * inside it, not the first time an administrator remembers to create something.
+ *
+ * A drive that cannot be made - a storage that is away, a name collision - is
+ * left out rather than allowed to take the whole listing down with it. Somebody
+ * whose NAS is unplugged still gets to see their own files.
+ *
+ * Whether this account may run the shelf's own rules comes back with it, because
+ * it is the organization's question rather than the row's: nobody owns a company
+ * drive, so ownership answers no for everybody including the owner, and a screen
+ * that reads the row alone offers Manage access to a whole roster and then
+ * refuses every one of them.
+ */
+async function organizationDrivesFor(userId: string) {
+    const { memberOrgIds, resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
+    const { ensureOrganizationDrive } = await import("@/lib/organization-drive");
+    const orgIds = await memberOrgIds(userId);
+    const drives = await Promise.all(
+        orgIds.map(async (orgId) => {
+            try {
+                const [drive, access] = await Promise.all([
+                    ensureOrganizationDrive(orgId),
+                    resolveOrgAccess({ id: userId, isAdmin: false }, orgId)
+                ]);
+                return {
+                    id: drive.id,
+                    name: drive.name,
+                    kind: PERSONAL_KIND,
+                    status: "active",
+                    requiresHostd: false,
+                    config: JSON.stringify({
+                        kind: PERSONAL_KIND,
+                        targetId: drive.targetId,
+                        root: drive.root
+                    }),
+                    createdAt: new Date(),
+                    shared: false,
+                    manageable: orgCan(access, "drive.manage"),
+                    needsRekey: false
+                };
+            } catch {
+                return null;
+            }
+        })
+    );
+    return drives.filter((drive) => drive !== null);
+}
+
 export async function listAccessibleConnections(userId: string) {
-    const [owned, grantedIds, hosts] = await Promise.all([
+    const [owned, grantedIds, hosts, orgDrives] = await Promise.all([
         listConnections(userId, { personal: true }),
         grantedConnectionIds(userId),
-        listHosts(userId)
+        listHosts(userId),
+        organizationDrivesFor(userId)
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));
@@ -708,10 +761,20 @@ export async function listAccessibleConnections(userId: string) {
         }),
         createdAt: host.createdAt,
         shared: false,
+        manageable: false,
         needsRekey: false
     }));
     return [
-        ...owned.map((row) => ({ ...row, shared: false })),
+        // `manageable` is who runs the location's own rules - its grants, its
+        // locks, what is shared out of it. Ownership answers it everywhere
+        // except a company's shelf, which is why it is carried rather than
+        // worked out again from `shared` on the screen.
+        ...owned.map((row) => ({ ...row, shared: false, manageable: true })),
+        // The shelves of the organizations this account belongs to. Not "shared"
+        // - nobody handed them over, they are the company's and being on the
+        // roster is what reaches them - so they sit beside your own rather than
+        // under what somebody gave you.
+        ...orgDrives,
         // Somebody else's own drive is never a location in your sidebar, even
         // when they have shared a folder out of it: what you were given is that
         // folder, and listing the drive would open at a root you may not read
@@ -719,7 +782,11 @@ export async function listAccessibleConnections(userId: string) {
         // which knows the path, and the browser resolves the storage from that.
         ...shared
             .filter((row) => !isPersonalKind(row.kind))
-            .map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
+            .map((row) => ({
+                ...annotateRekey(row, fingerprint),
+                shared: true,
+                manageable: false
+            })),
         ...hostSummaries
     ];
 }
@@ -753,7 +820,9 @@ export async function getSharedConnection(userId: string, connectionId: string) 
         rootPath: rootPath ?? "",
         // A personal drive is called "My files" by its owner; to anybody else it
         // is that person's, and saying "My files" would be a lie on their screen.
-        name: isPersonalKind(row.kind) ? `${owner.name}'s files` : row.name,
+        // An organization's Drive belongs to no account, and already carries the
+        // organization's name, so it keeps it.
+        name: isPersonalKind(row.kind) && owner ? `${owner.name}'s files` : row.name,
         shared: true
     };
 }

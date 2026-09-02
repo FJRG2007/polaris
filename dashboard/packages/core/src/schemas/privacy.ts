@@ -100,6 +100,7 @@ export const PRIVACY_FIELD_LABELS = {
     companies: "Where you work",
     followers: "The names behind your follower counts",
     friendRequests: "Who can ask to be your friend",
+    fileTransfers: "Who can send you files",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -123,7 +124,9 @@ export const PRIVACY_FIELD_NOTES = {
     friendRequests:
         "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered.",
     forwarding:
-        "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
+        "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words.",
+    fileTransfers:
+        "Who may offer you a file or a folder. Nothing ever lands without you accepting it, so this is about who may ask - anybody who cannot is simply not offered the button. People you share an organization with count as friends here; set to nobody, nobody can, including them."
 } as const;
 
 /** The order the settings are read in, so the screen does not have its own. */
@@ -137,6 +140,7 @@ export const PRIVACY_FIELDS = [
     "companies",
     "followers",
     "friendRequests",
+    "fileTransfers",
     "lastSeen",
     "readReceipts",
     "forwarding"
@@ -166,7 +170,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "reaching",
         label: "Reaching you",
-        fields: ["friendRequests"]
+        fields: ["friendRequests", "fileTransfers"]
     },
     {
         id: "presence",
@@ -231,6 +235,8 @@ function rule(audience: PrivacyAudience) {
 
 const open = rule("everyone");
 const closed = rule("nobody");
+/** Neither open nor shut: the people this account has actually agreed to know. */
+const known = rule("friends");
 
 export const privacySettingsSchema = z.object({
     /**
@@ -328,6 +334,27 @@ export const privacySettingsSchema = z.object({
      * telling either side.
      */
     friendRequests: open,
+    /**
+     * Who may send you a file.
+     *
+     * Friends by default, and this is the one place the middle answer is the
+     * right default rather than a compromise. A friend request is a line of
+     * text; a transfer arrives as somebody else's files landing in your Drive,
+     * taking your space and carrying whatever they carry. Open by default would
+     * make every account on the instance reachable by anybody who can type a
+     * username, which is how a shared instance becomes a way to push things at
+     * people.
+     *
+     * Colleagues count as friends here, and only here: being put in the same
+     * organization is somebody with authority over both accounts saying they
+     * work together, which is a stronger statement than a friend request. That
+     * is a widening of `friends`, not of `nobody` - an account that says nobody
+     * means nobody, including the people it works with.
+     *
+     * Nothing lands without being accepted whatever this says. This decides who
+     * may ASK; the answer is always the recipient's.
+     */
+    fileTransfers: known,
     /**
      * Who is shown the address the account signs in with.
      *

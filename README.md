@@ -102,10 +102,13 @@ with one thing does not get the rest.
 **Files and secrets**
 
 - **Drive** - a private drive for every account from the moment they open it, plus
-  browsing, uploading, downloading and sharing across every NAS you own: local
-  disks, SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology, QNAP,
+  a shelf for every organization, reached by everybody on its roster; browsing,
+  uploading, downloading and sharing across every NAS you own: local disks,
+  SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology, QNAP,
   TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
-  buffer. Share a file or folder with a person or group, with a role, a note and
+  buffer. Send a file or folder to a person or an organization, a copy by
+  default or the file itself on a move, kept with the sender until accepted;
+  share a file or folder with a person or group, with a role, a note and
   an expiry; public links with passwords and expiry; drop points for people who
   have no account; viewers and editors for documents, spreadsheets, PDFs and
   media; and a grid that shows the picture of an image or a document's first

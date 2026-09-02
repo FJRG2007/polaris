@@ -1,8 +1,8 @@
 import { PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
 import { DriveExplorer } from "./drive-explorer";
-import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
+import { requirePermission } from "@/lib/session";
 import { isSavedConnection, type ConnectionSummary } from "./types";
+import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
 import { ensurePersonalDrive, PERSONAL_DRIVE_TAKEN } from "@/lib/personal-drive";
 import {
     connectionWebUrl,
@@ -72,10 +72,13 @@ export default async function DrivePage({
             requiresHostd: row.requiresHostd,
             webUrl: connectionWebUrl(row.kind, row.config),
             shared: row.shared,
-            // Only the owner (or an admin) manages a connection's ACLs and locks; a
+            // Only whoever runs a connection's rules manages its ACLs and locks; a
             // shared connection is browse-only from the grantee's side, and a server
-            // borrowed from the Servers app is managed there, not here.
-            canManageAccess: isSavedConnection(row.id) && (!row.shared || user.isAdmin),
+            // borrowed from the Servers app is managed there, not here. An
+            // organization's shelf is nobody's to own, so what answers there is the
+            // organization's own permission - carried on the row, because a screen
+            // cannot work it out from ownership that does not exist.
+            canManageAccess: isSavedConnection(row.id) && (row.manageable || user.isAdmin),
             // Their own drive is theirs to share out of, and nobody's to reconfigure.
             editable:
                 isSavedConnection(row.id) &&

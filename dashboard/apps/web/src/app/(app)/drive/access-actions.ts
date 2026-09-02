@@ -9,13 +9,16 @@
  * limited per user and lock so it cannot be brute-forced.
  */
 
-import { revalidatePath } from "next/cache";
+import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { DRIVE_ACTIONS, normalizeRelPath, type DriveAction } from "@polaris/core";
-import { prisma } from "@polaris/db";
+import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { authorizeDrive } from "@/lib/drive-authz";
+import { recordAudit } from "@/lib/audit-service";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
+import type { AccessPrincipal, AccessSettings } from "./access-types";
+import { authorizeDrive, canManageDriveConnection } from "@/lib/drive-authz";
+import { DRIVE_ACTIONS, normalizeRelPath, type DriveAction } from "@polaris/core";
 import { listDriveAcls, removeDriveAcl, setDriveAcl } from "@/lib/drive-acl-service";
 import {
     createLock,
@@ -25,18 +28,15 @@ import {
     signLockUnlock,
     verifyLockPassword
 } from "@/lib/access-lock-service";
-import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
-import { recordAudit } from "@/lib/audit-service";
-import type { AccessPrincipal, AccessSettings } from "./access-types";
 
-/** Ensure the caller owns the connection (or is an admin). Returns the user id. */
+/** Ensure the caller runs the connection's own rules - its owner, an admin, or
+ *  somebody the organization it belongs to has given its Drive to. Returns the
+ *  user id. */
 async function requireConnectionManager(connectionId: string): Promise<string> {
     const user = await requireUser();
-    if (user.isAdmin) return user.id;
-    const owns = await prisma.storageConnection.count({
-        where: { id: connectionId, ownerId: user.id }
-    });
-    if (owns === 0) throw new Error("You do not manage this connection");
+    if (!(await canManageDriveConnection(user.id, user.isAdmin, connectionId))) {
+        throw new Error("You do not manage this connection");
+    }
     return user.id;
 }
 

@@ -45,6 +45,7 @@ function draw() {
             avatars={{ choice: "auto", resolved: target, options: [] }}
             chat={{ choice: "auto", resolved: target, options: [] }}
             drives={{ choice: "auto", resolved: target, options: [], existing: [] }}
+            orgDrives={{ choice: "auto", resolved: target, options: [], existing: [] }}
             footage={null}
         />
     );

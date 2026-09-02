@@ -16,25 +16,26 @@
 
 import { withLease } from "./lease";
 import { prisma } from "@polaris/db";
+import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueBackups } from "@/lib/backups/service";
-import { sweepSilentSessions } from "@/lib/agents/session-runtime";
-import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
-import { sweepCameraReachability } from "@/lib/home/reachability";
-import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
+import { sweepRetention } from "@/lib/retention-service";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
-import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
+import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
-import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
+import { sweepCameraReachability } from "@/lib/home/reachability";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
-import { sweepRetention } from "@/lib/retention-service";
+import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { sweepGameActivity } from "@/lib/apps/games-activity-service";
 import { dispatchDueReminders } from "@/lib/tasks/task-detail-service";
 import { syncTracker, trackersToSync } from "@/lib/tasks/trackers/sync";
+import { sweepContinuousRecording, sweepHomeRetention } from "@/lib/home/sweeps";
 import { sweepInventorySnapshots } from "@/lib/apps/minecraft/inventory-service";
+import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
+import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 import { runGameRoutines, sweepGameSchedules } from "@/lib/apps/minecraft/schedule-service";
 import { isGameServerApp, sweepGameReach, syncFirewallBans } from "@/lib/apps/games-service";
 
@@ -394,6 +395,19 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
+    },
+    {
+        key: "drive-transfers",
+        // Hourly, because a fortnight is what an offer stands for and nothing is
+        // waiting on the minute it stops. What this ends is an offer the
+        // recipient already cannot see - it still counts against how many the
+        // sender may have out, and still sits in their own list under "waiting
+        // to be answered" with no way but Take back to clear it.
+        everyMs: Number(process.env.POLARIS_TRANSFER_SWEEP_MS) || HOUR,
+        // Unleased: it names the rows it changes by their state, so a second
+        // runner finds nothing left.
+        leaseMs: null,
+        run: expireTransfers
     },
     {
         key: "suspensions",

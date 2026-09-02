@@ -18,6 +18,7 @@
 
 import { getUserGroupIds } from "@polaris/auth";
 import { prisma, VISIBLE_USER } from "@polaris/db";
+import { memberOrgIds } from "@/lib/orgs/org-service";
 import { baseName, normalizeRelPath, type DriveAction } from "@polaris/core";
 import { liveGrants, removeDriveAcl, setDriveAcl } from "@/lib/drive-acl-service";
 
@@ -122,7 +123,10 @@ interface GrantRow {
     note: string | null;
     expiresAt: Date | null;
     createdAt: Date;
-    connection: { name: string; ownerId: string };
+    // Null on an organization's Drive, which belongs to no account. Every
+    // caller here is about what one person handed another, so those rows are
+    // filtered out before they reach this.
+    connection: { name: string; ownerId: string | null };
 }
 
 const GRANT_SELECT = {
@@ -135,7 +139,7 @@ const GRANT_SELECT = {
     note: true,
     expiresAt: true,
     createdAt: true,
-    connection: { select: { name: true, ownerId: true } }
+    connection: { select: { name: true, ownerId: true, orgId: true } }
 };
 
 function decodeActions(raw: string): DriveAction[] {
@@ -176,18 +180,75 @@ export async function listSharedWithMe(userId: string): Promise<SharedItem[]> {
     });
     if (rows.length === 0) return [];
 
-    const owners = await peopleByIds(rows.map((row) => row.connection.ownerId));
-    return rows.map((row) =>
-        itemOf(row, owners.get(row.connection.ownerId) ?? unknownPerson(row.connection.ownerId))
+    // Whose files these are, which is an account for a personal drive and the
+    // organization itself for a company shelf.
+    //
+    // A grant on a company shelf is dropped for the people already on its
+    // roster - they reach the whole thing from the shelf's own entry, and it is
+    // not something a person handed them. It is kept for everybody else, and
+    // that case is the reason the per-folder rules exist: a contractor given one
+    // directory is not a member, gets no sidebar entry from
+    // `organizationDrivesFor`, and without this has an authorized grant that no
+    // screen anywhere produces a link to.
+    const mine = new Set(await memberOrgIds(userId));
+    const shared = rows.filter(
+        (row) => row.connection.ownerId !== null || !mine.has(row.connection.orgId ?? "")
     );
+    if (shared.length === 0) return [];
+
+    const [owners, orgs] = await Promise.all([
+        peopleByIds(shared.map((row) => row.connection.ownerId).filter((id) => id !== null)),
+        prisma.organization.findMany({
+            where: {
+                id: {
+                    in: [
+                        ...new Set(
+                            shared
+                                .filter((row) => row.connection.ownerId === null)
+                                .map((row) => row.connection.orgId)
+                                .filter((id) => id !== null)
+                        )
+                    ]
+                }
+            },
+            select: { id: true, name: true }
+        })
+    ]);
+    const byOrg = new Map(orgs.map((org) => [org.id, org.name]));
+    return shared.map((row) => {
+        const ownerId = row.connection.ownerId;
+        if (ownerId !== null) return itemOf(row, owners.get(ownerId) ?? unknownPerson(ownerId));
+        const orgId = row.connection.orgId ?? "";
+        // An organization stands in the sender's place, as a group rather than
+        // a person - which is what it is, and what the screen already draws.
+        return itemOf(row, {
+            type: "group",
+            id: orgId,
+            name: byOrg.get(orgId) ?? "An organization that is no longer here"
+        });
+    });
 }
 
-/** Everything this account has given to somebody else, newest first. */
+/**
+ * Everything this account has given to somebody else, newest first.
+ *
+ * Their own storages, and the organization shelves they run. A company shelf is
+ * owned by no account, so filtering on ownership alone leaves somebody who
+ * shared a folder out of it with a grant they can see on the folder's own Access
+ * dialog and nowhere on the screen that exists to answer "what have I handed
+ * out" - and nowhere to take it back from. It is still only what THEY wrote:
+ * `createdById` is what makes this a list of one person's shares rather than of
+ * every rule on the shelf.
+ */
 export async function listSharedByMe(userId: string): Promise<SharedItem[]> {
+    const mine = await memberOrgIds(userId);
     const rows = await prisma.driveAcl.findMany({
         where: {
             effect: "allow",
-            connection: { ownerId: userId },
+            OR: [
+                { connection: { ownerId: userId } },
+                ...(mine.length > 0 ? [{ connection: { orgId: { in: mine } } }] : [])
+            ],
             // A rule naming the owner is not a share; nor is one somebody else
             // wrote on this storage, which belongs on the access rules screen.
             createdById: userId,

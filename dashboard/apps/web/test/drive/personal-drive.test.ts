@@ -39,9 +39,8 @@ vi.mock("@/lib/storage-service", () => ({
 }));
 vi.mock("@/lib/drive-folder-size", () => ({ getCachedFolderSizes: vi.fn(async () => new Map()) }));
 
-const { discardPersonalDrive, ensurePersonalDrive, personalDriveId } = await import(
-    "../../src/lib/personal-drive"
-);
+const { discardPersonalDrive, ensurePersonalDrive, personalDriveId, personalDriveSettings } =
+    await import("../../src/lib/personal-drive");
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -134,6 +133,19 @@ describe("a person's own drive", () => {
 
         await expect(ensurePersonalDrive(ANA)).rejects.toThrow();
         expect(upsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("what the uploads screen is told", () => {
+    it("counts the drives people have, and not the shelves organizations have", async () => {
+        // A company's shelf is the same kind of row with an organization on it
+        // instead of an account, and it has a card of its own beside this one.
+        // Counted here too, every company Drive is reported as somebody's
+        // personal one - and reported twice.
+        await personalDriveSettings();
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { kind: "personal", orgId: null } })
+        );
     });
 });
 

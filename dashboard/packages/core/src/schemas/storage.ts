@@ -29,15 +29,23 @@ export const STORAGE_PROVIDER_KINDS = [
 export type StorageProviderKind = (typeof STORAGE_PROVIDER_KINDS)[number];
 
 /**
- * The kind a person's own drive has.
+ * The kind a drive Polaris made has, rather than one somebody connected.
  *
  * It is a provider like the others because everything Polaris hangs off a
  * storage - who may open it, what was shared out of it, what is in its bin,
- * which of its folders somebody starred - is keyed by a connection, and a
- * personal drive needs all of it. What it is not is something anybody connects:
- * there is nothing to fill in, Polaris makes it the first time its owner opens
- * Drive, and it is deliberately absent from the picker and from every list of
- * storages an administrator can point something else at.
+ * which of its folders somebody starred - is keyed by a connection, and a drive
+ * needs all of it. What it is not is something anybody connects: there is
+ * nothing to fill in, Polaris makes it the first time somebody opens Drive, and
+ * it is deliberately absent from the picker and from every list of storages an
+ * administrator can point something else at.
+ *
+ * The stored value still reads `personal`, which is where it started and what
+ * every existing row says. An organization's Drive is the same thing with a
+ * different owner, and whose it is lives in the row rather than in the kind: a
+ * connection carries an account id or an organization id, and exactly one of
+ * them. Splitting the kind in two would have meant a second provider, a second
+ * config shape and a second entry in every list that hides this one - all to say
+ * something the row already says.
  */
 export const PERSONAL_KIND = "personal" satisfies StorageProviderKind;
 

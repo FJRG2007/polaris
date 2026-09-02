@@ -40,7 +40,10 @@ vi.mock("@/lib/storage-service", () => ({
     HOST_CONNECTION_PREFIX: "host:",
     getDriverForConnection: vi.fn()
 }));
-vi.mock("@/lib/drive-acl-service", () => ({ canAccessDrive: async () => false }));
+vi.mock("@/lib/drive-acl-service", () => ({
+    canAccessDrive: async () => false,
+    resolveDriveDecision: async () => "implicit-deny"
+}));
 vi.mock("@/lib/access-lock-service", () => ({
     findLockForPath: async () => null,
     lockUnlockCookie: (id: string) => `lock_${id}`,
@@ -65,17 +68,24 @@ describe("a server as a Drive source", () => {
 
     it("lets the owner browse it, without touching the connection table", async () => {
         await expect(authorizeDrive(OWNER, SOURCE, "var/log", "read")).resolves.toBeUndefined();
-        expect(findUniqueHost).toHaveBeenCalledWith({ where: { id: HOST }, select: { ownerId: true } });
+        expect(findUniqueHost).toHaveBeenCalledWith({
+            where: { id: HOST },
+            select: { ownerId: true }
+        });
         expect(findUniqueConnection).not.toHaveBeenCalled();
     });
 
     it("still asks for the Drive capability the verb needs", async () => {
         userHasPermission.mockResolvedValueOnce(false);
-        await expect(authorizeDrive(OWNER, SOURCE, "", "write")).rejects.toBeInstanceOf(DriveAccessError);
+        await expect(authorizeDrive(OWNER, SOURCE, "", "write")).rejects.toBeInstanceOf(
+            DriveAccessError
+        );
     });
 
     it("refuses somebody else's server", async () => {
-        await expect(authorizeDrive(OTHER, SOURCE, "", "read")).rejects.toBeInstanceOf(DriveAccessError);
+        await expect(authorizeDrive(OTHER, SOURCE, "", "read")).rejects.toBeInstanceOf(
+            DriveAccessError
+        );
     });
 
     it("lets an admin in without owning it", async () => {
@@ -85,6 +95,8 @@ describe("a server as a Drive source", () => {
 
     it("refuses a server that is no longer registered", async () => {
         findUniqueHost.mockResolvedValue(null);
-        await expect(authorizeDrive(OWNER, SOURCE, "", "read")).rejects.toBeInstanceOf(DriveAccessError);
+        await expect(authorizeDrive(OWNER, SOURCE, "", "read")).rejects.toBeInstanceOf(
+            DriveAccessError
+        );
     });
 });

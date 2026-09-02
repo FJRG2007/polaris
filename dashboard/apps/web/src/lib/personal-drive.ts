@@ -204,8 +204,12 @@ export async function personalDriveSettings(): Promise<PersonalDriveSettings> {
         getSetting(PERSONAL_TARGET_KEY),
         resolveStorageTarget(PERSONAL_TARGET_KEY),
         storageTargetOptions(),
+        // An organization's shelf is the same kind of row with an organization
+        // on it instead of an account, and it has a screen of its own beside
+        // this one - counted here too, every company's Drive would be reported
+        // as somebody's personal one and reported twice.
         prisma.storageConnection.findMany({
-            where: { kind: PERSONAL_KIND },
+            where: { kind: PERSONAL_KIND, orgId: null },
             select: { config: true }
         })
     ]);
