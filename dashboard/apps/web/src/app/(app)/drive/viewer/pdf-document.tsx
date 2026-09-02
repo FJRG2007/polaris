@@ -62,7 +62,14 @@ export default function PdfDocument({
     const options = useMemo<PDFSlickOptions>(
         () => ({
             filename: target.name,
-            scaleValue: "page-width",
+            // Automatic rather than fitting the width, which is what this opened
+            // on before. Fitting the width is the right default for somebody
+            // marking a page up - the text is as large as the pane allows - and
+            // the wrong one for somebody reading, because a portrait page fitted
+            // to a wide pane is taller than the screen and every page becomes a
+            // scroll. Reading is what opening a PDF usually is, and the zoom
+            // control is one click away for the other case.
+            scaleValue: "auto",
             thumbnailWidth: 132,
             annotationMode: readOnly ? AnnotationMode.ENABLE : AnnotationMode.ENABLE_STORAGE,
             // A reader who cannot write the file back is not given an editor to

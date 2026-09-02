@@ -21,7 +21,16 @@ const nextConfig = {
         "@polaris/docker",
         "ssh2",
         "undici",
-        "v9u-smb2"
+        "v9u-smb2",
+        // The two that draw a file's thumbnail. Both carry a compiled binary for
+        // the platform they run on, and a bundler cannot put one of those inside
+        // a JavaScript chunk - it stops the build rather than trying.
+        //
+        // `pdfjs-dist` deliberately is NOT here even though the same code uses
+        // it: the viewer reaches it from the browser through another package,
+        // and externalising it breaks that import instead.
+        "sharp",
+        "@napi-rs/canvas"
     ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).
@@ -60,7 +69,11 @@ const nextConfig = {
         // the URL said nothing about which part of Polaris you were in. They are
         // all under /admin now, and Drive's two stray screens under /drive.
         { source: "/integrations", destination: "/admin/integrations", permanent: false },
-        { source: "/integrations/:path*", destination: "/admin/integrations/:path*", permanent: false },
+        {
+            source: "/integrations/:path*",
+            destination: "/admin/integrations/:path*",
+            permanent: false
+        },
         { source: "/settings", destination: "/admin/settings", permanent: false },
         { source: "/settings/:path*", destination: "/admin/settings/:path*", permanent: false },
         { source: "/inbox", destination: "/admin/inbox", permanent: false },

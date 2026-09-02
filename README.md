@@ -39,20 +39,20 @@ and repairs all happen from the interface.
 The fastest way to say what Polaris is: it is the tools you are already using,
 on hardware you already own, sharing one account and one interface.
 
-| What you use today                 | What Polaris runs instead                                                                     |
-| ---------------------------------- | --------------------------------------------------------------------------------------------- |
-| Railway, Render, Fly               | Deploy from a repository or an image - onto their servers or onto your own machines           |
-| Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips   |
-| GitHub Actions                     | The same workflows on your own runners, so a private repository costs no minutes              |
-| CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                               |
-| Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules |
+| What you use today                 | What Polaris runs instead                                                                                                                                        |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Railway, Render, Fly               | Deploy from a repository or an image - onto their servers or onto your own machines                                                                              |
+| Discord, Slack, WhatsApp, Telegram | One chat: channels and servers, direct messages, calls, meetings, voice notes, screen clips                                                                      |
+| GitHub Actions                     | The same workflows on your own runners, so a private repository costs no minutes                                                                                 |
+| CodeRabbit                         | Reviews and coding agents that run here, on your own model keys                                                                                                  |
+| Pterodactyl and a pile of scripts  | Game servers - Minecraft, ARK and FiveM - with worlds, mods, resources, players and schedules                                                                    |
 | ClickUp, Jira, Linear              | Spaces, lists, boards, sprints, goals, docs and time tracking - or connect your existing Linear or Jira and keep its issues mirrored in, with status pushed back |
-| Home Assistant, a camera app       | Places and cameras: live views, detections, clips, and alerts that arrive in chat             |
-| Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                       |
-| Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                   |
-| Cloudflare's dashboard             | A firewall of your own: rules, country and network blocks, bot defences, bans                 |
-| A backup tool and a database GUI   | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis               |
-| Google Analytics, Plausible        | Cookieless analytics for the sites you host                                                   |
+| Home Assistant, a camera app       | Places and cameras: live views, detections, clips, and alerts that arrive in chat                                                                                |
+| Your NAS vendor's web UI           | One file browser across every NAS you own, with sharing and drop points                                                                                          |
+| Bitwarden, 1Password               | A vault your existing Bitwarden apps can point at, encrypted in the browser                                                                                      |
+| Cloudflare's dashboard             | A firewall of your own: rules, country and network blocks, bot defences, bans                                                                                    |
+| A backup tool and a database GUI   | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis                                                                                  |
+| Google Analytics, Plausible        | Cookieless analytics for the sites you host                                                                                                                      |
 
 None of it is a fork of any of them. It is the same idea, built once, with the
 half those products cannot give you: it is yours, it is on your hardware, and
@@ -107,8 +107,9 @@ with one thing does not get the rest.
   TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
   buffer. Share a file or folder with a person or group, with a role, a note and
   an expiry; public links with passwords and expiry; drop points for people who
-  have no account; and viewers and editors for documents, spreadsheets, PDFs and
-  media.
+  have no account; viewers and editors for documents, spreadsheets, PDFs and
+  media; and a grid that shows the picture of an image or a document's first
+  page instead of a generic icon.
 - **Vault** - a password manager that speaks the Bitwarden client protocol, so
   the apps and extensions you already use point at your own instance. Everything
   is encrypted in the browser; the server never sees a master password.
