@@ -259,15 +259,19 @@ Agents (coding sessions):
 - [x] A tool's own first-run wizard - Claude Code's colour-scheme and
       login-method screens on a machine it has never run on - answered before a
       session ever reaches it: the catalogue names the file and the key its
-      onboarding writes, filled in only where the tool has not answered that
-      question itself yet, and only into a home Polaris owns. The same answers
-      run ahead of a sign-in container too, since it prepares the same
-      persistent home. One of those answers is about the checkout rather than
-      the tool - Claude Code's workspace-trust dialog, which defaults to "No,
+      onboarding writes, and only into a home Polaris owns. A colour scheme is
+      filled in only where the tool has not answered that question itself yet,
+      so a person who picks one keeps it - but the wizard's own answers
+      (onboarding completed, the workspace-trust dialog) are asserted instead,
+      because the only thing that can have answered those already is an agent
+      hitting the highlighted option on a screen nobody was there to read, not
+      a person's own choice. The same answers run ahead of a sign-in container
+      too, since it prepares the same persistent home. The workspace-trust
+      dialog is about the checkout rather than the tool - it defaults to "No,
       exit" and is recorded per project folder - so it nests under the
       session's own worktree path instead of sitting beside the flat answers,
-      is skipped where there is no worktree yet, and merges in without
-      disturbing a folder another session already answered for
+      is skipped where there is no worktree yet, and merges in without taking
+      another worktree's own answer away
 - [x] What a session is doing is read from its own lifecycle hooks where the
       tool supports them (written into the worktree rather than the machine's
       home directory), and from its terminal output otherwise; steering it is a

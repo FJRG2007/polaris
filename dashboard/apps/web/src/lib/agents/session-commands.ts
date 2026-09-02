@@ -429,39 +429,15 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
 }
 
 /**
- * The tool's own first-run wizard, answered before it can be asked.
+ * The program that writes the answers, on its own.
  *
- * A fresh home is a machine the tool has never run on, so it does what it does
- * for anybody: it opens on "choose the text style that looks best with your
- * terminal", and then on "select login method" - and both of them read single
- * keystrokes, so the prompt Polaris pastes next is eaten rather than answered.
- * From outside, a session sitting on that menu is indistinguishable from an
- * agent thinking hard. It is `autonomyArgs` all over again, one screen earlier
- * and holding a login this instance had already been given.
- *
- * Only where Polaris owns the home. On somebody's own server the home is theirs,
- * the tool ran there long before Polaris did, and writing our answers into their
- * configuration is exactly what this file refuses to do everywhere else.
- *
- * Absent keys only, and absent at every level of nesting: a person who opens the
- * session and picks a light theme keeps it, and a folder that already has an
- * answer keeps that answer too - the question is answered once, and the answer
- * is never overruled.
- *
- * One of these questions is not about the tool but about the checkout: Claude
- * Code's workspace-trust dialog, which defaults to "No, exit" on a folder it has
- * never seen and is recorded per project path rather than as a flag at the top
- * of the file. `FIRST_RUN_WORKDIR` stands in for that path in the answer, and is
- * replaced here with the session's own worktree - or the answer is left out
- * entirely where there is no worktree yet, such as a sign-in container.
+ * Separate from the script around it so a test can RUN it rather than read it.
+ * Everything here is decided by what it does to a real directory - a folder that
+ * was already answered `false`, a theme somebody chose, a path that cannot be
+ * written - and a test that greps the source for a line proves none of that.
  */
-export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
-    if (answers.length === 0) return "";
-    // Node rather than a shell: these are JSON documents the tool wrote and will
-    // rewrite, and every other way of editing one from a shell corrupts it the
-    // first time a value contains something interesting. The image the container
-    // runs is a Node image, and this only ever runs there.
-    const program = [
+export function firstRunProgram(): string {
+    return [
         'const fs = require("node:fs");',
         'const path = require("node:path");',
         "const home = process.env.HOME;",
@@ -471,27 +447,39 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // worktree - a sign-in container - and an answer needing it is skipped
         // there rather than written under a key still spelling the placeholder.
         'const workdir = process.env.POLARIS_WORKDIR || "";',
-        // Deep, because one of these answers is two levels down, and
-        // absent-only at every level: a folder somebody has already answered
-        // for keeps its answer, exactly as a theme they have chosen does.
+        // Deep, because one of these answers is two levels down, and the rule
+        // holds at every level: a theme somebody has chosen keeps its value.
         //
-        // A branch that is not there yet is filled aside and attached only if
-        // something reached a leaf inside it, so an answer skipped for want of a
-        // worktree leaves no empty `projects: {}` behind in the tool's own file.
-        "function fill(target, source) {",
+        // `assert` is the difference between filling in what a file does not say
+        // and writing what is Polaris's to say - the wizard itself, which only
+        // an agent on a screen nobody could reach can have answered already. See
+        // `CLAUDE_WIZARD_ANSWER`.
+        "function fill(target, source, assert) {",
         "    let wrote = false;",
         "    for (const [name, value] of Object.entries(source)) {",
         `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
         "        if (!key) continue;",
         '        if (value && typeof value === "object") {',
         "            const branch = target[key];",
-        "            if (branch === undefined) {",
+        '            if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
+        "                if (fill(branch, value, assert)) wrote = true;",
+        // A branch that is not there yet is filled aside and attached only if
+        // something reached a leaf inside it, so an answer skipped for want of a
+        // worktree leaves no empty `projects: {}` behind in the tool's own file.
+        //
+        // One that IS there but is not an object - `null`, a list, a number - is
+        // left alone where the rule is to fill in, and replaced where the answer
+        // is Polaris's to give. Walking away from it there would be the answer
+        // never written and nothing said about it, which is the exact failure
+        // `assert` exists to end, reached from a different starting state.
+        "            } else if (branch === undefined || assert) {",
         "                const fresh = {};",
-        "                if (fill(fresh, value)) { target[key] = fresh; wrote = true; }",
-        '            } else if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
-        "                if (fill(branch, value)) wrote = true;",
+        "                if (fill(fresh, value, assert)) { target[key] = fresh; wrote = true; }",
         "            }",
-        "        } else if (target[key] === undefined) {",
+        // Written when the file is silent, or when it says something else and this
+        // is an answer Polaris gives. Never when it already agrees, so a session
+        // with nothing to do writes nothing and prints nothing.
+        "        } else if (target[key] === undefined || (assert && target[key] !== value)) {",
         "            target[key] = value; wrote = true;",
         "        }",
         "    }",
@@ -505,7 +493,9 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // because a cache file the tool owns had a byte out of place.
         '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
         '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
-        "    if (!fill(current, answer.json)) continue;",
+        "    let changed = answer.json ? fill(current, answer.json, false) : false;",
+        "    if (answer.assert && fill(current, answer.assert, true)) changed = true;",
+        "    if (!changed) continue;",
         // Said out loud, on the screen somebody is watching - and said AFTER the
         // write rather than before it. Where a tool keeps its configuration is a
         // thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so a
@@ -529,6 +519,45 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         "    }",
         "}"
     ].join("\n");
+}
+
+/**
+ * The tool's own first-run wizard, answered before it can be asked.
+ *
+ * A fresh home is a machine the tool has never run on, so it does what it does
+ * for anybody: it opens on "choose the text style that looks best with your
+ * terminal", and then on "select login method" - and both of them read single
+ * keystrokes, so the prompt Polaris pastes next is eaten rather than answered.
+ * From outside, a session sitting on that menu is indistinguishable from an
+ * agent thinking hard. It is `autonomyArgs` all over again, one screen earlier
+ * and holding a login this instance had already been given.
+ *
+ * Only where Polaris owns the home. On somebody's own server the home is theirs,
+ * the tool ran there long before Polaris did, and writing our answers into their
+ * configuration is exactly what this file refuses to do everywhere else.
+ *
+ * What is somebody's to choose is filled in only where the file is silent, at
+ * every level of nesting: a person who opens the session and picks a light theme
+ * keeps it. The wizard's own answers are asserted instead - written whatever the
+ * file says - because the only thing that can have answered one of those already
+ * is an agent that met the screen before Polaris knew to. Which answer takes
+ * which rule is declared in `AGENT_CLIS`; see `CLAUDE_WIZARD_ANSWER` for why the
+ * two are not the same question.
+ *
+ * One of these questions is not about the tool but about the checkout: Claude
+ * Code's workspace-trust dialog, which defaults to "No, exit" on a folder it has
+ * never seen and is recorded per project path rather than as a flag at the top
+ * of the file. `FIRST_RUN_WORKDIR` stands in for that path in the answer, and is
+ * replaced here with the session's own worktree - or the answer is left out
+ * entirely where there is no worktree yet, such as a sign-in container.
+ */
+export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
+    if (answers.length === 0) return "";
+    // Node rather than a shell: these are JSON documents the tool wrote and will
+    // rewrite, and every other way of editing one from a shell corrupts it the
+    // first time a value contains something interesting. The image the container
+    // runs is a Node image, and this only ever runs there.
+    const program = firstRunProgram();
     return [
         `printf %s ${shellQuote(JSON.stringify(answers))} > ${FIRST_RUN_FILE}`,
         `node -e ${shellQuote(program)} ${FIRST_RUN_FILE}`,
