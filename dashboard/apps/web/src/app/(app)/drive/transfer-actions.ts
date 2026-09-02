@@ -20,18 +20,7 @@ import { findPeople } from "@/lib/people-search";
 import { normalizeRelPath } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { listMyOrgs, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
-import {
-    acceptTransfer,
-    cancelTransfer,
-    declineTransfer,
-    dismissTransferNotice,
-    mayReceiveFrom,
-    sendTransfer,
-    transfersSentBy,
-    transfersWaitingFor,
-    TransferRefused,
-    type TransferView
-} from "@/lib/drive-transfer-service";
+import * as transfers from "@/lib/drive-transfer-service";
 
 /** What a person is allowed to say. A note is a sentence beside the offer, not a
  *  place to put a document. */
@@ -57,7 +46,7 @@ const sendSchema = z.object({
 /** The one sentence a caller is meant to read. Anything else is logged and
  *  replaced, because the rest name paths and storages nobody asked to publish. */
 function refusal(caught: unknown): { error: string } {
-    if (caught instanceof TransferRefused) return { error: caught.message };
+    if (caught instanceof transfers.TransferRefused) return { error: caught.message };
     console.error(caught);
     return { error: "That could not be sent." };
 }
@@ -70,7 +59,7 @@ export async function findTransferPeopleAction(
 ): Promise<{ results: { id: string; name: string; allowed: boolean }[]; withheld: number }> {
     const user = await requireUser();
     const found = await findPeople(user, String(query ?? ""), { reachableOnly: false });
-    const allowed = await mayReceiveFrom(
+    const allowed = await transfers.mayReceiveFrom(
         user.id,
         found.people.map((person) => person.id)
     );
@@ -107,7 +96,7 @@ export async function sendTransferAction(
     const parsed = sendSchema.safeParse(input);
     if (!parsed.success) return { error: "That is not something Polaris can send." };
     try {
-        const made = await sendTransfer({
+        const made = await transfers.sendTransfer({
             senderId: user.id,
             connectionId: parsed.data.connectionId,
             path: normalizeRelPath(parsed.data.path),
@@ -129,14 +118,14 @@ export async function sendTransferAction(
     }
 }
 
-export async function waitingTransfersAction(): Promise<TransferView[]> {
+export async function waitingTransfersAction(): Promise<transfers.TransferView[]> {
     const user = await requireUser();
-    return transfersWaitingFor(user.id);
+    return transfers.transfersWaitingFor(user.id);
 }
 
-export async function sentTransfersAction(): Promise<TransferView[]> {
+export async function sentTransfersAction(): Promise<transfers.TransferView[]> {
     const user = await requireUser();
-    return transfersSentBy(user.id);
+    return transfers.transfersSentBy(user.id);
 }
 
 export async function acceptTransferAction(
@@ -146,7 +135,11 @@ export async function acceptTransferAction(
     const user = await requireUser();
     if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
     try {
-        const landed = await acceptTransfer(transferId, user.id, into ? String(into) : "");
+        const landed = await transfers.acceptTransfer(
+            transferId,
+            user.id,
+            into ? String(into) : ""
+        );
         revalidatePath("/drive");
         return { path: landed.path };
     } catch (caught) {
@@ -158,7 +151,7 @@ export async function declineTransferAction(transferId: string): Promise<{ error
     const user = await requireUser();
     if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
     try {
-        await declineTransfer(transferId, user.id);
+        await transfers.declineTransfer(transferId, user.id);
         revalidatePath("/drive");
         return {};
     } catch (caught) {
@@ -170,7 +163,7 @@ export async function cancelTransferAction(transferId: string): Promise<{ error?
     const user = await requireUser();
     if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
     try {
-        await cancelTransfer(transferId, user.id);
+        await transfers.cancelTransfer(transferId, user.id);
         revalidatePath("/drive");
         return {};
     } catch (caught) {
@@ -184,7 +177,7 @@ export async function dismissTransferNoticeAction(transferId: string): Promise<{
     const user = await requireUser();
     if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
     try {
-        await dismissTransferNotice(transferId, user.id);
+        await transfers.dismissTransferNotice(transferId, user.id);
         revalidatePath("/drive");
         return {};
     } catch (caught) {
