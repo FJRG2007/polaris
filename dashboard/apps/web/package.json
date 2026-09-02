@@ -68,6 +68,7 @@
         "node-unrar-js": "2.0.2",
         "nodemailer": "9.0.3",
         "pdfjs-dist": "6.1.200",
+        "sharp": "0.34.5",
         "pg": "8.13.1",
         "plyr": "3.7.8",
         "qrcode.react": "4.2.0",

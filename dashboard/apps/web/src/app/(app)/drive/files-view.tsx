@@ -17,6 +17,8 @@ import Link from "next/link";
 import type { DriveEntry } from "./types";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
+import { EntryThumbnail } from "./entry-thumbnail";
+import { thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
@@ -2187,9 +2189,9 @@ export function FilesView({
                                                                             "border-primary bg-primary/10 ring-2 ring-primary"
                                                                     )}
                                                                 >
-                                                                    <EntryIcon
+                                                                    <GridIcon
+                                                                        connectionId={connectionId}
                                                                         entry={entry}
-                                                                        className="size-10"
                                                                     />
                                                                     {isRenaming ? (
                                                                         <Input
@@ -3075,6 +3077,29 @@ export function FilesView({
 }
 
 /** The icon for an entry: a user-set one, else the folder mark or the file type's. */
+/**
+ * A tile's picture, or its icon.
+ *
+ * Only a file whose name could produce one is wrapped at all, so a folder or a
+ * spreadsheet costs nothing to decide - not a request, not an observer, not an
+ * element. The size is fixed either way so the grid does not reflow when a
+ * picture arrives after the icon.
+ */
+function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveEntry }) {
+    const icon = <EntryIcon entry={entry} className="size-10" />;
+    if (entry.kind !== "file" || !thumbnailKind(entry.name)) return icon;
+    return (
+        <EntryThumbnail
+            connectionId={connectionId}
+            path={entry.path}
+            version={`${entry.modifiedAt}-${entry.size}`}
+            className="size-14"
+        >
+            {icon}
+        </EntryThumbnail>
+    );
+}
+
 function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; className?: string }) {
     const Custom = iconComponent(entry.icon);
     if (Custom) return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
