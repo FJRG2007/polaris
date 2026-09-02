@@ -117,6 +117,18 @@ export interface AgentFirstRunAnswer {
     /** The file, relative to the home of whoever runs the tool. JSON, and
      *  created if it is not there yet. */
     readonly file: string;
+    /**
+     * The keys written into it whatever it already says.
+     *
+     * For the answers that are Polaris's to give rather than the person's: a
+     * folder Polaris made for this session, which an agent may already have
+     * answered `No` to on a screen nobody could reach. See `CLAUDE_TRUST_ANSWER`
+     * for why that is not the same thing as overruling somebody.
+     *
+     * Nothing is written when the file already says the same, so a session that
+     * has nothing to do stays silent.
+     */
+    readonly assert?: Readonly<Record<string, AgentFirstRunValue>>;
     /** The keys merged into it, filled in only where absent. Nested, because
      *  some of these answers are not a flag at the top of a file - see
      *  `FIRST_RUN_WORKDIR`. */
@@ -157,7 +169,33 @@ export const FIRST_RUN_WORKDIR = "{workdir}";
  * read-modify-write and one line on the terminal naming the file it wrote.
  */
 const CLAUDE_CONFIG_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
-    hasCompletedOnboarding: true,
+    hasCompletedOnboarding: true
+};
+
+/**
+ * The folder, which is asserted rather than filled in.
+ *
+ * The difference matters and it is not a detail. Everything else here is filled
+ * in only where the file is silent, so a person who picks a light theme keeps
+ * it. This one has to be written even when the file already answers it, because
+ * of who wrote the answer that is there.
+ *
+ * The home outlives every session and the container's path is a constant, so the
+ * FIRST session - the one that met this dialog before Polaris knew to answer it -
+ * left `hasTrustDialogAccepted: false` under that exact path, chosen by an agent
+ * hitting the highlighted option on a screen nobody could reach. Fill-if-absent
+ * then finds an answer, writes nothing, prints nothing, and the dialog comes back
+ * with the terminal silent - the precise invisible failure the line naming each
+ * written file exists to prevent. Every deployment that has already run a session
+ * is in that state right now.
+ *
+ * That value is not somebody's decision. It is the absence of one, recorded.
+ * Polaris made the folder, cloned into it, and started the container around it,
+ * so it is Polaris's answer to give - and only ever for a path Polaris made: this
+ * runs nowhere but in a home Polaris owns, and the only key it writes is the
+ * worktree of the session being started.
+ */
+const CLAUDE_TRUST_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
     projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
 };
 
@@ -308,8 +346,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             // projects[...].hasTrustDialogAccepted". It lives in whichever of
             // the two files is being read, exactly as the flag above it does, so
             // a bare launch with Enigma off finds it answered too.
-            { file: ".claude/.claude.json", json: CLAUDE_CONFIG_ANSWER },
-            { file: ".claude.json", json: CLAUDE_CONFIG_ANSWER },
+            {
+                file: ".claude/.claude.json",
+                json: CLAUDE_CONFIG_ANSWER,
+                assert: CLAUDE_TRUST_ANSWER
+            },
+            { file: ".claude.json", json: CLAUDE_CONFIG_ANSWER, assert: CLAUDE_TRUST_ANSWER },
             // Settings were always right: they live in the configuration home
             // under their own name, which is the same path either way.
             { file: ".claude/settings.json", json: { theme: "dark" } }

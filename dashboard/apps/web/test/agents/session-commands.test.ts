@@ -8,6 +8,10 @@
  * event Polaris does not recognise moves nothing.
  */
 
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as core from "@polaris/core";
 import * as commands from "@/lib/agents/session-commands";
@@ -172,131 +176,179 @@ describe("the terminal the agent is started on", () => {
     });
 });
 
+/**
+ * What the first-run answers actually DO to a directory.
+ *
+ * Run rather than read. An earlier round of these grepped the generated program
+ * for a line of its own source, which proves the line is there and nothing about
+ * what it does - and the bug that cost three rounds of this was a correct-looking
+ * write into a file nothing reads. So the program is executed against real
+ * directories, and the files it leaves behind are the assertion.
+ */
 describe("the tool's own first-run wizard", () => {
-    // Reported from a real session: the terminal fix got Claude Code as far as
-    // drawing, and what it drew was "choose the text style that looks best with
-    // your terminal", then "select login method" - on a machine where Polaris
-    // had already handed it a credential, and where nobody could answer either
-    // screen. Both read single keystrokes, so the prompt that arrived next was
-    // eaten rather than answered.
     const claude = core.agentCliById("claude")!;
 
-    it("answers what a fresh Claude Code asks, in the files it asks it from", () => {
-        // Every key here was read off an installed Claude Code. The flag is the
-        // one its own startup tests before showing the wizard; the colour scheme
-        // lives in the settings file rather than beside the flag, which is
-        // exactly the sort of thing that cannot be guessed.
-        const answer = {
-            hasCompletedOnboarding: true,
-            projects: { [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
+    /** Run the answers against a throwaway home and hand back what it wrote. */
+    function answer(
+        answers: readonly core.AgentFirstRunAnswer[],
+        options: { readonly workdir?: string; readonly before?: Record<string, unknown> } = {}
+    ) {
+        const home = mkdtempSync(join(tmpdir(), "polaris-first-run-"));
+        for (const [file, body] of Object.entries(options.before ?? {})) {
+            const at = join(home, file);
+            mkdirSync(dirname(at), { recursive: true });
+            writeFileSync(at, JSON.stringify(body));
+        }
+        const list = join(home, "answers.json");
+        writeFileSync(list, JSON.stringify(answers));
+        const done = spawnSync(process.execPath, ["-e", commands.firstRunProgram(), list], {
+            encoding: "utf8",
+            env: { ...process.env, HOME: home, POLARIS_WORKDIR: options.workdir ?? "" }
+        });
+        expect(done.status, done.stderr).toBe(0);
+        return {
+            said: done.stdout.split("\n").filter((line) => line.startsWith("polaris:")),
+            read: (file: string): Record<string, any> | null => {
+                try {
+                    return JSON.parse(readFileSync(join(home, file), "utf8")) as Record<string, any>;
+                } catch {
+                    return null;
+                }
+            }
         };
-        expect(claude.firstRun).toEqual([
-            { file: ".claude/.claude.json", json: answer },
-            { file: ".claude.json", json: answer },
-            { file: ".claude/settings.json", json: { theme: "dark" } }
-        ]);
+    }
+
+    it("answers what a fresh Claude Code asks, in the files it asks it from", () => {
+        // Every key was read off an installed Claude Code. The flag is the one
+        // its own startup tests before showing the wizard; the trust key is the
+        // one its own message names as the alternative to the dialog; and the
+        // colour scheme lives in the settings file rather than beside them,
+        // which is exactly the sort of thing that cannot be guessed.
+        const run = answer(claude.firstRun, { workdir: "/session/repo" });
+        expect(run.read(".claude/.claude.json")).toEqual({
+            hasCompletedOnboarding: true,
+            projects: { "/session/repo": { hasTrustDialogAccepted: true } }
+        });
+        expect(run.read(".claude/settings.json")).toEqual({ theme: "dark" });
     });
 
     it("answers the flag in the configuration home as well as beside it", () => {
         // The one that was missing, and the reason the wizard came up anyway.
-        // `CLAUDE_CONFIG_DIR` is Claude Code's configuration home and the config
+        // CLAUDE_CONFIG_DIR is Claude Code's configuration home and the config
         // file moves inside it; Enigma's launcher always sets that variable, and
         // Polaris starts these tools through Enigma whenever it is in the
-        // session. So the file that gets read is the one in the directory, and
-        // the one beside it is what a plain `claude` reads when Enigma is off.
-        // Both are started by Polaris, so both are answered.
-        const flags = claude.firstRun.filter((one) => "hasCompletedOnboarding" in one.json);
-        expect(flags.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
+        // session. The file beside it is what a bare launch reads, and Polaris
+        // starts the tool both ways, so both are answered.
+        const run = answer(claude.firstRun, { workdir: "/session/repo" });
+        expect(run.read(".claude.json")?.hasCompletedOnboarding).toBe(true);
+        expect(run.read(".claude/.claude.json")?.hasCompletedOnboarding).toBe(true);
     });
 
-    it("trusts the folder it made, because nobody is there to be asked about it", () => {
-        // The screen this replaces defaults to "No, exit" - and that is exactly
-        // what the agent did. The question is about a checkout Polaris made, of
-        // a repository the person picked a moment ago, in a container Polaris
-        // started; it is the same argument `autonomyArgs` already makes about
-        // the menu after it.
-        //
-        // Per folder rather than global, because that is where the tool records
-        // it - its own message says so: accept the dialog once interactively,
-        // or set projects[...].hasTrustDialogAccepted.
-        const trust = claude.firstRun.filter((one) => "projects" in one.json);
-        expect(trust.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
-        for (const one of trust) {
-            expect(one.json.projects).toEqual({
-                [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true }
-            });
-        }
+    it("turns a No the agent gave itself into a Yes", () => {
+        // The case every deployment that has already run a session is in. The
+        // home outlives the session and the container's path is a constant, so
+        // the first run left `false` under that exact path - chosen by an agent
+        // hitting the highlighted option on a screen nobody could reach. Filling
+        // in only what is missing would find an answer there, write nothing,
+        // print nothing, and the dialog would come back with the terminal silent.
+        const run = answer(claude.firstRun, {
+            workdir: "/session/repo",
+            before: {
+                ".claude/.claude.json": {
+                    hasCompletedOnboarding: true,
+                    projects: {
+                        "/session/repo": { hasTrustDialogAccepted: false, allowedTools: ["Bash"] }
+                    }
+                }
+            }
+        });
+        const project = run.read(".claude/.claude.json")?.projects["/session/repo"];
+        expect(project.hasTrustDialogAccepted).toBe(true);
+        // And only that key: whatever the tool recorded beside it stays.
+        expect(project.allowedTools).toEqual(["Bash"]);
     });
 
-    it("answers every question a file holds in one pass over it", () => {
-        // Which of the two files gets read is decided by `CLAUDE_CONFIG_DIR`,
-        // not by the key, so both hold everything - and each file is read,
-        // merged and named on the terminal once rather than once per question.
-        expect(claude.firstRun.map((one) => one.file)).toEqual([
-            ".claude/.claude.json",
-            ".claude.json",
-            ".claude/settings.json"
+    it("never overrules a choice that is the person's to make", () => {
+        // The other half of the same rule. Trust is Polaris's answer about a
+        // folder Polaris made; a colour scheme is not Polaris's business at all.
+        const run = answer(claude.firstRun, {
+            workdir: "/session/repo",
+            before: { ".claude/settings.json": { theme: "light" } }
+        });
+        expect(run.read(".claude/settings.json")).toEqual({ theme: "light" });
+    });
+
+    it("says nothing at all when there is nothing left to answer", () => {
+        const answered = {
+            hasCompletedOnboarding: true,
+            projects: { "/session/repo": { hasTrustDialogAccepted: true } }
+        };
+        const run = answer(claude.firstRun, {
+            workdir: "/session/repo",
+            before: {
+                ".claude/.claude.json": answered,
+                ".claude.json": answered,
+                ".claude/settings.json": { theme: "dark" }
+            }
+        });
+        expect(run.said).toEqual([]);
+    });
+
+    it("names each file it wrote, and names it after writing it", () => {
+        // The line exists because where a tool keeps its configuration MOVES,
+        // and that failure leaves nothing to read. A line that could appear for
+        // a file that was never written would be the same silence with a
+        // reassurance on top.
+        const run = answer(claude.firstRun, { workdir: "/session/repo" });
+        expect(run.said).toHaveLength(3);
+        for (const line of run.said) expect(line).toContain("answered its first run in");
+    });
+
+    it("skips the folder answer where there is no folder, and leaves nothing behind", () => {
+        // The sign-in container has no worktree. The answer needing one is
+        // skipped rather than written under a key still spelling the
+        // placeholder - and no empty `projects` is left in the tool's own file.
+        const run = answer(claude.firstRun);
+        expect(run.read(".claude/.claude.json")).toEqual({ hasCompletedOnboarding: true });
+    });
+
+    it("adds a second worktree without taking the first one's answer away", () => {
+        // Two sessions on one machine work in two folders, and the home they
+        // share outlives both.
+        const first = answer(claude.firstRun, { workdir: "/session/repo" });
+        const run = answer(claude.firstRun, {
+            workdir: "/home/node/workspace",
+            before: { ".claude/.claude.json": first.read(".claude/.claude.json") ?? {} }
+        });
+        expect(Object.keys(run.read(".claude/.claude.json")?.projects ?? {}).sort()).toEqual([
+            "/home/node/workspace",
+            "/session/repo"
         ]);
     });
 
-    it("stands the folder in for a path only the machine knows", () => {
-        // The worktree is made minutes before this runs, so the key cannot be
-        // written down here. The script fills it from the session's own
-        // environment, and skips the answer where there is no worktree at all -
-        // a sign-in container - rather than writing a key still spelling the
-        // placeholder.
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("process.env.POLARIS_WORKDIR");
-        expect(script).toContain(`name === "${core.FIRST_RUN_WORKDIR}" ? workdir : name`);
-        expect(script).toContain("if (!key) continue;");
-    });
-
-    it("merges through the nesting rather than replacing the branch", () => {
-        // Two sessions on one machine work in two folders, and the second must
-        // not take the first's answer away with it.
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("if (fill(branch, value)) wrote = true;");
-    });
-
-    it("leaves no empty branch behind for an answer it skipped", () => {
-        // The sign-in container has no worktree, so the folder's answer is
-        // skipped - and a `projects: {}` written into the tool's own file for a
-        // question nobody answered is a change made for nothing.
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("if (fill(fresh, value)) { target[key] = fresh; wrote = true; }");
-        expect(script).not.toContain("target[key] = {};");
-    });
-
-    it("says on the terminal where it wrote, because where a tool keeps this moves", () => {
-        // The failure this prevents is invisible by nature: the answer is
-        // written, nothing reads it, the wizard appears anyway, and nothing
-        // anywhere says which file was touched.
-        expect(commands.firstRunScript(claude.firstRun)).toContain(
-            "polaris: answered its first run in"
-        );
-    });
-
-    it("says it after the write, not before", () => {
-        // A line that can appear for a file that was never written is worse
-        // than no line: it is the same silence with a reassurance on top.
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script.indexOf("fs.writeFileSync(file")).toBeLessThan(
-            script.indexOf("polaris: answered its first run in")
-        );
-    });
-
     it("names a file it could not write instead of abandoning the rest", () => {
-        // One unwritable path is one tool asking its question; an abort there
-        // is every question after it left unanswered.
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("polaris: could not write");
-        expect(script).toContain("} catch (error) {");
+        // One unwritable path is one tool asking its question; an abort there is
+        // every question after it left unanswered.
+        const home = mkdtempSync(join(tmpdir(), "polaris-first-run-"));
+        writeFileSync(join(home, ".claude"), "not a directory");
+        const list = join(home, "answers.json");
+        writeFileSync(list, JSON.stringify(claude.firstRun));
+        const done = spawnSync(process.execPath, ["-e", commands.firstRunProgram(), list], {
+            encoding: "utf8",
+            env: { ...process.env, HOME: home, POLARIS_WORKDIR: "/session/repo" }
+        });
+        expect(done.status).toBe(0);
+        expect(done.stdout).toContain("could not write");
+        // And the one that could be written still was.
+        expect(JSON.parse(readFileSync(join(home, ".claude.json"), "utf8"))).toMatchObject({
+            hasCompletedOnboarding: true
+        });
     });
 
     it("says nothing about a tool nothing has been sourced for", () => {
         // The same rule as `credentials`: an empty list is an answer. A guessed
-        // key is written, ignored, and leaves the session in front of the wizard
-        // with nothing anywhere saying why.
+        // key is written, silently ignored, and leaves the session in front of
+        // the wizard with nothing anywhere saying why.
         for (const cli of core.AGENT_CLIS) {
             if (cli.id === "claude") continue;
             expect(cli.firstRun, cli.id).toEqual([]);
@@ -306,19 +358,6 @@ describe("the tool's own first-run wizard", () => {
 
     it("writes nothing at all when there is nothing to answer", () => {
         expect(commands.firstRunScript([])).toBe("");
-    });
-
-    it("fills a key in only when it is absent, so a choice already made stands", () => {
-        const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("target[key] === undefined");
-        // The write is the else of that test, never a statement of its own.
-        expect(script).toContain("} else if (target[key] === undefined) {");
-    });
-
-    it("treats a file it cannot read as one that was not there", () => {
-        // A half-written cache the tool owns must not be the reason a session
-        // does not start.
-        expect(commands.firstRunScript(claude.firstRun)).toContain("catch { current = {}; }");
     });
 
     it("quotes the answers rather than pasting them into a shell", () => {

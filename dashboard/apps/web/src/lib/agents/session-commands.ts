@@ -455,13 +455,16 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
  * replaced here with the session's own worktree - or the answer is left out
  * entirely where there is no worktree yet, such as a sign-in container.
  */
-export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
-    if (answers.length === 0) return "";
-    // Node rather than a shell: these are JSON documents the tool wrote and will
-    // rewrite, and every other way of editing one from a shell corrupts it the
-    // first time a value contains something interesting. The image the container
-    // runs is a Node image, and this only ever runs there.
-    const program = [
+/**
+ * The program that writes the answers, on its own.
+ *
+ * Separate from the script around it so a test can RUN it rather than read it.
+ * Everything here is decided by what it does to a real directory - a folder that
+ * was already answered `false`, a theme somebody chose, a path that cannot be
+ * written - and a test that greps the source for a line proves none of that.
+ */
+export function firstRunProgram(): string {
+    return [
         'const fs = require("node:fs");',
         'const path = require("node:path");',
         "const home = process.env.HOME;",
@@ -478,7 +481,11 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // A branch that is not there yet is filled aside and attached only if
         // something reached a leaf inside it, so an answer skipped for want of a
         // worktree leaves no empty `projects: {}` behind in the tool's own file.
-        "function fill(target, source) {",
+        // `assert` is the difference between filling in what a file does not say
+        // and writing what is Polaris's to say. A folder Polaris made, which an
+        // agent already answered No to on a screen nobody could reach, is the
+        // second kind - see `CLAUDE_TRUST_ANSWER`.
+        "function fill(target, source, assert) {",
         "    let wrote = false;",
         "    for (const [name, value] of Object.entries(source)) {",
         `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
@@ -487,11 +494,14 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         "            const branch = target[key];",
         "            if (branch === undefined) {",
         "                const fresh = {};",
-        "                if (fill(fresh, value)) { target[key] = fresh; wrote = true; }",
+        "                if (fill(fresh, value, assert)) { target[key] = fresh; wrote = true; }",
         '            } else if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
-        "                if (fill(branch, value)) wrote = true;",
+        "                if (fill(branch, value, assert)) wrote = true;",
         "            }",
-        "        } else if (target[key] === undefined) {",
+        // Written when the file is silent, or when it says something else and this
+        // is an answer Polaris gives. Never when it already agrees, so a session
+        // with nothing to do writes nothing and prints nothing.
+        "        } else if (target[key] === undefined || (assert && target[key] !== value)) {",
         "            target[key] = value; wrote = true;",
         "        }",
         "    }",
@@ -505,7 +515,9 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // because a cache file the tool owns had a byte out of place.
         '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
         '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
-        "    if (!fill(current, answer.json)) continue;",
+        "    let changed = fill(current, answer.json, false);",
+        "    if (answer.assert && fill(current, answer.assert, true)) changed = true;",
+        "    if (!changed) continue;",
         // Said out loud, on the screen somebody is watching - and said AFTER the
         // write rather than before it. Where a tool keeps its configuration is a
         // thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so a
@@ -529,6 +541,15 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         "    }",
         "}"
     ].join("\n");
+}
+
+export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
+    if (answers.length === 0) return "";
+    // Node rather than a shell: these are JSON documents the tool wrote and will
+    // rewrite, and every other way of editing one from a shell corrupts it the
+    // first time a value contains something interesting. The image the container
+    // runs is a Node image, and this only ever runs there.
+    const program = firstRunProgram();
     return [
         `printf %s ${shellQuote(JSON.stringify(answers))} > ${FIRST_RUN_FILE}`,
         `node -e ${shellQuote(program)} ${FIRST_RUN_FILE}`,
