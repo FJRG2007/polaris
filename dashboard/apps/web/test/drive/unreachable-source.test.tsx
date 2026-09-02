@@ -39,6 +39,11 @@ vi.mock("../../src/app/(app)/drive/files-view", () => ({
     FilesView: () => <div data-testid="files-view" />
 }));
 vi.mock("../../src/app/(app)/drive/share-dialog", () => ({ ShareDialog: () => null }));
+// Both of these reach the transfer server actions, which reach the session and
+// its configuration as they are imported. Neither takes part in the decision
+// this file is about, so they are stubbed like every other dialog here.
+vi.mock("../../src/app/(app)/drive/send-dialog", () => ({ SendDialog: () => null }));
+vi.mock("../../src/app/(app)/drive/transfers-panel", () => ({ TransfersPanel: () => null }));
 vi.mock("../../src/app/(app)/drive/people-share-dialog", () => ({ PeopleShareDialog: () => null }));
 vi.mock("../../src/app/(app)/drive/request-dialog", () => ({ RequestDialog: () => null }));
 vi.mock("../../src/app/(app)/drive/unifi-console-button", () => ({

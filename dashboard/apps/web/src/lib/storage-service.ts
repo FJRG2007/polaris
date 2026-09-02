@@ -683,15 +683,24 @@ export async function listConnections(ownerId: string, options?: { readonly pers
  * A drive that cannot be made - a storage that is away, a name collision - is
  * left out rather than allowed to take the whole listing down with it. Somebody
  * whose NAS is unplugged still gets to see their own files.
+ *
+ * Whether this account may run the shelf's own rules comes back with it, because
+ * it is the organization's question rather than the row's: nobody owns a company
+ * drive, so ownership answers no for everybody including the owner, and a screen
+ * that reads the row alone offers Manage access to a whole roster and then
+ * refuses every one of them.
  */
 async function organizationDrivesFor(userId: string) {
-    const { memberOrgIds } = await import("@/lib/orgs/org-service");
+    const { memberOrgIds, resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
     const { ensureOrganizationDrive } = await import("@/lib/organization-drive");
     const orgIds = await memberOrgIds(userId);
     const drives = await Promise.all(
         orgIds.map(async (orgId) => {
             try {
-                const drive = await ensureOrganizationDrive(orgId);
+                const [drive, access] = await Promise.all([
+                    ensureOrganizationDrive(orgId),
+                    resolveOrgAccess({ id: userId, isAdmin: false }, orgId)
+                ]);
                 return {
                     id: drive.id,
                     name: drive.name,
@@ -705,6 +714,7 @@ async function organizationDrivesFor(userId: string) {
                     }),
                     createdAt: new Date(),
                     shared: false,
+                    manageable: orgCan(access, "drive.manage"),
                     needsRekey: false
                 };
             } catch {
@@ -751,10 +761,15 @@ export async function listAccessibleConnections(userId: string) {
         }),
         createdAt: host.createdAt,
         shared: false,
+        manageable: false,
         needsRekey: false
     }));
     return [
-        ...owned.map((row) => ({ ...row, shared: false })),
+        // `manageable` is who runs the location's own rules - its grants, its
+        // locks, what is shared out of it. Ownership answers it everywhere
+        // except a company's shelf, which is why it is carried rather than
+        // worked out again from `shared` on the screen.
+        ...owned.map((row) => ({ ...row, shared: false, manageable: true })),
         // The shelves of the organizations this account belongs to. Not "shared"
         // - nobody handed them over, they are the company's and being on the
         // roster is what reaches them - so they sit beside your own rather than
@@ -767,7 +782,11 @@ export async function listAccessibleConnections(userId: string) {
         // which knows the path, and the browser resolves the storage from that.
         ...shared
             .filter((row) => !isPersonalKind(row.kind))
-            .map((row) => ({ ...annotateRekey(row, fingerprint), shared: true })),
+            .map((row) => ({
+                ...annotateRekey(row, fingerprint),
+                shared: true,
+                manageable: false
+            })),
         ...hostSummaries
     ];
 }

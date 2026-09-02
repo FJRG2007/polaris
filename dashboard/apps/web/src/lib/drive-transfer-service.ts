@@ -21,6 +21,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { blockedBetween } from "@/lib/blocks";
 import { allowedBy } from "@/lib/privacy-service";
 import { ensurePersonalDrive } from "@/lib/personal-drive";
 import { recordItemCreator } from "@/lib/drive-meta-service";
@@ -109,6 +110,13 @@ export async function mayReceiveFrom(
             for (const row of owners) if (!shut.has(row.ownerId)) allowed.add(row.ownerId);
         }
     }
+
+    // A block holds wherever one account can reach another, and being sent
+    // somebody's files is a stronger reach than a friend request. It is asked
+    // last and of everybody left, because neither door above closes on it:
+    // blocking a friend does not end the friendship, and the colleague widening
+    // never went through `allowedBy` at all.
+    for (const id of await blockedBetween(senderId, [...allowed])) allowed.delete(id);
     return allowed;
 }
 
@@ -178,15 +186,16 @@ export async function sendTransfer(input: SendInput): Promise<string[]> {
         }
     }
 
+    // Only the branches that actually name somebody. An empty object inside an
+    // `OR` is an empty filter, which matches every row - so a send to one kind
+    // of recipient would count every offer this account has waiting anywhere and
+    // turn a per-recipient ceiling into a global one.
+    const towards = [
+        ...(userIds.length > 0 ? [{ recipientId: { in: userIds } }] : []),
+        ...(orgIds.length > 0 ? [{ recipientOrg: { in: orgIds } }] : [])
+    ];
     const waiting = await prisma.driveTransfer.count({
-        where: {
-            senderId: input.senderId,
-            status: "pending",
-            OR: [
-                userIds.length > 0 ? { recipientId: { in: userIds } } : {},
-                orgIds.length > 0 ? { recipientOrg: { in: orgIds } } : {}
-            ]
-        }
+        where: { senderId: input.senderId, status: "pending", OR: towards }
     });
     if (waiting + input.to.length > PENDING_PER_PAIR) {
         throw new TransferRefused(
@@ -301,9 +310,14 @@ export async function transfersWaitingFor(userId: string): Promise<TransferView[
         where: {
             status: "pending",
             expiresAt: { gt: new Date() },
+            // The organization branch only when there is one. A sentinel that
+            // matches nothing has no spelling here: the id is a Postgres uuid,
+            // and comparing one against a non-uuid raises rather than answering
+            // empty - which would take everything waiting for this person with
+            // it. See `lib/uuid.ts`.
             OR: [
                 { recipientId: userId },
-                answerable.length > 0 ? { recipientOrg: { in: answerable } } : { id: "" }
+                ...(answerable.length > 0 ? [{ recipientOrg: { in: answerable } }] : [])
             ]
         },
         orderBy: { createdAt: "desc" },
@@ -401,6 +415,11 @@ async function freeName(
  * The order is the point. A move that deleted first and failed to copy would
  * lose the file for both of them, so the sender's copy goes last and only once
  * the recipient's is there.
+ *
+ * Which is also why the two halves do not share one catch. Once the copy has
+ * landed the transfer has happened: the recipient must not be told it failed
+ * because the sender's own copy could not be cleared afterwards, and the row
+ * must not say `failed` over a file that is sitting in their Drive.
  */
 export async function acceptTransfer(
     transferId: string,
@@ -413,30 +432,14 @@ export async function acceptTransfer(
     const drive = row.recipientOrg
         ? await ensureOrganizationDrive(row.recipientOrg)
         : await ensurePersonalDrive(userId);
-    const folder = core.normalizeRelPath(into);
+    const landing = await landCopy(row, drive.id, core.normalizeRelPath(into), userId);
 
-    let source;
-    let target;
-    try {
-        // Read as the SENDER, because it is their file and their standing that
-        // was checked when they offered it. The recipient never gets a driver on
-        // somebody else's drive.
-        source = await requireDriveDriver(row.senderId, row.connectionId, row.path, "download");
-        target = await getDriverForConnection(drive.id);
-        const name = await freeName(target, folder, row.name);
-        const landing = folder ? `${folder}/${name}` : name;
-        await copyAcross(source, target, row.path, landing, row.isFolder);
-
-        await recordItemCreator(drive.id, landing, userId).catch(() => undefined);
-        await prisma.driveTransfer.update({
-            where: { id: row.id },
-            data: { status: "accepted", respondedAt: new Date(), landedPath: landing }
-        });
-
-        if (row.mode === "move") {
-            // Last, and never before. The sender's standing to delete was
-            // established when they offered it; a failure here leaves them with
-            // their copy, which is the safe way round.
+    if (row.mode === "move") {
+        // Last, and never before. The sender's standing to delete was
+        // established when they offered it; a failure here leaves them with
+        // their copy, which is the safe way round - and leaves the transfer
+        // accepted, because it was.
+        try {
             const remover = await requireDriveDriver(
                 row.senderId,
                 row.connectionId,
@@ -448,8 +451,52 @@ export async function acceptTransfer(
             } finally {
                 await remover.dispose().catch(() => undefined);
             }
+        } catch (caught) {
+            console.error("polaris: a sender's copy could not be removed after a move:", caught);
+            await prisma.driveTransfer
+                .update({
+                    where: { id: row.id },
+                    data: { failure: "It arrived. The sender's own copy could not be removed." }
+                })
+                .catch(() => undefined);
         }
-        return { path: landing };
+    }
+    return { path: landing };
+}
+
+/** The half that can still fail with nothing having happened: copy it in, and
+ *  record where it landed. Answers the path in the recipient's own Drive. */
+async function landCopy(
+    row: {
+        id: string;
+        senderId: string;
+        connectionId: string;
+        path: string;
+        name: string;
+        isFolder: boolean;
+    },
+    driveId: string,
+    folder: string,
+    userId: string
+): Promise<string> {
+    let source;
+    let target;
+    try {
+        // Read as the SENDER, because it is their file and their standing that
+        // was checked when they offered it. The recipient never gets a driver on
+        // somebody else's drive.
+        source = await requireDriveDriver(row.senderId, row.connectionId, row.path, "download");
+        target = await getDriverForConnection(driveId);
+        const name = await freeName(target, folder, row.name);
+        const landing = folder ? `${folder}/${name}` : name;
+        await copyAcross(source, target, row.path, landing, row.isFolder);
+
+        await recordItemCreator(driveId, landing, userId).catch(() => undefined);
+        await prisma.driveTransfer.update({
+            where: { id: row.id },
+            data: { status: "accepted", respondedAt: new Date(), landedPath: landing }
+        });
+        return landing;
     } catch (caught) {
         await prisma.driveTransfer
             .update({

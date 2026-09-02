@@ -20,10 +20,11 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getUserGroupIds } from "@polaris/auth";
 import { findPeople } from "@/lib/people-search";
-import { DRIVE_GRANT_NOTE_MAX, normalizeRelPath } from "@polaris/core";
 import type { ItemShare } from "./sharing-types";
 import { recordAudit } from "@/lib/audit-service";
 import { listDriveAcls } from "@/lib/drive-acl-service";
+import { canManageDriveConnection } from "@/lib/drive-authz";
+import { DRIVE_GRANT_NOTE_MAX, normalizeRelPath } from "@polaris/core";
 import {
     DRIVE_SHARE_ROLES,
     listSharedByMe,
@@ -35,14 +36,13 @@ import {
     type SharePerson
 } from "@/lib/drive-sharing";
 
-/** Ensure the caller owns the storage the item is on (or is an admin). */
+/** Ensure the caller owns the storage the item is on (or is an admin, or holds
+ *  the organization's Drive when the storage is a company shelf nobody owns). */
 async function requireOwner(connectionId: string): Promise<string> {
     const user = await requireUser();
-    if (user.isAdmin) return user.id;
-    const owns = await prisma.storageConnection.count({
-        where: { id: connectionId, ownerId: user.id }
-    });
-    if (owns === 0) throw new Error("Only the owner can share this");
+    if (!(await canManageDriveConnection(user.id, user.isAdmin, connectionId))) {
+        throw new Error("Only the owner can share this");
+    }
     return user.id;
 }
 

@@ -13,7 +13,7 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { Building2, Send, User } from "lucide-react";
+import { Building2, Send, User, X } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import {
     findTransferPeopleAction,
@@ -151,6 +151,34 @@ export function SendDialog({
                         placeholder="Search for a person"
                         aria-label="Search for a person"
                     />
+
+                    {/* Who is chosen, shown outside the results. The results are
+                        only ever the current search, so somebody picked before
+                        the query changed would otherwise be nowhere on screen -
+                        countable on the button and impossible to take off. */}
+                    {chosen.length > 0 ? (
+                        <ul className="flex flex-wrap gap-1.5">
+                            {chosen.map((one) => (
+                                <li key={one.id}>
+                                    <button
+                                        type="button"
+                                        onClick={() => pick(one)}
+                                        title={`Remove ${one.name}`}
+                                        aria-label={`Remove ${one.name}`}
+                                        className="flex max-w-52 items-center gap-1.5 rounded-full bg-primary/10 py-1 pl-2.5 pr-2 text-xs hover:bg-primary/20"
+                                    >
+                                        {one.isOrg ? (
+                                            <Building2 className="size-3 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                            <User className="size-3 shrink-0 text-muted-foreground" />
+                                        )}
+                                        <span className="truncate" title={one.name}>{one.name}</span>
+                                        <X className="size-3 shrink-0 text-muted-foreground" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
 
                     <div className="max-h-56 space-y-1 overflow-y-auto">
                         {rows.map((candidate) => {

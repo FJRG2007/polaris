@@ -40,7 +40,10 @@ vi.mock("@/lib/storage-service", () => ({
     HOST_CONNECTION_PREFIX: "host:",
     getDriverForConnection: vi.fn()
 }));
-vi.mock("@/lib/drive-acl-service", () => ({ canAccessDrive: async () => false }));
+vi.mock("@/lib/drive-acl-service", () => ({
+    canAccessDrive: async () => false,
+    resolveDriveDecision: async () => "implicit-deny"
+}));
 vi.mock("@/lib/access-lock-service", () => ({
     findLockForPath: async () => null,
     lockUnlockCookie: (id: string) => `lock_${id}`,

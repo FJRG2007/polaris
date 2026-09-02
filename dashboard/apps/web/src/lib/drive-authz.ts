@@ -18,10 +18,10 @@
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
-import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
 import type { StorageDriver } from "@polaris/storage";
-import { canAccessDrive } from "@/lib/drive-acl-service";
 import type { DriveAction, Permission } from "@polaris/core";
+import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
+import { canAccessDrive, resolveDriveDecision } from "@/lib/drive-acl-service";
 import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection, HOST_CONNECTION_PREFIX } from "@/lib/storage-service";
 import {
     findLockForPath,
@@ -130,14 +130,18 @@ export async function authorizeDrive(
 
     if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
         if (connection.orgId) {
-            // An organization's Drive, which belongs to no account at all.
-            if (!(await allowedInOrgDrive(userId, connection.orgId, action))) {
-                // Still one more way in: an access rule may name this person for
-                // this folder even when the roster does not reach them, which is
-                // how a contractor is given one directory and nothing else.
-                if (!(await canAccessDrive(userId, connectionId, path, action))) {
-                    throw new DriveAccessError();
-                }
+            // An organization's Drive, which belongs to no account at all. The
+            // rules are asked first and asked always: they are what narrows the
+            // roster to a folder only Legal opens, and a deny they carry has to
+            // win here as it does everywhere else - consulting them only after
+            // the roster has refused makes every deny written against a member
+            // silently do nothing.
+            const rules = await resolveDriveDecision(userId, connectionId, path, action);
+            if (rules === "deny") throw new DriveAccessError();
+            if (rules !== "allow" && !(await allowedInOrgDrive(userId, connection.orgId, action))) {
+                // An allow is still the other way in, for somebody the roster
+                // does not reach at all: a contractor given one directory.
+                throw new DriveAccessError();
             }
         } else if (connection.ownerId === userId) {
             // Owner: gated by the coarse global capability, as the app always has.
@@ -169,6 +173,13 @@ export async function authorizeDrive(
  *
  * Anything narrower than that - a folder only Legal opens - is the per-folder
  * access rules Drive already has, which sit on top of this.
+ *
+ * Being answered by `resolveOrgAccess` is not the same question as being on the
+ * roster, and the difference is a shelf full of company documents. A successor
+ * the owner named is answered with a membership holding nothing at all so that
+ * the one screen they may open has something to resolve; `org.read` is what
+ * every roster role carries and what that one deliberately does not, so it is
+ * what this asks.
  */
 async function allowedInOrgDrive(
     userId: string,
@@ -178,7 +189,37 @@ async function allowedInOrgDrive(
     const { resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
     const access = await resolveOrgAccess({ id: userId, isAdmin: false }, orgId);
     if (!access) return false;
+    if (!access.isOwner && !orgCan(access, "org.read")) return false;
     if (action === "read" || action === "download") return true;
+    return orgCan(access, "drive.manage");
+}
+
+/**
+ * Whether this account runs a connection's own rules: its access grants, its
+ * locks, what is shared out of it.
+ *
+ * Ownership answers it for a storage somebody connected and for their own drive.
+ * An organization's shelf is owned by no account, so the question there is the
+ * organization's own - the same permission that lets somebody change what is on
+ * it. Without this the company shelf offers Manage access and Share to every
+ * member and then refuses all of them, and only an instance administrator can
+ * write the per-folder rule that narrows a company's Drive.
+ */
+export async function canManageDriveConnection(
+    userId: string,
+    isAdmin: boolean,
+    connectionId: string
+): Promise<boolean> {
+    if (isAdmin) return true;
+    const connection = await prisma.storageConnection.findUnique({
+        where: { id: connectionId },
+        select: { ownerId: true, orgId: true }
+    });
+    if (!connection) return false;
+    if (connection.ownerId === userId) return true;
+    if (!connection.orgId) return false;
+    const { resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
+    const access = await resolveOrgAccess({ id: userId, isAdmin: false }, connection.orgId);
     return orgCan(access, "drive.manage");
 }
 

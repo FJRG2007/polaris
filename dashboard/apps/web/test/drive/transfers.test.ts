@@ -25,8 +25,10 @@ const allowedBy = vi.fn();
 const memberOrgIds = vi.fn();
 const resolveOrgAccess = vi.fn();
 const requireDriveDriver = vi.fn();
+const blockedBetween = vi.fn();
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
+vi.mock("@/lib/blocks", () => ({ blockedBetween }));
 vi.mock("@/lib/privacy-service", () => ({ allowedBy }));
 vi.mock("@/lib/orgs/org-service", () => ({
     memberOrgIds,
@@ -46,7 +48,7 @@ vi.mock("@/lib/drive-authz", () => ({
     DriveAccessError: class extends Error {}
 }));
 
-const { sendTransfer, mayReceiveFrom, TransferRefused } = await import(
+const { sendTransfer, mayReceiveFrom, transfersWaitingFor, TransferRefused } = await import(
     "@/lib/drive-transfer-service"
 );
 
@@ -64,6 +66,8 @@ beforeEach(() => {
     db.organization.findMany.mockResolvedValue([]);
     db.driveTransfer.count.mockResolvedValue(0);
     db.driveTransfer.create.mockResolvedValue({ id: "t1" });
+    db.driveTransfer.findMany.mockResolvedValue([]);
+    blockedBetween.mockResolvedValue(new Set<string>());
     requireDriveDriver.mockResolvedValue(aFolder);
 });
 
@@ -96,6 +100,39 @@ describe("who may be sent a file", () => {
 
     it("never counts the sender themselves", async () => {
         expect([...(await mayReceiveFrom("me", ["me"]))]).toEqual([]);
+    });
+
+    it("keeps a block out, in either direction and past every widening", async () => {
+        // A block holds wherever one account can reach another, and neither door
+        // above closes on it: blocking a friend does not end the friendship, and
+        // a colleague never went through the privacy check at all.
+        memberOrgIds.mockResolvedValue(["org1"]);
+        db.organizationMember.findMany.mockResolvedValue([{ userId: "bob" }]);
+        allowedBy.mockResolvedValue(new Set(["ada"]));
+        blockedBetween.mockResolvedValue(new Set(["bob", "ada"]));
+        expect([...(await mayReceiveFrom("me", ["bob", "ada"]))]).toEqual([]);
+    });
+});
+
+describe("what is waiting to be answered", () => {
+    it("asks for no organization when the account administers none", async () => {
+        // The id is a Postgres uuid, and a sentinel that is not one raises
+        // instead of matching nothing - which took every offer made to the
+        // person with it, for everybody not running an organization's Drive.
+        memberOrgIds.mockResolvedValue([]);
+        await transfersWaitingFor("me");
+        const where = db.driveTransfer.findMany.mock.calls[0][0].where;
+        expect(where.OR).toEqual([{ recipientId: "me" }]);
+    });
+
+    it("asks for the organizations it may answer for when there are some", async () => {
+        memberOrgIds.mockResolvedValue(["org1", "org2"]);
+        resolveOrgAccess.mockImplementation(async (_actor: unknown, orgId: string) =>
+            orgId === "org1" ? { permissions: ["drive.manage"] } : { permissions: ["org.read"] }
+        );
+        await transfersWaitingFor("me");
+        const where = db.driveTransfer.findMany.mock.calls[0][0].where;
+        expect(where.OR).toEqual([{ recipientId: "me" }, { recipientOrg: { in: ["org1"] } }]);
     });
 });
 
@@ -197,6 +234,28 @@ describe("offering something", () => {
                 to: [{ userId: "bob" }]
             })
         ).rejects.toThrow(/already several waiting/i);
+    });
+
+    it("counts what is waiting for THESE recipients and nobody else", async () => {
+        // An empty object inside an `OR` is an empty filter and matches every
+        // row, so a ceiling written per recipient counted every offer this
+        // account had out anywhere - twenty people answered by nobody made a
+        // twenty-first impossible to write to.
+        allowedBy.mockResolvedValue(new Set(["bob"]));
+        await sendTransfer({
+            senderId: "me",
+            connectionId: "c1",
+            path: "a/b.txt",
+            mode: "copy",
+            to: [{ userId: "bob" }]
+        });
+        expect(db.driveTransfer.count).toHaveBeenCalledWith({
+            where: {
+                senderId: "me",
+                status: "pending",
+                OR: [{ recipientId: { in: ["bob"] } }]
+            }
+        });
     });
 
     it("refuses an organization the sender may not write to", async () => {
