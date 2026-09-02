@@ -6,8 +6,8 @@
  * files. Keyed by (connectionId, path).
  */
 
-import { prisma } from "@polaris/db";
 import { isUuid } from "./uuid";
+import { prisma } from "@polaris/db";
 
 export interface ItemMeta {
     hidden: boolean;
@@ -79,21 +79,44 @@ export async function resolveUserNames(userIds: string[]): Promise<Map<string, s
     return new Map(users.map((user) => [user.id, user.name]));
 }
 
-/** Assert the connection is owned by the user (throws otherwise). */
-async function assertOwns(ownerId: string, connectionId: string): Promise<void> {
+/**
+ * Establish that this account may customize the connection, and answer who the
+ * resulting row belongs to.
+ *
+ * Ownership is not the question, because an organization's shelf is owned by no
+ * account: asking `ownerId === userId` there refuses the organization's own
+ * owner, every member of it and every instance administrator alike, and it
+ * refuses them on a star - which the browser applies optimistically and then
+ * silently rolls back, so nothing on screen ever says no.
+ *
+ * The row that comes out is filed under whoever the connection belongs to,
+ * which is an account for a personal drive and the organization for a company
+ * one. A star on the company shelf is therefore the company's, the same way the
+ * files on it are - the person who put it there is `creatorId`, beside it.
+ */
+async function assertMayCustomize(userId: string, connectionId: string): Promise<string> {
     if (!isUuid(connectionId)) throw new Error("This source cannot be customized");
-    const owns = await prisma.storageConnection.count({ where: { id: connectionId, ownerId } });
-    if (owns === 0) throw new Error("Connection not found");
+    const connection = await prisma.storageConnection.findUnique({
+        where: { id: connectionId },
+        select: { ownerId: true, orgId: true }
+    });
+    const owner = connection?.ownerId ?? connection?.orgId;
+    if (!connection || !owner) throw new Error("Connection not found");
+    const { canManageDriveConnection } = await import("@/lib/drive-authz");
+    if (!(await canManageDriveConnection(userId, false, connectionId))) {
+        throw new Error("Connection not found");
+    }
+    return owner;
 }
 
 /** Set (or clear) an item's hidden flag. */
 export async function setItemHidden(
-    ownerId: string,
+    userId: string,
     connectionId: string,
     path: string,
     hidden: boolean
 ): Promise<void> {
-    await assertOwns(ownerId, connectionId);
+    const ownerId = await assertMayCustomize(userId, connectionId);
     await prisma.driveItemMeta.upsert({
         where: { connectionId_path: { connectionId, path } },
         create: { ownerId, connectionId, path, hidden },
@@ -103,12 +126,12 @@ export async function setItemHidden(
 
 /** Star or unstar an item (mark it a favorite). */
 export async function setItemFavorite(
-    ownerId: string,
+    userId: string,
     connectionId: string,
     path: string,
     favorite: boolean
 ): Promise<void> {
-    await assertOwns(ownerId, connectionId);
+    const ownerId = await assertMayCustomize(userId, connectionId);
     await prisma.driveItemMeta.upsert({
         where: { connectionId_path: { connectionId, path } },
         create: { ownerId, connectionId, path, favorite },
@@ -118,13 +141,13 @@ export async function setItemFavorite(
 
 /** Set (or clear, with nulls) an item's custom icon and color. */
 export async function setItemIcon(
-    ownerId: string,
+    userId: string,
     connectionId: string,
     path: string,
     icon: string | null,
     iconColor: string | null
 ): Promise<void> {
-    await assertOwns(ownerId, connectionId);
+    const ownerId = await assertMayCustomize(userId, connectionId);
     await prisma.driveItemMeta.upsert({
         where: { connectionId_path: { connectionId, path } },
         create: { ownerId, connectionId, path, icon, iconColor },
@@ -134,12 +157,12 @@ export async function setItemIcon(
 
 /** Set (or clear with null/empty) a free-text note on an item. */
 export async function setItemNote(
-    ownerId: string,
+    userId: string,
     connectionId: string,
     path: string,
     note: string | null
 ): Promise<void> {
-    await assertOwns(ownerId, connectionId);
+    const ownerId = await assertMayCustomize(userId, connectionId);
     const value = note && note.trim() ? note.trim() : null;
     await prisma.driveItemMeta.upsert({
         where: { connectionId_path: { connectionId, path } },
@@ -161,10 +184,19 @@ export interface FavoriteItem {
     path: string;
 }
 
-/** Every item the user has starred, newest first, across all their connections. */
-export async function listFavorites(ownerId: string): Promise<FavoriteItem[]> {
+/**
+ * Every item starred on a shelf this account reaches, newest first.
+ *
+ * Their own drives are filed under them; a company's are filed under the
+ * organization, because that is who the shelf belongs to. Both are asked for,
+ * or a star put on the company shelf goes into Favourites for nobody - the one
+ * place it was put there to appear.
+ */
+export async function listFavorites(userId: string): Promise<FavoriteItem[]> {
+    const { memberOrgIds } = await import("@/lib/orgs/org-service");
+    const owners = [userId, ...(await memberOrgIds(userId))];
     const rows = await prisma.driveItemMeta.findMany({
-        where: { ownerId, favorite: true },
+        where: { ownerId: { in: owners }, favorite: true },
         orderBy: { updatedAt: "desc" },
         select: { connectionId: true, path: true, connection: { select: { name: true } } }
     });

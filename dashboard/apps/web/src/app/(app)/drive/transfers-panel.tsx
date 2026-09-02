@@ -15,7 +15,7 @@
 
 import { formatBytes } from "@polaris/core";
 import { runAction } from "@/lib/run-action";
-import { File, Folder, Inbox } from "lucide-react";
+import { AlertTriangle, File, Folder, Inbox } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import type { TransferView } from "@/lib/drive-transfer-service";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
@@ -23,6 +23,7 @@ import {
     acceptTransferAction,
     cancelTransferAction,
     declineTransferAction,
+    dismissTransferNoticeAction,
     sentTransfersAction,
     waitingTransfersAction
 } from "./transfer-actions";
@@ -53,6 +54,12 @@ export function TransfersPanel() {
         });
     };
 
+    // The sent list carries two different things: offers nobody has answered,
+    // which can still be taken back, and ones that went wrong, which are a
+    // sentence the sender has to read.
+    const wrong = sent.filter((offer) => offer.failure !== null);
+    const waitingToBeAnswered = sent.filter((offer) => offer.status === "pending");
+
     // Nothing waiting and nothing sent is not an empty state worth a card. The
     // panel is only there when it has something to say.
     if (waiting !== null && waiting.length === 0 && sent.length === 0) return null;
@@ -62,7 +69,7 @@ export function TransfersPanel() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Inbox className="size-4 shrink-0" />
-                    Files sent to you
+                    Files on the way
                 </CardTitle>
             </CardHeader>
             <CardBody className="space-y-3">
@@ -111,12 +118,46 @@ export function TransfersPanel() {
                     </div>
                 ))}
 
-                {sent.length > 0 ? (
+                {/* What went wrong, before what is still waiting. A move whose
+                    copy landed but whose delete failed leaves the sender holding
+                    a duplicate of a file they asked to give away, and it leaves
+                    the waiting list without a word - so this is the only place
+                    they would ever learn it. */}
+                {wrong.length > 0 ? (
+                    <div className="space-y-2 pt-1">
+                        {wrong.map((offer) => (
+                            <div
+                                key={offer.id}
+                                className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"
+                            >
+                                <AlertTriangle className="size-4 shrink-0 text-amber-400" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium" title={offer.name}>
+                                        {offer.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{offer.failure}</p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() =>
+                                        answer(() => dismissTransferNoticeAction(offer.id))
+                                    }
+                                >
+                                    Got it
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+
+                {waitingToBeAnswered.length > 0 ? (
                     <div className="space-y-2 pt-1">
                         <p className="text-xs text-muted-foreground">
                             Waiting to be answered. Nothing has left your Drive.
                         </p>
-                        {sent.map((offer) => (
+                        {waitingToBeAnswered.map((offer) => (
                             <div key={offer.id} className="flex items-center gap-3 text-sm">
                                 <span className="min-w-0 flex-1 truncate" title={offer.name}>
                                     {offer.name}

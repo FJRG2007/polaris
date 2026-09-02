@@ -18,6 +18,7 @@ import type { AvatarSettings } from "@/lib/avatar-service";
 import { ResolvedTarget, TargetPicker } from "./target-picker";
 import type { ChatStorageSettings } from "@/lib/chat/attachments";
 import type { PersonalDriveSettings } from "@/lib/personal-drive";
+import type { OrganizationDriveSettings } from "@/lib/organization-drive";
 import type { UploadSettings } from "@/lib/tasks/attachment-service";
 import { Button, Card, CardBody, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
 import {
@@ -25,6 +26,7 @@ import {
     setAvatarSettingsAction,
     setChatStorageTargetAction,
     setFootageTargetAction,
+    setOrganizationDriveTargetAction,
     setPersonalDriveTargetAction,
     setUploadSettingsAction,
     tidyChatStorageAction,
@@ -620,17 +622,104 @@ function FootageCard({ settings }: { settings: FootageSettings }) {
     );
 }
 
+/**
+ * Where organizations' shelves are kept.
+ *
+ * Its own choice rather than the one above, because the two fill up for
+ * different reasons: personal drives grow one person at a time, and a company's
+ * holds the things everybody there works on. An instance may reasonably want the
+ * company's documents on the NAS and everybody's own on the box.
+ */
+function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSettings }) {
+    const initial = settings.choice;
+    const [target, setTarget] = useState(initial);
+    const [saving, setSaving] = useState(false);
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState("");
+
+    const made = settings.existing.reduce((total, row) => total + row.count, 0);
+    const elsewhere = settings.existing.filter((row) => row.targetId !== settings.resolved.id);
+
+    const save = async () => {
+        if (saving) return;
+        setSaving(true);
+        setError("");
+        const result = await runAction(() => setOrganizationDriveTargetAction({ target }), setError);
+        setSaving(false);
+        if (result?.error) {
+            setError(result.error);
+            return;
+        }
+        setSaved(true);
+    };
+
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-4 p-4">
+                <div>
+                    <h2 className="text-sm font-medium">Organizations&apos; shelves</h2>
+                    <p className="text-xs text-muted-foreground">
+                        Every organization gets a shelf of its own in Drive, made the first time
+                        somebody there opens it. It is where a company keeps what belongs to the
+                        company rather than to one person.
+                    </p>
+                </div>
+
+                <ResolvedTarget
+                    resolved={settings.resolved}
+                    automatic="Worked out from what this instance has connected. Connect a NAS and new shelves follow it."
+                />
+
+                <TargetPicker
+                    label="Where to keep them"
+                    hint="Shelves that already exist stay on the disk they were made on; this decides where the next ones go."
+                    value={target}
+                    options={settings.options}
+                    resolvedName={settings.resolved.name}
+                    onChange={(value) => {
+                        setTarget(value);
+                        setSaved(false);
+                    }}
+                />
+
+                {made > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                        {made === 1 ? "One shelf has been made" : `${made} shelves have been made`}
+                        {elsewhere.length > 0
+                            ? `, ${elsewhere.reduce((total, row) => total + row.count, 0)} of them on a different disk from the one above.`
+                            : "."}
+                    </p>
+                )}
+
+                <div>
+                    <CheckButton which="orgDrive" />
+                </div>
+                <SaveRow
+                    dirty={target !== initial}
+                    valid
+                    saving={saving}
+                    saved={saved}
+                    error={error}
+                    onSave={() => void save()}
+                />
+            </CardBody>
+        </Card>
+    );
+}
+
 export function UploadsView({
     uploads,
     avatars,
     chat,
     drives,
+    orgDrives,
     footage
 }: {
     uploads: UploadSettings;
     avatars: AvatarSettings;
     chat: ChatStorageSettings;
     drives: PersonalDriveSettings;
+    orgDrives: OrganizationDriveSettings;
     /** Absent on an instance with no Home installed - there is nothing recording,
      *  so a card about where recordings go would be a setting for a feature that
      *  is not there. */
@@ -639,6 +728,7 @@ export function UploadsView({
     return (
         <div className="flex max-w-2xl flex-col gap-4">
             <DrivesCard settings={drives} />
+            <OrganizationDrivesCard settings={orgDrives} />
             <AttachmentsCard settings={uploads} />
             <PhotosCard settings={avatars} />
             <ChatCard settings={chat} />

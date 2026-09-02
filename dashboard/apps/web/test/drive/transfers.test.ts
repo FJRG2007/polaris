@@ -42,15 +42,14 @@ vi.mock("@/lib/orgs/org-service", () => ({
 vi.mock("@/lib/personal-drive", () => ({ ensurePersonalDrive: vi.fn() }));
 vi.mock("@/lib/organization-drive", () => ({ ensureOrganizationDrive: vi.fn() }));
 vi.mock("@/lib/storage-service", () => ({ getDriverForConnection: vi.fn() }));
-vi.mock("@/lib/drive-meta-service", () => ({ recordItemCreator: vi.fn() }));
+vi.mock("@/lib/drive-meta-service", () => ({ recordItemCreator: vi.fn(async () => undefined) }));
 vi.mock("@/lib/drive-authz", () => ({
     requireDriveDriver,
     DriveAccessError: class extends Error {}
 }));
 
-const { sendTransfer, mayReceiveFrom, transfersWaitingFor, TransferRefused } = await import(
-    "@/lib/drive-transfer-service"
-);
+const { acceptTransfer, sendTransfer, mayReceiveFrom, transfersSentBy, transfersWaitingFor, TransferRefused } =
+    await import("@/lib/drive-transfer-service");
 
 const aFolder = {
     stat: vi.fn(async () => ({ kind: "dir" as const, size: 10n })),
@@ -283,6 +282,82 @@ describe("offering something", () => {
         expect(db.driveTransfer.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: expect.objectContaining({ recipientOrg: "org1", recipientId: null })
+            })
+        );
+    });
+});
+
+describe("answering an offer", () => {
+    const offer = {
+        id: "t1",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 60_000),
+        senderId: "ada",
+        connectionId: "c1",
+        path: "a/b.txt",
+        name: "b.txt",
+        isFolder: false,
+        mode: "copy",
+        recipientId: "bob",
+        recipientOrg: null
+    };
+
+    beforeEach(async () => {
+        const { ensurePersonalDrive } = await import("@/lib/personal-drive");
+        vi.mocked(ensurePersonalDrive).mockResolvedValue({ id: "mine" } as never);
+        db.driveTransfer.findUnique.mockResolvedValue(offer);
+        db.driveTransfer.updateMany.mockResolvedValue({ count: 1 });
+        db.driveTransfer.update.mockResolvedValue({});
+        requireDriveDriver.mockResolvedValue({
+            stat: vi.fn(async () => {
+                throw new Error("not there");
+            }),
+            readStream: vi.fn(async () => "bytes"),
+            writeStream: vi.fn(async () => undefined),
+            dispose: vi.fn(async () => undefined)
+        });
+    });
+
+    it("claims the offer before it copies anything", async () => {
+        // Two people answering the same organization's offer, or one person in
+        // two tabs, would otherwise both pass the pending check and both copy -
+        // the second landing beside the first under a suffix.
+        await acceptTransfer("t1", "bob");
+        expect(db.driveTransfer.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { id: "t1", status: "pending" },
+                data: expect.objectContaining({ status: "accepting" })
+            })
+        );
+    });
+
+    it("refuses the second answer, having lost the claim", async () => {
+        db.driveTransfer.updateMany.mockResolvedValue({ count: 0 });
+        await expect(acceptTransfer("t1", "bob")).rejects.toThrow(/already been answered/i);
+    });
+
+    it("opens the destination through the door every other write goes through", async () => {
+        // The folder it lands in came from a browser. Taking a bare driver here
+        // would put a file somewhere an explicit deny or an access lock holds
+        // shut - on a company shelf, and on the person's own Drive too.
+        await acceptTransfer("t1", "bob", "legal");
+        expect(requireDriveDriver).toHaveBeenCalledWith("bob", "mine", "legal", "write");
+    });
+});
+
+describe("telling the sender", () => {
+    it("keeps an answered transfer in front of them while it carries a failure", async () => {
+        // A move whose copy landed but whose delete failed leaves them holding a
+        // duplicate of a file they asked to give away, and it leaves the waiting
+        // list without a word. This is the only place they would ever learn it.
+        db.driveTransfer.findMany.mockResolvedValue([]);
+        await transfersSentBy("ada");
+        expect(db.driveTransfer.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    senderId: "ada",
+                    OR: [{ status: "pending" }, { failure: { not: null } }]
+                })
             })
         );
     });

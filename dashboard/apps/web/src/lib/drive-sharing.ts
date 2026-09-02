@@ -19,6 +19,7 @@
 import { getUserGroupIds } from "@polaris/auth";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { baseName, normalizeRelPath, type DriveAction } from "@polaris/core";
+import { memberOrgIds } from "@/lib/orgs/org-service";
 import { liveGrants, removeDriveAcl, setDriveAcl } from "@/lib/drive-acl-service";
 
 /** What one person may do with something somebody shared with them. */
@@ -138,7 +139,7 @@ const GRANT_SELECT = {
     note: true,
     expiresAt: true,
     createdAt: true,
-    connection: { select: { name: true, ownerId: true } }
+    connection: { select: { name: true, ownerId: true, orgId: true } }
 };
 
 function decodeActions(raw: string): DriveAction[] {
@@ -179,18 +180,53 @@ export async function listSharedWithMe(userId: string): Promise<SharedItem[]> {
     });
     if (rows.length === 0) return [];
 
-    // Only the ones an account owns. A grant written on an organization's Drive
-    // was not handed over by a person, so there is nobody to show as the sender
-    // and it does not belong in a list of what people have shared with you - it
-    // is reached from the organization's own shelf instead.
+    // Whose files these are, which is an account for a personal drive and the
+    // organization itself for a company shelf.
+    //
+    // A grant on a company shelf is dropped for the people already on its
+    // roster - they reach the whole thing from the shelf's own entry, and it is
+    // not something a person handed them. It is kept for everybody else, and
+    // that case is the reason the per-folder rules exist: a contractor given one
+    // directory is not a member, gets no sidebar entry from
+    // `organizationDrivesFor`, and without this has an authorized grant that no
+    // screen anywhere produces a link to.
+    const mine = new Set(await memberOrgIds(userId));
     const shared = rows.filter(
-        (row): row is typeof row & { connection: { ownerId: string } } =>
-            row.connection.ownerId !== null
+        (row) => row.connection.ownerId !== null || !mine.has(row.connection.orgId ?? "")
     );
-    const owners = await peopleByIds(shared.map((row) => row.connection.ownerId));
-    return shared.map((row) =>
-        itemOf(row, owners.get(row.connection.ownerId) ?? unknownPerson(row.connection.ownerId))
-    );
+    if (shared.length === 0) return [];
+
+    const [owners, orgs] = await Promise.all([
+        peopleByIds(shared.map((row) => row.connection.ownerId).filter((id) => id !== null)),
+        prisma.organization.findMany({
+            where: {
+                id: {
+                    in: [
+                        ...new Set(
+                            shared
+                                .filter((row) => row.connection.ownerId === null)
+                                .map((row) => row.connection.orgId)
+                                .filter((id) => id !== null)
+                        )
+                    ]
+                }
+            },
+            select: { id: true, name: true }
+        })
+    ]);
+    const byOrg = new Map(orgs.map((org) => [org.id, org.name]));
+    return shared.map((row) => {
+        const ownerId = row.connection.ownerId;
+        if (ownerId !== null) return itemOf(row, owners.get(ownerId) ?? unknownPerson(ownerId));
+        const orgId = row.connection.orgId ?? "";
+        // An organization stands in the sender's place, as a group rather than
+        // a person - which is what it is, and what the screen already draws.
+        return itemOf(row, {
+            type: "group",
+            id: orgId,
+            name: byOrg.get(orgId) ?? "An organization that is no longer here"
+        });
+    });
 }
 
 /** Everything this account has given to somebody else, newest first. */

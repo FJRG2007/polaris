@@ -34,7 +34,7 @@
 import { prisma } from "@polaris/db";
 import type { StorageDriver } from "@polaris/storage";
 import { LOCAL_TARGET, PERSONAL_KIND, type StorageConfig } from "@polaris/core";
-import { getSetting } from "@/lib/setting-store";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { getDriverForConnection, PERSONAL_LOCAL_FOLDER } from "@/lib/storage-service";
 import {
     AUTOMATIC_TARGET,
@@ -231,4 +231,10 @@ export async function organizationDriveSettings(): Promise<OrganizationDriveSett
         options,
         existing: [...counts].map(([targetId, count]) => ({ targetId, count }))
     };
+}
+
+/** Choose where the organization drives made from now on are kept. Moves
+ *  nothing: a shelf records where its files actually are when it is made. */
+export async function setOrganizationDriveTarget(target: string): Promise<void> {
+    await setSetting(ORGANIZATION_TARGET_KEY, target);
 }

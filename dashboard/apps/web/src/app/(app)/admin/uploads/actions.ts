@@ -13,6 +13,10 @@ import { avatarSettings } from "@/lib/avatar-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
 import { checkStorageTarget } from "@/lib/storage-target";
 import { personalDriveSettings, setPersonalDriveTarget } from "@/lib/personal-drive";
+import {
+    organizationDriveSettings,
+    setOrganizationDriveTarget
+} from "@/lib/organization-drive";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 import { footageSettings, setFootageTarget } from "@/lib/home/stills";
@@ -175,13 +179,34 @@ export async function setPersonalDriveTargetAction(input: unknown): Promise<{ er
     }
 }
 
+export async function setOrganizationDriveTargetAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ target }).safeParse(input);
+    if (!parsed.success) return { error: "Check the settings and try again" };
+    try {
+        await setOrganizationDriveTarget(parsed.data.target);
+        await recordAudit({
+            actorId: admin.id,
+            action: "settings.drive.organization.update",
+            targetType: "setting",
+            targetId: "drive.organization",
+            metadata: { target: parsed.data.target }
+        });
+        return {};
+    } catch (caught) {
+        console.error(caught);
+        return { error: "Could not save that" };
+    }
+}
+
 /** The questions this screen answers, and the folder each writes under. */
 const CHECKS = {
     tasks: "uploads",
     avatars: "avatars",
     chat: "chat",
     footage: "home",
-    drive: "drive"
+    drive: "drive",
+    orgDrive: "drive"
 } as const;
 
 export type StorageCheck = keyof typeof CHECKS;
@@ -206,6 +231,8 @@ export async function checkStorageAction(
             ? await chatTarget()
             : which === "drive"
               ? (await personalDriveSettings()).resolved
+              : which === "orgDrive"
+                ? (await organizationDriveSettings()).resolved
               : which === "avatars"
                 ? (await avatarSettings()).resolved
                 : which === "footage"

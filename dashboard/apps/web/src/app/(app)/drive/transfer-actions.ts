@@ -24,6 +24,7 @@ import {
     acceptTransfer,
     cancelTransfer,
     declineTransfer,
+    dismissTransferNotice,
     mayReceiveFrom,
     sendTransfer,
     transfersSentBy,
@@ -170,6 +171,20 @@ export async function cancelTransferAction(transferId: string): Promise<{ error?
     if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
     try {
         await cancelTransfer(transferId, user.id);
+        revalidatePath("/drive");
+        return {};
+    } catch (caught) {
+        return refusal(caught);
+    }
+}
+
+/** Put down the sentence saying a transfer went wrong, once its sender has read
+ *  it. Only the notice goes; what happened already happened. */
+export async function dismissTransferNoticeAction(transferId: string): Promise<{ error?: string }> {
+    const user = await requireUser();
+    if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
+    try {
+        await dismissTransferNotice(transferId, user.id);
         revalidatePath("/drive");
         return {};
     } catch (caught) {

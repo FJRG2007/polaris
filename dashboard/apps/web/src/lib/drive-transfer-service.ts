@@ -302,10 +302,14 @@ function viewOf(row: {
  *  offers made to the organizations they may accept for. */
 export async function transfersWaitingFor(userId: string): Promise<TransferView[]> {
     const orgIds = await memberOrgIds(userId);
-    const answerable: string[] = [];
-    for (const orgId of orgIds) {
-        if (await mayOfferToOrg(userId, orgId)) answerable.push(orgId);
-    }
+    // Asked of every organization at once. Each answer is two queries of its
+    // own, this panel is on every Drive page, and the page beside it is already
+    // resolving the same organizations - a serial chain here is a wait in front
+    // of a panel that is usually empty.
+    const answers = await Promise.all(
+        orgIds.map(async (orgId) => ((await mayOfferToOrg(userId, orgId)) ? orgId : null))
+    );
+    const answerable = answers.filter((orgId) => orgId !== null);
     const rows = await prisma.driveTransfer.findMany({
         where: {
             status: "pending",
@@ -326,15 +330,37 @@ export async function transfersWaitingFor(userId: string): Promise<TransferView[
     return rows.map(viewOf);
 }
 
-/** What this account has offered and not yet had answered, so it can be taken
- *  back. */
+/**
+ * What this account has offered: the ones still waiting, so they can be taken
+ * back, and the ones that went wrong, so the sender is told.
+ *
+ * The second half is not decoration. A move whose copy landed but whose delete
+ * failed is a transfer that succeeded and left the sender holding a duplicate
+ * they asked to give away - and it leaves the "waiting to be answered" list
+ * silently, so without this the only thing they can conclude is that the file
+ * left. Anything carrying a `failure` stays in front of them until they say
+ * they have read it.
+ */
 export async function transfersSentBy(userId: string): Promise<TransferView[]> {
     const rows = await prisma.driveTransfer.findMany({
-        where: { senderId: userId, status: "pending" },
+        where: {
+            senderId: userId,
+            OR: [{ status: "pending" }, { failure: { not: null } }]
+        },
         orderBy: { createdAt: "desc" },
         select: VIEW_SELECT
     });
     return rows.map(viewOf);
+}
+
+/** Put down a transfer's failure notice, once its sender has read it. The row
+ *  keeps its status; only the sentence in front of them goes. */
+export async function dismissTransferNotice(transferId: string, senderId: string): Promise<void> {
+    const { count } = await prisma.driveTransfer.updateMany({
+        where: { id: transferId, senderId, failure: { not: null } },
+        data: { failure: null }
+    });
+    if (count === 0) throw new TransferRefused("There is nothing to put down.");
 }
 
 /** Whether this account is the one being asked. */
@@ -429,6 +455,22 @@ export async function acceptTransfer(
     const row = await answerableBy(transferId, userId);
     if (!row) throw new TransferRefused("That is not waiting for you any more.");
 
+    // Claimed before a single byte moves. Establishing that this account MAY
+    // answer is not the same as being the one who DID: an offer made to an
+    // organization is answerable by everybody there who can change its shelf,
+    // and a second tab does it for a personal one. Two accepts that both got
+    // past the check above would both copy, and the second would land beside
+    // the first under a ` (1)` suffix - or, for a move, delete a path the
+    // first one had already deleted.
+    const claimed = await prisma.driveTransfer.updateMany({
+        where: { id: row.id, status: "pending" },
+        // Stamped now rather than at the end, so a claim that never finishes -
+        // the process went away mid-copy - is a row the sweep below can tell
+        // from one that is still working.
+        data: { status: "accepting", respondedAt: new Date() }
+    });
+    if (claimed.count === 0) throw new TransferRefused("That has already been answered.");
+
     const drive = row.recipientOrg
         ? await ensureOrganizationDrive(row.recipientOrg)
         : await ensurePersonalDrive(userId);
@@ -486,7 +528,13 @@ async function landCopy(
         // was checked when they offered it. The recipient never gets a driver on
         // somebody else's drive.
         source = await requireDriveDriver(row.senderId, row.connectionId, row.path, "download");
-        target = await getDriverForConnection(driveId);
+        // And write as the RECIPIENT, through the same door as every other
+        // write. The folder they are landing it in came from a browser, so
+        // taking a bare driver here would let somebody put a file in a
+        // directory an explicit deny or an access lock holds shut against
+        // them - on a company shelf they are otherwise allowed to change, and
+        // on their own Drive too.
+        target = await requireDriveDriver(userId, driveId, folder, "write");
         const name = await freeName(target, folder, row.name);
         const landing = folder ? `${folder}/${name}` : name;
         await copyAcross(source, target, row.path, landing, row.isFolder);
@@ -504,17 +552,25 @@ async function landCopy(
                 data: {
                     status: "failed",
                     respondedAt: new Date(),
-                    // What a person can act on, never the storage's own message.
-                    failure:
-                        caught instanceof DriveAccessError
-                            ? "The sender can no longer reach that file."
-                            : "It could not be copied across."
+                    // What a person can act on, never the storage's own
+                    // message. Which side was refused decides the sentence:
+                    // told "the sender can no longer reach it" when it was
+                    // their own folder that was shut, somebody would go and ask
+                    // the sender about a file that is sitting right there.
+                    failure: !(caught instanceof DriveAccessError)
+                        ? "It could not be copied across."
+                        : source
+                          ? "That is not somewhere you can put it."
+                          : "The sender can no longer reach that file."
                 }
             })
             .catch(() => undefined);
-        throw caught instanceof TransferRefused
-            ? caught
-            : new TransferRefused("That could not be copied across.");
+        if (caught instanceof TransferRefused) throw caught;
+        throw new TransferRefused(
+            caught instanceof DriveAccessError && source
+                ? "That is not somewhere you can put it."
+                : "That could not be copied across."
+        );
     } finally {
         await source?.dispose().catch(() => undefined);
         await target?.dispose().catch(() => undefined);
@@ -549,11 +605,32 @@ async function copyAcross(
     } while (cursor);
 }
 
-/** Offers nobody answered in time. Run from the same sweep everything else is. */
+/** How long a claimed transfer may be copying before the sweep calls it dead. A
+ *  folder of many gigabytes over a slow link is the case this has to clear, so
+ *  it is hours rather than minutes. */
+const COPY_MAY_TAKE = 6 * 60 * 60 * 1000;
+
+/** Offers nobody answered in time, and copies that were interrupted. Run from
+ *  the same sweep everything else is. */
 export async function expireTransfers(): Promise<number> {
-    const { count } = await prisma.driveTransfer.updateMany({
-        where: { status: "pending", expiresAt: { lte: new Date() } },
-        data: { status: "declined", respondedAt: new Date() }
-    });
-    return count;
+    const now = new Date();
+    const [expired, abandoned] = await Promise.all([
+        prisma.driveTransfer.updateMany({
+            where: { status: "pending", expiresAt: { lte: now } },
+            data: { status: "declined", respondedAt: now }
+        }),
+        // A claim whose process went away leaves a row that is neither waiting
+        // nor finished, and nothing else would ever move it: its `expiresAt` is
+        // a fortnight out and it is no longer `pending`. Freed here rather than
+        // retried, because whatever it had already copied is sitting in the
+        // recipient's Drive and copying it again would land it twice.
+        prisma.driveTransfer.updateMany({
+            where: {
+                status: "accepting",
+                respondedAt: { lte: new Date(now.getTime() - COPY_MAY_TAKE) }
+            },
+            data: { status: "failed", failure: "It was interrupted before it finished." }
+        })
+    ]);
+    return expired.count + abandoned.count;
 }

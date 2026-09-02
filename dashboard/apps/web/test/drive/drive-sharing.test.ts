@@ -22,6 +22,8 @@ const userFindUnique = vi.fn();
 const groupFindUnique = vi.fn();
 const groupFindMany = vi.fn(async () => []);
 const getUserGroupIds = vi.fn(async () => [] as string[]);
+const memberOrgIds = vi.fn(async () => [] as string[]);
+const orgFindMany = vi.fn(async () => [] as { id: string; name: string }[]);
 
 vi.mock("@polaris/db", () => ({
     VISIBLE_USER: { bannedAt: null, disabledAt: null },
@@ -34,9 +36,11 @@ vi.mock("@polaris/db", () => ({
             deleteMany: vi.fn(async () => ({ count: 1 }))
         },
         user: { findMany: userFindMany, findUnique: userFindUnique },
-        group: { findMany: groupFindMany, findUnique: groupFindUnique }
+        group: { findMany: groupFindMany, findUnique: groupFindUnique },
+        organization: { findMany: orgFindMany }
     }
 }));
+vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds }));
 vi.mock("@polaris/auth", () => ({
     getUserGroupIds,
     resolvePrincipalPolicyStatements: async () => []
@@ -50,6 +54,8 @@ beforeEach(() => {
     aclFindMany.mockResolvedValue([]);
     aclFindFirst.mockResolvedValue(null);
     getUserGroupIds.mockResolvedValue([]);
+    memberOrgIds.mockResolvedValue([]);
+    orgFindMany.mockResolvedValue([]);
     userFindMany.mockResolvedValue([]);
     userFindUnique.mockResolvedValue({ id: BEN } as never);
     groupFindUnique.mockResolvedValue({ id: "group-7" } as never);
@@ -66,7 +72,7 @@ function grant(over: Record<string, unknown> = {}) {
         note: null,
         expiresAt: null,
         createdAt: new Date("2026-08-01T00:00:00Z"),
-        connection: { name: "My files", ownerId: BEN },
+        connection: { name: "My files", ownerId: BEN, orgId: null },
         ...over
     };
 }
@@ -210,5 +216,32 @@ describe("what I have shared", () => {
 
         const [item] = await listSharedByMe(ANA);
         expect(item.recipient?.name).toBe("Ben");
+    });
+});
+
+describe("a grant on a company shelf", () => {
+    const ORG = "33333333-3333-4333-8333-333333333333";
+
+    function orgGrant() {
+        return grant({ connection: { name: "Acme Inc. files", ownerId: null, orgId: ORG } });
+    }
+
+    it("reaches somebody the roster does not, with the organization as the sender", async () => {
+        // The contractor given one directory is the exact case per-folder rules
+        // exist for. They are not a member, so the shelf never appears in their
+        // sidebar - without this their grant is authorized and no screen
+        // anywhere produces a link to it.
+        aclFindMany.mockResolvedValue([orgGrant()] as never);
+        orgFindMany.mockResolvedValue([{ id: ORG, name: "Acme Inc." }] as never);
+        const [item] = await listSharedWithMe(ANA);
+        expect(item.owner).toEqual({ type: "group", id: ORG, name: "Acme Inc." });
+    });
+
+    it("is left out for somebody already on the roster", async () => {
+        // They open the whole shelf from its own entry, and nobody handed it to
+        // them - it is not something a person shared.
+        aclFindMany.mockResolvedValue([orgGrant()] as never);
+        memberOrgIds.mockResolvedValue([ORG]);
+        expect(await listSharedWithMe(ANA)).toEqual([]);
     });
 });
