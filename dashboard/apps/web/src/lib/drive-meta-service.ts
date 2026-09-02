@@ -54,12 +54,19 @@ export async function recordItemCreator(
     if (!creatorId || !isUuid(connectionId)) return;
     const connection = await prisma.storageConnection.findUnique({
         where: { id: connectionId },
-        select: { ownerId: true }
+        select: { ownerId: true, orgId: true }
     });
     if (!connection) return;
+    // Whoever the connection belongs to, which is an account for a personal
+    // drive and an organization for the company's. It is an index rather than a
+    // relation, and `creatorId` beside it is the one that answers "who put this
+    // here" - which is the question worth asking on a shelf several people
+    // write to.
+    const owner = connection.ownerId ?? connection.orgId;
+    if (!owner) return;
     await prisma.driveItemMeta.upsert({
         where: { connectionId_path: { connectionId, path } },
-        create: { ownerId: connection.ownerId, connectionId, path, creatorId },
+        create: { ownerId: owner, connectionId, path, creatorId },
         update: { creatorId }
     });
 }

@@ -122,7 +122,10 @@ interface GrantRow {
     note: string | null;
     expiresAt: Date | null;
     createdAt: Date;
-    connection: { name: string; ownerId: string };
+    // Null on an organization's Drive, which belongs to no account. Every
+    // caller here is about what one person handed another, so those rows are
+    // filtered out before they reach this.
+    connection: { name: string; ownerId: string | null };
 }
 
 const GRANT_SELECT = {
@@ -176,8 +179,16 @@ export async function listSharedWithMe(userId: string): Promise<SharedItem[]> {
     });
     if (rows.length === 0) return [];
 
-    const owners = await peopleByIds(rows.map((row) => row.connection.ownerId));
-    return rows.map((row) =>
+    // Only the ones an account owns. A grant written on an organization's Drive
+    // was not handed over by a person, so there is nobody to show as the sender
+    // and it does not belong in a list of what people have shared with you - it
+    // is reached from the organization's own shelf instead.
+    const shared = rows.filter(
+        (row): row is typeof row & { connection: { ownerId: string } } =>
+            row.connection.ownerId !== null
+    );
+    const owners = await peopleByIds(shared.map((row) => row.connection.ownerId));
+    return shared.map((row) =>
         itemOf(row, owners.get(row.connection.ownerId) ?? unknownPerson(row.connection.ownerId))
     );
 }

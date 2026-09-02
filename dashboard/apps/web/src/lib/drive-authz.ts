@@ -121,12 +121,25 @@ export async function authorizeDrive(
 
     const [user, connection] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
-        prisma.storageConnection.findUnique({ where: { id: connectionId }, select: { ownerId: true } })
+        prisma.storageConnection.findUnique({
+            where: { id: connectionId },
+            select: { ownerId: true, orgId: true }
+        })
     ]);
     if (!connection) throw new DriveAccessError();
 
     if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
-        if (connection.ownerId === userId) {
+        if (connection.orgId) {
+            // An organization's Drive, which belongs to no account at all.
+            if (!(await allowedInOrgDrive(userId, connection.orgId, action))) {
+                // Still one more way in: an access rule may name this person for
+                // this folder even when the roster does not reach them, which is
+                // how a contractor is given one directory and nothing else.
+                if (!(await canAccessDrive(userId, connectionId, path, action))) {
+                    throw new DriveAccessError();
+                }
+            }
+        } else if (connection.ownerId === userId) {
             // Owner: gated by the coarse global capability, as the app always has.
             if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         } else if (!(await canAccessDrive(userId, connectionId, path, action))) {
@@ -139,6 +152,34 @@ export async function authorizeDrive(
         const gate = await lockedGate(connectionId, path);
         if (gate) throw new DriveLockedError(gate);
     }
+}
+
+/**
+ * What being in an organization gets somebody in its Drive.
+ *
+ * Reading follows from the roster and nothing else. Not a permission, and that
+ * is deliberate: a permission no existing role holds is a shelf that is empty
+ * for every organization that already exists, with no screen anywhere saying
+ * why. Being let in is what being a member of the company means.
+ *
+ * Changing anything is a permission, so one member cannot quietly replace the
+ * company's documents, and an organization that wants somebody to be able to
+ * grants it on their role. The owner and the seeded administrator hold it
+ * already, so an organization is usable the moment its Drive exists.
+ *
+ * Anything narrower than that - a folder only Legal opens - is the per-folder
+ * access rules Drive already has, which sit on top of this.
+ */
+async function allowedInOrgDrive(
+    userId: string,
+    orgId: string,
+    action: DriveAction
+): Promise<boolean> {
+    const { resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
+    const access = await resolveOrgAccess({ id: userId, isAdmin: false }, orgId);
+    if (!access) return false;
+    if (action === "read" || action === "download") return true;
+    return orgCan(access, "drive.manage");
 }
 
 /** Authorize, then return a connected driver for the connection. */

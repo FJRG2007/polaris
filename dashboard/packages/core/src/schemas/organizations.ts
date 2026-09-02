@@ -90,6 +90,11 @@ export const ORG_PERMISSIONS = [
     "deploy.manage",
     "domains.manage",
     "vault.manage",
+    // Changing what is in the organization's Drive. Reading it is not a
+    // permission and deliberately never was: being on the roster is what lets
+    // somebody open the company's shelf, because a permission no existing role
+    // holds would be an empty shelf on every organization that already exists.
+    "drive.manage",
     "activity.read",
     "settings.manage"
 ] as const;
@@ -124,7 +129,10 @@ export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string;
         // Who is in the shared vault and what is in it. NOT the ability to read what
         // is in it: that needs the organization's key, which only a member somebody
         // has already vouched for holds, and no permission can hand it over.
-        "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" }
+        "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" },
+        // Reading is not here because reading is not a permission: every member
+        // opens the organization's files. This is being able to change them.
+        "drive.manage": { area: "Work", label: "Add to and change the organization's files" }
     };
 
 /** The areas in the order the editor draws them. Read off the meta rather than

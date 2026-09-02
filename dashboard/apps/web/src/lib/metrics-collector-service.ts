@@ -388,6 +388,11 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
     });
     const rows: SampleRow[] = [];
     for (const conn of conns) {
+        // Drives Polaris made are already excluded by kind above, so every row
+        // here is a storage somebody connected and has the account that
+        // connected it. Checked rather than asserted, because the column stopped
+        // being required the day an organization got a Drive of its own.
+        if (!conn.ownerId) continue;
         try {
             if (conn.kind === "unifi-unas") {
                 const metrics = await getUnasMetrics(conn.id, conn.ownerId);
