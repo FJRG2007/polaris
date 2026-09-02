@@ -262,7 +262,12 @@ Agents (coding sessions):
       onboarding writes, filled in only where the tool has not answered that
       question itself yet, and only into a home Polaris owns. The same answers
       run ahead of a sign-in container too, since it prepares the same
-      persistent home
+      persistent home. One of those answers is about the checkout rather than
+      the tool - Claude Code's workspace-trust dialog, which defaults to "No,
+      exit" and is recorded per project folder - so it nests under the
+      session's own worktree path instead of sitting beside the flat answers,
+      is skipped where there is no worktree yet, and merges in without
+      disturbing a folder another session already answered for
 - [x] What a session is doing is read from its own lifecycle hooks where the
       tool supports them (written into the worktree rather than the machine's
       home directory), and from its terminal output otherwise; steering it is a

@@ -27,7 +27,12 @@
  */
 
 import { shellQuote } from "./session-hooks";
-import { promptSubmitDelayMs, sanitizeAgentPrompt, type AgentFirstRunAnswer } from "@polaris/core";
+import {
+    FIRST_RUN_WORKDIR,
+    promptSubmitDelayMs,
+    sanitizeAgentPrompt,
+    type AgentFirstRunAnswer
+} from "@polaris/core";
 
 /** The tmux session every agent runs in, inside its own container or its own
  *  directory on a server. Fixed rather than derived: there is one agent per
@@ -438,8 +443,17 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
  * the tool ran there long before Polaris did, and writing our answers into their
  * configuration is exactly what this file refuses to do everywhere else.
  *
- * Absent keys only. A person who opens the session and picks a light theme keeps
- * it - the question is answered once, and the answer is never overruled.
+ * Absent keys only, and absent at every level of nesting: a person who opens the
+ * session and picks a light theme keeps it, and a folder that already has an
+ * answer keeps that answer too - the question is answered once, and the answer
+ * is never overruled.
+ *
+ * One of these questions is not about the tool but about the checkout: Claude
+ * Code's workspace-trust dialog, which defaults to "No, exit" on a folder it has
+ * never seen and is recorded per project path rather than as a flag at the top
+ * of the file. `FIRST_RUN_WORKDIR` stands in for that path in the answer, and is
+ * replaced here with the session's own worktree - or the answer is left out
+ * entirely where there is no worktree yet, such as a sign-in container.
  */
 export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
     if (answers.length === 0) return "";
@@ -452,6 +466,37 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         'const path = require("node:path");',
         "const home = process.env.HOME;",
         "if (!home) process.exit(0);",
+        // The directory this session works in, for the answers that are about
+        // the FOLDER rather than about the tool. Empty where there is no
+        // worktree - a sign-in container - and an answer needing it is skipped
+        // there rather than written under a key still spelling the placeholder.
+        'const workdir = process.env.POLARIS_WORKDIR || "";',
+        // Deep, because one of these answers is two levels down, and
+        // absent-only at every level: a folder somebody has already answered
+        // for keeps its answer, exactly as a theme they have chosen does.
+        //
+        // A branch that is not there yet is filled aside and attached only if
+        // something reached a leaf inside it, so an answer skipped for want of a
+        // worktree leaves no empty `projects: {}` behind in the tool's own file.
+        "function fill(target, source) {",
+        "    let wrote = false;",
+        "    for (const [name, value] of Object.entries(source)) {",
+        `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
+        "        if (!key) continue;",
+        '        if (value && typeof value === "object") {',
+        "            const branch = target[key];",
+        "            if (branch === undefined) {",
+        "                const fresh = {};",
+        "                if (fill(fresh, value)) { target[key] = fresh; wrote = true; }",
+        '            } else if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
+        "                if (fill(branch, value)) wrote = true;",
+        "            }",
+        "        } else if (target[key] === undefined) {",
+        "            target[key] = value; wrote = true;",
+        "        }",
+        "    }",
+        "    return wrote;",
+        "}",
         'for (const answer of JSON.parse(fs.readFileSync(process.argv[1], "utf8"))) {',
         "    const file = path.join(home, answer.file);",
         "    let current = {};",
@@ -460,22 +505,19 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // because a cache file the tool owns had a byte out of place.
         '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
         '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
-        "    let changed = false;",
-        "    for (const [key, value] of Object.entries(answer.json)) {",
-        "        if (current[key] === undefined) { current[key] = value; changed = true; }",
-        "    }",
-        "    if (!changed) continue;",
-        // Said out loud, on the screen somebody is watching - and said AFTER
-        // the write rather than before it. Where a tool keeps its configuration
-        // is a thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so
-        // a launcher that sets it relocates the file, and the failure that causes
+        "    if (!fill(current, answer.json)) continue;",
+        // Said out loud, on the screen somebody is watching - and said AFTER the
+        // write rather than before it. Where a tool keeps its configuration is a
+        // thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so a
+        // launcher that sets it relocates the file, and the failure that causes
         // is invisible by nature - the answer is written, nothing reads it, the
-        // wizard appears anyway, and the terminal says nothing. A line naming the
-        // file is what turns that into something a person sees the first time,
-        // and it is worth nothing if it can appear for a file never written.
+        // question is asked anyway, and the terminal says nothing. A line naming
+        // the file is what turns that into something a person sees the first
+        // time, and it is worth nothing if it can appear for a file never
+        // written.
         //
         // Each answer stands on its own, so a path that cannot be written is
-        // named on the screen instead of taking the answers after it down with
+        // named on the screen instead of taking every answer after it down with
         // it. One unwritable file is one tool asking its question; an abort is
         // every question left unanswered.
         "    try {",

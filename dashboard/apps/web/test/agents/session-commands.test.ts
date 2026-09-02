@@ -186,9 +186,13 @@ describe("the tool's own first-run wizard", () => {
         // one its own startup tests before showing the wizard; the colour scheme
         // lives in the settings file rather than beside the flag, which is
         // exactly the sort of thing that cannot be guessed.
+        const answer = {
+            hasCompletedOnboarding: true,
+            projects: { [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
+        };
         expect(claude.firstRun).toEqual([
-            { file: ".claude/.claude.json", json: { hasCompletedOnboarding: true } },
-            { file: ".claude.json", json: { hasCompletedOnboarding: true } },
+            { file: ".claude/.claude.json", json: answer },
+            { file: ".claude.json", json: answer },
             { file: ".claude/settings.json", json: { theme: "dark" } }
         ]);
     });
@@ -203,6 +207,64 @@ describe("the tool's own first-run wizard", () => {
         // Both are started by Polaris, so both are answered.
         const flags = claude.firstRun.filter((one) => "hasCompletedOnboarding" in one.json);
         expect(flags.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
+    });
+
+    it("trusts the folder it made, because nobody is there to be asked about it", () => {
+        // The screen this replaces defaults to "No, exit" - and that is exactly
+        // what the agent did. The question is about a checkout Polaris made, of
+        // a repository the person picked a moment ago, in a container Polaris
+        // started; it is the same argument `autonomyArgs` already makes about
+        // the menu after it.
+        //
+        // Per folder rather than global, because that is where the tool records
+        // it - its own message says so: accept the dialog once interactively,
+        // or set projects[...].hasTrustDialogAccepted.
+        const trust = claude.firstRun.filter((one) => "projects" in one.json);
+        expect(trust.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
+        for (const one of trust) {
+            expect(one.json.projects).toEqual({
+                [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true }
+            });
+        }
+    });
+
+    it("answers every question a file holds in one pass over it", () => {
+        // Which of the two files gets read is decided by `CLAUDE_CONFIG_DIR`,
+        // not by the key, so both hold everything - and each file is read,
+        // merged and named on the terminal once rather than once per question.
+        expect(claude.firstRun.map((one) => one.file)).toEqual([
+            ".claude/.claude.json",
+            ".claude.json",
+            ".claude/settings.json"
+        ]);
+    });
+
+    it("stands the folder in for a path only the machine knows", () => {
+        // The worktree is made minutes before this runs, so the key cannot be
+        // written down here. The script fills it from the session's own
+        // environment, and skips the answer where there is no worktree at all -
+        // a sign-in container - rather than writing a key still spelling the
+        // placeholder.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("process.env.POLARIS_WORKDIR");
+        expect(script).toContain(`name === "${core.FIRST_RUN_WORKDIR}" ? workdir : name`);
+        expect(script).toContain("if (!key) continue;");
+    });
+
+    it("merges through the nesting rather than replacing the branch", () => {
+        // Two sessions on one machine work in two folders, and the second must
+        // not take the first's answer away with it.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("if (fill(branch, value)) wrote = true;");
+    });
+
+    it("leaves no empty branch behind for an answer it skipped", () => {
+        // The sign-in container has no worktree, so the folder's answer is
+        // skipped - and a `projects: {}` written into the tool's own file for a
+        // question nobody answered is a change made for nothing.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("if (fill(fresh, value)) { target[key] = fresh; wrote = true; }");
+        expect(script).not.toContain("target[key] = {};");
     });
 
     it("says on the terminal where it wrote, because where a tool keeps this moves", () => {
@@ -248,8 +310,9 @@ describe("the tool's own first-run wizard", () => {
 
     it("fills a key in only when it is absent, so a choice already made stands", () => {
         const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("current[key] === undefined");
-        expect(script).not.toContain("current[key] = value;\n");
+        expect(script).toContain("target[key] === undefined");
+        // The write is the else of that test, never a statement of its own.
+        expect(script).toContain("} else if (target[key] === undefined) {");
     });
 
     it("treats a file it cannot read as one that was not there", () => {
