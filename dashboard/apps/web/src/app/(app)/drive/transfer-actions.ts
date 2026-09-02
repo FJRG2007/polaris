@@ -19,8 +19,8 @@ import { revalidatePath } from "next/cache";
 import { findPeople } from "@/lib/people-search";
 import { normalizeRelPath } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
-import { listMyOrgs, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 import * as transfers from "@/lib/drive-transfer-service";
+import { listMyOrgs, orgCan, resolveOrgAccess } from "@/lib/orgs/org-service";
 
 /** What a person is allowed to say. A note is a sentence beside the offer, not a
  *  place to put a document. */
@@ -128,17 +128,27 @@ export async function sentTransfersAction(): Promise<transfers.TransferView[]> {
     return transfers.transfersSentBy(user.id);
 }
 
+/** Which offer, and where in the recipient's own Drive it is to land. The folder
+ *  is parsed like every other field rather than coerced with `String`: it is a
+ *  path the browser chose, and the service is not the place to find out it was
+ *  a number or a megabyte of text. */
+const acceptSchema = z.object({
+    transferId: z.string().uuid(),
+    into: z.string().max(4096).optional()
+});
+
 export async function acceptTransferAction(
     transferId: string,
     into?: string
 ): Promise<{ path?: string; error?: string }> {
     const user = await requireUser();
-    if (!z.string().uuid().safeParse(transferId).success) return { error: "That is not an offer." };
+    const parsed = acceptSchema.safeParse({ transferId, into });
+    if (!parsed.success) return { error: "That is not an offer." };
     try {
         const landed = await transfers.acceptTransfer(
-            transferId,
+            parsed.data.transferId,
             user.id,
-            into ? String(into) : ""
+            parsed.data.into ?? ""
         );
         revalidatePath("/drive");
         return { path: landed.path };

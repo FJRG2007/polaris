@@ -164,11 +164,17 @@ export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ 
         await orgs.requireOrgDeletion(caller, orgId);
         const proven = await proveStepUp(caller.id, `org-delete:${orgId}`, parsed.data);
         if (proven.error) return proven;
-        await orgs.deleteOrg(orgId);
+        const leftBehind = await orgs.deleteOrg(orgId);
         // The organization is gone, so nothing will ever read this through its
         // own screen. It stays for the instance's history, which is the one place
-        // "where did Acme go" can still be answered.
-        await record(caller.id, orgId, "org.delete");
+        // "where did Acme go" can still be answered - and the one place a folder
+        // a storage would not give up is ever named, since nothing retries it.
+        await record(
+            caller.id,
+            orgId,
+            "org.delete",
+            leftBehind.length > 0 ? { leftBehind } : undefined
+        );
         refresh();
         return {};
     } catch (caught) {

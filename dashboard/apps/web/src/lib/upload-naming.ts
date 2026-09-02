@@ -53,7 +53,7 @@ async function serialized<T>(key: string, job: () => Promise<T>): Promise<T> {
 }
 
 /** Whether something already exists at `path`. Any other failure propagates. */
-async function exists(driver: StorageDriver, path: string): Promise<boolean> {
+export async function pathExists(driver: StorageDriver, path: string): Promise<boolean> {
     try {
         await driver.stat(path);
         return true;
@@ -118,10 +118,13 @@ export async function claimUploadPath(driver: StorageDriver, target: string): Pr
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
             const candidate = numberedName(name, attempt);
             const path = parent ? `${parent}/${candidate}` : candidate;
-            if (await exists(driver, path)) continue;
+            if (await pathExists(driver, path)) continue;
             await driver.writeStream(path, emptyBody(), { size: 0n });
             return path;
         }
-        throw new StorageError("already_exists", `No free name for ${name} after ${MAX_ATTEMPTS} tries`);
+        throw new StorageError(
+            "already_exists",
+            `No free name for ${name} after ${MAX_ATTEMPTS} tries`
+        );
     });
 }

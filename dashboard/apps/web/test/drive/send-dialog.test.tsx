@@ -79,9 +79,7 @@ describe("sending a file", () => {
 
         const toggle = screen.getByLabelText("Send the file itself");
         expect(toggle.getAttribute("aria-checked")).toBe("false");
-        expect(
-            screen.getByText(/It leaves your Drive once they accept it/)
-        ).toBeTruthy();
+        expect(screen.getByText(/It leaves your Drive once they accept it/)).toBeTruthy();
 
         await user.click(screen.getByRole("button", { name: "Send" }));
         expect(sendTransferAction).toHaveBeenCalledWith(

@@ -46,7 +46,7 @@ export default async function OrganizationSettingsPage({
             : Promise.resolve([]),
         canDelete
             ? orgDeletionImpact(org.id)
-            : Promise.resolve({ spaces: 0, tasks: 0, projects: 0 }),
+            : Promise.resolve({ spaces: 0, tasks: 0, projects: 0, drive: false }),
         // The owner alone. Who answers for an organization when its owner is gone
         // is the owner's decision and nobody else's business - a member holding
         // `settings.manage` is not shown the name, let alone offered the field.

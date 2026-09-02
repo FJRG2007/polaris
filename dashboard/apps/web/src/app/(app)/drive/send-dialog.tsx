@@ -71,9 +71,7 @@ export function SendDialog({
         setGiveUp(false);
         setError(null);
         void transferOrgsAction()
-            .then((rows) =>
-                setOrgs(rows.map((org) => ({ ...org, allowed: true, isOrg: true })))
-            )
+            .then((rows) => setOrgs(rows.map((org) => ({ ...org, allowed: true, isOrg: true }))))
             .catch(() => setOrgs([]));
     }, [open]);
 
@@ -172,7 +170,9 @@ export function SendDialog({
                                         ) : (
                                             <User className="size-3 shrink-0 text-muted-foreground" />
                                         )}
-                                        <span className="truncate" title={one.name}>{one.name}</span>
+                                        <span className="truncate" title={one.name}>
+                                            {one.name}
+                                        </span>
                                         <X className="size-3 shrink-0 text-muted-foreground" />
                                     </button>
                                 </li>
@@ -199,7 +199,12 @@ export function SendDialog({
                                     ) : (
                                         <User className="size-4 shrink-0 text-muted-foreground" />
                                     )}
-                                    <span className="min-w-0 flex-1 truncate" title={candidate.name}>{candidate.name}</span>
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={candidate.name}
+                                    >
+                                        {candidate.name}
+                                    </span>
                                     {candidate.allowed ? null : (
                                         <span className="shrink-0 text-xs text-muted-foreground">
                                             Not accepting files

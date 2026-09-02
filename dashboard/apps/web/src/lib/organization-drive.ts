@@ -33,8 +33,8 @@
 
 import { prisma } from "@polaris/db";
 import type { StorageDriver } from "@polaris/storage";
-import { LOCAL_TARGET, PERSONAL_KIND, type StorageConfig } from "@polaris/core";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { LOCAL_TARGET, PERSONAL_KIND, type StorageConfig } from "@polaris/core";
 import { getDriverForConnection, PERSONAL_LOCAL_FOLDER } from "@/lib/storage-service";
 import {
     AUTOMATIC_TARGET,
@@ -231,6 +231,55 @@ export async function organizationDriveSettings(): Promise<OrganizationDriveSett
         options,
         existing: [...counts].map(([targetId, count]) => ({ targetId, count }))
     };
+}
+
+/**
+ * Take a company's files off the disk, before the row that says where they are
+ * goes with the organization.
+ *
+ * The same rule as an account's own drive, and it is here for the same reason: a
+ * cascade takes rows, not bytes, so without this a deleted organization's whole
+ * shelf stays on the NAS with nothing left anywhere that knows whose it was or
+ * that it is there at all.
+ *
+ * Answers what it could not remove rather than throwing. A storage that is away
+ * must not be able to block a deletion somebody asked for and confirmed - the
+ * organization still goes, and what was left behind is named in the audit entry
+ * so an operator can take it out by hand.
+ */
+export async function discardOrganizationDrive(orgId: string): Promise<string | null> {
+    const drive = await findOrganizationDrive(orgId);
+    if (!drive) return null;
+
+    let driver;
+    try {
+        driver = await getDriverForConnection(drive.id);
+    } catch (caught) {
+        return `${drive.root}: ${caught instanceof Error ? caught.message : "could not be reached"}`;
+    }
+    try {
+        // Everything inside it, one level in: the drive's own folder is exactly
+        // what the driver refuses to remove, and it is left for the storage's
+        // owner to sweep up empty.
+        //
+        // To the end of the listing, not the first page of it: a bucket answers
+        // a thousand keys at a time, and stopping there would leave the rest of
+        // a company's documents on the disk while reporting that nothing was
+        // left.
+        let cursor: string | undefined;
+        do {
+            const page = await driver.list("", { cursor });
+            for (const entry of page.entries) {
+                await driver.delete(entry.path, { recursive: true });
+            }
+            cursor = page.nextCursor;
+        } while (cursor);
+        return null;
+    } catch (caught) {
+        return `${drive.root}: ${caught instanceof Error ? caught.message : "could not be emptied"}`;
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
 }
 
 /** Choose where the organization drives made from now on are kept. Moves

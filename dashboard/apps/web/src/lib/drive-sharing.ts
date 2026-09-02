@@ -18,8 +18,8 @@
 
 import { getUserGroupIds } from "@polaris/auth";
 import { prisma, VISIBLE_USER } from "@polaris/db";
-import { baseName, normalizeRelPath, type DriveAction } from "@polaris/core";
 import { memberOrgIds } from "@/lib/orgs/org-service";
+import { baseName, normalizeRelPath, type DriveAction } from "@polaris/core";
 import { liveGrants, removeDriveAcl, setDriveAcl } from "@/lib/drive-acl-service";
 
 /** What one person may do with something somebody shared with them. */
@@ -229,12 +229,26 @@ export async function listSharedWithMe(userId: string): Promise<SharedItem[]> {
     });
 }
 
-/** Everything this account has given to somebody else, newest first. */
+/**
+ * Everything this account has given to somebody else, newest first.
+ *
+ * Their own storages, and the organization shelves they run. A company shelf is
+ * owned by no account, so filtering on ownership alone leaves somebody who
+ * shared a folder out of it with a grant they can see on the folder's own Access
+ * dialog and nowhere on the screen that exists to answer "what have I handed
+ * out" - and nowhere to take it back from. It is still only what THEY wrote:
+ * `createdById` is what makes this a list of one person's shares rather than of
+ * every rule on the shelf.
+ */
 export async function listSharedByMe(userId: string): Promise<SharedItem[]> {
+    const mine = await memberOrgIds(userId);
     const rows = await prisma.driveAcl.findMany({
         where: {
             effect: "allow",
-            connection: { ownerId: userId },
+            OR: [
+                { connection: { ownerId: userId } },
+                ...(mine.length > 0 ? [{ connection: { orgId: { in: mine } } }] : [])
+            ],
             // A rule naming the owner is not a share; nor is one somebody else
             // wrote on this storage, which belongs on the access rules screen.
             createdById: userId,

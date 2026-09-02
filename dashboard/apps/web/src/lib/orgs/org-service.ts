@@ -359,10 +359,7 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
                 { members: { some: { userId } } },
                 { successor: { successorId: userId } },
                 {
-                    AND: [
-                        { successor: null },
-                        { owner: { successor: { successorId: userId } } }
-                    ]
+                    AND: [{ successor: null }, { owner: { successor: { successorId: userId } } }]
                 }
             ]
         },
@@ -837,11 +834,17 @@ export async function transferOrg(orgId: string, toUserId: string): Promise<void
     ]);
 }
 
-/** Delete the organization and, with it, the spaces it owns. Deliberately not a
- *  lift-to-personal: work that belonged to a group has no obvious individual to
- *  fall to, and quietly handing it to whoever pressed delete is worse than
- *  saying what will go. */
-export async function deleteOrg(orgId: string): Promise<void> {
+/**
+ * Delete the organization and, with it, the spaces it owns. Deliberately not a
+ * lift-to-personal: work that belonged to a group has no obvious individual to
+ * fall to, and quietly handing it to whoever pressed delete is worse than saying
+ * what will go.
+ *
+ * Answers whatever could not be taken off a storage, for the audit entry - a NAS
+ * that is away must not be able to refuse a deletion somebody confirmed, and the
+ * log is then the only place an operator learns there is a folder to sweep up.
+ */
+export async function deleteOrg(orgId: string): Promise<string[]> {
     // The row cascade takes the organization's deploy projects with it, and a
     // cascade cannot stop a container: without this the services it was running
     // stay up on their servers with nothing left in Polaris pointing at them.
@@ -857,23 +860,44 @@ export async function deleteOrg(orgId: string): Promise<void> {
         }
     }
     // Its photo, before the row saying where it is cascades away with it.
-    await discardAvatars("org", orgId);
+    const leftBehind = await discardAvatars("org", orgId);
+    // And the company's own shelf, for the same reason and with the same rule.
+    // The Drive row carries the organization's id, so it cascades away with the
+    // organization and takes with it the only record of where a company's whole
+    // document store is - the bytes stay on the disk under a folder named after
+    // an id nothing points at any more.
+    const { discardOrganizationDrive } = await import("@/lib/organization-drive");
+    const driveLeft = await discardOrganizationDrive(orgId);
+    if (driveLeft) leftBehind.push(driveLeft);
     await prisma.organization.delete({ where: { id: orgId } });
+    return leftBehind;
 }
 
 /** What deleting an organization would take with it, so the confirmation can
  *  name it rather than asking "are you sure" about an unknown quantity. */
-export async function orgDeletionImpact(
-    orgId: string
-): Promise<{ spaces: number; tasks: number; projects: number }> {
-    const [spaces, tasks, projects] = await Promise.all([
+export interface OrgDeletionImpact {
+    readonly spaces: number;
+    readonly tasks: number;
+    readonly projects: number;
+    /** Whether the organization has a Drive of its own. A count of what is on it
+     *  would be a walk of a whole storage for one line of a confirmation. */
+    readonly drive: boolean;
+}
+
+export async function orgDeletionImpact(orgId: string): Promise<OrgDeletionImpact> {
+    const [spaces, tasks, projects, drive] = await Promise.all([
         prisma.taskSpace.count({ where: { orgId } }),
         prisma.task.count({ where: { space: { orgId } } }),
         // Named because this is the part that is not just a row: the services
         // these projects run are stopped and removed from their servers.
-        prisma.project.count({ where: { orgId } })
+        prisma.project.count({ where: { orgId } }),
+        // Whether there is a company shelf, rather than what is on it: counting
+        // the files means walking a whole storage to draw one line of a
+        // confirmation. That there IS a Drive going is the part somebody is
+        // wrong about.
+        prisma.storageConnection.count({ where: { orgId } })
     ]);
-    return { spaces, tasks, projects };
+    return { spaces, tasks, projects, drive: drive > 0 };
 }
 
 /**

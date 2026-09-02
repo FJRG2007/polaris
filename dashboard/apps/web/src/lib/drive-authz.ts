@@ -22,7 +22,11 @@ import type { StorageDriver } from "@polaris/storage";
 import type { DriveAction, Permission } from "@polaris/core";
 import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
 import { canAccessDrive, resolveDriveDecision } from "@/lib/drive-acl-service";
-import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection, HOST_CONNECTION_PREFIX } from "@/lib/storage-service";
+import {
+    CONTAINER_CONNECTION_PREFIX,
+    getDriverForConnection,
+    HOST_CONNECTION_PREFIX
+} from "@/lib/storage-service";
 import {
     findLockForPath,
     lockUnlockCookie,
@@ -96,7 +100,8 @@ export async function authorizeDrive(
         if (!app) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return;
     }
@@ -114,7 +119,8 @@ export async function authorizeDrive(
         if (!host) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (host.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return;
     }
@@ -145,7 +151,8 @@ export async function authorizeDrive(
             }
         } else if (connection.ownerId === userId) {
             // Owner: gated by the coarse global capability, as the app always has.
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         } else if (!(await canAccessDrive(userId, connectionId, path, action))) {
             // Non-owner: needs an explicit ACL/policy allow for this resource.
             throw new DriveAccessError();
@@ -221,6 +228,34 @@ export async function canManageDriveConnection(
     const { resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
     const access = await resolveOrgAccess({ id: userId, isAdmin: false }, connection.orgId);
     return orgCan(access, "drive.manage");
+}
+
+/**
+ * Whether this account may see that a path is there, as a question rather than a
+ * refusal.
+ *
+ * For the screens that list somebody's own things back to them - what they
+ * starred, what they were given - where a path they may not open is not an error
+ * to raise but a row to leave out. The same resolution as every read, so a deny
+ * written on one folder of a company shelf holds on those screens too rather
+ * than being a rule only the browser honours.
+ *
+ * The lock gate is deliberately skipped: a locked folder is one whose password
+ * is asked for on the way in, not one whose existence is a secret from the
+ * person who starred it.
+ */
+export async function mayReadDrive(
+    userId: string,
+    connectionId: string,
+    path: string
+): Promise<boolean> {
+    try {
+        await authorizeDrive(userId, connectionId, path, "read", { skipLock: true });
+        return true;
+    } catch (caught) {
+        if (caught instanceof DriveAccessError) return false;
+        throw caught;
+    }
 }
 
 /** Authorize, then return a connected driver for the connection. */
