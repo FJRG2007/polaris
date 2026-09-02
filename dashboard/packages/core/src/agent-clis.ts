@@ -117,9 +117,36 @@ export interface AgentFirstRunAnswer {
     /** The file, relative to the home of whoever runs the tool. JSON, and
      *  created if it is not there yet. */
     readonly file: string;
-    /** The keys merged into it. */
-    readonly json: Readonly<Record<string, string | number | boolean>>;
+    /** The keys merged into it, filled in only where absent. Nested, because
+     *  some of these answers are not a flag at the top of a file - see
+     *  `FIRST_RUN_WORKDIR`. */
+    readonly json: Readonly<Record<string, AgentFirstRunValue>>;
 }
+
+/** What an answer may be. Objects nest; everything else is a leaf that is
+ *  written only where the file does not already have that key. */
+export type AgentFirstRunValue =
+    | string
+    | number
+    | boolean
+    | { readonly [key: string]: AgentFirstRunValue };
+
+/**
+ * The key that stands for the directory the agent is working in.
+ *
+ * Some of what a tool asks the first time is not about the tool, it is about
+ * the FOLDER - and the answer is recorded under the folder's own path. Claude
+ * Code's "is this a project you trust?" is one: it is stored per project, so
+ * there is no global answer to write, and a session's worktree is a path that
+ * did not exist until a minute ago.
+ *
+ * Nobody is there to be asked, either. The question is about a checkout Polaris
+ * made, of a repository the person picked a moment ago, inside a container
+ * Polaris started - and the default answer on that screen is "No, exit", which
+ * is exactly what the agent did. This is the same argument `autonomyArgs` makes
+ * about the menu after it, so it is answered the same way.
+ */
+export const FIRST_RUN_WORKDIR = "{workdir}";
 
 export interface AgentCli {
     /** Stable id. Stored on a session, so it never changes once shipped. */
@@ -264,7 +291,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             { file: ".claude.json", json: { hasCompletedOnboarding: true } },
             // Settings were always right: they live in the configuration home
             // under their own name, which is the same path either way.
-            { file: ".claude/settings.json", json: { theme: "dark" } }
+            { file: ".claude/settings.json", json: { theme: "dark" } },
+            // And the folder. Read off the tool's own message, which names the
+            // key and says in as many words that setting it is the alternative
+            // to accepting the dialog by hand: "accept the trust dialog here
+            // once interactively, or set projects[...].hasTrustDialogAccepted".
+            //
+            // It goes only in the configuration home, because that is the file
+            // this is stored in and there is no second place for it - unlike the
+            // onboarding flag, which a bare launch keeps beside it.
+            {
+                file: ".claude/.claude.json",
+                json: { projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } } }
+            }
         ]
     },
     {

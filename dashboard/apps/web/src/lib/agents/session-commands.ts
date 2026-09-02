@@ -27,7 +27,12 @@
  */
 
 import { shellQuote } from "./session-hooks";
-import { promptSubmitDelayMs, sanitizeAgentPrompt, type AgentFirstRunAnswer } from "@polaris/core";
+import {
+    FIRST_RUN_WORKDIR,
+    promptSubmitDelayMs,
+    sanitizeAgentPrompt,
+    type AgentFirstRunAnswer
+} from "@polaris/core";
 
 /** The tmux session every agent runs in, inside its own container or its own
  *  directory on a server. Fixed rather than derived: there is one agent per
@@ -452,6 +457,29 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         'const path = require("node:path");',
         "const home = process.env.HOME;",
         "if (!home) process.exit(0);",
+        // The directory this session works in, for the answers that are about
+        // the FOLDER rather than about the tool. Empty where there is no
+        // worktree - a sign-in container - and an answer needing it is skipped
+        // there rather than written under a key still spelling the placeholder.
+        'const workdir = process.env.POLARIS_WORKDIR || "";',
+        // Deep, because one of these answers is two levels down, and
+        // absent-only at every level: a folder somebody has already answered
+        // for keeps its answer, exactly as a theme they have chosen does.
+        "function fill(target, source) {",
+        "    let wrote = false;",
+        "    for (const [name, value] of Object.entries(source)) {",
+        `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
+        "        if (!key) continue;",
+        '        if (value && typeof value === "object") {',
+        "            if (target[key] === undefined) target[key] = {};",
+        '            if (!target[key] || typeof target[key] !== "object") continue;',
+        "            if (fill(target[key], value)) wrote = true;",
+        "        } else if (target[key] === undefined) {",
+        "            target[key] = value; wrote = true;",
+        "        }",
+        "    }",
+        "    return wrote;",
+        "}",
         'for (const answer of JSON.parse(fs.readFileSync(process.argv[1], "utf8"))) {',
         "    const file = path.join(home, answer.file);",
         "    let current = {};",
@@ -460,22 +488,19 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // because a cache file the tool owns had a byte out of place.
         '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
         '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
-        "    let changed = false;",
-        "    for (const [key, value] of Object.entries(answer.json)) {",
-        "        if (current[key] === undefined) { current[key] = value; changed = true; }",
-        "    }",
-        "    if (!changed) continue;",
-        // Said out loud, on the screen somebody is watching - and said AFTER
-        // the write rather than before it. Where a tool keeps its configuration
-        // is a thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so
-        // a launcher that sets it relocates the file, and the failure that causes
+        "    if (!fill(current, answer.json)) continue;",
+        // Said out loud, on the screen somebody is watching - and said AFTER the
+        // write rather than before it. Where a tool keeps its configuration is a
+        // thing that MOVES: Claude Code's file follows CLAUDE_CONFIG_DIR, so a
+        // launcher that sets it relocates the file, and the failure that causes
         // is invisible by nature - the answer is written, nothing reads it, the
-        // wizard appears anyway, and the terminal says nothing. A line naming the
-        // file is what turns that into something a person sees the first time,
-        // and it is worth nothing if it can appear for a file never written.
+        // question is asked anyway, and the terminal says nothing. A line naming
+        // the file is what turns that into something a person sees the first
+        // time, and it is worth nothing if it can appear for a file never
+        // written.
         //
         // Each answer stands on its own, so a path that cannot be written is
-        // named on the screen instead of taking the answers after it down with
+        // named on the screen instead of taking every answer after it down with
         // it. One unwritable file is one tool asking its question; an abort is
         // every question left unanswered.
         "    try {",
