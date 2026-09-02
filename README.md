@@ -107,8 +107,9 @@ with one thing does not get the rest.
   TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
   buffer. Share a file or folder with a person or group, with a role, a note and
   an expiry; public links with passwords and expiry; drop points for people who
-  have no account; and viewers and editors for documents, spreadsheets, PDFs and
-  media.
+  have no account; viewers and editors for documents, spreadsheets, PDFs and
+  media; and a grid that shows the picture of an image or a document's first
+  page instead of a generic icon.
 - **Vault** - a password manager that speaks the Bitwarden client protocol, so
   the apps and extensions you already use point at your own instance. Everything
   is encrypted in the browser; the server never sees a master password.

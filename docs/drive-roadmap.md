@@ -56,7 +56,8 @@ account; snippets; a recycle bin; scheduled deletions; favourites; recent items;
 per-item icon, colour, note and hidden flag; password gates on a folder; per-path
 access rules for users and groups; a viewer that edits spreadsheets in place and
 annotates PDFs, and reads code, Markdown, media, presentations and documents;
-zip download of a selection; encrypted archives; folder-weight insights; and
+thumbnails for images and the first page of a document in the grid; zip
+download of a selection; encrypted archives; folder-weight insights; and
 search with wildcards, extensions and regex.
 
 ---
