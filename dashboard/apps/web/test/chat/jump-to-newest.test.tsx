@@ -222,8 +222,6 @@ describe("the way back to the newest message", () => {
         // read; it does not perform it, and on a machine with nothing else to do
         // the effect lands before the next line while on a loaded one it does
         // not. That is why this passed here and failed in CI on the same commit.
-        await waitFor(() =>
-            expect(marked).toEqual([{ channelId: "c1", messageId: "m3" }])
-        );
+        await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m3" }]));
     });
 });
