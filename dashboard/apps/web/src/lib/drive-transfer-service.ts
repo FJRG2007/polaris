@@ -22,6 +22,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBetween } from "@/lib/blocks";
+import { pathExists } from "@/lib/upload-naming";
 import { allowedBy } from "@/lib/privacy-service";
 import { ensurePersonalDrive } from "@/lib/personal-drive";
 import { recordItemCreator } from "@/lib/drive-meta-service";
@@ -69,8 +70,12 @@ export interface TransferTarget {
  * A colleague counts as a friend, and only for this. Being put in the same
  * organization is somebody with authority over both accounts saying they work
  * together, which is a stronger statement than a friend request - but it widens
- * `friends`, never `nobody`. An account that says nobody means nobody, including
- * the people it works with.
+ * `friends`, and nothing else. The colleagues are handed back to the same
+ * privacy check as a fact about the sender rather than added to its answer
+ * afterwards, because the answer is where every audience that names an
+ * exception lives: `nobody`, but also "everybody except him" and "only these
+ * two", each of which is a decision somebody made on purpose and none of which
+ * a second door here may open.
  */
 export async function mayReceiveFrom(
     senderId: string,
@@ -79,45 +84,60 @@ export async function mayReceiveFrom(
     const wanted = [...new Set(candidateIds)].filter((id) => id !== senderId);
     if (wanted.length === 0) return new Set();
 
-    const allowed = await allowedBy({ id: senderId, isAdmin: false }, "fileTransfers", wanted);
+    const viewer = { id: senderId, isAdmin: false };
+    const allowed = await allowedBy(viewer, "fileTransfers", wanted);
 
-    // The colleagues among the rest, and only those who have not shut the door.
+    // The colleagues among the rest, asked again as friends. Only the rest,
+    // because somebody already allowed cannot be allowed more.
     const undecided = wanted.filter((id) => !allowed.has(id));
     if (undecided.length > 0) {
-        const [mine, settings] = await Promise.all([
-            memberOrgIds(senderId),
-            prisma.userPrivacy.findMany({
-                where: { userId: { in: undecided } },
-                select: { userId: true, fileTransfers: true }
-            })
-        ]);
-        const shut = new Set(
-            settings.filter((row) => row.fileTransfers === "nobody").map((row) => row.userId)
-        );
-        if (mine.length > 0) {
-            const shared = await prisma.organizationMember.findMany({
-                where: { orgId: { in: mine }, userId: { in: undecided } },
-                select: { userId: true }
-            });
-            for (const row of shared) if (!shut.has(row.userId)) allowed.add(row.userId);
-            // The owner of an organization is never a member row, so it is asked
-            // for separately - otherwise the one account that answers for a
-            // company is the one nobody in it can send anything to.
-            const owners = await prisma.organization.findMany({
-                where: { id: { in: mine }, ownerId: { in: undecided } },
-                select: { ownerId: true }
-            });
-            for (const row of owners) if (!shut.has(row.ownerId)) allowed.add(row.ownerId);
+        const colleagues = await colleaguesAmong(senderId, undecided);
+        if (colleagues.size > 0) {
+            for (const id of await allowedBy(
+                viewer,
+                "fileTransfers",
+                [...colleagues],
+                colleagues
+            )) {
+                allowed.add(id);
+            }
         }
     }
 
     // A block holds wherever one account can reach another, and being sent
     // somebody's files is a stronger reach than a friend request. It is asked
     // last and of everybody left, because neither door above closes on it:
-    // blocking a friend does not end the friendship, and the colleague widening
-    // never went through `allowedBy` at all.
+    // blocking a friend does not end the friendship, and being colleagues does
+    // not either.
     for (const id of await blockedBetween(senderId, [...allowed])) allowed.delete(id);
     return allowed;
+}
+
+/**
+ * Which of these accounts share an organization with this one.
+ *
+ * The organization's owner is asked for separately, because an owner is never a
+ * member row - otherwise the one account that answers for a company is the one
+ * nobody in it can send anything to.
+ */
+async function colleaguesAmong(
+    senderId: string,
+    candidateIds: readonly string[]
+): Promise<Set<string>> {
+    const mine = await memberOrgIds(senderId);
+    if (mine.length === 0) return new Set();
+    const ids = [...candidateIds];
+    const [members, owners] = await Promise.all([
+        prisma.organizationMember.findMany({
+            where: { orgId: { in: mine }, userId: { in: ids } },
+            select: { userId: true }
+        }),
+        prisma.organization.findMany({
+            where: { id: { in: mine }, ownerId: { in: ids } },
+            select: { ownerId: true }
+        })
+    ]);
+    return new Set([...members.map((row) => row.userId), ...owners.map((row) => row.ownerId)]);
 }
 
 /** Whether this account may put something on an organization's shelf, which is
@@ -413,6 +433,12 @@ export async function cancelTransfer(transferId: string, senderId: string): Prom
  * Overwriting is never the answer here. The recipient did not choose the name -
  * the sender did - so a transfer must not be able to replace a file somebody
  * already had by being called the same thing.
+ *
+ * Which is why a storage that cannot answer is a refusal rather than a free
+ * name. `pathExists` tells "there is nothing here" apart from "I could not
+ * look", and only the first is an answer: taking a permissions failure or a
+ * dropped connection for a spare name is how the copy below lands on top of the
+ * very file nobody could see.
  */
 async function freeName(
     driver: Awaited<ReturnType<typeof getDriverForConnection>>,
@@ -425,13 +451,20 @@ async function freeName(
     for (let attempt = 0; attempt < 50; attempt++) {
         const candidate = attempt === 0 ? name : `${stem} (${attempt})${extension}`;
         const at = folder ? `${folder}/${candidate}` : candidate;
-        try {
-            await driver.stat(at);
-        } catch {
-            return candidate;
-        }
+        if (!(await pathExists(driver, at))) return candidate;
     }
     throw new TransferRefused("There are already too many files by that name.");
+}
+
+/** The folder an offer is being accepted into, as a path this drive can hold. A
+ *  browser sends it, so a value that climbs out of the drive is a refusal in a
+ *  sentence rather than the path library's own error. */
+function intoFolder(into: string): string {
+    try {
+        return core.normalizeRelPath(into);
+    } catch {
+        throw new TransferRefused("That is not somewhere you can put it.");
+    }
 }
 
 /**
@@ -455,6 +488,17 @@ export async function acceptTransfer(
     const row = await answerableBy(transferId, userId);
     if (!row) throw new TransferRefused("That is not waiting for you any more.");
 
+    // Where it is going, worked out while the offer is still waiting. Both of
+    // these can refuse - a folder that came from a browser as `../elsewhere`,
+    // a shelf whose id is taken, a storage that is away - and a refusal after
+    // the claim below would be a row left `accepting` for six hours: gone from
+    // what is waiting to be answered and gone from what the sender can take
+    // back, answerable by nobody.
+    const folder = intoFolder(into);
+    const drive = row.recipientOrg
+        ? await ensureOrganizationDrive(row.recipientOrg)
+        : await ensurePersonalDrive(userId);
+
     // Claimed before a single byte moves. Establishing that this account MAY
     // answer is not the same as being the one who DID: an offer made to an
     // organization is answerable by everybody there who can change its shelf,
@@ -471,10 +515,7 @@ export async function acceptTransfer(
     });
     if (claimed.count === 0) throw new TransferRefused("That has already been answered.");
 
-    const drive = row.recipientOrg
-        ? await ensureOrganizationDrive(row.recipientOrg)
-        : await ensurePersonalDrive(userId);
-    const landing = await landCopy(row, drive.id, core.normalizeRelPath(into), userId);
+    const landing = await landCopy(row, drive.id, folder, userId);
 
     if (row.mode === "move") {
         // Last, and never before. The sender's standing to delete was
@@ -523,6 +564,7 @@ async function landCopy(
 ): Promise<string> {
     let source;
     let target;
+    let started: string | null = null;
     try {
         // Read as the SENDER, because it is their file and their standing that
         // was checked when they offered it. The recipient never gets a driver on
@@ -537,7 +579,9 @@ async function landCopy(
         target = await requireDriveDriver(userId, driveId, folder, "write");
         const name = await freeName(target, folder, row.name);
         const landing = folder ? `${folder}/${name}` : name;
+        started = landing;
         await copyAcross(source, target, row.path, landing, row.isFolder);
+        started = null;
 
         await recordItemCreator(driveId, landing, userId).catch(() => undefined);
         await prisma.driveTransfer.update({
@@ -565,6 +609,14 @@ async function landCopy(
                 }
             })
             .catch(() => undefined);
+        // And take the half of it that did land back out. `freeName` had just
+        // established the name was nobody's, so what is under it is this
+        // copy and nothing else - left there it is a folder appearing in
+        // somebody's Drive under a name they never chose, that no screen
+        // mentions and no retry would ever clear.
+        if (started && target) {
+            await target.delete(started, { recursive: true }).catch(() => undefined);
+        }
         if (caught instanceof TransferRefused) throw caught;
         throw new TransferRefused(
             caught instanceof DriveAccessError && source

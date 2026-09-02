@@ -199,11 +199,28 @@ describe("what I have shared", () => {
         await listSharedByMe(ANA);
         const where = aclFindMany.mock.calls[0][0].where;
 
-        expect(where.connection).toEqual({ ownerId: ANA });
+        expect(where.OR).toEqual([{ connection: { ownerId: ANA } }]);
         expect(where.createdById).toBe(ANA);
         // A rule naming yourself is not a share, and an administrator writing
         // one on your storage is their rule, not your share.
         expect(where.NOT).toEqual({ principalType: "user", principalId: ANA });
+    });
+
+    it("asks for the organization shelves too, which nobody owns", async () => {
+        // A company shelf has no `ownerId`, so ownership alone leaves whoever
+        // shared a folder out of one with a grant that appears on no screen and
+        // can be taken back from none - while the dialog that wrote it is
+        // offered to exactly the people who may manage the shelf.
+        memberOrgIds.mockResolvedValue(["org1"]);
+        await listSharedByMe(ANA);
+        const where = aclFindMany.mock.calls[0][0].where;
+
+        expect(where.OR).toEqual([
+            { connection: { ownerId: ANA } },
+            { connection: { orgId: { in: ["org1"] } } }
+        ]);
+        // And still only what this person wrote, never every rule on the shelf.
+        expect(where.createdById).toBe(ANA);
     });
 
     it("says who it went to", async () => {

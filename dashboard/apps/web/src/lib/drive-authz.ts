@@ -223,6 +223,34 @@ export async function canManageDriveConnection(
     return orgCan(access, "drive.manage");
 }
 
+/**
+ * Whether this account may see that a path is there, as a question rather than a
+ * refusal.
+ *
+ * For the screens that list somebody's own things back to them - what they
+ * starred, what they were given - where a path they may not open is not an error
+ * to raise but a row to leave out. The same resolution as every read, so a deny
+ * written on one folder of a company shelf holds on those screens too rather
+ * than being a rule only the browser honours.
+ *
+ * The lock gate is deliberately skipped: a locked folder is one whose password
+ * is asked for on the way in, not one whose existence is a secret from the
+ * person who starred it.
+ */
+export async function mayReadDrive(
+    userId: string,
+    connectionId: string,
+    path: string
+): Promise<boolean> {
+    try {
+        await authorizeDrive(userId, connectionId, path, "read", { skipLock: true });
+        return true;
+    } catch (caught) {
+        if (caught instanceof DriveAccessError) return false;
+        throw caught;
+    }
+}
+
 /** Authorize, then return a connected driver for the connection. */
 export async function requireDriveDriver(
     userId: string,

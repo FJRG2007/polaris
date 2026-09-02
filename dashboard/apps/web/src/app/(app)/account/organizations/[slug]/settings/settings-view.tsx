@@ -20,7 +20,7 @@ import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import type { OrgDetail } from "@/lib/orgs/org-service";
+import type { OrgDeletionImpact, OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepUpFields } from "@/components/step-up-fields";
 import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
@@ -65,7 +65,7 @@ export function SettingsView({
      *  inherited from the owner's own account. Null for anybody but the owner,
      *  who is the only person shown or asked. */
     successor: OrgSuccessorPerson | null;
-    impact: { spaces: number; tasks: number; projects: number };
+    impact: OrgDeletionImpact;
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -289,7 +289,7 @@ function TransferCard({
  * organization", because the number of spaces and tasks is the part people are
  * wrong about.
  */
-function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number; tasks: number; projects: number } }) {
+function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [proof, setProof] = useState<core.StepUpProofInput | null>(null);
@@ -299,6 +299,10 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number;
     const spaces = `${impact.spaces} space${impact.spaces === 1 ? "" : "s"}`;
     const tasks = `${impact.tasks} task${impact.tasks === 1 ? "" : "s"}`;
     const projects = `${impact.projects} deploy project${impact.projects === 1 ? "" : "s"}`;
+    // Named in both places rather than counted: what is on a company's shelf is
+    // a walk of a whole storage away, and that there is one going at all is the
+    // part somebody about to press this is wrong about.
+    const drive = impact.drive ? " Its Drive and everything on it go with it." : "";
 
     return (
         <Card>
@@ -309,6 +313,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number;
                 <p className="text-muted-foreground text-xs">
                     Deleting takes {spaces} and {tasks} with it, along with its teams, roles and domains.
                     {impact.projects > 0 && ` Its ${projects} go too, and the services they run are stopped.`}
+                    {drive}
                 </p>
                 <Button
                     size="sm"
@@ -331,7 +336,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: { spaces: number;
                 error={error}
                 pending={pending}
                 confirmDisabled={proof === null}
-                description={`${spaces} and ${tasks} are deleted with it, along with its teams, roles and domains. This cannot be undone.`}
+                description={`${spaces} and ${tasks} are deleted with it, along with its teams, roles and domains.${drive} This cannot be undone.`}
                 onConfirm={async () => {
                     if (!proof) return;
                     setPending(true);

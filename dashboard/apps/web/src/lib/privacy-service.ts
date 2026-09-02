@@ -21,8 +21,8 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { getSetting, setSetting } from "@/lib/setting-store";
 import { friendIds } from "@/lib/friends-service";
+import { getSetting, setSetting } from "@/lib/setting-store";
 
 /**
  * What a new account's follower lists are visible to.
@@ -133,11 +133,20 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
  *
  * Absence is the schema's default, as everywhere else: an account that has never
  * opened the screen has not asked for anything.
+ *
+ * `asFriends` is the one way a caller may widen somebody's answer, and it widens
+ * the FACT rather than the rule: those accounts are decided as though the viewer
+ * were a friend of theirs, and the audience they chose still decides. So a rule
+ * that names the viewer as an exception, or one that names two people and not
+ * them, refuses them exactly as it did - which is the whole point, because a
+ * caller adding names to the answer afterwards overrides a decision somebody
+ * made on purpose.
  */
 export async function allowedBy(
     viewer: PrivacyViewer,
     field: keyof core.PrivacySettings,
-    userIds: readonly string[]
+    userIds: readonly string[],
+    asFriends?: ReadonlySet<string>
 ): Promise<Set<string>> {
     const wanted = [...new Set(userIds)];
     if (wanted.length === 0) return new Set();
@@ -168,6 +177,7 @@ export async function allowedBy(
     // settings are all "everybody" costs the one read above and nothing else.
     const needsReach = wanted.filter((userId) => core.audienceNeedsReach(audiences.get(userId)!));
     const needsFriends = wanted.filter((userId) => {
+        if (asFriends?.has(userId)) return false;
         const audience = audiences.get(userId)!;
         return audience === "friends" || audience === "friendsExcept" || audience === "friendsOfFriends";
     });
@@ -193,7 +203,7 @@ export async function allowedBy(
         wanted.filter((userId) =>
             core.audienceAllows(audiences.get(userId)!, {
                 self: userId === viewer.id,
-                friends: friends.has(userId),
+                friends: friends.has(userId) || (asFriends?.has(userId) ?? false),
                 viewerIsAdmin: false,
                 inList: listed.has(userId),
                 subjectFollowsViewer: reach.subjectFollows.has(userId),

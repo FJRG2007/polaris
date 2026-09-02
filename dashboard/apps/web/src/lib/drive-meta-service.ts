@@ -191,6 +191,14 @@ export interface FavoriteItem {
  * organization, because that is who the shelf belongs to. Both are asked for,
  * or a star put on the company shelf goes into Favourites for nobody - the one
  * place it was put there to appear.
+ *
+ * A star on a company shelf is the company's, so being on the roster is what
+ * finds it - and being on the roster is not what opens it. The per-folder rules
+ * are what narrow a shelf to the people who may see one directory of it, and a
+ * screen that listed the name and the full path of everything starred in there
+ * would hand the whole of a folder only Legal opens to everybody in the
+ * company. Each of those rows therefore goes through the same door the folder
+ * itself does; a personal drive is its owner's and asks nothing.
  */
 export async function listFavorites(userId: string): Promise<FavoriteItem[]> {
     const { memberOrgIds } = await import("@/lib/orgs/org-service");
@@ -198,11 +206,27 @@ export async function listFavorites(userId: string): Promise<FavoriteItem[]> {
     const rows = await prisma.driveItemMeta.findMany({
         where: { ownerId: { in: owners }, favorite: true },
         orderBy: { updatedAt: "desc" },
-        select: { connectionId: true, path: true, connection: { select: { name: true } } }
+        select: {
+            connectionId: true,
+            path: true,
+            connection: { select: { name: true, ownerId: true } }
+        }
     });
-    return rows.map((row) => ({
-        connectionId: row.connectionId,
-        connectionName: row.connection.name,
-        path: row.path
-    }));
+    const { mayReadDrive } = await import("@/lib/drive-authz");
+    const readable = await Promise.all(
+        rows.map(async (row) =>
+            // Nothing to resolve for their own: the row is under this account
+            // because the connection is, and the query above said so.
+            row.connection.ownerId !== null
+                ? true
+                : mayReadDrive(userId, row.connectionId, row.path)
+        )
+    );
+    return rows
+        .filter((_, index) => readable[index])
+        .map((row) => ({
+            connectionId: row.connectionId,
+            connectionName: row.connection.name,
+            path: row.path
+        }));
 }

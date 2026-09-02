@@ -14,10 +14,11 @@ const db = {
     driveItemMeta: { upsert: vi.fn(), findMany: vi.fn() }
 };
 const canManageDriveConnection = vi.fn();
+const mayReadDrive = vi.fn();
 const memberOrgIds = vi.fn();
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
-vi.mock("@/lib/drive-authz", () => ({ canManageDriveConnection }));
+vi.mock("@/lib/drive-authz", () => ({ canManageDriveConnection, mayReadDrive }));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds }));
 
 const { listFavorites, setItemFavorite } = await import("@/lib/drive-meta-service");
@@ -33,7 +34,18 @@ beforeEach(() => {
     db.driveItemMeta.upsert.mockResolvedValue({});
     db.storageConnection.findUnique.mockResolvedValue({ ownerId: null, orgId: ORG });
     canManageDriveConnection.mockResolvedValue(true);
+    mayReadDrive.mockResolvedValue(true);
 });
+
+/** A starred row as the query answers it: the shelf it is on, and whether that
+ *  shelf belongs to an account or to an organization. */
+function star(path: string, ownerId: string | null = null) {
+    return {
+        connectionId: ownerId === null ? SHELF : "mine",
+        path,
+        connection: { name: "Acme files", ownerId }
+    };
+}
 
 describe("customizing an item on a company shelf", () => {
     it("asks whether the account may manage the shelf, not whether it owns one", async () => {
@@ -63,5 +75,33 @@ describe("favourites", () => {
                 where: { ownerId: { in: [ADA, ORG] }, favorite: true }
             })
         );
+    });
+
+    it("leaves out what the shelf's own rules do not let this account open", async () => {
+        // Being on the roster is what finds a company's stars; it is not what
+        // opens them. A folder narrowed by a deny to one team would otherwise
+        // have its names and its full paths listed for everybody in the
+        // organization, on a screen nothing else gates.
+        db.driveItemMeta.findMany.mockResolvedValue([
+            star("legal/settlement.pdf"),
+            star("shared/notes.md")
+        ]);
+        mayReadDrive.mockImplementation(
+            async (_userId: string, _connectionId: string, path: string) =>
+                !path.startsWith("legal/")
+        );
+
+        expect((await listFavorites(ADA)).map((item) => item.path)).toEqual(["shared/notes.md"]);
+        expect(mayReadDrive).toHaveBeenCalledWith(ADA, SHELF, "legal/settlement.pdf");
+    });
+
+    it("asks nothing of a drive this account owns", async () => {
+        // The row is under this account because the connection is, which the
+        // query already established - a second resolution per star would be a
+        // page of queries answering a question nobody asked.
+        db.driveItemMeta.findMany.mockResolvedValue([star("holiday.jpg", ADA)]);
+
+        expect((await listFavorites(ADA)).map((item) => item.path)).toEqual(["holiday.jpg"]);
+        expect(mayReadDrive).not.toHaveBeenCalled();
     });
 });
