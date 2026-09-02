@@ -22,7 +22,11 @@ import type { StorageDriver } from "@polaris/storage";
 import type { DriveAction, Permission } from "@polaris/core";
 import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
 import { canAccessDrive, resolveDriveDecision } from "@/lib/drive-acl-service";
-import { CONTAINER_CONNECTION_PREFIX, getDriverForConnection, HOST_CONNECTION_PREFIX } from "@/lib/storage-service";
+import {
+    CONTAINER_CONNECTION_PREFIX,
+    getDriverForConnection,
+    HOST_CONNECTION_PREFIX
+} from "@/lib/storage-service";
 import {
     findLockForPath,
     lockUnlockCookie,
@@ -96,7 +100,8 @@ export async function authorizeDrive(
         if (!app) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return;
     }
@@ -114,7 +119,8 @@ export async function authorizeDrive(
         if (!host) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (host.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         }
         return;
     }
@@ -145,7 +151,8 @@ export async function authorizeDrive(
             }
         } else if (connection.ownerId === userId) {
             // Owner: gated by the coarse global capability, as the app always has.
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
+                throw new DriveAccessError();
         } else if (!(await canAccessDrive(userId, connectionId, path, action))) {
             // Non-owner: needs an explicit ACL/policy allow for this resource.
             throw new DriveAccessError();

@@ -109,7 +109,9 @@ export function SettingsView({
             {isOwner && (
                 <OrgSuccessorCard orgId={org.id} orgName={org.name} successor={successor} />
             )}
-            {isOwner && <TransferCard org={org} candidates={candidates} confirm={confirm} onRun={run} />}
+            {isOwner && (
+                <TransferCard org={org} candidates={candidates} confirm={confirm} onRun={run} />
+            )}
             {canDelete && <DangerCard org={org} impact={impact} />}
             {confirmElement}
         </div>
@@ -202,7 +204,10 @@ function HandleCard({
                         });
                         if (!ok) return;
                         onError("");
-                        const result = await runAction(() => changeOrgSlugAction(org.id, slug), onError);
+                        const result = await runAction(
+                            () => changeOrgSlugAction(org.id, slug),
+                            onError
+                        );
                         if (!result || result.error) {
                             if (result?.error) onError(result.error);
                             return;
@@ -214,9 +219,18 @@ function HandleCard({
                 >
                     <label className="text-muted-foreground flex min-w-48 flex-1 flex-col gap-1 text-xs">
                         Handle
-                        <Input value={slug} className="h-9" onChange={(event) => setSlug(event.target.value)} />
+                        <Input
+                            value={slug}
+                            className="h-9"
+                            onChange={(event) => setSlug(event.target.value)}
+                        />
                     </label>
-                    <Button type="submit" size="sm" variant="secondary" disabled={!changed || !parsed.success}>
+                    <Button
+                        type="submit"
+                        size="sm"
+                        variant="secondary"
+                        disabled={!changed || !parsed.success}
+                    >
                         Change
                     </Button>
                     <p className="text-muted-foreground w-full text-xs">
@@ -249,8 +263,8 @@ function TransferCard({
             <CardBody>
                 {candidates.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        Only somebody already on the roster can be given the organization, and nobody else is on it
-                        yet.
+                        Only somebody already on the roster can be given the organization, and
+                        nobody else is on it yet.
                     </p>
                 ) : (
                     <label className="text-muted-foreground flex max-w-sm flex-col gap-1 text-xs">
@@ -260,9 +274,14 @@ function TransferCard({
                             className="h-9"
                             aria-label="New owner"
                             placeholder="Choose somebody"
-                            options={candidates.map((member) => ({ value: member.userId, label: member.name }))}
+                            options={candidates.map((member) => ({
+                                value: member.userId,
+                                label: member.name
+                            }))}
                             onValueChange={async (userId) => {
-                                const person = candidates.find((member) => member.userId === userId);
+                                const person = candidates.find(
+                                    (member) => member.userId === userId
+                                );
                                 const ok = await confirm({
                                     title: `Hand ${org.name} to ${person?.name}?`,
                                     description:
@@ -311,8 +330,10 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
             </CardHeader>
             <CardBody className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
-                    Deleting takes {spaces} and {tasks} with it, along with its teams, roles and domains.
-                    {impact.projects > 0 && ` Its ${projects} go too, and the services they run are stopped.`}
+                    Deleting takes {spaces} and {tasks} with it, along with its teams, roles and
+                    domains.
+                    {impact.projects > 0 &&
+                        ` Its ${projects} go too, and the services they run are stopped.`}
                     {drive}
                 </p>
                 <Button

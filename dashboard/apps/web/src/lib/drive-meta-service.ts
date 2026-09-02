@@ -19,11 +19,22 @@ export interface ItemMeta {
 }
 
 /** Metadata for the given paths in a connection, as a path -> meta map. */
-export async function getMetaMap(connectionId: string, paths: string[]): Promise<Map<string, ItemMeta>> {
+export async function getMetaMap(
+    connectionId: string,
+    paths: string[]
+): Promise<Map<string, ItemMeta>> {
     if (paths.length === 0 || !isUuid(connectionId)) return new Map();
     const rows = await prisma.driveItemMeta.findMany({
         where: { connectionId, path: { in: paths } },
-        select: { path: true, hidden: true, favorite: true, icon: true, iconColor: true, note: true, creatorId: true }
+        select: {
+            path: true,
+            hidden: true,
+            favorite: true,
+            icon: true,
+            iconColor: true,
+            note: true,
+            creatorId: true
+        }
     });
     return new Map(
         rows.map((row) => [
@@ -75,7 +86,10 @@ export async function recordItemCreator(
 export async function resolveUserNames(userIds: string[]): Promise<Map<string, string>> {
     const unique = [...new Set(userIds.filter(Boolean))];
     if (unique.length === 0) return new Map();
-    const users = await prisma.user.findMany({ where: { id: { in: unique } }, select: { id: true, name: true } });
+    const users = await prisma.user.findMany({
+        where: { id: { in: unique } },
+        select: { id: true, name: true }
+    });
     return new Map(users.map((user) => [user.id, user.name]));
 }
 
@@ -174,7 +188,10 @@ export async function setItemNote(
 /** Re-point metadata to a new path after a move/rename so it follows the item. */
 export async function moveItemMeta(connectionId: string, from: string, to: string): Promise<void> {
     if (!isUuid(connectionId)) return;
-    await prisma.driveItemMeta.updateMany({ where: { connectionId, path: from }, data: { path: to } });
+    await prisma.driveItemMeta.updateMany({
+        where: { connectionId, path: from },
+        data: { path: to }
+    });
 }
 
 /** A starred item, with the connection it lives on, for the Favorites view. */

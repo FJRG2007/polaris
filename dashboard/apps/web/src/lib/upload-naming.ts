@@ -122,6 +122,9 @@ export async function claimUploadPath(driver: StorageDriver, target: string): Pr
             await driver.writeStream(path, emptyBody(), { size: 0n });
             return path;
         }
-        throw new StorageError("already_exists", `No free name for ${name} after ${MAX_ATTEMPTS} tries`);
+        throw new StorageError(
+            "already_exists",
+            `No free name for ${name} after ${MAX_ATTEMPTS} tries`
+        );
     });
 }

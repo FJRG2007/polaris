@@ -34,10 +34,7 @@ export const orgSlugField = z
     .min(3, "At least 3 characters")
     .max(30, "At most 30 characters")
     .regex(/^[a-z0-9_-]+$/, "Use letters, numbers, - or _")
-    .refine(
-        (value) => !value.startsWith("-") && !value.endsWith("-"),
-        "Cannot start or end with -"
-    )
+    .refine((value) => !value.startsWith("-") && !value.endsWith("-"), "Cannot start or end with -")
     // The same names an account cannot take, for the same reason and out of the
     // same list. A handle addresses a public page here whether it belongs to a
     // person or to a company, and `@polaris-support` is exactly as convincing

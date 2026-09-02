@@ -13,10 +13,7 @@ import { avatarSettings } from "@/lib/avatar-service";
 import { setAvatarSettings } from "@/lib/avatar-service";
 import { checkStorageTarget } from "@/lib/storage-target";
 import { personalDriveSettings, setPersonalDriveTarget } from "@/lib/personal-drive";
-import {
-    organizationDriveSettings,
-    setOrganizationDriveTarget
-} from "@/lib/organization-drive";
+import { organizationDriveSettings, setOrganizationDriveTarget } from "@/lib/organization-drive";
 import { uploadSettings } from "@/lib/tasks/attachment-service";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 import { footageSettings, setFootageTarget } from "@/lib/home/stills";
@@ -179,7 +176,9 @@ export async function setPersonalDriveTargetAction(input: unknown): Promise<{ er
     }
 }
 
-export async function setOrganizationDriveTargetAction(input: unknown): Promise<{ error?: string }> {
+export async function setOrganizationDriveTargetAction(
+    input: unknown
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ target }).safeParse(input);
     if (!parsed.success) return { error: "Check the settings and try again" };
@@ -233,11 +232,11 @@ export async function checkStorageAction(
               ? (await personalDriveSettings()).resolved
               : which === "orgDrive"
                 ? (await organizationDriveSettings()).resolved
-              : which === "avatars"
-                ? (await avatarSettings()).resolved
-                : which === "footage"
-                  ? (await footageSettings()).resolved
-                  : (await uploadSettings()).resolved;
+                : which === "avatars"
+                  ? (await avatarSettings()).resolved
+                  : which === "footage"
+                    ? (await footageSettings()).resolved
+                    : (await uploadSettings()).resolved;
 
     const result = await checkStorageTarget(target.id, folder);
     return {

@@ -644,7 +644,10 @@ function OrganizationDrivesCard({ settings }: { settings: OrganizationDriveSetti
         if (saving) return;
         setSaving(true);
         setError("");
-        const result = await runAction(() => setOrganizationDriveTargetAction({ target }), setError);
+        const result = await runAction(
+            () => setOrganizationDriveTargetAction({ target }),
+            setError
+        );
         setSaving(false);
         if (result?.error) {
             setError(result.error);

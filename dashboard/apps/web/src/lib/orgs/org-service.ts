@@ -359,10 +359,7 @@ export async function listMyOrgs(userId: string): Promise<OrgSummary[]> {
                 { members: { some: { userId } } },
                 { successor: { successorId: userId } },
                 {
-                    AND: [
-                        { successor: null },
-                        { owner: { successor: { successorId: userId } } }
-                    ]
+                    AND: [{ successor: null }, { owner: { successor: { successorId: userId } } }]
                 }
             ]
         },

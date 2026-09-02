@@ -49,8 +49,14 @@ vi.mock("@/lib/drive-authz", () => ({
     DriveAccessError: class extends Error {}
 }));
 
-const { acceptTransfer, sendTransfer, mayReceiveFrom, transfersSentBy, transfersWaitingFor, TransferRefused } =
-    await import("@/lib/drive-transfer-service");
+const {
+    acceptTransfer,
+    sendTransfer,
+    mayReceiveFrom,
+    transfersSentBy,
+    transfersWaitingFor,
+    TransferRefused
+} = await import("@/lib/drive-transfer-service");
 
 const aFolder = {
     stat: vi.fn(async () => ({ kind: "dir" as const, size: 10n })),

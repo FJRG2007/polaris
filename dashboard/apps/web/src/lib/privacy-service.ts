@@ -86,9 +86,15 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
     ]);
     // Read whether or not there is a row: a `null` column and a missing row both
     // mean nobody has chosen, and both resolve to what the operator set.
-    const followers = core.storedAudience("followers", row?.followers ?? (await defaultFollowerAudience()));
+    const followers = core.storedAudience(
+        "followers",
+        row?.followers ?? (await defaultFollowerAudience())
+    );
     if (!row && links.length === 0) {
-        return { ...core.DEFAULT_PRIVACY, followers: { audience: followers, listId: null, people: [] } };
+        return {
+            ...core.DEFAULT_PRIVACY,
+            followers: { audience: followers, listId: null, people: [] }
+        };
     }
 
     // A named list comes back as the id it is; a setting's own unnamed one comes
@@ -179,7 +185,11 @@ export async function allowedBy(
     const needsFriends = wanted.filter((userId) => {
         if (asFriends?.has(userId)) return false;
         const audience = audiences.get(userId)!;
-        return audience === "friends" || audience === "friendsExcept" || audience === "friendsOfFriends";
+        return (
+            audience === "friends" ||
+            audience === "friendsExcept" ||
+            audience === "friendsOfFriends"
+        );
     });
 
     const [listed, friends, reach, shared] = await Promise.all([
