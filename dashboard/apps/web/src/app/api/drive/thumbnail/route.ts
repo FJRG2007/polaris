@@ -31,6 +31,25 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * "Keep the icon."
+ *
+ * Held for a day rather than sent back bare, because otherwise the files this
+ * refuses are the ones asked for again on every single page load - and they are
+ * the expensive ones. The answer is safe to hold for the same reason the picture
+ * is: the caller puts the file's identity in the query, so an edited file is a
+ * different address rather than a stale refusal.
+ *
+ * A day and not the year a picture gets, because a refusal can stop being true
+ * without the file changing - a Polaris that has been updated may draw what this
+ * build could not.
+ */
+const KEEP_THE_ICON = { "cache-control": "private, max-age=86400" };
+
+/** The same answer, for a drive that did not respond. Not held at all: nothing
+ *  about the file was decided, and it is right again as soon as the drive is. */
+const NOT_NOW = { "cache-control": "no-store" };
+
 /** Kept out of the audit trail on purpose. A thumbnail is drawn by scrolling
  *  past a folder, and a log where every tile is a read event is a log in which
  *  the downloads nobody can see any more. */
@@ -50,7 +69,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const kind = thumbnailKind(path);
-    if (!kind) return new Response(null, { status: 404 });
+    if (!kind) return new Response(null, { status: 404, headers: KEEP_THE_ICON });
 
     let driver;
     try {
@@ -64,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
     try {
         const stat = await driver.stat(path);
         if (stat.kind !== "file" || !withinCeiling(kind, stat.size)) {
-            return new Response(null, { status: 404 });
+            return new Response(null, { status: 404, headers: KEEP_THE_ICON });
         }
         const picture = await thumbnailFor(
             kind,
@@ -74,7 +93,7 @@ export async function GET(request: Request): Promise<Response> {
             // opened, not after.
             async () => await collectStream(await driver.readStream(path))
         );
-        if (!picture) return new Response(null, { status: 404 });
+        if (!picture) return new Response(null, { status: 404, headers: KEEP_THE_ICON });
         return new Response(new Uint8Array(picture), {
             headers: {
                 "content-type": "image/webp",
@@ -84,8 +103,14 @@ export async function GET(request: Request): Promise<Response> {
                 "cache-control": "private, max-age=31536000, immutable"
             }
         });
-    } catch {
-        return new Response(null, { status: 404 });
+    } catch (caught) {
+        // Nothing here is the file saying no - it is the drive, or the cache, or
+        // a library that did not start. The tile is told the same thing either
+        // way, because there is nothing a reader could do with the difference,
+        // but it is written down: otherwise a share that has gone away and a
+        // native binary missing from the image both read as "the icons stayed".
+        console.warn(`drive: no thumbnail could be served for ${connectionId}:`, caught);
+        return new Response(null, { status: 404, headers: NOT_NOW });
     } finally {
         await driver.dispose().catch(() => undefined);
     }

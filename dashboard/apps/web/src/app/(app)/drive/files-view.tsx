@@ -17,16 +17,16 @@ import Link from "next/link";
 import type { DriveEntry } from "./types";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
-import { EntryThumbnail } from "./entry-thumbnail";
-import { thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
+import { EntryThumbnail } from "./entry-thumbnail";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
+import { thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
 import { activityKey, prefetchListing } from "./listing-cache";
 import { useDisplayFormat } from "@/components/display-format";
@@ -3076,30 +3076,40 @@ export function FilesView({
     );
 }
 
-/** The icon for an entry: a user-set one, else the folder mark or the file type's. */
+/** The box a tile's picture or icon sits in. One value, because the two are
+ *  interchangeable inside a grid and a grid whose rows differ by file type is
+ *  one nobody can read down. */
+const THUMBNAIL_BOX = "size-14";
+
 /**
  * A tile's picture, or its icon.
  *
  * Only a file whose name could produce one is wrapped at all, so a folder or a
  * spreadsheet costs nothing to decide - not a request, not an observer, not an
- * element. The size is fixed either way so the grid does not reflow when a
- * picture arrives after the icon.
+ * element. Both branches occupy the same box, so a grid of documents lines up
+ * with a grid of photographs and nothing reflows when a picture arrives after
+ * the icon it replaces.
  */
 function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveEntry }) {
     const icon = <EntryIcon entry={entry} className="size-10" />;
-    if (entry.kind !== "file" || !thumbnailKind(entry.name)) return icon;
+    if (entry.kind !== "file" || !thumbnailKind(entry.name)) {
+        return (
+            <span className={cn(THUMBNAIL_BOX, "flex items-center justify-center")}>{icon}</span>
+        );
+    }
     return (
         <EntryThumbnail
             connectionId={connectionId}
             path={entry.path}
             version={`${entry.modifiedAt}-${entry.size}`}
-            className="size-14"
+            className={THUMBNAIL_BOX}
         >
             {icon}
         </EntryThumbnail>
     );
 }
 
+/** The icon for an entry: a user-set one, else the folder mark or the file type's. */
 function EntryIcon({ entry, className = "size-4" }: { entry: DriveEntry; className?: string }) {
     const Custom = iconComponent(entry.icon);
     if (Custom) return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
