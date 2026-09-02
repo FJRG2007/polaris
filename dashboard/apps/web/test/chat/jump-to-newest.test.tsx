@@ -16,7 +16,7 @@
 
 import userEvent from "@testing-library/user-event";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** The conversation, oldest first, as the channel is drawn. */
@@ -197,8 +197,12 @@ describe("the way back to the newest message", () => {
     it("marks the conversation read, even though the list did not change", async () => {
         const user = userEvent.setup();
         const { container } = render(<ChannelView channelId="c1" />);
+        // Waited for rather than read straight after the line appears: the read
+        // is announced from an effect, and an effect runs after the frame that
+        // drew the line. On a loaded machine the two are far enough apart that
+        // the list was on screen with the mark still to come.
         await screen.findByText("m2");
-        expect(marked).toEqual([{ channelId: "c1", messageId: "m2" }]);
+        await waitFor(() => expect(marked).toEqual([{ channelId: "c1", messageId: "m2" }]));
 
         // Away from the live end, and past the window in which the list insists
         // on the bottom for itself.
