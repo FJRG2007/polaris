@@ -197,7 +197,9 @@ describe("the tool's own first-run wizard", () => {
         for (const [file, body] of Object.entries(options.before ?? {})) {
             const at = join(home, file);
             mkdirSync(dirname(at), { recursive: true });
-            writeFileSync(at, JSON.stringify(body));
+            // A string is written as it stands, so a file that is not JSON at
+            // all can be seeded the way the tool leaves one behind half-written.
+            writeFileSync(at, typeof body === "string" ? body : JSON.stringify(body));
         }
         const list = join(home, "answers.json");
         writeFileSync(list, JSON.stringify(answers));
@@ -210,7 +212,10 @@ describe("the tool's own first-run wizard", () => {
             said: done.stdout.split("\n").filter((line) => line.startsWith("polaris:")),
             read: (file: string): Record<string, any> | null => {
                 try {
-                    return JSON.parse(readFileSync(join(home, file), "utf8")) as Record<string, any>;
+                    return JSON.parse(readFileSync(join(home, file), "utf8")) as Record<
+                        string,
+                        any
+                    >;
                 } catch {
                     return null;
                 }
@@ -232,16 +237,23 @@ describe("the tool's own first-run wizard", () => {
         expect(run.read(".claude/settings.json")).toEqual({ theme: "dark" });
     });
 
-    it("answers the flag in the configuration home as well as beside it", () => {
+    it("answers both questions in the configuration home as well as beside it", () => {
         // The one that was missing, and the reason the wizard came up anyway.
         // CLAUDE_CONFIG_DIR is Claude Code's configuration home and the config
         // file moves inside it; Enigma's launcher always sets that variable, and
         // Polaris starts these tools through Enigma whenever it is in the
         // session. The file beside it is what a bare launch reads, and Polaris
         // starts the tool both ways, so both are answered.
+        //
+        // The folder as much as the flag: dropping it from either file leaves a
+        // bare launch in front of the dialog with nothing on screen to say why.
         const run = answer(claude.firstRun, { workdir: "/session/repo" });
-        expect(run.read(".claude.json")?.hasCompletedOnboarding).toBe(true);
-        expect(run.read(".claude/.claude.json")?.hasCompletedOnboarding).toBe(true);
+        for (const file of [".claude.json", ".claude/.claude.json"]) {
+            expect(run.read(file)?.hasCompletedOnboarding, file).toBe(true);
+            expect(run.read(file)?.projects["/session/repo"], file).toEqual({
+                hasTrustDialogAccepted: true
+            });
+        }
     });
 
     it("turns a No the agent gave itself into a Yes", () => {
@@ -251,21 +263,54 @@ describe("the tool's own first-run wizard", () => {
         // hitting the highlighted option on a screen nobody could reach. Filling
         // in only what is missing would find an answer there, write nothing,
         // print nothing, and the dialog would come back with the terminal silent.
+        //
+        // The flag one screen earlier is the same answer by the same agent, so
+        // it is asserted the same way and checked here in both files.
+        const recorded = {
+            hasCompletedOnboarding: false,
+            projects: {
+                "/session/repo": { hasTrustDialogAccepted: false, allowedTools: ["Bash"] }
+            }
+        };
         const run = answer(claude.firstRun, {
             workdir: "/session/repo",
-            before: {
-                ".claude/.claude.json": {
-                    hasCompletedOnboarding: true,
-                    projects: {
-                        "/session/repo": { hasTrustDialogAccepted: false, allowedTools: ["Bash"] }
-                    }
-                }
-            }
+            before: { ".claude/.claude.json": recorded, ".claude.json": recorded }
         });
-        const project = run.read(".claude/.claude.json")?.projects["/session/repo"];
-        expect(project.hasTrustDialogAccepted).toBe(true);
-        // And only that key: whatever the tool recorded beside it stays.
-        expect(project.allowedTools).toEqual(["Bash"]);
+        for (const file of [".claude/.claude.json", ".claude.json"]) {
+            expect(run.read(file)?.hasCompletedOnboarding, file).toBe(true);
+            const project = run.read(file)?.projects["/session/repo"];
+            expect(project.hasTrustDialogAccepted, file).toBe(true);
+            // And only those keys: whatever the tool recorded beside them stays.
+            expect(project.allowedTools, file).toEqual(["Bash"]);
+        }
+    });
+
+    it("writes the answer where the file holds something that is not a folder", () => {
+        // `projects` present as `null` is a branch the fill rule walks away
+        // from, which would be the answer never written and nothing said about
+        // it - the same invisible failure, reached from a different state. An
+        // answer that is Polaris's to give replaces it instead.
+        const run = answer(claude.firstRun, {
+            workdir: "/session/repo",
+            before: { ".claude/.claude.json": { hasCompletedOnboarding: true, projects: null } }
+        });
+        expect(run.read(".claude/.claude.json")?.projects).toEqual({
+            "/session/repo": { hasTrustDialogAccepted: true }
+        });
+        expect(run.said).toHaveLength(3);
+    });
+
+    it("treats a file it cannot read as one that was not there", () => {
+        // A cache the tool owns, caught half-written. Refusing to start a
+        // session over a byte out of place in it is the worse answer.
+        const run = answer(claude.firstRun, {
+            workdir: "/session/repo",
+            before: { ".claude/.claude.json": "{not json" }
+        });
+        expect(run.read(".claude/.claude.json")).toEqual({
+            hasCompletedOnboarding: true,
+            projects: { "/session/repo": { hasTrustDialogAccepted: true } }
+        });
     });
 
     it("never overrules a choice that is the person's to make", () => {

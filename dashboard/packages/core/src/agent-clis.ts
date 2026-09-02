@@ -109,9 +109,10 @@ export interface AgentCredential {
  * be called. A guessed key is silently ignored, which puts the session back in
  * front of the wizard with nothing to show why.
  *
- * They are filled in only where absent, so a person who later picks a light
- * theme keeps it: Polaris answers the question once and never overrules the
- * answer.
+ * Two rules, and which one an answer takes is the whole of it. `json` is filled
+ * in only where the file is silent, so a person who later picks a light theme
+ * keeps it. `assert` is written whatever the file already says, for the answers
+ * that were never the person's to give - see `CLAUDE_WIZARD_ANSWER`.
  */
 export interface AgentFirstRunAnswer {
     /** The file, relative to the home of whoever runs the tool. JSON, and
@@ -120,23 +121,28 @@ export interface AgentFirstRunAnswer {
     /**
      * The keys written into it whatever it already says.
      *
-     * For the answers that are Polaris's to give rather than the person's: a
-     * folder Polaris made for this session, which an agent may already have
-     * answered `No` to on a screen nobody could reach. See `CLAUDE_TRUST_ANSWER`
-     * for why that is not the same thing as overruling somebody.
+     * For the answers that are Polaris's to give rather than the person's: the
+     * wizard itself, on a screen nobody could reach, which only the agent that
+     * met it can have answered already. See `CLAUDE_WIZARD_ANSWER` for why that
+     * is not the same thing as overruling somebody.
      *
      * Nothing is written when the file already says the same, so a session that
-     * has nothing to do stays silent.
+     * has nothing to do stays silent. A branch that is there but is not an
+     * object is replaced rather than walked away from: an answer that is
+     * Polaris's to give is not left unwritten, and unsaid, because the file
+     * holds something unreadable where it goes.
      */
     readonly assert?: Readonly<Record<string, AgentFirstRunValue>>;
     /** The keys merged into it, filled in only where absent. Nested, because
      *  some of these answers are not a flag at the top of a file - see
-     *  `FIRST_RUN_WORKDIR`. */
-    readonly json: Readonly<Record<string, AgentFirstRunValue>>;
+     *  `FIRST_RUN_WORKDIR`. Left out where every answer for the file is
+     *  asserted. */
+    readonly json?: Readonly<Record<string, AgentFirstRunValue>>;
 }
 
-/** What an answer may be. Objects nest; everything else is a leaf that is
- *  written only where the file does not already have that key. */
+/** What an answer may be. Objects nest; everything else is a leaf, written
+ *  where the file does not already have that key - or whatever it says there,
+ *  when the answer is asserted. */
 export type AgentFirstRunValue =
     | string
     | number
@@ -161,41 +167,37 @@ export type AgentFirstRunValue =
 export const FIRST_RUN_WORKDIR = "{workdir}";
 
 /**
- * Everything a fresh Claude Code asks before it will run, in one answer.
+ * Everything a fresh Claude Code asks before it will run, asserted rather than
+ * filled in.
  *
  * One object rather than one per question because the file is the unit: which
  * of the two config files gets read is decided by `CLAUDE_CONFIG_DIR` and not
  * by the key, so both files need all of it - and answering a file once is one
  * read-modify-write and one line on the terminal naming the file it wrote.
- */
-const CLAUDE_CONFIG_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
-    hasCompletedOnboarding: true
-};
-
-/**
- * The folder, which is asserted rather than filled in.
  *
- * The difference matters and it is not a detail. Everything else here is filled
- * in only where the file is silent, so a person who picks a light theme keeps
- * it. This one has to be written even when the file already answers it, because
- * of who wrote the answer that is there.
+ * Asserted, and the difference is not a detail. A colour scheme is filled in
+ * only where the file is silent, because choosing one is somebody's to do.
+ * Neither of these is: they ARE the wizard, so the only thing that can have
+ * answered them already is an agent that met the screen before Polaris knew to.
  *
  * The home outlives every session and the container's path is a constant, so the
- * FIRST session - the one that met this dialog before Polaris knew to answer it -
- * left `hasTrustDialogAccepted: false` under that exact path, chosen by an agent
- * hitting the highlighted option on a screen nobody could reach. Fill-if-absent
- * then finds an answer, writes nothing, prints nothing, and the dialog comes back
- * with the terminal silent - the precise invisible failure the line naming each
- * written file exists to prevent. Every deployment that has already run a session
- * is in that state right now.
+ * FIRST session - the one that met these screens before Polaris knew to answer
+ * them - left `hasTrustDialogAccepted: false` under that exact path, chosen by an
+ * agent hitting the highlighted option, which is "No, exit", where nobody could
+ * see it. A recorded `hasCompletedOnboarding: false` is the same thing one screen
+ * earlier. Fill-if-absent then finds an answer, writes nothing, prints nothing,
+ * and the wizard comes back with the terminal silent - the precise invisible
+ * failure the line naming each written file exists to prevent. Every deployment
+ * that has already run a session is in that state right now.
  *
- * That value is not somebody's decision. It is the absence of one, recorded.
- * Polaris made the folder, cloned into it, and started the container around it,
- * so it is Polaris's answer to give - and only ever for a path Polaris made: this
- * runs nowhere but in a home Polaris owns, and the only key it writes is the
- * worktree of the session being started.
+ * Those values are not somebody's decision. They are the absence of one,
+ * recorded. Polaris made the folder, cloned into it, and started the container
+ * around it, so it is Polaris's answer to give - and only ever where Polaris
+ * made it: this runs nowhere but in a home Polaris owns, and the only folder it
+ * writes under is the worktree of the session being started.
  */
-const CLAUDE_TRUST_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
+const CLAUDE_WIZARD_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
+    hasCompletedOnboarding: true,
     projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
 };
 
@@ -346,12 +348,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             // projects[...].hasTrustDialogAccepted". It lives in whichever of
             // the two files is being read, exactly as the flag above it does, so
             // a bare launch with Enigma off finds it answered too.
-            {
-                file: ".claude/.claude.json",
-                json: CLAUDE_CONFIG_ANSWER,
-                assert: CLAUDE_TRUST_ANSWER
-            },
-            { file: ".claude.json", json: CLAUDE_CONFIG_ANSWER, assert: CLAUDE_TRUST_ANSWER },
+            { file: ".claude/.claude.json", assert: CLAUDE_WIZARD_ANSWER },
+            { file: ".claude.json", assert: CLAUDE_WIZARD_ANSWER },
             // Settings were always right: they live in the configuration home
             // under their own name, which is the same path either way.
             { file: ".claude/settings.json", json: { theme: "dark" } }
