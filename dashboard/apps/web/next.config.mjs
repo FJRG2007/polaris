@@ -69,7 +69,11 @@ const nextConfig = {
         // the URL said nothing about which part of Polaris you were in. They are
         // all under /admin now, and Drive's two stray screens under /drive.
         { source: "/integrations", destination: "/admin/integrations", permanent: false },
-        { source: "/integrations/:path*", destination: "/admin/integrations/:path*", permanent: false },
+        {
+            source: "/integrations/:path*",
+            destination: "/admin/integrations/:path*",
+            permanent: false
+        },
         { source: "/settings", destination: "/admin/settings", permanent: false },
         { source: "/settings/:path*", destination: "/admin/settings/:path*", permanent: false },
         { source: "/inbox", destination: "/admin/inbox", permanent: false },
