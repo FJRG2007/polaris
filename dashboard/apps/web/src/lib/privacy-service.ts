@@ -67,6 +67,7 @@ const AUDIENCE_COLUMNS = {
     friendRequests: true,
     lastSeen: true,
     forwarding: true,
+    fileTransfers: true,
     discoverable: true,
     readReceipts: true
 } as const;

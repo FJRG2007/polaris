@@ -287,6 +287,8 @@ model User {
   privacyFieldLists      PrivacyFieldList[]
   friendshipsAsked       Friendship[]              @relation("FriendshipRequester")
   friendshipsReceived    Friendship[]              @relation("FriendshipAddressee")
+  transfersSent          DriveTransfer[]           @relation("DriveTransferSender")
+  transfersReceived      DriveTransfer[]           @relation("DriveTransferRecipient")
   blocking               UserBlock[]               @relation("UserBlockBlocker")
   blockedBy              UserBlock[]               @relation("UserBlockBlocked")
   presenceSchedules      PresenceSchedule[]
@@ -1398,6 +1400,7 @@ model StorageConnection {
   scheduledDeletions ScheduledDeletion[]
   deployVolumes      Volume[]
   backupDestinations BackupDestination[]
+  DriveTransfer      DriveTransfer[]
 
   @@index([ownerId])
   @@index([orgId])
@@ -4197,6 +4200,8 @@ model Organization {
   vault         VaultOrganization?
   // Its own Drive: one row, made the first time somebody opens it.
   storages      StorageConnection[]
+  // Files somebody offered the organization, waiting to be accepted.
+  transfers     DriveTransfer[]
 
   @@index([ownerId])
 }
@@ -7222,6 +7227,13 @@ model UserPrivacy {
   // request is the mildest thing one account can do to another, and nothing
   // happens until it is answered.
   friendRequests String   @default("everyone")
+  // Who may offer this account a file or a folder. Friends by default, and the
+  // only setting here whose default is the middle answer rather than an end of
+  // it: a friend request is a line of text, while a transfer is somebody else's
+  // files landing in your Drive and taking your space. Somebody in the same
+  // organization counts as a friend for this and nothing else. Nothing lands
+  // without being accepted whatever this says - it decides who may ASK.
+  fileTransfers  String   @default("friends")
   // Who may send something this account wrote into another conversation. Open
   // by default, like the rest: a messenger where nothing can be passed on is
   // not what anybody expects, and a default that removed a button would read
@@ -8129,4 +8141,79 @@ model AgentSigninAttempt {
 
   @@index([userId, endedAt])
   @@index([endedAt, startedAt])
+}
+
+/// One offer of a file or a folder from one account to somebody else.
+///
+/// A transfer is not a share. A share leaves the file where it is and lets
+/// somebody else look at it; this puts a copy in their own Drive, theirs to
+/// keep, rename and delete, and it stops being connected to the original the
+/// moment it lands. That is what somebody means when they say "send it to me" -
+/// they would otherwise download it and upload it again, which is what this
+/// replaces.
+///
+/// Nothing moves until the recipient accepts. That is the whole shape of the
+/// model and the reason it is a row rather than a call: files arriving in
+/// somebody's Drive without being asked for is how a shared instance turns into
+/// a way to fill up other people's space with things they did not want.
+///
+/// The source is recorded as a path on a connection rather than copied
+/// anywhere while it waits. A pending transfer costs nothing but this row, and
+/// what lands is read at the moment it is accepted - so a sender who changes
+/// their mind deletes the file and the offer simply fails, which is the honest
+/// outcome.
+model DriveTransfer {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  senderId     String  @db.Uuid
+  /// Where it is coming from, while it waits.
+  connectionId String  @db.Uuid
+  path         String
+  /// What it will be called when it lands, taken from the source at the time of
+  /// sending so the recipient sees the name they were offered rather than one
+  /// the sender changed afterwards.
+  name         String
+  /// Whether the source is a folder, which decides how much this costs to carry
+  /// and what the recipient is being asked to take.
+  isFolder     Boolean @default(false)
+  /// What it was when it was offered, so the recipient is told the size before
+  /// they agree to hold it rather than after.
+  size         BigInt  @default(0)
+  /// copy | move
+  ///
+  /// A copy leaves the sender's own alone, which is the default and what most
+  /// people mean. A move takes it out of the sender's Drive once it has landed
+  /// in the recipient's - never before, so a transfer that fails half way leaves
+  /// the file where it was rather than nowhere.
+  mode         String  @default("copy")
+  /// Said to the recipient beside the offer. Null when nothing was said.
+  note         String?
+
+  /// Exactly one of these two: a person, or an organization's shelf.
+  recipientId  String? @db.Uuid
+  recipientOrg String? @db.Uuid
+
+  /// pending | accepted | declined | cancelled | failed
+  status     String  @default("pending")
+  /// Where it landed, so the recipient can be taken to it.
+  landedPath String?
+  /// Why it could not land, for the one screen that has to say so. Never the
+  /// storage's own message, which names paths nobody asked to publish.
+  failure    String?
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+  /// When an unanswered offer stops being offered. A request nobody answered is
+  /// not a request that stands forever, and the source may not even be there any
+  /// more.
+  expiresAt   DateTime
+
+  sender     User              @relation("DriveTransferSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient  User?             @relation("DriveTransferRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  org        Organization?     @relation(fields: [recipientOrg], references: [id], onDelete: Cascade)
+  connection StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, status])
+  @@index([recipientOrg, status])
+  @@index([senderId, status])
+  @@index([expiresAt])
 }
