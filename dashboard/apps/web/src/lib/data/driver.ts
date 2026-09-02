@@ -188,6 +188,29 @@ export interface DataDriver {
 }
 
 /**
+ * A LIKE pattern matching every schema Postgres owns.
+ *
+ * The backslash escapes the underscore, so this matches a literal `pg_` prefix
+ * rather than "pg" followed by any character - without it, LIKE reads `_` as its
+ * own single-character wildcard and a schema called `pgbouncer` disappears too.
+ *
+ * Held here as a value and interpolated by the queries that need it, rather than
+ * written into each of them. Written inline it has to survive whatever quoting
+ * the surrounding statement uses, and it did not: in a template literal a lone
+ * backslash before an underscore is dropped, which turns the escape back into
+ * the wildcard silently.
+ *
+ * The prefix is the rule rather than a list of names because the list cannot be
+ * complete - `pg_temp_N` and `pg_toast_temp_N` are created per backend as
+ * sessions make temporary tables, so the set changes while somebody is looking
+ * at it. Naming three fixed schemas and one of the two patterns is what shipped,
+ * and `pg_toast_temp_3` duly turned up in the schema selector. Safe to exclude
+ * wholesale: Postgres reserves the prefix and refuses to create a schema with
+ * it, so there is no user schema this can hide.
+ */
+export const POSTGRES_SYSTEM_SCHEMA_LIKE = "pg\\_%";
+
+/**
  * The schemas an engine hands back that nobody keeps their own tables in.
  *
  * Postgres returns `information_schema` and its `pg_*` catalogues alongside the

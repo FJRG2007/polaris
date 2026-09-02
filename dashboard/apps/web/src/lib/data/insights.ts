@@ -25,7 +25,7 @@
 
 import { withDriver } from "./open";
 import { addressOf } from "./connections";
-import type { DataAddress } from "./driver";
+import { POSTGRES_SYSTEM_SCHEMA_LIKE, type DataAddress } from "./driver";
 
 /** One row of a "biggest things in here" chart. */
 export interface SizedRelation {
@@ -95,6 +95,17 @@ async function postgresInsights(address: DataAddress): Promise<DatabaseInsights>
         // which is what "how much room is this costing me" means. The estimate
         // from the planner's own statistics rather than count(*): a count on the
         // ten biggest tables is the most expensive thing this screen could do.
+        // Everything Postgres owns is excluded by prefix rather than by a list of
+        // names: pg_temp_N and pg_toast_temp_N are created per backend as
+        // sessions make temporary tables, so the set changes while somebody is
+        // looking at it - and a backend's temporary tables are ordinary relations
+        // that would otherwise turn up here as somebody's biggest tables.
+        //
+        // The pattern is interpolated rather than written into the statement.
+        // Inline it has to survive this template literal, where a lone backslash
+        // before an underscore is dropped - which turns LIKE's escape back into
+        // its single-character wildcard, silently, and takes a schema called
+        // pgbouncer with it. See POSTGRES_SYSTEM_SCHEMA_LIKE.
         const [sized] = await driver.run(
             `SELECT relname,
                     pg_total_relation_size(c.oid) AS bytes,
@@ -102,7 +113,8 @@ async function postgresInsights(address: DataAddress): Promise<DatabaseInsights>
                FROM pg_class c
                JOIN pg_namespace n ON n.oid = c.relnamespace
               WHERE c.relkind IN ('r', 'p', 'm')
-                AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                AND n.nspname <> 'information_schema'
+                AND n.nspname NOT LIKE '${POSTGRES_SYSTEM_SCHEMA_LIKE}'
               ORDER BY bytes DESC
               LIMIT ${TOP}`
         );

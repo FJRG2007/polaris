@@ -28,8 +28,23 @@ import {
  *  and a sort column both have one thing to hang off. */
 const ROW_ALIAS = '"row"';
 
-/** Schemas nobody browsing their own data means. */
-const SYSTEM_SCHEMAS = ["pg_catalog", "information_schema", "pg_toast"];
+/**
+ * Schemas nobody browsing their own data means.
+ *
+ * `information_schema` by name, and everything Postgres owns by its prefix. The
+ * prefix is the rule rather than a list because the list cannot be complete: the
+ * server creates `pg_temp_N` and `pg_toast_temp_N` per backend as sessions make
+ * temporary tables, so the set changes while somebody is looking at it. Naming
+ * the three fixed ones and one of the two patterns is what shipped, and
+ * `pg_toast_temp_3` duly turned up in the schema selector - and, on a database
+ * with no `public`, could be the one the browser opened on.
+ *
+ * Safe to exclude wholesale: Postgres reserves the `pg_` prefix and refuses to
+ * create a schema with it ("unacceptable schema name ... The prefix pg_ is
+ * reserved for system schemas"), so there is no user schema this can hide.
+ */
+const SYSTEM_SCHEMA_NAMES = ["information_schema"];
+const SYSTEM_SCHEMA_PREFIX = "pg\\_%";
 
 export class PostgresDriver implements data.DataDriver {
     readonly shape = "sql" as const;
@@ -72,10 +87,10 @@ export class PostgresDriver implements data.DataDriver {
             `SELECT n.nspname AS name, count(c.oid)::text AS count
                FROM pg_namespace n
                LEFT JOIN pg_class c ON c.relnamespace = n.oid AND c.relkind IN ('r','v','m','p','f')
-              WHERE n.nspname <> ALL($1::text[]) AND n.nspname NOT LIKE 'pg\\_temp%'
+              WHERE n.nspname <> ALL($1::text[]) AND n.nspname NOT LIKE $2
               GROUP BY n.nspname
               ORDER BY n.nspname`,
-            [SYSTEM_SCHEMAS]
+            [SYSTEM_SCHEMA_NAMES, SYSTEM_SCHEMA_PREFIX]
         );
         return result.rows.map((row) => ({
             name: row.name,
