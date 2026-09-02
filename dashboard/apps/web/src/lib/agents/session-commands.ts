@@ -443,8 +443,17 @@ export function agentReadyCommand(session = TMUX_SESSION): string {
  * the tool ran there long before Polaris did, and writing our answers into their
  * configuration is exactly what this file refuses to do everywhere else.
  *
- * Absent keys only. A person who opens the session and picks a light theme keeps
- * it - the question is answered once, and the answer is never overruled.
+ * Absent keys only, and absent at every level of nesting: a person who opens the
+ * session and picks a light theme keeps it, and a folder that already has an
+ * answer keeps that answer too - the question is answered once, and the answer
+ * is never overruled.
+ *
+ * One of these questions is not about the tool but about the checkout: Claude
+ * Code's workspace-trust dialog, which defaults to "No, exit" on a folder it has
+ * never seen and is recorded per project path rather than as a flag at the top
+ * of the file. `FIRST_RUN_WORKDIR` stands in for that path in the answer, and is
+ * replaced here with the session's own worktree - or the answer is left out
+ * entirely where there is no worktree yet, such as a sign-in container.
  */
 export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string {
     if (answers.length === 0) return "";
