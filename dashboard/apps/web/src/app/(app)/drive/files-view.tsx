@@ -114,6 +114,7 @@ import {
     Pencil,
     Scissors,
     Search,
+    Send,
     Share2,
     ShieldCheck,
     SlidersHorizontal,
@@ -310,6 +311,7 @@ export function FilesView({
     onShareFolder,
     onSharePeople,
     onSharePeopleFolder,
+    onSend,
     onRequestFiles,
     onToggleHidden,
     onSetFavorite,
@@ -352,6 +354,10 @@ export function FilesView({
     /** Give one item to somebody on this instance. Absent unless the viewer owns
      *  the storage: only an owner may hand out what is on it. */
     onSharePeople?: (entry: DriveEntry) => void;
+    /** Hand the item over: it lands in somebody else's Drive as theirs,
+     *  rather than being shown to them where it is. One at a time, because
+     *  what is being offered has to be named in the dialog. */
+    onSend?: (entry: DriveEntry) => void;
     /** The same for the folder that is open. */
     onSharePeopleFolder?: () => void;
     /** Ask somebody to drop files into a folder. Absent for the same reason. */
@@ -1174,6 +1180,12 @@ export function FilesView({
                     <ContextMenuItem onSelect={() => onSharePeople(entry)}>
                         <Users className="size-4" />
                         Share with people
+                    </ContextMenuItem>
+                ) : null}
+                {onSend && !many ? (
+                    <ContextMenuItem onSelect={() => onSend(entry)}>
+                        <Send className="size-4" />
+                        Send a copy
                     </ContextMenuItem>
                 ) : null}
                 {onShare ? (

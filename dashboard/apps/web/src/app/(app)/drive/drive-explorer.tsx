@@ -26,6 +26,8 @@ import { useRouter } from "next/navigation";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
 import { PeopleShareDialog, type PeopleShareTarget } from "./people-share-dialog";
+import { SendDialog } from "./send-dialog";
+import { TransfersPanel } from "./transfers-panel";
 import { useLiveResource } from "@/components/use-live-resource";
 import { RemoveConnectionDialog } from "./remove-connection-dialog";
 import { RequestDialog, type RequestTarget } from "./request-dialog";
@@ -165,6 +167,9 @@ export function DriveExplorer({
     const [editConn, setEditConn] = useState<ConnectionSummary | null>(null);
     const [shareTargets, setShareTargets] = useState<ShareTarget[] | null>(null);
     const [peopleTarget, setPeopleTarget] = useState<PeopleShareTarget | null>(null);
+    // What is being handed over, if anything. One item, because the dialog
+    // names it and an offer of "seven things" is not something to answer.
+    const [sending, setSending] = useState<{ path: string; name: string } | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
     const [opError, setOpError] = useState<string | null>(notice ?? null);
@@ -580,7 +585,11 @@ export function DriveExplorer({
                 </nav>
             </aside>
 
-            <section className="min-w-0">
+            <section className="min-w-0 space-y-4">
+                {/* Above the files, because an offer waiting to be answered is
+                    the one thing on this screen that somebody else is waiting on.
+                    It draws nothing at all when there is nothing waiting. */}
+                <TransfersPanel />
                 {!connectionId ? (
                     <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
                         Add a storage connection to start browsing.
@@ -694,6 +703,11 @@ export function DriveExplorer({
                                       })
                                 : undefined
                         }
+                        onSend={
+                            isSavedConnection(connectionId)
+                                ? (entry) => setSending({ path: entry.path, name: entry.name })
+                                : undefined
+                        }
                         onSharePeopleFolder={
                             selectedConnection?.canManageAccess
                                 ? () =>
@@ -804,6 +818,16 @@ export function DriveExplorer({
                 onOpenChange={(open) => !open && setPeopleTarget(null)}
                 onChanged={() => void load()}
             />
+            {sending && connectionId ? (
+                <SendDialog
+                    open
+                    onOpenChange={(open) => !open && setSending(null)}
+                    connectionId={connectionId}
+                    path={sending.path}
+                    name={sending.name}
+                    onSent={() => setSending(null)}
+                />
+            ) : null}
             <RequestDialog
                 target={requestTarget}
                 onOpenChange={(open) => !open && setRequestTarget(null)}
