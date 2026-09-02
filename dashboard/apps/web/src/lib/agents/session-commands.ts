@@ -465,15 +465,23 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
         // Deep, because one of these answers is two levels down, and
         // absent-only at every level: a folder somebody has already answered
         // for keeps its answer, exactly as a theme they have chosen does.
+        //
+        // A branch that is not there yet is filled aside and attached only if
+        // something reached a leaf inside it, so an answer skipped for want of a
+        // worktree leaves no empty `projects: {}` behind in the tool's own file.
         "function fill(target, source) {",
         "    let wrote = false;",
         "    for (const [name, value] of Object.entries(source)) {",
         `        const key = name === ${JSON.stringify(FIRST_RUN_WORKDIR)} ? workdir : name;`,
         "        if (!key) continue;",
         '        if (value && typeof value === "object") {',
-        "            if (target[key] === undefined) target[key] = {};",
-        '            if (!target[key] || typeof target[key] !== "object") continue;',
-        "            if (fill(target[key], value)) wrote = true;",
+        "            const branch = target[key];",
+        "            if (branch === undefined) {",
+        "                const fresh = {};",
+        "                if (fill(fresh, value)) { target[key] = fresh; wrote = true; }",
+        '            } else if (branch && typeof branch === "object" && !Array.isArray(branch)) {',
+        "                if (fill(branch, value)) wrote = true;",
+        "            }",
         "        } else if (target[key] === undefined) {",
         "            target[key] = value; wrote = true;",
         "        }",

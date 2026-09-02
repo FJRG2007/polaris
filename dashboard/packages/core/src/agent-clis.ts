@@ -148,6 +148,19 @@ export type AgentFirstRunValue =
  */
 export const FIRST_RUN_WORKDIR = "{workdir}";
 
+/**
+ * Everything a fresh Claude Code asks before it will run, in one answer.
+ *
+ * One object rather than one per question because the file is the unit: which
+ * of the two config files gets read is decided by `CLAUDE_CONFIG_DIR` and not
+ * by the key, so both files need all of it - and answering a file once is one
+ * read-modify-write and one line on the terminal naming the file it wrote.
+ */
+const CLAUDE_CONFIG_ANSWER: Readonly<Record<string, AgentFirstRunValue>> = {
+    hasCompletedOnboarding: true,
+    projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
+};
+
 export interface AgentCli {
     /** Stable id. Stored on a session, so it never changes once shipped. */
     readonly id: string;
@@ -287,23 +300,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
             //
             // Both are written because Polaris starts the tool both ways: with
             // Enigma, and without it when the operator has turned it off.
-            { file: ".claude/.claude.json", json: { hasCompletedOnboarding: true } },
-            { file: ".claude.json", json: { hasCompletedOnboarding: true } },
+            //
+            // The folder is answered in both for the same reason. Read off the
+            // tool's own message, which names the key and says in as many words
+            // that setting it is the alternative to accepting the dialog by
+            // hand: "accept the trust dialog here once interactively, or set
+            // projects[...].hasTrustDialogAccepted". It lives in whichever of
+            // the two files is being read, exactly as the flag above it does, so
+            // a bare launch with Enigma off finds it answered too.
+            { file: ".claude/.claude.json", json: CLAUDE_CONFIG_ANSWER },
+            { file: ".claude.json", json: CLAUDE_CONFIG_ANSWER },
             // Settings were always right: they live in the configuration home
             // under their own name, which is the same path either way.
-            { file: ".claude/settings.json", json: { theme: "dark" } },
-            // And the folder. Read off the tool's own message, which names the
-            // key and says in as many words that setting it is the alternative
-            // to accepting the dialog by hand: "accept the trust dialog here
-            // once interactively, or set projects[...].hasTrustDialogAccepted".
-            //
-            // It goes only in the configuration home, because that is the file
-            // this is stored in and there is no second place for it - unlike the
-            // onboarding flag, which a bare launch keeps beside it.
-            {
-                file: ".claude/.claude.json",
-                json: { projects: { [FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } } }
-            }
+            { file: ".claude/settings.json", json: { theme: "dark" } }
         ]
     },
     {

@@ -186,14 +186,14 @@ describe("the tool's own first-run wizard", () => {
         // one its own startup tests before showing the wizard; the colour scheme
         // lives in the settings file rather than beside the flag, which is
         // exactly the sort of thing that cannot be guessed.
+        const answer = {
+            hasCompletedOnboarding: true,
+            projects: { [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
+        };
         expect(claude.firstRun).toEqual([
-            { file: ".claude/.claude.json", json: { hasCompletedOnboarding: true } },
-            { file: ".claude.json", json: { hasCompletedOnboarding: true } },
-            { file: ".claude/settings.json", json: { theme: "dark" } },
-            {
-                file: ".claude/.claude.json",
-                json: { projects: { [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } } }
-            }
+            { file: ".claude/.claude.json", json: answer },
+            { file: ".claude.json", json: answer },
+            { file: ".claude/settings.json", json: { theme: "dark" } }
         ]);
     });
 
@@ -219,11 +219,24 @@ describe("the tool's own first-run wizard", () => {
         // Per folder rather than global, because that is where the tool records
         // it - its own message says so: accept the dialog once interactively,
         // or set projects[...].hasTrustDialogAccepted.
-        const trust = claude.firstRun.find((one) => "projects" in one.json);
-        expect(trust?.file).toBe(".claude/.claude.json");
-        expect(trust?.json).toEqual({
-            projects: { [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true } }
-        });
+        const trust = claude.firstRun.filter((one) => "projects" in one.json);
+        expect(trust.map((one) => one.file)).toEqual([".claude/.claude.json", ".claude.json"]);
+        for (const one of trust) {
+            expect(one.json.projects).toEqual({
+                [core.FIRST_RUN_WORKDIR]: { hasTrustDialogAccepted: true }
+            });
+        }
+    });
+
+    it("answers every question a file holds in one pass over it", () => {
+        // Which of the two files gets read is decided by `CLAUDE_CONFIG_DIR`,
+        // not by the key, so both hold everything - and each file is read,
+        // merged and named on the terminal once rather than once per question.
+        expect(claude.firstRun.map((one) => one.file)).toEqual([
+            ".claude/.claude.json",
+            ".claude.json",
+            ".claude/settings.json"
+        ]);
     });
 
     it("stands the folder in for a path only the machine knows", () => {
@@ -242,8 +255,16 @@ describe("the tool's own first-run wizard", () => {
         // Two sessions on one machine work in two folders, and the second must
         // not take the first's answer away with it.
         const script = commands.firstRunScript(claude.firstRun);
-        expect(script).toContain("if (fill(target[key], value)) wrote = true;");
-        expect(script).toContain("if (target[key] === undefined) target[key] = {};");
+        expect(script).toContain("if (fill(branch, value)) wrote = true;");
+    });
+
+    it("leaves no empty branch behind for an answer it skipped", () => {
+        // The sign-in container has no worktree, so the folder's answer is
+        // skipped - and a `projects: {}` written into the tool's own file for a
+        // question nobody answered is a change made for nothing.
+        const script = commands.firstRunScript(claude.firstRun);
+        expect(script).toContain("if (fill(fresh, value)) { target[key] = fresh; wrote = true; }");
+        expect(script).not.toContain("target[key] = {};");
     });
 
     it("says on the terminal where it wrote, because where a tool keeps this moves", () => {
