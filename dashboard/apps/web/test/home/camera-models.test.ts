@@ -24,6 +24,7 @@ import {
     askPowerFor,
     cameraBrands,
     connectionsFor,
+    searchBrands,
     modelsOfBrand,
     cameraModel,
     drawsFromBattery,
@@ -235,5 +236,33 @@ describe("a camera that is already connected", () => {
 
     it("takes the model's own first choice for a camera with nothing set yet", () => {
         expect(camera({ modelId: "tapo-c200", vendor: "" }).vendor).toBe("tapo");
+    });
+});
+
+describe("finding the make", () => {
+    it("finds it by its own name, however it is typed", () => {
+        expect(searchBrands("tapo").map((entry) => entry.brand)).toContain("Tapo");
+        expect(searchBrands("REOLINK").map((entry) => entry.brand)).toEqual(["Reolink"]);
+    });
+
+    it("finds it by the parent company, which is the name on the box", () => {
+        const found = searchBrands("tp-link").map((entry) => entry.brand);
+        expect(found).toContain("Tapo");
+        expect(found).toContain("VIGI");
+        expect(found).not.toContain("Reolink");
+    });
+
+    it("finds it by a camera it sells, for somebody who knows the model and not the brand", () => {
+        // The reason this searches models too: knowing you own a C410 is common,
+        // knowing TP-Link calls its camera line Tapo is not.
+        expect(searchBrands("c410").map((entry) => entry.brand)).toEqual(["Tapo"]);
+    });
+
+    it("lists every make when nothing has been typed", () => {
+        expect(searchBrands("")).toHaveLength(cameraBrands().length);
+    });
+
+    it("answers nothing for a make nobody sells", () => {
+        expect(searchBrands("zxqw")).toHaveLength(0);
     });
 });
