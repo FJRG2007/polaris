@@ -316,7 +316,14 @@ export function CameraDialog({
                 setError(`The camera is reachable, but its video would not open. ${stream.error}`);
                 return;
             }
-            setTested("The video opened. This camera works.");
+            setTested(
+                stream.streams === "main-only"
+                    ? // Worth saying rather than hiding: it is the whole reason
+                      // this camera drew nothing, and it means every picture of
+                      // it now costs the full-size stream.
+                      "The video opened. This camera publishes only its full-size stream, so that is what Polaris uses."
+                    : "The video opened. This camera works."
+            );
             return;
         }
         setTested(

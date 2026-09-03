@@ -68,22 +68,36 @@ export async function cameraStill(
     options: { width?: number; smooth?: boolean; signal?: AbortSignal } = {}
 ): Promise<Buffer> {
     const { endpoint } = await relayForCamera(installedAppId, cameraId);
-    const image = await snapshot(endpoint, cameraId, "sub", {
-        ...(options.width ? { width: options.width } : {}),
-        // A second by default. It is what makes a wall of tiles refreshing
-        // together cost one decode per camera rather than one per tile, and a
-        // picture up to a second old is not one anybody can tell from the live
-        // one when it is a postcard among eleven others.
-        //
-        // It is also a hard ceiling on how many different pictures anybody can
-        // be shown, and that is the whole of what "it looks like frames rather
-        // than video" means. So one camera being watched on its own asks for
-        // less: nothing else is competing for the relay, and the difference
-        // between one picture a second and four is the difference between a
-        // slideshow and something a person reads as moving.
-        cacheMs: options.smooth ? SMOOTH_CACHE_MS : 1000,
-        ...(options.signal ? { signal: options.signal } : {})
-    });
+    const ask = (quality: "main" | "sub") =>
+        snapshot(endpoint, cameraId, quality, {
+            ...(options.width ? { width: options.width } : {}),
+            // A second by default. It is what makes a wall of tiles refreshing
+            // together cost one decode per camera rather than one per tile, and a
+            // picture up to a second old is not one anybody can tell from the live
+            // one when it is a postcard among eleven others.
+            //
+            // It is also a hard ceiling on how many different pictures anybody can
+            // be shown, and that is the whole of what "it looks like frames rather
+            // than video" means. So one camera being watched on its own asks for
+            // less: nothing else is competing for the relay, and the difference
+            // between one picture a second and four is the difference between a
+            // slideshow and something a person reads as moving.
+            cacheMs: options.smooth ? SMOOTH_CACHE_MS : 1000,
+            ...(options.signal ? { signal: options.signal } : {})
+        });
+    // The small stream first, and the good one when there is no small one.
+    //
+    // Not every camera publishes two. Over RTSP that costs nothing to get wrong,
+    // because a camera with no sub path is given the main one as both and the
+    // small stream is the good stream under another name. The maker's own
+    // protocols have no paths to do that with - the stream is chosen by a number
+    // - so asking for the small one on a camera that has only the good one is a
+    // request the relay answers with no picture at all. That is a camera which
+    // works perfectly and draws nothing, on every tile and in every event.
+    //
+    // Second call only on the cameras where the first found nothing, and their
+    // sub stream is not going to start existing later.
+    const image = (await ask("sub")) ?? (await ask("main"));
     if (!image) throw new CameraOfflineError("The camera did not send a picture");
     return image;
 }
