@@ -27,13 +27,17 @@ const ENTRYPOINT = readFileSync(
 );
 
 /** The allowlist as the relay will read it: the items under `allow_paths`, up to
- *  the blank line that ends the block. */
+ *  the blank line that ends the block. A comment between items is skipped rather
+ *  than read as the end of it: every path in there has a reason and the reason
+ *  belongs beside the path, so stopping at the first one would leave this file
+ *  quietly checking half the list. */
 function allowedPaths(): string[] {
     const lines = ENTRYPOINT.split("\n");
     const start = lines.findIndex((line) => line.trim() === "allow_paths:");
     expect(start).toBeGreaterThan(-1);
     const paths: string[] = [];
     for (const line of lines.slice(start + 1)) {
+        if (/^\s*#/.test(line)) continue;
         const match = /^\s+- (\/\S+)$/.exec(line);
         if (!match) break;
         paths.push(match[1]!);

@@ -32,6 +32,12 @@ api:
   # Apple devices, which take no other format.
   allow_paths:
     - /api/streams
+    # go2rtc's own log. The only place its reason for a failure exists: asking
+    # for a frame from a camera that refused the password answers 200 with an
+    # empty body, and the stream record carries no error either - so without
+    # this, a working camera and a rejected one are the same answer, and the
+    # person reading the screen has no container to look in.
+    - /api/log
     - /api/frame.jpeg
     - /api/stream.mp4
     - /api/stream.m3u8
