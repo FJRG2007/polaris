@@ -17,7 +17,7 @@
  * Server-only.
  */
 
-import { relaySource } from "@/lib/home/vendors";
+import { redactSource, relaySource } from "@/lib/home/vendors";
 import { HomeError } from "@/lib/home/home-error";
 
 import type { CameraTarget } from "@/lib/home/cameras";
@@ -248,6 +248,74 @@ export async function snapshot(
     }).catch(() => null);
     if (!response?.ok) return null;
     return Buffer.from(await response.arrayBuffer());
+}
+
+/**
+ * How long a relay's own words may be before they stop being an explanation.
+ *
+ * They go on a screen, and a screen has room for a sentence. The useful part of
+ * one of these is always at the front - "401 Unauthorized", "unsupported codec"
+ * - and what trails it is the address it was trying.
+ */
+const REASON_MAX = 300;
+
+/**
+ * A frame, or why there was not one.
+ *
+ * `snapshot` answers null for everything: a camera asleep, a password the camera
+ * refused, a model the relay cannot open, a relay that is not running. Those
+ * have nothing in common as fixes, and the person reading the screen cannot open
+ * a terminal to tell them apart - so the one place that knows, the relay, is
+ * asked and its answer is carried out.
+ *
+ * Its answer is not shown raw. The relay's message quotes the source it was
+ * given, and that source carries the camera password, so everything on its way
+ * out goes through `redactSource` first. What is left is the relay's own reason,
+ * which is the half worth reading.
+ */
+export async function frameOrReason(
+    endpoint: RelayEndpoint,
+    cameraId: string,
+    quality: "main" | "sub" = "sub"
+): Promise<{ frame: Buffer } | { reason: string }> {
+    const query = new URLSearchParams({ src: streamName(cameraId, quality) });
+    const response = await relayFetch(endpoint, `/api/frame.jpeg?${query.toString()}`, {
+        timeoutMs: 15_000
+    }).catch(() => null);
+    if (!response) return { reason: "The relay did not answer." };
+    if (response.ok) {
+        const frame = Buffer.from(await response.arrayBuffer());
+        // A 200 with nothing in it is a relay that connected and got no picture,
+        // which reads as success everywhere that only checks the status.
+        return frame.length > 0 ? { frame } : { reason: "The camera answered with no picture." };
+    }
+    const said = (await response.text().catch(() => "")).trim();
+    const reason = said || (await streamError(endpoint, cameraId, quality));
+    return {
+        reason: reason
+            ? redactSource(reason).slice(0, REASON_MAX)
+            : `The relay refused it (${response.status}).`
+    };
+}
+
+/** What the relay recorded against a stream, when asking for a frame said
+ *  nothing useful. Best effort: this is already the second question. */
+async function streamError(
+    endpoint: RelayEndpoint,
+    cameraId: string,
+    quality: "main" | "sub"
+): Promise<string> {
+    const query = new URLSearchParams({ src: streamName(cameraId, quality) });
+    const response = await relayFetch(endpoint, `/api/streams?${query.toString()}`, {
+        timeoutMs: 5000
+    }).catch(() => null);
+    if (!response?.ok) return "";
+    const body = await response.text().catch(() => "");
+    // Read as text rather than parsed: go2rtc puts the failure in different
+    // places depending on how far the connection got, and what is wanted here is
+    // the sentence rather than a shape.
+    const found = body.match(/"error"\s*:\s*"([^"]{1,400})"/);
+    return found?.[1] ?? "";
 }
 
 /** Where a viewer's player connects, as a path on the relay. The browser never

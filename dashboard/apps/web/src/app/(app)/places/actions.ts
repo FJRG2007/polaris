@@ -385,6 +385,46 @@ export async function probeCameraAction(input: unknown): Promise<{
     };
 }
 
+/**
+ * Open a saved camera's stream once, and say what happened.
+ *
+ * The reachability check above answers whether something is at that address. It
+ * cannot answer the question everybody actually has, which is why there is no
+ * picture - a password the camera refused, a model the relay cannot open and a
+ * camera that has gone back to sleep all look identical from outside, and the
+ * person reading the screen has no terminal and no container logs to tell them
+ * apart. The relay knows. This asks it and carries its answer back.
+ *
+ * Only for a camera that already exists: it publishes the stream and consumes
+ * one frame, which is the same path a viewer takes, so a pass here means the
+ * camera really can be watched rather than that it is merely reachable.
+ */
+export async function testCameraStreamAction(
+    id: string
+): Promise<{ ok?: true; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(async () => {
+        const camera = await cameras.getCamera(install.id, id);
+        if (!camera) throw new Error("Camera not found");
+        const target = await cameras.cameraTarget(install.id, id);
+        if (!target) throw new Error("Camera not found");
+        const endpoint = await relay.ensureRelay(
+            install.ownerId,
+            user.id,
+            relay.relayServerFor(camera.reachVia)
+        );
+        await relay.publishCamera(endpoint, target, camera.vendor);
+        // The small stream, for the same reason the wall uses it: nothing looks
+        // at this picture, and the only question is whether one arrives.
+        return relay.frameOrReason(endpoint, camera.id, "sub");
+    });
+    if (result.error) return { error: result.error };
+    if (!result.value || "reason" in result.value) {
+        return { error: result.value?.reason ?? "The relay did not answer." };
+    }
+    return { ok: true };
+}
+
 /** Look for cameras nobody has added yet. */
 export async function discoverCamerasAction(input: unknown): Promise<{
     found?: Awaited<ReturnType<typeof discoverCameras>>;

@@ -391,13 +391,18 @@ export function CameraTile({
                             <Placeholder
                                 icon={<Camera className="size-5 shrink-0" />}
                                 label={
-                                    // A battery camera is asleep far more often
-                                    // than it is broken, and it is never probed
-                                    // on a timer - so there is no outage clock
-                                    // behind it and "not answering" would be
-                                    // saying something Polaris does not know.
+                                    // A battery camera is never probed on a
+                                    // timer, so there is no outage clock behind
+                                    // it and "not answering since" would be
+                                    // quoting one that does not exist. It does
+                                    // not say "asleep" either: asleep is the
+                                    // likeliest reason and it is still a guess,
+                                    // and the reader who has the camera open in
+                                    // its own app is being told something they
+                                    // can see is false. Its settings ask the
+                                    // relay and give the real answer.
                                     battery
-                                        ? "Asleep. Open it to wake it."
+                                        ? "No picture. Open its settings to test it."
                                         : since
                                           ? `Not answering since ${since}`
                                           : "Not answering"
