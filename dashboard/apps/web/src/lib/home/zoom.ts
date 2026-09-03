@@ -28,6 +28,37 @@ export interface Zoom {
     readonly y: number;
 }
 
+/**
+ * How much of the frame the picture actually covers when nothing is zoomed.
+ *
+ * Never larger than the frame in either direction, and smaller in one of them
+ * whenever the camera's shape is not the frame's - the picture is drawn to fit
+ * inside rather than to fill, so a 4:3 doorbell in a 16:9 dialog has a bar down
+ * each side and covers `{ x: 0.75, y: 1 }`.
+ *
+ * This is the thing the clamping has to be measured against. Measured against
+ * the frame instead, the picture can be dragged until one of those bars is in
+ * the middle of the screen, which reads as a camera that has come loose from its
+ * mount rather than as a control that let go.
+ */
+export interface Cover {
+    readonly x: number;
+    readonly y: number;
+}
+
+/** A picture that fills the frame, which is what a camera the same shape as the
+ *  dialog does and what the pure callers assume when they say nothing. */
+export const FILLS: Cover = { x: 1, y: 1 };
+
+/** What a picture of this shape covers in a frame of that shape. Both are width
+ *  over height; either being unknown means "assume it fills", which is what the
+ *  first frame is drawn under. */
+export function coverOf(picture: number | null | undefined, frame: number | null | undefined): Cover {
+    if (!picture || !frame || picture <= 0 || frame <= 0) return FILLS;
+    // Wider than the frame: it fits across and leaves a bar above and below.
+    return picture > frame ? { x: 1, y: frame / picture } : { x: picture / frame, y: 1 };
+}
+
 /** Not zoomed at all, which is where every camera opens. */
 export const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 
@@ -53,23 +84,25 @@ function clampScale(scale: number): number {
 /**
  * The shift, held inside what the picture can actually cover.
  *
- * At a scale of `s` the picture is `s` times the frame, so it can be moved by
- * half the difference in each direction before an edge comes into view. At a
- * scale of 1 that is zero, which is what puts the picture back in the middle the
- * moment somebody zooms all the way out.
+ * At a scale of `s` the picture covers `s * cover` of the frame, so it can be
+ * moved by half of whatever that is over one before its edge comes into view.
+ * Where it does not reach across the frame at all - a narrow picture at a low
+ * zoom - there is no room and it stays in the middle, which is also what puts it
+ * back the moment somebody zooms all the way out.
  */
-export function clampOffset(zoom: Zoom): Zoom {
+export function clampOffset(zoom: Zoom, cover: Cover = FILLS): Zoom {
     const scale = clampScale(zoom.scale);
-    const room = (scale - 1) / 2;
-    const hold = (value: number) => {
+    const roomIn = (reach: number) => Math.max(0, (scale * reach - 1) / 2);
+    const hold = (value: number, reach: number) => {
         if (!Number.isFinite(value)) return 0;
+        const room = roomIn(Number.isFinite(reach) && reach > 0 ? reach : 1);
         const held = Math.min(room, Math.max(-room, value));
         // Clamping to zero from below yields negative zero, which compares equal
         // to zero and prints as "-0.0000%". Not wrong, and not what anybody wants
         // to find in a transform they are reading.
         return held === 0 ? 0 : held;
     };
-    return { scale, x: hold(zoom.x), y: hold(zoom.y) };
+    return { scale, x: hold(zoom.x, cover.x), y: hold(zoom.y, cover.y) };
 }
 
 /**
@@ -84,14 +117,19 @@ export function clampOffset(zoom: Zoom): Zoom {
  * still be under it afterwards, so the shift moves by the point's distance from
  * the centre times the change in scale.
  */
-export function zoomBy(zoom: Zoom, factor: number, at: { x: number; y: number } = { x: 0, y: 0 }): Zoom {
+export function zoomBy(
+    zoom: Zoom,
+    factor: number,
+    at: { x: number; y: number } = { x: 0, y: 0 },
+    cover: Cover = FILLS
+): Zoom {
     const scale = clampScale(zoom.scale * (Number.isFinite(factor) && factor > 0 ? factor : 1));
     // Clamped first, so a factor that would take it past either end moves the
     // picture by the amount it actually zoomed rather than by the amount asked
     // for - otherwise holding the wheel at full zoom keeps panning.
     const applied = scale / zoom.scale;
     const shift = (value: number, point: number) => value * applied - point * (applied - 1);
-    return clampOffset({ scale, x: shift(zoom.x, at.x), y: shift(zoom.y, at.y) });
+    return clampOffset({ scale, x: shift(zoom.x, at.x), y: shift(zoom.y, at.y) }, cover);
 }
 
 /**
@@ -103,13 +141,16 @@ export function zoomBy(zoom: Zoom, factor: number, at: { x: number; y: number } 
  * feeling broken. That it covers less of the picture when zoomed in follows by
  * itself, because there is more picture per pixel of frame.
  */
-export function panBy(zoom: Zoom, dx: number, dy: number): Zoom {
+export function panBy(zoom: Zoom, dx: number, dy: number, cover: Cover = FILLS): Zoom {
     if (!isZoomed(zoom)) return zoom;
-    return clampOffset({
-        scale: zoom.scale,
-        x: zoom.x + (Number.isFinite(dx) ? dx : 0),
-        y: zoom.y + (Number.isFinite(dy) ? dy : 0)
-    });
+    return clampOffset(
+        {
+            scale: zoom.scale,
+            x: zoom.x + (Number.isFinite(dx) ? dx : 0),
+            y: zoom.y + (Number.isFinite(dy) ? dy : 0)
+        },
+        cover
+    );
 }
 
 /**
@@ -123,7 +164,7 @@ export function panBy(zoom: Zoom, dx: number, dy: number): Zoom {
  * clamping below it - which is in frame fractions - would let the picture be
  * dragged off its own edge by a factor of the zoom.
  */
-export function zoomTransform(zoom: Zoom): string {
-    const { scale, x, y } = clampOffset(zoom);
+export function zoomTransform(zoom: Zoom, cover: Cover = FILLS): string {
+    const { scale, x, y } = clampOffset(zoom, cover);
     return `translate(${(x * 100).toFixed(4)}%, ${(y * 100).toFixed(4)}%) scale(${scale})`;
 }

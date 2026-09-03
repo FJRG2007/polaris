@@ -34,6 +34,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     NO_ZOOM,
     ZOOM_STEP,
+    coverOf,
     isZoomed,
     panBy,
     zoomBy,
@@ -258,6 +259,16 @@ export function CameraViewer({
     const dragging = useRef<{ x: number; y: number } | null>(null);
 
     /**
+     * How much of the frame the picture covers before any zoom.
+     *
+     * The picture is drawn to fit inside rather than to fill, so a camera whose
+     * shape is not the dialog's leaves a bar down two of its sides - and every
+     * limit below is measured against the picture rather than against the frame,
+     * or it can be dragged until one of those bars is in the middle.
+     */
+    const cover = useMemo(() => coverOf(shape, surfaceShape), [shape, surfaceShape]);
+
+    /**
      * Whether the sound is on.
      *
      * Off to begin with, and not only out of politeness: a browser refuses to
@@ -305,12 +316,17 @@ export function CameraViewer({
         if (!element) return;
         const onWheel = (event: WheelEvent) => {
             event.preventDefault();
-            const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-            setZoom((current) => zoomBy(current, factor, pointAt(event)));
+            // Proportional to how hard the wheel was turned, rather than a fixed
+            // step per event. A notch is a small push and a trackpad sends a
+            // stream of tiny ones, and a step and a half on each of those is a
+            // picture that leaps past whatever was being aimed at.
+            const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+            const amount = Math.max(-240, Math.min(240, event.deltaY * lines));
+            setZoom((current) => zoomBy(current, Math.exp(-amount / 320), pointAt(event), cover));
         };
         element.addEventListener("wheel", onWheel, { passive: false });
         return () => element.removeEventListener("wheel", onWheel);
-    }, [pointAt]);
+    }, [pointAt, cover]);
 
     const toggleFullscreen = () => {
         if (document.fullscreenElement) void document.exitFullscreen();
@@ -334,7 +350,7 @@ export function CameraViewer({
                             // A second press puts it back rather than pushing
                             // further in: the way out has to be as easy as the
                             // way in, and there is no other gesture for it.
-                            isZoomed(current) ? NO_ZOOM : zoomBy(current, ZOOM_STEP * 2, pointAt(event))
+                            isZoomed(current) ? NO_ZOOM : zoomBy(current, ZOOM_STEP * 2, pointAt(event), cover)
                         )
                     }
                     onPointerDown={(event) => {
@@ -347,14 +363,18 @@ export function CameraViewer({
                         if (!from) return;
                         const to = pointAt(event);
                         dragging.current = to;
-                        setZoom((current) => panBy(current, to.x - from.x, to.y - from.y));
+                        setZoom((current) => panBy(current, to.x - from.x, to.y - from.y, cover));
                     }}
                     onPointerUp={() => (dragging.current = null)}
                     onPointerCancel={() => (dragging.current = null)}
                 >
+                {/* No transition on this. It is dragged and wheeled, and an
+                    eased transform lags a finger by its own duration - which
+                    reads as a picture that will not follow rather than as a
+                    picture that is being animated nicely. */}
                 <div
-                    className="relative origin-center transition-transform duration-fast"
-                    style={{ transform: zoomTransform(zoom) }}
+                    className="relative origin-center will-change-transform"
+                    style={{ transform: zoomTransform(zoom, cover) }}
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element -- a live
                         frame is never the same twice, so there is nothing for the
@@ -515,13 +535,13 @@ export function CameraViewer({
                         <Control
                             label="Zoom out"
                             disabled={!isZoomed(zoom)}
-                            onClick={() => setZoom((current) => zoomBy(current, 1 / ZOOM_STEP))}
+                            onClick={() => setZoom((current) => zoomBy(current, 1 / ZOOM_STEP, undefined, cover))}
                         >
                             <ZoomOut className="size-4 shrink-0" />
                         </Control>
                         <Control
                             label="Zoom in"
-                            onClick={() => setZoom((current) => zoomBy(current, ZOOM_STEP))}
+                            onClick={() => setZoom((current) => zoomBy(current, ZOOM_STEP, undefined, cover))}
                         >
                             <ZoomIn className="size-4 shrink-0" />
                         </Control>
