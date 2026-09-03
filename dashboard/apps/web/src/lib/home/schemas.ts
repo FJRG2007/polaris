@@ -43,12 +43,16 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.mainPath === "string") value.mainPath = normalizeStreamPath(value.mainPath);
     if (typeof value.subPath === "string") value.subPath = normalizeStreamPath(value.subPath);
     if (typeof value.username === "string") value.username = value.username.trim();
-    // The model decides the make, rather than the two being asked separately and
-    // left to disagree. A camera whose model this build does not know keeps the
-    // make it was set up with: that is every camera added before the list
-    // existed, and they are working.
+    // The model narrows how the camera can be reached; it does not overrule how
+    // it IS reached. A wired Tapo answers RTSP and TP-Link's own protocol both,
+    // and a camera that has been streaming over one of them for months must not
+    // be moved onto the other because somebody opened the form to fix its name.
+    // So what it is on wins wherever the model still supports it.
     if (typeof value.modelId === "string" && cameraModel(value.modelId)) {
-        value.vendor = vendorForModel(value.modelId);
+        value.vendor = vendorForModel(
+            value.modelId,
+            typeof value.vendor === "string" ? value.vendor : null
+        );
     }
     // A camera that cannot run off a battery is not asked how it is powered, so
     // an answer arriving for one is not a preference to keep - it is a stale

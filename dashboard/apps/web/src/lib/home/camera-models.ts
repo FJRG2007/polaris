@@ -57,8 +57,22 @@ export interface CameraModel {
     readonly name: string;
     /** Who makes it, as its owner would say it. */
     readonly brand: string;
-    /** The profile in vendors.ts that says how to talk to it. */
-    readonly vendor: string;
+    /**
+     * The ways Polaris can reach it, best first, as profile ids from vendors.ts.
+     *
+     * More than one is the normal case rather than the exception, and they are
+     * not equivalent. A wired Tapo answers RTSP, which is the better transport
+     * for video and what its owner most likely already has working - and it also
+     * answers TP-Link's own protocol, which needs no camera account and carries
+     * two-way audio. Which of those a camera should use is its owner's call, so
+     * the list is offered rather than resolved.
+     *
+     * The first is only the default for a camera being added. One that already
+     * exists keeps what it is on, as long as this model still supports it:
+     * changing the transport under a working camera is how a picker that was
+     * meant to help takes the picture away.
+     */
+    readonly connections: readonly string[];
     /** Other words somebody might type looking for it - the parent company, the
      *  old name, the way it is written on the invoice. */
     readonly search?: readonly string[];
@@ -99,12 +113,16 @@ const TAPO_CONDITIONAL = ["D225", "D235", "TD25"] as const;
 const CONDITIONAL_NOTE =
     "This one answers RTSP only when it is wired for power, has the jumper fitted, and is set to stay awake in the Tapo app. On its battery it publishes nothing, and Polaris reaches it over TP-Link's own protocol instead.";
 
-function tapo(name: string, vendor: string, extra: Partial<CameraModel> = {}): CameraModel {
+function tapo(
+    name: string,
+    connections: readonly string[],
+    extra: Partial<CameraModel> = {}
+): CameraModel {
     return {
         id: `tapo-${name.toLowerCase()}`,
         name,
         brand: "Tapo",
-        vendor,
+        connections,
         // Nobody looking for one of these types "Tapo" first. The box says
         // TP-Link and so does the invoice.
         search: ["tp-link", "tplink", "tp link"],
@@ -112,17 +130,25 @@ function tapo(name: string, vendor: string, extra: Partial<CameraModel> = {}): C
     };
 }
 
+/** A wired Tapo answers both, and they are a real choice: RTSP is the better
+ *  transport and wants a camera account; TP-Link's own protocol wants only the
+ *  account password and carries two-way audio. */
+const TAPO_BOTH = ["tapo", "tapo-cloud"] as const;
+
 export const CAMERA_MODELS: readonly CameraModel[] = [
-    ...TAPO_BATTERY.map((name) => tapo(name, "tapo-battery", { battery: true })),
+    ...TAPO_BATTERY.map((name) => tapo(name, ["tapo-battery"], { battery: true })),
+    // The native protocol first even though RTSP is listed: on these it is the
+    // only one that works until the camera is wired up, and offering the wired
+    // one as the default would be defaulting to a setup most of them are not in.
     ...TAPO_CONDITIONAL.map((name) =>
-        tapo(name, "tapo-battery", { battery: true, note: CONDITIONAL_NOTE })
+        tapo(name, ["tapo-battery", "tapo"], { battery: true, note: CONDITIONAL_NOTE })
     ),
-    ...TAPO_RTSP.map((name) => tapo(name, "tapo-cloud")),
+    ...TAPO_RTSP.map((name) => tapo(name, TAPO_BOTH)),
     {
         id: "tapo-other",
         name: "Another Tapo camera",
         brand: "Tapo",
-        vendor: "tapo-cloud",
+        connections: [...TAPO_BOTH, "tapo-battery"],
         search: ["tp-link", "tplink", "tp link"],
         // Asked rather than assumed: a model nobody here has heard of is as
         // likely to be a battery one as not, and the answer decides whether
@@ -133,25 +159,30 @@ export const CAMERA_MODELS: readonly CameraModel[] = [
         id: "vigi-other",
         name: "Any VIGI camera",
         brand: "VIGI",
-        vendor: "vigi",
+        connections: ["vigi"],
         search: ["tp-link", "tplink", "tp link"]
     },
-    { id: "reolink-other", name: "Any Reolink camera", brand: "Reolink", vendor: "reolink" },
-    { id: "hikvision-other", name: "Any Hikvision camera", brand: "Hikvision", vendor: "hikvision" },
-    { id: "dahua-other", name: "Any Dahua camera", brand: "Dahua", vendor: "dahua" },
-    { id: "amcrest-other", name: "Any Amcrest camera", brand: "Amcrest", vendor: "amcrest" },
+    { id: "reolink-other", name: "Any Reolink camera", brand: "Reolink", connections: ["reolink"] },
+    {
+        id: "hikvision-other",
+        name: "Any Hikvision camera",
+        brand: "Hikvision",
+        connections: ["hikvision"]
+    },
+    { id: "dahua-other", name: "Any Dahua camera", brand: "Dahua", connections: ["dahua"] },
+    { id: "amcrest-other", name: "Any Amcrest camera", brand: "Amcrest", connections: ["amcrest"] },
     {
         id: "onvif-other",
         name: "Any ONVIF camera",
         brand: "Other",
-        vendor: "onvif",
+        connections: ["onvif"],
         search: ["generic", "any", "other"]
     },
     {
         id: "generic-other",
         name: "Something else",
         brand: "Other",
-        vendor: "generic",
+        connections: ["generic"],
         search: ["generic", "any", "unknown", "rtsp"]
     }
 ];
@@ -180,28 +211,62 @@ export function askPowerFor(modelId: string | null | undefined): boolean {
     return cameraModel(modelId)?.battery === true;
 }
 
+/** One value, reduced to what a comparison should ignore: case, spaces and the
+ *  hyphens people put in "tp-link" about half the time. */
+function fold(value: string): string {
+    return value.toLowerCase().replace(/[\s._-]+/g, "");
+}
+
+/** Every word a model answers to, folded. */
+function wordsFor(model: CameraModel): readonly string[] {
+    return [model.name, model.brand, ...(model.search ?? [])].map(fold);
+}
+
+/**
+ * How well one word matches this model, or null when it does not.
+ *
+ * Lower is better, and the order is the order somebody expects: the thing they
+ * typed exactly, then the thing that starts with it, then the thing that merely
+ * contains it.
+ */
+function scoreWord(model: CameraModel, word: string): number | null {
+    const words = wordsFor(model);
+    if (words[0] === word) return 0;
+    if (words[0]!.startsWith(word)) return 1;
+    if (words.some((entry) => entry === word)) return 2;
+    if (words.some((entry) => entry.startsWith(word))) return 3;
+    if (words.some((entry) => entry.includes(word))) return 4;
+    return null;
+}
+
 /**
  * What the picker shows for a typed query.
  *
- * Matched against the brand, the name and the words somebody would actually
- * type - "tplink" has to find Tapo, because that is the name on the box and it
- * is not the name in this list. Ordered by how well it matches rather than
- * alphabetically: a search for "c410" that puts C410 fourteenth is a search that
- * did not work.
+ * Every word has to match something, and they are matched separately: "tapo
+ * c410" is a brand and a model, and joining them into one string is a search for
+ * a camera called "tapoc410", which nothing is. That is not a corner case - it
+ * is how anybody types the name of a camera they own, and it found nothing.
+ *
+ * Matched against the name on the box AND the name on the invoice: "tplink" has
+ * to reach Tapo, because nobody buying one of these thinks of Tapo as the
+ * manufacturer.
+ *
+ * Ordered by how well it matches rather than alphabetically: a search for "c410"
+ * that puts C410 fourteenth is a search that did not work.
  */
 export function searchModels(query: string): readonly CameraModel[] {
-    const asked = query.trim().toLowerCase().replace(/[\s-]+/g, "");
-    if (!asked) return CAMERA_MODELS;
+    const asked = query.trim().toLowerCase().split(/\s+/).map(fold).filter(Boolean);
+    if (asked.length === 0) return CAMERA_MODELS;
     const scored: { model: CameraModel; score: number }[] = [];
     for (const model of CAMERA_MODELS) {
-        const name = model.name.toLowerCase().replace(/[\s-]+/g, "");
-        const words = [name, model.brand.toLowerCase(), ...(model.search ?? [])].map((word) =>
-            word.toLowerCase().replace(/[\s-]+/g, "")
-        );
-        if (name === asked) scored.push({ model, score: 0 });
-        else if (name.startsWith(asked)) scored.push({ model, score: 1 });
-        else if (words.some((word) => word.startsWith(asked))) scored.push({ model, score: 2 });
-        else if (words.some((word) => word.includes(asked))) scored.push({ model, score: 3 });
+        const scores = asked.map((word) => scoreWord(model, word));
+        // Every word, not any: a second word is somebody narrowing what they
+        // meant, and a list that widens when they do is a list that ignored them.
+        if (scores.some((score) => score === null)) continue;
+        // Ranked on the best word rather than the total, so "tapo c410" ranks on
+        // the C410 rather than being dragged down by the brand it shares with
+        // fifty others.
+        scored.push({ model, score: Math.min(...(scores as number[])) });
     }
     return scored
         .sort(
@@ -211,10 +276,46 @@ export function searchModels(query: string): readonly CameraModel[] {
         .map((entry) => entry.model);
 }
 
-/** The profile a chosen model uses, falling back to the generic one for a model
- *  this build does not know. */
-export function vendorForModel(modelId: string | null | undefined): string {
-    return cameraModel(modelId)?.vendor ?? "generic";
+/** The brands, in the order the picker offers them, with how many cameras each
+ *  has. The order is the list's own: the makes Polaris knows most about first
+ *  and the escape hatches last. */
+export function cameraBrands(): readonly { brand: string; count: number }[] {
+    const counts = new Map<string, number>();
+    for (const model of CAMERA_MODELS) {
+        counts.set(model.brand, (counts.get(model.brand) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([brand, count]) => ({ brand, count }));
+}
+
+/** Every camera one brand makes, in the order they are listed. */
+export function modelsOfBrand(brand: string): readonly CameraModel[] {
+    return CAMERA_MODELS.filter((model) => model.brand === brand);
+}
+
+/**
+ * How Polaris should reach this camera.
+ *
+ * `current` is what it is on now, and it wins wherever this model still supports
+ * it. That rule is the whole point: somebody editing a camera that has been
+ * streaming over RTSP for months, to correct its name, must not have the model
+ * they picked quietly move it onto another protocol and take the picture away.
+ * The model's own first choice is for a camera that has not been set up yet.
+ */
+export function vendorForModel(
+    modelId: string | null | undefined,
+    current?: string | null
+): string {
+    const model = cameraModel(modelId);
+    if (!model) return current || "generic";
+    if (current && model.connections.includes(current)) return current;
+    return model.connections[0] ?? "generic";
+}
+
+/** The ways this model can be reached, for the picker that offers them. Empty
+ *  for a model this build does not know, which is what leaves such a camera on
+ *  the make it was set up with. */
+export function connectionsFor(modelId: string | null | undefined): readonly string[] {
+    return cameraModel(modelId)?.connections ?? [];
 }
 
 /** Whether a model can be pointed, which is the make's claim narrowed by the
@@ -222,5 +323,5 @@ export function vendorForModel(modelId: string | null | undefined): string {
  *  does. */
 export function modelCanPan(modelId: string | null | undefined): boolean {
     const model = cameraModel(modelId);
-    return model ? cameraVendor(model.vendor).ptz === true : false;
+    return model ? model.connections.some((id) => cameraVendor(id).ptz === true) : false;
 }

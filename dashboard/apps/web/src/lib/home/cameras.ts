@@ -14,7 +14,7 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
 
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, rtspUrl } from "@/lib/home/vendors";
+import { cameraVendor, rtspUrl, usesAccountPassword } from "@/lib/home/vendors";
 import { drawsFromBattery, modelCanPan } from "@/lib/home/camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "@/lib/home/schemas";
@@ -192,12 +192,48 @@ function secretColumns(password: string | undefined) {
     return { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId };
 }
 
+/**
+ * The credential this house already holds for the same account, when the camera
+ * being saved has been given none.
+ *
+ * On TP-Link's own protocol the password is the account's rather than the
+ * camera's: a house with four of them is four copies of one password, typed four
+ * times and mistyped once. So the second camera onwards can be added with the
+ * field left empty and take the one already stored.
+ *
+ * Copied as the encrypted blob rather than decrypted and re-encrypted: nothing
+ * here has to see the password to reuse it.
+ */
+async function sharedSecret(installedAppId: string, vendor: string) {
+    if (!usesAccountPassword(vendor)) return null;
+    const rows = await prisma.camera.findMany({
+        where: { installedAppId, encryptedSecret: { not: null } },
+        select: { vendor: true, encryptedSecret: true, secretNonce: true, secretKeyId: true },
+        orderBy: { createdAt: "desc" }
+    });
+    for (const row of rows) {
+        // Only from another camera on an account credential. A camera account is
+        // made per camera, so taking one of those would be handing this camera a
+        // password that was never its own.
+        if (!usesAccountPassword(row.vendor)) continue;
+        if (!row.encryptedSecret || !row.secretNonce || !row.secretKeyId) continue;
+        return {
+            encryptedSecret: row.encryptedSecret,
+            secretNonce: row.secretNonce,
+            secretKeyId: row.secretKeyId
+        };
+    }
+    return null;
+}
+
 export async function createCamera(
     installedAppId: string,
     input: CameraInput
 ): Promise<CameraView> {
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
+    const secret =
+        secretColumns(input.password) ?? (await sharedSecret(installedAppId, input.vendor));
     const row = await prisma.camera.create({
         data: {
             installedAppId,
@@ -223,7 +259,7 @@ export async function createCamera(
             storageTarget: input.storageTarget || null,
             retentionDays: input.retentionDays,
             enabled: input.enabled,
-            ...(secretColumns(input.password) ?? {})
+            ...(secret ?? {})
         }
     });
     return toView(row);

@@ -21,7 +21,13 @@
 import { Camera } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TpLinkMark } from "@/components/brand-icons";
-import { cameraModel, searchModels, type CameraModel } from "@/lib/home/camera-models";
+import {
+    CAMERA_MODELS,
+    cameraModel,
+    modelsOfBrand,
+    searchModels,
+    type CameraModel
+} from "@/lib/home/camera-models";
 import {
     cn,
     DropdownMenu,
@@ -62,17 +68,32 @@ function ModelLabel({ model }: { model: CameraModel }) {
 
 export function ModelPicker({
     value,
+    brand,
     onChange,
     /** What to show when nothing is picked - which is every camera added before
      *  this list existed, and they must not read as broken. */
     placeholder = "Choose the camera"
 }: {
     value: string;
+    /** The make already chosen, which is what this is listing. Empty lists every
+     *  camera, which is what a search across makes needs. */
+    brand: string;
     onChange: (modelId: string) => void;
     placeholder?: string;
 }) {
     const [query, setQuery] = useState("");
-    const matches = useMemo(() => searchModels(query), [query]);
+    // Narrowed to the make first, because a list of every camera anybody makes
+    // is a list nobody reads - and then searched inside it, because a make with
+    // fifty models is still fifty. A search that finds nothing in this make
+    // falls back to every make: somebody typing "c410" under Reolink has picked
+    // the wrong make, and showing them nothing tells them nothing.
+    const matches = useMemo(() => {
+        const within = brand ? modelsOfBrand(brand) : CAMERA_MODELS;
+        const found = searchModels(query).filter((model) =>
+            within.some((entry) => entry.id === model.id)
+        );
+        return found.length > 0 || !query.trim() ? found : searchModels(query);
+    }, [brand, query]);
     const chosen = cameraModel(value);
 
     return (
@@ -91,7 +112,8 @@ export function ModelPicker({
                 <MenuSearch value={query} onChange={setQuery} placeholder="Tapo C410, tplink, Reolink" />
                 {matches.length === 0 ? (
                     <p className="px-2 py-3 text-[0.75rem] text-muted-foreground">
-                        No camera by that name. Pick the make and Polaris asks the camera the rest.
+                        No camera by that name. Pick the closest one, or "Something else" - Polaris
+                        asks the camera the rest.
                     </p>
                 ) : (
                     matches.map((model) => (

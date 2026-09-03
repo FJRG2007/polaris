@@ -22,6 +22,9 @@ import { DEFAULT_DETECTION } from "@/lib/home/detection";
 import {
     CAMERA_MODELS,
     askPowerFor,
+    cameraBrands,
+    connectionsFor,
+    modelsOfBrand,
     cameraModel,
     drawsFromBattery,
     modelCanPan,
@@ -33,6 +36,21 @@ describe("finding a camera by what is written on it", () => {
     it("finds the model by its own name", () => {
         expect(searchModels("C410")[0]?.id).toBe("tapo-c410");
         expect(searchModels("c410")[0]?.id).toBe("tapo-c410");
+    });
+
+    it("finds it by the make AND the model together, which is how anybody types it", () => {
+        // The way somebody names the camera they own, and it found nothing: the
+        // words were joined into "tapoc410", which is not a camera.
+        for (const typed of ["tapo c410", "tp-link c410", "C410 tapo", "tplink  c410"]) {
+            expect(searchModels(typed)[0]?.id).toBe("tapo-c410");
+        }
+    });
+
+    it("narrows on a second word rather than widening", () => {
+        const one = searchModels("tapo");
+        const two = searchModels("tapo c4");
+        expect(two.length).toBeLessThan(one.length);
+        expect(two.every((model) => model.name.toLowerCase().startsWith("c4"))).toBe(true);
     });
 
     it("finds it by the maker's name, which is not in any of these names", () => {
@@ -77,8 +95,10 @@ describe("what the model decides", () => {
     });
 
     it("sends one the maker lists as answering RTSP to the profile that speaks it", () => {
-        expect(vendorForModel("tapo-c210")).toBe("tapo-cloud");
-        expect(vendorForModel("tapo-c310")).toBe("tapo-cloud");
+        // RTSP by default on these, because it is the better transport for
+        // video. The maker's own protocol stays available beside it.
+        expect(vendorForModel("tapo-c210")).toBe("tapo");
+        expect(vendorForModel("tapo-c310")).toBe("tapo");
     });
 
     it("falls back rather than guessing for a model this build never heard of", () => {
@@ -159,5 +179,61 @@ describe("what is stored", () => {
     it("treats a camera with nothing said about it as plugged in", () => {
         expect(camera({}).power).toBe("mains");
         expect(camera({}).modelId).toBe("");
+    });
+});
+
+describe("the makes, and what each can be reached by", () => {
+    it("offers every make in the list once, with what it covers", () => {
+        const brands = cameraBrands();
+        expect(brands.map((entry) => entry.brand)).toContain("Tapo");
+        expect(new Set(brands.map((entry) => entry.brand)).size).toBe(brands.length);
+        for (const entry of brands) {
+            expect(modelsOfBrand(entry.brand)).toHaveLength(entry.count);
+        }
+    });
+
+    it("gives a wired Tapo both ways in, RTSP first", () => {
+        // RTSP is the better transport for video and it is what most of these
+        // are already set up on. The maker's protocol is the one that needs no
+        // camera account, which is why it stays on the list.
+        expect(connectionsFor("tapo-c200")).toEqual(["tapo", "tapo-cloud"]);
+    });
+
+    it("gives a battery one the only way in it has", () => {
+        expect(connectionsFor("tapo-c410")).toEqual(["tapo-battery"]);
+    });
+
+    it("puts the protocol first on the doorbells that need wiring for RTSP", () => {
+        // Offering RTSP as the default would be defaulting to a setup most of
+        // them are not in.
+        expect(connectionsFor("tapo-d235")[0]).toBe("tapo-battery");
+        expect(connectionsFor("tapo-d235")).toContain("tapo");
+    });
+});
+
+describe("a camera that is already connected", () => {
+    const camera = (over: Record<string, unknown>) =>
+        parseCameraInput({
+            name: "Studio",
+            vendor: "generic",
+            address: "192.168.1.143",
+            detection: DEFAULT_DETECTION,
+            ...over
+        });
+
+    it("keeps the transport it is working on when the model allows it", () => {
+        // The regression this rule exists for: a C200 streaming over RTSP, whose
+        // owner opened the form to change its name, was moved onto the other
+        // protocol and lost its picture.
+        expect(camera({ modelId: "tapo-c200", vendor: "tapo" }).vendor).toBe("tapo");
+        expect(camera({ modelId: "tapo-c200", vendor: "tapo-cloud" }).vendor).toBe("tapo-cloud");
+    });
+
+    it("moves it only when the model cannot be reached that way at all", () => {
+        expect(camera({ modelId: "tapo-c410", vendor: "tapo" }).vendor).toBe("tapo-battery");
+    });
+
+    it("takes the model's own first choice for a camera with nothing set yet", () => {
+        expect(camera({ modelId: "tapo-c200", vendor: "" }).vendor).toBe("tapo");
     });
 });
