@@ -30,9 +30,28 @@ import { PtzPad } from "./ptz-pad";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
 import { useDetections } from "./use-detections";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    NO_ZOOM,
+    ZOOM_STEP,
+    isZoomed,
+    panBy,
+    zoomBy,
+    zoomTransform,
+    type Zoom
+} from "@/lib/home/zoom";
 import type { CameraView } from "@/lib/home/cameras";
-import { Camera, Maximize2, Minimize2 } from "lucide-react";
+import {
+    Camera,
+    Maximize2,
+    Minimize2,
+    Pause,
+    Play,
+    Volume2,
+    VolumeX,
+    ZoomIn,
+    ZoomOut
+} from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import { otherTransport, preferredTransport, stillSrc, streamSrc, type Transport } from "@/lib/home/player";
 
@@ -83,6 +102,34 @@ const FRAME_WIDTH = 1280;
  * stream is what this is waiting for.
  */
 const MOVING_WIDTH = 640;
+
+/** One control over the picture. Icon-only per the repeated-action rule, so it
+ *  carries both the name and the tooltip rather than a visible label. */
+function Control({
+    label,
+    onClick,
+    disabled,
+    children
+}: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <Button
+            variant="ghost"
+            size="icon"
+            aria-label={label}
+            title={label}
+            disabled={disabled}
+            className="text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-40"
+            onClick={onClick}
+        >
+            {children}
+        </Button>
+    );
+}
 
 export function CameraViewer({
     camera,
@@ -195,6 +242,76 @@ export function CameraViewer({
         };
     }, []);
 
+    /**
+     * How far into the picture the reader has pushed.
+     *
+     * Nothing is asked of the camera for this: the frame that arrived is the
+     * frame that arrived, and this decides which part of it fills the screen.
+     * Reset whenever the camera changes, so opening a second camera does not
+     * open it halfway into a corner of the first one's framing.
+     */
+    const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
+    useEffect(() => setZoom(NO_ZOOM), [camera.id]);
+
+    /** Where a drag started, in fractions of the frame. Null while nothing is
+     *  being dragged. */
+    const dragging = useRef<{ x: number; y: number } | null>(null);
+
+    /**
+     * Whether the sound is on.
+     *
+     * Off to begin with, and not only out of politeness: a browser refuses to
+     * start a video with sound that nobody asked for, so a stream that opened
+     * unmuted would not start at all. Turning it on is a press, which is the
+     * gesture the refusal is waiting for.
+     */
+    const [muted, setMuted] = useState(true);
+
+    /** Whether the reader has stopped it. Held rather than closed: the picture
+     *  stays on screen, and starting again reconnects rather than resuming - what
+     *  was buffered is a minute old by then, and a live view showing a minute ago
+     *  is worse than one that skipped it. */
+    const [paused, setPaused] = useState(false);
+
+    /** Where the pointer is inside the frame, as fractions from its centre, which
+     *  is what the zoom aims at. */
+    const pointAt = useCallback((event: { clientX: number; clientY: number }) => {
+        const box = frame.current?.getBoundingClientRect();
+        if (!box || box.width === 0 || box.height === 0) return { x: 0, y: 0 };
+        return {
+            x: (event.clientX - box.left) / box.width - 0.5,
+            y: (event.clientY - box.top) / box.height - 0.5
+        };
+    }, []);
+
+    useEffect(() => {
+        const element = video.current;
+        if (!element) return;
+        element.muted = muted;
+        if (paused) element.pause();
+    }, [muted, paused]);
+
+    /**
+     * The wheel zooms towards the pointer rather than scrolling the dialog.
+     *
+     * Attached by hand rather than as `onWheel`, because React registers its own
+     * wheel listener as passive: `preventDefault` inside a JSX handler is ignored
+     * and the browser scrolls the dialog underneath anyway, which over a picture
+     * taller than the window is the whole view sliding away while somebody tries
+     * to zoom into it.
+     */
+    useEffect(() => {
+        const element = frame.current;
+        if (!element) return;
+        const onWheel = (event: WheelEvent) => {
+            event.preventDefault();
+            const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+            setZoom((current) => zoomBy(current, factor, pointAt(event)));
+        };
+        element.addEventListener("wheel", onWheel, { passive: false });
+        return () => element.removeEventListener("wheel", onWheel);
+    }, [pointAt]);
+
     const toggleFullscreen = () => {
         if (document.fullscreenElement) void document.exitFullscreen();
         else void frame.current?.requestFullscreen().catch(() => setFull(false));
@@ -206,7 +323,39 @@ export function CameraViewer({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-5xl p-0" showClose={!full}>
                 <DialogTitle className="sr-only">{camera.name}</DialogTitle>
-                <div ref={frame} className="group/frame relative bg-black">
+                <div
+                    ref={frame}
+                    className={cn(
+                        "group/frame relative overflow-hidden bg-black",
+                        isZoomed(zoom) ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+                    )}
+                    onDoubleClick={(event) =>
+                        setZoom((current) =>
+                            // A second press puts it back rather than pushing
+                            // further in: the way out has to be as easy as the
+                            // way in, and there is no other gesture for it.
+                            isZoomed(current) ? NO_ZOOM : zoomBy(current, ZOOM_STEP * 2, pointAt(event))
+                        )
+                    }
+                    onPointerDown={(event) => {
+                        if (!isZoomed(zoom) || event.button !== 0) return;
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        dragging.current = pointAt(event);
+                    }}
+                    onPointerMove={(event) => {
+                        const from = dragging.current;
+                        if (!from) return;
+                        const to = pointAt(event);
+                        dragging.current = to;
+                        setZoom((current) => panBy(current, to.x - from.x, to.y - from.y));
+                    }}
+                    onPointerUp={() => (dragging.current = null)}
+                    onPointerCancel={() => (dragging.current = null)}
+                >
+                <div
+                    className="relative origin-center transition-transform duration-fast"
+                    style={{ transform: zoomTransform(zoom) }}
+                >
                     {/* eslint-disable-next-line @next/next/no-img-element -- a live
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
@@ -240,11 +389,14 @@ export function CameraViewer({
                             // Keyed on the format so swapping really re-creates the
                             // element: a <video> handed a new src after an error
                             // keeps the error and never tries again.
-                            key={transport}
+                            // Keyed on the pause as well, so starting again
+                            // re-creates the element and reconnects to live
+                            // rather than resuming a buffer from a minute ago.
+                            key={`${transport}-${paused ? "held" : "live"}`}
                             src={streamSrc(camera.id, "main", transport)}
                             className={cn("absolute inset-0 w-full bg-black", surface, !playing && "invisible")}
-                            autoPlay
-                            muted
+                            autoPlay={!paused}
+                            muted={muted}
                             playsInline
                             controls={false}
                             // Each of these is the stream saying it is still
@@ -273,6 +425,8 @@ export function CameraViewer({
                             tile={surfaceShape}
                         />
                     ))}
+
+                    </div>
 
                     {drawn === false && !playing ? (
                         <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/70">
@@ -315,16 +469,75 @@ export function CameraViewer({
                         </div>
                     </div>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={full ? "Leave fullscreen" : "Fullscreen"}
-                        title={full ? "Leave fullscreen" : "Fullscreen"}
-                        className="absolute bottom-3 left-3 text-white/80 opacity-0 transition-opacity hover:bg-white/15 hover:text-white group-hover/frame:opacity-100"
-                        onClick={toggleFullscreen}
-                    >
-                        {full ? <Minimize2 className="size-4 shrink-0" /> : <Maximize2 className="size-4 shrink-0" />}
-                    </Button>
+                    {/* The controls a live picture has, in the corner a live
+                        picture has them in. Icon-only and faded until somebody
+                        is looking for them, like the fullscreen button beside
+                        them: a bar of chrome across a live view is a smaller
+                        live view. */}
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 transition-opacity group-hover/frame:opacity-100">
+                        <Control
+                            label={full ? "Leave fullscreen" : "Fullscreen"}
+                            onClick={toggleFullscreen}
+                        >
+                            {full ? (
+                                <Minimize2 className="size-4 shrink-0" />
+                            ) : (
+                                <Maximize2 className="size-4 shrink-0" />
+                            )}
+                        </Control>
+                        {/* Only while there is a stream to hold or to listen to.
+                            On the pictures these would be two buttons that do
+                            nothing, which is worse than two that are absent. */}
+                        {playing ? (
+                            <>
+                                <Control
+                                    label={paused ? "Play" : "Pause"}
+                                    onClick={() => setPaused((current) => !current)}
+                                >
+                                    {paused ? (
+                                        <Play className="size-4 shrink-0" />
+                                    ) : (
+                                        <Pause className="size-4 shrink-0" />
+                                    )}
+                                </Control>
+                                <Control
+                                    label={muted ? "Turn the sound on" : "Mute"}
+                                    onClick={() => setMuted((current) => !current)}
+                                >
+                                    {muted ? (
+                                        <VolumeX className="size-4 shrink-0" />
+                                    ) : (
+                                        <Volume2 className="size-4 shrink-0" />
+                                    )}
+                                </Control>
+                            </>
+                        ) : null}
+                        <Control
+                            label="Zoom out"
+                            disabled={!isZoomed(zoom)}
+                            onClick={() => setZoom((current) => zoomBy(current, 1 / ZOOM_STEP))}
+                        >
+                            <ZoomOut className="size-4 shrink-0" />
+                        </Control>
+                        <Control
+                            label="Zoom in"
+                            onClick={() => setZoom((current) => zoomBy(current, ZOOM_STEP))}
+                        >
+                            <ZoomIn className="size-4 shrink-0" />
+                        </Control>
+                        {/* Said rather than left to be worked out: a picture that
+                            is zoomed looks like a camera that has been pointed
+                            somewhere, and the way back is not obvious. */}
+                        {isZoomed(zoom) ? (
+                            <button
+                                type="button"
+                                onClick={() => setZoom(NO_ZOOM)}
+                                className="rounded-full bg-black/60 px-2 py-1 text-[0.6875rem] text-white/80 transition-colors hover:bg-black/80 hover:text-white"
+                            >
+                                {zoom.scale.toFixed(1)}x - reset
+                            </button>
+                        ) : null}
+                    </div>
 
                     {camera.ptz && canControl ? <PtzPad cameraId={camera.id} /> : null}
                 </div>
