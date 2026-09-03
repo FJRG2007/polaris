@@ -23,6 +23,7 @@ import {
     TAPO_NATIVE_PORT,
     cameraVendor,
     onBattery,
+    redactSource,
     relaySource,
     reportsOwnAlerts
 } from "@/lib/home/vendors";
@@ -160,5 +161,39 @@ describe("what is stored when the rung was never named", () => {
         expect(parsed.rtspPort).toBe(554);
         expect(parsed.recording).toBe("motion");
         expect(parsed.enabled).toBe(true);
+    });
+});
+
+describe("carrying the relay's own words back without the password in them", () => {
+    it("takes out a credential that stands alone, which is the shape this protocol uses", () => {
+        // The reason this exists: the older redaction looks for `user:pass@` and
+        // a Tapo source has nothing before the @ but the secret, so it went
+        // through untouched and onto the screen.
+        expect(redactSource("dial tapo://hunter2@192.168.1.150?subtype=1: 401")).toBe(
+            "dial tapo://***@192.168.1.150?subtype=1: 401"
+        );
+    });
+
+    it("takes out one with a name beside it too", () => {
+        expect(redactSource("rtsp://polaris:secret@192.168.1.50:554/stream1 refused")).toBe(
+            "rtsp://***@192.168.1.50:554/stream1 refused"
+        );
+    });
+
+    it("finds one anywhere in the sentence, not only at the front", () => {
+        expect(redactSource("could not open source tapo://p%40ss@10.0.0.9")).toBe(
+            "could not open source tapo://***@10.0.0.9"
+        );
+    });
+
+    it("leaves a sentence with no credential in it alone", () => {
+        const said = "streams: exec: process exited with code 1";
+        expect(redactSource(said)).toBe(said);
+    });
+
+    it("leaves an address that carries no credential alone", () => {
+        expect(redactSource("dial tcp 192.168.1.150:8800: connect: timeout")).toBe(
+            "dial tcp 192.168.1.150:8800: connect: timeout"
+        );
     });
 });

@@ -283,12 +283,16 @@ export function CameraDialog({
         setTesting(true);
         setError(null);
         const result = await runAction(() => actions.probeCameraAction(payload()), setError);
-        setTesting(false);
-        if (!result) return;
-        if (result.error || !result.probe) {
-            setError(result.error ?? "The camera did not answer.");
+        if (!result?.probe || result.error) {
+            setTesting(false);
+            if (result) setError(result.error ?? "The camera did not answer.");
             return;
         }
+        // A saved camera gets a second call after this one, and the button has to
+        // stay busy across both - so it is cleared here only for the answers that
+        // end at the probe.
+        const tryVideo = result.probe.verified === "reachable" && camera?.id;
+        if (!tryVideo) setTesting(false);
         // What the camera said replaces what the make suggested - it is the only
         // authority on its own paths.
         setForm((current) => ({
@@ -297,13 +301,31 @@ export function CameraDialog({
             subPath: result.probe?.subPath || current.subPath,
             name: current.name || result.probe?.model || ""
         }));
+        // For a camera that exists, the reachable answer is not the end of it.
+        // "Something is answering there" and no picture is exactly where this
+        // was left before: the only place that knows why is the relay, and
+        // asking it is one more call.
+        if (tryVideo && camera) {
+            const stream = await runAction(
+                () => actions.testCameraStreamAction(camera.id),
+                setError
+            );
+            setTesting(false);
+            if (!stream) return;
+            if (stream.error) {
+                setError(`The camera is reachable, but its video would not open. ${stream.error}`);
+                return;
+            }
+            setTested("The video opened. This camera works.");
+            return;
+        }
         setTested(
             result.probe.verified === "reachable"
                 ? // All that can be asked of a camera that speaks only its
-                  // maker's protocol. Said plainly, because "the camera
-                  // answered" over a password nobody checked is the reassurance
-                  // that costs an evening.
-                  "Something is answering there. The password is checked the first time you watch it."
+                  // maker's protocol before it has been saved. Said plainly,
+                  // because "the camera answered" over a password nobody checked
+                  // is the reassurance that costs an evening.
+                  "Something is answering there. Save it, and ask again to try the video."
                 : [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
                   "The camera answered"
         );

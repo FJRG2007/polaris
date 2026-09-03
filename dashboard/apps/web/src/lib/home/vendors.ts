@@ -79,6 +79,12 @@ export interface CameraVendor {
     /**
      * It runs on a battery, so a connection is not free.
      *
+     * On these makes it is stronger than a cost: the camera takes its radio down
+     * between events, so it is not on the network at all for most of the day and
+     * nothing Polaris can send will bring it back. Waking one goes through the
+     * maker's own cloud, which is what the phone app is doing when it opens the
+     * live view.
+     *
      * Every other camera here is on a wire and costs the same whether anybody is
      * watching or not. These cost their own charge: holding the stream open is
      * what the battery is spent on, and a wall left open on one overnight is a
@@ -136,7 +142,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         nativePort: TAPO_NATIVE_PORT,
         nativeControlPort: TAPO_CONTROL_PORT,
         appConsent: "Me > Third-Party Services > Third-Party Compatibility",
-        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. Polaris connects only while somebody is watching, because on these the connection is the battery - and one that is asleep answers nothing until you open it in the Tapo app."
+        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. One of these is asleep almost all the time and answers nothing at all while it is: it wakes on its own movement, or when the Tapo app opens it. Polaris can watch one while it is awake and cannot wake one itself, so treat it as a camera you look in on rather than one that is always there."
     },
     {
         id: "tapo",
@@ -262,6 +268,24 @@ export function rtspUrl(
  *  a log line, an error, the row on the settings screen. */
 export function redactRtspUrl(url: string): string {
     return url.replace(/^([a-z]+:\/\/[^:/@]+):[^@]*@/i, "$1:***@");
+}
+
+/**
+ * Every credential taken out of a piece of text, wherever in it they are.
+ *
+ * `redactRtspUrl` reads one address that starts the string and expects a name
+ * beside the password. Neither holds for what comes back from the relay: its
+ * message is a sentence with an address somewhere inside it, and on the maker's
+ * own protocol the password stands alone - `tapo://secret@host` has nothing
+ * before the `@` but the secret itself, so a redaction looking for `user:pass`
+ * leaves it untouched and prints it.
+ *
+ * Anything between a scheme and an `@` is therefore treated as a credential,
+ * which over-redacts a bare username and never under-redacts a password. That is
+ * the right way round for text on its way to a screen or a log.
+ */
+export function redactSource(text: string): string {
+    return text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]*@/gi, "$1***@");
 }
 
 /**
