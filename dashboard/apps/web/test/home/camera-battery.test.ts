@@ -15,7 +15,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { normalizeCameraInput } from "@/lib/home/schemas";
+import { DEFAULT_DETECTION } from "@/lib/home/detection";
+import { normalizeCameraInput, parseCameraInput } from "@/lib/home/schemas";
 import {
     CAMERA_VENDORS,
     TAPO_NATIVE_PORT,
@@ -109,5 +110,33 @@ describe("the rung a camera like this is left on", () => {
     it("leaves a camera that can report its own movement where it was", () => {
         expect(normalizeCameraInput({ ...base, vendor: "tapo-cloud" }).detector).toBe("camera");
         expect(normalizeCameraInput({ ...base, vendor: "reolink" }).detector).toBe("camera");
+    });
+});
+
+describe("what is stored when the rung was never named", () => {
+    const payload = (vendor: string) => ({
+        name: "Garden",
+        vendor,
+        address: "192.168.1.64",
+        detection: DEFAULT_DETECTION
+    });
+
+    // The rung the schema fills in when a payload leaves it out is the camera's
+    // own alerts, so a body with no `detector` key has nothing for the
+    // normalizer to correct and arrives at the database on the one setting this
+    // camera can never honour.
+    it("does not let the field's own default put back the rung that cannot fire", () => {
+        expect(parseCameraInput(payload("tapo-battery")).detector).toBe("none");
+    });
+
+    it("still fills it in for a camera that can report its own movement", () => {
+        expect(parseCameraInput(payload("tapo-cloud")).detector).toBe("camera");
+    });
+
+    it("leaves everything else the schema settles alone", () => {
+        const parsed = parseCameraInput({ ...payload("tapo-battery"), address: "192.168.1.64" });
+        expect(parsed.rtspPort).toBe(554);
+        expect(parsed.recording).toBe("motion");
+        expect(parsed.enabled).toBe(true);
     });
 });

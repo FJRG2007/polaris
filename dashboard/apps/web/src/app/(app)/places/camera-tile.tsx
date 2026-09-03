@@ -295,11 +295,16 @@ export function CameraTile({
      * freeze on a stale image and look like a camera that had stopped. Asking
      * for one more costs a single request and makes the held frame the moment
      * everything stopped.
+     *
+     * Never on a battery camera. Its picture is the one frame it was asked for
+     * at mount and no stream was ever started over it, so there is nothing stale
+     * to replace - and the whole wall goes idle the moment any camera is opened,
+     * which would wake every battery camera in the house once per dialog.
      */
     useEffect(() => {
-        if (!idle || !showing) return;
+        if (!idle || !showing || battery) return;
         setStamp((value) => value + 1);
-    }, [idle, showing]);
+    }, [idle, showing, battery]);
 
     return (
         <div

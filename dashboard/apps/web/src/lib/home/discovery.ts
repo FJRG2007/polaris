@@ -59,6 +59,13 @@ const SWEEP_CONCURRENCY = 32;
 
 const CONNECT_TIMEOUT_MS = 700;
 
+/** How long one address is given when somebody asked about that address.
+ *  Nothing like the sweep's budget, which is short because it is spent 254 times
+ *  over: a camera on wireless that has been asleep takes a moment to answer at
+ *  all, and giving up on it in under a second is how a working camera gets told
+ *  it is not there. */
+export const REACH_TIMEOUT_MS = 4000;
+
 export interface DiscoveredCamera {
     /** Where it is. The only field that is always known. */
     readonly address: string;
@@ -179,14 +186,18 @@ export async function probeNetwork(windowMs = PROBE_WINDOW_MS): Promise<Discover
  *  Exported for the add-camera form, which needs the same question about one
  *  address: a make that speaks no ONVIF cannot be asked anything, and "is it
  *  there" is then the only thing that can be checked before it is saved. */
-export function portOpen(address: string, port: number): Promise<boolean> {
+export function portOpen(
+    address: string,
+    port: number,
+    timeoutMs = CONNECT_TIMEOUT_MS
+): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = new Socket();
         const done = (open: boolean) => {
             socket.destroy();
             resolve(open);
         };
-        socket.setTimeout(CONNECT_TIMEOUT_MS);
+        socket.setTimeout(timeoutMs);
         socket.once("connect", () => done(true));
         socket.once("timeout", () => done(false));
         socket.once("error", () => done(false));
@@ -279,8 +290,12 @@ export async function sweepFromServer(hostId: string, ownerId: string, cidr: str
     const base = hosts[0]!.split(".").slice(0, 3).join(".");
     // Both doors, and the answer says which one opened: a battery camera has no
     // 554 at all, so a sweep that only knocks there reports the network as
-    // having no cameras on it.
-    const command = `for p in 554 ${TAPO_NATIVE_PORT}; do for i in $(seq 1 254); do (timeout 1 bash -c "echo > /dev/tcp/${base}.$i/$p" 2>/dev/null && echo ${base}.$i:$p) & done; done; wait`;
+    // having no cameras on it. One port at a time, with the `wait` inside the
+    // loop: a second door is a second second of waiting, where forking both at
+    // once is 508 subshells at a go, and a router or a NAS that runs out of them
+    // says so on stderr - which nothing here reads, so the sweep would quietly
+    // come back short.
+    const command = `for p in 554 ${TAPO_NATIVE_PORT}; do for i in $(seq 1 254); do (timeout 1 bash -c "echo > /dev/tcp/${base}.$i/$p" 2>/dev/null && echo ${base}.$i:$p) & done; wait; done`;
 
     const client = await openSshClient({
         host: connection.address,

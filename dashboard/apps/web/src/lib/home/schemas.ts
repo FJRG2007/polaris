@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { reportsOwnAlerts } from "@/lib/home/vendors";
-import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES } from "@/lib/home/detection";
+import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES, type Detector } from "@/lib/home/detection";
 import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
 /** How a camera's address is written down, whatever was typed. Hostnames are
@@ -42,20 +42,25 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.mainPath === "string") value.mainPath = normalizeStreamPath(value.mainPath);
     if (typeof value.subPath === "string") value.subPath = normalizeStreamPath(value.subPath);
     if (typeof value.username === "string") value.username = value.username.trim();
-    // The camera's own alerts arrive over ONVIF, and a make that speaks none
-    // cannot send them - so a camera left on that rung would sit there having
-    // noticed nothing, with no way to tell that from a quiet garden. It drops to
-    // "nothing" rather than up to the rung that watches the stream: the makes
-    // this applies to are the battery ones, and a detector reading a stream all
-    // day is the one thing that flattens them. Anything above this is still
-    // choosable, and the form says what it costs.
-    //
-    // Here rather than only in the form, so an API call cannot store the setting
-    // that does nothing either.
-    if (typeof value.vendor === "string" && value.detector === "camera" && !reportsOwnAlerts(value.vendor)) {
-        value.detector = "none";
+    if (typeof value.vendor === "string" && typeof value.detector === "string") {
+        value.detector = settledDetector(value.vendor, value.detector as Detector);
     }
     return value as T;
+}
+
+/**
+ * The rung a camera is actually left on, once the make has had its say.
+ *
+ * The camera's own alerts arrive over ONVIF, and a make that speaks none cannot
+ * send them - so a camera left on that rung would sit there having noticed
+ * nothing, with no way to tell that from a quiet garden. It drops to "nothing"
+ * rather than up to the rung that watches the stream: the makes this applies to
+ * are the battery ones, and a detector reading a stream all day is the one thing
+ * that flattens them. Anything above this is still choosable, and the form says
+ * what it costs.
+ */
+function settledDetector(vendor: string, detector: Detector): Detector {
+    return detector === "camera" && !reportsOwnAlerts(vendor) ? "none" : detector;
 }
 
 /** What the database will accept where it wants a uuid. */
@@ -103,7 +108,7 @@ const reachViaSchema = z
     .trim()
     .regex(/^(direct|server:[0-9a-f-]{36})$/i, "Choose where this camera is reached from");
 
-export const cameraInputSchema = z.object({
+const cameraFieldsSchema = z.object({
     name: z.string().trim().min(1, "Give it a name").max(64),
     /** The place it is in. Checked against this install's places before it is
      *  stored - an id in a form is a request, not a fact. */
@@ -151,6 +156,30 @@ export const cameraInputSchema = z.object({
     // made deliberately with a bigger disk, not typed into a box.
     retentionDays: z.coerce.number().int().min(1).max(365).default(7),
     enabled: z.boolean().default(true)
+});
+
+/**
+ * A camera's settings, as they will be stored.
+ *
+ * The detector is settled here rather than only in the normalizer, because the
+ * normalizer runs before Zod fills the field in: a payload that names a make
+ * with no ONVIF and leaves `detector` out arrives with nothing to correct and
+ * then defaults to the camera's own alerts - the exact dead setting the rule
+ * exists to keep out of the database.
+ */
+export const cameraInputSchema = cameraFieldsSchema.transform((value) => ({
+    ...value,
+    detector: settledDetector(value.vendor, value.detector)
+}));
+
+/** The few fields the reachability check needs, taken off the same object so the
+ *  address and the account are judged by the rules that will store them. */
+export const cameraProbeInputSchema = cameraFieldsSchema.pick({
+    address: true,
+    onvifPort: true,
+    username: true,
+    password: true,
+    vendor: true
 });
 
 export type CameraInput = z.infer<typeof cameraInputSchema>;

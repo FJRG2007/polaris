@@ -35,7 +35,7 @@ import * as recording from "@/lib/home/recording";
 import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
 import { faceImageType } from "@/lib/home/face-image";
-import { discoverCameras, portOpen } from "@/lib/home/discovery";
+import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "@/lib/home/discovery";
 import { ensureVisionWorker } from "@/lib/home/vision";
 import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
@@ -44,6 +44,7 @@ import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/cur
 import {
     alertRuleInputSchema,
     cameraInputSchema,
+    cameraProbeInputSchema,
     cameraZoneInputSchema,
     discoveryInputSchema,
     normalizeCameraInput,
@@ -294,9 +295,9 @@ export async function probeCameraAction(input: unknown): Promise<{
     error?: string;
 }> {
     await requireHome("home.manage");
-    const parsed = cameraInputSchema
-        .pick({ address: true, onvifPort: true, username: true, password: true, vendor: true })
-        .safeParse(normalizeCameraInput((input ?? {}) as Record<string, unknown>));
+    const parsed = cameraProbeInputSchema.safeParse(
+        normalizeCameraInput((input ?? {}) as Record<string, unknown>)
+    );
     if (!parsed.success) return { error: "Check the address and the account." };
 
     const vendor = cameraVendor(parsed.data.vendor);
@@ -308,7 +309,7 @@ export async function probeCameraAction(input: unknown): Promise<{
     if (vendor.noOnvif) {
         const port = vendor.nativePort ?? parsed.data.onvifPort;
         if (!port) return { error: "There is nothing to ask this camera on." };
-        const open = await portOpen(parsed.data.address, port);
+        const open = await portOpen(parsed.data.address, port, REACH_TIMEOUT_MS);
         if (!open) {
             return {
                 error: "Nothing answered at that address. Check it in the Tapo app, under the camera's own settings."

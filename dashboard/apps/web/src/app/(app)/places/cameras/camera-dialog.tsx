@@ -723,6 +723,13 @@ export function CameraDialog({
                                 { value: "continuous", label: "Everything" }
                             ]}
                         />
+                        {battery && form.recording !== "off" ? (
+                            <p className="text-[0.75rem] leading-relaxed text-warning">
+                                Keeping footage from this camera means holding its stream open, and on a
+                                battery that is a charge measured in hours rather than months. Leave it on
+                                Nothing unless it is plugged in.
+                            </p>
+                        ) : null}
                         {form.recording !== "off" ? (
                             <Field
                                 label="Store on"
