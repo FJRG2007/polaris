@@ -29,6 +29,7 @@ import { isMuted } from "@polaris/core";
 import { raiseAlerts, type Said } from "@/lib/home/alerts";
 import { notify } from "@/lib/notifications/dispatch";
 import { ruleFor } from "@/lib/notifications/preferences";
+import { BATTERY_VENDORS } from "@/lib/home/vendors";
 import { OFFLINE_GRACE_MS } from "@/lib/home/availability";
 import {
     publishedStreams,
@@ -297,7 +298,13 @@ async function tell(
  */
 export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
     const cameras: Watched[] = await prisma.camera.findMany({
-        where: { enabled: true },
+        // Everything here rests on a camera that is always connected, where a
+        // frame costs the relay a dial and the camera nothing. A battery camera
+        // breaks that: this pass runs every minute, and every pass would wake
+        // one up - a charge meant to last months, spent on asking whether it was
+        // still there. It is asleep by design, so "quiet" is not an outage for
+        // one, and whether it answers is found out when somebody opens it.
+        where: { enabled: true, vendor: { notIn: [...BATTERY_VENDORS] } },
         select: {
             id: true,
             name: true,

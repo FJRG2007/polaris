@@ -10,6 +10,7 @@
  */
 
 import { z } from "zod";
+import { reportsOwnAlerts } from "@/lib/home/vendors";
 import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES } from "@/lib/home/detection";
 import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
@@ -41,6 +42,19 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.mainPath === "string") value.mainPath = normalizeStreamPath(value.mainPath);
     if (typeof value.subPath === "string") value.subPath = normalizeStreamPath(value.subPath);
     if (typeof value.username === "string") value.username = value.username.trim();
+    // The camera's own alerts arrive over ONVIF, and a make that speaks none
+    // cannot send them - so a camera left on that rung would sit there having
+    // noticed nothing, with no way to tell that from a quiet garden. It drops to
+    // "nothing" rather than up to the rung that watches the stream: the makes
+    // this applies to are the battery ones, and a detector reading a stream all
+    // day is the one thing that flattens them. Anything above this is still
+    // choosable, and the form says what it costs.
+    //
+    // Here rather than only in the form, so an API call cannot store the setting
+    // that does nothing either.
+    if (typeof value.vendor === "string" && value.detector === "camera" && !reportsOwnAlerts(value.vendor)) {
+        value.detector = "none";
+    }
     return value as T;
 }
 

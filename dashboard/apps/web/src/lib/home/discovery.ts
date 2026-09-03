@@ -25,6 +25,7 @@ import { Socket } from "node:net";
 import { randomUUID } from "node:crypto";
 import { createSocket } from "node:dgram";
 import { tagValue } from "@/lib/home/onvif";
+import { TAPO_NATIVE_PORT } from "@/lib/home/vendors";
 
 /** The address every ONVIF device listens for probes on. */
 const WS_DISCOVERY_ADDRESS = "239.255.255.250";
@@ -36,8 +37,21 @@ const PROBE_WINDOW_MS = 3000;
 
 /** Ports worth knocking on, and what answering one means. 2020 is here because
  *  Tapo puts its ONVIF service there rather than on 80, and a sweep without it
- *  finds none of them. */
-const PROBE_PORTS = [554, 2020, 80, 8000] as const;
+ *  finds none of them. 8800 is TP-Link's own protocol, and it is the only door a
+ *  battery camera opens at all - one of those has no 554 to find. */
+const PROBE_PORTS = [554, 2020, 80, 8000, TAPO_NATIVE_PORT] as const;
+
+/** What answering says the make is, when a port is distinctive enough to say.
+ *  Only ever a starting point for the form: the reader can change it. */
+function vendorFromPorts(open: readonly number[]): string | null {
+    // TP-Link's own protocol and no RTSP is the battery signature: the wired
+    // models answer 554 as well, and nothing else on a home network answers
+    // 8800.
+    if (open.includes(TAPO_NATIVE_PORT)) {
+        return open.includes(554) ? "tapo-cloud" : "tapo-battery";
+    }
+    return null;
+}
 
 /** How many hosts are probed at once. High enough to sweep a /24 in seconds, low
  *  enough not to look like a port scan to a router that is watching. */
@@ -160,8 +174,12 @@ export async function probeNetwork(windowMs = PROBE_WINDOW_MS): Promise<Discover
 
 /** Whether something is listening, without saying anything to it. A connect and
  *  an immediate close is the whole test: cameras are the only things on a home
- *  network with 554 open, and nothing is sent that a service could act on. */
-function portOpen(address: string, port: number): Promise<boolean> {
+ *  network with 554 open, and nothing is sent that a service could act on.
+ *
+ *  Exported for the add-camera form, which needs the same question about one
+ *  address: a make that speaks no ONVIF cannot be asked anything, and "is it
+ *  there" is then the only thing that can be checked before it is saved. */
+export function portOpen(address: string, port: number): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = new Socket();
         const done = (open: boolean) => {
@@ -216,15 +234,16 @@ export async function sweepSubnet(cidr: string): Promise<DiscoveredCamera[]> {
             for (const port of PROBE_PORTS) {
                 if (await portOpen(address, port)) open.push(port);
             }
-            // 554 is the one that means camera. A box with only 80 open is a
+            // 554 is the one that means camera, and 8800 is the one that means
+            // a camera with no 554 to give. A box with only 80 open is a
             // printer, a router, or a light switch, and listing it as a camera
             // wastes the reader's attention.
-            if (!open.includes(554)) continue;
+            if (!open.includes(554) && !open.includes(TAPO_NATIVE_PORT)) continue;
             found.push({
                 address,
                 onvifPort: open.find((port) => port === 2020 || port === 80) ?? null,
                 name: null,
-                vendor: null,
+                vendor: vendorFromPorts(open),
                 via: "sweep",
                 ports: open
             });
@@ -258,7 +277,10 @@ export async function sweepFromServer(hostId: string, ownerId: string, cidr: str
     // installed. The subshells run in parallel and each one gives up after a
     // second, which keeps a /24 to a few seconds rather than four minutes.
     const base = hosts[0]!.split(".").slice(0, 3).join(".");
-    const command = `for i in $(seq 1 254); do (timeout 1 bash -c "echo > /dev/tcp/${base}.$i/554" 2>/dev/null && echo ${base}.$i) & done; wait`;
+    // Both doors, and the answer says which one opened: a battery camera has no
+    // 554 at all, so a sweep that only knocks there reports the network as
+    // having no cameras on it.
+    const command = `for p in 554 ${TAPO_NATIVE_PORT}; do for i in $(seq 1 254); do (timeout 1 bash -c "echo > /dev/tcp/${base}.$i/$p" 2>/dev/null && echo ${base}.$i:$p) & done; done; wait`;
 
     const client = await openSshClient({
         host: connection.address,
@@ -270,18 +292,25 @@ export async function sweepFromServer(hostId: string, ownerId: string, cidr: str
     try {
         let output = "";
         await execCommand(client, command, { onStdout: (chunk) => (output += chunk.toString("utf8")) });
-        return output
-            .split(/\s+/)
-            .map((line) => line.trim())
-            .filter((line) => /^(\d{1,3}\.){3}\d{1,3}$/.test(line))
-            .map((address) => ({
-                address,
-                onvifPort: null,
-                name: null,
-                vendor: null,
-                via: "sweep" as const,
-                ports: [554] as readonly number[]
-            }));
+        // One line per open door, so an address that answered both arrives
+        // twice. Merged by address, because a camera is one entry however many
+        // ports it has.
+        const ports = new Map<string, number[]>();
+        for (const line of output.split(/\s+/)) {
+            const match = /^((?:\d{1,3}\.){3}\d{1,3}):(\d{1,5})$/.exec(line.trim());
+            if (!match) continue;
+            const found = ports.get(match[1]!) ?? [];
+            found.push(Number.parseInt(match[2]!, 10));
+            ports.set(match[1]!, found);
+        }
+        return [...ports.entries()].map(([address, open]) => ({
+            address,
+            onvifPort: null,
+            name: null,
+            vendor: vendorFromPorts(open),
+            via: "sweep" as const,
+            ports: open.sort((left, right) => left - right) as readonly number[]
+        }));
     } finally {
         client.end();
     }
