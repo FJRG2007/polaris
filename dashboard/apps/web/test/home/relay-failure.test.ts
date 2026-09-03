@@ -15,10 +15,15 @@ const REFUSED =
     '18:50:22.162 ERR github.com/AlexxIT/go2rtc/internal/mjpeg/mjpeg.go:82 > error="streams: 401 Unauthorized"';
 
 describe("why a camera would not open", () => {
-    it("turns a refused account into the switch that has to be turned on", () => {
-        const said = explainRelayFailure(REFUSED);
-        expect(said).toContain("refused the password");
-        expect(said).toContain("Third-Party Compatibility");
+    it("says the password first, because that is what a refusal means", () => {
+        // Written from the case it was diagnosed on, where the password really
+        // was wrong and the app setting really was on: a message that leads with
+        // the setting sends the reader to check something that is already right.
+        const said = explainRelayFailure(REFUSED) ?? "";
+        expect(said.startsWith("The camera refused the password.")).toBe(true);
+        expect(said.indexOf("TP-Link account")).toBeLessThan(
+            said.indexOf("Third-Party Compatibility")
+        );
     });
 
     it("reads the same refusal however the relay worded it", () => {
