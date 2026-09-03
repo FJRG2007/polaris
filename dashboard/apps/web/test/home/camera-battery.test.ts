@@ -19,6 +19,7 @@ import { DEFAULT_DETECTION } from "@/lib/home/detection";
 import { normalizeCameraInput, parseCameraInput } from "@/lib/home/schemas";
 import {
     CAMERA_VENDORS,
+    TAPO_CONTROL_PORT,
     TAPO_NATIVE_PORT,
     cameraVendor,
     onBattery,
@@ -70,6 +71,27 @@ describe("what the profile claims about it", () => {
 
     it("names the port its own protocol answers on, for the one check there is", () => {
         expect(cameraVendor("tapo-battery").nativePort).toBe(TAPO_NATIVE_PORT);
+    });
+
+    it("names the second port, so a camera that is there can be told from one that is not", () => {
+        // The two failures read identically to somebody at the form - nothing
+        // happened - and have nothing in common as fixes: one is the wrong
+        // address or a sleeping camera, the other is a switch in the account.
+        for (const id of ["tapo-battery", "tapo-cloud"]) {
+            expect(cameraVendor(id).nativeControlPort).toBe(TAPO_CONTROL_PORT);
+            expect(cameraVendor(id).nativeControlPort).not.toBe(cameraVendor(id).nativePort);
+        }
+    });
+
+    it("carries the switch the maker's app has to be told, in that app's own words", () => {
+        // Polaris cannot set it and cannot read it. Saying it is the whole of
+        // what Polaris can do, so it has to be on the profile rather than
+        // written into one screen.
+        for (const id of ["tapo-battery", "tapo-cloud"]) {
+            expect(cameraVendor(id).appConsent).toBe(
+                "Me > Third-Party Services > Third-Party Compatibility"
+            );
+        }
     });
 
     it("is the only make so far that spends a charge to be watched", () => {

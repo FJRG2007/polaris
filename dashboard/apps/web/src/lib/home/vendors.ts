@@ -52,6 +52,20 @@ export interface CameraVendor {
     /** Where that protocol answers, for the one thing Polaris can check before a
      *  camera is saved: that something is there at all. */
     readonly nativePort?: number;
+    /** Where the same make answers for everything that is not video, when it
+     *  uses a second port for it. Only ever asked as a second question after the
+     *  first one failed, to tell "not there" from "there and not sharing". */
+    readonly nativeControlPort?: number;
+    /**
+     * What has to be switched on in the maker's own app before any of this
+     * works, in the words of that app's menu.
+     *
+     * Recent firmware refuses every local connection until it is, which reaches
+     * somebody as a camera that answers nothing with a password they know is
+     * right. It is not a Polaris setting and Polaris cannot set it, so the only
+     * useful thing to do with it is say it where the failure appears.
+     */
+    readonly appConsent?: string;
     /**
      * The make speaks no ONVIF whatsoever.
      *
@@ -78,6 +92,12 @@ export interface CameraVendor {
  *  `tapo://` source dials, and the relay is what holds these connections. */
 export const TAPO_NATIVE_PORT = 8800;
 
+/** Where the same cameras answer for everything that is not video. Worth knowing
+ *  separately: a camera that answers here and not on the port above is on the
+ *  network and declining to share, which is a different problem with a different
+ *  fix from one that answers nowhere. */
+export const TAPO_CONTROL_PORT = 443;
+
 export const CAMERA_VENDORS: readonly CameraVendor[] = [
     {
         // First in the list on purpose: it is the one that works with what
@@ -93,7 +113,9 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         nativeScheme: "tapo",
         nativePasswordOnly: true,
         nativePort: TAPO_NATIVE_PORT,
-        note: "The password you sign into the Tapo app with. No camera account, and the microphone works both ways."
+        nativeControlPort: TAPO_CONTROL_PORT,
+        appConsent: "Me > Third-Party Services > Third-Party Compatibility",
+        note: "The password for your TP-Link account - the one you sign into the Tapo app with, not one set on the camera. No camera account, and the microphone works both ways."
     },
     {
         // The battery models, which are not a variation on the one above: they
@@ -112,7 +134,9 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         nativeScheme: "tapo",
         nativePasswordOnly: true,
         nativePort: TAPO_NATIVE_PORT,
-        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. The password you sign into the Tapo app with. Polaris connects only while somebody is watching, because on these the connection is the battery."
+        nativeControlPort: TAPO_CONTROL_PORT,
+        appConsent: "Me > Third-Party Services > Third-Party Compatibility",
+        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. Polaris connects only while somebody is watching, because on these the connection is the battery - and one that is asleep answers nothing until you open it in the Tapo app."
     },
     {
         id: "tapo",

@@ -309,10 +309,30 @@ export async function probeCameraAction(input: unknown): Promise<{
     if (vendor.noOnvif) {
         const port = vendor.nativePort ?? parsed.data.onvifPort;
         if (!port) return { error: "There is nothing to ask this camera on." };
-        const open = await portOpen(parsed.data.address, port, REACH_TIMEOUT_MS);
-        if (!open) {
+        // Two questions, because "nothing answered" has two causes with two
+        // different fixes and the reader cannot tell them apart from one answer.
+        // The video port is the one that matters; the control port only decides
+        // which sentence to write when the video port is shut.
+        const [streaming, answering] = await Promise.all([
+            portOpen(parsed.data.address, port, REACH_TIMEOUT_MS),
+            vendor.nativeControlPort
+                ? portOpen(parsed.data.address, vendor.nativeControlPort, REACH_TIMEOUT_MS)
+                : Promise.resolve(false)
+        ]);
+        if (!streaming) {
+            // It answered somewhere, so the address is right and the camera is
+            // awake - it is simply not sharing. On this make that is one switch,
+            // and it lives in the account rather than on the camera, which is
+            // why nobody finds it by looking at the camera's own settings.
+            if (answering && vendor.appConsent) {
+                return {
+                    error: `The camera is there but is not sharing its video. In the Tapo app: ${vendor.appConsent}, and turn it on.`
+                };
+            }
             return {
-                error: "Nothing answered at that address. Check it in the Tapo app, under the camera's own settings."
+                error: vendor.battery
+                    ? "Nothing answered at that address. One of these closes everything down while it sleeps, so open it once in the Tapo app and ask again - and check the address is the one the app shows for it."
+                    : "Nothing answered at that address. Check it is the one the Tapo app shows for this camera."
             };
         }
         return {
