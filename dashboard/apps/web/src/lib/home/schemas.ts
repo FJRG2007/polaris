@@ -11,7 +11,13 @@
 
 import { z } from "zod";
 import { reportsOwnAlerts } from "@/lib/home/vendors";
-import { POWER_SOURCES, askPowerFor, cameraModel, vendorForModel } from "@/lib/home/camera-models";
+import {
+    POWER_SOURCES,
+    askPowerFor,
+    cameraModel,
+    drawsFromBattery,
+    vendorForModel
+} from "@/lib/home/camera-models";
 import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES, type Detector } from "@/lib/home/detection";
 import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
@@ -59,6 +65,20 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     // field from a model that was chosen and then changed.
     if (typeof value.modelId === "string" && !askPowerFor(value.modelId)) {
         value.power = "mains";
+    }
+    // A camera on its own charge, with nothing said about what it should watch,
+    // watches nothing. The defaults below are written for a camera on a wire,
+    // where holding a stream open costs nothing - on a battery the same defaults
+    // are a camera that runs flat and switches itself off.
+    //
+    // Only where the field is absent, which is what "nothing was said" looks
+    // like: an answer that was given is its owner's, and they are warned what it
+    // costs where they give it. Here rather than after the schema, because the
+    // schema fills the field in before anything downstream can tell the two
+    // apart.
+    if (drawsFromBattery(value.power as string)) {
+        if (value.detector === undefined) value.detector = "none";
+        if (value.recording === undefined) value.recording = "off";
     }
     if (typeof value.vendor === "string" && typeof value.detector === "string") {
         value.detector = settledDetector(value.vendor, value.detector as Detector);

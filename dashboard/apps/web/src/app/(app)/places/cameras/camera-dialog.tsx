@@ -18,13 +18,14 @@
 import * as actions from "../actions";
 import Link from "next/link";
 import type { CameraActivity } from "@/lib/home/vision-activity";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
 import { BrandPicker, ModelPicker } from "./model-picker";
 import { cameraVendor, reportsOwnAlerts, usesAccountPassword } from "@/lib/home/vendors";
 import {
+    BATTERY_COST_WARNING,
     POWER_LABELS,
     POWER_NOTES,
     POWER_SOURCES,
@@ -271,6 +272,29 @@ export function CameraDialog({
      * battery camera, recording, because recording it means watching it and
      * watching it is what the battery is for.
      */
+    /**
+     * What the camera was said to be running on last time this ran. Null until
+     * the form has been drawn once, which is how a change made here is told from
+     * the value the camera was opened with.
+     */
+    const wasPowered = useRef<PowerSource | null>(null);
+
+    /**
+     * Saying a camera is on its own charge is the answer to what Polaris may do
+     * with it, so both of the settings that would hold its stream open go back
+     * to off.
+     *
+     * Only when the answer CHANGES. On the way in it is left alone: a camera
+     * whose owner deliberately set a detector on it, knowing the cost, must not
+     * have that quietly undone because they opened the form to rename it.
+     */
+    useEffect(() => {
+        const was = wasPowered.current;
+        wasPowered.current = form.power;
+        if (was === null || was === form.power || !drawsFromBattery(form.power)) return;
+        setForm((current) => ({ ...current, detector: "none", recording: "off" }));
+    }, [form.power]);
+
     useEffect(() => {
         const chosen = cameraVendor(vendorId);
         setForm((current) => {
@@ -524,8 +548,17 @@ export function CameraDialog({
                             </Field>
                         ) : null}
                         {askPower ? (
-                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
-                                {POWER_NOTES[form.power]}
+                            <p
+                                className={cn(
+                                    "text-[0.75rem] leading-relaxed",
+                                    battery && (needsSomewhereToRun(form.detector) || form.recording !== "off")
+                                        ? "text-warning"
+                                        : "text-muted-foreground"
+                                )}
+                            >
+                                {battery && (needsSomewhereToRun(form.detector) || form.recording !== "off")
+                                    ? BATTERY_COST_WARNING
+                                    : POWER_NOTES[form.power]}
                             </p>
                         ) : null}
                         {vendor.note ? (
@@ -705,9 +738,7 @@ export function CameraDialog({
                         ) : null}
                         {battery && needsSomewhereToRun(form.detector) ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
-                                This camera runs on a battery, and anything Polaris watches for itself means
-                                holding the stream open all day - which is a charge measured in hours rather
-                                than months. Leave it on Nothing unless it is plugged in.
+                                {BATTERY_COST_WARNING}
                             </p>
                         ) : null}
                         {battery && !ownAlerts && form.detector === "none" ? (
@@ -909,9 +940,7 @@ export function CameraDialog({
                         />
                         {battery && form.recording !== "off" ? (
                             <p className="text-[0.75rem] leading-relaxed text-warning">
-                                Keeping footage from this camera means holding its stream open, and on a
-                                battery that is a charge measured in hours rather than months. Leave it on
-                                Nothing unless it is plugged in.
+                                {BATTERY_COST_WARNING}
                             </p>
                         ) : null}
                         {form.recording !== "off" ? (
