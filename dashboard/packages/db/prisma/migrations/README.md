@@ -6,7 +6,7 @@ on boot, unattended, against a database nobody is watching.
 ## A migration must survive being run twice
 
 Postgres runs each statement for real. If the fourth one fails, the first three
-have already happened and are not rolled back — so the deployment is left with a
+have already happened and are not rolled back - so the deployment is left with a
 table half changed, the history records the migration as failed, and every later
 migration is refused.
 
@@ -31,7 +31,7 @@ ALTER TABLE "Thing" DROP CONSTRAINT IF EXISTS "Thing_pkey";
 ALTER TABLE "Thing" ADD CONSTRAINT "Thing_pkey" PRIMARY KEY ("id");
 ```
 
-The same applies to the foreign keys Prisma rewrites — `DROP CONSTRAINT` on its
+The same applies to the foreign keys Prisma rewrites - `DROP CONSTRAINT` on its
 own fails the second time, so it is always `DROP CONSTRAINT IF EXISTS`.
 
 A data statement has no conditional form at all: nothing about `INSERT` is a
@@ -52,7 +52,7 @@ names the statement it wants.
 
 ## Never edit a migration that has shipped
 
-Their text is checksummed. Changing an applied one stops the install updating —
+Their text is checksummed. Changing an applied one stops the install updating -
 the same outage the rule above exists to prevent. The test only binds migrations
 written from `20260930110001` onwards for exactly this reason: everything before
 it is already applied on real deployments and is left alone.
