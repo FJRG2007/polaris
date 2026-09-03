@@ -22,14 +22,13 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
-import { ModelPicker } from "./model-picker";
+import { BrandPicker, ModelPicker } from "./model-picker";
 import { cameraVendor, reportsOwnAlerts, usesAccountPassword } from "@/lib/home/vendors";
 import {
     POWER_LABELS,
     POWER_NOTES,
     POWER_SOURCES,
     askPowerFor,
-    cameraBrands,
     cameraModel,
     connectionsFor,
     drawsFromBattery,
@@ -441,26 +440,21 @@ export function CameraDialog({
                                 placeholder="Outside"
                             />
                         </Field>
-                        <Field label="Make" required>
-                            <Select
+                        <Field label="Brand" required>
+                            <BrandPicker
                                 value={form.brand}
-                                onValueChange={(value) =>
+                                onChange={(brand) =>
                                     setForm((current) => ({
                                         ...current,
-                                        brand: value,
-                                        // A model from the make that was just
+                                        brand,
+                                        // A model from the brand that was just
                                         // left is not a model of this one.
                                         modelId:
-                                            cameraModel(current.modelId)?.brand === value
+                                            cameraModel(current.modelId)?.brand === brand
                                                 ? current.modelId
                                                 : ""
                                     }))
                                 }
-                                placeholder="Who makes it"
-                                options={cameraBrands().map((entry) => ({
-                                    value: entry.brand,
-                                    label: entry.brand
-                                }))}
                             />
                         </Field>
                         <Field

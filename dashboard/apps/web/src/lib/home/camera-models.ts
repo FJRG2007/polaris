@@ -287,6 +287,21 @@ export function cameraBrands(): readonly { brand: string; count: number }[] {
     return [...counts.entries()].map(([brand, count]) => ({ brand, count }));
 }
 
+/**
+ * The makes that survive what has been typed.
+ *
+ * Matched against the make AND against the cameras under it, so typing a model
+ * finds the make that sells it: somebody who knows they have a C410 and not what
+ * TP-Link calls its camera brand should not have to guess "Tapo" to get past the
+ * first field.
+ */
+export function searchBrands(query: string): readonly { brand: string; count: number }[] {
+    const asked = query.trim();
+    if (!asked) return cameraBrands();
+    const found = new Set(searchModels(asked).map((model) => model.brand));
+    return cameraBrands().filter((entry) => found.has(entry.brand));
+}
+
 /** Every camera one brand makes, in the order they are listed. */
 export function modelsOfBrand(brand: string): readonly CameraModel[] {
     return CAMERA_MODELS.filter((model) => model.brand === brand);

@@ -18,13 +18,14 @@
  * lose the moment the menu opens.
  */
 
-import { Camera } from "lucide-react";
+import { Camera, ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TpLinkMark } from "@/components/brand-icons";
 import {
     CAMERA_MODELS,
     cameraModel,
     modelsOfBrand,
+    searchBrands,
     searchModels,
     type CameraModel
 } from "@/lib/home/camera-models";
@@ -36,6 +37,47 @@ import {
     DropdownMenuTrigger,
     MenuSearch
 } from "@polaris/ui";
+
+/** The shell every picker here is: a field that opens a menu with a search box
+ *  at the top of it. Written once because the make and the model are the same
+ *  control over different lists, and two of them would drift. */
+function PickerMenu({
+    query,
+    onQuery,
+    placeholder,
+    label,
+    empty,
+    value,
+    children
+}: {
+    query: string;
+    onQuery: (value: string) => void;
+    placeholder: string;
+    label: string;
+    empty: string;
+    value: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    return (
+        <DropdownMenu onOpenChange={(open) => (open ? onQuery("") : undefined)}>
+            <DropdownMenuTrigger
+                className="group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] transition-colors duration-fast hover:border-border-strong data-[state=open]:border-border-strong"
+                aria-label={label}
+            >
+                {value}
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]:rotate-180" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-80 w-[--radix-dropdown-menu-trigger-width] overflow-y-auto">
+                <MenuSearch value={query} onChange={onQuery} placeholder={placeholder} />
+                {children ? (
+                    children
+                ) : (
+                    <p className="px-2 py-3 text-[0.75rem] text-muted-foreground">{empty}</p>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
 
 /**
  * The brand's own mark, where there is one to use.
@@ -63,6 +105,60 @@ function ModelLabel({ model }: { model: CameraModel }) {
                 <span className="text-muted-foreground">{model.brand}</span> {model.name}
             </span>
         </span>
+    );
+}
+
+/**
+ * Which make it is.
+ *
+ * It was a plain select labelled "Make", which is a word half the people setting
+ * up a camera do not use, with no mark to recognise a brand by and no way to
+ * type. Typing matters more here than it looks: the list is short, but somebody
+ * who knows they own a C410 and not what TP-Link calls its camera brand can type
+ * the model and get the make that sells it.
+ */
+export function BrandPicker({
+    value,
+    onChange
+}: {
+    value: string;
+    onChange: (brand: string) => void;
+}) {
+    const [query, setQuery] = useState("");
+    const matches = useMemo(() => searchBrands(query), [query]);
+
+    return (
+        <PickerMenu
+            query={query}
+            onQuery={setQuery}
+            label="Camera brand"
+            placeholder="Tapo, TP-Link, Reolink"
+            empty="No make by that name. Pick Other and Polaris asks the camera the rest."
+            value={
+                value ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                        <BrandMark brand={value} />
+                        <span className="truncate">{value}</span>
+                    </span>
+                ) : (
+                    <span className="truncate text-foreground-subtle">Who makes it</span>
+                )
+            }
+        >
+            {matches.length === 0
+                ? null
+                : matches.map((entry) => (
+                      <DropdownMenuItem key={entry.brand} onSelect={() => onChange(entry.brand)}>
+                          <span className="flex min-w-0 items-center gap-2">
+                              <BrandMark brand={entry.brand} />
+                              <span className="truncate">{entry.brand}</span>
+                              <span className="ml-auto shrink-0 text-[0.6875rem] text-foreground-subtle">
+                                  {entry.count}
+                              </span>
+                          </span>
+                      </DropdownMenuItem>
+                  ))}
+        </PickerMenu>
     );
 }
 
@@ -97,32 +193,28 @@ export function ModelPicker({
     const chosen = cameraModel(value);
 
     return (
-        <DropdownMenu onOpenChange={(open) => (open ? setQuery("") : undefined)}>
-            <DropdownMenuTrigger
-                className="group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] transition-colors duration-fast hover:border-border-strong data-[state=open]:border-border-strong"
-                aria-label="Camera model"
-            >
-                {chosen ? (
+        <PickerMenu
+            query={query}
+            onQuery={setQuery}
+            label="Camera model"
+            placeholder="C410, tapo c200, tplink"
+            empty={'No camera by that name. Pick the closest one, or "Something else".'}
+            value={
+                chosen ? (
                     <ModelLabel model={chosen} />
                 ) : (
-                    <span className="truncate text-foreground-subtle" title={placeholder}>{placeholder}</span>
-                )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="max-h-80 w-[--radix-dropdown-menu-trigger-width] overflow-y-auto">
-                <MenuSearch value={query} onChange={setQuery} placeholder="Tapo C410, tplink, Reolink" />
-                {matches.length === 0 ? (
-                    <p className="px-2 py-3 text-[0.75rem] text-muted-foreground">
-                        No camera by that name. Pick the closest one, or "Something else" - Polaris
-                        asks the camera the rest.
-                    </p>
-                ) : (
-                    matches.map((model) => (
-                        <DropdownMenuItem key={model.id} onSelect={() => onChange(model.id)}>
-                            <ModelLabel model={model} />
-                        </DropdownMenuItem>
-                    ))
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    <span className="truncate text-foreground-subtle">{placeholder}</span>
+                )
+            }
+        >
+            {matches.length === 0
+                ? null
+                : matches.map((model) => (
+                      <DropdownMenuItem key={model.id} onSelect={() => onChange(model.id)}>
+                          <ModelLabel model={model} />
+                      </DropdownMenuItem>
+                  ))}
+        </PickerMenu>
     );
+
 }
