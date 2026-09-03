@@ -32,6 +32,15 @@ export interface CameraVendor {
     /** Whether the make's cameras generally point somewhere on command. Only a
      *  hint for the form - what a particular camera can do is asked of it. */
     readonly ptz?: boolean;
+    /**
+     * What this profile IS, as a way of reaching a camera rather than as a make.
+     *
+     * The labels above name a make, which is what the list of makes needed. Once
+     * a model has been chosen, the same profiles are a choice between transports
+     * for that one camera - and "TP-Link Tapo (camera account)" does not tell
+     * anybody which of the two is the one that streams better.
+     */
+    readonly method?: string;
     /** What somebody adding one of these has to know first. Shown on the form,
      *  because every one of these is a support question that would otherwise be
      *  asked as "it says wrong password". */
@@ -110,6 +119,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         // somebody already has, and the one that avoids the camera-account
         // detour every other Tapo setup starts with.
         id: "tapo-cloud",
+        method: "TP-Link's own protocol",
         label: "TP-Link Tapo (Tapo password)",
         // Reached over TP-Link's own protocol rather than RTSP, so there are no
         // paths to resolve - the subtype does that job.
@@ -131,6 +141,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         // permanent connection has nothing to connect to. The maker's own
         // protocol is the only way in, which is also how the phone app does it.
         id: "tapo-battery",
+        method: "TP-Link's own protocol",
         label: "TP-Link Tapo (battery, no RTSP)",
         mainPath: "",
         // Fixed lenses, every one of them, so there is nothing to point.
@@ -146,6 +157,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
     },
     {
         id: "tapo",
+        method: "RTSP, with a camera account",
         label: "TP-Link Tapo (camera account)",
         mainPath: "/stream1",
         subPath: "/stream2",
@@ -157,6 +169,7 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
     },
     {
         id: "vigi",
+        method: "RTSP, with a camera account",
         label: "TP-Link VIGI",
         mainPath: "/stream1",
         subPath: "/stream2",
@@ -211,6 +224,21 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
 /** One make by id, or the generic profile for anything unrecognized. */
 export function cameraVendor(id: string): CameraVendor {
     return CAMERA_VENDORS.find((vendor) => vendor.id === id) ?? CAMERA_VENDORS[CAMERA_VENDORS.length - 1]!;
+}
+
+/**
+ * Whether this profile's credential belongs to the account rather than to the
+ * camera.
+ *
+ * TP-Link's own protocol takes the password of the TP-Link account, which is one
+ * password for every camera on it - so a house with four of them types the same
+ * thing four times, and gets it wrong once. Where a profile says the credential
+ * is the account's, Polaris can take the one it already holds instead of asking
+ * again. A camera account is the opposite - it is made per camera, in the app,
+ * and two of them are two different passwords.
+ */
+export function usesAccountPassword(vendorId: string): boolean {
+    return cameraVendor(vendorId).nativePasswordOnly === true;
 }
 
 /**

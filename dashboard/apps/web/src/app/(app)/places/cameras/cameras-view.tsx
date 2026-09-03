@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { CameraDialog } from "./camera-dialog";
 import { ZonesDialog } from "./zones-dialog";
-import { cameraVendor } from "@/lib/home/vendors";
+import { cameraVendor, usesAccountPassword } from "@/lib/home/vendors";
 import { DiscoverDialog } from "./discover-dialog";
 import type { CameraView } from "@/lib/home/cameras";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
@@ -326,6 +326,12 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 <CameraDialog
                     camera={editing}
                     prefill={adding}
+                    // Whether this house already holds a TP-Link account
+                    // password, so the second camera onwards can be added
+                    // without typing it again.
+                    sharedPassword={(cameras ?? []).some(
+                        (row) => row.hasPassword && usesAccountPassword(row.vendor)
+                    )}
                     servers={servers}
                     storage={storage}
                     defaults={defaults}

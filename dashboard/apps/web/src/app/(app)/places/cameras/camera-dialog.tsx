@@ -23,14 +23,17 @@ import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
 import { ModelPicker } from "./model-picker";
-import { cameraVendor, reportsOwnAlerts } from "@/lib/home/vendors";
+import { cameraVendor, reportsOwnAlerts, usesAccountPassword } from "@/lib/home/vendors";
 import {
     POWER_LABELS,
     POWER_NOTES,
     POWER_SOURCES,
     askPowerFor,
+    cameraBrands,
     cameraModel,
+    connectionsFor,
     drawsFromBattery,
+    vendorForModel,
     type PowerSource
 } from "@/lib/home/camera-models";
 import {
@@ -73,6 +76,10 @@ interface FormState {
     name: string;
     zone: string;
     vendor: string;
+    /** Not stored: the make is a step on the way to the model, and the model is
+     *  what a camera carries. Kept so the picker below it has something to
+     *  narrow by before anything has been picked. */
+    brand: string;
     modelId: string;
     power: PowerSource;
     address: string;
@@ -113,6 +120,7 @@ function initial(
         // The make is still carried, because a camera added before the model
         // list existed has one and no model, and it is what keeps working.
         vendor: camera?.vendor ?? prefill?.vendor ?? "tapo-cloud",
+        brand: cameraModel(camera?.modelId)?.brand ?? "",
         modelId: camera?.modelId ?? "",
         power: (camera?.power as PowerSource) ?? "mains",
         address: camera?.address ?? prefill?.address ?? "",
@@ -146,6 +154,7 @@ function initial(
 export function CameraDialog({
     camera,
     prefill = null,
+    sharedPassword = false,
     servers,
     storage,
     defaults,
@@ -156,6 +165,10 @@ export function CameraDialog({
     /** A camera discovery found, being added: the address is known and the make
      *  is a guess worth starting from. */
     prefill?: { address: string; vendor: string | null } | null;
+    /** Whether this house already holds a TP-Link account password. It is one
+     *  password for every camera on the account, so the second one onwards does
+     *  not have to be given it again - and the field must not demand it. */
+    sharedPassword?: boolean;
     servers: Server[];
     /** The disks footage can be pointed at, the instance default first. */
     storage: { id: string; label: string }[];
@@ -183,8 +196,14 @@ export function CameraDialog({
     /** The model decides the make. A camera from before the list keeps the make
      *  it was set up with, which is why this falls back rather than defaulting. */
     const model = cameraModel(form.modelId);
-    const vendorId = model?.vendor ?? form.vendor;
+    /** What it is reached by: what it is on now, where the model still allows
+     *  it, and the model's own first choice for one being set up. */
+    const vendorId = vendorForModel(form.modelId, form.vendor);
     const vendor = cameraVendor(vendorId);
+    /** The ways this model can be reached. Offered whenever there is more than
+     *  one, because which of them to use is a real decision with a real cost and
+     *  not something to resolve behind somebody's back. */
+    const connections = connectionsFor(form.modelId);
     /** The server this camera is reached through, when it is not Polaris itself. */
     const reachedVia = form.reachVia.startsWith("server:")
         ? form.reachVia.slice("server:".length)
@@ -267,10 +286,14 @@ export function CameraDialog({
         });
     }, [vendorId, form.modelId, form.power, camera]);
 
+    /** Whether leaving the field empty means "use the one already stored for this
+     *  account" rather than "connect with nothing". */
+    const inheritsPassword = sharedPassword && usesAccountPassword(vendorId) && !camera?.hasPassword;
     /** On a make with its own protocol the password is the entire credential -
      *  there is no account name beside it - so an empty one cannot connect and
-     *  is not worth a round trip to find that out. */
-    const needsPassword = !usesRtsp && !form.password && !camera?.hasPassword;
+     *  is not worth a round trip to find that out. Unless there is one to
+     *  inherit, in which case empty is the answer rather than an omission. */
+    const needsPassword = !usesRtsp && !form.password && !camera?.hasPassword && !inheritsPassword;
     const incomplete = !form.name.trim() || !form.address.trim() || needsPassword;
 
     const payload = () => ({
@@ -418,16 +441,71 @@ export function CameraDialog({
                                 placeholder="Outside"
                             />
                         </Field>
+                        <Field label="Make" required>
+                            <Select
+                                value={form.brand}
+                                onValueChange={(value) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        brand: value,
+                                        // A model from the make that was just
+                                        // left is not a model of this one.
+                                        modelId:
+                                            cameraModel(current.modelId)?.brand === value
+                                                ? current.modelId
+                                                : ""
+                                    }))
+                                }
+                                placeholder="Who makes it"
+                                options={cameraBrands().map((entry) => ({
+                                    value: entry.brand,
+                                    label: entry.brand
+                                }))}
+                            />
+                        </Field>
                         <Field
-                            label="Camera"
-                            hint="Type the model, or the make if it is not listed. TP-Link cameras are sold as Tapo."
+                            label="Model"
+                            hint="Type it if the list is long. TP-Link cameras are sold as Tapo, so both names find them."
                             required
                         >
                             <ModelPicker
                                 value={form.modelId}
-                                onChange={(modelId) => set("modelId", modelId)}
+                                brand={form.brand}
+                                onChange={(modelId) =>
+                                    setForm((current) => ({
+                                        ...current,
+                                        modelId,
+                                        // Picking through a search that crossed
+                                        // makes moves the make to match, rather
+                                        // than leaving the two disagreeing.
+                                        brand: cameraModel(modelId)?.brand ?? current.brand
+                                    }))
+                                }
                             />
                         </Field>
+                        {/* More than one way in is the normal case, and they are
+                            not equivalent - so the choice is offered, with the
+                            one to take if you have no opinion marked as such
+                            rather than merely listed first. */}
+                        {connections.length > 1 ? (
+                            <Field
+                                label="How Polaris connects"
+                                hint="Both reach the same camera. Take the recommended one unless you have a reason not to."
+                            >
+                                <Select
+                                    value={vendorId}
+                                    onValueChange={(value) => set("vendor", value)}
+                                    options={connections.map((id, index) => {
+                                        const profile = cameraVendor(id);
+                                        const name = profile.method ?? profile.label;
+                                        return {
+                                            value: id,
+                                            label: index === 0 ? `${name} - recommended` : name
+                                        };
+                                    })}
+                                />
+                            </Field>
+                        ) : null}
                         {/* What is true of this model and not of its make - the
                             doorbells that answer RTSP only once they are wired
                             up, and nothing else. */}
@@ -501,11 +579,13 @@ export function CameraDialog({
                             ) : null}
                             <Field
                                 label={usesRtsp ? "Password" : "Tapo account password"}
-                                required={!usesRtsp}
+                                required={!usesRtsp && !inheritsPassword}
                                 hint={
                                     camera?.hasPassword
                                         ? "Stored. Type to replace it."
-                                        : usesRtsp
+                                        : inheritsPassword
+                                          ? "Leave it blank to use the password from your other TP-Link cameras - it is one password for the whole account."
+                                          : usesRtsp
                                           ? undefined
                                           : // The question everybody asks at this
                                             // field, answered at it: the camera
