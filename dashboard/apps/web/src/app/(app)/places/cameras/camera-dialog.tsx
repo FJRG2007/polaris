@@ -240,7 +240,11 @@ export function CameraDialog({
         });
     }, [form.vendor, camera]);
 
-    const incomplete = !form.name.trim() || !form.address.trim();
+    /** On a make with its own protocol the password is the entire credential -
+     *  there is no account name beside it - so an empty one cannot connect and
+     *  is not worth a round trip to find that out. */
+    const needsPassword = !usesRtsp && !form.password && !camera?.hasPassword;
+    const incomplete = !form.name.trim() || !form.address.trim() || needsPassword;
 
     const payload = () => ({
         name: form.name,
@@ -371,6 +375,15 @@ export function CameraDialog({
                                 {vendor.note}
                             </p>
                         ) : null}
+                        {/* Not a Polaris setting and not one Polaris can reach,
+                            so the only thing to do with it is say it before the
+                            camera refuses and the password gets the blame. */}
+                        {vendor.appConsent ? (
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                                Recent firmware refuses every local connection until it is allowed. In the
+                                Tapo app: <span className="text-foreground">{vendor.appConsent}</span>.
+                            </p>
+                        ) : null}
                         <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
                             <Field label="Address" required>
                                 <Input
@@ -401,9 +414,20 @@ export function CameraDialog({
                                 </Field>
                             ) : null}
                             <Field
-                                label="Password"
+                                label={usesRtsp ? "Password" : "Tapo account password"}
+                                required={!usesRtsp}
                                 hint={
-                                    camera?.hasPassword ? "Stored. Type to replace it." : undefined
+                                    camera?.hasPassword
+                                        ? "Stored. Type to replace it."
+                                        : usesRtsp
+                                          ? undefined
+                                          : // The question everybody asks at this
+                                            // field, answered at it: the camera
+                                            // checks the password by itself and
+                                            // never asks who is presenting it,
+                                            // so there is no address to give and
+                                            // its absence is not a missing step.
+                                            "The password for your TP-Link account. There is no email or account name to give - the camera checks the password and nothing else."
                                 }
                             >
                                 {/* enigma:allow-no-breach-check - nothing is being
