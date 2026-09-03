@@ -213,17 +213,6 @@ export function cameraVendor(id: string): CameraVendor {
     return CAMERA_VENDORS.find((vendor) => vendor.id === id) ?? CAMERA_VENDORS[CAMERA_VENDORS.length - 1]!;
 }
 
-/** Whether watching this camera spends a charge rather than a wire. */
-export function onBattery(vendorId: string): boolean {
-    return cameraVendor(vendorId).battery === true;
-}
-
-/** The makes that do, as a list a query can be written against - the sweeps
- *  decide which cameras to dial in the database rather than in a loop. */
-export const BATTERY_VENDORS: readonly string[] = CAMERA_VENDORS.filter(
-    (vendor) => vendor.battery === true
-).map((vendor) => vendor.id);
-
 /**
  * Whether this camera can tell Polaris it saw something by itself.
  *

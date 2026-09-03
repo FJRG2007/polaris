@@ -14,7 +14,8 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
 
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, onBattery, rtspUrl } from "@/lib/home/vendors";
+import { cameraVendor, rtspUrl } from "@/lib/home/vendors";
+import { drawsFromBattery, modelCanPan } from "@/lib/home/camera-models";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "@/lib/home/schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "@/lib/home/detection";
@@ -27,6 +28,11 @@ export interface CameraView {
     readonly zone: string;
     readonly vendor: string;
     readonly model: string | null;
+    /** The catalog model its owner picked, or "" on one added before the list. */
+    readonly modelId: string;
+    /** mains | battery | battery-solar. What decides whether Polaris may hold a
+     *  connection to this camera at all. */
+    readonly power: string;
     readonly address: string;
     readonly rtspPort: number;
     readonly onvifPort: number | null;
@@ -98,6 +104,8 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         zone: row.zone ?? "",
         vendor: row.vendor,
         model: row.model,
+        modelId: row.modelId ?? "",
+        power: row.power,
         address: row.address,
         rtspPort: row.rtspPort,
         onvifPort: row.onvifPort,
@@ -113,7 +121,10 @@ function toView(row: NonNullable<CameraRow>): CameraView {
         storageTarget: row.storageTarget ?? "",
         retentionDays: row.retentionDays,
         enabled: row.enabled,
-        ptz: row.onvifPort !== null,
+        // A camera that answered ONVIF can be pointed, and so can one whose
+        // model says so - which is how a make reached over its own protocol
+        // keeps its arrows, having never answered ONVIF to be asked.
+        ptz: row.onvifPort !== null || modelCanPan(row.modelId),
         lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
         offlineSince: row.offlineSince?.toISOString() ?? null
     };
@@ -194,6 +205,8 @@ export async function createCamera(
             name: input.name,
             zone: input.zone || null,
             vendor: input.vendor,
+            modelId: input.modelId || null,
+            power: input.power,
             address: input.address,
             rtspPort: input.rtspPort,
             // What the make listens on, unless the form was told otherwise. This
@@ -233,7 +246,7 @@ export async function updateCamera(
     // it was down would keep the clock it was carrying for good: every screen
     // reading "not answering since" a date that can never advance, and the event
     // in the log left open on an outage nothing will ever close.
-    const battery = onBattery(input.vendor);
+    const battery = drawsFromBattery(input.power);
     if (battery) {
         await prisma.cameraEvent.updateMany({
             where: { cameraId: id, kind: "offline", endedAt: null },
@@ -248,6 +261,8 @@ export async function updateCamera(
             name: input.name,
             zone: input.zone || null,
             vendor: input.vendor,
+            modelId: input.modelId || null,
+            power: input.power,
             address: input.address,
             rtspPort: input.rtspPort,
             onvifPort: input.onvifPort ?? vendor.onvifPort ?? null,

@@ -7701,6 +7701,16 @@ model Camera {
     /// What the camera calls itself, as reported over ONVIF. Kept for the row,
     /// not for logic.
     model          String?
+    /// The catalog model its owner picked, which is what decides how Polaris
+    /// talks to it. Null on a camera added before the list existed; those keep
+    /// answering to `vendor` alone, which is what they were set up with.
+    modelId        String?
+    /// mains | battery | battery-solar. Only asked of a model that can run off a
+    /// battery, and it is the whole of what decides whether Polaris may hold a
+    /// connection to this camera: the same model is a camera to watch all day on
+    /// a cable and one to leave asleep on a pole. Defaults to mains, which is
+    /// what every camera that predates this column is.
+    power          String  @default("mains")
 
     // How Polaris reaches it.
     address   String

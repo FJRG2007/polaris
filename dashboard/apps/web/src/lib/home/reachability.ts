@@ -29,7 +29,12 @@ import { isMuted } from "@polaris/core";
 import { raiseAlerts, type Said } from "@/lib/home/alerts";
 import { notify } from "@/lib/notifications/dispatch";
 import { ruleFor } from "@/lib/notifications/preferences";
-import { BATTERY_VENDORS } from "@/lib/home/vendors";
+import { POWER_SOURCES } from "@/lib/home/camera-models";
+
+/** The answers that mean "this camera is spending its own charge". Derived from
+ *  the list rather than written out again, so a fourth answer added later cannot
+ *  be forgotten here - which would be this pass quietly dialling it. */
+const BATTERY_POWER: readonly string[] = POWER_SOURCES.filter((source) => source !== "mains");
 import { OFFLINE_GRACE_MS } from "@/lib/home/availability";
 import {
     publishedStreams,
@@ -299,12 +304,18 @@ async function tell(
 export async function sweepCameraReachability(): Promise<ReachabilitySweep> {
     const cameras: Watched[] = await prisma.camera.findMany({
         // Everything here rests on a camera that is always connected, where a
-        // frame costs the relay a dial and the camera nothing. A battery camera
-        // breaks that: this pass runs every minute, and every pass would wake
-        // one up - a charge meant to last months, spent on asking whether it was
-        // still there. It is asleep by design, so "quiet" is not an outage for
-        // one, and whether it answers is found out when somebody opens it.
-        where: { enabled: true, vendor: { notIn: [...BATTERY_VENDORS] } },
+        // frame costs the relay a dial and the camera nothing. A camera running
+        // off its own charge breaks that: this pass runs every minute, and every
+        // pass would wake one up - a charge meant to last months, spent on asking
+        // whether it was still there. It is asleep by design, so "quiet" is not
+        // an outage for one, and whether it answers is found out when somebody
+        // opens it.
+        //
+        // Read off how the camera is powered rather than off its make, because
+        // that is the thing that decides it: several of these models are sold
+        // with a battery and run just as happily on a cable, and one on a cable
+        // is a camera this pass should be watching like any other.
+        where: { enabled: true, power: { notIn: [...BATTERY_POWER] } },
         select: {
             id: true,
             name: true,

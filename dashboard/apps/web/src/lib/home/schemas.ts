@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { reportsOwnAlerts } from "@/lib/home/vendors";
+import { POWER_SOURCES, askPowerFor, cameraModel, vendorForModel } from "@/lib/home/camera-models";
 import { DETECTORS, LOCAL_MACHINE, OBJECT_CLASSES, type Detector } from "@/lib/home/detection";
 import { MAX_ZONE_POINTS, MIN_ZONE_POINTS, ZONE_KINDS } from "@polaris/core";
 
@@ -42,6 +43,19 @@ export function normalizeCameraInput<T extends Record<string, unknown>>(input: T
     if (typeof value.mainPath === "string") value.mainPath = normalizeStreamPath(value.mainPath);
     if (typeof value.subPath === "string") value.subPath = normalizeStreamPath(value.subPath);
     if (typeof value.username === "string") value.username = value.username.trim();
+    // The model decides the make, rather than the two being asked separately and
+    // left to disagree. A camera whose model this build does not know keeps the
+    // make it was set up with: that is every camera added before the list
+    // existed, and they are working.
+    if (typeof value.modelId === "string" && cameraModel(value.modelId)) {
+        value.vendor = vendorForModel(value.modelId);
+    }
+    // A camera that cannot run off a battery is not asked how it is powered, so
+    // an answer arriving for one is not a preference to keep - it is a stale
+    // field from a model that was chosen and then changed.
+    if (typeof value.modelId === "string" && !askPowerFor(value.modelId)) {
+        value.power = "mains";
+    }
     if (typeof value.vendor === "string" && typeof value.detector === "string") {
         value.detector = settledDetector(value.vendor, value.detector as Detector);
     }
@@ -115,6 +129,11 @@ const cameraFieldsSchema = z.object({
     placeId: z.string().trim().max(64).default(""),
     zone: z.string().trim().max(64).default(""),
     vendor: z.string().trim().min(1).max(32),
+    /** The catalog model, when one was picked. Empty is allowed and means the
+     *  make alone decides, which is what a camera added before the list existed
+     *  carries and what an API call may reasonably send. */
+    modelId: z.string().trim().max(64).default(""),
+    power: z.enum(POWER_SOURCES).default("mains"),
     address: addressSchema,
     rtspPort: portSchema.default(554),
     onvifPort: portSchema.nullable().default(null),

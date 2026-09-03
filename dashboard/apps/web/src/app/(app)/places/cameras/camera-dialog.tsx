@@ -22,7 +22,17 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
-import { CAMERA_VENDORS, cameraVendor, reportsOwnAlerts } from "@/lib/home/vendors";
+import { ModelPicker } from "./model-picker";
+import { cameraVendor, reportsOwnAlerts } from "@/lib/home/vendors";
+import {
+    POWER_LABELS,
+    POWER_NOTES,
+    POWER_SOURCES,
+    askPowerFor,
+    cameraModel,
+    drawsFromBattery,
+    type PowerSource
+} from "@/lib/home/camera-models";
 import {
     DEFAULT_DETECTION,
     DETECTORS,
@@ -63,6 +73,8 @@ interface FormState {
     name: string;
     zone: string;
     vendor: string;
+    modelId: string;
+    power: PowerSource;
     address: string;
     rtspPort: string;
     onvifPort: string;
@@ -98,7 +110,11 @@ function initial(
     return {
         name: camera?.name ?? "",
         zone: camera?.zone ?? "",
+        // The make is still carried, because a camera added before the model
+        // list existed has one and no model, and it is what keeps working.
         vendor: camera?.vendor ?? prefill?.vendor ?? "tapo-cloud",
+        modelId: camera?.modelId ?? "",
+        power: (camera?.power as PowerSource) ?? "mains",
         address: camera?.address ?? prefill?.address ?? "",
         rtspPort: String(camera?.rtspPort ?? 554),
         onvifPort: camera?.onvifPort ? String(camera.onvifPort) : "",
@@ -164,7 +180,11 @@ export function CameraDialog({
     const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
         setForm((current) => ({ ...current, [key]: value }));
 
-    const vendor = cameraVendor(form.vendor);
+    /** The model decides the make. A camera from before the list keeps the make
+     *  it was set up with, which is why this falls back rather than defaulting. */
+    const model = cameraModel(form.modelId);
+    const vendorId = model?.vendor ?? form.vendor;
+    const vendor = cameraVendor(vendorId);
     /** The server this camera is reached through, when it is not Polaris itself. */
     const reachedVia = form.reachVia.startsWith("server:")
         ? form.reachVia.slice("server:".length)
@@ -175,8 +195,11 @@ export function CameraDialog({
     const usesRtsp = !vendor.nativeScheme;
     /** Whether this camera could ever report its own movement. */
     const ownAlerts = reportsOwnAlerts(form.vendor);
-    /** Whether watching it spends a charge rather than a wire. */
-    const battery = vendor.battery === true;
+    /** Whether this one is asked how it is powered at all. */
+    const askPower = askPowerFor(form.modelId);
+    /** Whether watching it spends a charge rather than a wire. Its owner's
+     *  answer, not the make's: the same model runs on a cable or on a pole. */
+    const battery = drawsFromBattery(form.power);
     /** The rungs worth offering. One that cannot fire on this camera is not a
      *  cheaper setting, it is a setting that does nothing - and the whole point
      *  of this section is that every choice says what it costs. */
@@ -231,14 +254,18 @@ export function CameraDialog({
      * watching it is what the battery is for.
      */
     useEffect(() => {
-        const chosen = cameraVendor(form.vendor);
+        const chosen = cameraVendor(vendorId);
         setForm((current) => {
             const next = { ...current };
             if (chosen.noOnvif && next.detector === "camera") next.detector = "none";
-            if (chosen.battery && !camera) next.recording = "off";
+            // A camera that cannot run off a battery is not asked how it is
+            // powered, so an answer left over from a model that was chosen and
+            // then changed is cleared rather than stored.
+            if (!askPowerFor(next.modelId)) next.power = "mains";
+            if (drawsFromBattery(next.power) && !camera) next.recording = "off";
             return next;
         });
-    }, [form.vendor, camera]);
+    }, [vendorId, form.modelId, form.power, camera]);
 
     /** On a make with its own protocol the password is the entire credential -
      *  there is no account name beside it - so an empty one cannot connect and
@@ -249,7 +276,9 @@ export function CameraDialog({
     const payload = () => ({
         name: form.name,
         zone: form.zone,
-        vendor: form.vendor,
+        vendor: vendorId,
+        modelId: form.modelId,
+        power: form.power,
         address: form.address,
         rtspPort: Number(form.rtspPort) || 554,
         onvifPort: form.onvifPort ? Number(form.onvifPort) : null,
@@ -389,16 +418,44 @@ export function CameraDialog({
                                 placeholder="Outside"
                             />
                         </Field>
-                        <Field label="Make">
-                            <Select
-                                value={form.vendor}
-                                onValueChange={(value) => set("vendor", value)}
-                                options={CAMERA_VENDORS.map((item) => ({
-                                    value: item.id,
-                                    label: item.label
-                                }))}
+                        <Field
+                            label="Camera"
+                            hint="Type the model, or the make if it is not listed. TP-Link cameras are sold as Tapo."
+                            required
+                        >
+                            <ModelPicker
+                                value={form.modelId}
+                                onChange={(modelId) => set("modelId", modelId)}
                             />
                         </Field>
+                        {/* What is true of this model and not of its make - the
+                            doorbells that answer RTSP only once they are wired
+                            up, and nothing else. */}
+                        {model?.note ? (
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                                {model.note}
+                            </p>
+                        ) : null}
+                        {askPower ? (
+                            <Field
+                                label="How it is powered"
+                                hint="This decides what Polaris is allowed to do with it, so it is worth getting right."
+                            >
+                                <Select
+                                    value={form.power}
+                                    onValueChange={(value) => set("power", value as PowerSource)}
+                                    options={POWER_SOURCES.map((source) => ({
+                                        value: source,
+                                        label: POWER_LABELS[source]
+                                    }))}
+                                />
+                            </Field>
+                        ) : null}
+                        {askPower ? (
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                                {POWER_NOTES[form.power]}
+                            </p>
+                        ) : null}
                         {vendor.note ? (
                             <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
                                 {vendor.note}
