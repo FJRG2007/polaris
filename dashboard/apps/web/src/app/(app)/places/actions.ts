@@ -401,7 +401,7 @@ export async function probeCameraAction(input: unknown): Promise<{
  */
 export async function testCameraStreamAction(
     id: string
-): Promise<{ ok?: true; error?: string }> {
+): Promise<{ ok?: true; streams?: "both" | "main-only"; error?: string }> {
     const { user, install } = await requireHome("home.manage");
     const result = await guard(async () => {
         const camera = await cameras.getCamera(install.id, id);
@@ -414,15 +414,23 @@ export async function testCameraStreamAction(
             relay.relayServerFor(camera.reachVia)
         );
         await relay.publishCamera(endpoint, target, camera.vendor);
-        // The small stream, for the same reason the wall uses it: nothing looks
-        // at this picture, and the only question is whether one arrives.
-        return relay.frameOrReason(endpoint, camera.id, "sub");
+        // Both streams, small one first, because which of them a camera actually
+        // publishes is the answer here rather than a detail. A camera that has
+        // only the good one draws nothing anywhere in Polaris while every check
+        // says it is fine - the wall, the event pictures and the detector all
+        // read the small stream - so finding that out is the point of asking.
+        const small = await relay.frameOrReason(endpoint, camera.id, "sub");
+        if (!("reason" in small)) return { streams: "both" as const };
+        const good = await relay.frameOrReason(endpoint, camera.id, "main");
+        return "reason" in good
+            ? { failed: small.reason }
+            : { streams: "main-only" as const };
     });
     if (result.error) return { error: result.error };
-    if (!result.value || "reason" in result.value) {
-        return { error: result.value?.reason ?? "The relay did not answer." };
+    if (!result.value || "failed" in result.value) {
+        return { error: result.value?.failed ?? "The relay did not answer." };
     }
-    return { ok: true };
+    return { ok: true, streams: result.value.streams };
 }
 
 /** Look for cameras nobody has added yet. */
