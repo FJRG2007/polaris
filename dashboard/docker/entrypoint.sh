@@ -37,8 +37,31 @@ fi
 # retry, the case, and all of the explanation written to be read - was
 # unreachable. A Postgres two seconds from ready took the whole deployment down
 # with Prisma's own error and none of the sentences meant to make sense of it.
+
+# Migrations named from here on are required to be rerunnable - every statement a
+# no-op when its object is already there - which is written down in
+# packages/db/prisma/migrations/README.md and enforced by
+# apps/web/test/updates/migrations-rerunnable.test.ts. That is the whole reason
+# one that failed half way through can be cleared and run again below: the second
+# run picks up where the first stopped instead of failing on the same statement.
+# Anything older than this was written before the rule and is not touched.
+RERUNNABLE_FROM=20260930110001
+
+# The migration is Prisma's `<14-digit timestamp>_<name>`; anything that does not
+# parse as one is treated as not covered, because guessing wrong here means
+# re-running a migration that was never written to survive it.
+is_rerunnable() {
+    stamp=${1%%_*}
+    case "$stamp" in
+        ""|*[!0-9]*) return 1 ;;
+    esac
+    [ "${#stamp}" -eq 14 ] || return 1
+    [ "$stamp" -ge "$RERUNNABLE_FROM" ]
+}
+
 attempts=30
 i=1
+cleared=0
 while [ "$i" -le "$attempts" ]; do
     status=0
     out=$(prisma migrate deploy --schema "$SCHEMA" 2>&1) || status=$?
@@ -64,9 +87,29 @@ while [ "$i" -le "$attempts" ]; do
             failed=$(printf '%s\n' "$out" |
                 sed -n 's/.*The `\([^`]*\)` migration started at.*/\1/p' |
                 head -n 1)
+            # A migration written under the rerunnable rule can be finished by
+            # running it again, and the only thing standing in the way is the
+            # history row saying it failed - which nothing else in Polaris ever
+            # clears, and the operator has no terminal to clear it from. So it is
+            # cleared here, once per boot: if the second run stops at the same
+            # statement the migration was not as rerunnable as the rule requires,
+            # and the refusal below is what the reader gets.
+            if [ "$cleared" -eq 0 ] && [ -n "$failed" ] && is_rerunnable "$failed"; then
+                resolved=0
+                prisma migrate resolve --rolled-back "$failed" --schema "$SCHEMA" || resolved=$?
+                if [ "$resolved" -eq 0 ]; then
+                    echo "polaris: the \"$failed\" change did not finish. It is written to be safe" >&2
+                    echo "polaris: to run again, so Polaris is retrying it once." >&2
+                    cleared=1
+                    continue
+                fi
+            fi
             echo "polaris: the database has a change that did not finish." >&2
             if [ -n "$failed" ]; then
                 echo "polaris: it is \"$failed\", and it is holding up every later one." >&2
+            fi
+            if [ "$cleared" -eq 1 ]; then
+                echo "polaris: it was already retried once on this boot and stopped again." >&2
             fi
             echo "polaris: Polaris will not start against a half-changed database, because" >&2
             echo "polaris: it would read and write columns that may not be there. Restore" >&2
@@ -88,26 +131,39 @@ while [ "$i" -le "$attempts" ]; do
     sleep 2
 done
 
-# --- Refuse to serve a database that is not the one this build expects ------
+# --- Refuse to serve a database that is missing what this build reads -------
 # "Was every migration applied" is not the same question as "does this database
 # have the columns this code reads". A restore from an older dump, a table
 # somebody edited by hand, and a half-applied change that was marked resolved
 # all pass the loop above and then fail one screen at a time, hours later, as
 # columns that are not there - which is the worst way to find out.
 #
-# Exit 2 is the two being different. Exit 1 is the check itself failing, which
-# is evidence of nothing: an instance does not get held down because Polaris
-# could not ask the question.
-drift=0
-prisma migrate diff \
-    --from-url "$POLARIS_DATABASE_URL" \
+# Only what is missing counts, and that is not the same as "the database differs
+# from the datamodel". The migrations deliberately create objects the datamodel
+# has no syntax for - the partial unique indexes on UserModelKey, the
+# VaultOrganization one-owner CHECK - so a correct database differs from it by
+# design, on every install in the world. Gating on any difference would refuse
+# all of them on the very update that delivered the gate. A plan that only drops
+# things is therefore that design showing through; a plan that has to create a
+# table or add a column is a database this build cannot read.
+#
+# The check failing to run is evidence of nothing, so it is not a reason to hold
+# an instance down: Polaris only stops when it got an answer.
+lacking=""
+plan=$(prisma migrate diff \
+    --from-schema-datasource "$SCHEMA" \
     --to-schema-datamodel "$SCHEMA" \
-    --exit-code >/dev/null 2>&1 || drift=$?
-if [ "$drift" -eq 2 ]; then
-    echo "polaris: the database does not match this version of Polaris." >&2
-    echo "polaris: starting anyway would mean reading columns that are not there," >&2
-    echo "polaris: so it is stopping instead. Restore the database from its last" >&2
-    echo "polaris: backup and update again." >&2
+    --script 2>/dev/null) || plan=""
+if [ -n "$plan" ]; then
+    lacking=$(printf '%s\n' "$plan" | grep -iE 'CREATE TABLE|ADD COLUMN' || true)
+fi
+if [ -n "$lacking" ]; then
+    echo "polaris: the database is missing tables or columns this version of Polaris" >&2
+    echo "polaris: reads. Starting anyway would fail one screen at a time, so it is" >&2
+    echo "polaris: stopping instead. Restore the database from its last backup and" >&2
+    echo "polaris: update again." >&2
+    echo "polaris: what is missing:" >&2
+    printf '%s\n' "$lacking" >&2
     exit 1
 fi
 
