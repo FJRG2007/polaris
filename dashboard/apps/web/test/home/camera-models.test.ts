@@ -266,3 +266,57 @@ describe("finding the make", () => {
         expect(searchBrands("zxqw")).toHaveLength(0);
     });
 });
+
+describe("a camera on its own charge, with nothing said about it", () => {
+    const camera = (over: Record<string, unknown>) =>
+        parseCameraInput({
+            name: "Garden",
+            vendor: "generic",
+            address: "192.168.1.64",
+            detection: DEFAULT_DETECTION,
+            ...over
+        });
+
+    it("watches nothing and keeps nothing", () => {
+        // The defaults are written for a camera on a wire, where holding a
+        // stream open costs nothing. On a battery the same defaults are a camera
+        // that runs flat and switches itself off.
+        const settled = camera({ modelId: "tapo-c410", power: "battery" });
+        expect(settled.detector).toBe("none");
+        expect(settled.recording).toBe("off");
+    });
+
+    it("does the same on a battery and a panel", () => {
+        const settled = camera({ modelId: "tapo-c410", power: "battery-solar" });
+        expect(settled.detector).toBe("none");
+        expect(settled.recording).toBe("off");
+    });
+
+    it("keeps an answer its owner actually gave", () => {
+        // They are warned what it costs at the place they give it, and it is
+        // their camera.
+        const settled = camera({
+            modelId: "tapo-c410",
+            power: "battery",
+            detector: "objects",
+            recording: "motion"
+        });
+        expect(settled.detector).toBe("objects");
+        expect(settled.recording).toBe("motion");
+    });
+
+    it("leaves a camera on a wire with the defaults it always had", () => {
+        const settled = camera({ modelId: "tapo-c200", power: "mains" });
+        expect(settled.detector).toBe("camera");
+        expect(settled.recording).toBe("motion");
+    });
+
+    it("keeps recording on for a battery model that is plugged in", () => {
+        // Its detector still drops, but for the other reason entirely: this
+        // model reports no movement of its own on any protocol. Nothing about
+        // being plugged in should touch what is kept.
+        const settled = camera({ modelId: "tapo-c410", power: "mains" });
+        expect(settled.detector).toBe("none");
+        expect(settled.recording).toBe("motion");
+    });
+});

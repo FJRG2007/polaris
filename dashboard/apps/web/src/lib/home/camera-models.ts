@@ -49,6 +49,18 @@ export const POWER_NOTES: Record<PowerSource, string> = {
         "The same as on a battery. A panel replaces what a day costs, not what a permanent connection costs, so nothing here holds one open."
 };
 
+/**
+ * What it costs to ask Polaris to watch a camera that is running off its own
+ * charge, said once and read wherever such a setting is offered.
+ *
+ * Said rather than prevented. Somebody with a camera on a mains adapter behind a
+ * porch light, entered as a battery model, has every right to turn detection on -
+ * and somebody with one on a pole deserves to know what they are agreeing to
+ * before the camera is dark and they are working out why.
+ */
+export const BATTERY_COST_WARNING =
+    "This camera is running off its own charge, and anything Polaris watches for itself means holding its stream open all day. That is a large increase in what it draws: if it is not recharging faster than that, it will run flat and switch itself off, and Polaris cannot wake it.";
+
 /** One camera anybody can buy. */
 export interface CameraModel {
     /** Stable id, stored on the row. Never shown. */
