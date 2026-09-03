@@ -14,7 +14,7 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
 
 import { loadEnv } from "@polaris/config";
-import { cameraVendor, rtspUrl } from "@/lib/home/vendors";
+import { cameraVendor, onBattery, rtspUrl } from "@/lib/home/vendors";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { detectionSettingsSchema, type CameraInput } from "@/lib/home/schemas";
 import { DEFAULT_DETECTION, LOCAL_MACHINE, type DetectionSettings } from "@/lib/home/detection";
@@ -228,9 +228,22 @@ export async function updateCamera(
     if (!existing) throw new HomeError("Camera not found");
     const vendor = cameraVendor(input.vendor);
     const paths = resolvePaths(input);
+    // A battery camera is not dialled by the availability pass, and that pass is
+    // the only thing that clears an outage. One moved onto a battery make while
+    // it was down would keep the clock it was carrying for good: every screen
+    // reading "not answering since" a date that can never advance, and the event
+    // in the log left open on an outage nothing will ever close.
+    const battery = onBattery(input.vendor);
+    if (battery) {
+        await prisma.cameraEvent.updateMany({
+            where: { cameraId: id, kind: "offline", endedAt: null },
+            data: { endedAt: new Date() }
+        });
+    }
     const row = await prisma.camera.update({
         where: { id },
         data: {
+            ...(battery ? { offlineSince: null } : {}),
             placeId: input.placeId || null,
             name: input.name,
             zone: input.zone || null,

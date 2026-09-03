@@ -49,7 +49,34 @@ export interface CameraVendor {
     /** Whether the maker's protocol wants the account name as well, or just the
      *  password. TP-Link's wants only the password. */
     readonly nativePasswordOnly?: boolean;
+    /** Where that protocol answers, for the one thing Polaris can check before a
+     *  camera is saved: that something is there at all. */
+    readonly nativePort?: number;
+    /**
+     * The make speaks no ONVIF whatsoever.
+     *
+     * Not the same as having no ONVIF port in this profile - most makes here
+     * simply answer on 80 and say nothing about it. This is the stronger claim,
+     * and it takes two things away: the camera cannot be asked what it streams,
+     * and it cannot report its own movement, so the cheapest rung of detection
+     * is a rung that would never fire on it.
+     */
+    readonly noOnvif?: boolean;
+    /**
+     * It runs on a battery, so a connection is not free.
+     *
+     * Every other camera here is on a wire and costs the same whether anybody is
+     * watching or not. These cost their own charge: holding the stream open is
+     * what the battery is spent on, and a wall left open on one overnight is a
+     * camera that is flat by morning. So Polaris connects to one only while
+     * somebody is actually looking, and says so rather than quietly draining it.
+     */
+    readonly battery?: boolean;
 }
+
+/** Where TP-Link's own protocol answers. Not a guess: it is the port go2rtc's
+ *  `tapo://` source dials, and the relay is what holds these connections. */
+export const TAPO_NATIVE_PORT = 8800;
 
 export const CAMERA_VENDORS: readonly CameraVendor[] = [
     {
@@ -65,7 +92,27 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
         ptz: true,
         nativeScheme: "tapo",
         nativePasswordOnly: true,
+        nativePort: TAPO_NATIVE_PORT,
         note: "The password you sign into the Tapo app with. No camera account, and the microphone works both ways."
+    },
+    {
+        // The battery models, which are not a variation on the one above: they
+        // publish no RTSP and no ONVIF at all, at any port, with any account.
+        // TP-Link says so themselves, and it is not a setting anybody can turn
+        // on - the camera is asleep most of the time and a protocol built on a
+        // permanent connection has nothing to connect to. The maker's own
+        // protocol is the only way in, which is also how the phone app does it.
+        id: "tapo-battery",
+        label: "TP-Link Tapo (battery, no RTSP)",
+        mainPath: "",
+        // Fixed lenses, every one of them, so there is nothing to point.
+        ptz: false,
+        noOnvif: true,
+        battery: true,
+        nativeScheme: "tapo",
+        nativePasswordOnly: true,
+        nativePort: TAPO_NATIVE_PORT,
+        note: "For the ones with a battery in them - C400, C410, C420, C425, D230 - which publish no RTSP however they are configured. The password you sign into the Tapo app with. Polaris connects only while somebody is watching, because on these the connection is the battery."
     },
     {
         id: "tapo",
@@ -134,6 +181,29 @@ export const CAMERA_VENDORS: readonly CameraVendor[] = [
 /** One make by id, or the generic profile for anything unrecognized. */
 export function cameraVendor(id: string): CameraVendor {
     return CAMERA_VENDORS.find((vendor) => vendor.id === id) ?? CAMERA_VENDORS[CAMERA_VENDORS.length - 1]!;
+}
+
+/** Whether watching this camera spends a charge rather than a wire. */
+export function onBattery(vendorId: string): boolean {
+    return cameraVendor(vendorId).battery === true;
+}
+
+/** The makes that do, as a list a query can be written against - the sweeps
+ *  decide which cameras to dial in the database rather than in a loop. */
+export const BATTERY_VENDORS: readonly string[] = CAMERA_VENDORS.filter(
+    (vendor) => vendor.battery === true
+).map((vendor) => vendor.id);
+
+/**
+ * Whether this camera can tell Polaris it saw something by itself.
+ *
+ * The cheapest rung of detection is the camera's own alerts, and they arrive
+ * over ONVIF. A make that speaks none cannot send them - so offering that rung
+ * for one is offering a setting that costs nothing and does nothing, which is
+ * the worst of the two.
+ */
+export function reportsOwnAlerts(vendorId: string): boolean {
+    return cameraVendor(vendorId).noOnvif !== true;
 }
 
 /** The credentials a camera is reached with. Kept apart from the row so nothing

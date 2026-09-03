@@ -35,7 +35,7 @@ import * as recording from "@/lib/home/recording";
 import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
 import { faceImageType } from "@/lib/home/face-image";
-import { discoverCameras } from "@/lib/home/discovery";
+import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "@/lib/home/discovery";
 import { ensureVisionWorker } from "@/lib/home/vision";
 import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
@@ -44,6 +44,7 @@ import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/cur
 import {
     alertRuleInputSchema,
     cameraInputSchema,
+    cameraProbeInputSchema,
     cameraZoneInputSchema,
     discoveryInputSchema,
     normalizeCameraInput,
@@ -280,16 +281,54 @@ export async function probeCameraAction(input: unknown): Promise<{
         mainPath: string;
         subPath: string;
         ptz: boolean;
+        /**
+         * How much of this was actually established.
+         *
+         * "onvif" is the camera itself answering: the credentials are right and
+         * the paths are its own. "reachable" is all a make that speaks no ONVIF
+         * can be asked - something accepted a connection on its protocol's port
+         * - and the screen must not round that up to "the camera answered", or
+         * the one setup that is hardest to debug is the one that looks fine.
+         */
+        verified: "onvif" | "reachable";
     };
     error?: string;
 }> {
     await requireHome("home.manage");
-    const parsed = cameraInputSchema
-        .pick({ address: true, onvifPort: true, username: true, password: true, vendor: true })
-        .safeParse(normalizeCameraInput((input ?? {}) as Record<string, unknown>));
+    const parsed = cameraProbeInputSchema.safeParse(
+        normalizeCameraInput((input ?? {}) as Record<string, unknown>)
+    );
     if (!parsed.success) return { error: "Check the address and the account." };
 
     const vendor = cameraVendor(parsed.data.vendor);
+
+    // A make that speaks no ONVIF has nothing to be asked. Probing it anyway is
+    // not a harmless extra: the call fails on every one of them, and it fails
+    // with the sentence a wrong password produces - so the reader is told to fix
+    // a credential that was right, for a camera that is working.
+    if (vendor.noOnvif) {
+        const port = vendor.nativePort ?? parsed.data.onvifPort;
+        if (!port) return { error: "There is nothing to ask this camera on." };
+        const open = await portOpen(parsed.data.address, port, REACH_TIMEOUT_MS);
+        if (!open) {
+            return {
+                error: "Nothing answered at that address. Check it in the Tapo app, under the camera's own settings."
+            };
+        }
+        return {
+            probe: {
+                model: "",
+                manufacturer: "",
+                // Its own protocol carries no paths; the stream is picked by
+                // quality when the relay is told about it.
+                mainPath: "",
+                subPath: "",
+                ptz: vendor.ptz === true,
+                verified: "reachable"
+            }
+        };
+    }
+
     const port = parsed.data.onvifPort ?? vendor.onvifPort ?? 80;
     const result = await guard(() =>
         probeCamera({
@@ -320,7 +359,8 @@ export async function probeCameraAction(input: unknown): Promise<{
             manufacturer: result.value.device.manufacturer,
             mainPath: pathOf(result.value.mainUrl),
             subPath: pathOf(result.value.subUrl),
-            ptz: result.value.ptz
+            ptz: result.value.ptz,
+            verified: "onvif"
         }
     };
 }

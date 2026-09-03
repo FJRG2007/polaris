@@ -22,7 +22,7 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { CameraView } from "@/lib/home/cameras";
 import { CircleCheck, Loader2, Sparkles } from "lucide-react";
-import { CAMERA_VENDORS, cameraVendor } from "@/lib/home/vendors";
+import { CAMERA_VENDORS, cameraVendor, reportsOwnAlerts } from "@/lib/home/vendors";
 import {
     DEFAULT_DETECTION,
     DETECTORS,
@@ -173,6 +173,14 @@ export function CameraDialog({
     // password is the whole credential. Showing the fields anyway is how somebody
     // ends up typing a camera account into a form that ignores it.
     const usesRtsp = !vendor.nativeScheme;
+    /** Whether this camera could ever report its own movement. */
+    const ownAlerts = reportsOwnAlerts(form.vendor);
+    /** Whether watching it spends a charge rather than a wire. */
+    const battery = vendor.battery === true;
+    /** The rungs worth offering. One that cannot fire on this camera is not a
+     *  cheaper setting, it is a setting that does nothing - and the whole point
+     *  of this section is that every choice says what it costs. */
+    const rungs = ownAlerts ? DETECTORS : DETECTORS.filter((id) => id !== "camera");
 
     // Asked once when the dialog opens rather than only when this rung is
     // picked: the answer decides what the picker says about a choice somebody is
@@ -212,6 +220,25 @@ export function CameraDialog({
     useEffect(() => {
         setTested(null);
     }, [form.address, form.username, form.password, form.vendor]);
+
+    /**
+     * Settings the make that was just chosen cannot honour.
+     *
+     * Keyed on the make alone, so this happens when somebody picks one and never
+     * again - a later choice of theirs is theirs. Two things move: the camera's
+     * own alerts, which a make that speaks no ONVIF cannot send, and, on a
+     * battery camera, recording, because recording it means watching it and
+     * watching it is what the battery is for.
+     */
+    useEffect(() => {
+        const chosen = cameraVendor(form.vendor);
+        setForm((current) => {
+            const next = { ...current };
+            if (chosen.noOnvif && next.detector === "camera") next.detector = "none";
+            if (chosen.battery && !camera) next.recording = "off";
+            return next;
+        });
+    }, [form.vendor, camera]);
 
     const incomplete = !form.name.trim() || !form.address.trim();
 
@@ -267,8 +294,14 @@ export function CameraDialog({
             name: current.name || result.probe?.model || ""
         }));
         setTested(
-            [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
-                "The camera answered"
+            result.probe.verified === "reachable"
+                ? // All that can be asked of a camera that speaks only its
+                  // maker's protocol. Said plainly, because "the camera
+                  // answered" over a password nobody checked is the reassurance
+                  // that costs an evening.
+                  "Something is answering there. The password is checked the first time you watch it."
+                : [result.probe.manufacturer, result.probe.model].filter(Boolean).join(" ") ||
+                  "The camera answered"
         );
     };
 
@@ -462,7 +495,7 @@ export function CameraDialog({
                         <Select
                             value={form.detector}
                             onValueChange={(value) => set("detector", value as Detector)}
-                            options={DETECTORS.map((id) => ({
+                            options={rungs.map((id) => ({
                                 value: id,
                                 label: DETECTOR_META[id].label
                             }))}
@@ -484,6 +517,20 @@ export function CameraDialog({
                                 <Link href="/places/settings" className="underline underline-offset-2">
                                     Open Settings
                                 </Link>
+                            </p>
+                        ) : null}
+                        {battery && needsSomewhereToRun(form.detector) ? (
+                            <p className="text-[0.75rem] leading-relaxed text-warning">
+                                This camera runs on a battery, and anything Polaris watches for itself means
+                                holding the stream open all day - which is a charge measured in hours rather
+                                than months. Leave it on Nothing unless it is plugged in.
+                            </p>
+                        ) : null}
+                        {battery && !ownAlerts && form.detector === "none" ? (
+                            <p className="text-[0.75rem] leading-relaxed text-muted-foreground">
+                                A camera like this has no way to tell Polaris what it saw, so its own alerts
+                                stay in the Tapo app. Polaris connects when you open it, and lets go when you
+                                leave.
                             </p>
                         ) : null}
                         {camera?.id && form.detector !== "none" ? (
@@ -676,6 +723,13 @@ export function CameraDialog({
                                 { value: "continuous", label: "Everything" }
                             ]}
                         />
+                        {battery && form.recording !== "off" ? (
+                            <p className="text-[0.75rem] leading-relaxed text-warning">
+                                Keeping footage from this camera means holding its stream open, and on a
+                                battery that is a charge measured in hours rather than months. Leave it on
+                                Nothing unless it is plugged in.
+                            </p>
+                        ) : null}
                         {form.recording !== "off" ? (
                             <Field
                                 label="Store on"

@@ -43,6 +43,7 @@ import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
+import { onBattery } from "@/lib/home/vendors";
 import { quietSince } from "@/lib/home/availability";
 import { useDisplayFormat } from "@/components/display-format";
 import {
@@ -167,8 +168,22 @@ export function CameraTile({
     const video = useRef<HTMLVideoElement | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    /**
+     * Whether this camera pays for the wall out of its own charge.
+     *
+     * Everything below assumes a camera on a wire, where a tile costs the relay
+     * a connection and the camera nothing. A battery camera is the opposite: the
+     * connection IS the cost, and a wall left open on one is a camera that is
+     * flat by morning. So it gets one frame and then stops, and the live stream
+     * is not started at all until somebody opens it.
+     */
+    const battery = onBattery(camera.vendor);
+
     const showing = camera.enabled && live;
-    const wantFrames = showing && visible && !playing && !idle;
+    // `drawn` is null only until the first frame settles, so a battery camera
+    // asks once - whether that frame arrived or not - and then leaves the camera
+    // alone rather than retrying on a timer nobody asked for.
+    const wantFrames = showing && visible && !playing && !idle && !(battery && drawn !== null);
 
     // Only what somebody can actually see is worth a connection.
     useEffect(() => {
@@ -280,11 +295,16 @@ export function CameraTile({
      * freeze on a stale image and look like a camera that had stopped. Asking
      * for one more costs a single request and makes the held frame the moment
      * everything stopped.
+     *
+     * Never on a battery camera. Its picture is the one frame it was asked for
+     * at mount and no stream was ever started over it, so there is nothing stale
+     * to replace - and the whole wall goes idle the moment any camera is opened,
+     * which would wake every battery camera in the house once per dialog.
      */
     useEffect(() => {
-        if (!idle || !showing) return;
+        if (!idle || !showing || battery) return;
         setStamp((value) => value + 1);
-    }, [idle, showing]);
+    }, [idle, showing, battery]);
 
     return (
         <div
@@ -322,7 +342,7 @@ export function CameraTile({
                                 if (wantFrames) after(FRAME_RETRY_MS);
                             }}
                         />
-                        {attempt && visible && !idle ? (
+                        {attempt && visible && !idle && !battery ? (
                             <video
                                 ref={video}
                                 // Keyed so switching quality or format really
@@ -370,7 +390,18 @@ export function CameraTile({
                         {drawn === false && !playing ? (
                             <Placeholder
                                 icon={<Camera className="size-5 shrink-0" />}
-                                label={since ? `Not answering since ${since}` : "Not answering"}
+                                label={
+                                    // A battery camera is asleep far more often
+                                    // than it is broken, and it is never probed
+                                    // on a timer - so there is no outage clock
+                                    // behind it and "not answering" would be
+                                    // saying something Polaris does not know.
+                                    battery
+                                        ? "Asleep. Open it to wake it."
+                                        : since
+                                          ? `Not answering since ${since}`
+                                          : "Not answering"
+                                }
                             />
                         ) : null}
                         {/* Said, not just drawn. A blurred still is ambiguous -
@@ -380,6 +411,16 @@ export function CameraTile({
                         {idle && drawn !== false ? (
                             <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
                                 Paused
+                            </span>
+                        ) : null}
+                        {/* The same reasoning as Paused: the picture is a moment
+                            old and looks live, and the reader deserves to know
+                            which. It also answers the question the tile
+                            provokes - why this one is not moving when the rest
+                            of the wall is. */}
+                        {battery && !idle && drawn !== false ? (
+                            <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-elevated/90 px-2 py-0.5 text-[0.6875rem] text-muted-foreground">
+                                On battery - open it to watch
                             </span>
                         ) : null}
                     </>
