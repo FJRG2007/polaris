@@ -26,7 +26,7 @@ export const RELAY_LOG_TAIL = 8000;
 /** What is said when the relay had nothing to say. Names the two causes that
  *  account for nearly all of these rather than describing the silence. */
 export const UNEXPLAINED =
-    "The camera accepted the connection and sent no video. On a Tapo that is usually the account refusing it - check Third-Party Compatibility is on in the Tapo app, under Me > Third-Party Services - and on a battery model it can also be the camera going back to sleep.";
+    "The camera accepted the connection and sent no video. The commonest cause by far is the password: on a Tapo it is the one for your TP-Link account, not one set on the camera. After that, Third-Party Compatibility being off in the Tapo app under Me > Third-Party Services - and on a battery model, the camera going back to sleep.";
 
 /**
  * The failures worth naming, most specific first.
@@ -37,12 +37,13 @@ export const UNEXPLAINED =
  */
 const REASONS: readonly { readonly test: RegExp; readonly say: string }[] = [
     {
-        // The one this file exists for. A camera that refuses the credential
-        // says so the same way whatever is wrong with it, and on TP-Link's own
-        // protocol the answer is nearly always the switch rather than the
-        // password - which is why the switch is named first.
+        // The one this file exists for. It says the plain thing first: the
+        // camera was given a password and did not accept it. The switch is
+        // second because it is the likelier cause only once the password has
+        // been ruled out, and leading with it sends somebody to check an app
+        // setting that is already on while the wrong password sits in the form.
         test: /\b401\b|unauthorized|auth(entication)? failed|wrong password/i,
-        say: "The camera refused the password. On a Tapo that is nearly always Third-Party Compatibility being off: in the Tapo app, Me > Third-Party Services > Third-Party Compatibility. If it is already on, the password is the one for your TP-Link account rather than one set on the camera."
+        say: "The camera refused the password. It is the one for your TP-Link account - the one you sign into the Tapo app with - and not one set on the camera. If that is what you typed, check Third-Party Compatibility is on in the Tapo app, under Me > Third-Party Services."
     },
     {
         test: /\b403\b|forbidden/i,
