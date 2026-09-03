@@ -18,6 +18,12 @@
  */
 
 import { redactSource, relaySource } from "@/lib/home/vendors";
+import {
+    RELAY_LOG_TAIL,
+    UNEXPLAINED,
+    explainRelayFailure,
+    relaySaid
+} from "@/lib/home/relay-failure";
 import { HomeError } from "@/lib/home/home-error";
 
 import type { CameraTarget } from "@/lib/home/cameras";
@@ -285,9 +291,11 @@ export async function frameOrReason(
     if (!response) return { reason: "The relay did not answer." };
     if (response.ok) {
         const frame = Buffer.from(await response.arrayBuffer());
-        // A 200 with nothing in it is a relay that connected and got no picture,
-        // which reads as success everywhere that only checks the status.
-        return frame.length > 0 ? { frame } : { reason: "The camera answered with no picture." };
+        if (frame.length > 0) return { frame };
+        // A 200 with nothing in it is what a refused camera looks like: go2rtc
+        // did its job, there was no picture at the end of it, and neither the
+        // status nor the stream record says why. Its log does.
+        return { reason: await explained(endpoint) };
     }
     const said = (await response.text().catch(() => "")).trim();
     const reason = said || (await streamError(endpoint, cameraId, quality));
@@ -296,6 +304,21 @@ export async function frameOrReason(
             ? redactSource(reason).slice(0, REASON_MAX)
             : `The relay refused it (${response.status}).`
     };
+}
+
+/**
+ * Why the relay could not open a camera, in the words of somebody who has to go
+ * and fix it.
+ *
+ * Its log is the only place the reason exists, and a relay from before that path
+ * was allowed answers 404 for it - so this degrades to naming the two causes
+ * that account for nearly all of these rather than to saying nothing.
+ */
+async function explained(endpoint: RelayEndpoint): Promise<string> {
+    const response = await relayFetch(endpoint, "/api/log", { timeoutMs: 5000 }).catch(() => null);
+    if (!response?.ok) return UNEXPLAINED;
+    const log = (await response.text().catch(() => "")).slice(-RELAY_LOG_TAIL);
+    return explainRelayFailure(log) ?? relaySaid(log) ?? UNEXPLAINED;
 }
 
 /** What the relay recorded against a stream, when asking for a frame said
