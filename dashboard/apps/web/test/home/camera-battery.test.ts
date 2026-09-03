@@ -22,7 +22,6 @@ import {
     TAPO_CONTROL_PORT,
     TAPO_NATIVE_PORT,
     cameraVendor,
-    onBattery,
     redactSource,
     relaySource,
     reportsOwnAlerts
@@ -95,18 +94,15 @@ describe("what the profile claims about it", () => {
         }
     });
 
-    it("is the only make so far that spends a charge to be watched", () => {
-        expect(onBattery("tapo-battery")).toBe(true);
+    it("is the only make so far that can be running off a charge", () => {
         for (const vendor of CAMERA_VENDORS) {
-            if (vendor.id === "tapo-battery") continue;
-            expect(onBattery(vendor.id)).toBe(false);
+            expect(vendor.battery === true).toBe(vendor.id === "tapo-battery");
         }
     });
 
     it("leaves the wired Tapo profiles alone", () => {
         expect(reportsOwnAlerts("tapo-cloud")).toBe(true);
         expect(reportsOwnAlerts("tapo")).toBe(true);
-        expect(onBattery("tapo-cloud")).toBe(false);
     });
 });
 

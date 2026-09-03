@@ -43,7 +43,7 @@ import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
 import { DetectionBox } from "./detection-box";
 import { boxLabel } from "./detection-label";
-import { onBattery } from "@/lib/home/vendors";
+import { drawsFromBattery } from "@/lib/home/camera-models";
 import { quietSince } from "@/lib/home/availability";
 import { useDisplayFormat } from "@/components/display-format";
 import {
@@ -171,13 +171,16 @@ export function CameraTile({
     /**
      * Whether this camera pays for the wall out of its own charge.
      *
+     * Its owner's answer, not its make: the same model is a camera to watch all
+     * day on a cable behind a porch light and one to leave asleep on a pole.
+     *
      * Everything below assumes a camera on a wire, where a tile costs the relay
      * a connection and the camera nothing. A battery camera is the opposite: the
      * connection IS the cost, and a wall left open on one is a camera that is
      * flat by morning. So it gets one frame and then stops, and the live stream
      * is not started at all until somebody opens it.
      */
-    const battery = onBattery(camera.vendor);
+    const battery = drawsFromBattery(camera.power);
 
     const showing = camera.enabled && live;
     // `drawn` is null only until the first frame settles, so a battery camera
