@@ -8,6 +8,7 @@
  */
 
 import { ArchiveView } from "./archive-view";
+import * as access from "@/lib/notes/access";
 import { requirePermission } from "@/lib/session";
 import { listArchivedNotes } from "@/lib/notes/note-service";
 
@@ -15,7 +16,11 @@ export const dynamic = "force-dynamic";
 
 export default async function NotesArchivePage() {
     const user = await requirePermission("notes.use");
-    const notes = await listArchivedNotes(user.id);
+    // Every shelf they can reach, not only the workspace they have open: the
+    // archive is where somebody goes to find one thing, and hiding half of it
+    // behind a switch they were not thinking about is how a note gets given up on.
+    const spaceIds = await access.visibleSpaceIds({ id: user.id, isAdmin: user.isAdmin });
+    const notes = await listArchivedNotes(user.id, spaceIds);
 
     return (
         <div className="flex w-full flex-col gap-4">

@@ -257,6 +257,9 @@ model User {
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
     orgSuccessorTo      OrganizationSuccessor[] @relation("OrganizationSuccessorHeir")
     notes               Note[]
+    noteSpaces          NoteSpace[]
+    noteSpaceMemberships NoteSpaceMember[]
+    noteFolders         NoteFolder[]
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
     chatSpacePreferences ChatSpacePreference[]
@@ -352,6 +355,17 @@ model Note {
     // and the shape people reach for is the one a notebook already has: a few
     // subjects, each with pages under it. There is no separate folder to create
     // and keep in step - any note can hold others.
+    // The shelf this sits on. Null is the private one, which is what every note
+    // written before spaces existed has and what a note made outside one still
+    // gets: readable by its author alone.
+    spaceId   String?  @db.Uuid
+    // The folder it is filed in, or null for the top of its shelf.
+    folderId  String?  @db.Uuid
+    // A Markdown file's leading `---` block, kept apart from the body rather than
+    // shown in the editor as text. An imported vault round-trips because of this
+    // column: what Obsidian wrote is handed back exactly, and Polaris does not
+    // have to understand a key to keep it.
+    frontmatter String?
     parentId  String?  @db.Uuid
     // Kept at the top of the list, for the few that are read every day.
     pinned    Boolean  @default(false)
@@ -366,10 +380,132 @@ model Note {
     // that never said how much it was about to destroy.
     parent   Note?  @relation("NoteTree", fields: [parentId], references: [id], onDelete: SetNull)
     children Note[] @relation("NoteTree")
+    space    NoteSpace?  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    // A folder that goes takes nothing with it: its notes are lifted to the
+    // folder's parent by the service, and this is only what happens if a row is
+    // removed some other way.
+    folder   NoteFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
     @@index([userId, archived, updatedAt])
     @@index([userId, parentId])
+    @@index([spaceId, archived, updatedAt])
+    @@index([folderId])
 }
+
+// A shelf of notes that is not one person's.
+//
+// A note with no space is what notes have always been: private without
+// qualification, readable by its author and by nobody else, an instance
+// administrator included. A space is the other kind - somewhere a team writes
+// together - and it is reached the way a Tasks space is, through a membership, a
+// team grant, or the organization that owns it. Nothing about the private kind
+// changed to make room for it: `spaceId` is null on every note that existed
+// before this, and null is still the strictest answer there is.
+model NoteSpace {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    ownerId    String   @db.Uuid
+    // The organization this belongs to, or null for a personal one. An
+    // organization's space outlives its creator leaving; a personal one is its
+    // owner's and whoever they added.
+    orgId      String?  @db.Uuid
+    name       String
+    // One emoji, the way a notebook has a sticker on it. Null draws the initial.
+    icon       String?
+    color      String   @default("#7c5cff")
+    // private | internal - see SPACE_VISIBILITIES in @polaris/core. On an
+    // organization's space `internal` means that roster, not the whole instance.
+    visibility String   @default("private")
+    archived   Boolean  @default(false)
+    order      Float    @default(1024)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    owner      User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org        Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    members    NoteSpaceMember[]
+    teamGrants NoteSpaceTeam[]
+    folders    NoteFolder[]
+    notes      Note[]
+
+    @@index([ownerId])
+    @@index([orgId])
+}
+
+// Somebody other than the owner who may reach a space. The owner is never a row
+// here, so removing every member cannot lock the space away from its creator.
+model NoteSpaceMember {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    userId    String   @db.Uuid
+    // guest | member | admin - see SPACE_ROLES in @polaris/core, the same
+    // vocabulary Tasks uses, so one role means one thing across Polaris.
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    space NoteSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, userId])
+    @@index([userId])
+}
+
+// A whole team given a space, resolved to the same three roles a person's
+// membership uses - so nothing downstream has to know whether somebody arrived
+// on their own or as part of a team, and where both apply the stronger wins.
+model NoteSpaceTeam {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    teamId    String   @db.Uuid
+    role      String   @default("member")
+    createdAt DateTime @default(now())
+
+    space NoteSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    team  Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, teamId])
+    @@index([teamId])
+}
+
+// A folder, which is the shape a vault of Markdown already has on disk.
+//
+// Notes nest inside each other and always have - a page can hold pages, which is
+// the idea a wiki is built on. A folder is the other one, the idea a filesystem
+// is built on, and somebody arriving with an Obsidian vault has thousands of
+// files arranged in exactly that. Keeping both is not indecision: a folder holds
+// what belongs together and a note holds what belongs to it, and an import that
+// had to flatten one into the other would lose the distinction the author made.
+//
+// It lives on a shelf, and which shelf is the same question a note answers:
+// `spaceId` null means it is the owner's own and nobody else's.
+model NoteFolder {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    // Who made it. Kept on an organization's folder as well, where it is only a
+    // record of who filed it - the space is what decides who may open it.
+    ownerId   String   @db.Uuid
+    spaceId   String?  @db.Uuid
+    parentId  String?  @db.Uuid
+    name      String
+    icon      String?
+    order     Float    @default(1024)
+    archived  Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner    User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    space    NoteSpace?   @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    // Deleting a folder lifts what was inside it to the folder's own parent, the
+    // way Tasks does: a folder is an arrangement, not the owner of the writing
+    // filed under it. The cascade here is the backstop for a row deleted out from
+    // under the application, never the path a person takes.
+    parent   NoteFolder?  @relation("NoteFolderNesting", fields: [parentId], references: [id], onDelete: Cascade)
+    children NoteFolder[] @relation("NoteFolderNesting")
+    notes    Note[]
+
+    @@index([ownerId, spaceId])
+    @@index([spaceId])
+    @@index([parentId])
+}
+
 
 // The account somebody named to take over their own if they die.
 //
@@ -4170,6 +4306,7 @@ model Organization {
     teams    Team[]
     roles    OrgRole[]
     spaces   TaskSpace[]
+    noteSpaces NoteSpace[]
     chatSpaces ChatSpace[]
     projects Project[]
     projectGrants ProjectMember[]
@@ -4394,6 +4531,7 @@ model Team {
     org           Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
     members       TeamMember[]
     spaceGrants   TaskSpaceTeam[]
+    noteSpaceGrants NoteSpaceTeam[]
     folderGrants  TaskFolderTeam[]
     projectGrants ProjectMember[]
 

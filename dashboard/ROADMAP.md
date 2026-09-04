@@ -336,7 +336,20 @@ Notes (personal writing):
 - [x] The same Markdown, mentions and Polaris references as everywhere else, and
       the same privacy as before: only the author reads them, an instance
       administrator included
-- [ ] Shared notebooks, and a note handed to somebody else
+- [x] Notebooks: a shelf a group writes on, beside the private one everybody
+      has. Reached the way a Tasks space is - a membership, a team grant, or the
+      organization that owns it - and a note with no notebook is still readable
+      by its author alone, an instance administrator included
+- [x] Folders, nested, on either shelf. A folder is where things are filed and a
+      parent note is what they are part of; keeping both is what lets a vault
+      arrive with the arrangement its author gave it. Deleting one lifts what was
+      inside it, the way a Tasks folder does
+- [x] Import a vault of Markdown - loose files, a folder, or a zip. Directories
+      become folders, frontmatter is kept beside the body rather than shown as
+      text, and `[[wikilinks]]` are rewritten into Polaris references once
+      everything is in
+- [ ] Export, and the other formats worth reading in
+- [ ] A note handed to one person outside the notebook it is on
 
 Chat (talking to the people here):
 
