@@ -87,7 +87,7 @@ function PickerMenu({
  * trademark either way - so every other brand gets the same neutral camera and
  * is told apart by its name, which is what the reader was reading anyway.
  */
-function BrandMark({ brand, className }: { brand: string; className?: string }) {
+export function BrandMark({ brand, className }: { brand: string; className?: string }) {
     if (brand === "Tapo" || brand === "VIGI") {
         return <TpLinkMark className={cn("size-4 text-foreground", className)} />;
     }

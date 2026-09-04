@@ -12,13 +12,16 @@
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import { BrandMark } from "./model-picker";
 import { CameraDialog } from "./camera-dialog";
 import { ZonesDialog } from "./zones-dialog";
 import { cameraVendor, usesAccountPassword } from "@/lib/home/vendors";
+import { brandOfCamera } from "@/lib/home/camera-models";
+import { filterCameras, zonesOf } from "@/lib/home/camera-filter";
 import { DiscoverDialog } from "./discover-dialog";
 import type { CameraView } from "@/lib/home/cameras";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
-import { Cctv, Pencil, Plus, Radar, Shapes, Trash2 } from "lucide-react";
+import { Cctv, Pencil, Plus, Radar, Search, Shapes, Trash2 } from "lucide-react";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
 import { focusAfterMove } from "@/lib/list-selection";
 import { quietSince } from "@/lib/home/availability";
@@ -26,7 +29,9 @@ import { useDisplayFormat } from "@/components/display-format";
 import {
     cn,
     Badge,
+    Input,
     Button,
+    Select,
     Skeleton,
     EmptyState,
     ContextMenu,
@@ -68,6 +73,15 @@ const RECORDING_LABEL: Record<string, string> = {
     continuous: "Kept always"
 };
 
+/**
+ * What the area picker calls "all of them".
+ *
+ * Not an empty string: that is what a camera with no area of its own carries, so
+ * the two would be the same option and choosing "every area" would silently mean
+ * "only the ones nobody filed".
+ */
+const ALL_AREAS = "*";
+
 export function CamerasView({ canManage, openId }: { canManage: boolean; openId: string | null }) {
     const [cameras, setCameras] = useState<CameraView[] | null>(null);
     const [servers, setServers] = useState<{ id: string; label: string }[]>([]);
@@ -77,6 +91,11 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
         settleSeconds: number;
         minGapSeconds: number;
     } | null>(null);
+    /** What is being looked for. Held here rather than in a URL: it is a way of
+     *  reading this list rather than a place anybody links to. */
+    const [query, setQuery] = useState("");
+    /** Which area is being shown, or null for all of them. */
+    const [zone, setZone] = useState<string | null>(null);
     const [editing, setEditing] = useState<CameraView | null>(null);
     const [adding, setAdding] = useState<{ address: string; vendor: string | null } | null>(null);
     const [discovering, setDiscovering] = useState(false);
@@ -143,7 +162,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
      * name that only exists here.
      */
     const onKeyDown = (event: React.KeyboardEvent) => {
-        const list = cameras ?? [];
+        const list = shown;
         const index = list.findIndex((camera) => camera.id === focused);
         const current = list[index];
         if ((event.key === "F2" || event.key === "Enter") && current && canManage) {
@@ -165,6 +184,14 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 
     if (cameras === null) return <ListSkeleton />;
 
+    /** The areas in use, for the picker. Built from the whole list rather than
+     *  from what is shown, or choosing one area would empty the picker of every
+     *  other and there would be no way back. */
+    const areas = zonesOf(cameras);
+    const shown = filterCameras(cameras, { query, zone });
+    /** Worth offering at all only once there is more than one answer to give. */
+    const narrowing = cameras.length > 4 || areas.length > 1;
+
     return (
         <div className="flex flex-col gap-4">
             {canManage ? (
@@ -182,6 +209,38 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
 
             {error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
 
+            {/* A house of four cameras needs none of this and a house of thirty
+                needs all of it, so it appears when there is something to narrow. */}
+            {cameras.length > 0 && narrowing ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder="Search cameras"
+                            aria-label="Search cameras"
+                            className="pl-8"
+                        />
+                    </div>
+                    {areas.length > 1 ? (
+                        <Select
+                            value={zone ?? ALL_AREAS}
+                            onValueChange={(value) => setZone(value === ALL_AREAS ? null : value)}
+                            aria-label="Area"
+                            className="w-48"
+                            options={[
+                                { value: ALL_AREAS, label: `Every area - ${cameras.length}` },
+                                ...areas.map((area) => ({
+                                    value: area.zone,
+                                    label: `${area.zone || "No area"} - ${area.count}`
+                                }))
+                            ]}
+                        />
+                    ) : null}
+                </div>
+            ) : null}
+
             {cameras.length === 0 ? (
                 <EmptyState
                     icon={<Cctv />}
@@ -191,6 +250,12 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                             ? "Add one by address, or let Polaris look for the ones already on your network."
                             : "Nobody has added a camera to this house yet."
                     }
+                />
+            ) : shown.length === 0 ? (
+                <EmptyState
+                    icon={<Search />}
+                    title="No camera matches that"
+                    description="Nothing here is called that, or is at that address, in the area you are looking at."
                 />
             ) : (
                 <div className="overflow-x-auto rounded-lg border border-border">
@@ -208,7 +273,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                             tabIndex={0}
                             onKeyDown={onKeyDown}
                         >
-                            {cameras.map((camera) => (
+                            {shown.map((camera) => (
                                 <ContextMenu key={camera.id}>
                                     <ContextMenuTrigger asChild>
                                         <tr
@@ -219,6 +284,12 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                         >
                                             <td className="w-full max-w-0 px-3 py-2">
                                                 <div className="flex items-center gap-2">
+                                                    {brandOfCamera(camera) ? (
+                                                        <BrandMark
+                                                            brand={brandOfCamera(camera) as string}
+                                                            className="text-muted-foreground"
+                                                        />
+                                                    ) : null}
                                                     <span
                                                         className="truncate text-foreground"
                                                         title={camera.name}
