@@ -20,7 +20,7 @@ const taskStatus = {
 };
 const taskTag = { updateMany: vi.fn(), deleteMany: vi.fn() };
 const taskCustomField = { updateMany: vi.fn(), deleteMany: vi.fn() };
-const task = { updateMany: vi.fn() };
+const task = { updateMany: vi.fn(), deleteMany: vi.fn() };
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -70,11 +70,35 @@ describe("a status", () => {
     });
 
     it("moves and removes only this space's rows when deleted", async () => {
-        await spaces.deleteStatus(SPACE, "st1", "st2");
+        await spaces.deleteStatus(SPACE, "st1", { kind: "move", replacementId: "st2" });
         expect(task.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({ where: { statusId: "st1", spaceId: SPACE } })
         );
         expect(taskStatus.deleteMany).toHaveBeenCalledWith({ where: { id: "st1", spaceId: SPACE } });
+    });
+
+    it("takes the work with the column when that is what was asked for", async () => {
+        // The one gesture on a board that destroys work, so it only happens on
+        // being asked for by name.
+        await spaces.deleteStatus(SPACE, "st1", { kind: "delete" });
+        expect(task.deleteMany).toHaveBeenCalledWith({
+            where: { statusId: "st1", spaceId: SPACE }
+        });
+        expect(task.updateMany).not.toHaveBeenCalled();
+        expect(taskStatus.deleteMany).toHaveBeenCalledWith({ where: { id: "st1", spaceId: SPACE } });
+    });
+
+    it("archives the work instead, onto a column that is staying", async () => {
+        // A task carries a status, so archiving it still means moving it off the
+        // column that is going - which is why this is not just a flag.
+        await spaces.deleteStatus(SPACE, "st1", { kind: "archive" });
+        expect(task.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { statusId: "st1", spaceId: SPACE },
+                data: expect.objectContaining({ archived: true })
+            })
+        );
+        expect(task.deleteMany).not.toHaveBeenCalled();
     });
 
     it("refuses to delete a status that is not in the space", async () => {
@@ -82,7 +106,9 @@ describe("a status", () => {
         taskStatus.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
             Promise.resolve(where.id === OTHER ? null : { id: where.id })
         );
-        await expect(spaces.deleteStatus(SPACE, OTHER, "st2")).rejects.toThrow(/not in this space/);
+        await expect(
+            spaces.deleteStatus(SPACE, OTHER, { kind: "move", replacementId: "st2" })
+        ).rejects.toThrow(/not in this space/);
         expect(task.updateMany).not.toHaveBeenCalled();
     });
 
@@ -90,13 +116,17 @@ describe("a status", () => {
         taskStatus.findFirst.mockImplementation(({ where }: { where: { id: string } }) =>
             Promise.resolve(where.id === OTHER ? null : { id: where.id })
         );
-        await expect(spaces.deleteStatus(SPACE, "st1", OTHER)).rejects.toThrow(/not in this space/);
+        await expect(
+            spaces.deleteStatus(SPACE, "st1", { kind: "move", replacementId: OTHER })
+        ).rejects.toThrow(/not in this space/);
         expect(task.updateMany).not.toHaveBeenCalled();
     });
 
     it("still keeps a space from losing its last one", async () => {
         taskStatus.count.mockResolvedValue(1);
-        await expect(spaces.deleteStatus(SPACE, "st1", "st2")).rejects.toThrow(/at least one status/);
+        await expect(
+            spaces.deleteStatus(SPACE, "st1", { kind: "move", replacementId: "st2" })
+        ).rejects.toThrow(/at least one status/);
     });
 });
 

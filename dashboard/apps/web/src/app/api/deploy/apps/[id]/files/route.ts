@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { listContainerFiles, writeContainerFile } from "@/lib/container-files-service";
 
@@ -11,7 +12,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path") ?? "/";
     try {
@@ -31,7 +33,8 @@ export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.manage");
+    const user = await apiPermission("deploy.manage");
+    if (user instanceof Response) return user;
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path");
     if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });

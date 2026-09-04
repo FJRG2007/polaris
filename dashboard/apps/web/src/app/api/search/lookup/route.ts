@@ -11,15 +11,16 @@
  * Node runtime for Prisma.
  */
 
-import { requireUser } from "@/lib/session";
 import { searchLookupSchema } from "@polaris/core";
+import { apiUser } from "@/lib/api-session";
 import { lookup } from "@/lib/search/lookup-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const params = new URL(request.url).searchParams;
     const parsed = searchLookupSchema.safeParse({ scope: params.get("scope"), query: params.get("q") ?? "" });
     if (!parsed.success) {

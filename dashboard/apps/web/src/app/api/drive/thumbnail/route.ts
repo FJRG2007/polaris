@@ -18,7 +18,8 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { requireUser, sessionCan } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+import { sessionCan } from "@/lib/session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import {
     collectStream,
@@ -54,7 +55,8 @@ const NOT_NOW = { "cache-control": "no-store" };
  *  past a folder, and a log where every tile is a read event is a log in which
  *  the downloads nobody can see any more. */
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) return new Response(null, { status: 403 });
 
     const url = new URL(request.url);

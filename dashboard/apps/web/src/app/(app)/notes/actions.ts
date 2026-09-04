@@ -22,9 +22,19 @@ import * as shelves from "@/lib/notes/shelf-service";
 import { importVault } from "@/lib/notes/import-service";
 import { findPeople } from "@/lib/people-search";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
+import { cookies } from "next/headers";
+import { loadEnv } from "@polaris/config";
+import * as share from "@/lib/notes/share-service";
+import { clientIp, hashForLog } from "@/lib/request-context";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 
 const NOTES_PATH = "/notes";
 const ARCHIVE_PATH = "/notes/archive";
+
+/** Guesses at one link's password, per address, per window. Low, because the
+ *  password on a public link is the only thing standing in front of it. */
+const UNLOCK_LIMIT = 8;
+const UNLOCK_WINDOW_MS = 10 * 60_000;
 
 /** The caller, once the instance permission has been checked. */
 async function actor(): Promise<access.NoteActor> {
@@ -442,4 +452,109 @@ export async function searchNotePeopleAction(
     const user = await requirePermission("notes.use");
     const found = await findPeople(user, String(query ?? ""), { reachableOnly: false });
     return { results: found.people };
+}
+// ---------------------------------------------------------------------------
+// Publishing a note
+// ---------------------------------------------------------------------------
+
+/** The link on a note, for the dialog that opens over it. */
+export async function noteShareAction(
+    noteId: string
+): Promise<{ share?: share.NoteShareView | null; error?: string; }> {
+    const caller = await actor();
+    try {
+        return { share: await share.getNoteShare(caller, noteId) };
+    } catch (caught) {
+        return failure(caught, "That link could not be read");
+    }
+}
+
+/**
+ * Publish a note, or change how it is published.
+ *
+ * The URL comes back every time rather than only on the first call: the dialog
+ * shows it, and a screen that had to ask for it separately after every change is
+ * a screen where the address on it is sometimes the old one.
+ */
+export async function publishNoteAction(
+    noteId: string,
+    input: unknown
+): Promise<{ url?: string; share?: share.NoteShareView; error?: string; }> {
+    const caller = await actor();
+    const parsed = core.noteShareSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those settings could not be read" };
+    }
+    try {
+        const published = await share.publishNote(caller, noteId, parsed.data);
+        refresh();
+        return published;
+    } catch (caught) {
+        return failure(caught, "That note could not be published");
+    }
+}
+
+/** The link again, for somebody who closed the dialog. */
+export async function revealNoteShareAction(
+    noteId: string
+): Promise<{ url?: string; error?: string; }> {
+    const caller = await actor();
+    try {
+        return { url: await share.revealNoteShare(caller, noteId) };
+    } catch (caught) {
+        return failure(caught, "That link could not be shown");
+    }
+}
+
+/** Take it down. What goes back up later is a new address, which is the honest
+ *  behaviour: a link that was revoked and restored is not the same link. */
+export async function unpublishNoteAction(noteId: string): Promise<{ error?: string; }> {
+    const caller = await actor();
+    try {
+        await share.unpublishNote(caller, noteId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That link could not be taken down");
+    }
+}
+
+/**
+ * The password on a published note, checked from the public page.
+ *
+ * Not behind `notes.use` and not behind a session: the whole point is that the
+ * person solving it has no account. What stands in for one is the token they
+ * already hold, a limit per link per address, and a cookie that says nothing but
+ * "this link was opened".
+ */
+export async function unlockNoteShareAction(
+    token: string,
+    password: string
+): Promise<{ error?: string; }> {
+    const link = await share.resolveNoteShareByToken(token);
+    if (!link) return { error: "This link is not available." };
+    if (!share.noteShareUsability(link).ok) return { error: "This link is no longer available." };
+
+    const limitKey = `note-unlock:${link.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
+    if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {
+        return { error: "Too many attempts. Please wait a few minutes and try again." };
+    }
+    if (!(await share.verifyNoteSharePassword(link.id, password))) {
+        return { error: "Incorrect password." };
+    }
+
+    await resetRateLimit(limitKey);
+    const env = loadEnv();
+    (await cookies()).set(
+        share.noteUnlockCookie(link.id),
+        share.signNoteUnlock(link.id, env.POLARIS_AUTH_SECRET),
+        {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: env.POLARIS_SECURE_COOKIES,
+            path: "/",
+            maxAge: 60 * 60 * 12
+        }
+    );
+    return {};
 }

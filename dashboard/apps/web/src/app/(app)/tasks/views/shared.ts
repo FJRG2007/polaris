@@ -70,10 +70,26 @@ export interface TaskBulkEdit {
 
 /** A list work can be moved into. The space is carried because a screen can span
  *  several and a task only moves between lists of its own. */
+/** What happens to the work on a column that is being removed. Mirrors
+ *  `ColumnWorkFate` in lib/tasks/space-service, which is what enforces it. */
+export type ColumnWorkFate =
+    | { kind: "move"; replacementId: string }
+    | { kind: "archive" }
+    | { kind: "delete" };
+
 export interface TaskListRef {
     readonly id: string;
     readonly name: string;
     readonly spaceId: string;
+    /**
+     * Where this list lives, in the words the tree uses - "Website / Sprint".
+     *
+     * Shown only when the name is not unique among the ones being offered, which
+     * is the whole reason it is here: two lists called "Tasks" in a "Move to"
+     * menu is a question the reader has not been given enough to answer, and
+     * qualifying every row would be harder to read than the names alone.
+     */
+    readonly where?: string;
 }
 
 /**
@@ -170,6 +186,14 @@ export interface ViewProps {
     readonly selected: readonly TaskRow[];
     /** The lists work can be moved into, across every space on this screen. */
     readonly lists: readonly TaskListRef[];
+    /**
+     * Put the selection on the clipboard, for pasting into another list.
+     *
+     * A screen that binds Ctrl+C offers this; one that does not, does not - and
+     * the menu leaves the row out rather than advertising a key that is not
+     * listening.
+     */
+    readonly onCopy?: (tasks: readonly TaskRow[]) => void;
     readonly onOpen: (taskId: string) => void;
     /**
      * A click that changed the selection rather than opening the task. `ordered`
@@ -219,7 +243,15 @@ export interface ViewProps {
     ) => Promise<boolean>;
     /** Remove a column, moving the work on it onto the status given: a board that
      *  quietly drops tasks is worse than one that refuses the delete. */
-    readonly onDeleteStatus?: (statusId: string, replacementId: string) => Promise<boolean>;
+    /**
+     * Remove a column, and do the named thing with the work that was on it.
+     *
+     * The fate is asked for rather than assumed. A column being removed with
+     * tasks in it used to move them somewhere by force, which is right for a
+     * column somebody is renaming their way out of and wrong for one full of
+     * noise they are clearing - and there was no way to say which.
+     */
+    readonly onDeleteStatus?: (statusId: string, fate: ColumnWorkFate) => Promise<boolean>;
     /** Write down the order the columns were dragged into. It belongs to the
      *  space, so it is the order everybody on it opens the board in. */
     readonly onReorderStatuses?: (orderedIds: string[]) => Promise<boolean>;

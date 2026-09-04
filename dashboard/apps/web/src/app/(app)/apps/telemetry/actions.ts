@@ -195,3 +195,77 @@ export async function deleteTelemetryProjectAction(projectId: string): Promise<{
         return failure(caught, "That project could not be deleted");
     }
 }
+
+/**
+ * Who may report into a project.
+ *
+ * The one screen in this app that changes what the ingest will accept, so the
+ * input is checked against a schema rather than trusted: a rule that is not an
+ * address, or "only these addresses" with none named, would be a project that
+ * silently turns away everything.
+ */
+export async function setReporterRulesAction(
+    projectId: string,
+    input: unknown
+): Promise<{ error?: string; }> {
+    const caller = await actor();
+    const parsed = core.reporterRulesSchema.safeParse(input);
+    if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message ?? "Those rules could not be read" };
+    }
+    try {
+        await projects.requireProject(caller, projectId);
+        await projects.setReporterRules(projectId, parsed.data);
+        revalidatePath(PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "Those rules could not be saved");
+    }
+}
+
+/**
+ * A key of the project's own, shown once.
+ *
+ * The address in a DSN is public by design; this is not, and there is nowhere to
+ * read it back from - what is stored is a digest. Somebody who loses it mints
+ * another, which is the same thing as rotating it.
+ */
+export async function mintTelemetrySecretAction(
+    projectId: string
+): Promise<{ secret?: string; error?: string; }> {
+    const caller = await actor();
+    try {
+        await projects.requireProject(caller, projectId);
+        const secret = await projects.mintSecret(projectId);
+        revalidatePath(PATH);
+        return { secret };
+    } catch (caught) {
+        return failure(caught, "That key could not be made");
+    }
+}
+
+/** Stop asking for a key, and forget the one there was. */
+export async function clearTelemetrySecretAction(projectId: string): Promise<{ error?: string; }> {
+    const caller = await actor();
+    try {
+        await projects.requireProject(caller, projectId);
+        await projects.clearSecret(projectId);
+        revalidatePath(PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "That key could not be removed");
+    }
+}
+
+/** Forget what was turned away, once somebody has read it and acted on it. */
+export async function clearTelemetryRefusalsAction(projectId: string): Promise<{ error?: string; }> {
+    const caller = await actor();
+    try {
+        await projects.requireProject(caller, projectId);
+        await projects.clearRefusals(projectId);
+        revalidatePath(PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "That could not be cleared");
+    }
+}

@@ -9,8 +9,9 @@
  */
 
 import { isHlsFile } from "@/lib/home/relay";
+import { apiUser } from "@/lib/api-session";
 import { homeInstall } from "@/lib/home/access";
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
 import { cameraHls, CameraOfflineError } from "@/lib/home/live";
 
 export const runtime = "nodejs";
@@ -20,7 +21,8 @@ export async function GET(
     request: Request,
     context: { params: Promise<{ id: string; file: string }> }
 ): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });
     const install = await homeInstall();
     if (!install) return new Response("Not found", { status: 404 });

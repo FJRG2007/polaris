@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { readPolarisFootprint } from "@/lib/polaris-footprint";
 
 export const runtime = "nodejs";
@@ -17,7 +18,8 @@ export const dynamic = "force-dynamic";
  * here is about containers that page already lists.
  */
 export async function GET(request: Request): Promise<Response> {
-    await requirePermission("deploy.read");
+    const refused = await apiPermission("deploy.read");
+    if (refused instanceof Response) return refused;
     const fresh = new URL(request.url).searchParams.get("fresh") === "1";
     try {
         return NextResponse.json(await readPolarisFootprint(fresh));

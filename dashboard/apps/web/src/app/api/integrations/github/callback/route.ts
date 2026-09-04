@@ -8,7 +8,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { apiAdmin } from "@/lib/api-session";
+
 import { exchangeManifestCode, refreshInstallations } from "@/lib/github-service";
 
 export const runtime = "nodejs";
@@ -26,7 +27,8 @@ function backToIntegrations(outcome?: string): NextResponse {
 }
 
 export async function GET(request: Request): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
 
     const url = new URL(request.url);
     const code = url.searchParams.get("code");

@@ -376,7 +376,15 @@ export function RichTextEditor({
     return (
         <div className={cn(surfaceClass(bordered, disabled), className)}>
             <SelectionToolbar editor={editor} />
-            <EditorMenu editor={editor} listAction={listAction}>
+            <EditorMenu
+                editor={editor}
+                listAction={listAction}
+                // The same reading the paste handler gives it: text off the
+                // clipboard is Markdown, and a Polaris link in it is the thing it
+                // points at. A menu that pasted it as plain characters would put
+                // asterisks in the document the keys never would.
+                onPaste={(text) => insertMarkdown(editor, text)}
+            >
                 <EditorContent editor={editor} />
             </EditorMenu>
         </div>
@@ -400,6 +408,31 @@ function surfaceClass(bordered: boolean, disabled: boolean): string {
 }
 
 /** Where this Polaris answers, so a pasted link to it is recognized as one. */
+/**
+ * Text somebody handed in, read the way a paste is read.
+ *
+ * Markdown becomes the document it describes, and a Polaris link becomes the
+ * chip it names - the same two steps the paste handler and the insert prop take,
+ * in one place so the right-press menu cannot drift from either.
+ */
+function insertMarkdown(editor: Editor, text: string): void {
+    if (!text) return;
+    // Inside a fence, pasted text is the code. Reading it as Markdown there would
+    // turn somebody's shell script into headings.
+    if (editor.isActive("codeBlock") || editor.isActive(md.MARKDOWN_BLOCK)) {
+        editor.chain().focus().insertContent(text).run();
+        return;
+    }
+    const doc = md.markdownToDoc(text, origin());
+    const pending = collectReferences(doc);
+    editor
+        .chain()
+        .focus()
+        .insertContent(inlineIfOneLine(doc))
+        .run();
+    if (pending.length > 0) void nameReferences(editor, pending);
+}
+
 /**
  * What to hand `insertContent`, given a document that is usually one line.
  *

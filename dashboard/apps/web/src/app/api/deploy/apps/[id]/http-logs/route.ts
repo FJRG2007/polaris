@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { readAppHttpLogs } from "@/lib/deploy-service";
 
 export const runtime = "nodejs";
@@ -11,7 +12,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
     const tail = Number(new URL(request.url).searchParams.get("tail"));
     const limit = Number.isFinite(tail) && tail > 0 ? Math.min(tail, 2000) : 500;

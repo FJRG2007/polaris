@@ -16,6 +16,7 @@
  * than one list somebody has to read the icons of.
  */
 
+import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { ShelfData } from "./note-tree";
@@ -66,6 +67,11 @@ export function NoteMoveDialog({
     );
     const spaceId = shelf?.space?.id ?? null;
     const sameShelf = spaceId === from.spaceId;
+
+    const sharedFolderNames = useMemo(
+        () => core.ambiguousLabels((shelf?.folders ?? []).map((folder) => folder.name)),
+        [shelf]
+    );
 
     const notes = useMemo(() => {
         if (!shelf) return [];
@@ -128,6 +134,15 @@ export function NoteMoveDialog({
                             <li key={folder.id}>
                                 <Destination
                                     label={folder.name}
+                                    // Two folders called "Notes" on one shelf is a
+                                    // question this list has not given the reader
+                                    // enough to answer, so the ones that share a
+                                    // name say where they sit and the rest do not.
+                                    where={
+                                        core.needsQualifying(folder.name, sharedFolderNames)
+                                            ? folderPath(shelf.folders, folder.id)
+                                            : undefined
+                                    }
                                     icon={<Folder className="size-3.5 shrink-0 text-muted-foreground" />}
                                     busy={busy}
                                     here={here({ spaceId, folderId: folder.id, parentId: null })}
@@ -173,8 +188,29 @@ export function NoteMoveDialog({
     );
 }
 
+/** Where a folder sits, as a path of the names above it. Only asked for when two
+ *  folders on one shelf share a name. */
+function folderPath(
+    folders: readonly { id: string; name: string; parentId: string | null }[],
+    folderId: string
+): string | undefined {
+    const byId = new Map(folders.map((folder) => [folder.id, folder]));
+    const steps: string[] = [];
+    let at = byId.get(folderId)?.parentId ?? null;
+    // Bounded by the folder count, so a row that somehow points at itself cannot
+    // hang the dialog.
+    for (let step = 0; at && step < folders.length; step += 1) {
+        const parent = byId.get(at);
+        if (!parent) break;
+        steps.unshift(parent.name);
+        at = parent.parentId;
+    }
+    return steps.length > 0 ? steps.join(" / ") : "Top level";
+}
+
 function Destination({
     label,
+    where,
     icon,
     depth = 0,
     busy,
@@ -182,6 +218,8 @@ function Destination({
     onSelect
 }: {
     label: string;
+    /** Shown under the name, for a row whose name is not enough on its own. */
+    where?: string;
     icon?: React.ReactNode;
     depth?: number;
     busy: boolean;
@@ -197,8 +235,15 @@ function Destination({
             className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
         >
             {icon}
-            <span className="truncate" title={label}>
-                {label}
+            <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate" title={label}>
+                    {label}
+                </span>
+                {where && (
+                    <span className="truncate text-xs text-muted-foreground" title={where}>
+                        {where}
+                    </span>
+                )}
             </span>
             {here && <span className="shrink-0 text-xs text-muted-foreground">where it is</span>}
         </button>

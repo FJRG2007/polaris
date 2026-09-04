@@ -11,10 +11,11 @@
  */
 
 import { listHosts } from "@/lib/host-service";
+import { apiUser } from "@/lib/api-session";
 import { listProjects } from "@/lib/deploy-service";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { SearchResource } from "@/lib/search/entries";
-import { requireUser, userHasManage } from "@/lib/session";
+import { userHasManage } from "@/lib/session";
 import { listInstalledApps } from "@/lib/apps/install-service";
 import { listRunnerPools } from "@/lib/runners/runner-service";
 import { listSnippetsForOwner } from "@/lib/snippet-service";
@@ -26,7 +27,8 @@ export const dynamic = "force-dynamic";
 const MAX_PER_SOURCE = 200;
 
 export async function GET(): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const [canDeploy, canManage] = await Promise.all([
         userHasManage(user, "deploy.read"),
         userHasManage(user, "system.manage")

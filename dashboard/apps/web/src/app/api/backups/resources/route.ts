@@ -9,15 +9,16 @@
  * something a viewer of one app should be able to do. Node runtime for Prisma.
  */
 
-import { requireAdmin } from "@/lib/session";
 import { listResources } from "@/lib/backups/manage";
+import { apiAdmin } from "@/lib/api-session";
 import { listResourcesSchema } from "@/lib/backups/schemas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireAdmin();
+    const user = await apiAdmin();
+    if (user instanceof Response) return user;
     const params = new URL(request.url).searchParams;
     const parsed = listResourcesSchema.safeParse({
         query: params.get("query") || undefined,

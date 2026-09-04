@@ -18,7 +18,8 @@
  */
 
 import { rangeOf } from "@/lib/http-range";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { channelAccess } from "@/lib/chat/access";
 import {
     channelOfAttachment,
@@ -41,7 +42,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ attachmentId: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("chat.use");
+    const user = await apiPermission("chat.use");
+    if (user instanceof Response) return user;
     const { attachmentId } = await params;
 
     const channelId = await channelOfAttachment(attachmentId);

@@ -16,13 +16,14 @@ import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
+import { NoteShareDialog } from "./note-share-dialog";
 import { NoteTree, type ShelfData } from "./note-tree";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
-import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Share2, Trash2 } from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 
 /** How long a note sits untouched before it is written. Long enough not to
@@ -37,6 +38,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
     const [error, setError] = useState("");
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [moving, setMoving] = useState<string | null>(null);
+    const [sharing, setSharing] = useState<string | null>(null);
     const [newNotebook, setNewNotebook] = useState(false);
     const [people, setPeople] = useState<string | null>(null);
     const [importing, setImporting] = useState<{
@@ -110,6 +112,7 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                     })
                 }
                 onMoveNote={setMoving}
+                onShareNote={setSharing}
             />
 
             <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -171,6 +174,15 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Move className="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Share this note by link"
+                                title="Share"
+                                onClick={() => setSharing(note.id)}
+                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <Share2 className="size-4" />
                             </button>
                             <button
                                 type="button"
@@ -274,11 +286,29 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                     }}
                 />
             )}
+            {sharing && (
+                <NoteShareDialog
+                    noteId={sharing}
+                    noteTitle={titleOf(shelves, sharing) ?? note?.title ?? "this note"}
+                    open
+                    onOpenChange={(next) => !next && setSharing(null)}
+                />
+            )}
             <NewNotebookDialog open={newNotebook} onOpenChange={setNewNotebook} />
             <NotebookPeopleDialog spaceId={people} onOpenChange={setPeople} />
             <ImportNotesDialog target={importing} onOpenChange={setImporting} />
         </div>
     );
+}
+
+/** What a note is called, read off the shelves the page already sent - so the
+ *  share dialog can name one that is not the note being edited. */
+function titleOf(shelves: readonly ShelfData[], noteId: string): string | null {
+    for (const shelf of shelves) {
+        const found = shelf.notes.find((entry) => entry.id === noteId);
+        if (found) return found.title;
+    }
+    return null;
 }
 
 /** Where a note is right now, read off the shelves the page already sent. */

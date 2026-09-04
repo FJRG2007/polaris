@@ -14,6 +14,7 @@ import { Link } from "@tiptap/extension-link";
 import { chipClass, chipLabel } from "./chip";
 import { Placeholder } from "@tiptap/extensions";
 import { mergeAttributes, Node } from "@tiptap/core";
+import { EditorCodeBlock } from "./editor-code-block";
 import { MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 
@@ -107,12 +108,16 @@ export function baseExtensions(placeholder: string) {
     return [
         // Everything visual is left to the shared type styles the surface
         // carries, so a heading is the same size here as it is once saved.
-        // Links come from `BoundedLink` instead, so StarterKit's own copy of the
-        // mark is turned off rather than registered twice.
+        // Links come from `BoundedLink` instead, and code blocks from
+        // `EditorCodeBlock` - which is StarterKit's with a language picker and
+        // colour on it - so StarterKit's own copies are turned off rather than
+        // registered twice.
         StarterKit.configure({
             heading: { levels: [1, 2, 3] },
-            link: false
+            link: false,
+            codeBlock: false
         }),
+        EditorCodeBlock,
         BoundedLink.configure({
             openOnClick: false,
             autolink: true,

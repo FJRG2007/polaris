@@ -343,6 +343,32 @@ export function Composer({
      * end of the line every time somebody else said something.
      */
     const replyingToId = replyingTo?.id ?? null;
+
+    /**
+     * Whatever is being dropped into the box, from wherever.
+     *
+     * The caller hands in mentions; the emoji picker below is the composer's own.
+     * Both go through the editor's `insert`, which puts them where the caret is -
+     * appending to the text instead looked like it worked and did not: the editor
+     * ignores a value that changed while it has the focus, on purpose, so an
+     * emoji picked with the caret in the box went nowhere at all.
+     *
+     * One counter for both, so the newest wins whichever it came from.
+     */
+    const [handed, setHanded] = useState<{ token: number; text: string } | null>(null);
+    const handedCount = useRef(0);
+    const hand = useCallback((text: string) => {
+        handedCount.current += 1;
+        setHanded({ token: handedCount.current, text });
+    }, []);
+
+    const givenToken = insert?.token ?? 0;
+    const givenText = insert?.text ?? "";
+    useEffect(() => {
+        if (!givenToken || !givenText) return;
+        hand(givenText);
+    }, [givenToken, givenText, hand]);
+
     const [focusAt, setFocusAt] = useState(0);
     const [focusWhere, setFocusWhere] = useState<"end" | "keep">("end");
     useEffect(() => {
@@ -733,7 +759,7 @@ export function Composer({
                     <RichTextEditor
                         key={generation}
                         value={body}
-                        insert={insert}
+                        insert={handed}
                         focusAt={focusAt}
                         disabled={disabled}
                         placeholder={placeholder}
@@ -880,7 +906,7 @@ export function Composer({
                                 // leaving the focus on the closed picker means
                                 // the next thing typed goes nowhere.
                                 onEmoji={(char) => {
-                                    setBody((current) => `${current}${char}`);
+                                    hand(char);
                                     setFocusAt((current) => current + 1);
                                 }}
                                 onMedia={(address) => void onMedia?.(address)}

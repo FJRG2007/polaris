@@ -1,10 +1,11 @@
 import { prisma } from "@polaris/db";
+import { apiPermission, apiUser } from "@/lib/api-session";
 import { NextResponse } from "next/server";
 import { accessFor } from "@/lib/container-service";
 import { currentReleaseRef } from "@/lib/deploy/releases";
 import { resolveDockerTransport } from "@/lib/docker-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
-import { requireUser, requirePermission, userHasManage } from "@/lib/session";
+import { userHasManage } from "@/lib/session";
 import { canOpenHostShell, mintTerminalTicket } from "@/lib/terminal-service";
 
 export const runtime = "nodejs";
@@ -37,7 +38,9 @@ export async function POST(request: Request): Promise<Response> {
     // before the deploy permission below is asked for at all.
     if (body?.sessionId) return mintSessionTicket(body.sessionId);
 
-    const user = await requirePermission("deploy.manage");
+    const user = await apiPermission("deploy.manage");
+
+    if (user instanceof Response) return user;
 
     if (body?.applicationId) {
         return mintServiceTicket(
@@ -82,7 +85,8 @@ export async function POST(request: Request): Promise<Response> {
  * offering a second door to it here would be a second thing to get wrong.
  */
 async function mintSessionTicket(sessionId: string): Promise<Response> {
-    const user = await requirePermission("agents.manage");
+    const user = await apiPermission("agents.manage");
+    if (user instanceof Response) return user;
     const session = await prisma.agentSession.findFirst({
         // The same two ways of reaching a session the list uses: through the
         // repository's owner, or - for a workspace, which has no repository to
@@ -168,7 +172,8 @@ async function mintServiceTicket(
  * that is gone, unpinned, or missing its key.
  */
 async function mintContainersTicket(connectionId: string, containerRef: string): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await userHasManage(user, "system.manage"))) {
         return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }

@@ -14,7 +14,8 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { requireUser, sessionCan } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { isProbableArchive, probeArchiveEncryption } from "@/lib/drive-archive-encryption";
@@ -33,7 +34,8 @@ const ARCHIVE_BUDGET_MS = 4000;
 const MAX_ARCHIVES = 60;
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

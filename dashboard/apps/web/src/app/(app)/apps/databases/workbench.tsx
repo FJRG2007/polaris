@@ -39,6 +39,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
@@ -474,6 +475,16 @@ function RowsPanel({
      * accident it prevents: right-clicking one row while four others are
      * selected, and having the menu act on the four.
      */
+    /**
+     * The cell the menu was opened on.
+     *
+     * The menu hangs off the row, because a row is what most of it is about - but
+     * half of what somebody wants from a right press is about the value under the
+     * pointer, and it was answering with "the first column that is not a key"
+     * instead. Recorded on the way in, cleared with the menu.
+     */
+    const [menuCell, setMenuCell] = useState<{ row: number; column: string } | null>(null);
+
     const adoptForMenu = (index: number) => {
         if (picked.has(index)) return;
         setPicked(new Set([index]));
@@ -701,6 +712,9 @@ function RowsPanel({
                                                                 !open && "truncate"
                                                             )}
                                                             title={open ? undefined : cellText(row[column.name])}
+                                                            onContextMenu={() =>
+                                                                setMenuCell({ row: index, column: column.name })
+                                                            }
                                                             onDoubleClick={() => beginEdit(index, column)}
                                                         >
                                                             {open ? (
@@ -719,7 +733,48 @@ function RowsPanel({
                                                 })}
                                             </tr>
                                         </ContextMenuTrigger>
-                                        <ContextMenuContent className="w-56">
+                                        <ContextMenuContent className="w-60">
+                                            {(() => {
+                                                // The column under the pointer,
+                                                // which is what the top of this
+                                                // menu is about. Null only if the
+                                                // press landed between cells.
+                                                const on =
+                                                    menuCell?.row === index
+                                                        ? columns.find(
+                                                              (column) => column.name === menuCell.column
+                                                          )
+                                                        : undefined;
+                                                if (!on) return null;
+                                                const value = row[on.name];
+                                                return (
+                                                    <>
+                                                        <ContextMenuLabel>{on.name}</ContextMenuLabel>
+                                                        <ContextMenuItem
+                                                            onSelect={() => copy(cellText(value))}
+                                                        >
+                                                            <Copy className="size-3.5" />
+                                                            Copy this value
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem
+                                                            onSelect={() => setFilter(cellText(value))}
+                                                        >
+                                                            <Search className="size-3.5" />
+                                                            Find rows like it
+                                                        </ContextMenuItem>
+                                                        {editable && !on.primaryKey ? (
+                                                            <ContextMenuItem
+                                                                onSelect={() => beginEdit(index, on)}
+                                                            >
+                                                                <Pencil className="size-3.5" />
+                                                                Edit this value
+                                                                <MenuShortcut>Double-click</MenuShortcut>
+                                                            </ContextMenuItem>
+                                                        ) : null}
+                                                        <ContextMenuSeparator />
+                                                    </>
+                                                );
+                                            })()}
                                             <ContextMenuItem
                                                 onSelect={() => copy(rowsAsJson(pickedRows))}
                                             >
@@ -734,27 +789,6 @@ function RowsPanel({
                                                 <Copy className="size-3.5" />
                                                 Copy as text
                                             </ContextMenuItem>
-                                            {editable ? (
-                                                <>
-                                                    <ContextMenuSeparator />
-                                                    {/* Named, because "edit" on a
-                                                        row is ambiguous and this
-                                                        only ever changes one
-                                                        cell. */}
-                                                    <ContextMenuItem
-                                                        onSelect={() => {
-                                                            const first = columns.find(
-                                                                (column) => !column.primaryKey
-                                                            );
-                                                            if (first) beginEdit(index, first);
-                                                        }}
-                                                    >
-                                                        <Pencil className="size-3.5" />
-                                                        Edit a value
-                                                        <MenuShortcut>Double-click</MenuShortcut>
-                                                    </ContextMenuItem>
-                                                </>
-                                            ) : null}
                                         </ContextMenuContent>
                                     </ContextMenu>
                                 ))

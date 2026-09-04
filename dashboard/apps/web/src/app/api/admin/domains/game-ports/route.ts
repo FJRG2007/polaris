@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { apiAdmin } from "@/lib/api-session";
+
 import { readGamePorts } from "@/lib/apps/games-service";
 
 export const runtime = "nodejs";
@@ -21,7 +22,8 @@ export const dynamic = "force-dynamic";
  * mistyped parameter costs a page nothing.
  */
 export async function GET(request: Request): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
     const probe = new URL(request.url).searchParams.get("probe") === "1";
     try {
         return NextResponse.json(await readGamePorts(probe));

@@ -131,7 +131,10 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="flex items-baseline justify-center gap-1.5 truncate text-sm font-medium" title={name}>
+                    {/* Left, like every line under it. The name was centred while
+                        the rest of the panel was not, which read as a mistake
+                        rather than as emphasis. */}
+                    <p className="flex items-baseline gap-1.5 truncate text-sm font-medium" title={name}>
                         {name}
                         {/* Beside the name, because that is what it is about -
                             and only when they have said. */}

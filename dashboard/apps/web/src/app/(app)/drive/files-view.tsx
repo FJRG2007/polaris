@@ -18,7 +18,7 @@ import type { DriveEntry } from "./types";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
-import { formatBytes } from "@polaris/core";
+import { formatBytes, isLiteralQuery, matchesLiterally } from "@polaris/core";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
@@ -865,7 +865,12 @@ export function FilesView({
 
         const parsed = parseSearch(query);
         rows = rows.filter((entry) => matchesStructured(entry.name, entry.path, parsed));
-        if (parsed.fuzzy) {
+        if (parsed.fuzzy && isLiteralQuery(parsed.fuzzy)) {
+            // A pasted address, path or identifier names one exact thing, and a
+            // fuzzy matcher handed one scores almost every row as a partial
+            // match - so it would answer with the whole folder.
+            rows = rows.filter((entry) => matchesLiterally(parsed.fuzzy, [entry.name, entry.path]));
+        } else if (parsed.fuzzy) {
             // In path mode the fuzzy pass ranks against the full relative path so a
             // query like "documentos/doc.pdf" matches a nested item.
             const fuse = new Fuse(rows, {

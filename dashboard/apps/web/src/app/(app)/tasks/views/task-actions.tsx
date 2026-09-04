@@ -24,6 +24,7 @@ import {
     Archive,
     Ban,
     Check,
+    ClipboardCopy,
     Copy,
     ExternalLink,
     Flag,
@@ -87,6 +88,8 @@ export interface TaskCommands {
     readonly onApply: (change: TaskBulkEdit) => void;
     readonly onDuplicate: () => void;
     readonly onDelete: () => void;
+    /** Only where the screen listens for the key this row says. */
+    readonly onCopy?: () => void;
     /** Creating a tag from the picker, when the screen offers that. */
     readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
     /** Creating a status, when the reader may change the space's own. */
@@ -111,6 +114,7 @@ export function commandsFor(props: ViewProps, task: TaskRow): TaskCommands {
         onApply: (change) => props.onApply(targets, change),
         onDuplicate: () => props.onDuplicate(task),
         onDelete: () => props.onDelete(targets),
+        onCopy: props.onCopy ? () => props.onCopy?.(targets) : undefined,
         onCreateTag: props.onCreateTag,
         onCreateStatus: props.onCreateStatus
     };
@@ -392,6 +396,14 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     const matchingTags = context.tags.filter((tag) => menuSearchMatches(tag.name, tagQuery));
     const matchingLists = destinations.filter((list) => menuSearchMatches(list.name, listQuery));
 
+    // Two lists called "Tasks" in this menu is a question the reader cannot
+    // answer, so the ones that share a name say where they live and the rest do
+    // not - qualifying every row would be harder to read than the names alone.
+    const sharedNames = useMemo(
+        () => core.ambiguousLabels(destinations.map((list) => list.name)),
+        [destinations]
+    );
+
     const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
         if (drafting === "tag") {
             const id = (await commands.onCreateTag?.(draft.name, draft.color)) ?? null;
@@ -665,7 +677,26 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                     className="gap-2"
                                                     onSelect={() => commands.onApply({ listId: list.id })}
                                                 >
-                                                    <span className="flex-1 truncate">{list.name}</span>
+                                                    {/* Both lines carry their own
+                                                        text: a long list name is
+                                                        clipped to the menu's width,
+                                                        and the whole point of the
+                                                        second line is telling two
+                                                        of them apart. */}
+                                                    <span className="flex min-w-0 flex-1 flex-col">
+                                                        <span className="truncate" title={list.name}>
+                                                            {list.name}
+                                                        </span>
+                                                        {list.where &&
+                                                            core.needsQualifying(list.name, sharedNames) && (
+                                                                <span
+                                                                    className="truncate text-xs text-muted-foreground"
+                                                                    title={list.where}
+                                                                >
+                                                                    {list.where}
+                                                                </span>
+                                                            )}
+                                                    </span>
                                                 </ContextMenuItem>
                                             ))}
                                         </div>
@@ -674,6 +705,16 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                             )}
 
                             <ContextMenuSeparator />
+                            {commands.onCopy && (
+                                // The key has been here since the clipboard
+                                // three were bound; nothing on screen said so,
+                                // which is the same as it not existing.
+                                <ContextMenuItem onSelect={commands.onCopy}>
+                                    <ClipboardCopy className="size-3.5" />
+                                    {many ? `Copy ${targets.length} tasks` : "Copy"}
+                                    <MenuShortcut>Ctrl+C</MenuShortcut>
+                                </ContextMenuItem>
+                            )}
                             {!many && (
                                 <ContextMenuItem onSelect={commands.onDuplicate}>
                                     <Copy className="size-3.5" />

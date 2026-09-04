@@ -17,12 +17,21 @@
  * different arrangement - another sort, another direction, a search - throws the
  * held order away and takes the engine's afresh.
  *
- * Reloading the page does the same, which is the escape hatch: a board that has
- * drifted out of order because somebody spent an afternoon re-prioritising is
- * one refresh away from being sorted again.
+ * And then it lets go. Holding for ever is the other half of the problem: a
+ * board sorted by urgency that never reorders is a board that is not sorted, and
+ * the reader had to reload the page to see the arrangement they asked for. So
+ * the hold is a beat rather than a decision - long enough that the row does not
+ * leave under the pointer that changed it, short enough that the screen is in
+ * order again before anybody goes looking for the reload button. A burst of
+ * edits settles once, when the burst stops.
+ *
+ * The one thing that is held for good is an order somebody dragged into place.
+ * That is the reader saying where a row goes, not the data moving underneath
+ * them, and a screen that undid it a second and a half later would be a screen
+ * that undid it. It is held until they sort differently, search, or reload.
  */
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * The freshly sorted order, with everything that was already on screen left
@@ -64,6 +73,16 @@ export function mergeOrder(held: readonly string[], next: readonly string[]): st
     // the screen, so walking the screen reaches all of it.
     return order;
 }
+
+/**
+ * How long the screen keeps an arrangement the data has moved on from.
+ *
+ * Long enough to cover the click that caused it and the one after it, short
+ * enough that nobody reads it as the list being broken. Every change pushes it
+ * back, so re-prioritising ten tasks reorders once at the end rather than ten
+ * times under the pointer.
+ */
+export const SETTLE_AFTER_MS = 1500;
 
 export interface StableOrder<T> {
     /** The same items, in the order the screen is holding. */
@@ -107,14 +126,48 @@ export function useStableOrder<T extends { readonly id: string }>(
         order: []
     });
 
+    /** Set by `settle`, which is only ever a drag. See the file comment: an order
+     *  somebody put a row into by hand is not one to let go of. */
+    const dragged = useRef(false);
+
+    /**
+     * Bumped when the hold has been let go of. The one thing here that causes a
+     * render of its own - everything else is derived from what is already being
+     * drawn, and this is the screen catching up with an order it decided not to
+     * show a moment ago.
+     */
+    const [released, setReleased] = useState(0);
+
     const ordered = useMemo(() => {
         const ids = items.map((item) => item.id);
-        const order = held.current.arrangement === arrangement ? mergeOrder(held.current.order, ids) : ids;
+        const fresh = held.current.arrangement !== arrangement;
+        if (fresh) dragged.current = false;
+        const order = fresh ? ids : mergeOrder(held.current.order, ids);
         held.current = { arrangement, order };
 
         const byId = new Map(items.map((item) => [item.id, item]));
         return order.map((id) => byId.get(id)).filter((item): item is T => item !== undefined);
-    }, [items, arrangement]);
+        // `released` is what re-runs this once the hold is dropped. It is not read
+        // in here, and that is exactly what it is for.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [items, arrangement, released]);
+
+    /**
+     * Let go, once the changes stop.
+     *
+     * Restarted on every change, so a burst of them reorders once at the end.
+     * Nothing is scheduled while the screen already agrees with the engine, which
+     * is the common case by far and must not render again.
+     */
+    const drifted = ordered.some((item, at) => item.id !== items[at]?.id);
+    useEffect(() => {
+        if (!drifted || dragged.current) return;
+        const timer = window.setTimeout(() => {
+            held.current = { arrangement: held.current.arrangement, order: [] };
+            setReleased((count) => count + 1);
+        }, SETTLE_AFTER_MS);
+        return () => window.clearTimeout(timer);
+    }, [drifted, items]);
 
     const arrange = useCallback(
         (ids: readonly string[]) => mergeOrder(held.current.order, ids),
@@ -126,6 +179,7 @@ export function useStableOrder<T extends { readonly id: string }>(
     // is the render this has to be in place for.
     const settle = useCallback((ids: readonly string[]) => {
         held.current = { arrangement: held.current.arrangement, order: [...ids] };
+        dragged.current = true;
     }, []);
 
     return { items: ordered, arrange, settle };

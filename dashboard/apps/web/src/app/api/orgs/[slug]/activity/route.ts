@@ -10,15 +10,16 @@
  * reader is trying to isolate.
  */
 
-import { requireUser } from "@/lib/session";
 import { hasOrgPermission } from "@polaris/core";
+import { apiUser } from "@/lib/api-session";
 import { orgIdForSlug, resolveOrgAccess } from "@/lib/orgs/org-service";
 import { listOrgActivity, listOrgActivityActors } from "@/lib/audit-service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { slug } = await params;
 
     const orgId = await orgIdForSlug(slug.toLowerCase());

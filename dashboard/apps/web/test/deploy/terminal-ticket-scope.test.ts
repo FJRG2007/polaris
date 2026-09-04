@@ -30,6 +30,14 @@ vi.mock("@/lib/session", () => ({
     userHasManage: vi.fn(async () => false)
 }));
 
+// The route asks the API twin, which answers with a response rather than
+// redirecting to a sign-in page - see lib/api-session.
+vi.mock("@/lib/api-session", () => ({
+    apiUser: vi.fn(),
+    apiPermission: (permission: string) => requirePermission(permission),
+    apiAdmin: vi.fn()
+}));
+
 vi.mock("@/lib/deploy-project-access", () => ({
     requireApplicationAccess: (applicationId: string, userId: string, capability: string) =>
         requireApplicationAccess(applicationId, userId, capability)

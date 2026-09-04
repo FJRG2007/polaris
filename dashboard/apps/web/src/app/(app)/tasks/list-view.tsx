@@ -231,12 +231,22 @@ export function ListScreen({
     const needle = search.trim();
 
     /**
-     * Search is fuzzy, because the way people look for a task is by half
-     * remembering it. A substring match only finds "user agent" if that is what
-     * somebody typed, and misses it for "useragent", "UA blocked" or a
+     * Some queries are not somebody half remembering.
+     *
+     * Pasting a URL, a path, an address or an identifier names one exact thing,
+     * and a fuzzy matcher handed a forty-character string scores almost every row
+     * as a partial match - so the answer was a list of everything with the one
+     * task that actually contains it somewhere in the middle. `isLiteralQuery`
+     * decides which kind of query this is; quoting forces it either way.
+     */
+    const literal = core.isLiteralQuery(needle);
+
+    /**
+     * Search is otherwise fuzzy, because the way people look for a task is by
+     * half remembering it. A substring match only finds "user agent" if that is
+     * what somebody typed, and misses it for "useragent", "UA blocked" or a
      * transposed letter - which is exactly when they are searching in the first
-     * place. Reference and tags are searchable too, at lower weight, so quoting
-     * "ENG-42" still lands on it.
+     * place. Reference and tags are searchable too, at lower weight.
      *
      * Built only while something is being searched for. The index is over every
      * task on the screen and the rows change on every tick of a checkbox, so
@@ -245,7 +255,7 @@ export function ListScreen({
      */
     const index = useMemo(
         () =>
-            needle
+            needle && !literal
                 ? new Fuse(rows, {
                       keys: [
                           { name: "name", weight: 3 },
@@ -258,22 +268,35 @@ export function ListScreen({
                       minMatchCharLength: 2
                   })
                 : null,
-        [rows, needle]
+        [rows, needle, literal]
     );
 
     const hidesClosed = core.hidesClosedWork(groupBy, showClosed);
 
     const sortedFacts = useMemo(() => {
         const now = new Date();
-        const matched = index ? index.search(needle).map((hit) => hit.item) : rows;
+        const matched = index
+            ? index.search(needle).map((hit) => hit.item)
+            : literal
+              ? rows.filter((task) =>
+                    core.matchesLiterally(needle, [
+                        task.name,
+                        task.reference,
+                        task.description,
+                        ...task.tags.map((tag) => tag.name)
+                    ])
+                )
+              : rows;
         const working = matched
             .filter((task) => !hidesClosed || task.statusType !== "closed")
             .map(toFacts)
             .filter((facts) => core.matchesFilter(facts, filter, now, format.weekStartsOn));
         // A search is already ranked by how well each row matched; re-sorting it
         // by due date would throw that away.
+        // A fuzzy search is already ranked by how well each row matched; a literal
+        // one is not ranked at all, so it keeps the order the screen was in.
         return index ? working : core.sortTasks(working, sort, statusOrder);
-    }, [rows, index, needle, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
+    }, [rows, index, needle, literal, filter, hidesClosed, sort, statusOrder, format.weekStartsOn]);
 
     /**
      * What the reader asked to see, as opposed to what the data happens to be.
@@ -829,6 +852,9 @@ export function ListScreen({
         onApply: applyToTasks,
         onDuplicate: duplicateTask,
         onDelete: setDeleting,
+        // This screen is the one that binds Ctrl+C, so this screen is the one
+        // whose menu may say so.
+        onCopy: copySelection,
         // A screen with no list of its own is showing work from several, so each
         // row has to name the one it came from.
         showLocation: listId === null,
@@ -865,9 +891,9 @@ export function ListScreen({
               }
             : undefined,
         onDeleteStatus: canManageColumns
-            ? async (statusId, replacementId) => {
+            ? async (statusId, fate) => {
                   const removed = await runAction(
-                      () => actions.deleteStatusAction(context.spaceId, statusId, replacementId),
+                      () => actions.deleteStatusAction(context.spaceId, statusId, fate),
                       setError
                   );
                   if (removed?.error) setError(removed.error);

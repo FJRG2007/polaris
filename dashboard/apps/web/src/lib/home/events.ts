@@ -494,14 +494,16 @@ function toEventView(
     };
 }
 
-/** What happened, newest first. Always bounded. */
-export async function listEvents(
+/**
+ * The cameras a query is about, by id and by name.
+ *
+ * Scoped through the cameras of this house rather than trusting the id in the
+ * request: an event id from anywhere else must not resolve.
+ */
+async function camerasFor(
     installedAppId: string,
-    query: EventQuery = {}
-): Promise<EventView[]> {
-    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
-    // Scoped through the cameras of this house rather than trusting the id in the
-    // request: an event id from anywhere else must not resolve.
+    query: EventQuery
+): Promise<Map<string, string>> {
     const cameras = await prisma.camera.findMany({
         where: {
             installedAppId,
@@ -510,9 +512,17 @@ export async function listEvents(
         },
         select: { id: true, name: true }
     });
-    if (cameras.length === 0) return [];
-    const names = new Map(cameras.map((camera) => [camera.id, camera.name]));
+    return new Map(cameras.map((camera) => [camera.id, camera.name]));
+}
 
+/**
+ * What a query matches, as a where clause.
+ *
+ * Written once and used by both the listing and the delete. They were two
+ * clauses before, which is exactly how "remove everything I am looking at" came
+ * to mean something slightly different from what was on screen.
+ */
+function eventsMatching(cameraIds: readonly string[], query: EventQuery) {
     // One `at` clause, because Prisma takes one per field and the window and the
     // page cursor are both about `at` - written separately, the later one wins
     // silently and the filter above it is simply ignored.
@@ -521,20 +531,32 @@ export async function listEvents(
     if (query.from) at.gte = query.from;
     if (query.to) at.lte = query.to;
 
+    return {
+        cameraId: { in: [...cameraIds] },
+        ...(query.kind ? { kind: query.kind } : {}),
+        ...(query.label ? { label: query.label } : {}),
+        ...(query.clipId ? { clipId: query.clipId } : {}),
+        // The area names are a JSON array in one column, so this is a substring
+        // match on the quoted name rather than an index lookup. A table per event
+        // per area would be indexable and would be a join, a cascade and a
+        // migration for a filter used by hand on a page that is already bounded
+        // to a couple of hundred rows.
+        ...(query.zone ? { zones: { contains: JSON.stringify(query.zone) } } : {}),
+        ...(Object.keys(at).length > 0 ? { at } : {})
+    };
+}
+
+/** What happened, newest first. Always bounded. */
+export async function listEvents(
+    installedAppId: string,
+    query: EventQuery = {}
+): Promise<EventView[]> {
+    const limit = Math.min(Math.max(query.limit ?? 50, 1), 200);
+    const names = await camerasFor(installedAppId, query);
+    if (names.size === 0) return [];
+
     const rows = await prisma.cameraEvent.findMany({
-        where: {
-            cameraId: { in: [...names.keys()] },
-            ...(query.kind ? { kind: query.kind } : {}),
-            ...(query.label ? { label: query.label } : {}),
-            ...(query.clipId ? { clipId: query.clipId } : {}),
-            // The area names are a JSON array in one column, so this is a
-            // substring match on the quoted name rather than an index lookup.
-            // A table per event per area would be indexable and would be a
-            // join, a cascade and a migration for a filter used by hand on a
-            // page that is already bounded to a couple of hundred rows.
-            ...(query.zone ? { zones: { contains: JSON.stringify(query.zone) } } : {}),
-            ...(Object.keys(at).length > 0 ? { at } : {})
-        },
+        where: eventsMatching([...names.keys()], query),
         orderBy: { at: "desc" },
         take: limit,
         select: EVENT_FIELDS
@@ -593,21 +615,55 @@ export async function deleteEvent(installedAppId: string, id: string): Promise<v
     await prisma.cameraEvent.delete({ where: { id } });
 }
 
+/** How many rows one pass of the delete takes. Big enough that a windy night is
+ *  a handful of passes, small enough that each one is a short statement. */
+const DELETE_BATCH = 500;
+
+/** A ceiling on one call, so a filter that matches a year of events cannot hold
+ *  a request open indefinitely. What is left is removed by asking again, and by
+ *  the nightly sweep regardless. */
+const DELETE_CEILING = 20_000;
+
 /**
  * Remove everything a filter matched.
  *
  * The one that matters after a windy night: forty rows of the same hedge, and
- * removing them one at a time is why they get left there instead. Bounded, and
- * it only ever removes what the screen was showing.
+ * removing them one at a time is why they get left there instead.
+ *
+ * Everything, not the first page of it. It used to list what the screen would
+ * have shown - two hundred rows at most - and delete those, so pressing it on a
+ * list of two thousand appeared to work and left eighteen hundred behind. It now
+ * works through the whole match in batches, and each batch is one statement
+ * rather than a row at a time; the stills have to be named to be removed, which
+ * is why the ids are read first rather than issuing a bare `deleteMany`.
  */
 export async function deleteEvents(installedAppId: string, query: EventQuery): Promise<number> {
-    const doomed = await listEvents(installedAppId, { ...query, limit: 200 });
-    for (const event of doomed) {
-        if (event.stillKey) await deleteStill(event.stillKey);
+    const names = await camerasFor(installedAppId, query);
+    if (names.size === 0) return 0;
+    const where = eventsMatching([...names.keys()], query);
+
+    let removed = 0;
+    while (removed < DELETE_CEILING) {
+        const batch = await prisma.cameraEvent.findMany({
+            where,
+            orderBy: { at: "desc" },
+            take: DELETE_BATCH,
+            select: { id: true, stillKey: true }
+        });
+        if (batch.length === 0) break;
+
+        // The pictures first: a row removed before its still is a still nothing
+        // points at, which is how a disk fills up quietly.
+        for (const event of batch) {
+            if (event.stillKey) await deleteStill(event.stillKey);
+        }
+        const { count } = await prisma.cameraEvent.deleteMany({
+            where: { id: { in: batch.map((event) => event.id) } }
+        });
+        removed += count;
+        if (batch.length < DELETE_BATCH) break;
     }
-    if (doomed.length === 0) return 0;
-    await prisma.cameraEvent.deleteMany({ where: { id: { in: doomed.map((event) => event.id) } } });
-    return doomed.length;
+    return removed;
 }
 
 /** How many are still waiting, for the badge. Counted rather than listed: the

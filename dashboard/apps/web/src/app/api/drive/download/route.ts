@@ -5,9 +5,10 @@
  */
 
 import { mimeForName } from "@/lib/mime";
+import { apiUser } from "@/lib/api-session";
 import { recordAudit } from "@/lib/audit-service";
 import { pipeThenDispose } from "@/lib/drive-stream";
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
@@ -17,7 +18,8 @@ export const dynamic = "force-dynamic";
 const RANGE = /^bytes=(\d+)-(\d*)$/;
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return new Response("Forbidden", { status: 403 });
     }

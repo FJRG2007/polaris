@@ -13,9 +13,10 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
+import { apiUser } from "@/lib/api-session";
 import { listLocks } from "@/lib/access-lock-service";
 import { driveBreakdown } from "@/lib/drive-breakdown";
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
@@ -23,7 +24,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

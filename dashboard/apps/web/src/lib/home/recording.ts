@@ -280,6 +280,68 @@ export async function openClip(
     }
 }
 
+/** How many clips one pass of a bulk delete takes. */
+const CLIP_DELETE_BATCH = 200;
+
+/** A ceiling on one call, so clearing a month of footage cannot hold a request
+ *  open indefinitely. What is left goes on the next press, and the nightly sweep
+ *  takes it either way. */
+const CLIP_DELETE_CEILING = 5_000;
+
+/**
+ * Remove everything a filter matched.
+ *
+ * The screen used to do this by calling the single delete once per clip, which
+ * on a list of a few hundred is a few hundred round trips and a request that
+ * gives up before it finishes - so "delete them all" looked like it did nothing.
+ * This works through the whole match instead, a batch at a time, with one
+ * statement per batch.
+ *
+ * A kept clip is never taken. That is what keeping one is for, and a bulk action
+ * that ignored it would be the one gesture here with no undo.
+ */
+export async function deleteClips(
+    installedAppId: string,
+    query: { placeId?: string | null; cameraId?: string | null; ids?: readonly string[] }
+): Promise<number> {
+    const cameras = await prisma.camera.findMany({
+        where: {
+            installedAppId,
+            ...(query.placeId ? { placeId: query.placeId } : {}),
+            ...(query.cameraId ? { id: query.cameraId } : {})
+        },
+        select: { id: true }
+    });
+    if (cameras.length === 0) return 0;
+
+    const where = {
+        cameraId: { in: cameras.map((camera) => camera.id) },
+        pinned: false,
+        ...(query.ids ? { id: { in: [...query.ids] } } : {})
+    };
+
+    let removed = 0;
+    while (removed < CLIP_DELETE_CEILING) {
+        const batch = await prisma.cameraClip.findMany({
+            where,
+            orderBy: { startedAt: "asc" },
+            take: CLIP_DELETE_BATCH,
+            select: { id: true, path: true }
+        });
+        if (batch.length === 0) break;
+
+        // The file before the row, so a failure leaves a row pointing at a file
+        // rather than a file nothing points at.
+        for (const clip of batch) await deleteClipFile(clip.path);
+        const { count } = await prisma.cameraClip.deleteMany({
+            where: { id: { in: batch.map((clip) => clip.id) } }
+        });
+        removed += count;
+        if (batch.length < CLIP_DELETE_BATCH) break;
+    }
+    return removed;
+}
+
 /** Remove a clip and its file. */
 export async function deleteClip(installedAppId: string, id: string): Promise<void> {
     const clip = await prisma.cameraClip.findFirst({

@@ -53,6 +53,7 @@ import {
     PinOff,
     Plus,
     Search,
+    Share2,
     Trash2,
     Users
 } from "lucide-react";
@@ -146,7 +147,8 @@ export function NoteTree({
     onNewNotebook,
     onPeople,
     onImport,
-    onMoveNote
+    onMoveNote,
+    onShareNote
 }: {
     shelves: readonly ShelfData[];
     activeNoteId: string | null;
@@ -154,6 +156,7 @@ export function NoteTree({
     onPeople: (spaceId: string) => void;
     onImport: (shelf: { spaceId: string | null; folderId: string | null }) => void;
     onMoveNote: (noteId: string) => void;
+    onShareNote: (noteId: string) => void;
 }) {
     const router = useRouter();
     const [query, setQuery] = useState("");
@@ -380,6 +383,7 @@ export function NoteTree({
                                     onCreateFolder={addFolder}
                                     onImport={onImport}
                                     onMoveNote={onMoveNote}
+                                    onShareNote={onShareNote}
                                     onAct={act}
                                     onRemove={setRemoving}
                                     onDragStart={setDragged}
@@ -687,6 +691,7 @@ function Branch({
     onCreateFolder,
     onImport,
     onMoveNote,
+    onShareNote,
     onAct,
     onRemove,
     onDragStart,
@@ -710,6 +715,7 @@ function Branch({
     onCreateFolder: (where: { spaceId: string | null; parentId: string | null }) => void;
     onImport: (shelf: { spaceId: string | null; folderId: string | null }) => void;
     onMoveNote: (noteId: string) => void;
+    onShareNote: (noteId: string) => void;
     onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
     onRemove: (target: { kind: "folder" | "space"; id: string; name: string; held: string }) => void;
     onDragStart: (dragged: Dragged) => void;
@@ -882,6 +888,7 @@ function Branch({
                                 onCreateFolder={onCreateFolder}
                                 onImport={onImport}
                                 onMoveNote={onMoveNote}
+                                onShareNote={onShareNote}
                                 onAct={onAct}
                                 onRemove={onRemove}
                                 onDragStart={onDragStart}
@@ -909,6 +916,7 @@ function Branch({
                     onRenameNote={onRenameNote}
                     onCreateNote={onCreateNote}
                     onMoveNote={onMoveNote}
+                    onShareNote={onShareNote}
                     onAct={onAct}
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
@@ -932,6 +940,7 @@ function NoteBranch({
     onRenameNote,
     onCreateNote,
     onMoveNote,
+    onShareNote,
     onAct,
     onDragStart,
     onDragEnd
@@ -948,6 +957,7 @@ function NoteBranch({
     onRenameNote: (noteId: string, title: string) => void;
     onCreateNote: (where: { spaceId: string | null; folderId: string | null; parentId?: string | null }) => void;
     onMoveNote: (noteId: string) => void;
+    onShareNote: (noteId: string) => void;
     onAct: (run: () => Promise<{ error?: string }>) => Promise<{ error?: string } | null>;
     onDragStart: (dragged: Dragged) => void;
     onDragEnd: () => void;
@@ -1058,6 +1068,10 @@ function NoteBranch({
                             <FolderPlus className="size-3.5" />
                             Move to...
                         </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => onShareNote(note.id)}>
+                            <Share2 className="size-3.5" />
+                            Share by link...
+                        </ContextMenuItem>
                         <ContextMenuItem onSelect={() => download("note", note.id)}>
                             <Download className="size-3.5" />
                             Export as Markdown
@@ -1102,6 +1116,7 @@ function NoteBranch({
                             onRenameNote={onRenameNote}
                             onCreateNote={onCreateNote}
                             onMoveNote={onMoveNote}
+                            onShareNote={onShareNote}
                             onAct={onAct}
                             onDragStart={onDragStart}
                             onDragEnd={onDragEnd}

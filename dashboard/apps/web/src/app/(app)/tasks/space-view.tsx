@@ -493,7 +493,11 @@ function StatusesTab({
                 onConfirm={async () => {
                     if (!removing || !replacement) return;
                     const result = await runAction(
-                        () => actions.deleteStatusAction(spaceId, removing.id, replacement),
+                        () =>
+                            actions.deleteStatusAction(spaceId, removing.id, {
+                                kind: "move",
+                                replacementId: replacement
+                            }),
                         onError
                     );
                     if (result?.error) onError(result.error);

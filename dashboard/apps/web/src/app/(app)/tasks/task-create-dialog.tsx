@@ -18,6 +18,13 @@
  * Only the name and the list are required. Everything a task can hold that needs
  * the task to exist first - its thread, its files, its time - is not offered
  * here and is one click away the moment it is created.
+ *
+ * Pressing outside a dialog closes it, and until now that threw away everything
+ * typed into it. A name, a description, three tags and a date is several minutes
+ * of somebody's attention to lose to a stray click, so a dialog with something in
+ * it asks first: keep writing, save the draft, or throw it away. A saved draft is
+ * this browser's - see `task-draft-store` - and it is offered back the next time
+ * the dialog opens on that list.
  */
 
 import * as actions from "./actions";
@@ -27,6 +34,13 @@ import { runAction } from "@/lib/run-action";
 import { PropertyRows } from "./task-properties";
 import { TaskNameField } from "./task-name-field";
 import { useEffect, useMemo, useState } from "react";
+import {
+    clearTaskDraft,
+    draftHasContent,
+    readTaskDraft,
+    writeTaskDraft,
+    type TaskDraft
+} from "./task-draft-store";
 import { taskOverlay, useLatest } from "./optimistic";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
@@ -42,6 +56,9 @@ import {
     Button,
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
     DialogTitle,
     Select
 } from "@polaris/ui";
@@ -94,6 +111,53 @@ function blank(
     };
 }
 
+/** The fields worth keeping, out of the row the dialog edits. */
+function toDraft(row: TaskRow): Omit<TaskDraft, "at"> {
+    return {
+        name: row.name,
+        description: row.description,
+        listId: row.listId,
+        statusId: row.statusId,
+        priority: row.priority,
+        dueDate: row.dueDate,
+        startDate: row.startDate,
+        assigneeIds: row.assignees.map((person) => person.id),
+        tagIds: row.tags.map((tag) => tag.id),
+        points: row.points
+    };
+}
+
+/**
+ * A kept draft, back in the row the dialog draws.
+ *
+ * The names and colours are looked up again rather than stored: a tag renamed
+ * since the draft was put down should come back with the name it has now, and a
+ * tag deleted since should not come back at all.
+ */
+function fromDraft(
+    draft: TaskDraft,
+    base: TaskRow,
+    book: { statuses: readonly StatusView[]; tags: readonly TagView[]; people: readonly PersonRef[] }
+): TaskRow {
+    const status = book.statuses.find((entry) => entry.id === draft.statusId) ?? null;
+    return {
+        ...base,
+        name: draft.name,
+        description: draft.description,
+        listId: draft.listId || base.listId,
+        statusId: status?.id ?? base.statusId,
+        statusName: status?.name ?? base.statusName,
+        statusColor: status?.color ?? base.statusColor,
+        statusType: status?.type ?? base.statusType,
+        priority: draft.priority as TaskRow["priority"],
+        dueDate: draft.dueDate,
+        startDate: draft.startDate,
+        points: draft.points,
+        assignees: book.people.filter((person) => draft.assigneeIds.includes(person.id)),
+        tags: book.tags.filter((tag) => draft.tagIds.includes(tag.id))
+    };
+}
+
 export function TaskCreateDialog({
     open,
     spaceId,
@@ -134,12 +198,22 @@ export function TaskCreateDialog({
     );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    /** Open when the dialog was dismissed with something in it. */
+    const [asking, setAsking] = useState(false);
+    /** Said once, when a draft was picked up rather than started fresh. */
+    const [restored, setRestored] = useState(false);
 
     // A dialog that reopens holding the last task's details is a dialog that
-    // creates the same task twice.
+    // creates the same task twice - so it starts blank, unless a draft was
+    // deliberately kept for this list, which is the one thing worth carrying
+    // over.
     useEffect(() => {
         if (!open) return;
-        setDraft(blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate }));
+        const fresh = blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate });
+        const kept = readTaskDraft(defaultListId);
+        setDraft(kept ? fromDraft(kept, fresh, { statuses, tags, people }) : fresh);
+        setRestored(kept !== null);
+        setAsking(false);
         setError("");
         // The status object is rebuilt on every render; its id is what changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,6 +262,37 @@ export function TaskCreateDialog({
         // creation is answered - so it stays the signal to look again.
     }, [draft, tagBook.tags]);
 
+    /**
+     * What leaving would cost.
+     *
+     * Asked of the draft rather than of a "dirty" flag, so opening the dialog and
+     * pressing outside it again - which is most of the times it is dismissed -
+     * puts no question in the way.
+     */
+    const worthKeeping = draftHasContent(toDraft(draft), defaultName);
+
+    /** Pressing outside, pressing Escape, or Cancel. All the same question. */
+    const dismiss = () => {
+        if (worthKeeping) {
+            setAsking(true);
+            return;
+        }
+        clearTaskDraft(draft.listId);
+        onClose();
+    };
+
+    const keepDraft = () => {
+        writeTaskDraft({ ...toDraft(draft), at: Date.now() });
+        setAsking(false);
+        onClose();
+    };
+
+    const throwAway = () => {
+        clearTaskDraft(draft.listId);
+        setAsking(false);
+        onClose();
+    };
+
     const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
     const canSubmit = draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
 
@@ -223,12 +328,14 @@ export function TaskCreateDialog({
             setError(result.error);
             return;
         }
+        clearTaskDraft(draft.listId);
         onClose();
         if (result?.id) onCreated(result.id);
     };
 
     return (
-        <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+        <>
+        <Dialog open={open} onOpenChange={(next) => (next ? undefined : dismiss())}>
             {/* Both widths are set: DialogContent's own max-w-lg would otherwise
                 cap this at a third of what the rows were laid out for. */}
             <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
@@ -294,7 +401,28 @@ export function TaskCreateDialog({
                 </div>
 
                 <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
-                    <Button variant="ghost" onClick={onClose} disabled={saving}>
+                    {restored && (
+                        <span className="mr-auto text-xs text-muted-foreground">
+                            Picked up where you left off.{" "}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    clearTaskDraft(defaultListId);
+                                    setRestored(false);
+                                    setDraft(
+                                        blank(defaultListId, firstStatus, {
+                                            name: defaultName,
+                                            dueDate: defaultDueDate
+                                        })
+                                    );
+                                }}
+                                className="underline hover:text-foreground"
+                            >
+                                Start again
+                            </button>
+                        </span>
+                    )}
+                    <Button variant="ghost" onClick={dismiss} disabled={saving}>
                         Cancel
                     </Button>
                     <Button onClick={() => void submit()} disabled={!canSubmit}>
@@ -303,5 +431,31 @@ export function TaskCreateDialog({
                 </footer>
             </DialogContent>
         </Dialog>
+
+        {/* Three answers, because there are three. Keeping the draft is the
+            middle one and the one most people want; throwing it away is
+            deliberately the plain button rather than the loud one, since a
+            dismissed dialog is usually a misclick and not a decision. */}
+        <Dialog open={asking} onOpenChange={(next) => (next ? undefined : setAsking(false))}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Keep this draft?</DialogTitle>
+                    <DialogDescription>
+                        It stays in this browser and is offered back the next time you write a task
+                        in this list.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2">
+                    <Button variant="ghost" onClick={throwAway}>
+                        Discard it
+                    </Button>
+                    <Button variant="outline" onClick={() => setAsking(false)}>
+                        Keep writing
+                    </Button>
+                    <Button onClick={keepDraft}>Save draft</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

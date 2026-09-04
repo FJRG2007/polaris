@@ -8,15 +8,16 @@
  * Admin-only. Node runtime for Prisma.
  */
 
-import { requireAdmin } from "@/lib/session";
 import { RESOURCE_KINDS_INFO } from "@/lib/backups/kinds";
+import { apiAdmin } from "@/lib/api-session";
 import { discoverUnprotected } from "@/lib/backups/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await requireAdmin();
+    const user = await apiAdmin();
+    if (user instanceof Response) return user;
     const candidates = await discoverUnprotected(user.id);
     return Response.json({
         candidates: candidates.map((candidate) => ({

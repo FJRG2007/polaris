@@ -15,9 +15,10 @@
  */
 
 import { z } from "zod";
+import { apiPermission } from "@/lib/api-session";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
-import { requirePermission } from "@/lib/session";
+
 import { rulesForChannel } from "@/lib/chat/rules";
 import { scheduleMessage } from "@/lib/chat/scheduled";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
@@ -79,7 +80,8 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ channelId: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("chat.use");
+    const user = await apiPermission("chat.use");
+    if (user instanceof Response) return user;
     const { channelId } = await params;
 
     try {

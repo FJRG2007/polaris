@@ -8,7 +8,8 @@
  */
 
 import { requireTask } from "@/lib/tasks/access";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { TaskAccessError } from "@/lib/tasks/access";
 import { publishTaskChange } from "@/lib/tasks/live";
 import { storeAttachment, uploadLimit } from "@/lib/tasks/attachment-service";
@@ -17,7 +18,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await requirePermission("tasks.manage");
+    const user = await apiPermission("tasks.manage");
+    if (user instanceof Response) return user;
 
     const url = new URL(request.url);
     const taskId = url.searchParams.get("task");

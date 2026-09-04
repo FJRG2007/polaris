@@ -13,8 +13,9 @@
  * the one failure nobody else is watching for.
  */
 
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 
 /** The slug and name Polaris' own project always has. */
 const SYSTEM_SLUG = "polaris";
@@ -22,6 +23,29 @@ const SYSTEM_SLUG = "polaris";
 export interface TelemetryActor {
     readonly id: string;
     readonly isAdmin: boolean;
+}
+
+/** The rules a report is admitted by, as the screen edits them. */
+export interface ReporterSettings {
+    readonly reporters: core.TelemetryReporters;
+    readonly allowedCidrs: readonly string[];
+    readonly allowedUserAgents: readonly string[];
+    readonly deniedUserAgents: readonly string[];
+    readonly requireSecret: boolean;
+    /** Whether a key has been minted. The key itself is shown once and stored as
+     *  a hash, so this and its last few characters are all there is to show. */
+    readonly hasSecret: boolean;
+    readonly secretTail: string | null;
+}
+
+/** What was turned away. Null throughout on a project that has never refused
+ *  anything, which is what most of them look like. */
+export interface RefusalSummary {
+    readonly count: number;
+    readonly at: string | null;
+    readonly ip: string | null;
+    readonly agent: string | null;
+    readonly reason: core.IngestRefusal;
 }
 
 export interface ProjectSummary {
@@ -39,12 +63,88 @@ export interface ProjectSummary {
     /** Unresolved issues, which is the only number the list needs. */
     readonly openIssues: number;
     readonly lastSeen: string | null;
+    readonly rules: ReporterSettings;
+    readonly refused: RefusalSummary;
 }
 
 /** A key is 32 hex characters: long enough that guessing one is not a strategy,
  *  short enough to read out of a configuration file. */
 function mintKey(): string {
     return randomBytes(16).toString("hex");
+}
+
+/**
+ * The number that goes in the DSN.
+ *
+ * Drawn at random rather than counted up. A sequence would say how many projects
+ * an instance has and make the next one guessable, and a DSN is a string that
+ * ends up in build logs and configuration repositories - the number in it should
+ * name a project and imply nothing else. The range stops short of a 32-bit
+ * integer because the column is one, and starts high enough that every number is
+ * the same length, so no DSN looks like a different kind of DSN.
+ */
+function mintNumber(): number {
+    return randomInt(100_000_000, 2_100_000_000);
+}
+
+/** A JSON string array as it comes out of the database, bounded and with the
+ *  empty entries dropped. Anything that is not an array of strings reads as no
+ *  rules at all, which for an allow list is the safe direction only because a
+ *  policy of "listed" refuses an empty one outright. */
+function readList(value: string | null | undefined, max: number): string[] {
+    try {
+        const parsed = JSON.parse(value ?? "[]");
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .slice(0, max);
+    } catch {
+        return [];
+    }
+}
+
+/** How many rules one project may carry. Every one of them is walked on every
+ *  report, so the ceiling is what stops a list being a way to make an ingest
+ *  expensive. */
+const MAX_RULES = 50;
+
+function rulesOf(row: {
+    reporters: string;
+    allowedCidrs: string;
+    allowedUserAgents: string;
+    deniedUserAgents: string;
+    requireSecret: boolean;
+    secretHash: string | null;
+    secretTail: string | null;
+}): ReporterSettings {
+    return {
+        reporters: core.readReporters(row.reporters),
+        allowedCidrs: readList(row.allowedCidrs, MAX_RULES),
+        allowedUserAgents: readList(row.allowedUserAgents, MAX_RULES),
+        deniedUserAgents: readList(row.deniedUserAgents, MAX_RULES),
+        requireSecret: row.requireSecret,
+        hasSecret: row.secretHash !== null,
+        secretTail: row.secretTail
+    };
+}
+
+/** The two values a key is stored as: what it is compared against, and the tail
+ *  that lets somebody tell which key this is without holding it. */
+function sealSecret(secret: string): { secretHash: string; secretTail: string } {
+    return {
+        secretHash: createHash("sha256").update(secret).digest("hex"),
+        secretTail: secret.slice(-4)
+    };
+}
+
+/** Compared byte by byte in constant time. Two hex digests are always the same
+ *  length, so this never falls back to the early return. */
+function sameDigest(a: string, b: string): boolean {
+    const left = Buffer.from(a, "utf8");
+    const right = Buffer.from(b, "utf8");
+    return left.length === right.length && timingSafeEqual(left, right);
 }
 
 /**
@@ -81,6 +181,18 @@ export async function listProjects(
             retentionDays: true,
             deployProjectId: true,
             orgId: true,
+            reporters: true,
+            allowedCidrs: true,
+            allowedUserAgents: true,
+            deniedUserAgents: true,
+            requireSecret: true,
+            secretHash: true,
+            secretTail: true,
+            refusedCount: true,
+            refusedAt: true,
+            refusedIp: true,
+            refusedAgent: true,
+            refusedReason: true,
             issues: {
                 where: { status: "unresolved" },
                 select: { lastSeen: true },
@@ -89,20 +201,37 @@ export async function listProjects(
         }
     });
     return rows.map((row) => ({
-        ...row,
+        id: row.id,
+        number: row.number,
+        name: row.name,
+        slug: row.slug,
+        platform: row.platform,
+        publicKey: row.publicKey,
+        enabled: row.enabled,
+        system: row.system,
+        retentionDays: row.retentionDays,
+        deployProjectId: row.deployProjectId,
+        orgId: row.orgId,
         openIssues: row.issues.length,
-        lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null
+        lastSeen: row.issues[0]?.lastSeen.toISOString() ?? null,
+        rules: rulesOf(row),
+        refused: {
+            count: row.refusedCount,
+            at: row.refusedAt?.toISOString() ?? null,
+            ip: row.refusedIp,
+            agent: row.refusedAgent,
+            reason: (row.refusedReason as core.IngestRefusal) ?? null
+        }
     }));
 }
 
 /**
  * Make a project.
  *
- * The number is allocated as one past the highest there is, and a collision
- * between two people creating one at the same moment is retried rather than
- * serialized: it is a handful of rows in the life of an instance, and a lock
- * held across a create would be a lock held for something that almost never
- * contends.
+ * The number is drawn at random and a collision is retried rather than
+ * serialized: with two billion of them and a handful of projects in the life of
+ * an instance, a lock held across a create would be a lock held for something
+ * that will not happen.
  */
 export async function createProject(input: {
     ownerId: string;
@@ -113,7 +242,6 @@ export async function createProject(input: {
     system?: boolean;
 }): Promise<{ id: string; number: number; publicKey: string }> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-        const highest = await prisma.telemetryProject.aggregate({ _max: { number: true } });
         try {
             return await prisma.telemetryProject.create({
                 data: {
@@ -122,14 +250,15 @@ export async function createProject(input: {
                     deployProjectId: input.deployProjectId ?? null,
                     name: input.name,
                     slug: input.slug,
-                    number: (highest._max.number ?? 0) + 1,
+                    number: mintNumber(),
                     publicKey: mintKey(),
                     system: input.system === true
                 },
                 select: { id: true, number: true, publicKey: true }
             });
         } catch (error) {
-            // Somebody else took the number between the read and the write.
+            // Either the number or the key was already taken. Both are drawn
+            // fresh on the next pass.
             if (attempt === 4) throw error;
         }
     }
@@ -177,24 +306,155 @@ export async function systemProject(): Promise<{ id: string; platform: string | 
     }
 }
 
+/** A project, as the ingest needs it: who it is, and what it will admit. */
+export interface IngestProject {
+    readonly id: string;
+    readonly platform: string | null;
+    readonly rules: core.ReporterRules;
+    /** Present only when the project asks for a key. */
+    readonly secretHash: string | null;
+}
+
 /**
  * The project a DSN names, if the key that came with it is that project's.
  *
  * The number says which project and the key says the request is allowed to write
  * into it. Neither is a secret and neither is treated as one; what this refuses
  * is a request that names one project with another's key, which is the whole of
- * what a public key can be asked to do.
+ * what a public key can be asked to do. The comparison is constant-time anyway -
+ * it costs nothing, and "public" is a statement about how a value is distributed
+ * rather than a licence to leak it a byte at a time.
+ *
+ * What comes back with it is the rules, so admission is decided from one read
+ * rather than two.
  */
-export async function projectForIngest(
-    number: number,
-    publicKey: string
-): Promise<{ id: string; platform: string | null } | null> {
+export async function projectForIngest(number: number, publicKey: string): Promise<IngestProject | null> {
     const project = await prisma.telemetryProject.findUnique({
         where: { number },
-        select: { id: true, publicKey: true, enabled: true, platform: true }
+        select: {
+            id: true,
+            publicKey: true,
+            enabled: true,
+            platform: true,
+            reporters: true,
+            allowedCidrs: true,
+            allowedUserAgents: true,
+            deniedUserAgents: true,
+            requireSecret: true,
+            secretHash: true,
+            secretTail: true
+        }
     });
-    if (!project || !project.enabled || project.publicKey !== publicKey) return null;
-    return { id: project.id, platform: project.platform };
+    if (!project || !project.enabled || !sameDigest(project.publicKey, publicKey)) return null;
+    const rules = rulesOf(project);
+    return {
+        id: project.id,
+        platform: project.platform,
+        // A project that asks for a key and has none would refuse everything for
+        // a reason nobody set: the switch means nothing until a key exists.
+        rules: { ...rules, requireSecret: rules.requireSecret && rules.hasSecret },
+        secretHash: project.secretHash
+    };
+}
+
+/** Whether the key a report carried is this project's. */
+export function secretAccepted(project: IngestProject, presented: string | null): boolean {
+    if (!project.secretHash || !presented) return false;
+    return sameDigest(project.secretHash, createHash("sha256").update(presented).digest("hex"));
+}
+
+/**
+ * Write down that a report was turned away.
+ *
+ * A count and the last one rather than a log. What somebody needs from this
+ * screen is "something is being refused, from there, for that reason" - which is
+ * one row - and a table of every rejected packet is a table an application in a
+ * crash loop fills by itself.
+ *
+ * Never throws: this runs on the path a refused request already took, and a
+ * failure to record it is not worth a second one.
+ */
+export async function recordRefusal(
+    projectId: string,
+    refusal: { reason: core.IngestRefusal; ip: string | null; userAgent: string | null }
+): Promise<void> {
+    try {
+        await prisma.telemetryProject.update({
+            where: { id: projectId },
+            data: {
+                refusedCount: { increment: 1 },
+                refusedAt: new Date(),
+                refusedIp: refusal.ip?.slice(0, 60) ?? null,
+                refusedAgent: refusal.userAgent?.slice(0, 200) ?? null,
+                refusedReason: refusal.reason
+            }
+        });
+    } catch {
+        // The report is already refused. Failing to note it changes nothing.
+    }
+}
+
+/** Forget what was refused, once somebody has read it and acted. */
+export async function clearRefusals(projectId: string): Promise<void> {
+    await prisma.telemetryProject.update({
+        where: { id: projectId },
+        data: { refusedCount: 0, refusedAt: null, refusedIp: null, refusedAgent: null, refusedReason: null }
+    });
+}
+
+/**
+ * Change who may report.
+ *
+ * The lists are stored as they were given, trimmed and bounded; whether a rule is
+ * a usable address or a usable pattern is decided before this, where there is a
+ * person to tell.
+ */
+export async function setReporterRules(
+    projectId: string,
+    input: {
+        reporters: core.TelemetryReporters;
+        allowedCidrs: readonly string[];
+        allowedUserAgents: readonly string[];
+        deniedUserAgents: readonly string[];
+        requireSecret: boolean;
+    }
+): Promise<void> {
+    await prisma.telemetryProject.update({
+        where: { id: projectId },
+        data: {
+            reporters: input.reporters,
+            allowedCidrs: JSON.stringify(input.allowedCidrs.slice(0, MAX_RULES)),
+            allowedUserAgents: JSON.stringify(input.allowedUserAgents.slice(0, MAX_RULES)),
+            deniedUserAgents: JSON.stringify(input.deniedUserAgents.slice(0, MAX_RULES)),
+            requireSecret: input.requireSecret
+        }
+    });
+}
+
+/**
+ * A key for a project that wants one, returned once.
+ *
+ * Longer than the public key and not hex, so the two cannot be mistaken for each
+ * other in a configuration file. Stored as a digest: a database dump yields
+ * nothing that can be presented, and there is no second place to read it from -
+ * somebody who loses it mints another.
+ */
+export async function mintSecret(projectId: string): Promise<string> {
+    const secret = `plt_${randomBytes(24).toString("base64url")}`;
+    await prisma.telemetryProject.update({
+        where: { id: projectId },
+        data: { ...sealSecret(secret), requireSecret: true }
+    });
+    return secret;
+}
+
+/** Stop asking for a key, and forget the one there was. Turning the switch off
+ *  without this would leave a value nobody can see still standing. */
+export async function clearSecret(projectId: string): Promise<void> {
+    await prisma.telemetryProject.update({
+        where: { id: projectId },
+        data: { requireSecret: false, secretHash: null, secretTail: null }
+    });
 }
 
 /** A new key for a project whose old one got out. The old one stops working the

@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
+import { apiPermission } from "@/lib/api-session";
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { readContainerFile } from "@/lib/container-files-service";
 
@@ -12,7 +13,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
     const path = new URL(request.url).searchParams.get("path");
     if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });

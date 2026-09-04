@@ -22,7 +22,7 @@ import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { useEffect, useMemo, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
-import { clickMode, type BoardMove, type SelectMode, type ViewProps } from "./shared";
+import { clickMode, type BoardMove, type ColumnWorkFate, type SelectMode, type ViewProps } from "./shared";
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
@@ -52,6 +52,7 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
+    MenuShortcut,
     ContextMenuSeparator,
     ContextMenuTrigger,
     DropdownMenu,
@@ -553,6 +554,10 @@ function ColumnMenu({
                         <ContextMenuItem variant="danger" className="gap-2" onSelect={onDelete}>
                             <Trash2 className="size-3.5" />
                             Delete {label}
+                            {/* The key that does the same thing to the column
+                                whose header has the focus, said out loud - the
+                                way chat says it, drawn by the same component. */}
+                            <MenuShortcut>Del</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}
@@ -571,6 +576,16 @@ export function BoardView(props: ViewProps) {
     const [editing, setEditing] = useState<string | null>(null);
     const [removing, setRemoving] = useState<{ key: string; label: string } | null>(null);
     const [replacement, setReplacement] = useState("");
+    /**
+     * What happens to the work on a column being removed.
+     *
+     * Deleting is the default the report asked for, and it is spelled out with
+     * the count beside it: this is the one gesture on a board that destroys work,
+     * so what it is about to destroy is on the screen rather than implied.
+     */
+    const [fate, setFate] = useState<ColumnWorkFate["kind"]>("delete");
+    /** How much is on the column being removed, read when the dialog opens. */
+    const [doomedCount, setDoomedCount] = useState(0);
     // The column being dragged by its header, and the one it is over. While one
     // is in the air the cards stop taking drops, so a column released over the
     // middle of another still lands on that column.
@@ -662,9 +677,11 @@ export function BoardView(props: ViewProps) {
     };
 
     /** Start removing a column, on the one it would hand its work to. */
-    const askToRemove = (group: { key: string; label: string }) => {
+    const askToRemove = (group: { key: string; label: string; tasks: readonly unknown[] }) => {
         setRemoving({ key: group.key, label: group.label });
         setReplacement(columns.find((column) => column.id !== group.key)?.id ?? "");
+        setDoomedCount(group.tasks.length);
+        setFate("delete");
     };
 
     return (
@@ -763,6 +780,19 @@ export function BoardView(props: ViewProps) {
                                 ) : (
                                     <header
                                         draggable={movable}
+                                        // A focus stop per column, the way a board
+                                        // is tabbed across everywhere else - and
+                                        // what makes Del on the column something
+                                        // the menu can honestly advertise.
+                                        tabIndex={0}
+                                        onKeyDown={(event) => {
+                                            if (event.key !== "Delete") return;
+                                            if (event.target !== event.currentTarget) return;
+                                            if (!isColumn || props.onDeleteStatus === undefined) return;
+                                            if (columns.length <= 1) return;
+                                            event.preventDefault();
+                                            askToRemove(group);
+                                        }}
                                         onDragStart={(event) => {
                                             if (!movable) return;
                                             event.dataTransfer.effectAllowed = "move";
@@ -934,39 +964,84 @@ export function BoardView(props: ViewProps) {
                     ))}
             </div>
 
-            <ConfirmDeleteDialog
+<ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.label ?? ""}
                 kind="column"
-                description="Tasks on it move to the column you pick, so nothing falls off the board."
+                description={
+                    doomedCount === 0
+                        ? "Nothing is on it."
+                        : "Say what happens to the work on it - it is not taken with the column unless you ask for that."
+                }
                 confirmLabel="Delete column"
-                confirmDisabled={!replacement}
+                confirmDisabled={fate === "move" && !replacement}
                 onConfirm={async () => {
-                    if (!removing || !replacement) return;
+                    if (!removing) return;
+                    if (fate === "move" && !replacement) return;
+                    const chosen: ColumnWorkFate =
+                        fate === "move"
+                            ? { kind: "move", replacementId: replacement }
+                            : fate === "archive"
+                              ? { kind: "archive" }
+                              : { kind: "delete" };
                     // One at a time: a space keeps its last status, and two deletes
                     // racing each other would both read the count before either
                     // landed. The replacement is another column, so it is never one
                     // of these.
                     let done = true;
                     for (const id of columnIds(removing.key)) {
-                        done = (await props.onDeleteStatus?.(id, replacement)) === true && done;
+                        done = (await props.onDeleteStatus?.(id, chosen)) === true && done;
                     }
                     if (done) setRemoving(null);
                 }}
             >
-                <label className="flex flex-col gap-1 text-sm">
-                    Move its tasks to
-                    <Select
-                        value={replacement}
-                        onValueChange={setReplacement}
-                        options={columns
-                            .filter((column) => column.id !== removing?.key)
-                            .map((column) => ({ value: column.id, label: column.name }))}
-                        aria-label="Replacement column"
-                        className="h-8 text-xs"
-                    />
-                </label>
+                {doomedCount > 0 && (
+                    <div className="flex flex-col gap-2 text-sm">
+                        <span className="text-xs text-muted-foreground">
+                            {doomedCount === 1 ? "One task is on it" : `${doomedCount} tasks are on it`}
+                        </span>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="column-work"
+                                checked={fate === "delete"}
+                                onChange={() => setFate("delete")}
+                            />
+                            Delete them with the column
+                        </label>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="column-work"
+                                checked={fate === "move"}
+                                onChange={() => setFate("move")}
+                            />
+                            Move them to
+                            <Select
+                                value={replacement}
+                                onValueChange={(value) => {
+                                    setReplacement(value);
+                                    setFate("move");
+                                }}
+                                options={columns
+                                    .filter((column) => column.id !== removing?.key)
+                                    .map((column) => ({ value: column.id, label: column.name }))}
+                                aria-label="Replacement column"
+                                className="h-8 w-44 text-xs"
+                            />
+                        </label>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="column-work"
+                                checked={fate === "archive"}
+                                onChange={() => setFate("archive")}
+                            />
+                            Archive them, and take the column
+                        </label>
+                    </div>
+                )}
             </ConfirmDeleteDialog>
         </>
     );

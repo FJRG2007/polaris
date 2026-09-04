@@ -97,7 +97,12 @@ export const SelectItem = forwardRef<
     <RadixSelect.Item
         ref={ref}
         className={cn(
-            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
+            // `data-[highlighted]` and not only `focus:`. A menu item takes real
+            // DOM focus when the pointer reaches it, so `focus:` is enough there;
+            // a select item never does - Radix marks it highlighted instead - so
+            // the row under the pointer was drawn exactly like the rows that were
+            // not, which reads as a list that does not respond.
+            "relative flex w-full cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded py-1.5 pl-2 pr-8 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-card-hover data-[highlighted]:bg-card-hover data-[highlighted]:text-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-foreground",
             className
         )}
         {...props}

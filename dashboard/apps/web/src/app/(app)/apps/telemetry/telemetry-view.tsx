@@ -15,6 +15,7 @@
 
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
+import { ReporterRules } from "./reporter-rules";
 import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { RelativeTime } from "@/components/relative-time";
@@ -182,7 +183,12 @@ export function TelemetryView({
                 </div>
             </div>
 
-            {project && <ProjectAddress project={project} onDone={load} />}
+            {project && (
+                <>
+                    <ProjectAddress project={project} onDone={load} />
+                    <ReporterRules project={project} onDone={load} />
+                </>
+            )}
 
             {error && (
                 <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">

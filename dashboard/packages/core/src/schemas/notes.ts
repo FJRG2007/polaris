@@ -26,6 +26,7 @@
  */
 
 import { z } from "zod";
+import { addressRuleFields } from "./link-rules.js";
 import { FOLDER_DEPTH_LIMIT, hexColor, SPACE_ROLES, SPACE_VISIBILITIES } from "./tasks.js";
 
 export const noteTitle = z.string().trim().min(1, "Give it a title").max(200);
@@ -211,3 +212,32 @@ export const noteImportSchema = z.object({
 });
 
 export type NoteImportInput = z.infer<typeof noteImportSchema>;
+// ---------------------------------------------------------------------------
+// Publishing one
+// ---------------------------------------------------------------------------
+
+/**
+ * A note handed to somebody with no account here.
+ *
+ * The same limits every public link in Polaris offers, in the same words, so a
+ * note behaves like a shared file rather than like a second idea of what sharing
+ * means: a password, an expiry, a cap on opens, and the three address
+ * allowlists. Each of them empty or absent means "no restriction" - a link is
+ * open to whoever holds it until its owner says otherwise.
+ */
+export const noteShareSchema = z.object({
+    /** Whether the pages under this one travel with it. */
+    includeChildren: z.boolean().default(true),
+    /** Stored as an argon2 hash, never in the clear. */
+    password: z.string().min(1).max(256).optional(),
+    /** Sent to take a password off a link that had one. */
+    clearPassword: z.boolean().default(false),
+    maxViews: z.number().int().positive().max(1_000_000).optional(),
+    /** Sent to lift a cap that was set. */
+    clearMaxViews: z.boolean().default(false),
+    expiresAt: z.coerce.date().optional(),
+    clearExpiry: z.boolean().default(false),
+    ...addressRuleFields
+});
+
+export type NoteShareInput = z.infer<typeof noteShareSchema>;

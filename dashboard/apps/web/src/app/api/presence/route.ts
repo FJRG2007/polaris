@@ -13,7 +13,8 @@
  */
 
 import { z } from "zod";
-import { requireUser } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+
 import { presenceFor } from "@/lib/presence-service";
 
 export const runtime = "nodejs";
@@ -26,7 +27,8 @@ const MOST = 200;
 const askSchema = z.object({ ids: z.array(z.string().uuid()).max(MOST) });
 
 export async function POST(request: Request): Promise<Response> {
-    const viewer = await requireUser();
+    const viewer = await apiUser();
+    if (viewer instanceof Response) return viewer;
 
     let body: unknown;
     try {

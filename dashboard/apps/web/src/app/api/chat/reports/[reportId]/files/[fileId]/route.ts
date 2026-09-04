@@ -20,8 +20,8 @@
  * should be talked into running something found inside them.
  */
 
-import { requireAdmin } from "@/lib/session";
 import { readReportFile } from "@/lib/chat/report-files";
+import { apiAdmin } from "@/lib/api-session";
 import { isInlineImage, isPlayableMedia } from "@/lib/chat/attachments";
 
 export const runtime = "nodejs";
@@ -35,7 +35,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ reportId: string; fileId: string }> }
 ): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
     const { reportId, fileId } = await params;
 
     const file = await readReportFile(reportId, fileId);

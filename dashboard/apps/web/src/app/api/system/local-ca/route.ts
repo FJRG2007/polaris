@@ -5,14 +5,15 @@
  * keep it off anonymous scanners. Served as a .crt attachment.
  */
 
-import { requireUser } from "@/lib/session";
 import { readLocalCaRoot } from "@/lib/local-ca-service";
+import { apiUser } from "@/lib/api-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    await requireUser();
+    const refused = await apiUser();
+    if (refused instanceof Response) return refused;
     const pem = await readLocalCaRoot();
     if (!pem) return new Response("The local certificate authority is not available yet.", { status: 404 });
     return new Response(pem, {
