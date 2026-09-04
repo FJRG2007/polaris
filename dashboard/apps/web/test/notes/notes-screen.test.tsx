@@ -76,6 +76,13 @@ describe("the notes screen", () => {
         expect(markup).toContain("Delete this note");
     });
 
+    it("offers to take the open note out as Markdown", () => {
+        // The context menu offers it for a note, a folder and a notebook, but a
+        // menu only exists once it is opened - this is the one that is on the
+        // page, so it is the one a render can assert.
+        expect(screen([ownShelf([summary])], note)).toContain("Export this note as Markdown");
+    });
+
     it("offers a way into what a note holds, and only when it holds something", () => {
         const parent: NoteSummary = { ...summary, hasChildren: true };
         expect(screen([ownShelf([parent])], null)).toContain("Hide what is under Migration plan");

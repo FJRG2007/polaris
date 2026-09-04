@@ -19,6 +19,7 @@ import { prisma } from "@polaris/db";
 import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepDueBackups } from "@/lib/backups/service";
 import { sweepRetention } from "@/lib/retention-service";
+import { pruneTelemetry } from "@/lib/telemetry/store";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { expireTransfers } from "@/lib/drive-transfer-service";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
@@ -218,6 +219,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // zero. Nothing is written twice and nothing is lost.
         leaseMs: null,
         run: sweepRetention
+    },
+    {
+        key: "telemetry-prune",
+        // Hourly, like retention and for the same reason: what it removes is a
+        // stack trace older than the project keeps, and a pass that runs late
+        // removes exactly the same rows. The daily counts are not touched, so a
+        // chart does not develop a hole where the events used to be.
+        everyMs: Number(process.env.POLARIS_TELEMETRY_PRUNE_MS) || HOUR,
+        // Unleased. Two runners delete the same rows and one of them counts
+        // zero; nothing is written and nothing is lost.
+        leaseMs: null,
+        run: pruneTelemetry
     },
     {
         key: "backups",

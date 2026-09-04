@@ -348,7 +348,12 @@ Notes (personal writing):
       become folders, frontmatter is kept beside the body rather than shown as
       text, and `[[wikilinks]]` are rewritten into Polaris references once
       everything is in
-- [ ] Export, and the other formats worth reading in
+- [x] Export the other way: a note, a folder or a whole notebook, as a zip of
+      Markdown arranged the way a vault is on disk. The frontmatter goes back
+      where it was and the references become [[wikilinks]] again, so what comes
+      out re-imports as the same shape - and opens in Obsidian, or in a text
+      editor, or in nothing at all
+- [ ] The other formats worth reading in
 - [ ] A note handed to one person outside the notebook it is on
 
 Chat (talking to the people here):
@@ -439,6 +444,33 @@ Code (pull requests and issues):
       operator's token ends up listing their private repositories to everybody
 - [ ] Linking a GitHub issue to a Polaris task, review comments on a diff, and
       opening a pull request from here
+
+Telemetry (what breaks):
+
+- [x] `/apps/telemetry`, beside Analytics and the firewall because it answers the
+      third question about the same things: who came, who was turned away, and
+      what fell over
+- [x] Speaks the ingest protocol Sentry's clients speak, so an application points
+      the SDK it already has at a Polaris address and reports here instead - no
+      agent to install, no format to learn, and nothing to change again if it
+      ever moves somewhere else. Both the envelope endpoint current clients use
+      and the store endpoint older ones do
+- [x] Every deployed project gets an address without anybody configuring one:
+      `SENTRY_DSN` is in the environment of every service it deploys, underneath
+      whatever the operator set themselves
+- [x] Polaris reports its own crashes into a project of its own, in process
+      rather than over HTTP - posting to itself would fail exactly when what is
+      being reported is that requests are failing
+- [x] A thousand copies of one crash is one row. The grouping is pure and tested:
+      the client's own fingerprint if it sent one, then the exception and the
+      application's own frames by file and function and never by line, then the
+      message with the ids taken out of it
+- [x] Resolving records the release it was resolved in, so the same fault in a
+      later build reopens itself rather than waiting to be noticed
+- [x] Events age out per project and the daily counts do not, so a chart of a
+      fault over months survives the stack traces being pruned
+- [ ] Alerting - a message when a fault is new, or when one comes back
+- [ ] Source maps, and performance traces
 
 ## Notes / deliberate decisions
 

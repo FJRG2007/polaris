@@ -34,12 +34,14 @@ import {
     ContextMenuItem,
     ContextMenuSeparator,
     ContextMenuTrigger,
-    Input
+    Input,
+    MenuShortcut
 } from "@polaris/ui";
 import {
     Archive,
     ChevronRight,
     CornerDownRight,
+    Download,
     FilePlus2,
     Folder,
     FolderOpen,
@@ -82,6 +84,49 @@ const COLLAPSED_KEY = "polaris.notes.collapsed";
 
 /** The private shelf has no id, and something has to key it. */
 const OWN = "own";
+
+/**
+ * Where a download comes from.
+ *
+ * A plain address rather than an action, because what comes back is a file and
+ * only the browser can save one. Assigning it starts the download without
+ * leaving the page, since the answer carries a Content-Disposition.
+ */
+function exportHref(scope: "note" | "folder" | "space", id: string | null): string {
+    const params = new URLSearchParams({ scope });
+    if (id) params.set("id", id);
+    return `/api/notes/export?${params.toString()}`;
+}
+
+function download(scope: "note" | "folder" | "space", id: string | null): void {
+    window.location.assign(exportHref(scope, id));
+}
+
+/**
+ * The two keys every row answers to.
+ *
+ * Declared once because a shelf, a folder and a note all take them, and three
+ * copies is three chances for one of them to stop matching what its own menu
+ * says it does. A key pressed while a name is being typed is part of the name -
+ * without that guard, backspacing over a folder name deletes the folder.
+ */
+function rowKeys(
+    event: React.KeyboardEvent,
+    handlers: { onRename?: () => void; onDelete?: () => void }
+): void {
+    if ((event.target as HTMLElement).tagName === "INPUT") return;
+    if (event.key === "F2" && handlers.onRename) {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onRename();
+        return;
+    }
+    if (event.key === "Delete" && handlers.onDelete) {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onDelete();
+    }
+}
 
 const shelfKey = (shelf: ShelfData) => shelf.space?.id ?? OWN;
 
@@ -296,6 +341,7 @@ export function NoteTree({
                                 }
                                 onPeople={() => shelf.space && onPeople(shelf.space.id)}
                                 onImport={() => onImport({ spaceId: shelf.space?.id ?? null, folderId: null })}
+                                onExport={() => download("space", shelf.space?.id ?? null)}
                                 onDelete={() =>
                                     shelf.space &&
                                     setRemoving({
@@ -484,6 +530,7 @@ function ShelfRow({
     onNewFolder,
     onPeople,
     onImport,
+    onExport,
     onDelete,
     onDragOver,
     onDragLeave,
@@ -500,6 +547,7 @@ function ShelfRow({
     onNewFolder: () => void;
     onPeople: () => void;
     onImport: () => void;
+    onExport: () => void;
     onDelete: () => void;
     onDragOver: () => void;
     onDragLeave: () => void;
@@ -511,6 +559,12 @@ function ShelfRow({
         <ContextMenu>
             <ContextMenuTrigger asChild>
                 <div
+                    onKeyDown={(event) =>
+                        rowKeys(event, {
+                            onRename: shelf.space && canAdminister(shelf) ? onStartRename : undefined,
+                            onDelete: shelf.space && canAdminister(shelf) ? onDelete : undefined
+                        })
+                    }
                     onDragOver={(event) => {
                         if (!writable) return;
                         event.preventDefault();
@@ -580,12 +634,17 @@ function ShelfRow({
                         </ContextMenuItem>
                     </>
                 )}
+                <ContextMenuItem onSelect={onExport}>
+                    <Download className="size-3.5" />
+                    Export as Markdown
+                </ContextMenuItem>
                 {shelf.space && canAdminister(shelf) && (
                     <>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={onStartRename}>
                             <Pencil className="size-3.5" />
                             Rename
+                            <MenuShortcut>F2</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onPeople}>
                             <Users className="size-3.5" />
@@ -595,6 +654,7 @@ function ShelfRow({
                         <ContextMenuItem variant="danger" onSelect={onDelete}>
                             <Trash2 className="size-3.5" />
                             Delete notebook
+                            <MenuShortcut>Del</MenuShortcut>
                         </ContextMenuItem>
                     </>
                 )}
@@ -681,6 +741,20 @@ function Branch({
                             <ContextMenuTrigger asChild>
                                 <div
                                     draggable={writable}
+                                    onKeyDown={(event) =>
+                                        rowKeys(event, {
+                                            onRename: writable ? () => onStartRename(key) : undefined,
+                                            onDelete: writable
+                                                ? () =>
+                                                      onRemove({
+                                                          kind: "folder",
+                                                          id: folder.id,
+                                                          name: folder.name,
+                                                          held: ""
+                                                      })
+                                                : undefined
+                                        })
+                                    }
                                     onDragStart={() =>
                                         onDragStart({ kind: "folder", id: folder.id, spaceId })
                                     }
@@ -760,10 +834,15 @@ function Branch({
                                         <Import className="size-3.5" />
                                         Import Markdown here
                                     </ContextMenuItem>
+                                    <ContextMenuItem onSelect={() => download("folder", folder.id)}>
+                                        <Download className="size-3.5" />
+                                        Export as Markdown
+                                    </ContextMenuItem>
                                     <ContextMenuSeparator />
                                     <ContextMenuItem onSelect={() => onStartRename(key)}>
                                         <Pencil className="size-3.5" />
                                         Rename
+                                        <MenuShortcut>F2</MenuShortcut>
                                     </ContextMenuItem>
                                     <ContextMenuSeparator />
                                     <ContextMenuItem
@@ -779,6 +858,7 @@ function Branch({
                                     >
                                         <Trash2 className="size-3.5" />
                                         Delete folder
+                                        <MenuShortcut>Del</MenuShortcut>
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             )}
@@ -884,6 +964,14 @@ function NoteBranch({
                 <ContextMenuTrigger asChild>
                     <div
                         draggable={writable}
+                        onKeyDown={(event) =>
+                            rowKeys(event, {
+                                onRename: writable ? () => onStartRename(key) : undefined,
+                                onDelete: writable
+                                    ? () => void onAct(() => actions.deleteNoteAction(note.id))
+                                    : undefined
+                            })
+                        }
                         onDragStart={() => onDragStart({ kind: "note", id: note.id, spaceId })}
                         onDragEnd={onDragEnd}
                         className={cn(
@@ -954,6 +1042,7 @@ function NoteBranch({
                         <ContextMenuItem onSelect={() => onStartRename(key)}>
                             <Pencil className="size-3.5" />
                             Rename
+                            <MenuShortcut>F2</MenuShortcut>
                         </ContextMenuItem>
                         <ContextMenuItem
                             onSelect={() =>
@@ -968,6 +1057,10 @@ function NoteBranch({
                         <ContextMenuItem onSelect={() => onMoveNote(note.id)}>
                             <FolderPlus className="size-3.5" />
                             Move to...
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => download("note", note.id)}>
+                            <Download className="size-3.5" />
+                            Export as Markdown
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem
@@ -986,6 +1079,7 @@ function NoteBranch({
                         >
                             <Trash2 className="size-3.5" />
                             Delete
+                            <MenuShortcut>Del</MenuShortcut>
                         </ContextMenuItem>
                     </ContextMenuContent>
                 )}
