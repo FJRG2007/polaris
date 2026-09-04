@@ -32,6 +32,22 @@ export interface CommentView {
     readonly resolvedAt: string | null;
     readonly createdAt: string;
     readonly author: { readonly id: string; readonly name: string; readonly image: string | null } | null;
+    /**
+     * What was sent with it.
+     *
+     * Empty for every comment on every subject but a task: this is the one place
+     * files are sent in a thread, and the shape is here rather than in a second
+     * view so the bubble that draws a comment does not need two of them.
+     */
+    readonly files: readonly CommentFile[];
+}
+
+/** A file sent with a comment, as the thread draws it. */
+export interface CommentFile {
+    readonly id: string;
+    readonly name: string;
+    readonly mime: string;
+    readonly size: number;
 }
 
 export interface CommentInput {
@@ -85,6 +101,24 @@ export async function thread(
             user: { select: { id: true, name: true, image: true } }
         }
     });
+    // What was sent with them, in one read rather than one per comment. Only a
+    // task has files in its thread, so nothing else pays for the query.
+    const files =
+        subjectType === "task" && rows.length > 0
+            ? await prisma.taskAttachment.findMany({
+                  where: { commentId: { in: rows.map((row) => row.id) } },
+                  orderBy: { createdAt: "asc" },
+                  select: { id: true, name: true, mime: true, size: true, commentId: true }
+              })
+            : [];
+    const byComment = new Map<string, CommentFile[]>();
+    for (const file of files) {
+        if (!file.commentId) continue;
+        const bucket = byComment.get(file.commentId) ?? [];
+        bucket.push({ id: file.id, name: file.name, mime: file.mime, size: file.size });
+        byComment.set(file.commentId, bucket);
+    }
+
     return rows.map((row) => ({
         id: row.id,
         body: row.body,
@@ -92,7 +126,8 @@ export async function thread(
         assignedToId: row.assignedToId,
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
-        author: row.user
+        author: row.user,
+        files: byComment.get(row.id) ?? []
     }));
 }
 

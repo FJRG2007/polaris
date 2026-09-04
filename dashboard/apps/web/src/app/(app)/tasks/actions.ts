@@ -1057,16 +1057,21 @@ export async function setWatchingAction(
 // Comments, checklists, dependencies, fields
 // ---------------------------------------------------------------------------
 
-export async function addCommentAction(input: unknown): Promise<{ error?: string }> {
+export async function addCommentAction(
+    input: unknown
+): Promise<{ commentId?: string; error?: string }> {
     const caller = await actor("tasks.read");
     const parsed = core.commentSchema.safeParse(input);
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Write something first" };
     try {
         const { spaceId } = await access.requireTask(caller, parsed.data.taskId, "guest");
-        await details.addComment(caller.id, parsed.data);
+        // The id comes back so files sent with the comment can be attached to it.
+        // They upload after it exists rather than before: a file belonging to a
+        // comment that was refused is a file on the task nobody meant to add.
+        const commentId = await details.addComment(caller.id, parsed.data);
         refresh(caller, spaceId);
-        return {};
+        return { commentId };
     } catch (caught) {
         return failure(caught, "Could not post the comment");
     }

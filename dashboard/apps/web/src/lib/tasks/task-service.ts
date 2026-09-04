@@ -410,6 +410,26 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
         listCommits(taskId)
     ]);
 
+    // What was sent with each comment, in one read rather than one per comment.
+    // A separate query rather than a nested select: the column carries no foreign
+    // key on purpose - the file outlives the comment, and a deleted comment must
+    // not silently take a file off the task with it.
+    const commentFiles =
+        comments.length > 0
+            ? await prisma.taskAttachment.findMany({
+                  where: { commentId: { in: comments.map((comment) => comment.id) } },
+                  orderBy: { createdAt: "asc" },
+                  select: { id: true, name: true, mime: true, size: true, commentId: true }
+              })
+            : [];
+    const filesByComment = new Map<string, { id: string; name: string; mime: string; size: number }[]>();
+    for (const file of commentFiles) {
+        if (!file.commentId) continue;
+        const bucket = filesByComment.get(file.commentId) ?? [];
+        bucket.push({ id: file.id, name: file.name, mime: file.mime, size: file.size });
+        filesByComment.set(file.commentId, bucket);
+    }
+
     const authorIds = [
         ...new Set(activity.map((line) => line.userId).filter((id): id is string => id !== null))
     ];
@@ -433,7 +453,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
             author: comment.user,
             assignedToId: comment.assignedToId,
             resolvedAt: comment.resolvedAt?.toISOString() ?? null,
-            createdAt: comment.createdAt.toISOString()
+            createdAt: comment.createdAt.toISOString(),
+            files: filesByComment.get(comment.id) ?? []
         })),
         dependencies: [
             ...blocking.map((edge) => toDependency(edge.id, edge.type, "blocking", edge.blocked)),

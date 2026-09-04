@@ -5414,6 +5414,16 @@ model TaskReminder {
 model TaskAttachment {
     id           String   @id @default(uuid(7)) @db.Uuid
     taskId       String   @db.Uuid
+    /// The comment it was sent with, when it was sent in the thread rather than
+    /// added to the task's files.
+    ///
+    /// Both, not either: a picture dropped into a conversation is part of what
+    /// was said there AND a file on the task, and a person looking for "that
+    /// screenshot" a month later goes to the Files list rather than scrolling
+    /// the thread. No foreign key for the same reason the uploader has none -
+    /// the file outlives the comment, and a deleted comment must not silently
+    /// take a file off the task with it.
+    commentId    String?  @db.Uuid
     name         String
     mime         String   @default("application/octet-stream")
     // Bytes. Capped at upload, so an Int is enough and stays JSON-safe.
@@ -5428,6 +5438,7 @@ model TaskAttachment {
     task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
     @@index([taskId])
+    @@index([commentId])
 }
 
 // A commit somebody attached to a task. Stored rather than fetched on read: the

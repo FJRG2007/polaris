@@ -24,6 +24,10 @@ export async function POST(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const taskId = url.searchParams.get("task");
     const name = url.searchParams.get("name");
+    // The comment it was sent with, when it came from the thread's composer
+    // rather than from the Files list. Not trusted to say which task: the task
+    // is its own parameter and is what the access check runs on.
+    const commentId = url.searchParams.get("comment");
     if (!taskId || !name) return new Response("Missing parameters", { status: 400 });
     if (!request.body) return new Response("Empty body", { status: 400 });
 
@@ -51,7 +55,8 @@ export async function POST(request: Request): Promise<Response> {
             name: decodeURIComponent(name),
             mime: request.headers.get("content-type") || "application/octet-stream",
             size: declared,
-            body: request.body
+            body: request.body,
+            commentId
         });
         // The uploader's own screen already redraws from the response; this is
         // for everybody else looking at the same task.

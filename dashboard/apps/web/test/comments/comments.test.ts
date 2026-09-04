@@ -18,6 +18,9 @@ const commentUpdate = vi.fn(async (_args: unknown) => ({}));
 const commentUpdateMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 const commentDeleteMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 const commentCount = vi.fn(async (_args: unknown) => 0);
+/** Files sent with a comment. Only a task thread has any, which is what the
+ *  reader below checks before asking. */
+const attachmentFindMany = vi.fn(async (_args: unknown) => [] as unknown[]);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -28,7 +31,8 @@ vi.mock("@polaris/db", () => ({
             updateMany: commentUpdateMany,
             deleteMany: commentDeleteMany,
             count: commentCount
-        }
+        },
+        taskAttachment: { findMany: attachmentFindMany }
     }
 }));
 
@@ -91,9 +95,12 @@ describe("reading", () => {
                 assignedToId: null,
                 resolvedAt: null,
                 createdAt: AT.toISOString(),
-                author: { id: "u1", name: "Ana", image: null }
+                author: { id: "u1", name: "Ana", image: null },
+                files: []
             }
         ]);
+        // An app's thread carries no files, so it does not pay for the query.
+        expect(attachmentFindMany).not.toHaveBeenCalled();
         const call = commentFindMany.mock.calls[0]?.[0] as { orderBy: { createdAt: string } };
         expect(call.orderBy.createdAt).toBe("asc");
     });
