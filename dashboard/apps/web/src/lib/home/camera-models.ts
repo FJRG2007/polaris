@@ -105,7 +105,7 @@ const TAPO_RTSP = [
     "C121", "C125", "C200", "C201", "C206", "C207", "C210", "C211", "C216",
     "C217", "C220", "C225", "C230", "C236", "C246D", "C260", "C310", "C320WS",
     "C325WB", "C500", "C510W", "C520WS", "C530WS", "C560WS", "C575D", "C710",
-    "C720", "TC53", "TCB72", "TCW30", "TCW61"
+    "C720", "TC53", "TCB72", "TCH50 KIT", "TCW30", "TCW61"
 ] as const;
 
 /** The ones the maker lists as answering neither RTSP nor ONVIF. Every one of
