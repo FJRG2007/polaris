@@ -273,7 +273,19 @@ export async function guardSession({
                 action: "account.session.compromised",
                 targetType: "session",
                 targetId: sessionId,
-                metadata: { breach, ip: ip ?? null }
+                metadata: {
+                    breach,
+                    ip: ip ?? null,
+                    // What the two readings were. Without them a refusal is a
+                    // word - "client" - and working out which half disagreed,
+                    // and whether it should have, means reproducing it.
+                    was: sessionClient({ userAgent: null, state }).label,
+                    now: describeClient(
+                        (await clientUserAgent()) ?? null,
+                        (await clientUserAgentBrands()) ?? null,
+                        (await clientUserAgentPlatform()) ?? null
+                    ).label
+                }
             });
             await notifySessionCompromised({
                 userId,
@@ -391,15 +403,35 @@ async function breachOf(
     if (!bindClient && pinScope === "off" && state.pinToAddress !== true) return null;
 
     const was = sessionClient({ userAgent: null, state });
-    const here = describeClient(
-        (await clientUserAgent()) ?? null,
-        (await clientUserAgentBrands()) ?? null,
-        (await clientUserAgentPlatform()) ?? null
-    );
+    const [userAgent, brands, platform] = await Promise.all([
+        clientUserAgent(),
+        clientUserAgentBrands(),
+        clientUserAgentPlatform()
+    ]);
+    const here = describeClient(userAgent ?? null, brands ?? null, platform ?? null);
     return bindingBreach(
         { bindClient, pinScope, pinThisSession: state.pinToAddress },
-        { os: was.os, browser: was.browser, ip: state.ip, handheld: isHandheld(was.os) },
-        { os: here.os, browser: here.browser, ip }
+        {
+            os: was.os,
+            browser: was.browser,
+            claimedOs: was.claimedOs,
+            claimedBrowser: was.claimedBrowser,
+            // Whether the session was recorded WITH hints. A session opened over
+            // http, or before Polaris kept them, has none - and its reading has
+            // to be compared against the user-agent's rather than against a
+            // hinted one that names browsers it never could.
+            hinted: state.userAgentBrands !== null || state.userAgentPlatform !== null,
+            ip: state.ip,
+            handheld: isHandheld(was.os)
+        },
+        {
+            os: here.os,
+            browser: here.browser,
+            claimedOs: here.claimedOs,
+            claimedBrowser: here.claimedBrowser,
+            hinted: (brands ?? null) !== null || (platform ?? null) !== null,
+            ip
+        }
     );
 }
 

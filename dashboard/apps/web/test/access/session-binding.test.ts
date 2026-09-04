@@ -9,7 +9,10 @@
  * So the false positives are enumerated. A browser updating itself. A phone that
  * cannot report its platform. A session opened before any of this existed and
  * carrying no address. A laptop moving between wifi and a hotspot while the
- * account has only asked for the client binding.
+ * account has only asked for the client binding. And the one that was reported
+ * from a live deployment: a Brave that named itself in the client hints on the
+ * request that opened the session, and had none to send on a later one - reading
+ * as Brave against Chrome, which is one browser and was treated as two.
  *
  * And the refusals are the two the whole thing exists for: a cookie pasted into
  * a different browser, and a cookie used from a different address by an account
@@ -24,20 +27,39 @@ import type { BindingRules, RequestOrigin, SessionOrigin } from "@polaris/core";
 const PHONE: SessionOrigin = {
     os: "Android",
     browser: "Brave",
+    claimedOs: "Android",
+    claimedBrowser: "Chrome",
+    hinted: true,
     ip: "203.0.113.7",
     handheld: true
 };
 
-/** And a laptop at a desk. */
+/**
+ * And a laptop at a desk.
+ *
+ * Brave, which is the case every one of these turns on: it writes Chrome into
+ * its user-agent on purpose, so `claimedBrowser` is Chrome and only the hints
+ * say otherwise.
+ */
 const LAPTOP: SessionOrigin = {
     os: "Windows",
     browser: "Brave",
+    claimedOs: "Windows",
+    claimedBrowser: "Chrome",
+    hinted: true,
     ip: "198.51.100.4",
     handheld: false
 };
 
-/** The same person, still there. */
-const SAME: RequestOrigin = { os: "Windows", browser: "Brave", ip: "198.51.100.4" };
+/** The same person, still there, on a request that carried hints. */
+const SAME: RequestOrigin = {
+    os: "Windows",
+    browser: "Brave",
+    claimedOs: "Windows",
+    claimedBrowser: "Chrome",
+    hinted: true,
+    ip: "198.51.100.4"
+};
 
 const rules = (over: Partial<BindingRules> = {}): BindingRules => ({
     bindClient: true,
@@ -48,15 +70,43 @@ const rules = (over: Partial<BindingRules> = {}): BindingRules => ({
 
 describe("a cookie somewhere it should not be", () => {
     it("is refused when the browser is not the one it was opened in", () => {
+        // Both sides named themselves in the hints, so the names mean the same
+        // thing and a real Chrome is a real difference.
         expect(
-            bindingBreach(rules(), LAPTOP, { os: "Windows", browser: "Chrome", ip: LAPTOP.ip })
+            bindingBreach(rules(), LAPTOP, {
+                os: "Windows",
+                browser: "Chrome",
+                claimedOs: "Windows",
+                claimedBrowser: "Chrome",
+                hinted: true,
+                ip: LAPTOP.ip
+            })
         ).toBe("client");
     });
 
     it("is refused when the system is not the one it was opened on", () => {
         // The reported shape exactly: taken off Windows, replayed from Linux.
+        // Caught whether or not the second request carried any hints, because
+        // the user-agent names the system on its own.
         expect(
-            bindingBreach(rules(), LAPTOP, { os: "Linux", browser: "Brave", ip: LAPTOP.ip })
+            bindingBreach(rules(), LAPTOP, {
+                os: "Linux",
+                browser: "Brave",
+                claimedOs: "Linux",
+                claimedBrowser: "Chrome",
+                hinted: true,
+                ip: LAPTOP.ip
+            })
+        ).toBe("client");
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "Chrome",
+                browser: "Chrome",
+                claimedOs: "Linux",
+                claimedBrowser: "Chrome",
+                hinted: false,
+                ip: LAPTOP.ip
+            })
         ).toBe("client");
     });
 
@@ -80,6 +130,34 @@ describe("a cookie somewhere it should not be", () => {
 describe("the same person, still there", () => {
     it("passes with everything on", () => {
         expect(bindingBreach(rules({ pinScope: "all" }), LAPTOP, SAME)).toBeNull();
+    });
+
+    it("survives the same browser sending no hints on one request", () => {
+        // The reported false positive, and the reason the readings are compared
+        // like with like. Brave says "Brave" only in the hints; without them the
+        // very same browser reads as Chrome, and calling that a stolen cookie
+        // signs its owner out of their own account.
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "Windows",
+                browser: "Chrome",
+                claimedOs: "Windows",
+                claimedBrowser: "Chrome",
+                hinted: false,
+                ip: LAPTOP.ip
+            })
+        ).toBeNull();
+    });
+
+    it("survives a session that was recorded without hints and used with them", () => {
+        // The same thing the other way round: a session opened over http on the
+        // home network, then used over the deployment's own name.
+        const opened: SessionOrigin = {
+            ...LAPTOP,
+            browser: "Chrome",
+            hinted: false
+        };
+        expect(bindingBreach(rules(), opened, SAME)).toBeNull();
     });
 
     it("survives the browser updating itself", () => {
