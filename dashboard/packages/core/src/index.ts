@@ -89,6 +89,7 @@ export * from "./schemas/runners.js";
 export * from "./schemas/agents.js";
 export * from "./schemas/agent-sessions.js";
 export * from "./schemas/account-security.js";
+export * from "./schemas/telemetry.js";
 export * from "./schemas/account-lifecycle.js";
 export * from "./schemas/instance-security.js";
 export * from "./schemas/mail.js";

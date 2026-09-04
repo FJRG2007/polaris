@@ -8377,9 +8377,13 @@ model TelemetryProject {
     //
     // Not the id, and not cosmetic: a Sentry client validates that the last
     // segment of a DSN is digits and refuses to send at all when it is not, so a
-    // uuid there would be an integration that silently never reports. Allocated
-    // as one past the highest, which is what GlitchTip does and for the same
-    // reason.
+    // uuid there would be an integration that silently never reports.
+    //
+    // Drawn at random rather than counted up. A number allocated in sequence
+    // says how many projects an instance has and makes the next one guessable,
+    // and a DSN is a string that ends up in build logs and configuration
+    // repositories - the number in it should name a project and imply nothing
+    // else. Sentry counts, and this is the one place not to copy it.
     number        Int      @unique
     // What reports into it, as the first event said - "node", "python". A label
     // for the list, never a switch.
@@ -8395,6 +8399,47 @@ model TelemetryProject {
     // How long an event's full detail is kept. The daily counts outlive it, so a
     // chart does not develop a hole where the events were pruned.
     retentionDays Int      @default(30)
+
+    // Who may report into it. See TELEMETRY_REPORTERS in @polaris/core.
+    //
+    // "internal" is the default and means the machines on this network, which is
+    // where an application deployed by Polaris reports from - plus anything named
+    // in the list below. "listed" is that list and nothing else. "anywhere" is
+    // what a browser client needs, because its reports come from the addresses of
+    // the people using it, and it is the one to move away from.
+    reporters         String    @default("internal")
+    // Addresses and ranges that may report whatever the policy says. JSON string
+    // array of IP/CIDR rules, the shape a share and an API key already use.
+    allowedCidrs      String    @default("[]")
+    // Which clients may report, beside where from. JSON string arrays of patterns
+    // matched against the request's user-agent; an empty allow list means any
+    // client, and a deny match refuses whatever the allow list says.
+    allowedUserAgents String    @default("[]")
+    deniedUserAgents  String    @default("[]")
+    // Whether a report must also carry the project's own key, in a header.
+    //
+    // Off by default because not every Sentry client can be made to send one, and
+    // a project that silently stops reporting is worse than one reporting from an
+    // address nobody vetted. On, it is the only one of these three that a forged
+    // packet cannot walk past.
+    requireSecret     Boolean   @default(false)
+    // SHA-256 of that key, so a database dump yields nothing usable, and the last
+    // few characters of it - which identify nothing on their own and are how
+    // somebody tells which value in their configuration this is.
+    secretHash        String?
+    secretTail        String?
+
+    // What was turned away, so a project that has gone quiet says why instead of
+    // looking healthy. A count and enough of the last one to act on it, rather
+    // than a log: the question this answers is "is something being refused, and
+    // from where", and one row answers it.
+    refusedCount      Int       @default(0)
+    refusedAt         DateTime?
+    refusedIp         String?
+    refusedAgent      String?
+    // address | client | secret - which check turned it away.
+    refusedReason     String?
+
     createdAt     DateTime @default(now())
     updatedAt     DateTime @updatedAt
 

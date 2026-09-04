@@ -16,13 +16,20 @@
  *
  * `envelope` is what current clients send and `store` is what older ones do.
  * Both end in the same place.
+ *
+ * Because the key proves nothing - it ships inside the browser bundle of every
+ * web application that reports - a project also says who may report into it:
+ * from which addresses, with which clients, and optionally carrying a key of its
+ * own. Those rules are `reporterRefusal` in @polaris/core, and what they turn
+ * away is counted on the project, because a project refusing everything and a
+ * project nobody is reporting to look identical from the screen otherwise.
  */
 
 import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { captureEvent } from "@/lib/telemetry/store";
-import { projectForIngest } from "@/lib/telemetry/project-service";
+import { projectForIngest, recordRefusal, secretAccepted } from "@/lib/telemetry/project-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,11 +38,16 @@ export const dynamic = "force-dynamic";
  * Reported from a browser, so the request is cross-origin by definition and the
  * preflight has to pass. Open, for the reason the analytics collector's is: this
  * endpoint reads nothing and returns nothing that is not already the caller's.
+ *
+ * `x-polaris-key` and `authorization` are named so a browser client that has been
+ * given a key of its own can actually send it: a header the preflight does not
+ * name is a header the browser drops.
  */
 const CORS = {
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "POST, OPTIONS",
-    "access-control-allow-headers": "content-type, x-sentry-auth, x-requested-with",
+    "access-control-allow-headers":
+        "content-type, x-sentry-auth, x-requested-with, x-polaris-key, authorization",
     "access-control-max-age": "86400"
 };
 
@@ -48,6 +60,12 @@ const MAX_BYTES = 1_000_000;
 const LIMIT = 600;
 const WINDOW_MS = 60_000;
 
+/** And per address, before the project is looked up at all. The project limit is
+ *  the one that protects the table; this one stops a single sender spending
+ *  another project's budget, and stops an unidentified caller making the database
+ *  work by asking. */
+const ADDRESS_LIMIT = 300;
+
 export function OPTIONS(): NextResponse {
     return new NextResponse(null, { status: 204, headers: CORS });
 }
@@ -57,11 +75,21 @@ export function OPTIONS(): NextResponse {
  *
  * Accepted, refused, rate limited, unreadable and addressed to a project that
  * does not exist all look identical from outside - so this endpoint cannot be
- * used to find out which projects or which keys exist, and a client never has a
- * reason to retry.
+ * used to find out which projects or which keys exist, nor which rule turned a
+ * report away - and a client never has a reason to retry.
  */
 function accepted(eventId?: string | null): NextResponse {
     return NextResponse.json({ id: eventId ?? "" }, { status: 200, headers: CORS });
+}
+
+/** Who is asking, as far as the edge can say. The same pair of headers the
+ *  analytics collector reads, and the same nothing when neither is set. */
+function callerOf(request: Request): { ip: string | null; userAgent: string | null } {
+    const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    return {
+        ip: forwarded || request.headers.get("x-real-ip")?.trim() || null,
+        userAgent: request.headers.get("user-agent")
+    };
 }
 
 export async function POST(
@@ -73,6 +101,12 @@ export async function POST(
 
     const number = Number.parseInt(projectId, 10);
     if (!Number.isSafeInteger(number) || number <= 0) return accepted();
+
+    const caller = callerOf(request);
+    if (caller.ip) {
+        const perAddress = await rateLimit(`telemetry:from:${caller.ip}`, ADDRESS_LIMIT, WINDOW_MS);
+        if (!perAddress.ok) return accepted();
+    }
 
     const length = Number.parseInt(request.headers.get("content-length") ?? "0", 10);
     if (Number.isFinite(length) && length > MAX_BYTES) return accepted();
@@ -94,6 +128,27 @@ export async function POST(
 
     const project = await projectForIngest(number, key);
     if (!project) return accepted();
+
+    // Who may report into this project. The answer never says which rule turned a
+    // report away - that would make this endpoint a way to map them - so the
+    // reason is written on the project instead, where the person who set the rule
+    // is the one who reads it.
+    const refusal = core.reporterRefusal(project.rules, {
+        ip: caller.ip,
+        userAgent: caller.userAgent,
+        secretOk: secretAccepted(
+            project,
+            core.readIngestSecret({
+                header: request.headers.get("x-polaris-key"),
+                authorization: request.headers.get("authorization"),
+                sentryAuth: request.headers.get("x-sentry-auth")
+            })
+        )
+    });
+    if (refusal) {
+        await recordRefusal(project.id, { reason: refusal, ...caller });
+        return accepted();
+    }
 
     // Counted per project rather than per address: an application behind one
     // load balancer is one address, and a browser application is thousands.

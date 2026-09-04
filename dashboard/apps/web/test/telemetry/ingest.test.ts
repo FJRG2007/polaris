@@ -16,15 +16,35 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const captureEvent = vi.fn(async () => undefined);
+
+/** What a project admits, unless a test says otherwise. "anywhere" is the loose
+ *  end of the three, so a test that is not about the rules is not silently
+ *  passing because of them. */
+const OPEN_RULES = {
+    reporters: "anywhere" as const,
+    allowedCidrs: [] as string[],
+    allowedUserAgents: [] as string[],
+    deniedUserAgents: [] as string[],
+    requireSecret: false
+};
+
+let rules: typeof OPEN_RULES = { ...OPEN_RULES };
+
 const projectForIngest = vi.fn(async (number: number, key: string) =>
     number === 7 && key === "abc123def456abc123def456abc12345"
-        ? { id: "p1", platform: null }
+        ? { id: "p1", platform: null, rules, secretHash: null }
         : null
 );
+const recordRefusal = vi.fn(async () => undefined);
+const secretAccepted = vi.fn(() => false);
 const rateLimit = vi.fn(async () => ({ ok: true, remaining: 1, resetAt: new Date() }));
 
 vi.mock("@/lib/telemetry/store", () => ({ captureEvent }));
-vi.mock("@/lib/telemetry/project-service", () => ({ projectForIngest }));
+vi.mock("@/lib/telemetry/project-service", () => ({
+    projectForIngest,
+    recordRefusal,
+    secretAccepted
+}));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
 
 const route = await import("../../src/app/api/telemetry/api/[projectId]/[kind]/route");
@@ -69,6 +89,8 @@ async function post(
 
 beforeEach(() => {
     vi.clearAllMocks();
+    rules = { ...OPEN_RULES };
+    secretAccepted.mockReturnValue(false);
     rateLimit.mockResolvedValue({ ok: true, remaining: 1, resetAt: new Date() });
 });
 
@@ -177,11 +199,110 @@ describe("what it refuses, and how", () => {
     });
 });
 
+describe("who may report", () => {
+    const from = (ip: string, agent?: string) => ({
+        "x-forwarded-for": ip,
+        ...(agent ? { "user-agent": agent } : {})
+    });
+
+    it("takes a report from this network when that is the policy", async () => {
+        rules = { ...OPEN_RULES, reporters: "internal" };
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, from("10.1.2.3"));
+        expect(captureEvent).toHaveBeenCalled();
+        expect(recordRefusal).not.toHaveBeenCalled();
+    });
+
+    it("turns one away from the open internet, and says so on the project", async () => {
+        // A routable address, deliberately: the documentation ranges are not
+        // internet-routable, so "internal" admits them and a test written with
+        // 203.0.113.x would pass without exercising anything.
+        rules = { ...OPEN_RULES, reporters: "internal" };
+        const response = await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, from("100.0.0.1", "sentry.python/2.1.0"));
+        // Identical to an accepted one from outside: which rule refused it is
+        // written where the person who set the rule will read it, and nowhere else.
+        expect(response.status).toBe(200);
+        expect(captureEvent).not.toHaveBeenCalled();
+        expect(recordRefusal).toHaveBeenCalledWith("p1", {
+            reason: "address",
+            ip: "100.0.0.1",
+            userAgent: "sentry.python/2.1.0"
+        });
+    });
+
+    it("admits an outside address that was named", async () => {
+        rules = { ...OPEN_RULES, reporters: "listed", allowedCidrs: ["100.0.0.0/24"] };
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, from("100.0.0.1"));
+        expect(captureEvent).toHaveBeenCalled();
+    });
+
+    it("refuses a client the project said it does not expect", async () => {
+        rules = { ...OPEN_RULES, deniedUserAgents: ["curl*"] };
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, from("100.0.0.1", "curl/8.4.0"));
+        expect(captureEvent).not.toHaveBeenCalled();
+        expect(recordRefusal).toHaveBeenCalledWith(
+            "p1",
+            expect.objectContaining({ reason: "client" })
+        );
+    });
+
+    it("wants the key when the project asks for one", async () => {
+        rules = { ...OPEN_RULES, requireSecret: true };
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        });
+        expect(captureEvent).not.toHaveBeenCalled();
+        expect(recordRefusal).toHaveBeenCalledWith(
+            "p1",
+            expect.objectContaining({ reason: "secret" })
+        );
+    });
+
+    it("takes it when the key is right", async () => {
+        rules = { ...OPEN_RULES, requireSecret: true };
+        secretAccepted.mockReturnValue(true);
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, { "x-polaris-key": "plt_aaaaaaaaaaaaaaaaaaaa" });
+        expect(captureEvent).toHaveBeenCalled();
+    });
+
+    it("limits one address before it looks a project up at all", async () => {
+        rateLimit.mockResolvedValueOnce({ ok: false, remaining: 0, resetAt: new Date() });
+        await post(`/api/telemetry/api/7/envelope/?sentry_key=${KEY}`, envelope(crash), {
+            projectId: "7",
+            kind: "envelope"
+        }, from("100.0.0.1"));
+        expect(rateLimit).toHaveBeenCalledWith(
+            "telemetry:from:100.0.0.1",
+            expect.any(Number),
+            expect.any(Number)
+        );
+        expect(projectForIngest).not.toHaveBeenCalled();
+    });
+});
+
 describe("the browser case", () => {
     it("answers the preflight, because a page reports cross-origin by definition", () => {
         const response = route.OPTIONS();
         expect(response.status).toBe(204);
         expect(response.headers.get("access-control-allow-origin")).toBe("*");
         expect(response.headers.get("access-control-allow-headers")).toContain("x-sentry-auth");
+        // A header the preflight does not name is a header the browser drops, so
+        // a page that was given a key could never send it.
+        expect(response.headers.get("access-control-allow-headers")).toContain("x-polaris-key");
     });
 });

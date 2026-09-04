@@ -20,6 +20,9 @@
  * of nulls nobody can act on.
  */
 
+import { ipAllowed, isPrivateIp } from "./cidr.js";
+import { userAgentAllowed } from "./user-agent.js";
+
 /** How severe the reporter said it was. Anything unrecognised reads as "error",
  *  which is what an unlabelled crash is. */
 export const TELEMETRY_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -448,4 +451,136 @@ export function titleOf(event: Pick<CapturedEvent, "type" | "value">): string {
     const line = event.value.split("\n")[0]?.trim() ?? "";
     if (!event.type) return line.slice(0, MAX_TITLE) || "Unknown error";
     return (line ? `${event.type}: ${line}` : event.type).slice(0, MAX_TITLE);
+}
+
+// ---------------------------------------------------------------------------
+// Who may report
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a project accepts reports from.
+ *
+ * The key in a DSN names a project and proves nothing - it ships inside the
+ * browser bundle of every web application that reports, and anybody who has seen
+ * one can write into that project forever. That is how the protocol works and it
+ * is not going to change, so the answer is to narrow who gets to try.
+ *
+ * - `internal`: the machines on this network, which is where an application
+ *   deployed by Polaris reports from, plus anything in the address list. The
+ *   default, because it costs nothing to set up and it is already the right
+ *   answer for the reporters Polaris deploys itself.
+ * - `listed`: the address list and nothing else. For a reporter that lives
+ *   somewhere known - one server, one CI runner.
+ * - `anywhere`: no address check at all. What a browser client needs, because its
+ *   reports come from the addresses of the people using it; the user-agent rules
+ *   and the key still apply.
+ */
+export const TELEMETRY_REPORTERS = ["internal", "listed", "anywhere"] as const;
+
+export type TelemetryReporters = (typeof TELEMETRY_REPORTERS)[number];
+
+/** Anything unrecognised reads as the strictest of the three rather than the
+ *  loosest: a column that has been edited by hand must not widen a project. */
+export function readReporters(value: unknown): TelemetryReporters {
+    const said = typeof value === "string" ? value.trim() : "";
+    return (TELEMETRY_REPORTERS as readonly string[]).includes(said)
+        ? (said as TelemetryReporters)
+        : "listed";
+}
+
+/** What a project will admit. */
+export interface ReporterRules {
+    readonly reporters: TelemetryReporters;
+    /** Addresses and ranges admitted whatever the policy says. */
+    readonly allowedCidrs: readonly string[];
+    readonly allowedUserAgents: readonly string[];
+    readonly deniedUserAgents: readonly string[];
+    /** Whether a report must also carry the project's own key. */
+    readonly requireSecret: boolean;
+}
+
+/** What one request looks like to the rules. `secret` is what it presented, not
+ *  whether it was right - comparing is the caller's job, because that is where
+ *  the stored hash is. */
+export interface ReporterRequest {
+    readonly ip: string | null;
+    readonly userAgent: string | null;
+    readonly secretOk: boolean;
+}
+
+/** Which check turned a report away, or null when none did. The word is shown on
+ *  the project, so it says what to change rather than that something is wrong. */
+export type IngestRefusal = "address" | "client" | "secret" | null;
+
+/**
+ * Whether a report is admitted, and if not, by which rule.
+ *
+ * Checked in the order somebody would fix them: where it came from, what sent
+ * it, then what it carried. None of the three is a proof of identity on its own -
+ * an address can be spoofed on a network that lets it and a header is written by
+ * whoever makes the request - which is why these narrow a public key rather than
+ * standing in for a credential. The key is the one that does not narrow: it is a
+ * secret, and a request without it is refused however plausible it looks.
+ */
+export function reporterRefusal(rules: ReporterRules, request: ReporterRequest): IngestRefusal {
+    if (rules.reporters !== "anywhere") {
+        const from = request.ip?.trim() ?? "";
+        // No address at all is refused rather than admitted: a policy that says
+        // "only from here" must not be satisfied by a request that declines to
+        // say where it is from.
+        if (!from) return "address";
+        const listed = ipAllowed(from, rules.allowedCidrs);
+        const named = rules.allowedCidrs.length > 0 && listed;
+        const inside = rules.reporters === "internal" && isPrivateIp(from);
+        if (!named && !inside) return "address";
+    }
+
+    if (
+        !userAgentAllowed(
+            {
+                allowedUserAgents: [...rules.allowedUserAgents],
+                deniedUserAgents: [...rules.deniedUserAgents]
+            },
+            request.userAgent
+        )
+    ) {
+        return "client";
+    }
+
+    if (rules.requireSecret && !request.secretOk) return "secret";
+    return null;
+}
+
+/**
+ * The key a report carried, wherever it put it.
+ *
+ * Not part of the Sentry protocol - that has no second credential any current
+ * client sends - so this reads the places a client can actually be made to put
+ * one: a header of our own, an ordinary bearer token, and `sentry_secret` in the
+ * auth header, which is the deprecated half of the old DSN format and is still
+ * sent by some clients that will never be updated.
+ *
+ * A JavaScript client sets the first through its transport headers, and anything
+ * posting the envelope itself sets whichever it likes.
+ */
+export function readIngestSecret(input: {
+    header?: string | null;
+    authorization?: string | null;
+    sentryAuth?: string | null;
+}): string | null {
+    const own = input.header?.trim();
+    if (own) return boundedSecret(own);
+
+    const bearer = /^Bearer\s+(\S+)$/i.exec(input.authorization?.trim() ?? "")?.[1];
+    if (bearer) return boundedSecret(bearer);
+
+    const legacy = /sentry_secret\s*=\s*([A-Za-z0-9]+)/i.exec(input.sentryAuth ?? "")?.[1];
+    return legacy ? boundedSecret(legacy) : null;
+}
+
+/** Bounded before it is compared, so a header cannot be used to make hashing
+ *  expensive. */
+function boundedSecret(value: string): string | null {
+    const trimmed = value.trim();
+    return trimmed.length >= 16 && trimmed.length <= 200 ? trimmed : null;
 }
