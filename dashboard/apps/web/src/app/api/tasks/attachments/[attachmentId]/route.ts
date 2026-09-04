@@ -7,8 +7,8 @@
  * on the task; everything else downloads.
  */
 
-import { requirePermission } from "@/lib/session";
 import { requireTask, TaskAccessError } from "@/lib/tasks/access";
+import { apiPermission } from "@/lib/api-session";
 import { attachmentTaskId, readAttachment } from "@/lib/tasks/attachment-service";
 
 export const runtime = "nodejs";
@@ -19,7 +19,8 @@ export async function GET(
     { params }: { params: Promise<{ attachmentId: string }> }
 ): Promise<Response> {
     const { attachmentId } = await params;
-    const user = await requirePermission("tasks.read");
+    const user = await apiPermission("tasks.read");
+    if (user instanceof Response) return user;
 
     const taskId = await attachmentTaskId(attachmentId);
     if (!taskId) return new Response("Not found", { status: 404 });

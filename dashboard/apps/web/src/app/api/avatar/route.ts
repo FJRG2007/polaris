@@ -10,8 +10,8 @@
  * so the two are not allowed to be the same thing.
  */
 
-import { requireUser } from "@/lib/session";
 import { deleteAvatar, forgetGravatar, MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
+import { apiUser } from "@/lib/api-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 const TOO_BIG = `A profile photo has to be under ${Math.round(MAX_AVATAR_BYTES / (1024 * 1024))} MB`;
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!request.body) return new Response("Empty body", { status: 400 });
 
     // Content-Length is a claim like any other, so it only refuses the obviously
@@ -56,7 +57,8 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function DELETE(): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     await deleteAvatar({ kind: "user", id: user.id });
     forgetGravatar(user.email);
     return Response.json({ ok: true });

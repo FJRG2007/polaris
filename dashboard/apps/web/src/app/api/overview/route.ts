@@ -14,7 +14,8 @@
  */
 
 import { z } from "zod";
-import { requireUser } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+
 import { OVERVIEW_WIDGET_IDS } from "@polaris/core";
 import { getOverviewData } from "@/lib/overview/overview-service";
 
@@ -40,7 +41,8 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const parsed = querySchema.safeParse({
         widgets: new URL(request.url).searchParams.get("widgets") ?? ""
     });

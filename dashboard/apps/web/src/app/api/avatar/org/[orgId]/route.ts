@@ -13,7 +13,8 @@
  * a claim, and the type a file is served back as is what a browser acts on.
  */
 
-import { requireUser, resolveSession } from "@/lib/session";
+import { resolveSession } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
 import { profilesArePublic } from "@/lib/profile-service";
 import { recordAudit } from "@/lib/audit-service";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
@@ -91,7 +92,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { orgId } = await params;
     const refused = await guard(user, orgId);
     if (refused) return refused;
@@ -130,7 +132,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ org
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ orgId: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { orgId } = await params;
     const refused = await guard(user, orgId);
     if (refused) return refused;

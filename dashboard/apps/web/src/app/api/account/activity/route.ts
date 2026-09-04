@@ -12,8 +12,9 @@
  */
 
 import { z } from "zod";
+import { apiUser } from "@/lib/api-session";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+
 import { sessionDeviceLabels } from "@/lib/session-device";
 import { listUserActivity, listUserActivitySessions } from "@/lib/audit-service";
 
@@ -30,7 +31,8 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
 
     const parsed = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!parsed.success) {

@@ -13,8 +13,9 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { apiAdmin } from "@/lib/api-session";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+
 import { probeEdge } from "@/lib/network-advice";
 import { publicHostname } from "@/lib/domain-edge";
 import { connectionFlowOrigin } from "@/lib/connections/oauth";
@@ -56,7 +57,8 @@ async function flowOrigin(requestOrigin: string): Promise<string> {
 }
 
 export async function GET(request: Request): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
 
     const requested = new URL(request.url);
     const origin = await flowOrigin(requested.origin);

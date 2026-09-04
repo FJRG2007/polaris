@@ -1,5 +1,6 @@
 
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { resolveRange } from "@/lib/metrics-shared";
 
@@ -9,7 +10,8 @@ export const dynamic = "force-dynamic";
 /** Downsampled consumption history for a Drive storage connection (NAS/server),
  *  over a preset (?range=1h|6h|1d|7d|30d) or custom window (?from=&to= epoch ms). */
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

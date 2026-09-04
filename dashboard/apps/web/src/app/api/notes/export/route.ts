@@ -13,15 +13,16 @@
  * one every other read makes rather than a looser one written for a download.
  */
 
-import { requirePermission } from "@/lib/session";
 import { NoteAccessError } from "@/lib/notes/access";
+import { apiPermission } from "@/lib/api-session";
 import { exportArchive, type ExportScope } from "@/lib/notes/export-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requirePermission("notes.use");
+    const user = await apiPermission("notes.use");
+    if (user instanceof Response) return user;
     const url = new URL(request.url);
     const kind = url.searchParams.get("scope");
     const id = url.searchParams.get("id");

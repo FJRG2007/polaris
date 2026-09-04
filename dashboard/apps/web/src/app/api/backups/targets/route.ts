@@ -7,14 +7,15 @@
  */
 
 import { prisma } from "@polaris/db";
+import { apiAdmin } from "@/lib/api-session";
 import { PERSONAL_KIND } from "@polaris/core";
-import { requireAdmin } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await requireAdmin();
+    const user = await apiAdmin();
+    if (user instanceof Response) return user;
     const [connections, hosts] = await Promise.all([
         prisma.storageConnection.findMany({
             // Never somebody's own drive: a backup is the instance's, and a

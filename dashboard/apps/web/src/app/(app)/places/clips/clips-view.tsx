@@ -182,20 +182,29 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
         setClips((current) => (current ?? []).map((item) => (back.has(item.id) ? { ...item, pinned: !next } : item)));
     };
 
-    /** Delete every clip given, and drop the ones that went. A failure leaves its
-     *  row where it was rather than pretending the file is gone. */
+    /**
+     * Delete every clip given, in one call.
+     *
+     * It used to be one call per clip, which on a few hundred rows is a few
+     * hundred round trips and a request that gives up before it finishes - so
+     * pressing it on a long list looked like it did nothing at all. A kept clip
+     * is never taken; that is what keeping one is for.
+     */
     const remove = async (targets: ClipView[]) => {
         setRemoving(null);
-        const gone: string[] = [];
-        for (const clip of targets) {
-            const result = await runAction(() => actions.deleteClipAction(clip.id), setError);
-            if (result && !result.error) gone.push(clip.id);
-        }
-        if (gone.length === 0) return;
-        const dropped = new Set(gone);
-        setClips((current) => (current ?? []).filter((item) => !dropped.has(item.id)));
-        setSelected((current) => new Set([...current].filter((id) => !dropped.has(id))));
-        if (playing && dropped.has(playing)) setPlaying(null);
+        const doomed = targets.filter((clip) => !clip.pinned);
+        if (doomed.length === 0) return;
+        const ids = new Set(doomed.map((clip) => clip.id));
+
+        const result = await runAction(
+            () => actions.deleteClipsAction({ ids: [...ids], cameraId: cameraId || null }),
+            setError
+        );
+        if (result?.error) return;
+
+        setClips((current) => (current ?? []).filter((item) => !ids.has(item.id)));
+        setSelected((current) => new Set([...current].filter((id) => !ids.has(id))));
+        if (playing && ids.has(playing)) setPlaying(null);
     };
 
     const clickRow = (event: React.MouseEvent, index: number) => {

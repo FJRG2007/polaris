@@ -70,9 +70,16 @@ export default async function EverythingPage({
                 OR: [{ spaceId: { in: scope.spaceIds } }, { id: { in: scope.listIds } }]
             },
             orderBy: { name: "asc" },
-            // The space comes with it: work only moves between lists of its own
-            // space, so a destination has to say which one it belongs to.
-            select: { id: true, name: true, spaceId: true }
+            // The space and the folder come with it: work only moves between lists of
+            // its own space, and two lists that share a name have to be able to say
+            // where each of them lives.
+            select: {
+                id: true,
+                name: true,
+                spaceId: true,
+                space: { select: { name: true } },
+                folder: { select: { name: true } }
+            }
         }),
         // The people on the spaces in reach, not the instance's whole directory:
         // a picker here should offer who can actually be given this work.
@@ -150,9 +157,33 @@ export default async function EverythingPage({
                 tasks={tasks}
                 savedViews={[]}
                 context={context}
-                lists={lists}
+                lists={toListRefs(lists)}
                 initialFilter={initialFilter}
             />
         </div>
     );
+}
+
+/**
+ * The lists work can be moved to, as the pickers want them.
+ *
+ * `where` is only read when two of them share a name, which is the case it
+ * exists for: a menu offering two lists called "Tasks" is a menu asking a
+ * question it has not given the reader enough to answer.
+ */
+function toListRefs(
+    rows: readonly {
+        id: string;
+        name: string;
+        spaceId: string;
+        space: { name: string } | null;
+        folder: { name: string } | null;
+    }[]
+) {
+    return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        spaceId: row.spaceId,
+        where: [row.space?.name, row.folder?.name].filter(Boolean).join(" / ") || undefined
+    }));
 }

@@ -22,6 +22,7 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { AccountView } from "./account-view";
+import { IdentityCard } from "./identity-card";
 import { UserAccessView } from "./access-view";
 import { Badge, PageHeader } from "@polaris/ui";
 import { listRoleOptions } from "@/lib/role-service";
@@ -70,6 +71,10 @@ export default async function UserAccessPage({ params }: { params: Promise<{ id:
                     </>
                 }
             />
+            {/* Who they are, before anything about what they may do. */}
+            <div className="mb-4">
+                <IdentityCard userId={account.id} />
+            </div>
             <AccountView
                 user={account}
                 roles={roles}

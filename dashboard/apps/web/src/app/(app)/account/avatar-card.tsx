@@ -485,7 +485,12 @@ export function ProfilePicturesCard({
                         {/* Positioned, so the handle can be laid over the face -
                             and so the face keeps sitting over the band it
                             overlaps rather than being painted under it. */}
-                        <div className="relative -mt-8 w-fit">
+                        {/* A flex box, so it is exactly the size of the face.
+                            Left as a block it takes the line box of the image
+                            inside it, which is a few pixels taller than the
+                            circle - and the round handle laid over `inset-0`
+                            then draws as an ellipse hanging below it. */}
+                        <div className="relative -mt-8 flex w-fit">
                             <Avatar
                                 person={{ id: userId, name }}
                                 size={72}
@@ -569,7 +574,12 @@ export function OrgPicturesCard({
                         {/* Positioned, so the handle can be laid over the mark -
                             and so the mark keeps sitting over the band it
                             overlaps rather than being painted under it. */}
-                        <div className="relative -mt-8 w-fit">
+                        {/* A flex box, so it is exactly the size of the face.
+                            Left as a block it takes the line box of the image
+                            inside it, which is a few pixels taller than the
+                            circle - and the round handle laid over `inset-0`
+                            then draws as an ellipse hanging below it. */}
+                        <div className="relative -mt-8 flex w-fit">
                             <OrgAvatar
                                 org={{ id: orgId, name }}
                                 size={72}

@@ -15,7 +15,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { apiAdmin } from "@/lib/api-session";
+
 import { getUpdateStatus } from "@/lib/update-service";
 import { checkedAddresses } from "@/lib/address-health";
 import { getNetworkStatus } from "@/lib/network-service";
@@ -25,7 +26,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
     const [status, addresses, network] = await Promise.all([
         getUpdateStatus(),
         checkedAddresses(),

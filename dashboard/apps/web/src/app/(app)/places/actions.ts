@@ -1018,6 +1018,32 @@ export async function deleteClipAction(id: string): Promise<{ error?: string }> 
     return result.error ? { error: result.error } : {};
 }
 
+/**
+ * Remove several at once, or everything the screen is showing.
+ *
+ * With `ids`, exactly those. Without, every clip of the place being looked at -
+ * which is what the button says and what the screen used to only pretend to do,
+ * by calling the single delete once per row until the request gave up.
+ *
+ * A kept clip is never taken either way.
+ */
+export async function deleteClipsAction(input: {
+    ids?: readonly string[];
+    cameraId?: string | null;
+}): Promise<{ removed?: number; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(async () =>
+        recording.deleteClips(install.id, {
+            placeId: (await currentPlace(install.id)).current.id,
+            cameraId: input.cameraId ?? null,
+            ids: input.ids && input.ids.length > 0 ? input.ids : undefined
+        })
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(`${PATH}/clips`);
+    return { removed: result.value ?? 0 };
+}
+
 /** Which cameras the relay is actually serving, so a tile can tell "not started
  *  yet" from "started and the camera is down". */
 export async function liveCamerasAction(): Promise<{ live?: string[]; error?: string }> {

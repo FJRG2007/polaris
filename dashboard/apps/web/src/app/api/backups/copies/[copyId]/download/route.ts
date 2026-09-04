@@ -9,8 +9,8 @@
  * Node runtime for the streams.
  */
 
-import { requireAdmin } from "@/lib/session";
 import { openCopy } from "@/lib/backups/manage";
+import { apiAdmin } from "@/lib/api-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ export async function GET(
     _request: Request,
     context: { params: Promise<{ copyId: string }> }
 ): Promise<Response> {
-    const user = await requireAdmin();
+    const user = await apiAdmin();
+    if (user instanceof Response) return user;
     const { copyId } = await context.params;
 
     let opened;

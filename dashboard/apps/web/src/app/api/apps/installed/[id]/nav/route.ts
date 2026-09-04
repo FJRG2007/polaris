@@ -13,8 +13,8 @@
  * exists so nobody is shown a door that is locked.
  */
 
-import { requireUser } from "@/lib/session";
 import { resourceAccess } from "@/lib/resource-access";
+import { apiUser } from "@/lib/api-session";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { getInstalledApp } from "@/lib/apps/install-service";
 import { gamePermissionsFor, installRef } from "@/lib/apps/install-access";
@@ -24,7 +24,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { id } = await context.params;
     // The same pair of grants the app's own page accepts: a game grant reaches it
     // without a global one, and neither reaches an app that was never theirs.

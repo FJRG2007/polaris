@@ -55,6 +55,12 @@ export async function sweepContinuousRecording(): Promise<{ started: number }> {
  * not deserve the same month. Pinned clips are never dropped - that is what
  * pinning is for - and the file is removed before the row, so a failure leaves a
  * row pointing at a file rather than a file nothing points at.
+ *
+ * Every removal stands on its own. One row that will not go - a clip another pass
+ * already took, a disk that answers an error rather than a refusal - used to
+ * throw out of the loop and end the whole pass, so nothing behind it was ever
+ * swept and the same row broke the next pass in the same place. That is how a
+ * fortnight of footage survives a retention of a week.
  */
 export async function sweepHomeRetention(): Promise<{ clips: number; events: number }> {
     const cameras = await prisma.camera.findMany({ select: { id: true, retentionDays: true } });
@@ -71,9 +77,15 @@ export async function sweepHomeRetention(): Promise<{ clips: number; events: num
             select: { id: true, path: true }
         });
         for (const clip of due) {
-            await deleteClipFile(clip.path);
-            await prisma.cameraClip.delete({ where: { id: clip.id } });
-            clips += 1;
+            try {
+                await deleteClipFile(clip.path);
+                await prisma.cameraClip.delete({ where: { id: clip.id } });
+                clips += 1;
+            } catch (error) {
+                // Named, because a row that keeps failing is worth finding - and
+                // skipped, because the rest of the sweep is worth running.
+                console.error(`polaris: could not drop an expired clip (${clip.id}):`, error);
+            }
         }
     }
 
@@ -87,7 +99,12 @@ export async function sweepHomeRetention(): Promise<{ clips: number; events: num
         select: { id: true, stillKey: true }
     });
     for (const event of oldEvents) {
-        if (event.stillKey) await deleteStill(event.stillKey);
+        if (!event.stillKey) continue;
+        // Same rule as above: a picture that will not go is not a reason to keep
+        // ninety days of rows.
+        await deleteStill(event.stillKey).catch((error) =>
+            console.error(`polaris: could not drop an expired still (${event.id}):`, error)
+        );
     }
     if (oldEvents.length > 0) {
         await prisma.cameraEvent.deleteMany({ where: { id: { in: oldEvents.map((event) => event.id) } } });

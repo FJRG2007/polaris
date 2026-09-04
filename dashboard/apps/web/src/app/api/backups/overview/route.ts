@@ -10,8 +10,8 @@
  * Admin-only. Node runtime for Prisma.
  */
 
-import { requireAdmin } from "@/lib/session";
 import { adoptLegacyBackups } from "@/lib/backups/adoption";
+import { apiAdmin } from "@/lib/api-session";
 import { ensureDefaultDestinations } from "@/lib/backups/service";
 import { backupSummary, listDestinations, listPlans } from "@/lib/backups/manage";
 
@@ -19,7 +19,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await requireAdmin();
+    const user = await apiAdmin();
+    if (user instanceof Response) return user;
     // The first visit is where an owner gets somewhere to put a backup. Doing it
     // here rather than in a migration means it happens for an account created
     // later too, and it is a no-op every time after the first.

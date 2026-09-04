@@ -11,14 +11,15 @@
  * Node runtime because the Docker transports and Prisma need it.
  */
 
-import { requirePermission } from "@/lib/session";
 import { getWatchContainers } from "@/lib/watch-overview-service";
+import { apiPermission } from "@/lib/api-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const containers = await getWatchContainers(user.id);
     return Response.json({ containers });
 }

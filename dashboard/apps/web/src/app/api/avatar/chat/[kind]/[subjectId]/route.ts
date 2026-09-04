@@ -17,7 +17,8 @@
  */
 
 import { prisma } from "@polaris/db";
-import { requireUser } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+
 import { channelAccess, picturesAllowed, spaceAccess } from "@/lib/chat/access";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
 import {
@@ -52,7 +53,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ kind: string; subjectId: string }> }
 ): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return blankAvatarResponse(NO_CACHE);
@@ -101,7 +103,8 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ kind: string; subjectId: string }> }
 ): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return new Response("Not found", { status: 404 });
@@ -137,7 +140,8 @@ export async function DELETE(
     _request: Request,
     { params }: { params: Promise<{ kind: string; subjectId: string }> }
 ): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return new Response("Not found", { status: 404 });

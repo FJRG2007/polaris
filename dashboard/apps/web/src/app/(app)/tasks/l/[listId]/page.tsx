@@ -53,7 +53,16 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
                 ...(scope.partialSpaceIds.includes(list.spaceId) ? { id: { in: scope.listIds } } : {})
             },
             orderBy: { order: "asc" },
-            select: { id: true, name: true, spaceId: true }
+            // The space and the folder come with it: work only moves between lists of
+            // its own space, and two lists that share a name have to be able to say
+            // where each of them lives.
+            select: {
+                id: true,
+                name: true,
+                spaceId: true,
+                space: { select: { name: true } },
+                folder: { select: { name: true } }
+            }
         })
     ]);
 
@@ -68,8 +77,32 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
                 tasks={tasks}
                 savedViews={views}
                 context={context}
-                lists={siblingLists}
+                lists={toListRefs(siblingLists)}
             />
         </div>
     );
+}
+
+/**
+ * The lists work can be moved to, as the pickers want them.
+ *
+ * `where` is only read when two of them share a name, which is the case it
+ * exists for: a menu offering two lists called "Tasks" is a menu asking a
+ * question it has not given the reader enough to answer.
+ */
+function toListRefs(
+    rows: readonly {
+        id: string;
+        name: string;
+        spaceId: string;
+        space: { name: string } | null;
+        folder: { name: string } | null;
+    }[]
+) {
+    return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        spaceId: row.spaceId,
+        where: [row.space?.name, row.folder?.name].filter(Boolean).join(" / ") || undefined
+    }));
 }

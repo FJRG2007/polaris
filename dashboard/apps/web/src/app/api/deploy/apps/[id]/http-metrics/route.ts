@@ -1,5 +1,6 @@
-import { requirePermission } from "@/lib/session";
+
 import { readAppHttpMetrics } from "@/lib/deploy-service";
+import { apiPermission } from "@/lib/api-session";
 import { resolveRange } from "@/lib/metrics-shared";
 
 export const runtime = "nodejs";
@@ -12,7 +13,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
     const url = new URL(request.url);
     const { from, to } = resolveRange(

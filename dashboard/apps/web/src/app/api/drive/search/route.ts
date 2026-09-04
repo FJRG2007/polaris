@@ -9,7 +9,8 @@
  */
 
 import { normalizeRelPath } from "@polaris/core";
-import { requireUser, sessionCan } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
+import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 import { listLocks } from "@/lib/access-lock-service";
@@ -26,7 +27,8 @@ const MAX_RESULTS = 500;
 const MAX_NODES = 20000;
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

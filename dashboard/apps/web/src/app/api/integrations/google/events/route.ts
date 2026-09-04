@@ -11,8 +11,9 @@
  */
 
 import { z } from "zod";
+import { apiUser } from "@/lib/api-session";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/session";
+
 import { listConnections, readCredential } from "@/lib/connections/store";
 import { getGoogleOAuthClient, listGoogleEvents, GoogleAuthExpiredError } from "@/lib/google-calendar/service";
 
@@ -36,7 +37,8 @@ const rangeSchema = z
     );
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const url = new URL(request.url);
     const parsed = rangeSchema.safeParse({ from: url.searchParams.get("from"), to: url.searchParams.get("to") });
     if (!parsed.success) {

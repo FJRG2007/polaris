@@ -8,8 +8,9 @@
  */
 
 import { homeInstall } from "@/lib/home/access";
+import { apiUser } from "@/lib/api-session";
 import { openClip } from "@/lib/home/recording";
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export const dynamic = "force-dynamic";
 const RANGE = /^bytes=(\d+)-(\d*)$/;
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });
     const install = await homeInstall();
     if (!install) return new Response("Not found", { status: 404 });

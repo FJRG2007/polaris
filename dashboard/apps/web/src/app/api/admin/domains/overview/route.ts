@@ -15,7 +15,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { apiAdmin } from "@/lib/api-session";
+
 import { getDomainZones } from "@/lib/domain-zones";
 import { ownerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses } from "@/lib/address-health";
@@ -26,7 +27,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
     const [config, effectiveAppUrl, zones, addresses, ownerPolicy] = await Promise.all([
         getDomainConfig(),
         appBaseUrl(),

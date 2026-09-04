@@ -1,5 +1,6 @@
-import { requirePermission } from "@/lib/session";
+
 import { resolveRange } from "@/lib/metrics-shared";
+import { apiPermission } from "@/lib/api-session";
 import { getVolumeOwner } from "@/lib/deploy-service";
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
@@ -14,7 +15,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
 
     // The series belongs to the project, not to the reader: resolve who owns the

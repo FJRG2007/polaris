@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/session";
+import { apiAdmin } from "@/lib/api-session";
+
 import { readCallPorts } from "@/lib/chat/call-reach";
 
 export const runtime = "nodejs";
@@ -19,7 +20,8 @@ export const dynamic = "force-dynamic";
  * screen before it starts.
  */
 export async function GET(request: Request): Promise<Response> {
-    await requireAdmin();
+    const refused = await apiAdmin();
+    if (refused instanceof Response) return refused;
     const probe = new URL(request.url).searchParams.get("probe") === "1";
     try {
         return NextResponse.json(await readCallPorts(probe));

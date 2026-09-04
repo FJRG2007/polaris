@@ -719,12 +719,15 @@ export async function updateStatusAction(
 export async function deleteStatusAction(
     spaceId: string,
     statusId: string,
-    replacementId: string
+    fate: spaces.ColumnWorkFate
 ): Promise<{ error?: string }> {
     const caller = await actor();
+    if (fate.kind !== "move" && fate.kind !== "archive" && fate.kind !== "delete") {
+        return { error: "Say what to do with the work on it" };
+    }
     try {
         await access.requireSpace(caller, spaceId, "admin");
-        await spaces.deleteStatus(spaceId, statusId, replacementId);
+        await spaces.deleteStatus(spaceId, statusId, fate);
         refresh(caller, spaceId);
         return {};
     } catch (caught) {

@@ -5,15 +5,16 @@
  * the meter. Auth is re-checked. Node runtime for Prisma and the drivers.
  */
 
-
-import { requireUser, sessionCan } from "@/lib/session";
+import { sessionCan } from "@/lib/session";
+import { apiUser } from "@/lib/api-session";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }

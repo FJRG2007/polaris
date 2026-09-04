@@ -9,13 +9,14 @@
  * not, so this cannot be used to find out which organizations a Polaris has.
  */
 
-import { requireUser } from "@/lib/session";
 import { canDeleteOrg, orgIdForSlug, resolveOrgAccess, getOrg } from "@/lib/orgs/org-service";
+import { apiUser } from "@/lib/api-session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }): Promise<Response> {
-    const user = await requireUser();
+    const user = await apiUser();
+    if (user instanceof Response) return user;
     const { slug } = await params;
 
     const orgId = await orgIdForSlug(slug.toLowerCase());

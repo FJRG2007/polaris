@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requirePermission } from "@/lib/session";
+import { apiPermission } from "@/lib/api-session";
+
 import { readAppContainerMetrics } from "@/lib/app-container-metrics";
 
 export const runtime = "nodejs";
@@ -11,7 +12,8 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await requirePermission("deploy.read");
+    const user = await apiPermission("deploy.read");
+    if (user instanceof Response) return user;
     const { id } = await params;
     try {
         return NextResponse.json(await readAppContainerMetrics(id, user.id));

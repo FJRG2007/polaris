@@ -210,7 +210,21 @@ export function EventsView({ canControl }: { canControl: boolean }) {
             setError(result.error);
             return;
         }
-        setEvents([]);
+        // Read back rather than blanking the list. The delete works through
+        // everything the filter matched, and a screen that empties itself either
+        // way is a screen that says the job is done before it is - which is what
+        // it did while the delete was quietly bounded to the first page.
+        const again = await actions.listEventsAction({
+            cameraId: cameraId || null,
+            kind: kind || null,
+            label: label || null,
+            zone: zone || null,
+            from: from || null,
+            to: to || null
+        });
+        if (again.error) setError(again.error);
+        setEvents(again.events ?? []);
+        setDone(false);
     };
 
     const acknowledge = async (event: EventView) => {

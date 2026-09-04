@@ -1050,27 +1050,85 @@ export async function updateStatus(
  * simply vanish: the tasks on it would be left with no column to appear in, and
  * a board that silently drops work is worse than one that refuses the delete.
  */
+/**
+ * What becomes of the work on a column being removed.
+ *
+ * Three answers, because there are three, and the screen asks rather than
+ * choosing: move it somewhere else, archive it, or delete it with the column.
+ * The last one is what somebody clearing out a column of noise means, and it is
+ * the one nothing else in Polaris will do for them - so it exists, and it is
+ * spelled out on the button with the count on it.
+ */
+export type ColumnWorkFate =
+    | { kind: "move"; replacementId: string }
+    | { kind: "archive" }
+    | { kind: "delete" };
+
+/**
+ * Remove a column, and do the named thing with what was on it.
+ *
+ * Archiving is offered because a column of finished work is usually not noise:
+ * the tasks keep existing, off the board, exactly as an archived task does
+ * anywhere else. They have to land on a status either way - a task without one
+ * is a task no screen can draw - so they are moved to whichever column is left
+ * and archived there.
+ */
 export async function deleteStatus(
     spaceId: string,
     statusId: string,
-    replacementId: string
+    fate: ColumnWorkFate
 ): Promise<void> {
-    if (statusId === replacementId) throw new Error("Pick a different status to move the tasks to");
+    const replacementId = fate.kind === "move" ? fate.replacementId : null;
+    if (replacementId && statusId === replacementId) {
+        throw new Error("Pick a different status to move the tasks to");
+    }
     // Both ends are checked, not just the one being removed: a replacement from
     // another space would move this space's work onto a column nobody here can
     // see, and would do it under an authorization that never mentioned it.
     const [status, replacement, remaining] = await Promise.all([
         prisma.taskStatus.findFirst({ where: { id: statusId, spaceId }, select: { id: true } }),
-        prisma.taskStatus.findFirst({
-            where: { id: replacementId, spaceId },
-            select: { id: true }
-        }),
+        replacementId
+            ? prisma.taskStatus.findFirst({
+                  where: { id: replacementId, spaceId },
+                  select: { id: true }
+              })
+            : Promise.resolve(null),
         prisma.taskStatus.count({ where: { spaceId } })
     ]);
-    if (!status || !replacement) throw notInSpace("status");
+    if (!status) throw notInSpace("status");
+    if (replacementId && !replacement) throw notInSpace("status");
     if (remaining <= 1) throw new Error("A space needs at least one status");
+
+    if (fate.kind === "delete") {
+        await prisma.$transaction([
+            prisma.task.deleteMany({ where: { statusId, spaceId } }),
+            prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
+        ]);
+        return;
+    }
+
+    if (fate.kind === "archive") {
+        // Somewhere to stand: a task carries a status, so archiving it still
+        // means moving it off the column that is going. Whichever is left and
+        // lowest in the order, which is where a board reads from.
+        const landing = await prisma.taskStatus.findFirst({
+            where: { spaceId, id: { not: statusId } },
+            orderBy: { order: "asc" },
+            select: { id: true }
+        });
+        if (!landing) throw new Error("A space needs at least one status");
+        await prisma.$transaction([
+            prisma.task.updateMany({
+                where: { statusId, spaceId },
+                data: { statusId: landing.id, archived: true }
+            }),
+            prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
+        ]);
+        return;
+    }
+
     await prisma.$transaction([
-        prisma.task.updateMany({ where: { statusId, spaceId }, data: { statusId: replacementId } }),
+        prisma.task.updateMany({ where: { statusId, spaceId }, data: { statusId: replacementId! } }),
         prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
     ]);
 }

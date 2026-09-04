@@ -15,8 +15,8 @@
  * and an image route open to the world would be a small hole in a closed app.
  */
 
-import { requirePermission } from "@/lib/session";
 import { previewImage } from "@/lib/chat/link-preview";
+import { apiPermission } from "@/lib/api-session";
 
 export const runtime = "nodejs";
 
@@ -29,7 +29,8 @@ export async function GET(
     _request: Request,
     { params }: { params: Promise<{ previewId: string }> }
 ): Promise<Response> {
-    await requirePermission("chat.use");
+    const refused = await apiPermission("chat.use");
+    if (refused instanceof Response) return refused;
     const { previewId } = await params;
 
     const image = await previewImage(previewId).catch(() => null);
