@@ -388,6 +388,7 @@ model Note {
     // folder's parent by the service, and this is only what happens if a row is
     // removed some other way.
     folder   NoteFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    share    NoteShare?
 
     @@index([userId, archived, updatedAt])
     @@index([userId, parentId])
@@ -480,6 +481,55 @@ model NoteSpaceTeam {
 //
 // It lives on a shelf, and which shelf is the same question a note answers:
 // `spaceId` null means it is the owner's own and nobody else's.
+// A note handed to somebody who has no account here.
+//
+// One link per note, the way a page has one address: the question the screen
+// asks is "is this published", and a note with four links each with its own
+// password is four answers to a question nobody asked. Revoking is then
+// unambiguous, which is the half that matters.
+//
+// The limits are the ones every public link in Polaris carries - password,
+// expiry, a cap on opens, and the address allowlists - so this is gated by
+// lib/link-guards exactly as a share, a drop point and a snippet are, rather than
+// by rules written a fourth time.
+model NoteShare {
+    id      String @id @default(uuid(7)) @db.Uuid
+    noteId  String @unique @db.Uuid
+    ownerId String @db.Uuid
+    // SHA-256 of the token; lookups are by hash, so a database dump yields no
+    // working links.
+    tokenHash String @unique
+    // The token, envelope-encrypted under the master key, so the owner can be
+    // shown the link again after they close the dialog. A dump alone still yields
+    // nothing: the master key is not in the database.
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
+    // argon2 hash of the optional link password.
+    passwordHash   String?
+    // Whether the pages filed under this note travel with it. On by default,
+    // because a page with its sub-pages missing is a page with holes in it; off
+    // is how one section of a notebook is published without the rest.
+    includeChildren Boolean @default(true)
+    // A cap on opens, or null. Counted per served page rather than per visitor:
+    // there is no visitor to count, which is the point of a public link.
+    maxViews  Int?
+    viewCount Int @default(0)
+    // JSON string arrays, the shape every other link in Polaris uses. Empty means
+    // no restriction.
+    allowedCidrs      String    @default("[]")
+    allowedCountries  String    @default("[]")
+    allowedContinents String    @default("[]")
+    expiresAt DateTime?
+    revokedAt DateTime?
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId])
+}
+
 model NoteFolder {
     id        String   @id @default(uuid(7)) @db.Uuid
     // Who made it. Kept on an organization's folder as well, where it is only a

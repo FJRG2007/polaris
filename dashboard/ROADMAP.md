@@ -353,6 +353,18 @@ Notes (personal writing):
       where it was and the references become [[wikilinks]] again, so what comes
       out re-imports as the same shape - and opens in Obsidian, or in a text
       editor, or in nothing at all
+- [x] Published by link, for somebody who has no account here. The same guards
+      every public link in Polaris carries - a password, an expiry, a cap on
+      opens, and the address allowlists - so it behaves like a shared file rather
+      than like a second idea of what sharing means. Read-only, and an archived
+      note stops being served whatever the link says
+- [x] A code block says which language it is, and is coloured while it is being
+      written rather than only once it is read back. The grammar arrives as its
+      own chunk when a block asks for it, and the colour is decorations over the
+      text rather than markup replacing it
+- [x] Cut, copy and paste on the right press, beside the formatting. Paste is
+      read the way a paste is read - Markdown becomes the document it describes -
+      and says when the browser will not hand the page the clipboard
 - [ ] The other formats worth reading in
 - [ ] A note handed to one person outside the notebook it is on
 
@@ -469,6 +481,17 @@ Telemetry (what breaks):
       later build reopens itself rather than waiting to be noticed
 - [x] Events age out per project and the daily counts do not, so a chart of a
       fault over months survives the stack traces being pruned
+- [x] The key in a DSN names a project and proves nothing - it ships inside the
+      browser bundle of every application that reports from one - so a project
+      says who may report into it: from which addresses, with which clients, and
+      optionally carrying a key of its own that a Sentry client with settable
+      transport headers can send. A new project accepts this network and nothing
+      else, which is where an application deployed by Polaris reports from
+- [x] What gets turned away is counted on the project and shown with the address
+      it came from and a button to admit it, so a project refusing everything
+      says so rather than looking healthy
+- [x] The number in a DSN is drawn at random rather than counted up: a sequence
+      would say how many projects an instance has and make the next one guessable
 - [ ] Alerting - a message when a fault is new, or when one comes back
 - [ ] Source maps, and performance traces
 

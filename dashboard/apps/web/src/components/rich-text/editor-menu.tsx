@@ -10,33 +10,39 @@
  * the marks the selection toolbar carries, the blocks the "/" menu carries, and
  * whatever the surface itself can do with what is selected.
  *
- * The clipboard is deliberately not here. Cut, copy and paste are the browser's
- * to run - a page cannot read a clipboard it was not handed - and a menu item
- * that says Paste and does nothing is worse than no item at all. The keys still
- * work, and they are what people use.
+ * The clipboard is here, which it once was not. Cut and copy are the editor's
+ * own selection written out; paste is the half that needs the browser's
+ * permission, so it is read when the menu opens and the row says what it found -
+ * something to paste, nothing to paste, or a browser that will not say. Every row
+ * carries its key as well, because when a page is refused the clipboard the key
+ * still works and that is the answer somebody needs at that moment.
  *
  * Every press keeps the selection: `onMouseDown` never moves the focus out of
  * the editor, which is the same rule the selection toolbar follows.
  */
 
-import type { ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
+import { useState, type ReactNode } from "react";
 import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
-    ContextMenuTrigger
+    ContextMenuTrigger,
+    MenuShortcut
 } from "@polaris/ui";
 import {
     Bold,
+    ClipboardPaste,
     Code,
+    Copy,
     Heading2,
     Italic,
     List,
     ListOrdered,
     ListTree,
     Quote,
+    Scissors,
     Strikethrough
 } from "lucide-react";
 
@@ -78,15 +84,21 @@ export function selectedListItems(
 function Item({
     label,
     icon,
+    keys,
+    disabled,
     onSelect
 }: {
     label: string;
     icon: ReactNode;
+    /** The keyboard shortcut, for the rows that have one. */
+    keys?: string;
+    disabled?: boolean;
     onSelect: () => void;
 }) {
     return (
         <ContextMenuItem
             className="gap-2"
+            disabled={disabled}
             // The selection is lost the moment the editor blurs, so nothing here
             // may move the focus out of it.
             onMouseDown={(event) => event.preventDefault()}
@@ -94,17 +106,39 @@ function Item({
         >
             {icon}
             {label}
+            {keys ? <MenuShortcut>{keys}</MenuShortcut> : null}
         </ContextMenuItem>
     );
+}
+
+/**
+ * What the keys are called here.
+ *
+ * The menu is worth less than nothing if it teaches the wrong shortcut, and the
+ * shortcut is the part that keeps working when the browser will not hand a page
+ * the clipboard.
+ */
+function modifierKey(): string {
+    if (typeof navigator === "undefined") return "Ctrl";
+    return /Mac|iPhone|iPad/.test(navigator.userAgent) ? "Cmd" : "Ctrl";
 }
 
 export function EditorMenu({
     editor,
     listAction,
+    onPaste,
     children
 }: {
     editor: Editor;
     listAction?: ListAction;
+    /**
+     * What to do with text off the clipboard.
+     *
+     * The surface's job rather than this menu's: pasted text is read as Markdown
+     * and its references are resolved, and that lives with the editor. Without
+     * one, the text is inserted as it is.
+     */
+    onPaste?: (text: string) => void;
     children: ReactNode;
 }) {
     // Read when the menu opens rather than on every render: the selection changes
@@ -113,10 +147,82 @@ export function EditorMenu({
     const list = listAction ? selectedListItems(editor) : null;
     const marks = !editor.state.selection.empty;
 
+    /**
+     * What the clipboard holds, read when the menu opens and never before: a page
+     * that polls the clipboard is a page asking for a permission it has no use
+     * for. Null is "not read yet", "" is empty or refused.
+     */
+    const [pending, setPending] = useState<string | null>(null);
+    const keys = modifierKey();
+
+    /** The selection as text, which is what goes on the clipboard. */
+    const selectedText = (): string => {
+        const { from, to } = editor.state.selection;
+        return editor.state.doc.textBetween(from, to, "\n", " ");
+    };
+
+    async function put(text: string): Promise<boolean> {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch {
+            // An insecure origin, or a document that is not focused. Nothing
+            // useful to say: the key does this too.
+            return false;
+        }
+    }
+
     return (
-        <ContextMenu>
+        <ContextMenu
+            onOpenChange={(open) => {
+                if (!open) {
+                    setPending(null);
+                    return;
+                }
+                void navigator.clipboard
+                    ?.readText()
+                    .then((text) => setPending(text))
+                    .catch(() => setPending(""));
+            }}
+        >
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-            <ContextMenuContent className="w-56">
+            <ContextMenuContent className="w-60">
+                <Item
+                    label="Cut"
+                    keys={`${keys}+X`}
+                    disabled={!marks}
+                    icon={<Scissors className="size-3.5" />}
+                    onSelect={() => {
+                        const text = selectedText();
+                        void put(text).then((written) => {
+                            // Only once it is somewhere else. Text cut onto a
+                            // clipboard that refused it is text that is gone.
+                            if (written && !editor.isDestroyed) {
+                                editor.chain().focus().deleteSelection().run();
+                            }
+                        });
+                    }}
+                />
+                <Item
+                    label="Copy"
+                    keys={`${keys}+C`}
+                    disabled={!marks}
+                    icon={<Copy className="size-3.5" />}
+                    onSelect={() => void put(selectedText())}
+                />
+                <Item
+                    label={pending === "" ? "Nothing to paste" : "Paste"}
+                    keys={`${keys}+V`}
+                    disabled={!pending}
+                    icon={<ClipboardPaste className="size-3.5" />}
+                    onSelect={() => {
+                        if (!pending) return;
+                        if (onPaste) onPaste(pending);
+                        else editor.chain().focus().insertContent(pending).run();
+                    }}
+                />
+                <ContextMenuSeparator />
+
                 {marks ? (
                     <>
                         <Item

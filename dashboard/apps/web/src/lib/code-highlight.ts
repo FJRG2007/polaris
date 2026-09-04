@@ -27,8 +27,21 @@ export type Highlighter = (code: string, token: string) => string | null;
 let core: Promise<HLJSApi> | null = null;
 const grammars = new Map<string, Promise<boolean>>();
 
+/** The same two, once they have arrived, for the callers that cannot await -
+ *  see `highlightIfReady` at the foot of this file. Not a second cache: these
+ *  are written as the promises above resolve and read nowhere else. */
+let loadedCore: HLJSApi | null = null;
+const loaded = new Set<string>();
+/** Every grammar whose load has finished, however it finished. A chunk that
+ *  failed must stop being asked for, or a caller that redraws when one lands
+ *  redraws for ever. */
+const settled = new Set<string>();
+
 function loadCore(): Promise<HLJSApi> {
-    core ??= import("highlight.js/lib/core").then((module) => module.default);
+    core ??= import("highlight.js/lib/core").then((module) => {
+        loadedCore = module.default;
+        return module.default;
+    });
     return core;
 }
 
@@ -39,9 +52,14 @@ function loadGrammar(language: CodeLanguage): Promise<boolean> {
     const loading = Promise.all([loadCore(), language.load()])
         .then(([hljs, grammar]) => {
             hljs.registerLanguage(language.id, grammar.default);
+            loaded.add(language.id);
+            settled.add(language.id);
             return true;
         })
-        .catch(() => false);
+        .catch(() => {
+            settled.add(language.id);
+            return false;
+        });
     grammars.set(language.id, loading);
     return loading;
 }
@@ -92,4 +110,41 @@ export function useHighlighter(token: string | null): Highlighter | null {
     }, [token]);
 
     return highlighter;
+}
+// ---------------------------------------------------------------------------
+// Highlighting something that is being edited
+// ---------------------------------------------------------------------------
+
+/**
+ * The same highlighting, for a caller that cannot await.
+ *
+ * A ProseMirror plugin redraws inside a transaction: there is no point at which
+ * it may wait for a grammar to arrive. So these two split the job the hook does
+ * in one - ask whether a grammar is here yet and colour with it, or start
+ * fetching it and be told when to redraw.
+ *
+ * Everything they need is already loaded by the pair above; this adds a way to
+ * read that state synchronously, not a second cache.
+ */
+
+/** Colour a snippet with a grammar that is already loaded, or null. Nothing is
+ *  fetched: a redraw that had to fetch would be a redraw that blocks. */
+export function highlightIfReady(code: string, token: string): string | null {
+    const language = languageForToken(token);
+    if (!language || !loadedCore || !loaded.has(language.id)) return null;
+    if (code.length > HIGHLIGHT_LIMIT) return null;
+    return loadedCore.highlight(code, { language: language.id, ignoreIllegals: true }).value;
+}
+
+/**
+ * Make sure a grammar is on its way, and say when it lands.
+ *
+ * Null when there is nothing to wait for - the token names no grammar we have,
+ * or that grammar has already finished loading, or finished failing - which is
+ * what lets a caller tell "redraw later" from "this is as good as it gets".
+ */
+export function ensureGrammar(token: string): Promise<boolean> | null {
+    const language = languageForToken(token);
+    if (!language || settled.has(language.id)) return null;
+    return Promise.all([loadCore(), loadGrammar(language)]).then(([, ok]) => ok);
 }
