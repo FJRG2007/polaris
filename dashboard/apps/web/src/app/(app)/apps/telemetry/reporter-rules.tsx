@@ -101,6 +101,15 @@ export function ReporterRules({
 
     const dirty = !same(draft, draftOf(project));
     const chosen = POLICIES.find((policy) => policy.value === draft.reporters);
+    /** The one-line reading of the rules, built once so the clipped element can
+     *  carry the whole of it. */
+    const summary = [
+        chosen?.label,
+        draft.allowedCidrs.length > 0 ? `${draft.allowedCidrs.length} listed` : null,
+        draft.requireSecret ? "key required" : null
+    ]
+        .filter(Boolean)
+        .join(" - ");
 
     async function save(next: Draft) {
         setBusy(true);
@@ -146,10 +155,11 @@ export function ReporterRules({
                     <ShieldCheck className="size-4 shrink-0 text-success" />
                 )}
                 <span className="text-xs font-medium">Who may report</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                    {chosen?.label}
-                    {draft.allowedCidrs.length > 0 && ` - ${draft.allowedCidrs.length} listed`}
-                    {draft.requireSecret && " - key required"}
+                <span
+                    className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                    title={summary}
+                >
+                    {summary}
                 </span>
                 <ChevronDown
                     className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
@@ -337,7 +347,13 @@ function ProjectKey({
             </p>
             {issued ? (
                 <div className="flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 font-mono text-xs">
+                    {/* The one moment this value exists. Clipped to the panel's
+                        width, so the element carries it in full - and the copy
+                        button beside it is the way it is actually taken. */}
+                    <code
+                        className="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1 font-mono text-xs"
+                        title={issued}
+                    >
                         {issued}
                     </code>
                     <CopyButton value={issued} label="Copy the key" />

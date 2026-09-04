@@ -239,7 +239,11 @@ function Destination({
                 <span className="truncate" title={label}>
                     {label}
                 </span>
-                {where && <span className="truncate text-xs text-muted-foreground">{where}</span>}
+                {where && (
+                    <span className="truncate text-xs text-muted-foreground" title={where}>
+                        {where}
+                    </span>
+                )}
             </span>
             {here && <span className="shrink-0 text-xs text-muted-foreground">where it is</span>}
         </button>

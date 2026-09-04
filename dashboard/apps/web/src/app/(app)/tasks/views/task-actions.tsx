@@ -677,11 +677,22 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                     className="gap-2"
                                                     onSelect={() => commands.onApply({ listId: list.id })}
                                                 >
+                                                    {/* Both lines carry their own
+                                                        text: a long list name is
+                                                        clipped to the menu's width,
+                                                        and the whole point of the
+                                                        second line is telling two
+                                                        of them apart. */}
                                                     <span className="flex min-w-0 flex-1 flex-col">
-                                                        <span className="truncate">{list.name}</span>
+                                                        <span className="truncate" title={list.name}>
+                                                            {list.name}
+                                                        </span>
                                                         {list.where &&
                                                             core.needsQualifying(list.name, sharedNames) && (
-                                                                <span className="truncate text-xs text-muted-foreground">
+                                                                <span
+                                                                    className="truncate text-xs text-muted-foreground"
+                                                                    title={list.where}
+                                                                >
                                                                     {list.where}
                                                                 </span>
                                                             )}

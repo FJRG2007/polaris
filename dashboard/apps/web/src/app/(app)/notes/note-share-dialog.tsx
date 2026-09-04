@@ -153,7 +153,10 @@ export function NoteShareDialog({
                         <>
                             <div className="flex items-center gap-2">
                                 <Link2 className="size-4 shrink-0 text-muted-foreground" />
-                                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs">
+                                <code
+                                    className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs"
+                                    title={url || undefined}
+                                >
                                     {url || "..."}
                                 </code>
                                 {url && <CopyButton value={url} label="Copy the link" />}
