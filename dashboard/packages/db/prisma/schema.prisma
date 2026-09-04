@@ -260,6 +260,9 @@ model User {
     noteSpaces          NoteSpace[]
     noteSpaceMemberships NoteSpaceMember[]
     noteFolders         NoteFolder[]
+    telemetryProjects   TelemetryProject[]
+    telemetryResolved   TelemetryIssue[]  @relation("TelemetryResolver")
+    telemetryAssigned   TelemetryIssue[]  @relation("TelemetryAssignee")
     chatSpaces          ChatSpace[]
     chatSpaceMemberships ChatSpaceMember[]
     chatSpacePreferences ChatSpacePreference[]
@@ -3587,6 +3590,7 @@ model Project {
     members      ProjectMember[]
     webhooks     ProjectWebhook[]
     tokens       ApiKey[]
+    telemetry    TelemetryProject[]
 
     @@unique([ownerId, slug])
     @@index([ownerId])
@@ -4307,6 +4311,7 @@ model Organization {
     roles    OrgRole[]
     spaces   TaskSpace[]
     noteSpaces NoteSpace[]
+    telemetryProjects TelemetryProject[]
     chatSpaces ChatSpace[]
     projects Project[]
     projectGrants ProjectMember[]
@@ -8343,4 +8348,161 @@ model DriveTransfer {
     @@index([recipientOrg, status])
     @@index([senderId, status])
     @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry: what a running program says when it breaks
+// ---------------------------------------------------------------------------
+
+// One thing that reports. A deployed project, or Polaris itself.
+//
+// It exists so a DSN exists, and a DSN is the whole integration: an application
+// points the Sentry client it already has at Polaris and reports here instead.
+// The key in it is public by construction - it ships inside the browser bundle
+// of every web application that reports - so it is a routing label and never a
+// credential. What keeps it honest is that it can only ever write into its own
+// project, and that the ingest route is rate limited per project.
+model TelemetryProject {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    ownerId       String   @db.Uuid
+    orgId         String?  @db.Uuid
+    // The deployed project this reports for, when it is one. One DSN per
+    // project rather than per service: which service and which environment an
+    // event came from is on the event, which is how every client already sends
+    // it and how anybody reading Sentry already expects to filter.
+    deployProjectId String? @db.Uuid
+    name          String
+    slug          String
+    // The number that goes in the DSN.
+    //
+    // Not the id, and not cosmetic: a Sentry client validates that the last
+    // segment of a DSN is digits and refuses to send at all when it is not, so a
+    // uuid there would be an integration that silently never reports. Allocated
+    // as one past the highest, which is what GlitchTip does and for the same
+    // reason.
+    number        Int      @unique
+    // What reports into it, as the first event said - "node", "python". A label
+    // for the list, never a switch.
+    platform      String?
+    // The public half of the DSN. Rotating one is a new value here, which is
+    // what makes an accidentally published key recoverable.
+    publicKey     String   @unique
+    enabled       Boolean  @default(true)
+    // Polaris' own project. Made on first boot and not deletable, because the
+    // dashboard reports into it and a missing row would mean dropping the one
+    // crash nobody else is watching for.
+    system        Boolean  @default(false)
+    // How long an event's full detail is kept. The daily counts outlive it, so a
+    // chart does not develop a hole where the events were pruned.
+    retentionDays Int      @default(30)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org           Organization?    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    deployProject Project?         @relation(fields: [deployProjectId], references: [id], onDelete: SetNull)
+    issues        TelemetryIssue[]
+    events        TelemetryEvent[]
+    days          TelemetryDay[]
+
+    @@unique([ownerId, slug])
+    @@index([orgId])
+    @@index([deployProjectId])
+}
+
+// One crash, however many times it happened.
+//
+// The row a person actually works with: a thousand copies of one fault is a
+// number on one line, and the fingerprint that decides which copies are the same
+// fault is computed in @polaris/core/telemetry, where it can be stated and
+// tested rather than guessed at inside a query.
+model TelemetryIssue {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    projectId   String    @db.Uuid
+    fingerprint String
+    // The exception's class, and the one-line title a list shows.
+    type        String    @default("")
+    title       String
+    culprit     String    @default("")
+    level       String    @default("error")
+    // unresolved | resolved | ignored - see TELEMETRY_STATUSES in @polaris/core.
+    status      String    @default("unresolved")
+    timesSeen   Int       @default(0)
+    firstSeen   DateTime  @default(now())
+    lastSeen    DateTime  @default(now())
+    // Which release it was last seen in, which is how "did the fix work" is
+    // answered without reading the events.
+    lastRelease String?
+    resolvedAt  DateTime?
+    resolvedById String?  @db.Uuid
+    // Set when it was resolved, and compared against a later event's release: a
+    // fault that comes back in a build made after the fix is a regression, and
+    // saying so is the one thing a list of resolved issues is for.
+    resolvedInRelease String?
+    assignedToId String?  @db.Uuid
+
+    project    TelemetryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    resolvedBy User?            @relation("TelemetryResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+    assignedTo User?            @relation("TelemetryAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+    events     TelemetryEvent[]
+    days       TelemetryDay[]
+
+    @@unique([projectId, fingerprint])
+    @@index([projectId, status, lastSeen])
+    @@index([projectId, lastSeen])
+}
+
+// One occurrence, kept whole so somebody can read the stack that mattered.
+//
+// The searchable parts are columns and everything else is one JSON blob: the
+// frames, the breadcrumbs and the tags are read together when a person opens an
+// event and never queried across, so a table per shape would be five joins to
+// draw one screen.
+model TelemetryEvent {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    projectId   String   @db.Uuid
+    issueId     String   @db.Uuid
+    // The reporter's own id for it, which is what a client dedupes on.
+    eventId     String?
+    level       String   @default("error")
+    message     String
+    culprit     String   @default("")
+    release     String?
+    environment String?
+    serverName  String?
+    transaction String?
+    url         String?
+    method      String?
+    // Whatever the reporter chose to call the person, shown and never matched on.
+    userLabel   String?
+    // The frames, breadcrumbs and tags, as JSON text.
+    detail      String   @default("{}")
+    at          DateTime @default(now())
+
+    project TelemetryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    issue   TelemetryIssue   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+    @@index([issueId, at])
+    @@index([projectId, at])
+}
+
+// How many times an issue happened on a day.
+//
+// Written as events arrive rather than counted afterwards, because the events
+// themselves are pruned and the shape of a fault over weeks is the thing worth
+// keeping longest. Analytics keeps its history the same way and for the same
+// reason.
+model TelemetryDay {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    projectId String   @db.Uuid
+    issueId   String   @db.Uuid
+    // Midnight UTC of the day being counted.
+    day       DateTime
+    count     Int      @default(0)
+
+    project TelemetryProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    issue   TelemetryIssue   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+    @@unique([issueId, day])
+    @@index([projectId, day])
 }
