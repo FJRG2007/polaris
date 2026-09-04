@@ -320,3 +320,28 @@ describe("a camera on its own charge, with nothing said about it", () => {
         expect(settled.recording).toBe("motion");
     });
 });
+
+describe("the list against the one the maker published", () => {
+    it("carries every model TP-Link names as answering RTSP", () => {
+        // Transcribed by hand from the maker's own support page, which is the
+        // only authority on this - and a name dropped in transcription is a
+        // camera its owner cannot find in the picker.
+        const published = [
+            "C100", "C101", "C103", "C104", "C110", "C110P2", "C111", "C113",
+            "C120", "C121", "C125", "C200", "C201", "C206", "C207", "C210",
+            "C211", "C216", "C217", "C220", "C225", "C230", "C236", "C246D",
+            "C260", "C310", "C320WS", "C325WB", "C500", "C510W", "C520WS",
+            "C530WS", "C560WS", "C575D", "C710", "C720", "TC53", "TCB72",
+            "TCH50 KIT", "TCW30", "TCW61"
+        ];
+        const listed = new Set(modelsOfBrand("Tapo").map((model) => model.name));
+        for (const name of published) expect(listed.has(name)).toBe(true);
+    });
+
+    it("carries every one it names as answering neither", () => {
+        const battery = ["C400", "C402", "C410", "C420", "C425", "C460", "C645D", "C660", "D230"];
+        for (const name of battery) {
+            expect(connectionsFor(`tapo-${name.toLowerCase()}`)).toEqual(["tapo-battery"]);
+        }
+    });
+});
