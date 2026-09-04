@@ -70,9 +70,18 @@ interface GuardInput {
     sessionCreatedAt: Date;
 }
 
-/** End a session for good: the row is what the cookie is validated against. */
-async function revokeSession(sessionId: string): Promise<void> {
-    await prisma.session.deleteMany({ where: { id: sessionId } });
+/**
+ * End a session for good: the row is what the cookie is validated against.
+ *
+ * Answers whether this call was the one that ended it. A single navigation
+ * resolves the session more than once - the layout and the page render at the
+ * same moment - so two requests can reach the same refusal together, and the
+ * account was told twice that it had been used by somebody else. The loser of
+ * that race deletes nothing, and says nothing.
+ */
+async function revokeSession(sessionId: string): Promise<boolean> {
+    const { count } = await prisma.session.deleteMany({ where: { id: sessionId } });
+    return count > 0;
 }
 
 /**
@@ -265,40 +274,44 @@ export async function guardSession({
     //    account, and a session that is not this person's should not get as far
     //    as being judged as if it were.
     if (state) {
-        const breach = await breachOf(state, settings, ip ?? null);
+        const asked = await requestClient();
+        const breach = breachOf(state, settings, asked, ip ?? null);
         if (breach) {
-            await revokeSession(sessionId);
-            await recordAudit({
-                actorId: userId,
-                action: "account.session.compromised",
-                targetType: "session",
-                targetId: sessionId,
-                metadata: {
-                    breach,
-                    ip: ip ?? null,
-                    // What the two readings were. Without them a refusal is a
-                    // word - "client" - and working out which half disagreed,
-                    // and whether it should have, means reproducing it.
-                    was: sessionClient({ userAgent: null, state }).label,
-                    now: describeClient(
-                        (await clientUserAgent()) ?? null,
-                        (await clientUserAgentBrands()) ?? null,
-                        (await clientUserAgentPlatform()) ?? null
-                    ).label
-                }
-            });
-            await notifySessionCompromised({
-                userId,
-                report: {
-                    device: sessionClient({ userAgent: null, state }).label,
-                    breach,
-                    ip: ip ?? null,
-                    userAgent: (await clientUserAgent()) ?? null,
-                    brands: (await clientUserAgentBrands()) ?? null,
-                    platform: (await clientUserAgentPlatform()) ?? null,
-                    at: new Date()
-                }
-            });
+            // Only the request that actually ended the session reports it.
+            if (await revokeSession(sessionId)) {
+                await recordAudit({
+                    actorId: userId,
+                    action: "account.session.compromised",
+                    targetType: "session",
+                    targetId: sessionId,
+                    metadata: {
+                        breach,
+                        ip: ip ?? null,
+                        // What the two readings were, and the headers they were
+                        // taken from. Without them a refusal is a word -
+                        // "client" - and working out which half disagreed, and
+                        // whether it should have, means reproducing it.
+                        was: sessionClient({ userAgent: null, state }).label,
+                        wasBrands: state.userAgentBrands,
+                        wasPlatform: state.userAgentPlatform,
+                        now: describeClient(asked.userAgent, asked.brands, asked.platform).label,
+                        nowBrands: asked.brands,
+                        nowPlatform: asked.platform
+                    }
+                });
+                await notifySessionCompromised({
+                    userId,
+                    report: {
+                        device: sessionClient({ userAgent: null, state }).label,
+                        breach,
+                        ip: ip ?? null,
+                        userAgent: asked.userAgent,
+                        brands: asked.brands,
+                        platform: asked.platform,
+                        at: new Date()
+                    }
+                });
+            }
             return { ok: false, redirect: "/oauth/login?compromised=1" };
         }
     }
@@ -373,6 +386,21 @@ export async function guardSession({
     return { ok: true, view: state };
 }
 
+/** What this request said it was, in the three headers that say it. Read once:
+ *  the refusal, the log entry and the alert all describe the same request. */
+async function requestClient(): Promise<{
+    userAgent: string | null;
+    brands: string | null;
+    platform: string | null;
+}> {
+    const [userAgent, brands, platform] = await Promise.all([
+        clientUserAgent(),
+        clientUserAgentBrands(),
+        clientUserAgentPlatform()
+    ]);
+    return { userAgent: userAgent ?? null, brands: brands ?? null, platform: platform ?? null };
+}
+
 /**
  * Whether this request is somebody other than whoever opened the session.
  *
@@ -385,7 +413,7 @@ export async function guardSession({
  * of its judgement calls is a false positive waiting to happen and each of them
  * is worth being able to state and check on its own.
  */
-async function breachOf(
+function breachOf(
     state: {
         userAgent: string | null;
         userAgentBrands: string | null;
@@ -394,8 +422,9 @@ async function breachOf(
         pinToAddress: boolean | null;
     },
     settings: { bindSessionsToClient: boolean; pinSessionsToAddress: string } | null | undefined,
+    asked: { userAgent: string | null; brands: string | null; platform: string | null },
     ip: string | null
-): Promise<BindingBreach | null> {
+): BindingBreach | null {
     // No settings row means the account has never opened Security, which is the
     // common case and carries the defaults - the client binding among them.
     const bindClient = settings?.bindSessionsToClient ?? true;
@@ -403,12 +432,7 @@ async function breachOf(
     if (!bindClient && pinScope === "off" && state.pinToAddress !== true) return null;
 
     const was = sessionClient({ userAgent: null, state });
-    const [userAgent, brands, platform] = await Promise.all([
-        clientUserAgent(),
-        clientUserAgentBrands(),
-        clientUserAgentPlatform()
-    ]);
-    const here = describeClient(userAgent ?? null, brands ?? null, platform ?? null);
+    const here = describeClient(asked.userAgent, asked.brands, asked.platform);
     return bindingBreach(
         { bindClient, pinScope, pinThisSession: state.pinToAddress },
         {
@@ -416,11 +440,12 @@ async function breachOf(
             browser: was.browser,
             claimedOs: was.claimedOs,
             claimedBrowser: was.claimedBrowser,
-            // Whether the session was recorded WITH hints. A session opened over
-            // http, or before Polaris kept them, has none - and its reading has
-            // to be compared against the user-agent's rather than against a
-            // hinted one that names browsers it never could.
-            hinted: state.userAgentBrands !== null || state.userAgentPlatform !== null,
+            // Which headers the session was recorded WITH. A session opened over
+            // http, or before Polaris kept them, has neither - and each half of
+            // its reading has to be compared against the user-agent's rather
+            // than against a hinted one that names things it never could.
+            brandHinted: state.userAgentBrands !== null,
+            platformHinted: state.userAgentPlatform !== null,
             ip: state.ip,
             handheld: isHandheld(was.os)
         },
@@ -429,7 +454,8 @@ async function breachOf(
             browser: here.browser,
             claimedOs: here.claimedOs,
             claimedBrowser: here.claimedBrowser,
-            hinted: (brands ?? null) !== null || (platform ?? null) !== null,
+            brandHinted: asked.brands !== null,
+            platformHinted: asked.platform !== null,
             ip
         }
     );
