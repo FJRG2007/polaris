@@ -39,6 +39,19 @@ export interface ClientReading {
     osVersion: string | null;
     /** "Brave on Windows" - the single string a table cell or a card shows. */
     label: string;
+    /**
+     * What the user-agent alone said, before the hints were preferred over it.
+     *
+     * Not for showing - `browser` and `os` above are the reading, and they are
+     * the better one. This is for comparing two readings that were not taken the
+     * same way. A Chromium that rebadges Chrome names itself only in the hints,
+     * so the same Brave reads as "Brave" on a request that carried them and as
+     * "Chrome" on one that did not - and anything that treats that as two
+     * different browsers is wrong about the commonest browser there is.
+     */
+    claimedBrowser: string;
+    /** The same for the system. */
+    claimedOs: string;
 }
 
 /** Brands the hints header carries that name no browser: the engine every
@@ -215,7 +228,9 @@ export function describeClient(
             browserVersion: null,
             os: "Unknown OS",
             osVersion: null,
-            label: "Unknown device"
+            label: "Unknown device",
+            claimedBrowser: "Unknown browser",
+            claimedOs: "Unknown OS"
         };
     }
 
@@ -242,7 +257,9 @@ export function describeClient(
         browserVersion,
         os,
         osVersion,
-        label: `${browser} on ${os}`
+        label: `${browser} on ${os}`,
+        claimedBrowser: claimed.name,
+        claimedOs: claimedOs.name
     };
 }
 

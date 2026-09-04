@@ -31,7 +31,12 @@ describe("describeClient", () => {
             os: "Windows",
             // 10 and 11 both report NT 10.0, so no number is claimed.
             osVersion: null,
-            label: "Chrome on Windows"
+            label: "Chrome on Windows",
+            // What the user-agent alone said, kept beside the reading so two
+            // readings taken different ways can still be compared. The same
+            // here, because nothing was hinted and there was nothing to prefer.
+            claimedBrowser: "Chrome",
+            claimedOs: "Windows"
         });
     });
 
@@ -260,5 +265,35 @@ describe("userAgentAllowed", () => {
         const rules = { allowedUserAgents: ["Mozilla"], deniedUserAgents: ["Chrome/131"] };
         expect(userAgentAllowed(rules, CHROME_WINDOWS)).toBe(false);
         expect(userAgentAllowed(rules, FIREFOX_LINUX)).toBe(true);
+    });
+});
+
+describe("what the user-agent said on its own", () => {
+    const BRAVE_HINTS = '"Chromium";v="131", "Brave";v="131", "Not_A Brand";v="24"';
+
+    it("is kept beside the reading, not instead of it", () => {
+        // The whole reason it exists. Brave writes Chrome into its user-agent on
+        // purpose and names itself only in the hints, so a reading taken with
+        // hints and one taken without name two different browsers for one
+        // machine - and something has to be able to tell that from two machines.
+        const reading = describeClient(CHROME_WINDOWS, BRAVE_HINTS, '"Windows"');
+        expect(reading.browser).toBe("Brave");
+        expect(reading.claimedBrowser).toBe("Chrome");
+    });
+
+    it("keeps the system the user-agent named, even where a hint overruled it", () => {
+        // A browser emulating a phone rewrites the user-agent and leaves the
+        // hint alone. The hint is the reading; what the string said is still
+        // worth keeping, because it is what a request carrying no hints will be
+        // compared against.
+        const reading = describeClient(WEBKIT_IPHONE, undefined, String.raw`"Windows"`);
+        expect(reading.os).toBe("Windows");
+        expect(reading.claimedOs).toBe("iOS");
+    });
+
+    it("says it knows nothing when there was no user-agent at all", () => {
+        const reading = describeClient(null);
+        expect(reading.claimedBrowser).toBe("Unknown browser");
+        expect(reading.claimedOs).toBe("Unknown OS");
     });
 });
