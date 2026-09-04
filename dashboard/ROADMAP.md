@@ -348,7 +348,12 @@ Notes (personal writing):
       become folders, frontmatter is kept beside the body rather than shown as
       text, and `[[wikilinks]]` are rewritten into Polaris references once
       everything is in
-- [ ] Export, and the other formats worth reading in
+- [x] Export the other way: a note, a folder or a whole notebook, as a zip of
+      Markdown arranged the way a vault is on disk. The frontmatter goes back
+      where it was and the references become [[wikilinks]] again, so what comes
+      out re-imports as the same shape - and opens in Obsidian, or in a text
+      editor, or in nothing at all
+- [ ] The other formats worth reading in
 - [ ] A note handed to one person outside the notebook it is on
 
 Chat (talking to the people here):

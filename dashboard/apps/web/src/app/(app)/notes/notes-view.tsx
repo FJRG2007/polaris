@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
-import { Archive, ChevronRight, Move, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { Archive, ChevronRight, Download, Move, Pin, PinOff, Plus, Trash2 } from "lucide-react";
 import { ImportNotesDialog, NewNotebookDialog, NotebookPeopleDialog } from "./notebook-dialogs";
 
 /** How long a note sits untouched before it is written. Long enough not to
@@ -171,6 +171,17 @@ export function NotesView({ shelves, note }: { shelves: readonly ShelfData[]; no
                                 className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <Move className="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Export this note as Markdown"
+                                title="Export"
+                                onClick={() =>
+                                    window.location.assign(`/api/notes/export?scope=note&id=${note.id}`)
+                                }
+                                className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <Download className="size-4" />
                             </button>
                             <button
                                 type="button"

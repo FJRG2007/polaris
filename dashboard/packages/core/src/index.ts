@@ -32,6 +32,7 @@ export * from "./pleasantries.js";
 export * from "./paths.js";
 export * from "./scope.js";
 export * from "./notes-import.js";
+export * from "./notes-export.js";
 export * from "./telemetry.js";
 export * from "./format.js";
 export * from "./permissions.js";
