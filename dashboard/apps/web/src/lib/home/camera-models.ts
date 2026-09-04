@@ -345,6 +345,24 @@ export function connectionsFor(modelId: string | null | undefined): readonly str
     return cameraModel(modelId)?.connections ?? [];
 }
 
+/**
+ * The brand behind a make, for a camera that carries no model.
+ *
+ * Every camera added before the model list existed has a make and nothing else,
+ * and a list that shows a mark beside some rows and a blank beside others reads
+ * as a list that has lost something. Derived from the models rather than written
+ * out again, so a make added later cannot be forgotten here.
+ */
+export function brandForVendor(vendorId: string): string | null {
+    return CAMERA_MODELS.find((model) => model.connections.includes(vendorId))?.brand ?? null;
+}
+
+/** The brand to draw beside a camera: what its model says, and what its make
+ *  says for one that has no model. */
+export function brandOfCamera(camera: { modelId?: string | null; vendor: string }): string | null {
+    return cameraModel(camera.modelId)?.brand ?? brandForVendor(camera.vendor);
+}
+
 /** Whether a model can be pointed, which is the make's claim narrowed by the
  *  model's own: a battery camera has a fixed lens whatever the make generally
  *  does. */
