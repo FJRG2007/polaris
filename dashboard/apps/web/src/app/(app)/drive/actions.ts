@@ -21,6 +21,13 @@ import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import {
+    cancelDriveJob,
+    DRIVE_JOB_MAX_PATHS,
+    listDriveJobs,
+    startDriveJob,
+    type DriveJobView
+} from "@/lib/drive-jobs";
+import {
     authorizeDrive,
     requireDriveDriver,
     DriveAccessError,
@@ -618,6 +625,81 @@ export async function scheduleDeleteAction(
         metadata: { path, deleteAt: when.toISOString(), permanent }
     });
     revalidatePath("/drive");
+    return {};
+}
+
+/**
+ * Move a selection to the bin, or delete it, as one job.
+ *
+ * The screen used to call the single-item action once per path. Every one of
+ * those opened a connection to the storage and closed it again, so clearing a
+ * folder of seven thousand files was seven thousand handshakes at a NAS, the
+ * explorer was unusable while it ran, and closing the tab abandoned it halfway.
+ *
+ * This hands the whole list to a job that works it in batches over one open
+ * connection, and answers with the job so the panel can draw a bar. Everything
+ * is authorized here, before the job exists: the worker runs with nobody
+ * watching, so it must never be the thing that decides whether this was allowed.
+ */
+export async function startDriveJobAction(
+    connectionId: string,
+    kind: "trash" | "delete",
+    paths: string[]
+): Promise<{ job?: DriveJobView; error?: string }> {
+    const user = await requireUser();
+    if (paths.length === 0) return { error: "Nothing was selected." };
+    if (paths.length > DRIVE_JOB_MAX_PATHS) {
+        return { error: "That is more than one job can carry. Empty the folder instead." };
+    }
+
+    try {
+        // Every path, not a sample of them. A job is a list somebody may not have
+        // read to the end, and the one path in the middle that they could not
+        // touch is exactly the one this has to catch.
+        for (const path of paths) {
+            await authorizeDrive(user.id, connectionId, path, "delete");
+        }
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "Those items could not be removed.") };
+    }
+
+    const label =
+        paths.length === 1
+            ? `${kind === "trash" ? "Moving" : "Deleting"} 1 item`
+            : `${kind === "trash" ? "Moving" : "Deleting"} ${paths.length} items`;
+
+    try {
+        const job = await startDriveJob({
+            ownerId: user.id,
+            connectionId,
+            kind,
+            label: kind === "trash" ? `${label} to Trash` : `${label} permanently`,
+            paths
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: kind === "trash" ? "drive.trash" : "drive.delete",
+            targetType: "connection",
+            targetId: connectionId,
+            metadata: { paths: paths.length }
+        });
+        return { job };
+    } catch (caught) {
+        return { error: driveErrorMessage(caught, "That could not be started.") };
+    }
+}
+
+/** What this account has running, for the panel. Cheap on purpose: it is polled
+ *  while a job is going and answers from one indexed read. */
+export async function driveJobsAction(): Promise<{ jobs: DriveJobView[] }> {
+    const user = await requireUser();
+    return { jobs: await listDriveJobs(user.id) };
+}
+
+/** Stop one. What has already moved stays moved - this is "stop", not "undo". */
+export async function cancelDriveJobAction(id: string): Promise<{ error?: string }> {
+    const user = await requireUser();
+    await cancelDriveJob(user.id, id);
     return {};
 }
 

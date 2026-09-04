@@ -492,6 +492,59 @@ model NoteSpaceTeam {
 // expiry, a cap on opens, and the address allowlists - so this is gated by
 // lib/link-guards exactly as a share, a drop point and a snippet are, rather than
 // by rules written a fourth time.
+// A long job somebody started in Drive, still going after they closed the tab.
+//
+// Trashing seven thousand files was a loop of seven thousand server actions, each
+// opening its own connection to the NAS and closing it again - which is the
+// FileZilla failure exactly: a server hammered with one request per file when one
+// session would have done. It also died the moment the tab did, and the screen
+// that started it could not be used while it ran.
+//
+// So the work is a row. A worker takes it a batch at a time over ONE open driver,
+// writes down how far it has got, and the screen reads that - which is what makes
+// a progress bar possible, what lets somebody navigate away, and what makes
+// finishing survive a reload, a crash and a redeploy.
+//
+// Not a general queue. This is the shape of the one kind of work Drive has that
+// is worth minutes rather than seconds, and a table per shape beats a table that
+// has to describe every shape.
+model DriveJob {
+    id           String @id @default(uuid(7)) @db.Uuid
+    ownerId      String @db.Uuid
+    // Not a foreign key: a source can be a host: or container: pseudo-connection
+    // with no row of its own - see the drive prefixed-sources rule.
+    connectionId String
+    // trash | delete | restore - see DRIVE_JOB_KINDS in @polaris/core.
+    kind         String
+    /// What the screen calls it, decided when it was started so the wording never
+    /// drifts from what the reader pressed.
+    label        String
+    /// The paths still to do, as a JSON string array. Rewritten after each batch,
+    /// which is what makes an interrupted job resume where it stopped rather than
+    /// starting again on files it has already moved.
+    pending      String @default("[]")
+    total        Int    @default(0)
+    done         Int    @default(0)
+    failed       Int    @default(0)
+    /// The first refusal, kept for the screen. The rest of the batch still runs:
+    /// one file that will not move is not a reason to leave the other six
+    /// thousand where they are.
+    error        String?
+    /// queued | running | finished | cancelled - see DRIVE_JOB_STATES.
+    state        String @default("queued")
+    /// Held by whichever process is working it. Expiry rather than a flag, so a
+    /// worker that dies mid-batch hands the job back instead of holding it for
+    /// ever.
+    leaseUntil   DateTime?
+    startedAt    DateTime?
+    finishedAt   DateTime?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([ownerId, state])
+    @@index([state, leaseUntil])
+}
+
 model NoteShare {
     id      String @id @default(uuid(7)) @db.Uuid
     noteId  String @unique @db.Uuid

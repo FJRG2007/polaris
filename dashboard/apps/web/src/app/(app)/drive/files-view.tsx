@@ -19,6 +19,7 @@ import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
 import { formatBytes, isLiteralQuery, matchesLiterally } from "@polaris/core";
+import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
@@ -302,6 +303,7 @@ export function FilesView({
     uploading,
     fileInput,
     href,
+    abilities,
     onNewFolder,
     onNewFile,
     onUpload,
@@ -340,6 +342,15 @@ export function FilesView({
     uploading: boolean;
     fileInput: React.RefObject<HTMLInputElement | null>;
     href: (id: string, target: string) => string;
+    /**
+     * What this reader may do here.
+     *
+     * The server decides again on every write and stays the decider - but a
+     * screen offering New folder, Rename and Delete to somebody with read-only
+     * access lies four times and then shows an error, which reads as Polaris
+     * being broken rather than as a permission they never had.
+     */
+    abilities: DriveAbilities;
     onNewFolder: () => void;
     onNewFile: () => void;
     onUpload: (items: { file: File; relPath: string }[]) => void;
@@ -1142,7 +1153,7 @@ export function FilesView({
                         ) : null}
                     </>
                 )}
-                {many ? null : (
+                {many || !abilities.write ? null : (
                     <ContextMenuItem onSelect={() => startRename(entry)}>
                         <Pencil className="size-4" />
                         Rename
@@ -1159,18 +1170,22 @@ export function FilesView({
                     {many ? `Cut ${targets.length} items` : "Cut"}
                     <MenuShortcut>Ctrl+X</MenuShortcut>
                 </ContextMenuItem>
-                <ContextMenuItem
-                    onSelect={() => {
-                        for (const item of targets) duplicate(item);
-                    }}
-                >
-                    <Files className="size-4" />
-                    Duplicate
-                </ContextMenuItem>
-                <ContextMenuItem onSelect={() => openMove(targets)}>
-                    <FolderInput className="size-4" />
-                    Move to...
-                </ContextMenuItem>
+                {abilities.write ? (
+                    <>
+                        <ContextMenuItem
+                            onSelect={() => {
+                                for (const item of targets) duplicate(item);
+                            }}
+                        >
+                            <Files className="size-4" />
+                            Duplicate
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => openMove(targets)}>
+                            <FolderInput className="size-4" />
+                            Move to...
+                        </ContextMenuItem>
+                    </>
+                ) : null}
                 <ContextMenuItem
                     onSelect={() =>
                         void navigator.clipboard.writeText(
@@ -1240,6 +1255,8 @@ export function FilesView({
                         ) : null}
                     </>
                 )}
+                {abilities.remove ? (
+                <>
                 <ContextMenuSeparator />
                 <ContextMenuSub>
                     <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
@@ -1285,6 +1302,8 @@ export function FilesView({
                         </ContextMenuItem>
                     </ContextMenuSubContent>
                 </ContextMenuSub>
+                </>
+                ) : null}
             </ContextMenuContent>
         );
     }
@@ -1709,6 +1728,7 @@ export function FilesView({
                                 <span className="hidden sm:inline">Request files</span>
                             </Button>
                         ) : null}
+                        {abilities.write ? (
                         <Button
                             size="sm"
                             variant="ghost"
@@ -1720,13 +1740,14 @@ export function FilesView({
                             <FolderPlus className="size-4" />
                             <span className="hidden sm:inline">New folder</span>
                         </Button>
+                        ) : null}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    disabled={uploading}
-                                    title="Upload"
+                                    disabled={uploading || !abilities.write}
+                                    title={abilities.write ? "Upload" : "You can read this, not change it"}
                                     aria-label="Upload"
                                 >
                                     <Upload className="size-4" />

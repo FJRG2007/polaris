@@ -34,6 +34,7 @@ export * from "./scope.js";
 export * from "./search-text.js";
 export * from "./labels.js";
 export * from "./text-safety.js";
+export * from "./drive-jobs.js";
 export * from "./notes-import.js";
 export * from "./notes-export.js";
 export * from "./telemetry.js";

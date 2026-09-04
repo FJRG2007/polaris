@@ -53,6 +53,9 @@ function render(extra: { onShareFolder?: () => void }): string {
             uploading={false}
             fileInput={{ current: null }}
             href={(id, target) => `/drive?c=${id}&p=${target}`}
+            // Everything on offer, so what these assert stays about the gesture
+            // rather than about who is allowed to make it.
+            abilities={{ read: true, write: true, remove: true }}
             onNewFolder={() => {}}
             onNewFile={() => {}}
             onUpload={() => {}}

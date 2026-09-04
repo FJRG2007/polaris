@@ -22,6 +22,7 @@ import { sweepRetention } from "@/lib/retention-service";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { sweepCrashLoops } from "@/lib/apps/games-health";
 import { expireTransfers } from "@/lib/drive-transfer-service";
+import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
@@ -231,6 +232,27 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // zero; nothing is written and nothing is lost.
         leaseMs: null,
         run: pruneTelemetry
+    },
+    {
+        key: "drive-jobs",
+        // The backstop behind the kick a button press gives a new job: one whose
+        // worker died mid-batch, one queued by a process that then restarted, one
+        // left running by a container that went away during a rollover. Often
+        // enough that a lost job is picked up in a minute rather than an hour.
+        everyMs: Number(process.env.POLARIS_DRIVE_JOBS_MS) || MINUTE,
+        // Unleased. Each job is taken under its own lease inside the sweep, which
+        // is the lock that matters - two runners here find nothing to take and
+        // return.
+        leaseMs: null,
+        run: sweepDriveJobs
+    },
+    {
+        key: "drive-jobs-prune",
+        // Daily. A finished job is worth keeping only long enough for the screen
+        // that started it to see that it finished.
+        everyMs: Number(process.env.POLARIS_DRIVE_JOBS_PRUNE_MS) || 24 * HOUR,
+        leaseMs: null,
+        run: pruneDriveJobs
     },
     {
         key: "backups",
