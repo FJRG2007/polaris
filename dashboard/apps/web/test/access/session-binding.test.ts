@@ -9,10 +9,12 @@
  * So the false positives are enumerated. A browser updating itself. A phone that
  * cannot report its platform. A session opened before any of this existed and
  * carrying no address. A laptop moving between wifi and a hotspot while the
- * account has only asked for the client binding. And the one that was reported
+ * account has only asked for the client binding. And the two that were reported
  * from a live deployment: a Brave that named itself in the client hints on the
- * request that opened the session, and had none to send on a later one - reading
- * as Brave against Chrome, which is one browser and was treated as two.
+ * request that opened the session and had none to send on a later one - reading
+ * as Brave against Chrome, which is one browser and was treated as two - and the
+ * same laptop with its developer tools open, whose device toolbar puts an
+ * iPhone's user-agent on it and leaves it exactly where it was.
  *
  * And the refusals are the two the whole thing exists for: a cookie pasted into
  * a different browser, and a cookie used from a different address by an account
@@ -29,7 +31,8 @@ const PHONE: SessionOrigin = {
     browser: "Brave",
     claimedOs: "Android",
     claimedBrowser: "Chrome",
-    hinted: true,
+    brandHinted: true,
+    platformHinted: true,
     ip: "203.0.113.7",
     handheld: true
 };
@@ -46,7 +49,8 @@ const LAPTOP: SessionOrigin = {
     browser: "Brave",
     claimedOs: "Windows",
     claimedBrowser: "Chrome",
-    hinted: true,
+    brandHinted: true,
+    platformHinted: true,
     ip: "198.51.100.4",
     handheld: false
 };
@@ -57,7 +61,8 @@ const SAME: RequestOrigin = {
     browser: "Brave",
     claimedOs: "Windows",
     claimedBrowser: "Chrome",
-    hinted: true,
+    brandHinted: true,
+    platformHinted: true,
     ip: "198.51.100.4"
 };
 
@@ -78,33 +83,54 @@ describe("a cookie somewhere it should not be", () => {
                 browser: "Chrome",
                 claimedOs: "Windows",
                 claimedBrowser: "Chrome",
-                hinted: true,
+                brandHinted: true,
+                platformHinted: true,
                 ip: LAPTOP.ip
             })
         ).toBe("client");
     });
 
-    it("is refused when the system is not the one it was opened on", () => {
-        // The reported shape exactly: taken off Windows, replayed from Linux.
-        // Caught whether or not the second request carried any hints, because
-        // the user-agent names the system on its own.
+    it("is refused when the system is not the one it was opened on, from elsewhere", () => {
+        // Taken off Windows, replayed from Linux, at another address - which is
+        // the half that makes it a second machine rather than the first one
+        // describing itself differently. Caught whether or not the second
+        // request carried any hints, because the user-agent names the system on
+        // its own.
         expect(
             bindingBreach(rules(), LAPTOP, {
                 os: "Linux",
                 browser: "Brave",
                 claimedOs: "Linux",
                 claimedBrowser: "Chrome",
-                hinted: true,
-                ip: LAPTOP.ip
+                brandHinted: true,
+                platformHinted: true,
+                ip: "203.0.113.99"
             })
         ).toBe("client");
         expect(
             bindingBreach(rules(), LAPTOP, {
-                os: "Chrome",
+                os: "Linux",
                 browser: "Chrome",
                 claimedOs: "Linux",
                 claimedBrowser: "Chrome",
-                hinted: false,
+                brandHinted: false,
+                platformHinted: false,
+                ip: "203.0.113.99"
+            })
+        ).toBe("client");
+    });
+
+    it("is refused for the browser alone, wherever the request came from", () => {
+        // The browser half needs no corroborating address: a browser does not
+        // become another browser without the cookie being carried into one.
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "Windows",
+                browser: "Firefox",
+                claimedOs: "Windows",
+                claimedBrowser: "Firefox",
+                brandHinted: false,
+                platformHinted: false,
                 ip: LAPTOP.ip
             })
         ).toBe("client");
@@ -143,7 +169,8 @@ describe("the same person, still there", () => {
                 browser: "Chrome",
                 claimedOs: "Windows",
                 claimedBrowser: "Chrome",
-                hinted: false,
+                brandHinted: false,
+                platformHinted: false,
                 ip: LAPTOP.ip
             })
         ).toBeNull();
@@ -155,9 +182,86 @@ describe("the same person, still there", () => {
         const opened: SessionOrigin = {
             ...LAPTOP,
             browser: "Chrome",
-            hinted: false
+            brandHinted: false,
+            platformHinted: false
         };
         expect(bindingBreach(rules(), opened, SAME)).toBeNull();
+    });
+
+    it("survives the device toolbar in a set of developer tools", () => {
+        // The second report from a live deployment. Pressing F12 restores the
+        // device the tools were last emulating, the browser starts sending an
+        // iPhone's user-agent from the same Windows laptop, and the session was
+        // ended with an alert telling its owner somebody else had used it.
+        //
+        // The brands still say Brave, because the tools rewrite the user-agent
+        // and not who the browser is. The address is the one it has been at all
+        // along. Nothing moved.
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "iOS",
+                browser: "Brave",
+                claimedOs: "iOS",
+                claimedBrowser: "Safari",
+                brandHinted: true,
+                platformHinted: false,
+                ip: LAPTOP.ip
+            })
+        ).toBeNull();
+    });
+
+    it("survives an emulated device that takes the hints with it", () => {
+        // The same tools set to a custom user-agent, which drops the brands as
+        // well. Both sides fall back to what the user-agent claims, and Brave's
+        // claim is Chrome either way - so the browser matches, the system does
+        // not, and the address says the laptop never left the desk.
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "Linux",
+                browser: "Chrome",
+                claimedOs: "Linux",
+                claimedBrowser: "Chrome",
+                brandHinted: false,
+                platformHinted: false,
+                ip: LAPTOP.ip
+            })
+        ).toBeNull();
+    });
+
+    it("survives a phone asked for the desktop version of a page", () => {
+        // Android's "request desktop site" sends a desktop Linux user-agent and
+        // goes on saying Android in the platform hint. Read like with like, the
+        // hint is what both sides are compared on and the two agree.
+        expect(
+            bindingBreach(rules(), PHONE, {
+                os: "Android",
+                browser: "Brave",
+                claimedOs: "Linux",
+                claimedBrowser: "Chrome",
+                brandHinted: true,
+                platformHinted: true,
+                ip: PHONE.ip
+            })
+        ).toBeNull();
+    });
+
+    it("survives a request that carried the brands and not the platform", () => {
+        // One header can arrive without the other, and each half of the reading
+        // is compared against the header it came from. Comparing a hinted
+        // browser against a user-agent's is what signed people out for using
+        // Brave; comparing a hinted system against a user-agent's is what signed
+        // them out for opening their developer tools.
+        expect(
+            bindingBreach(rules(), LAPTOP, {
+                os: "Windows",
+                browser: "Brave",
+                claimedOs: "Windows",
+                claimedBrowser: "Chrome",
+                brandHinted: true,
+                platformHinted: false,
+                ip: LAPTOP.ip
+            })
+        ).toBeNull();
     });
 
     it("survives the browser updating itself", () => {
