@@ -10,9 +10,11 @@
  * something in. This card is that window.
  *
  * Two settings, and the copy is honest about which one can be wrong. The client
- * binding cannot: a browser update changes a version, never the name of the
- * browser or of the system underneath it, so nothing legitimate crosses it. The
- * address binding can, and the note on each choice says exactly when.
+ * binding cannot: a browser update changes a version and never a name, and the
+ * one name a browser does rewrite about itself - the system, which any set of
+ * developer tools will put a phone's on a laptop - is only acted on when the
+ * address changed with it. The address binding can be wrong, and the note on
+ * each choice says exactly when.
  */
 
 import { useState } from "react";
@@ -72,9 +74,10 @@ export function SessionBindingCard({
                         <span className="min-w-0">
                             <span className="block text-sm">Only the browser it was opened in</span>
                             <span className="block text-xs text-muted-foreground">
-                                A session used from a different browser or a different operating
-                                system is ended and you are told. Nothing you do normally crosses
-                                this: an update changes a version, not a name.
+                                A session used from a different browser is ended and you are told,
+                                as is one used from a different operating system somewhere else.
+                                Nothing you do normally crosses this: an update changes a version,
+                                not a name.
                             </span>
                         </span>
                         <Switch
