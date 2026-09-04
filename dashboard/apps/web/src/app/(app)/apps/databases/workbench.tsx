@@ -68,6 +68,28 @@ import {
  *  for. */
 const PAGE = 100;
 
+/**
+ * How the tables are ordered in the list.
+ *
+ * By name is where a list of names belongs, and it is the default. By size is the
+ * question somebody opening a database they did not build actually arrives with -
+ * which of these has anything in it - and answering it by reading a hundred names
+ * and their counts is reading a hundred names and their counts.
+ *
+ * The count is an estimate the engine already keeps, never a scan, so ordering by
+ * it costs nothing: the numbers are on the rows before this is offered.
+ */
+const RELATION_ORDERS = [
+    { value: "name", label: "Name" },
+    { value: "rows", label: "Rows" }
+] as const;
+
+type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
+
+/** Where this browser's preference is kept. A habit of the person reading rather
+ *  than a property of the database, so it belongs here and not in a row. */
+const ORDER_KEY = "polaris.databases.order";
+
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
@@ -77,6 +99,20 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
     const [find, setFind] = useState("");
     const [tab, setTab] = useState<"data" | "query" | "stats">("data");
     const [error, setError] = useState("");
+    /**
+     * Read after mount rather than at render: what is in this browser's storage
+     * is not what the server built the markup from, and reading it during the
+     * first render would draw one order and then change it under the reader.
+     */
+    const [order, setOrder] = useState<RelationOrder>("name");
+    useEffect(() => {
+        try {
+            const kept = window.localStorage.getItem(ORDER_KEY);
+            if (kept === "rows" || kept === "name") setOrder(kept);
+        } catch {
+            // Storage off, or a private window. Name is a fine answer.
+        }
+    }, []);
 
     const load = useCallback(
         async (chosen: string | null) => {
@@ -120,9 +156,23 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
     );
     const shown = useMemo(() => {
         const needle = find.trim();
-        if (!needle) return relations ?? [];
-        return fuse.search(needle).map((hit) => hit.item);
-    }, [fuse, relations, find]);
+        // A search is already ranked by how well each name matched; re-ordering
+        // it by anything else throws that away.
+        if (needle) return fuse.search(needle).map((hit) => hit.item);
+        const list = [...(relations ?? [])];
+        if (order === "rows") {
+            // A table whose size the engine does not keep sinks rather than
+            // floating on a missing value, and ties fall back to the name so the
+            // list is the same list every time it is drawn.
+            list.sort(
+                (left, right) =>
+                    (right.rows ?? -1) - (left.rows ?? -1) || left.name.localeCompare(right.name)
+            );
+        } else {
+            list.sort((left, right) => left.name.localeCompare(right.name));
+        }
+        return list;
+    }, [fuse, relations, find, order]);
 
     return (
         <div className="flex min-h-0 flex-1 gap-4">
@@ -153,6 +203,32 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                         aria-label="Find a table"
                         value={find}
                         onChange={(event) => setFind(event.target.value)}
+                    />
+                </div>
+
+                {/* Under the search rather than beside it: the sidebar is narrow,
+                    and two controls on one line there is two controls nobody can
+                    read the labels of. */}
+                <div className="flex items-center gap-2 px-1">
+                    <span className="text-xs text-muted-foreground">Order by</span>
+                    <Select
+                        value={order}
+                        onValueChange={(next) => {
+                            const chosen = next as RelationOrder;
+                            setOrder(chosen);
+                            try {
+                                window.localStorage.setItem(ORDER_KEY, chosen);
+                            } catch {
+                                // The list is still ordered; it simply does not
+                                // remember, which is the right thing to lose.
+                            }
+                        }}
+                        aria-label="Order the tables by"
+                        className="h-7 flex-1 text-xs"
+                        options={RELATION_ORDERS.map((entry) => ({
+                            value: entry.value,
+                            label: entry.label
+                        }))}
                     />
                 </div>
 

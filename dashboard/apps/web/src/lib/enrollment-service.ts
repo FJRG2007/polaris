@@ -39,6 +39,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { setLocalHostId } from "@/lib/local-server";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { getHostLanIp } from "@/lib/host-address";
 import { enrollmentCommand } from "@/lib/enrollment-script";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptCredentials, encryptSecret } from "@polaris/storage";
@@ -74,6 +75,14 @@ const FETCH_WINDOW_MS = 10 * 60 * 1000;
 const REFUSE_LIMIT = 10;
 const REFUSE_WINDOW_MS = 10 * 60 * 1000;
 
+/** The same command, addressed at Polaris on the local network. */
+export interface LocalEnrollment {
+    command: string;
+    /** The address it names, so the screen can say which one it is offering. */
+    base: string;
+    insecureTransport: boolean;
+}
+
 /** What the operator is shown after opening an enrollment. */
 export interface OpenedEnrollment {
     id: string;
@@ -85,6 +94,22 @@ export interface OpenedEnrollment {
     /** True when the command hands a plain-HTTP URL to a root shell, which is
      *  worth saying out loud rather than quietly doing. */
     insecureTransport: boolean;
+    /**
+     * The same command aimed at this machine on the LAN, when there is one to
+     * aim at.
+     *
+     * The command above names the configured domain, which is right whenever the
+     * server being added can reach the internet - it is the address that keeps
+     * working when the machine moves, and the one with a certificate. It is
+     * useless on a box that has no way out, or on a network where this Polaris is
+     * only reachable by its own name, and the operator was left with a command
+     * that could not resolve and nothing on screen saying why.
+     *
+     * Absent when the configured address already is the local one, and when no
+     * LAN address is published - an install without the mDNS responder knows
+     * nothing about the network it is on and must not guess at it.
+     */
+    local?: LocalEnrollment;
 }
 
 /**
@@ -131,7 +156,30 @@ export async function openEnrollment(
         id: row.id,
         command: enrollmentCommand(base, token),
         expiresAt: expiresAt.toISOString(),
-        insecureTransport: base.startsWith("http://")
+        insecureTransport: base.startsWith("http://"),
+        local: await localEnrollment(base, token)
+    };
+}
+
+/**
+ * The LAN address a machine with no way out can call back on.
+ *
+ * The published IPv4 rather than `polaris.local`: mDNS is a courtesy a headless
+ * server often does not resolve, and an address that does not resolve is exactly
+ * the failure this exists to avoid. Plain HTTP by necessity - the certificate is
+ * for the domain - which the panel says out loud beside it.
+ */
+async function localEnrollment(base: string, token: string): Promise<LocalEnrollment | undefined> {
+    const ip = await getHostLanIp().catch(() => null);
+    if (!ip) return undefined;
+    const localBase = `http://${ip}`;
+    // Nothing to offer when the configured address already is this one: two
+    // identical commands behind a switch is a switch that does nothing.
+    if (base.replace(/\/+$/, "") === localBase) return undefined;
+    return {
+        command: enrollmentCommand(localBase, token),
+        base: localBase,
+        insecureTransport: true
     };
 }
 

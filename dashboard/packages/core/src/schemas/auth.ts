@@ -7,13 +7,36 @@
 import { z } from "zod";
 import { isReservedUsername, RESERVED_USERNAME_MESSAGE } from "./usernames.js";
 import { normalizePersonName } from "../names.js";
+import { nameRefusal } from "../text-safety.js";
 import { pendingGrantSchema } from "./sharing.js";
 import { accessRulesSchema } from "./account-security.js";
 import { MAX_ROLE_NAME_LENGTH, PERMISSIONS } from "../permissions.js";
 import { IDENTITY_PASSWORD_MESSAGE, passwordMatchesIdentity } from "../password-safety.js";
 
 export const emailField = z.string().trim().min(1, "Email is required").email("Enter a valid email");
-export const nameField = z.string().trim().min(1, "Name is required").max(120);
+
+/**
+ * A name field refuses what is not a name.
+ *
+ * Emoji, zero-width characters, direction overrides and the tag block, all of
+ * which end up printed beside everything the account does - in a roster, in an
+ * audit line, in the subject of a message. Two of the three are impersonation
+ * with no forgery in it: a zero-width space makes two accounts look identical
+ * and compare differently, and U+202E rewrites the line it is printed in.
+ *
+ * Declared on the field rather than in each form, so every screen and every
+ * server action that takes a name gets it, and the message says which of the
+ * three it was - see `text-safety`. Every script a name is actually written in
+ * passes, the joiners Persian and the Indic scripts need included.
+ */
+function readableName<T extends z.ZodType<string, z.ZodTypeDef, unknown>>(field: T) {
+    return field.superRefine((value, ctx) => {
+        const refusal = nameRefusal(value);
+        if (refusal) ctx.addIssue({ code: z.ZodIssueCode.custom, message: refusal });
+    });
+}
+
+export const nameField = readableName(z.string().trim().min(1, "Name is required").max(120));
 /** A person's name as it is stored: what they typed, written the same way it
  *  would have been from any other keyboard. A phone capitalizes sentences rather
  *  than words, so a name typed on one arrives as "juan perez" and a name typed on
@@ -31,20 +54,19 @@ export const personNameField = nameField.transform(normalizePersonName);
  * case on purpose. Whitespace is still settled - a name with a stray double
  * space in it is a typo in any language - and that is all.
  */
-export const displayNameField = z
-    .string()
-    .trim()
-    .min(1, "Display name is required")
-    .max(120, "At most 120 characters")
-    .transform((value) => value.replace(/\s+/g, " "));
+export const displayNameField = readableName(
+    z
+        .string()
+        .trim()
+        .min(1, "Display name is required")
+        .max(120, "At most 120 characters")
+).transform((value) => value.replace(/\s+/g, " "));
 
 /** One half of a person's name. Optional everywhere: an account is usable
  *  without it, and every account that predates the two fields has neither. */
-export const nameHalfField = z
-    .string()
-    .trim()
-    .max(120, "At most 120 characters")
-    .transform(normalizePersonName);
+export const nameHalfField = readableName(
+    z.string().trim().max(120, "At most 120 characters")
+).transform(normalizePersonName);
 
 /** Refuse a password built out of the account it protects. Declared on the object
  *  because a password field cannot see the name and address beside it, and the
