@@ -1935,6 +1935,54 @@ export async function redeployForEnvScope(
     }
 }
 
+/**
+ * Where a deployed application reports its crashes, handed to it without
+ * anybody setting anything up.
+ *
+ * The project it belongs to gets a telemetry project the first time one of its
+ * services is deployed, and every service in it reports to the same address -
+ * which service and which environment an event came from travels on the event,
+ * the way every Sentry client already sends it.
+ *
+ * Two names for one value: `SENTRY_DSN` is what every client reads without being
+ * told to, and `POLARIS_TELEMETRY_DSN` is what an application that wants to be
+ * explicit about it can read instead.
+ *
+ * The address is the one Polaris hands out everywhere else. A container that
+ * cannot resolve it - a LAN-only install whose app domain is an mDNS name - will
+ * simply fail to send, and the operator can point it somewhere reachable by
+ * setting `SENTRY_DSN` themselves, which wins over this. Never overwritten, for
+ * exactly that reason: somebody who has set their own is reporting to their own
+ * Sentry and must keep doing so.
+ */
+async function telemetryEnv(environmentId: string): Promise<Record<string, string>> {
+    try {
+        const environment = await prisma.environment.findUnique({
+            where: { id: environmentId },
+            select: {
+                name: true,
+                project: { select: { id: true, name: true, slug: true, ownerId: true, orgId: true } }
+            }
+        });
+        if (!environment) return {};
+
+        const [{ projectForDeploy, dsnFor }, { appBaseUrl }] = await Promise.all([
+            import("@/lib/telemetry/project-service"),
+            import("@/lib/domain-service")
+        ]);
+        const project = await projectForDeploy(environment.project);
+        return {
+            SENTRY_DSN: dsnFor(project, await appBaseUrl()),
+            POLARIS_TELEMETRY_DSN: dsnFor(project, await appBaseUrl()),
+            SENTRY_ENVIRONMENT: environment.name
+        };
+    } catch (error) {
+        // A deploy must not fail because the crash reporting could not be set up.
+        console.error("polaris: could not prepare a telemetry address for a deploy:", error);
+        return {};
+    }
+}
+
 async function mergedEnv(
     environmentId: string,
     applicationId: string
@@ -1953,7 +2001,8 @@ async function mergedEnv(
             (a.scopeType === "environment" ? -1 : 1) - (b.scopeType === "environment" ? -1 : 1)
     );
     const masterKey = loadEnv().POLARIS_MASTER_KEY;
-    const env: Record<string, string> = {};
+    // Underneath everything the operator set, so their own value wins.
+    const env: Record<string, string> = await telemetryEnv(environmentId);
     for (const row of rows) {
         if (row.isSecret && row.encryptedValue && row.valueNonce) {
             env[row.key] = decryptSecret(

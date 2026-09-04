@@ -13,6 +13,7 @@ import {
     Bot,
     Blocks,
     BookOpen,
+    Bug,
     Building2,
     CalendarRange,
     Camera,
@@ -513,6 +514,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: ChartColumn,
             group: OPERATIONS_GROUP,
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
+        },
+        {
+            label: "Telemetry",
+            href: "/apps/telemetry",
+            icon: Bug,
+            group: OPERATIONS_GROUP,
+            keywords: ["errors", "exceptions", "crashes", "stack trace", "sentry", "issues", "logging"]
         },
         {
             label: "Databases",

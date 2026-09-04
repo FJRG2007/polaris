@@ -14,6 +14,12 @@ export async function register(): Promise<void> {
         console.error("polaris: unhandled rejection (server kept alive):", reason);
     });
 
+    // And write them down. The console line is what somebody reading container
+    // logs looks for; this is what somebody who was not watching finds
+    // afterwards, on the same screen a deployed application reports to.
+    const { watchProcessFailures } = await import("./lib/telemetry/capture");
+    watchProcessFailures();
+
     // Detect the edition and keep it live: probe polaris-hostd on startup and on
     // an interval, folding its capability report into the shared snapshot that
     // getCapabilities() serves. Without this the dashboard is stuck reporting the
