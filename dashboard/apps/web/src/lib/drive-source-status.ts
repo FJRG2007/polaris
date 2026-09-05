@@ -13,9 +13,16 @@
  * port would report a live device as off, which is worse than not knowing.
  * Sources with no machine to reach (a bucket, a local path, a container on this
  * box) are not probed and simply do not appear in the answer.
+ *
+ * The machine Polaris runs on is probed like any other - it is enrolled like any
+ * other, and Drive reaches its filesystem the same way - but it is MARKED, and
+ * that mark is what stops the screen saying something false. A box that is not
+ * answering and a box Polaris is running on top of are different facts, and only
+ * one of them is about a machine being off.
  */
 
 import { probeTcp } from "./server-status";
+import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import type { SourceStatus } from "@/app/(app)/drive/types";
 import { listAccessibleConnections } from "./storage-service";
 
@@ -75,15 +82,24 @@ export function sourceEndpoint(config: Record<string, unknown>): { host: string;
  * reported up, so the browser treats them as unknown and browses as before.
  */
 export async function driveSourceStatuses(userId: string): Promise<SourceStatus[]> {
-    const connections = await listAccessibleConnections(userId);
+    const [connections, identity] = await Promise.all([
+        listAccessibleConnections(userId),
+        // Read once for the whole sweep rather than per source: it is three
+        // settings reads and the answer is the same for all of them.
+        localMachineIdentity().catch(() => null)
+    ]);
     const probed = await Promise.all(
         connections.map(async (connection): Promise<SourceStatus | null> => {
-            const endpoint = sourceEndpoint(parseConfig(connection.config));
+            const config = parseConfig(connection.config);
+            const endpoint = sourceEndpoint(config);
             if (!endpoint) return null;
             const { detail } = await probeTcp(endpoint.host, endpoint.port);
             return {
                 id: connection.id,
                 state: detail === null ? "up" : "down",
+                local: Boolean(
+                    identity && isLocalMachine({ address: endpoint.host }, identity)
+                ),
                 detail,
                 // What was dialled, so a refusal names something the reader can
                 // act on rather than only what went wrong.

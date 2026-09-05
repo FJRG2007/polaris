@@ -328,6 +328,11 @@ export function DriveExplorer({
     const downEndpoint =
         (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) || null;
     const unreachable = downReason(connectionId);
+    /** Whether the source being looked at is the machine Polaris runs on. It
+     *  changes what the failure means and what is worth offering about it. */
+    const downIsLocal = Boolean(
+        connectionId && reachability?.find((entry) => entry.id === connectionId)?.local
+    );
     const anyDown = connections.some((connection) => downReason(connection.id) !== null);
 
     const load = useCallback(
@@ -704,11 +709,16 @@ export function DriveExplorer({
                                 ? `/apps/servers/${connectionId.slice("host:".length)}`
                                 : null
                         }
+                        // No id when it is this machine: the search skips
+                        // Polaris' own address by design, so it could only ever
+                        // come back with "not on this network" about the box it
+                        // is running on.
                         hostId={
-                            isServerSource(connectionId)
+                            isServerSource(connectionId) && !downIsLocal
                                 ? connectionId.slice("host:".length)
                                 : null
                         }
+                        local={downIsLocal}
                         onRecheck={recheckSources}
                     />
                 ) : selectedConnection?.needsRekey ? (
@@ -1360,6 +1370,7 @@ function UnreachableServer({
     endpoint,
     serverHref,
     hostId,
+    local,
     onRecheck
 }: {
     name: string;
@@ -1372,6 +1383,8 @@ function UnreachableServer({
     serverHref: string | null;
     /** The server's id, when the source is one. What the search needs. */
     hostId: string | null;
+    /** Whether this is the machine Polaris runs on. */
+    local: boolean;
     onRecheck: () => void;
 }) {
     /**
@@ -1432,9 +1445,19 @@ function UnreachableServer({
             <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 size-5 shrink-0 text-danger" />
                 <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-medium">{name} is not answering</h3>
+                    {/* The machine Polaris runs on cannot be "not answering":
+                        it is holding up the page the sentence would be printed
+                        on. What has failed is Polaris reaching its own host from
+                        inside its container, which is a different fault with a
+                        different answer, and saying the first sends somebody to
+                        check a machine that is plainly fine. */}
+                    <h3 className="text-sm font-medium">
+                        {local ? `Polaris cannot reach ${name} from inside itself` : `${name} is not answering`}
+                    </h3>
                     <p className="text-sm text-muted-foreground">
-                        {detail}. Its files are unavailable until it is back.
+                        {local
+                            ? `${name} is the machine Polaris runs on, so it is not off - Polaris is on it. What is not working is the way Polaris reaches its files, which is a connection out of its own container and back to this machine.`
+                            : `${detail}. Its files are unavailable until it is back.`}
                     </p>
                     {/* The address it dialled, which is what turns a reason into
                         something somebody can act on: "that address does not

@@ -2,11 +2,12 @@ import { prisma } from "@polaris/db";
 import { listHosts } from "@/lib/host-service";
 import { LOCAL_SERVER_ID } from "@polaris/core";
 import { listAlarms } from "@/lib/watch-service";
-import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import { WatchSubjectDetail } from "@/app/(app)/watch/watch-subject-detail";
+import { MACHINE_PERMISSION, offeredBreakdowns } from "@/lib/watch/subject-breakdown";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,10 @@ export default async function WatchSubjectPage({
 
     const owned = await listAlarms(user.id);
     const watching = (targetId: string) => owned.filter((alarm) => alarm.targetId === targetId);
+    // Whether a card may be opened to see what is behind it depends on what is
+    // deployed here and on how much of the machine this reader is allowed to see,
+    // so it is settled here rather than guessed at in the browser.
+    const viewer = { id: user.id, canReadMachine: await userHasManage(user, MACHINE_PERMISSION) };
 
     if (kind === "server") {
         const [hosts, identity] = await Promise.all([listHosts(user.id), localMachineIdentity()]);
@@ -54,6 +59,7 @@ export default async function WatchSubjectPage({
                     // enrolled as, which is what it is called everywhere alarms
                     // are made - the local subject holds samples, not targets.
                     alarms={watching(localHost?.id ?? LOCAL_SERVER_ID)}
+                    breakdowns={await offeredBreakdowns(viewer, { kind: "server", id })}
                 />
             );
         }
@@ -70,6 +76,7 @@ export default async function WatchSubjectPage({
                 name={host.name}
                 detail={`${host.username}@${host.address}`}
                 alarms={watching(host.id)}
+                breakdowns={await offeredBreakdowns(viewer, { kind: "server", id })}
             />
         );
     }
@@ -93,6 +100,7 @@ export default async function WatchSubjectPage({
             projectId={app.environment.projectId}
             serviceHref={`/apps/deploy/${app.environment.projectId}?service=${app.id}`}
             alarms={watching(app.id)}
+            breakdowns={await offeredBreakdowns(viewer, { kind: "service", id: app.id })}
         />
     );
 }

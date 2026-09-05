@@ -28,6 +28,23 @@ export interface SourceStatus {
     /** The Drive source id, prefix included. */
     id: string;
     state: "up" | "down";
+    /**
+     * Whether this source is the machine Polaris itself runs on.
+     *
+     * Carried because it changes what a failure MEANS, and the screen was saying
+     * something false without it. "This machine is not answering" about the box
+     * Polaris is running on is a sentence contradicted by the page it is printed
+     * on - the machine is plainly up, or none of this would be on screen. What
+     * has actually failed is Polaris reaching its own host, from inside the
+     * container, at the address it was enrolled under. That is a different fault
+     * with a different answer, and it is the one worth naming.
+     *
+     * It also decides whether looking for the machine on the network is worth
+     * offering. It is not: that search skips Polaris' own address by design, so
+     * for this source it can only ever come back with "not on this network",
+     * about a machine that is underneath it.
+     */
+    local?: boolean;
     /** Why it is not answering, in the words the connection used. */
     detail: string | null;
     /**
