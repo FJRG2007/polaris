@@ -263,6 +263,34 @@ export function describeClient(
     };
 }
 
+/**
+ * The same browser, however many times it has updated itself.
+ *
+ * A user-agent is not a device identifier, but it is the only thing a browser
+ * offers, and the version numbers in it are the part that changes on their own.
+ * Chrome writes a new one every few weeks without being asked; the machine, the
+ * system, the architecture and every other token stay exactly as they were. So a
+ * register that keys on the raw string sees a device it has never met each time
+ * a browser updates - and whatever that register was protecting starts over on
+ * somebody who changed nothing.
+ *
+ * Only the versions go. `Chrome/131.0.6778.86` and `Chrome/132.0.6834.83` come
+ * back the same; `Windows NT 10.0`, `Win64; x64`, `Mobile`, a rebadged
+ * Chromium's own token and everything else survive, because those are what still
+ * tell one machine's browser from another's. It is not an identity - two people
+ * running the same browser on the same kind of machine read the same - and
+ * nothing that needs one should use it. What it is good for is the question "has
+ * this account seen this browser before", where the alternative was answering no
+ * every few weeks.
+ */
+export function deviceFingerprint(userAgent: string | null | undefined): string {
+    if (!userAgent) return "";
+    // Only a run of digits and dots directly after a slash, which is how every
+    // product token in a user-agent writes its version and is not how anything
+    // else in one is written.
+    return userAgent.trim().replace(/\/[0-9][0-9.]*/g, "/x");
+}
+
 /** The one-line reading, for the lists that show a device as a single string. */
 export function describeDevice(
     userAgent: string | null | undefined,

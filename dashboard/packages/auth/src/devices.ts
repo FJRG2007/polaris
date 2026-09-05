@@ -26,25 +26,35 @@
  * Off unless the account turns it on. Making a genuine new laptop wait a week is
  * a real cost, and whether it is worth paying depends on what the account holds.
  *
- * A device is identified by what its browser says it is. Two identical machines
- * count as one, a browser that updates itself reads as a device the account has
- * never seen, and anyone able to set a header can claim to be a device that has
- * been here for months. The middle one is the one that costs the owner something,
- * and it cannot be fixed by reading the claim more loosely: the coarsest reading
- * that survives an update - the browser and the operating system - is exactly the
- * reading under which somebody else's Chrome on Windows is the owner's. Telling
- * one machine from another needs something the machine keeps, not something it
- * says, and that is a larger change than this. The rest is worth knowing and not
- * worth fixing here: the
- * claim is read from the session's recorded description rather than from the
- * request in hand, so it is fixed when the session is created and cannot be
- * varied per call, and the worst a forged one does is let somebody who already
- * has the password skip a wait that was never what kept them out.
+ * A device is identified by what its browser says it is, with the version
+ * numbers taken out. That last part is the whole of the difference between a
+ * wait somebody serves once and a wait that restarts on its own: a browser
+ * writes a new version into its user-agent every few weeks without being asked,
+ * and keyed on the raw string that is a device the account has never seen. The
+ * owner, on the machine they have used for a year, was being told their device
+ * was new - and told it again after the next update.
+ *
+ * `deviceFingerprint` takes the versions and nothing else, so the machine, the
+ * system, the architecture and every other token still have to match. What that
+ * costs is real and worth stating: somebody else running the same browser on the
+ * same kind of machine now reads as this device, where before they would have
+ * needed the same build of it too. It is a smaller loss than it sounds - browsers
+ * update in step, so the same build was already the common case - and it is not
+ * what keeps an attacker out. What would tell one machine from another is
+ * something the machine keeps rather than something it says, and that is a
+ * larger change than this.
+ *
+ * The rest is worth knowing and not worth fixing here: the claim is read from
+ * the session's recorded description rather than from the request in hand, so it
+ * is fixed when the session is created and cannot be varied per call, two
+ * identical machines count as one, and the worst a forged one does is let
+ * somebody who already has the password skip a wait that was never what kept
+ * them out.
  */
 
 import { prisma } from "@polaris/db";
 import type { DeviceOrigin } from "./two-factor.js";
-import { NEW_DEVICE_GRACE_CHOICES } from "@polaris/core";
+import { deviceFingerprint, NEW_DEVICE_GRACE_CHOICES } from "@polaris/core";
 
 /** How much of a user-agent is kept. It is a header, so its length is the
  *  caller's to choose, and this one is an index key. A real one is far shorter. */
@@ -115,7 +125,7 @@ async function foundingDevice(userId: string): Promise<string | null> {
         orderBy: [{ firstSeenAt: "asc" }, { id: "asc" }],
         select: { userAgent: true }
     });
-    return first?.userAgent ?? null;
+    return first ? deviceFingerprint(first.userAgent) : null;
 }
 
 /**
@@ -142,30 +152,45 @@ export async function accountDeviceStanding(
     const known = userAgent?.slice(0, MAX_USER_AGENT);
     if (!known) return { settled: false, graceDays, settlesAt: null, firstSeenAt: null };
 
-    const [device, founding] = await Promise.all([
-        prisma.accountDevice.findUnique({
-            where: { userId_userAgent: { userId, userAgent: known } },
-            select: { firstSeenAt: true }
+    const fingerprint = deviceFingerprint(known);
+    const [rows, founding] = await Promise.all([
+        // Every row this account has, because the one that matters may have been
+        // written under an older version of the same browser. An account has a
+        // handful of these, and each is a device somebody actually signed in
+        // from.
+        prisma.accountDevice.findMany({
+            where: { userId },
+            select: { userAgent: true, firstSeenAt: true }
         }),
         foundingDevice(userId)
     ]);
+
+    // The earliest sighting of this browser, whatever version it was running
+    // then. Taking the earliest rather than the matching row is the point: the
+    // wait is served once by the device, not once by each version of it.
+    let firstSeenAt: Date | null = null;
+    for (const row of rows) {
+        if (deviceFingerprint(row.userAgent) !== fingerprint) continue;
+        if (!firstSeenAt || row.firstSeenAt < firstSeenAt) firstSeenAt = row.firstSeenAt;
+    }
+
     // No row means the session predates the account keeping this register, and
     // every sign-in since has written one. An older session than the feature is
     // not a new device.
-    if (!device) return { ...SETTLED, graceDays };
+    if (!firstSeenAt) return { ...SETTLED, graceDays };
 
     // The browser the account was opened from serves no wait, whatever it is set
     // to. It has nothing to settle at, because it was never unsettled.
-    if (founding === known) {
-        return { settled: true, graceDays, settlesAt: null, firstSeenAt: device.firstSeenAt };
+    if (founding === fingerprint) {
+        return { settled: true, graceDays, settlesAt: null, firstSeenAt };
     }
 
-    const settlesAt = new Date(device.firstSeenAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
+    const settlesAt = new Date(firstSeenAt.getTime() + graceDays * 24 * 60 * 60 * 1000);
     return {
         settled: settlesAt.getTime() <= Date.now(),
         graceDays,
         settlesAt,
-        firstSeenAt: device.firstSeenAt
+        firstSeenAt
     };
 }
 
