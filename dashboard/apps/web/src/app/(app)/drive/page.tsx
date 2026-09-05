@@ -1,6 +1,7 @@
 import { PageHeader } from "@polaris/ui";
 import { DriveExplorer } from "./drive-explorer";
 import { requirePermission } from "@/lib/session";
+import { driveAbilities } from "@/lib/drive-authz";
 import { isSavedConnection, type ConnectionSummary } from "./types";
 import { isPersonalKind, type StorageProviderKind } from "@polaris/core";
 import { ensurePersonalDrive, PERSONAL_DRIVE_TAKEN } from "@/lib/personal-drive";
@@ -142,6 +143,16 @@ export default async function DrivePage({
     const connectionId = requested ?? connections[0]?.id ?? null;
     const path = pick(params.p) ?? "";
 
+    // What this reader may do here, decided once for the folder they are in.
+    // Nothing on the screen is allowed to be the thing that permits a write - the
+    // server checks again - but a screen offering New folder, Rename and Delete
+    // to somebody with read-only access lies four times and then shows an error,
+    // which reads as Polaris being broken rather than as a permission they do not
+    // have.
+    const abilities = connectionId
+        ? await driveAbilities(user.id, connectionId, path)
+        : { read: true, write: false, remove: false };
+
     return (
         <>
             <PageHeader
@@ -153,6 +164,7 @@ export default async function DrivePage({
                 connectionId={connectionId}
                 path={path}
                 notice={driveNotice}
+                abilities={abilities}
             />
         </>
     );

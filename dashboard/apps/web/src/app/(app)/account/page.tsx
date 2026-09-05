@@ -8,6 +8,7 @@
 
 import { prisma } from "@polaris/db";
 import { ProfilePicturesCard } from "./avatar-card";
+import { AppearanceCard } from "./appearance-card";
 import { requireUser } from "@/lib/session";
 import { AccountView } from "./account-view";
 import { CompaniesCard } from "./companies-card";
@@ -19,6 +20,7 @@ import {
     typedCompanies
 } from "@/lib/profile-service";
 import { getSetting } from "@/lib/setting-store";
+import { getProfileStyle } from "@/lib/profile-style-service";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import {
     usernameChangeAllowedAt,
@@ -32,7 +34,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, photo, banner, emails, mail, phone, whatsappChannel, organizations, shown] =
+    const [user, photo, banner, style, emails, mail, phone, whatsappChannel, organizations, shown] =
         await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
@@ -55,6 +57,9 @@ export default async function AccountPage() {
         prisma.userAvatar.findUnique({ where: { userId: session.id }, select: { userId: true } }),
         // The same, for the band across the top of the profile.
         prisma.userBanner.findUnique({ where: { userId: session.id }, select: { userId: true } }),
+        // What they chose their profile to look like, so the panel opens on what
+        // is already true rather than on nothing and then correcting itself.
+        getProfileStyle(session.id),
         listUserEmails(session.id),
         getAuthMailStatus(),
         getUserPhone(session.id),
@@ -111,6 +116,11 @@ export default async function AccountPage() {
                 mailReady={mail.channelId !== null}
                 phone={phone}
                 canSendWhatsApp={whatsappChannel !== null}
+            />
+            <AppearanceCard
+                userId={session.id}
+                name={user?.name ?? session.name}
+                initial={style}
             />
             <DetailsCard
                 headline={user?.headline ?? ""}

@@ -26,6 +26,8 @@
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { nameplateCss } from "@/lib/profile-style-css";
+import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
 import { usePresence } from "@/components/presence-store";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import { MemberMenu, type MenuPerson } from "./member-menu";
@@ -259,6 +261,9 @@ function MemberRow({
     // not change; a status is what somebody is doing this afternoon, and two
     // lines under a name in a 14rem column is a wall.
     const under = where?.note || role;
+    // Asked from the same store the face asked, so it is one request for the
+    // panel rather than one per member.
+    const plate = usePersonNameplate(member.userId);
     return (
                         <li key={member.userId}>
                             <MemberMenu
@@ -277,8 +282,16 @@ function MemberRow({
                                 onClick={onOpen}
                                 className={cn(
                                     "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                                    you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70"
+                                    you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                                    // A plate replaces the row's own hover tint
+                                    // rather than being tinted by it.
+                                    plate && platedRow(plate, "hover:bg-transparent")
                                 )}
+                                // The plate somebody chose, drawn behind their
+                                // whole row - which is where a nameplate goes,
+                                // and the only place in a list narrow enough for
+                                // a pill around a name to look like a mistake.
+                                style={plate ? nameplateCss(plate) : undefined}
                             >
                                 <Avatar
                                     person={{ id: member.userId, name: member.name }}
@@ -286,10 +299,18 @@ function MemberRow({
                                 />
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-1">
-                                        <span className="truncate text-sm">
-                                            {member.name}
-                                            {you && <span className="text-muted-foreground"> (you)</span>}
-                                        </span>
+                                        <PersonName
+                                            id={member.userId}
+                                            name={member.name}
+                                            className="truncate text-sm"
+                                        >
+                                            {you && (
+                                                <span className={plate ? "opacity-80" : "text-muted-foreground"}>
+                                                    {" "}
+                                                    (you)
+                                                </span>
+                                            )}
+                                        </PersonName>
                                         {member.role === "owner" && (
                                             <Crown
                                                 role="img"

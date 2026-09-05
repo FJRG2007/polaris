@@ -227,6 +227,7 @@ model User {
     phone               UserPhone?
     avatar              UserAvatar?
     banner              UserBanner?
+    profileStyle        UserProfileStyle?
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
@@ -492,6 +493,59 @@ model NoteSpaceTeam {
 // expiry, a cap on opens, and the address allowlists - so this is gated by
 // lib/link-guards exactly as a share, a drop point and a snippet are, rather than
 // by rules written a fourth time.
+// A long job somebody started in Drive, still going after they closed the tab.
+//
+// Trashing seven thousand files was a loop of seven thousand server actions, each
+// opening its own connection to the NAS and closing it again - which is the
+// FileZilla failure exactly: a server hammered with one request per file when one
+// session would have done. It also died the moment the tab did, and the screen
+// that started it could not be used while it ran.
+//
+// So the work is a row. A worker takes it a batch at a time over ONE open driver,
+// writes down how far it has got, and the screen reads that - which is what makes
+// a progress bar possible, what lets somebody navigate away, and what makes
+// finishing survive a reload, a crash and a redeploy.
+//
+// Not a general queue. This is the shape of the one kind of work Drive has that
+// is worth minutes rather than seconds, and a table per shape beats a table that
+// has to describe every shape.
+model DriveJob {
+    id           String @id @default(uuid(7)) @db.Uuid
+    ownerId      String @db.Uuid
+    // Not a foreign key: a source can be a host: or container: pseudo-connection
+    // with no row of its own - see the drive prefixed-sources rule.
+    connectionId String
+    // trash | delete | restore - see DRIVE_JOB_KINDS in @polaris/core.
+    kind         String
+    /// What the screen calls it, decided when it was started so the wording never
+    /// drifts from what the reader pressed.
+    label        String
+    /// The paths still to do, as a JSON string array. Rewritten after each batch,
+    /// which is what makes an interrupted job resume where it stopped rather than
+    /// starting again on files it has already moved.
+    pending      String @default("[]")
+    total        Int    @default(0)
+    done         Int    @default(0)
+    failed       Int    @default(0)
+    /// The first refusal, kept for the screen. The rest of the batch still runs:
+    /// one file that will not move is not a reason to leave the other six
+    /// thousand where they are.
+    error        String?
+    /// queued | running | finished | cancelled - see DRIVE_JOB_STATES.
+    state        String @default("queued")
+    /// Held by whichever process is working it. Expiry rather than a flag, so a
+    /// worker that dies mid-batch hands the job back instead of holding it for
+    /// ever.
+    leaseUntil   DateTime?
+    startedAt    DateTime?
+    finishedAt   DateTime?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([ownerId, state])
+    @@index([state, leaseUntil])
+}
+
 model NoteShare {
     id      String @id @default(uuid(7)) @db.Uuid
     noteId  String @unique @db.Uuid
@@ -679,6 +733,36 @@ model UserBanner {
     mime         String
     size         Int      @default(0)
     updatedAt    DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// What somebody has chosen their profile to look like: a background for the band
+// when no banner is over it, a ring around their face, a plate behind their name
+// and a treatment on the card.
+//
+// Catalogue ids and colours, never files. A decoration somebody could upload
+// would be an image drawn beside their name in every list in the product, which
+// is a moderation queue and a storage bill; the catalogue is neither, which is
+// why all of it is simply on for everybody. What each id means, and every check
+// applied to what is stored here, is `profile-style.ts` in @polaris/core - an id
+// withdrawn there stops being drawn everywhere at once, and a row still naming
+// it reads as nothing rather than as something to guess about.
+//
+// One row per account and only for accounts that chose something: a profile with
+// no row is the ordinary profile, which is almost all of them.
+model UserProfileStyle {
+    userId String @id @db.Uuid
+    // The band's background, as one tagged string - `solid:#1b6ac9`, or
+    // `gradient:135:#1b6ac9:#8b3ad6`. One value that is only ever read and
+    // written whole, so a third kind of background is an arm in the parser
+    // rather than a migration on a table every account has a row in.
+    banner     String?
+    decoration String?
+    nameplate  String?
+    effect     String?
+    nameStyle  String?
+    updatedAt  DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -5361,6 +5445,16 @@ model TaskReminder {
 model TaskAttachment {
     id           String   @id @default(uuid(7)) @db.Uuid
     taskId       String   @db.Uuid
+    /// The comment it was sent with, when it was sent in the thread rather than
+    /// added to the task's files.
+    ///
+    /// Both, not either: a picture dropped into a conversation is part of what
+    /// was said there AND a file on the task, and a person looking for "that
+    /// screenshot" a month later goes to the Files list rather than scrolling
+    /// the thread. No foreign key for the same reason the uploader has none -
+    /// the file outlives the comment, and a deleted comment must not silently
+    /// take a file off the task with it.
+    commentId    String?  @db.Uuid
     name         String
     mime         String   @default("application/octet-stream")
     // Bytes. Capped at upload, so an Int is enough and stays JSON-safe.
@@ -5375,6 +5469,7 @@ model TaskAttachment {
     task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
     @@index([taskId])
+    @@index([commentId])
 }
 
 // A commit somebody attached to a task. Stored rather than fetched on read: the

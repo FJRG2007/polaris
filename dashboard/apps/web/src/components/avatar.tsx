@@ -23,7 +23,9 @@ import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 import { usePhotoOpenable } from "@/components/photo-access";
-import { PRESENCE_WORDS, type Presence } from "@polaris/core";
+import { useProfileStyle } from "@/components/profile-style-store";
+import { ringBackground, ringGlow, ringWidth } from "@/lib/profile-style-css";
+import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
 
 export interface AvatarPerson {
     /**
@@ -134,6 +136,7 @@ export function Avatar({
     square = false,
     status = true,
     presence,
+    decoration: chosen,
     openable = false
 }: {
     person: AvatarPerson;
@@ -150,6 +153,14 @@ export function Avatar({
      * right here".
      */
     presence?: Presence;
+    /**
+     * The ring to wear, when the caller already knows better than the store does.
+     *
+     * For the panel where somebody is choosing one: the preview has to show what
+     * they have just pressed, and the store still holds what they saved last
+     * time. Everywhere else this is left alone and the store answers.
+     */
+    decoration?: string | null;
     /**
      * Whether pressing the face opens the photo full size.
      *
@@ -183,6 +194,27 @@ export function Avatar({
     // Nothing is asked when the caller has already answered - and a guest has no
     // id to ask about in the first place.
     const known = usePresence(presence || !status || square ? null : person.id);
+    /**
+     * The ring somebody chose, if they chose one.
+     *
+     * Asked for by id from the store every face shares, rather than threaded
+     * through the caller: this component is drawn in a hundred places and half
+     * of them have nothing but a name and an id to hand. An organization is not
+     * a person and has no appearance to wear, so it is not asked about.
+     */
+    const stored = useProfileStyle(square || chosen !== undefined ? null : person.id);
+    const decoration = decorationOf(chosen === undefined ? stored?.decoration ?? null : chosen);
+    /**
+     * The ring is drawn inside the size the caller asked for, not around it.
+     *
+     * A decoration that grows outward is a face that changes size when somebody
+     * else edits their profile - and, worse, one that is cut in half by every
+     * scrolling panel and rounded row it happens to sit in. Drawn inward the
+     * layout is exactly what it was, nothing is ever clipped, and what somebody
+     * gives up is a couple of pixels of their own photograph.
+     */
+    const band = decoration ? ringWidth(decoration, size) : 0;
+    const inner = size - band * 2;
     const where = presence ? { status: presence, inCall: false } : known;
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
@@ -214,9 +246,9 @@ export function Avatar({
                 className
             )}
             style={{
-                width: size,
-                height: size,
-                fontSize: Math.max(9, Math.round(size * 0.4)),
+                width: inner,
+                height: inner,
+                fontSize: Math.max(9, Math.round(inner * 0.4)),
                 backgroundColor: tintFor(person.id ?? person.name)
             }}
         >
@@ -248,7 +280,7 @@ export function Avatar({
     // rather than replacing it, so the circle, the ring and the tint are the same
     // ones every other face has - a photo somebody can open must not be a
     // different-looking face.
-    const shown = opens ? (
+    const pressable = opens ? (
         <button
             type="button"
             aria-label={`Open ${person.name}'s photo`}
@@ -266,6 +298,28 @@ export function Avatar({
         </button>
     ) : (
         face
+    );
+
+    // The ring goes behind the face rather than around it: the face is opaque,
+    // so all that shows is the band at its edge - and a layer of its own is what
+    // lets the turning ones turn without turning somebody's photograph with them.
+    const shown = decoration ? (
+        <span
+            className="relative inline-flex shrink-0 items-center justify-center"
+            style={{ width: size, height: size }}
+        >
+            <span
+                aria-hidden="true"
+                className={cn(
+                    "pointer-events-none absolute inset-0 rounded-full",
+                    decoration.spin && "profile-ring-turn"
+                )}
+                style={{ background: ringBackground(decoration), boxShadow: ringGlow(decoration, size) }}
+            />
+            <span className="relative inline-flex">{pressable}</span>
+        </span>
+    ) : (
+        pressable
     );
 
     // Put on the body rather than beside the face: the viewer covers the window,

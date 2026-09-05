@@ -48,6 +48,7 @@ import {
     TaskLocation
 } from "../pickers";
 import {
+    Checkbox,
     ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
@@ -1002,19 +1003,17 @@ export function BoardView(props: ViewProps) {
                             {doomedCount === 1 ? "One task is on it" : `${doomedCount} tasks are on it`}
                         </span>
                         <label className="flex items-center gap-2">
-                            <input
-                                type="radio"
-                                name="column-work"
+                            <Checkbox
                                 checked={fate === "delete"}
+                                aria-label="Delete them with the column"
                                 onChange={() => setFate("delete")}
                             />
                             Delete them with the column
                         </label>
                         <label className="flex items-center gap-2">
-                            <input
-                                type="radio"
-                                name="column-work"
+                            <Checkbox
                                 checked={fate === "move"}
+                                aria-label="Move them to"
                                 onChange={() => setFate("move")}
                             />
                             Move them to
@@ -1032,10 +1031,9 @@ export function BoardView(props: ViewProps) {
                             />
                         </label>
                         <label className="flex items-center gap-2">
-                            <input
-                                type="radio"
-                                name="column-work"
+                            <Checkbox
                                 checked={fate === "archive"}
+                                aria-label="Archive them, and take the column"
                                 onChange={() => setFate("archive")}
                             />
                             Archive them, and take the column

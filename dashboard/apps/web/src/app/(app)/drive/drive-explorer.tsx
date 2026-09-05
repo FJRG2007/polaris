@@ -22,6 +22,9 @@
 import Link from "next/link";
 import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
+import { driveJobFraction, driveJobSummary } from "@polaris/core";
+import type { DriveJobView } from "@/lib/drive-jobs";
+import type { DriveAbilities } from "@/lib/drive-authz";
 import { useRouter } from "next/navigation";
 import { UnifiConsoleButton } from "./unifi-console-button";
 import { ShareDialog, type ShareTarget } from "./share-dialog";
@@ -129,7 +132,8 @@ export function DriveExplorer({
     connections,
     connectionId,
     path,
-    notice
+    notice,
+    abilities
 }: {
     connections: ConnectionSummary[];
     connectionId: string | null;
@@ -137,6 +141,9 @@ export function DriveExplorer({
     /** Something the page worked out before this rendered and could not act on -
      *  shown in the same corner a failed operation is, and dismissed the same way. */
     notice?: string;
+    /** What this reader may do in the folder that is open. Worked out by the page
+     *  from the same gate the writes go through - see `driveAbilities`. */
+    abilities: DriveAbilities;
 }) {
     const router = useRouter();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -172,6 +179,17 @@ export function DriveExplorer({
     const [sending, setSending] = useState<{ path: string; name: string } | null>(null);
     const [requestTarget, setRequestTarget] = useState<RequestTarget | null>(null);
     const [ops, setOps] = useState<{ id: string; label: string }[]>([]);
+    /**
+     * The long work the server is doing for this account.
+     *
+     * Not the same thing as `ops`, which is a request this tab is waiting on.
+     * These belong to the account rather than to the tab: they carry on when it
+     * is closed, and a second tab watching the same Drive sees the same bar.
+     */
+    const [jobs, setJobs] = useState<DriveJobView[]>([]);
+    /** Recomputed on a timer so the estimate under a bar moves without waiting
+     *  for the next poll. */
+    const [tick, setTick] = useState(() => Date.now());
     const [opError, setOpError] = useState<string | null>(notice ?? null);
 
     // The page works the notice out on every render of its own, not only the
@@ -206,6 +224,46 @@ export function DriveExplorer({
             }
         });
     }
+
+    /**
+     * Watch them while there are any.
+     *
+     * Every two seconds while something is running, and not at all when nothing
+     * is: an explorer sitting open on a folder nobody is changing should not be
+     * a request every two seconds for the rest of the afternoon. The first read
+     * happens on mount, because a job started in another tab - or before this one
+     * was reloaded - is exactly the case this exists to show.
+     */
+    useEffect(() => {
+        let live = true;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const look = async () => {
+            const result = await driveActions.driveJobsAction().catch(() => null);
+            if (!live) return;
+            const running = result?.jobs ?? [];
+            setJobs((before) => {
+                // A job that has just left the list finished, and the listing on
+                // screen is the one it changed.
+                if (before.length > 0 && running.length < before.length) {
+                    dropDriveSnapshots();
+                    void load();
+                }
+                return running;
+            });
+            setTick(Date.now());
+            timer = setTimeout(() => void look(), running.length > 0 ? 2000 : 15_000);
+        };
+
+        void look();
+        return () => {
+            live = false;
+            if (timer) clearTimeout(timer);
+        };
+        // `load` is rebuilt on every render of this component; depending on it
+        // would restart the poll on every keystroke in the search box.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const segments = path ? path.split("/") : [];
     const selectedConnection =
@@ -442,19 +500,10 @@ export function DriveExplorer({
         setDeleteTargets(null);
         const paths = new Set(targets.map((entry) => entry.path));
         setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
-        const label =
-            targets.length === 1
-                ? `Moving ${targets[0]?.name} to Trash`
-                : `Moving ${targets.length} items to Trash`;
-        // The first refusal stops the run and is what gets reported. Carrying on
-        // would leave the banner naming one failure while others went unmentioned,
-        // and the listing reload in runOp puts back whatever did not move.
-        runOp(label, async () => {
-            for (const entry of targets) {
-                const result = await driveActions.moveToTrashAction(connectionId, entry.path);
-                if (result.error) return result;
-            }
-        });
+        // One job rather than one request per file. See `lib/drive-jobs`: the
+        // loop this replaces opened a connection to the storage per item, could
+        // not be navigated away from, and died with the tab.
+        void startJob("trash", targets);
     }
 
     function confirmDeletePermanent() {
@@ -463,16 +512,31 @@ export function DriveExplorer({
         setPermanentTargets(null);
         const paths = new Set(targets.map((entry) => entry.path));
         setEntries((prev) => prev.filter((entry) => !paths.has(entry.path)));
-        const label =
-            targets.length === 1
-                ? `Deleting ${targets[0]?.name} permanently`
-                : `Deleting ${targets.length} items permanently`;
-        runOp(label, async () => {
-            for (const entry of targets) {
-                const result = await driveActions.deleteEntryAction(connectionId, entry.path);
-                if (result.error) return result;
-            }
-        });
+        void startJob("delete", targets);
+    }
+
+    /**
+     * Hand a selection to the server and let it get on with it.
+     *
+     * The rows leave the listing at once - the answer is not in doubt, and a list
+     * that waits for seven thousand files to move is a list nobody can use - and
+     * the panel shows the bar. A refusal puts them back on the next read.
+     */
+    async function startJob(kind: "trash" | "delete", targets: DriveEntry[]) {
+        if (!connectionId) return;
+        setOpError(null);
+        const result = await driveActions.startDriveJobAction(
+            connectionId,
+            kind,
+            targets.map((entry) => entry.path)
+        );
+        if (result.error) {
+            setOpError(result.error);
+            dropDriveSnapshots();
+            void load();
+            return;
+        }
+        if (result.job) setJobs((before) => [...before, result.job as DriveJobView]);
     }
 
     function confirmEmpty() {
@@ -644,6 +708,7 @@ export function DriveExplorer({
                     />
                 ) : (
                     <FilesView
+                        abilities={abilities}
                         connectionId={connectionId}
                         path={path}
                         segments={segments}
@@ -780,15 +845,64 @@ export function DriveExplorer({
                 )}
             </section>
 
-            {ops.length > 0 ? (
-                <div className="fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
+            {ops.length > 0 || jobs.length > 0 ? (
+                <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
                     <p className="text-xs font-medium text-muted-foreground">
                         Working in the background
                     </p>
                     {ops.map((op) => (
                         <div key={op.id} className="flex items-center gap-2 text-sm">
                             <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
-                            <span className="truncate">{op.label}</span>
+                            <span className="min-w-0 flex-1 truncate" title={op.label}>
+                                {op.label}
+                            </span>
+                        </div>
+                    ))}
+                    {jobs.map((job) => (
+                        <div key={job.id} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className="min-w-0 flex-1 truncate" title={job.label}>
+                                    {job.label}
+                                </span>
+                                <button
+                                    type="button"
+                                    aria-label={`Stop ${job.label}`}
+                                    title="Stop - what has already moved stays moved"
+                                    onClick={() => {
+                                        setJobs((before) =>
+                                            before.filter((entry) => entry.id !== job.id)
+                                        );
+                                        void driveActions.cancelDriveJobAction(job.id);
+                                    }}
+                                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                    <X className="size-3.5" />
+                                </button>
+                            </div>
+                            {/* A bar with a number beside it. A spinner on its own
+                                is indistinguishable from a hang, which is why
+                                people press the button a second time. */}
+                            <div
+                                role="progressbar"
+                                aria-label={job.label}
+                                aria-valuemin={0}
+                                aria-valuemax={job.total}
+                                aria-valuenow={job.done}
+                                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    className="h-full rounded-full bg-primary transition-[width] duration-500"
+                                    style={{
+                                        width: `${Math.round(driveJobFraction(job) * 100)}%`
+                                    }}
+                                />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {driveJobSummary({ ...job, startedAt: job.startedAt }, tick)}
+                            </p>
+                            {job.error ? (
+                                <p className="text-xs text-danger">{job.error}</p>
+                            ) : null}
                         </div>
                     ))}
                 </div>

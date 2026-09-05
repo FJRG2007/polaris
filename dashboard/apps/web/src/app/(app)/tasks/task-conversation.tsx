@@ -24,6 +24,7 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
+import { formatBytes } from "@polaris/core";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useMemo, useState } from "react";
@@ -32,7 +33,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { RichText } from "@/components/rich-text/rich-text";
 import { cn, Input, Button, SegmentedControl } from "@polaris/ui";
 import { Composer } from "@/app/(app)/chat/composer";
-import { CheckCircle2, Play, Square, Trash2 } from "lucide-react";
+import { CheckCircle2, Paperclip, Play, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
 import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
 
@@ -52,7 +53,10 @@ import { describeActivity, mergeConversation, type ConversationFilter } from "./
 const COMMENT_RULES: core.ChatRules = {
     ...core.DEFAULT_CHAT_RULES,
     maxMessageLength: core.COMMENT_BODY_MAX,
-    maxAttachments: 0
+    // A task thread takes files, pictures, voice notes and screen clips - the
+    // same things the chat composer already offers, because it is the same
+    // composer. It was zero, which is why the buttons were not drawn at all.
+    maxAttachments: core.DEFAULT_CHAT_RULES.maxAttachments
 };
 
 export function ActivityStream({
@@ -84,11 +88,56 @@ export function ActivityStream({
 
     useEffect(() => follow.stick(), [taskId, follow]);
 
-    const post = async (body: string, parentId: string | null) => {
+    /**
+     * Say something, and send whatever came with it.
+     *
+     * The comment first and the files after, in that order and never the other
+     * way round: a file attached to a comment that was then refused is a file on
+     * the task nobody meant to add, and there is nothing on screen that would
+     * explain where it came from.
+     *
+     * The upload is the same route the Files list uses, with the comment named -
+     * so what is dropped in the conversation is on the task as well, which is
+     * where somebody looks for it a month later.
+     */
+    const post = async (
+        body: string,
+        parentId: string | null,
+        files: readonly File[] = []
+    ) => {
         setBusy(true);
         onError("");
-        const result = await runAction(() => actions.addCommentAction({ taskId, body, parentId }), onError);
-        if (result?.error) onError(result.error);
+        const result = await runAction(
+            () => actions.addCommentAction({ taskId, body, parentId }),
+            onError
+        );
+        if (result?.error) {
+            onError(result.error);
+            setBusy(false);
+            return;
+        }
+
+        for (const file of files) {
+            try {
+                const response = await fetch(
+                    `/api/tasks/attachments?task=${encodeURIComponent(taskId)}&name=${encodeURIComponent(
+                        file.name
+                    )}${result?.commentId ? `&comment=${encodeURIComponent(result.commentId)}` : ""}`,
+                    {
+                        method: "POST",
+                        // The File itself, not FormData: the route streams the
+                        // body straight into storage, and FormData would make it
+                        // a multipart document somebody has to parse in memory.
+                        headers: { "Content-Type": file.type || "application/octet-stream" },
+                        body: file
+                    }
+                );
+                if (!response.ok) onError((await response.text()) || "Could not send that file");
+            } catch {
+                onError("Could not send that file");
+            }
+        }
+
         setBusy(false);
         setReplyTo(null);
         onChanged();
@@ -118,6 +167,47 @@ export function ActivityStream({
                     )}
                 </div>
                 <RichText value={comment.body} className="break-words text-foreground/90" />
+                {comment.files.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-2">
+                        {comment.files.map((file) =>
+                            file.mime.startsWith("image/") ? (
+                                // Drawn rather than listed. A screenshot in a
+                                // conversation is the message; making somebody
+                                // open it to find that out is the thing that
+                                // makes a thread unreadable.
+                                <a
+                                    key={file.id}
+                                    href={`/api/tasks/attachments/${file.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="block max-w-[16rem] overflow-hidden rounded-md border border-border"
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- one attachment, no loader wanted */}
+                                    <img
+                                        src={`/api/tasks/attachments/${file.id}`}
+                                        alt={file.name}
+                                        className="h-auto w-full"
+                                    />
+                                </a>
+                            ) : (
+                                <a
+                                    key={file.id}
+                                    href={`/api/tasks/attachments/${file.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={file.name}
+                                    className="flex max-w-[16rem] items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs transition-colors hover:bg-muted"
+                                >
+                                    <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
+                                        {formatBytes(BigInt(file.size))}
+                                    </span>
+                                </a>
+                            )
+                        )}
+                    </div>
+                )}
                 <div className="mt-1 flex items-center gap-3 text-[0.6875rem] text-muted-foreground">
                     {!nested && (
                         <button type="button" onClick={() => setReplyTo(comment.id)} className="hover:text-foreground">
@@ -157,9 +247,8 @@ export function ActivityStream({
                             channelId={null}
                             rules={COMMENT_RULES}
                             disabled={busy}
-                            attachable={false}
                             placeholder="Write a reply"
-                            onSend={(body) => post(body, comment.id)}
+                            onSend={(body, files) => post(body, comment.id, files)}
                         />
                         <button
                             type="button"
@@ -219,13 +308,17 @@ export function ActivityStream({
             </div>
 
             <div className="border-t border-border p-4">
+                {/* Files, pictures, voice notes and screen clips, which is the
+                    same composer the chat uses and therefore the same set of
+                    affordances - a task thread is a conversation, and the one
+                    thing it could not do was hand somebody the screenshot they
+                    were describing. */}
                 <Composer
                     channelId={null}
                     rules={COMMENT_RULES}
                     disabled={busy}
-                    attachable={false}
                     placeholder="Write a comment"
-                    onSend={(body) => post(body, null)}
+                    onSend={(body, files) => post(body, null, files)}
                 />
             </div>
         </div>

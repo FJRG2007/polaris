@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { serverEnvironmentSchema } from "./host.js";
+import { isLocalAddress, sameLocalNetwork } from "../local-network.js";
 
 /** What a machine becomes when it claims an enrollment. `local` is the box Polaris
  *  itself runs on: the same exchange, and the reason it is told apart is that the
@@ -206,7 +207,21 @@ const MAX_ADDRESS_CANDIDATES = 6;
  * Loopback is never a candidate: a claim arriving from 127.0.0.1 came through
  * Polaris's own proxy, so believing it would point the new server at Polaris.
  */
-export function enrollmentAddressCandidates(observed: string | undefined, reported: string[]): string[] {
+export function enrollmentAddressCandidates(
+    observed: string | undefined,
+    reported: string[],
+    /**
+     * Polaris' own address on the local network, when it has one.
+     *
+     * With it, an address on that network is tried before anything public. A
+     * machine on the same wire reached through its public name goes out to the
+     * router and back for every byte - which works, so nothing looks wrong, and
+     * is slower for no reason, depends on the router hairpinning, and stops the
+     * moment the line does. Getting this right at enrollment is what stops a
+     * server being recorded on the long way round for the rest of its life.
+     */
+    near?: string | null
+): string[] {
     const ordered = [observed ?? "", ...reported].map((value) => value.trim());
     const candidates: string[] = [];
     for (const value of ordered) {
@@ -214,7 +229,13 @@ export function enrollmentAddressCandidates(observed: string | undefined, report
         candidates.push(value);
         if (candidates.length === MAX_ADDRESS_CANDIDATES) break;
     }
-    return candidates;
+    if (!near || !isLocalAddress(near)) return candidates;
+    // Stable within each group, so everything the ordering above decided still
+    // holds between addresses that are equally near.
+    const here = candidates.filter((value) => sameLocalNetwork(value, near));
+    const local = candidates.filter((value) => !here.includes(value) && isLocalAddress(value));
+    const rest = candidates.filter((value) => !here.includes(value) && !local.includes(value));
+    return [...here, ...local, ...rest];
 }
 
 function isLoopback(value: string): boolean {

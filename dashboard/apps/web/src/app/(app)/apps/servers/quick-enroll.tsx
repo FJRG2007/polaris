@@ -17,7 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import type { ServerEnvironment } from "@polaris/core";
 import { Check, Copy, Terminal, TriangleAlert } from "lucide-react";
 import { ENVIRONMENT_CHOICES, ENVIRONMENT_META } from "./environment-meta";
@@ -37,6 +37,8 @@ interface Opened {
     command: string;
     expiresAt: string;
     insecureTransport: boolean;
+    /** The same command aimed at this machine on the LAN, when there is one. */
+    local?: { command: string; base: string; insecureTransport: boolean };
 }
 
 export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
@@ -53,6 +55,16 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     // before claiming - no SSH server running, Remote Login off - reports why and
     // spends nothing, so this is a state to recover from rather than the end of it.
     const [stillUsable, setStillUsable] = useState(false);
+    /**
+     * Whether the command shown is the LAN one.
+     *
+     * Off, because the configured domain is the right answer whenever the server
+     * can reach the internet - it survives the machine moving and it has a
+     * certificate. A box on an intranet with no way out cannot resolve it at all,
+     * and until now the operator got a command that failed with nothing on screen
+     * saying which address it had used.
+     */
+    const [overLan, setOverLan] = useState(false);
 
     // Watch the enrollment until the machine claims it. The dialog closing
     // unmounts this, which is what stops the poll.
@@ -129,6 +141,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     }
 
     if (opened) {
+        const local = opened.local;
+        const showing = overLan && local ? local : opened;
         return (
             <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
@@ -139,7 +153,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                 <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3">
                     <Terminal className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     <code className="flex-1 break-all font-mono text-xs leading-relaxed">
-                        {opened.command}
+                        {showing.command}
                     </code>
                     <Button
                         size="icon"
@@ -147,7 +161,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                         aria-label="Copy the command"
                         title="Copy the command"
                         onClick={() => {
-                            void navigator.clipboard.writeText(opened.command);
+                            void navigator.clipboard.writeText(showing.command);
                             setCopied(true);
                         }}
                     >
@@ -155,11 +169,30 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                     </Button>
                 </div>
 
-                {opened.insecureTransport ? (
+                {local ? (
+                    <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                            checked={overLan}
+                            aria-label="Point the command at the local address"
+                            onChange={(event) => {
+                                setOverLan(event.target.checked);
+                                setCopied(false);
+                            }}
+                            className="mt-0.5"
+                        />
+                        <span className="text-muted-foreground">
+                            This server cannot reach the internet. Point the command at{" "}
+                            <code className="font-mono text-xs">{local.base}</code> instead, which only
+                            works from the same network.
+                        </span>
+                    </label>
+                ) : null}
+
+                {showing.insecureTransport ? (
                     <Notice>
-                        Polaris is only reachable over plain HTTP here, so this command pipes an
-                        unencrypted download into a root shell. Set a domain with HTTPS under Admin &gt;
-                        Domains before running it on anything you do not fully trust the network of.
+                        {overLan && local
+                            ? "The local address has no certificate, so this command pipes an unencrypted download into a root shell. It stays on your own network, which is the trade being made."
+                            : "Polaris is only reachable over plain HTTP here, so this command pipes an unencrypted download into a root shell. Set a domain with HTTPS under Admin > Domains before running it on anything you do not fully trust the network of."}
                     </Notice>
                 ) : null}
 

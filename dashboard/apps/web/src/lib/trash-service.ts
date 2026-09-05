@@ -62,6 +62,97 @@ function trackable(connectionId: string): boolean {
     return !connectionId.includes(":");
 }
 
+/**
+ * Move several items into the bin over one open connection.
+ *
+ * The difference between this and calling `moveToTrash` in a loop is the whole
+ * point of it: that loop opened and closed a session per file, so binning seven
+ * thousand of them was seven thousand SMB or SSH handshakes at a NAS that had
+ * done nothing to deserve them. This opens one, moves everything through it, and
+ * writes the rows in a single insert.
+ *
+ * A refusal on one path does not stop the rest - somebody clearing out a folder
+ * wants the other six thousand moved - so what comes back is which ones failed
+ * and why, for the caller to record and show.
+ */
+export async function moveManyToTrash(
+    ownerId: string,
+    connectionId: string,
+    paths: readonly string[]
+): Promise<{ moved: string[]; failures: { path: string; reason: string }[] }> {
+    if (!trackable(connectionId)) {
+        throw new TrashUnavailableError(
+            "This source has no recycle bin. Use Delete permanently instead."
+        );
+    }
+
+    const moved: string[] = [];
+    const failures: { path: string; reason: string }[] = [];
+    const rows: {
+        ownerId: string;
+        connectionId: string;
+        name: string;
+        originalPath: string;
+        trashPath: string;
+        kind: string;
+        size: bigint;
+    }[] = [];
+
+    const driver = await getDriver(connectionId, ownerId);
+    try {
+        // Once, not once per file. The bin folder either exists or is made here,
+        // and every move below lands in it.
+        try {
+            await driver.mkdir(TRASH_DIR);
+        } catch {
+            // Already there, or the driver makes parents implicitly.
+        }
+
+        for (const path of paths) {
+            const source = normalizeRelPath(path);
+            // Polaris' own hidden folder is never binned, and neither is nothing.
+            if (!source || source === POLARIS_DIR || source.startsWith(`${POLARIS_DIR}/`)) continue;
+            try {
+                // Something that is not there any more is already in the state the
+                // caller asked for - a stale listing, or two people pressing
+                // Delete on the same row.
+                if (!(await exists(driver, source))) {
+                    moved.push(source);
+                    continue;
+                }
+                const stat = await driver.stat(source);
+                const name = baseName(source) || source;
+                const trashPath = `${TRASH_DIR}/${randomBytes(6).toString("hex")}-${name}`;
+                await driver.move(source, trashPath);
+                rows.push({
+                    ownerId,
+                    connectionId,
+                    name,
+                    originalPath: source,
+                    trashPath,
+                    kind: stat.kind,
+                    size: stat.size
+                });
+                moved.push(source);
+            } catch (caught) {
+                failures.push({
+                    path: source,
+                    reason: caught instanceof Error ? caught.message : "Could not move it"
+                });
+            }
+        }
+    } finally {
+        await driver.dispose();
+    }
+
+    // One insert rather than one per file, and after the moves rather than
+    // between them: a row written for a move that then failed is a bin entry
+    // pointing at a file that is still where it was.
+    if (rows.length > 0) await prisma.trashItem.createMany({ data: rows });
+    for (const path of moved) await invalidateFolderSizes(connectionId, path);
+    return { moved, failures };
+}
+
 /** Move an item into the connection's trash folder and record it. */
 export async function moveToTrash(
     ownerId: string,

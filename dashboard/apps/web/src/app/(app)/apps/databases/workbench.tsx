@@ -28,27 +28,12 @@
 
 import Fuse from "fuse.js";
 import * as actions from "./actions";
+import { TabStrip } from "./tab-strip";
 import { StatsPanel } from "./stats-panel";
-import { CodeSurface } from "@/components/code-surface";
+import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
+import { CodeSurface } from "@/components/code-surface";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-    Button,
-    Card,
-    CardBody,
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuLabel,
-    ContextMenuSeparator,
-    ContextMenuTrigger,
-    Input,
-    MenuShortcut,
-    SegmentedControl,
-    Select,
-    Skeleton,
-    cn
-} from "@polaris/ui";
 import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
 import {
     Check,
@@ -63,20 +48,119 @@ import {
     Table2,
     X
 } from "lucide-react";
+import {
+    Button,
+    Card,
+    CardBody,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Input,
+    MenuShortcut,
+    Select,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 
 /** How many rows a page holds. The server clamps it too; this is what is asked
  *  for. */
 const PAGE = 100;
+
+/**
+ * How the tables are ordered in the list.
+ *
+ * By name is where a list of names belongs, and it is the default. By size is the
+ * question somebody opening a database they did not build actually arrives with -
+ * which of these has anything in it - and answering it by reading a hundred names
+ * and their counts is reading a hundred names and their counts.
+ *
+ * The count is an estimate the engine already keeps, never a scan, so ordering by
+ * it costs nothing: the numbers are on the rows before this is offered.
+ */
+const RELATION_ORDERS = [
+    { value: "name", label: "Name" },
+    { value: "rows", label: "Rows" }
+] as const;
+
+type RelationOrder = (typeof RELATION_ORDERS)[number]["value"];
+
+/** Where this browser's preference is kept. A habit of the person reading rather
+ *  than a property of the database, so it belongs here and not in a row. */
+const ORDER_KEY = "polaris.databases.order";
 
 export function Workbench({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
     const [namespace, setNamespace] = useState<string | null>(null);
     const [relations, setRelations] = useState<DataRelation[] | null>(null);
-    const [relation, setRelation] = useState<string | null>(null);
     const [find, setFind] = useState("");
-    const [tab, setTab] = useState<"data" | "query" | "stats">("data");
     const [error, setError] = useState("");
+    /**
+     * What is open, and which connection it was read for.
+     *
+     * The two travel together on purpose. Restoring happens after mount - what
+     * is in this browser's storage is not what the server built the markup from
+     * - so for one render the state on screen belongs to the connection before
+     * this one, and writing it back then would file one database's tabs under
+     * another's name. Carrying the id in the state is what makes that render
+     * recognisable instead of merely unlikely.
+     */
+    const [bench, setBench] = useState<{ id: string; state: openTabs.TabState }>({
+        id: "",
+        state: openTabs.NO_TABS
+    });
+    const tabs = bench.state.tabs;
+    const activeId = bench.state.activeId;
+    const active = useMemo(() => tabs.find((entry) => entry.id === activeId) ?? null, [tabs, activeId]);
+
+    const change = useCallback(
+        (next: (was: openTabs.TabState) => openTabs.TabState) => {
+            setBench((was) => ({ id: was.id, state: next(was.state) }));
+        },
+        []
+    );
+
+    useEffect(() => {
+        setBench({ id: connectionId, state: openTabs.readTabState(connectionId) });
+    }, [connectionId]);
+
+    useEffect(() => {
+        if (bench.id !== connectionId) return;
+        openTabs.writeTabState(connectionId, bench.state);
+    }, [connectionId, bench]);
+
+    /**
+     * Which tabs have been in front at least once.
+     *
+     * A restored bench of nine tables must not put nine queries to the database
+     * on the way in - the person is looking at one of them, and the other eight
+     * are a burst of load nobody asked for on a connection that may be somebody
+     * else's production. So a panel is built the first time its tab is brought
+     * forward and then left alone: switching away hides it rather than throwing
+     * it out, which is what keeps a page, a sort and a filter where they were.
+     */
+    const [built, setBuilt] = useState<ReadonlySet<string>>(new Set());
+    useEffect(() => {
+        if (!activeId) return;
+        setBuilt((was) => (was.has(activeId) ? was : new Set(was).add(activeId)));
+    }, [activeId]);
+    /**
+     * Read after mount rather than at render: what is in this browser's storage
+     * is not what the server built the markup from, and reading it during the
+     * first render would draw one order and then change it under the reader.
+     */
+    const [order, setOrder] = useState<RelationOrder>("name");
+    useEffect(() => {
+        try {
+            const kept = window.localStorage.getItem(ORDER_KEY);
+            if (kept === "rows" || kept === "name") setOrder(kept);
+        } catch {
+            // Storage off, or a private window. Name is a fine answer.
+        }
+    }, []);
 
     const load = useCallback(
         async (chosen: string | null) => {
@@ -97,16 +181,22 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             // then asked for it under the name in the box.
             setNamespace(result.namespace ?? null);
             // A key-value store has one thing to look at, so it is opened rather
-            // than offered as a list of one.
-            if ((result.relations?.length ?? 0) === 1 && result.shape === "keyvalue") {
-                setRelation(result.relations?.[0]?.name ?? null);
+            // than offered as a list of one - unless something is already open,
+            // because then the bench somebody left behind is the answer to what
+            // they want to see and this would put a tab in front of it.
+            const only = result.relations?.length === 1 && result.shape === "keyvalue"
+                ? result.relations[0]?.name ?? null
+                : null;
+            if (only) {
+                change((was) =>
+                    was.tabs.length === 0 ? openTabs.openTable(was, result.namespace ?? null, only) : was
+                );
             }
         },
-        [connectionId]
+        [change, connectionId]
     );
 
     useEffect(() => {
-        setRelation(null);
         void load(null);
     }, [load]);
 
@@ -120,9 +210,23 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
     );
     const shown = useMemo(() => {
         const needle = find.trim();
-        if (!needle) return relations ?? [];
-        return fuse.search(needle).map((hit) => hit.item);
-    }, [fuse, relations, find]);
+        // A search is already ranked by how well each name matched; re-ordering
+        // it by anything else throws that away.
+        if (needle) return fuse.search(needle).map((hit) => hit.item);
+        const list = [...(relations ?? [])];
+        if (order === "rows") {
+            // A table whose size the engine does not keep sinks rather than
+            // floating on a missing value, and ties fall back to the name so the
+            // list is the same list every time it is drawn.
+            list.sort(
+                (left, right) =>
+                    (right.rows ?? -1) - (left.rows ?? -1) || left.name.localeCompare(right.name)
+            );
+        } else {
+            list.sort((left, right) => left.name.localeCompare(right.name));
+        }
+        return list;
+    }, [fuse, relations, find, order]);
 
     return (
         <div className="flex min-h-0 flex-1 gap-4">
@@ -130,10 +234,10 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 {namespaces.length > 1 && (
                     <Select
                         value={namespace ?? ""}
-                        onValueChange={(next) => {
-                            setRelation(null);
-                            void load(next);
-                        }}
+                        // The list changes; what is open does not. A tab holds
+                        // the schema it was opened from, so browsing another one
+                        // is browsing, not a decision to close anything.
+                        onValueChange={(next) => void load(next)}
                         aria-label="Which schema"
                         options={namespaces.map((entry) => ({
                             value: entry.name,
@@ -156,6 +260,32 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                     />
                 </div>
 
+                {/* Under the search rather than beside it: the sidebar is narrow,
+                    and two controls on one line there is two controls nobody can
+                    read the labels of. */}
+                <div className="flex items-center gap-2 px-1">
+                    <span className="text-xs text-muted-foreground">Order by</span>
+                    <Select
+                        value={order}
+                        onValueChange={(next) => {
+                            const chosen = next as RelationOrder;
+                            setOrder(chosen);
+                            try {
+                                window.localStorage.setItem(ORDER_KEY, chosen);
+                            } catch {
+                                // The list is still ordered; it simply does not
+                                // remember, which is the right thing to lose.
+                            }
+                        }}
+                        aria-label="Order the tables by"
+                        className="h-7 flex-1 text-xs"
+                        options={RELATION_ORDERS.map((entry) => ({
+                            value: entry.value,
+                            label: entry.label
+                        }))}
+                    />
+                </div>
+
                 <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
                     {relations === null ? (
                         <div className="flex flex-col gap-2 p-3" aria-hidden="true">
@@ -173,13 +303,17 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                 <li key={`${entry.namespace}.${entry.name}`}>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setRelation(entry.name);
-                                            setTab("data");
-                                        }}
+                                        onClick={() => change((was) => openTabs.openTable(was, namespace, entry.name))}
                                         className={cn(
                                             "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-card-hover",
-                                            entry.name === relation && "bg-muted text-foreground"
+                                            // What is in front, rather than
+                                            // everything open: a sidebar with
+                                            // six names lit says nothing about
+                                            // which one is on the screen.
+                                            active?.kind === "table" &&
+                                                active.relation === entry.name &&
+                                                active.namespace === namespace &&
+                                                "bg-muted text-foreground"
                                         )}
                                     >
                                         <Table2 className="size-3.5 shrink-0 text-muted-foreground" />
@@ -198,26 +332,23 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             </aside>
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-                <div className="flex items-center gap-2">
-                    <SegmentedControl
-                        // Its own width, and not squeezed by the note beside it:
-                        // a flex row will happily shrink it until "Data" is "D...".
-                        className="shrink-0 self-start"
-                        aria-label="What to show"
-                        value={tab}
-                        onValueChange={(next) => setTab(next)}
-                        options={[
-                            { value: "data", label: "Data" },
-                            { value: "query", label: shape === "sql" ? "SQL" : "Command" },
-                            { value: "stats", label: "Activity" }
-                        ]}
-                    />
-                    {readOnly && (
-                        <span className="text-xs text-muted-foreground">
-                            Read-only. Nothing here can change the database.
-                        </span>
-                    )}
-                </div>
+                <TabStrip
+                    tabs={tabs}
+                    activeId={activeId}
+                    shape={shape}
+                    onFocus={(id) => change((was) => openTabs.focusTab(was, id))}
+                    onClose={(id) => change((was) => openTabs.closeTab(was, id))}
+                    onCloseOthers={(id) => change((was) => openTabs.closeOthers(was, id))}
+                    onCloseAll={() => change(() => openTabs.NO_TABS)}
+                    onNewQuery={() => change((was) => openTabs.openQuery(was))}
+                    onStats={() => change((was) => openTabs.openStats(was))}
+                />
+
+                {readOnly && (
+                    <span className="text-xs text-muted-foreground">
+                        Read-only. Nothing here can change the database.
+                    </span>
+                )}
 
                 {error && (
                     <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -225,28 +356,50 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                     </p>
                 )}
 
-                {tab === "stats" ? (
-                    <div className="min-h-0 flex-1 overflow-y-auto">
-                        <StatsPanel connectionId={connectionId} />
-                    </div>
-                ) : tab === "data" ? (
-                    relation ? (
-                        <RowsPanel
-                            connectionId={connectionId}
-                            namespace={namespace}
-                            relation={relation}
-                            shape={shape}
-                            readOnly={readOnly}
-                        />
-                    ) : (
-                        <Card>
-                            <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                                Pick something on the left to see what is in it.
-                            </CardBody>
-                        </Card>
-                    )
+                {tabs.length === 0 ? (
+                    <Card>
+                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                            Pick something on the left to see what is in it.
+                        </CardBody>
+                    </Card>
                 ) : (
-                    <QueryPanel connectionId={connectionId} shape={shape} />
+                    tabs.map((entry) => {
+                        // Built once it has been looked at, and kept from then
+                        // on. Hidden rather than unmounted is the whole point of
+                        // the strip: coming back to a table means coming back to
+                        // the page, the sort and the filter that were on it.
+                        if (!built.has(entry.id)) return null;
+                        const front = entry.id === activeId;
+                        return (
+                            <div
+                                key={entry.id}
+                                className={front ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}
+                            >
+                                {entry.kind === "table" ? (
+                                    <RowsPanel
+                                        connectionId={connectionId}
+                                        namespace={entry.namespace}
+                                        relation={entry.relation}
+                                        shape={shape}
+                                        readOnly={readOnly}
+                                    />
+                                ) : entry.kind === "stats" ? (
+                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                        <StatsPanel connectionId={connectionId} />
+                                    </div>
+                                ) : (
+                                    <QueryPanel
+                                        connectionId={connectionId}
+                                        shape={shape}
+                                        statement={entry.statement}
+                                        onStatement={(text) =>
+                                            change((was) => openTabs.writeStatement(was, entry.id, text))
+                                        }
+                                    />
+                                )}
+                            </div>
+                        );
+                    })
                 )}
             </div>
         </div>
@@ -889,11 +1042,35 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
 }
 
 /** The statement box, and what came back. */
-function QueryPanel({ connectionId, shape }: { connectionId: string; shape: string }) {
-    const [statement, setStatement] = useState("");
+function QueryPanel({
+    connectionId,
+    shape,
+    statement: kept,
+    onStatement
+}: {
+    connectionId: string;
+    shape: string;
+    /** What was in the box last time this tab was on the screen, or when the
+     *  page was last loaded. */
+    statement: string;
+    onStatement: (statement: string) => void;
+}) {
+    const [statement, setStatement] = useState(kept);
     const [results, setResults] = useState<QueryResult[] | null>(null);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState("");
+
+    /**
+     * Handed up to the tab so a reload does not empty the box - but not on every
+     * keystroke. The tab needs to know what is in here in time for a reload, and
+     * that is a wait measured in seconds, so a pause in the typing is early
+     * enough and costs one write instead of one per character.
+     */
+    useEffect(() => {
+        if (statement === kept) return;
+        const timer = setTimeout(() => onStatement(statement), 400);
+        return () => clearTimeout(timer);
+    }, [statement, kept, onStatement]);
 
     const run = async () => {
         if (!statement.trim() || running) return;

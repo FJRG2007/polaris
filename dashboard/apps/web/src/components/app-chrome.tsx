@@ -35,6 +35,7 @@ import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
 import { MessageToasts } from "@/components/message-toasts";
 import { CommandPalette } from "@/components/command-palette";
 import { PresenceProvider } from "@/components/presence-store";
+import { ProfileStyleProvider } from "@/components/profile-style-store";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
@@ -120,6 +121,12 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     everything, because faces are drawn on every
                                     screen there is. */}
                                     <PresenceProvider>
+                                        {/* And what everybody has chosen to
+                                    look like, asked the same way and kept for
+                                    the session: a decoration is a decision
+                                    rather than a state, so it does not go
+                                    stale between requests. */}
+                                        <ProfileStyleProvider>
                                         {/* The call is held above every screen rather
                                     than by the conversation that started it, so
                                     walking off to look something up shrinks it
@@ -227,6 +234,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                 ) : null}
                                             </AppShell>
                                         </CallHolder>
+                                        </ProfileStyleProvider>
                                     </PresenceProvider>
                                 </ToastProvider>
                             </NotificationsProvider>

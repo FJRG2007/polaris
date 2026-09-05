@@ -24,6 +24,7 @@ import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
+import { PersonName } from "@/components/person-name";
 import { MessageMenu } from "./message-menu";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -35,7 +36,8 @@ import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usableAccent } from "@/lib/chat/accent";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { recentEmoji, rememberEmoji } from "./recents";
 import { autoplaying, embedFor } from "@/lib/chat/embeds";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -152,9 +154,33 @@ import {
  *  later starts a new one. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
-/** The emoji the hover offers without opening anything. Six, because a row of
- *  six is read at a glance and a row of thirty is a menu with no lid. */
-const QUICK_EMOJI = ["👍", "❤️", "😄", "🎉", "👀", "✅"] as const;
+/**
+ * The emoji the hover offers without opening anything.
+ *
+ * Three, and the three this person last reached for. Nine emoji out of two
+ * thousand are most of what anybody sends and they are not the same nine for any
+ * two people - so a fixed row is a row that is right for whoever chose it, and a
+ * row of six of them is most of the width of the bar spent on guesses.
+ *
+ * The defaults below fill in behind: a browser that has never reacted still
+ * offers something, and it stops offering it as soon as there is a habit to show
+ * instead.
+ */
+const DEFAULT_QUICK_EMOJI = ["👍", "❤️", "😄"] as const;
+
+/** How many the bar shows. Discord shows three and so does everything else that
+ *  put them on the hover rather than behind a picker. */
+const QUICK_COUNT = 3;
+
+/** The last few, padded from the defaults so there are always three. */
+function quickEmoji(recent: readonly string[]): string[] {
+    const chosen = [...recent.slice(0, QUICK_COUNT)];
+    for (const fallback of DEFAULT_QUICK_EMOJI) {
+        if (chosen.length >= QUICK_COUNT) break;
+        if (!chosen.includes(fallback)) chosen.push(fallback);
+    }
+    return chosen;
+}
 
 export interface MessageListProps {
     messages: readonly ChatMessageView[];
@@ -240,6 +266,32 @@ export function MessageList({
      *  item is chosen, and a dialog opened by something that is about to
      *  disappear never appears. */
     const [naming, setNaming] = useState<MenuPerson | null>(null);
+
+    /**
+     * The three the hover offers.
+     *
+     * Read on mount rather than at render: the habit lives in this browser's
+     * storage, which the server has no copy of, so reading it while the markup is
+     * being built server-side would hand back the defaults and then change them
+     * under the reader on the first frame. Re-read on every press, so a reaction
+     * sent from the picker is at the front of the row on the next message.
+     */
+    const [recent, setRecent] = useState<readonly string[]>([]);
+    useEffect(() => setRecent(recentEmoji()), []);
+    const quick = useMemo(() => quickEmoji(recent), [recent]);
+
+    /** React, and remember it. The picker records what is chosen through it; the
+     *  hover row did not, so pressing the same emoji forty times never made it
+     *  one of the three on offer. */
+    const react = useCallback(
+        (messageId: string, emoji: string) => {
+            rememberEmoji(emoji);
+            setRecent(recentEmoji());
+            onReact(messageId, emoji);
+        },
+        [onReact]
+    );
+
     const toast = useToast();
     /** A refusal from a name's menu has nowhere in the stream to sit, so it is
      *  said over the conversation. The empty string is the hook clearing a
@@ -313,6 +365,7 @@ export function MessageList({
                     >
                         {newDay && <DaySeparator iso={message.createdAt} />}
                         <Message
+                            quick={quick}
                             message={message}
                             grouped={grouped}
                             // The ticks go under the last message of a block and
@@ -332,7 +385,7 @@ export function MessageList({
                             canPost={canPost}
                             canModerate={canModerate}
                             onOpenThread={onOpenThread}
-                            onReact={onReact}
+                            onReact={react}
                             onStar={onStar}
                             onMarkUnread={onMarkUnread}
                             inVoice={inVoice}
@@ -583,7 +636,8 @@ function Message({
     viewerId,
     onMention,
     onNickname,
-    onError
+    onError,
+    quick
 }: {
     message: ChatMessageView;
     grouped: boolean;
@@ -623,6 +677,9 @@ function Message({
     onMention?: (text: string) => void;
     onNickname: (person: MenuPerson) => void;
     onError: (message: string) => void;
+    /** The three the hover offers, decided once by the list so every row's bar
+     *  shows the same ones and they all change together. */
+    quick: readonly string[];
 }) {
     const format = useDisplayFormat();
     const baseUrl = useAppUrl();
@@ -770,11 +827,13 @@ function Message({
                                         onClick={() => void direct.open(writer)}
                                         className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
                                     >
-                                        {author}
+                                        <PersonName id={message.authorId} name={author} />
                                     </button>
                                 </Writer>
                             ) : (
-                                <span className="text-sm font-medium">{author}</span>
+                                <span className="text-sm font-medium">
+                                    <PersonName id={message.authorId} name={author} />
+                                </span>
                             )}
                             <span
                                 className="text-[0.6875rem] text-foreground-subtle"
@@ -962,17 +1021,23 @@ function Message({
 
                 {canPost && !message.deleted && (
                     <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
-                        {QUICK_EMOJI.map((emoji) => (
+                        {quick.map((emoji) => (
                             <button
                                 key={emoji}
                                 type="button"
                                 aria-label={`React with ${emoji}`}
+                                title={`React with ${emoji}`}
                                 onClick={() => onReact(message.id, emoji)}
                                 className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
                             >
                                 {emoji}
                             </button>
                         ))}
+                        {/* The reactions are one kind of thing and everything to
+                            the right of this is another. Without the rule they
+                            read as one row of seven controls where three of them
+                            happen to be pictures. */}
+                        <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
                         <button
                             type="button"
                             aria-label={message.starred ? "Remove from saved" : "Save this message"}

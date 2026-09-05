@@ -13,6 +13,11 @@
  * The picture is simply drawn on top. An account without one is answered with a
  * transparent pixel by the route, exactly as a face without a photo is, so the
  * colour shows through and nothing here has to ask which case it is in first.
+ *
+ * A colour somebody actually chose outranks the one taken from their face. That
+ * is the whole of the appearance panel as far as this component is concerned:
+ * the derived colour was always a good guess at what they would have picked, and
+ * it stops being interesting the moment they pick.
  */
 
 import { cn } from "@polaris/ui";
@@ -20,10 +25,13 @@ import { useState } from "react";
 import { bannerUrl, orgBannerUrl } from "@/lib/avatar-url";
 import { tintFor } from "@/components/avatar";
 import { accentGradient, useAccent, type AccentSubject } from "@/lib/profile-accent";
+import { fillCss, readFill, type BannerFill } from "@polaris/core";
+import { useProfileStyle } from "@/components/profile-style-store";
 
 export function ProfileBanner({
     person,
     kind = "user",
+    fill,
     className
 }: {
     person: { readonly id: string; readonly name: string };
@@ -37,14 +45,30 @@ export function ProfileBanner({
      * everywhere else to avoid.
      */
     kind?: AccentSubject;
+    /**
+     * The background they chose, when whoever is drawing this already knows it.
+     *
+     * For the public profile page, which is rendered for readers who may not be
+     * signed in at all: there is no store above that page to ask, so the server
+     * that already read the profile hands the colour down with it.
+     */
+    fill?: BannerFill | string | null;
     className?: string;
 }) {
     const accent = useAccent(person.id, kind);
+    // An organization has no appearance of its own to wear; asking would be a
+    // request per company card for a row that cannot exist.
+    const stored = useProfileStyle(kind === "org" || fill !== undefined ? null : person.id);
+    const chosen = fill === undefined ? stored?.banner ?? null : typeof fill === "string" ? readFill(fill) : fill;
     // A face with no colour in it - initials, a black and white photograph - is
     // still that person's colour: the tint their initials are drawn on is
     // already stable per account and already what everybody has learnt to
     // recognise them by.
-    const background = accent ? accentGradient(accent) : tintFor(person.id);
+    const background = chosen
+        ? fillCss(chosen)
+        : accent
+          ? accentGradient(accent)
+          : tintFor(person.id);
     const [failed, setFailed] = useState(false);
 
     return (

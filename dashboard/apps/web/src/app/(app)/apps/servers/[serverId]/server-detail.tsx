@@ -27,7 +27,7 @@ import { RemoveServerDialog } from "../remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
-import { Connect, LocalNote, Reachability, RenameForm } from "../server-panels";
+import { Connect, LocalNote, LocalPathPanel, Reachability, RenameForm } from "../server-panels";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { ArrowLeft, Boxes, FolderOpen, MapPin, SquareTerminal, Trash2 } from "lucide-react";
@@ -205,6 +205,10 @@ export function ServerDetail({
             ) : tab === "overview" ? (
                 <div className="flex flex-col gap-5">
                     <Reachability server={server} status={status} />
+
+                    {/* Only where there is a machine to ask. The box Polaris runs
+                        on is already as near as anything gets. */}
+                    {server.kind === "local" ? null : <LocalPathPanel server={server} />}
 
                     {/* The whole machine, including everything that is not a
                         container. It needs a login on the box, so it is offered

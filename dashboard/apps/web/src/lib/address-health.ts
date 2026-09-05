@@ -31,6 +31,7 @@ import { removeDashboardDomain } from "@/lib/domain-service";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";
 import { getPolarisTunnelStatus, stopPolarisTunnel } from "@/lib/polaris-tunnel-service";
+import { hasInternet } from "@/lib/internet-reach";
 
 /** Who hears about an address going down - the people who can fix one. */
 const ADDRESS_PERMISSION: Permission = "system.manage";
@@ -270,11 +271,29 @@ async function sweepAddress(address: DeploymentAddress): Promise<void> {
         return;
     }
 
+    // Which of the two this is. Polaris probes its own address from inside the
+    // container, so a silence means either the address really is down or this box
+    // has no way out and cannot see anything, its own domain included. Told apart
+    // they are different jobs; confused, the second wears the first one's clothes
+    // and somebody is sent to check DNS records on a morning when the router is
+    // unplugged.
+    if (!(await hasInternet())) {
+        await notifyOperators({
+            permission: ADDRESS_PERMISSION,
+            event: "network.address",
+            title: "Polaris cannot reach the internet",
+            body: `Nothing answered at ${address.url}, and neither did anything else - the public resolvers Polaris checks are silent too, so this is the line rather than the address. Nothing about ${address.host} needs changing: it will be reachable again when the connection is. Anything Polaris does outside this network is paused until then.`,
+            href: "/admin/settings",
+            actionRequired: true
+        });
+        return;
+    }
+
     await notifyOperators({
         permission: ADDRESS_PERMISSION,
         event: "network.address",
         title: `${address.host} is not answering`,
-        body: `Nothing answered at ${address.url}${detail ? ` (${detail})` : ""}. It is still listed in Settings, marked unreachable.`,
+        body: `Nothing answered at ${address.url}${detail ? ` (${detail})` : ""}. Polaris can reach the internet, so this is about that address rather than about the connection. It is still listed in Settings, marked unreachable.`,
         href: "/admin/settings",
         actionRequired: true
     });

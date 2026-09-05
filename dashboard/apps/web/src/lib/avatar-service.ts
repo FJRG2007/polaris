@@ -22,6 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
+import { fetchImage } from "@/lib/safe-fetch";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     AUTOMATIC_TARGET,
@@ -531,6 +532,59 @@ interface GravatarAnswer {
     readonly certain: boolean;
 }
 
+/**
+ * The picture the account somebody signed in with has for them.
+ *
+ * Cached exactly like a Gravatar, and for the same reasons: it is a request to
+ * somebody else's server, it is asked for once per face on a page, and the
+ * answer changes about as often as a person changes their profile picture
+ * anywhere.
+ *
+ * Fetched through the guarded fetcher rather than plain `fetch`. The URL comes
+ * out of the database - written by whatever provider the account was linked with
+ * - and a server that follows a stored URL wherever it points is a request
+ * forgery with a sign-in page in front of it. What it is allowed to reach is
+ * `safe-fetch`'s business, and this is one of the callers that exists because
+ * of it.
+ */
+async function linkedImage(url: string): Promise<GravatarAnswer> {
+    const key = `linked:${url}`;
+    const cached = gravatarCache.get(key);
+    if (cached && Date.now() < cached.until) return { image: cached.image, certain: !cached.failed };
+
+    let image: AvatarImage | null = null;
+    let answered = false;
+    try {
+        const fetched = await fetchImage(url, MAX_AVATAR_BYTES);
+        // Reaching the server at all is an answer, whether or not there was a
+        // picture behind it; only a failure to reach it is worth retrying soon.
+        answered = true;
+        // What it serves is checked against the same list an upload is, never
+        // trusted by the type it declares.
+        const mime = fetched ? sniffImageMime(fetched.bytes) : null;
+        if (fetched && mime) {
+            image = {
+                bytes: fetched.bytes,
+                mime,
+                // Tagged by the bytes rather than the address, so a provider that
+                // reuses one URL for a changed picture is not pinned into every
+                // browser that ever loaded it.
+                etag: `"l${createHash("sha256").update(fetched.bytes).digest("hex").slice(0, 16)}"`
+            };
+        }
+    } catch (error) {
+        if (!cached?.failed) console.error("avatars: linked picture unreachable:", error);
+    }
+
+    const kept = answered ? image : (cached?.image ?? null);
+    gravatarCache.set(key, {
+        until: Date.now() + (answered ? GRAVATAR_TTL_MS : GRAVATAR_RETRY_MS),
+        image: kept,
+        failed: !answered
+    });
+    return { image: kept, certain: answered };
+}
+
 /** Forget an address, so a photo taken down here is not shadowed by a stale
  *  "this account has a Gravatar" for the rest of the day. */
 export function forgetGravatar(email: string): void {
@@ -565,10 +619,31 @@ export interface AvatarAnswer {
 export async function resolveAvatar(userId: string): Promise<AvatarAnswer> {
     const uploaded = await uploadedAvatar({ kind: "user", id: userId });
     if (uploaded) return { picture: uploaded, certain: true };
-    if (!(await gravatarEnabled())) return { picture: null, certain: true };
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, image: true }
+    });
     if (!user) return { picture: null, certain: true };
 
+    // The picture whoever they signed in with had for them. It sits here rather
+    // than being read by whatever draws the face: pages used to put it straight
+    // into an <img>, which meant it outranked the photo the person had actually
+    // uploaded, and went on being drawn after they took that photo down. In this
+    // order it is what it should always have been - the answer for somebody who
+    // has not chosen one.
+    //
+    // Fetched by Polaris and never by the browser, for the same reason Gravatar
+    // is: an <img> pointing at the provider would tell them who is looking at
+    // whom, on every screen with a face on it.
+    if (user.image) {
+        const { image, certain } = await linkedImage(user.image);
+        if (image) {
+            return { picture: { etag: image.etag, mime: image.mime, load: async () => image.bytes }, certain };
+        }
+    }
+
+    if (!(await gravatarEnabled())) return { picture: null, certain: true };
     const { image, certain } = await gravatarImage(user.email);
     return {
         picture: image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null,

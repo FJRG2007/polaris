@@ -510,6 +510,16 @@ export interface OrgMemberView {
      * it - and it used to hand every one of them everybody's address.
      */
     readonly contact: string;
+    /**
+     * A picture from somewhere else, which for a person is nothing.
+     *
+     * Kept as a field because the shape is shared, and left null on purpose: a
+     * face is resolved from the account id, through the one route that decides
+     * between an upload, a linked account's picture and a Gravatar. Filling this
+     * in from what an OAuth provider handed better-auth is how a provider's
+     * picture came to outrank the photo somebody had chosen here - and to go on
+     * being drawn after they took that photo down.
+     */
     readonly image: string | null;
     /** The role's slug, or "owner". */
     readonly role: string;
@@ -566,7 +576,7 @@ export async function listOrgMembers(orgId: string, viewer: OrgActor): Promise<O
         userId: user.id,
         name: user.name,
         contact: contacts.get(user.id) ?? "",
-        image: user.image,
+        image: null,
         role,
         roleName: role === "owner" ? "Owner" : roleDisplayName(org.roles, role),
         joinedAt: joinedAt.toISOString(),

@@ -152,6 +152,9 @@ export async function storeAttachment(input: {
     mime: string;
     size: number;
     body: ReadableStream<Uint8Array>;
+    /** Set when the file was sent in the thread rather than added to the task's
+     *  files. It is on both either way; this is what lets the thread draw it. */
+    commentId?: string | null;
 }): Promise<AttachmentView> {
     // The storage uploads are sent to, or this server when that one cannot be
     // opened. A share that is away must not be the reason somebody cannot
@@ -175,7 +178,8 @@ export async function storeAttachment(input: {
                 size,
                 connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
                 path: stored,
-                uploadedById: input.uploadedById
+                uploadedById: input.uploadedById,
+                commentId: input.commentId ?? null
             },
             select: {
                 id: true,

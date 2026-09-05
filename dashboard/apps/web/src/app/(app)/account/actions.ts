@@ -21,6 +21,7 @@ import { emailField, USERNAME_COOLDOWN_KEY, usernameCooldownDays } from "@polari
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { setProfileStyle } from "@/lib/profile-style-service";
 import { getSetting } from "@/lib/setting-store";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
@@ -187,6 +188,27 @@ const companiesSchema = z.object({
     companies: z.array(core.companyField).max(core.MOST_COMPANIES),
     organizationIds: z.array(z.string().uuid()).max(50)
 });
+
+/**
+ * What somebody has chosen their profile to look like.
+ *
+ * Its own action, like every other card on this page, so saving a decoration
+ * does not write back a name that another card has changed since the page
+ * loaded. Everything in it is checked against the catalogue it claims to come
+ * from before it is stored - these values end up in a `style` attribute on a
+ * page other people read, and an id Polaris did not ship is not one of them.
+ */
+export async function saveProfileStyleAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = core.profileStyleSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you picked" };
+
+    await setProfileStyle(user.id, parsed.data);
+    // Their own public page is rendered per request, so there is nothing to
+    // revalidate there: the next reader gets what was just saved.
+    revalidatePath("/account");
+    return {};
+}
 
 export async function saveCompaniesAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();

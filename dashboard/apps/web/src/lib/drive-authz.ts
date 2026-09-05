@@ -44,6 +44,55 @@ const OWNER_CAPABILITY: Record<DriveAction, Permission> = {
     delete: "drive.delete"
 };
 
+/**
+ * What a reader may actually do here.
+ *
+ * The gate below is the truth and stays the truth: nothing on a screen is allowed
+ * to decide whether a write happens. But a screen that offers New folder, Rename
+ * and Delete to somebody with read-only access is a screen that lies four times
+ * and then shows an error - which reads as Polaris being broken rather than as a
+ * permission they never had. The affordance and the refusal have to agree.
+ *
+ * So the same function that guards the write answers the question, and the answer
+ * is what the controls are drawn from. Asked once per screen against the folder
+ * being looked at, not once per row: it is a handful of queries, and a listing of
+ * two hundred files would otherwise be six hundred.
+ *
+ * `skipLock` throughout, deliberately. A locked folder is a folder somebody has
+ * not unlocked yet, and greying out its buttons would tell them their account
+ * cannot do this when the answer is that the folder is closed - the unlock screen
+ * says that far better.
+ */
+export interface DriveAbilities {
+    readonly read: boolean;
+    readonly write: boolean;
+    readonly remove: boolean;
+}
+
+export async function driveAbilities(
+    userId: string,
+    connectionId: string,
+    path: string
+): Promise<DriveAbilities> {
+    const allowed = async (action: DriveAction): Promise<boolean> => {
+        try {
+            await authorizeDrive(userId, connectionId, path, action, { skipLock: true });
+            return true;
+        } catch {
+            // A refusal is the answer, not a failure. Anything else thrown in
+            // there - a storage that will not answer - is also a "no" as far as
+            // drawing a button goes, and the write itself still reports properly.
+            return false;
+        }
+    };
+    const [read, write, remove] = await Promise.all([
+        allowed("read"),
+        allowed("write"),
+        allowed("delete")
+    ]);
+    return { read, write, remove };
+}
+
 /** Raised when a user is not authorized for a Drive resource. Maps to 403. */
 export class DriveAccessError extends Error {
     public constructor() {
