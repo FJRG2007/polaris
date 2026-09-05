@@ -19,24 +19,31 @@ export const dynamic = "force-dynamic";
 export default async function TelemetryPage({
     searchParams
 }: {
-    searchParams: Promise<{ project?: string; issue?: string; status?: string }>;
+    searchParams: Promise<{
+        project?: string;
+        issue?: string;
+        status?: string;
+        section?: string;
+    }>;
 }) {
     await requirePermission("deploy.manage");
-    const { project, issue, status } = await searchParams;
+    const { project, issue, status, section } = await searchParams;
 
     return (
         <div className="flex w-full flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">Telemetry</h1>
                 <p className="text-sm text-muted-foreground">
-                    What your applications report when they break, and what Polaris reports about
-                    itself. Point any Sentry client at the address below.
+                    What your applications report when they break, and what Polaris reports
+                    about itself. Open a project for its faults and the address to point a Sentry
+                    client at.
                 </p>
             </div>
             <TelemetryView
                 projectId={project ?? null}
                 issueId={issue ?? null}
                 status={status ?? "unresolved"}
+                section={section ?? ""}
             />
         </div>
     );

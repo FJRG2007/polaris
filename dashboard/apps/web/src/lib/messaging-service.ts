@@ -21,6 +21,7 @@ import type {
 } from "@polaris/messaging";
 import {
     bridgeChannelState,
+    bridgeConfigured,
     bridgeConnectChannel,
     bridgeDisconnectChannel,
     bridgeListTargets,
@@ -866,6 +867,25 @@ export async function channelState(ownerId: string, channelId: string): Promise<
     return { status: state.status, qr: state.qr, externalId: state.externalId, setup: state.setup };
 }
 
+/**
+ * The last reason each channel could not be re-established.
+ *
+ * This runs every minute forever, so a reason reported on every pass is a line
+ * per channel per minute for as long as the condition lasts - which, for a
+ * bridge that is down for an afternoon, is hundreds of copies of one fact. Kept
+ * here so the same reason is said once and a *changed* one is said again, and
+ * cleared the moment a channel comes back so the next failure is not swallowed
+ * by the memory of the last one.
+ */
+const reconcileTrouble = new Map<string, string>();
+
+/** Say it, unless it is the same thing this channel said last time. */
+function reportTrouble(channelId: string, reason: string): void {
+    if (reconcileTrouble.get(channelId) === reason) return;
+    reconcileTrouble.set(channelId, reason);
+    console.error(`reconcileChannels: could not re-establish ${channelId}:`, reason);
+}
+
 /** Re-establish live adapters in the bridge for channels the DB considers up. The
  *  bridge holds adapters in memory, so a bridge (or web) restart leaves a channel
  *  "connected" in the DB but dead at the bridge; this reconnects any whose bridge
@@ -873,10 +893,31 @@ export async function channelState(ownerId: string, channelId: string): Promise<
  *  QR when the session is still valid. Best-effort and idempotent - channels the
  *  bridge already runs are left alone, so it never churns a healthy adapter. */
 export async function reconcileChannels(): Promise<void> {
+    // No bridge, nothing to reconcile - and nothing wrong. The bridge is an app
+    // somebody installs, so an instance that never installed one is not a broken
+    // instance, and every channel row left over from before it was removed is
+    // not a fault either.
+    //
+    // Reported as an error this was one line per channel per minute, forever,
+    // about a feature nobody had turned on. It is the first thing Polaris' own
+    // telemetry caught once it started listening, and it would have buried
+    // everything real underneath it.
+    if (!(await bridgeConfigured())) {
+        reconcileTrouble.clear();
+        return;
+    }
+
     const env = loadEnv();
     const channels = await prisma.channel.findMany({
         where: { status: { in: ["connected", "connecting"] }, platform: { not: EMAIL_PLATFORM } }
     });
+    // A channel that is no longer in the list cannot report anything, and its
+    // remembered reason would otherwise sit here for the life of the process.
+    const present = new Set(channels.map((channel) => channel.id));
+    for (const id of [...reconcileTrouble.keys()]) {
+        if (!present.has(id)) reconcileTrouble.delete(id);
+    }
+
     for (const channel of channels) {
         try {
             await bridgeChannelState(channel.id);
@@ -884,6 +925,7 @@ export async function reconcileChannels(): Promise<void> {
             // leave it. Never re-initialize a live whatsapp-web client just because it
             // reports an error - a fresh init re-links the device, which WhatsApp flags
             // as suspicious. Only (re)establish a channel whose adapter is truly gone.
+            reconcileTrouble.delete(channel.id);
             continue;
         } catch {
             // Adapter absent (404) or bridge unreachable: (re)establish it below.
@@ -915,11 +957,9 @@ export async function reconcileChannels(): Promise<void> {
                 token,
                 config: providerConfig
             });
+            reconcileTrouble.delete(channel.id);
         } catch (caught) {
-            console.error(
-                `reconcileChannels: could not re-establish ${channel.id}:`,
-                caught instanceof Error ? caught.message : caught
-            );
+            reportTrouble(channel.id, caught instanceof Error ? caught.message : String(caught));
         }
     }
 }
@@ -927,10 +967,22 @@ export async function reconcileChannels(): Promise<void> {
 /** Run channel reconcile at startup and on an interval, so channels self-heal
  *  after a bridge or web restart without any manual reconnection. */
 export function startChannelReconcile(): void {
+    // The pass itself handles a channel that will not come back; what reaches
+    // here is the pass failing outright - the database away, mostly. Said once
+    // for the same reason as the rest: on a minute timer, a condition that lasts
+    // an hour is sixty copies of one sentence.
+    let lastFailure: string | null = null;
     const tick = () =>
-        void reconcileChannels().catch((error) =>
-            console.error("polaris: channel reconcile failed:", error)
-        );
+        void reconcileChannels()
+            .then(() => {
+                lastFailure = null;
+            })
+            .catch((error: unknown) => {
+                const reason = error instanceof Error ? error.message : String(error);
+                if (lastFailure === reason) return;
+                lastFailure = reason;
+                console.error("polaris: channel reconcile failed:", error);
+            });
     tick();
     setInterval(tick, 60_000);
 }

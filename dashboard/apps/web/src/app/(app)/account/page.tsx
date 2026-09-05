@@ -21,7 +21,6 @@
  */
 
 import { prisma } from "@polaris/db";
-import { ProfilePicturesCard } from "./avatar-card";
 import { AppearanceCard } from "./appearance-card";
 import { requireUser } from "@/lib/session";
 import { ProfileView } from "./profile-view";
@@ -100,12 +99,6 @@ export default async function AccountPage() {
                     How you appear to everybody else in Polaris.
                 </p>
             </div>
-            <ProfilePicturesCard
-                userId={session.id}
-                name={user?.name ?? session.name}
-                hasPhoto={photo !== null}
-                hasBanner={banner !== null}
-            />
             <ProfileView
                 name={user?.name ?? session.name}
                 // Not edited here - the account screen owns them - but the handle
@@ -120,9 +113,14 @@ export default async function AccountPage() {
                 usernameChangeIn={usernameChangeIn}
                 description={user?.description ?? ""}
             />
+            {/* One card, not two. The picture handles live on the preview that
+                was already drawing the same banner and the same face - having
+                both was the profile shown twice on one screen. */}
             <AppearanceCard
                 userId={session.id}
                 name={user?.name ?? session.name}
+                hasPhoto={photo !== null}
+                hasBanner={banner !== null}
                 initial={style}
             />
             <DetailsCard

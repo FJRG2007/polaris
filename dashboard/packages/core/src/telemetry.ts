@@ -43,6 +43,17 @@ const MAX_TAG = 200;
 const MAX_TAGS = 50;
 const MAX_FRAMES = 60;
 const MAX_BREADCRUMBS = 40;
+/** The code around a frame. Five lines either side is what fits on a screen
+ *  without scrolling and what every tool that shows one has settled on. */
+const MAX_SNIPPET = 5;
+const MAX_CONTEXTS = 16;
+const MAX_CONTEXT_FIELDS = 32;
+const MAX_HEADERS = 60;
+const MAX_CRUMB_DATA = 12;
+/** A request body, which is the one field here written by a person rather than
+ *  by a client library, and the one that can be a megabyte. */
+const MAX_BODY = 4000;
+const MAX_VALUE = 1000;
 
 /** One line of a stack, as far as this cares about it. */
 export interface StackFrame {
@@ -54,7 +65,53 @@ export interface StackFrame {
      *  than a library's. It is what the grouping keys on, and what a stack trace
      *  shows expanded. */
     readonly inApp: boolean;
+    /** The line that threw. */
     readonly context: string | null;
+    /** The lines above and below it, in order. A stack frame says where; these
+     *  are what says what, and they are the difference between a file and line
+     *  somebody has to go and open and an answer on the screen. Sent by every
+     *  SDK that can read its own source, and dropped on the floor here until
+     *  there was somewhere to show them. */
+    readonly pre: readonly string[];
+    readonly post: readonly string[];
+}
+
+/** One header, and whether it is the kind that should not be read over
+ *  somebody's shoulder. */
+export interface HeaderField {
+    readonly name: string;
+    readonly value: string;
+    /** Marked here rather than blanked here. A credential in a request is often
+     *  the reason the request failed - the wrong key, the expired token - so
+     *  removing it removes the answer. The screen keeps it covered until
+     *  somebody asks for it; see `headerIsSecret`. */
+    readonly secret: boolean;
+}
+
+/** What the failing request was, as far as the reporter described it. */
+export interface RequestFacts {
+    readonly url: string | null;
+    readonly method: string | null;
+    readonly query: readonly HeaderField[];
+    readonly headers: readonly HeaderField[];
+    /** The body as text. JSON is kept as it arrived except for values under a
+     *  key that names a secret, which are covered like a header. */
+    readonly body: string | null;
+}
+
+/** A named group of facts about where the program was running - the runtime,
+ *  the operating system, the machine. Ordered rather than a bare object so the
+ *  screen draws them the same way twice. */
+export interface ContextGroup {
+    readonly name: string;
+    readonly fields: readonly { readonly key: string; readonly value: string }[];
+}
+
+/** Which client library reported, which is the first question when an event
+ *  arrives in a shape nothing else sends. */
+export interface SdkFacts {
+    readonly name: string;
+    readonly version: string;
 }
 
 export interface Breadcrumb {
@@ -63,6 +120,10 @@ export interface Breadcrumb {
     readonly category: string;
     readonly message: string;
     readonly level: TelemetryLevel;
+    /** What the crumb carried - the URL and status of a request, the arguments
+     *  of a log line. Most crumbs are only legible with it: an `http` crumb with
+     *  its data removed is the word "http". */
+    readonly data: readonly { readonly key: string; readonly value: string }[];
 }
 
 /** An event, once it has been read out of whatever shape it arrived in. */
@@ -90,6 +151,19 @@ export interface CapturedEvent {
     readonly tags: Readonly<Record<string, string>>;
     readonly frames: readonly StackFrame[];
     readonly breadcrumbs: readonly Breadcrumb[];
+    /** Where the program was running: its runtime and version, the operating
+     *  system, the machine's memory and processors. Every client sends this and
+     *  it is most of what makes one report actionable - "it only happens on the
+     *  old node" is a sentence nobody can say without it. */
+    readonly contexts: readonly ContextGroup[];
+    /** The request that was in flight, when the report came from something
+     *  serving one. */
+    readonly request: RequestFacts | null;
+    readonly sdk: SdkFacts | null;
+    /** The address the report came from. Kept because the question "which
+     *  machine" is the second one asked about anything running in more than one
+     *  place, and `server_name` is often a container id that answers it badly. */
+    readonly ip: string | null;
     readonly at: Date;
     /** What decides which issue this is another instance of. */
     readonly fingerprint: string;
@@ -258,9 +332,179 @@ function framesOf(stacktrace: unknown): StackFrame[] {
             line: typeof frame.lineno === "number" ? frame.lineno : null,
             column: typeof frame.colno === "number" ? frame.colno : null,
             inApp: frame.in_app === true,
-            context: asString(frame.context_line, MAX_CULPRIT) || null
+            context: asString(frame.context_line, MAX_CULPRIT) || null,
+            pre: sourceLines(frame.pre_context).slice(-MAX_SNIPPET),
+            post: sourceLines(frame.post_context).slice(0, MAX_SNIPPET)
         };
     });
+}
+
+/** The lines of source around a frame, as strings and nothing else. A client is
+ *  free to send nulls in here for lines it could not read. */
+function sourceLines(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.map((line) => asString(line, MAX_CULPRIT));
+}
+
+/**
+ * Whether a header, a query parameter or a field name is carrying a credential.
+ *
+ * Matched as a substring, and that asymmetry is deliberate: covering something
+ * harmless costs a click, and failing to cover a bearer token puts a live
+ * credential on a screen, in a screenshot, and in whatever the screenshot is
+ * pasted into. There is no header worth reading at a glance badly enough to
+ * justify the other mistake.
+ *
+ * Pure and exported so the ingest, the screen and the tests all decide this the
+ * same way, once.
+ */
+export function headerIsSecret(name: string): boolean {
+    const lower = name.trim().toLowerCase();
+    return SECRET_WORDS.some((word) => lower.includes(word));
+}
+
+const SECRET_WORDS = [
+    "auth",
+    "cookie",
+    "token",
+    "secret",
+    "password",
+    "passwd",
+    "credential",
+    "signature",
+    "session",
+    "api-key",
+    "api_key",
+    "apikey"
+] as const;
+
+/** A list of name/value pairs, bounded, with the secrets among them marked. */
+function fieldsOf(value: unknown, limit: number): HeaderField[] {
+    const entries: [unknown, unknown][] = Array.isArray(value)
+        ? value.map((pair) => {
+              const row = Array.isArray(pair) ? pair : [];
+              return [row[0], row[1]];
+          })
+        : Object.entries(asRecord(value));
+    const fields: HeaderField[] = [];
+    for (const [key, entry] of entries.slice(0, limit)) {
+        const name = asString(key, 80);
+        if (!name) continue;
+        fields.push({
+            name,
+            value: asString(entry, MAX_VALUE),
+            secret: headerIsSecret(name)
+        });
+    }
+    return fields;
+}
+
+/** The query string, as its parameters. Sentry sends it either already split or
+ *  as the raw string, and both are in the wild. */
+function queryOf(value: unknown): HeaderField[] {
+    if (typeof value !== "string") return fieldsOf(value, MAX_HEADERS);
+    const raw = value.startsWith("?") ? value.slice(1) : value;
+    if (!raw) return [];
+    return raw
+        .split("&")
+        .slice(0, MAX_HEADERS)
+        .map((pair) => {
+            const at = pair.indexOf("=");
+            const name = decodeSafely(at === -1 ? pair : pair.slice(0, at));
+            const said = at === -1 ? "" : decodeSafely(pair.slice(at + 1));
+            return { name, value: said, secret: headerIsSecret(name) };
+        })
+        .filter((field) => field.name !== "");
+}
+
+/** Percent-decoding that cannot throw on a malformed escape, which a crashing
+ *  program is entitled to send. */
+function decodeSafely(value: string): string {
+    try {
+        return decodeURIComponent(value.replace(/\+/g, " ")).slice(0, MAX_VALUE);
+    } catch {
+        return value.slice(0, MAX_VALUE);
+    }
+}
+
+/**
+ * The body, as text.
+ *
+ * A JSON body is re-serialized with the values of secret-looking keys replaced,
+ * because a login that failed reports the password that failed with it. Anything
+ * that is not JSON is kept as it came and bounded - guessing at the structure of
+ * a form encoding or a protobuf would be a way to mangle it, not to protect it.
+ */
+function bodyOf(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string") return value.slice(0, MAX_BODY) || null;
+    try {
+        return JSON.stringify(coverSecrets(value), null, 2).slice(0, MAX_BODY);
+    } catch {
+        return null;
+    }
+}
+
+/** The same value with anything under a secret-looking key replaced. Walks
+ *  nested objects, because a credential is as often one level down. */
+function coverSecrets(value: unknown, depth = 0): unknown {
+    if (depth > 6) return value;
+    if (Array.isArray(value)) return value.map((entry) => coverSecrets(entry, depth + 1));
+    if (value === null || typeof value !== "object") return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+        out[key] = headerIsSecret(key) ? COVERED : coverSecrets(entry, depth + 1);
+    }
+    return out;
+}
+
+/** What stands in for a value that was covered inside a body. Written out
+ *  rather than blanked, so a reader can tell "it was there and is hidden" from
+ *  "it was never sent" - which are different bugs. */
+const COVERED = "[hidden]";
+
+/**
+ * Where the program was running.
+ *
+ * Sentry's `contexts` is an open map of open maps, and the whole value of it is
+ * that a client can put anything in. So nothing here is interpreted: each group
+ * is flattened to its own scalar fields, in the order the client wrote them,
+ * with the well-known ones first because those are the ones read every time.
+ */
+function contextsOf(value: unknown): ContextGroup[] {
+    const groups: ContextGroup[] = [];
+    for (const [name, entry] of Object.entries(asRecord(value)).slice(0, MAX_CONTEXTS)) {
+        const label = asString(name, 60);
+        if (!label) continue;
+        const fields: { key: string; value: string }[] = [];
+        for (const [key, said] of Object.entries(asRecord(entry)).slice(0, MAX_CONTEXT_FIELDS)) {
+            // "type" is the client repeating the group's own name back, which is
+            // a row that says nothing on every single group.
+            if (key === "type") continue;
+            const printed =
+                said !== null && typeof said === "object" ? safeJson(said) : asString(said, MAX_VALUE);
+            if (printed) fields.push({ key: asString(key, 60), value: printed });
+        }
+        if (fields.length > 0) groups.push({ name: label, fields });
+    }
+    return groups.sort((left, right) => contextRank(left.name) - contextRank(right.name));
+}
+
+/** The order the groups are read in. Everything unlisted keeps its own order
+ *  after the known ones rather than being sorted into them. */
+const CONTEXT_ORDER = ["runtime", "os", "browser", "device", "app", "trace", "culture"];
+
+function contextRank(name: string): number {
+    const at = CONTEXT_ORDER.indexOf(name.toLowerCase());
+    return at === -1 ? CONTEXT_ORDER.length : at;
+}
+
+function safeJson(value: unknown): string {
+    try {
+        return JSON.stringify(value).slice(0, MAX_VALUE);
+    } catch {
+        return "";
+    }
 }
 
 function breadcrumbsOf(value: unknown): Breadcrumb[] {
@@ -273,7 +517,17 @@ function breadcrumbsOf(value: unknown): Breadcrumb[] {
             type: asString(crumb.type, 40) || "default",
             category: asString(crumb.category, MAX_TAG),
             message: asString(crumb.message, MAX_TITLE),
-            level: levelOf(crumb.level)
+            level: levelOf(crumb.level),
+            data: Object.entries(asRecord(crumb.data))
+                .slice(0, MAX_CRUMB_DATA)
+                .map(([key, said]) => ({
+                    key: asString(key, 60),
+                    value:
+                        said !== null && typeof said === "object"
+                            ? safeJson(said)
+                            : asString(said, MAX_VALUE)
+                }))
+                .filter((field) => field.key !== "" && field.value !== "")
         };
     });
 }
@@ -293,6 +547,31 @@ function tagsOf(value: unknown): Record<string, string> {
         if (name && said) tags[name] = said;
     }
     return tags;
+}
+
+/** The request, or null when the reporter described none - which is most of
+ *  what a background job or a CLI sends. */
+function requestOf(request: Record<string, unknown>): RequestFacts | null {
+    const url = asString(request.url, 2000) || null;
+    const method = asString(request.method, 10).toUpperCase() || null;
+    const headers = fieldsOf(request.headers, MAX_HEADERS);
+    const query = queryOf(request.query_string);
+    const body = bodyOf(request.data);
+    // Cookies arrive in their own field as often as in a header, and they are a
+    // credential wherever they arrive.
+    const cookies = typeof request.cookies === "string" ? request.cookies : "";
+    const all = cookies
+        ? [...headers, { name: "cookie", value: cookies.slice(0, MAX_VALUE), secret: true }]
+        : headers;
+    if (!url && !method && all.length === 0 && query.length === 0 && !body) return null;
+    return { url, method, query, headers: all, body };
+}
+
+function sdkOf(value: unknown): SdkFacts | null {
+    const sdk = asRecord(value);
+    const name = asString(sdk.name, MAX_TAG);
+    if (!name) return null;
+    return { name, version: asString(sdk.version, 40) };
 }
 
 /** The frame worth naming in a list: the application's own innermost one, and
@@ -354,6 +633,16 @@ export function readEvent(payload: unknown, now: Date): CapturedEvent | null {
         tags: tagsOf(event.tags),
         frames,
         breadcrumbs: breadcrumbsOf(event.breadcrumbs),
+        contexts: contextsOf(event.contexts),
+        request: requestOf(request),
+        sdk: sdkOf(event.sdk),
+        // `user.ip_address` is where every SDK puts it; a server-side client
+        // that knows the caller's address puts that one in the request's env
+        // instead, which is the same question with a different answer.
+        ip:
+            asString(user.ip_address, 60) ||
+            asString(asRecord(request.env).REMOTE_ADDR, 60) ||
+            null,
         at: timeOf(event.timestamp, now)
     };
 

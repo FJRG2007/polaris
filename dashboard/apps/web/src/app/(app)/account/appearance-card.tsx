@@ -27,11 +27,22 @@ import * as core from "@polaris/core";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
-import { RotateCcw, Sparkles } from "lucide-react";
 import { saveProfileStyleAction } from "./actions";
+import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
 import { ProfileBanner } from "@/components/profile-banner";
+import { PictureEditor, usePicture } from "./avatar-card";
+import { BAND_CROP, FACE_CROP } from "@/components/image-cropper";
+import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
-import { Button, Card, CardBody, CardHeader, CardTitle, ColorPicker, cn } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    ColorPicker,
+    cn
+} from "@polaris/ui";
 import {
     frameCss,
     nameStyleCss,
@@ -51,10 +62,16 @@ type Background = "photo" | "solid" | "gradient";
 export function AppearanceCard({
     userId,
     name,
+    hasPhoto,
+    hasBanner,
     initial
 }: {
     userId: string;
     name: string;
+    /** Whether there is a picture of their own behind each of the two handles,
+     *  which is what decides whether there is anything to reframe or take away. */
+    hasPhoto: boolean;
+    hasBanner: boolean;
     initial: core.ProfileStyle;
 }) {
     const [style, setStyle] = useState<core.ProfileStyle>(initial);
@@ -63,6 +80,9 @@ export function AppearanceCard({
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
     const refreshFaces = useProfileStyleRefresh();
+    const photo = usePicture("/api/avatar", avatarUrl(userId), FACE_CROP);
+    const banner = usePicture("/api/banner", bannerUrl(userId), BAND_CROP);
+    const pictureError = photo.error || banner.error;
 
     const changed = useMemo(
         () => JSON.stringify(style) !== JSON.stringify(saved),
@@ -94,6 +114,11 @@ export function AppearanceCard({
         <Card>
             <CardHeader>
                 <CardTitle>Appearance</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                    How your profile looks to everybody else. Without a photo, Polaris uses the
+                    picture your email address has on Gravatar and your initials if it has none;
+                    without a banner, a colour taken from your photo.
+                </p>
             </CardHeader>
             <CardBody className="flex flex-col gap-5">
                 {/* Drawn by the same components your profile is drawn by, so what
@@ -117,19 +142,47 @@ export function AppearanceCard({
                             style={sheen}
                         />
                     ) : null}
-                    <ProfileBanner
-                        person={{ id: userId, name }}
-                        fill={style.banner}
-                        className="h-24"
-                    />
+                    <div className="relative">
+                        <ProfileBanner
+                            person={{ id: userId, name }}
+                            fill={style.banner}
+                            className="h-24"
+                        />
+                        {/* Only over a banner that is actually a picture. With a
+                            colour or a gradient chosen, the uploaded one is not
+                            what is on screen, and a handle to reframe something
+                            invisible is a handle that does nothing anybody can
+                            see. */}
+                        {background === "photo" && (
+                            <PictureEditor
+                                label="banner"
+                                icon={ImageIcon}
+                                picture={banner}
+                                exists={hasBanner}
+                                radius="none"
+                            />
+                        )}
+                    </div>
                     <div className="flex flex-col gap-2 p-4">
                         <div className="-mt-12 flex items-end gap-3">
-                            <span className="rounded-full ring-4 ring-card">
+                            {/* A flex box, so it is exactly the size of the face.
+                                Left as a block it takes the line box of the image
+                                inside it, which is a few pixels taller than the
+                                circle - and the round handle laid over `inset-0`
+                                then draws as an ellipse hanging below it. */}
+                            <span className="relative flex w-fit rounded-full ring-4 ring-card">
                                 <Avatar
                                     person={{ id: userId, name }}
                                     size={72}
                                     decoration={style.decoration}
                                     status={false}
+                                />
+                                <PictureEditor
+                                    label="photo"
+                                    icon={Camera}
+                                    picture={photo}
+                                    exists={hasPhoto}
+                                    radius="full"
                                 />
                             </span>
                         </div>
@@ -363,7 +416,9 @@ export function AppearanceCard({
                 </section>
 
                 <div className="flex items-center justify-between gap-2">
-                    {error ? <p className="text-danger text-sm">{error}</p> : null}
+                    {error || pictureError ? (
+                        <p className="text-danger text-sm">{error || pictureError}</p>
+                    ) : null}
                     {done && !error ? <p className="text-success text-sm">Saved.</p> : null}
                     <div className="ml-auto flex items-center gap-2">
                         <Button
