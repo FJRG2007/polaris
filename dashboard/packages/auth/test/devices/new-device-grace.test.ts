@@ -13,7 +13,10 @@
  *     the alternative locks out every account the day the feature ships;
  *   - a device that signs in again does not restart its own wait;
  *   - the device the account was opened from is never held, because there was no
- *     earlier device for a stolen password to be racing.
+ *     earlier device for a stolen password to be racing;
+ *   - and a browser that has updated itself is the device it always was, which
+ *     is the one that was getting this wrong: keyed on the raw user-agent, the
+ *     owner's machine of a year arrived as a stranger every few weeks.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const userSecurity = { findUnique: vi.fn(), upsert: vi.fn() };
-const accountDevice = { findFirst: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() };
+const accountDevice = { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() };
 const session = { findFirst: vi.fn() };
 
 vi.mock("@polaris/db", () => ({ prisma: { userSecurity, accountDevice, session } }));
@@ -30,6 +33,9 @@ const { accountDeviceStanding, newDeviceWaitMessage, rememberAccountDevice, sess
     await import("../../src/devices.js");
 
 const CHROME = "Mozilla/5.0 (Windows NT 10.0) Chrome/131.0.0.0";
+/** The same browser after it updated itself, which it does on its own every few
+ *  weeks. Every token but the version is the machine it was before. */
+const CHROME_NEXT = "Mozilla/5.0 (Windows NT 10.0) Chrome/132.0.0.0";
 const SAFARI = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Version/17.0 Safari/605.1.15";
 
 /** An account that asks new devices to wait this many days. */
@@ -37,9 +43,16 @@ function graceOf(days: number) {
     userSecurity.findUnique.mockResolvedValue({ newDeviceGraceDays: days });
 }
 
-/** A device first seen this long ago. */
-function firstSeenDaysAgo(days: number) {
-    accountDevice.findUnique.mockResolvedValue({ firstSeenAt: new Date(Date.now() - days * DAY_MS) });
+/** The register, as the account holds it: a browser and when it was first seen. */
+function register(...rows: { userAgent: string; days: number }[]) {
+    accountDevice.findMany.mockResolvedValue(
+        rows.map((row) => ({ userAgent: row.userAgent, firstSeenAt: new Date(Date.now() - row.days * DAY_MS) }))
+    );
+}
+
+/** A device first seen this long ago, and nothing else on the account. */
+function firstSeenDaysAgo(days: number, userAgent = CHROME) {
+    register({ userAgent, days });
 }
 
 /** The browser the account was opened from. */
@@ -61,7 +74,7 @@ describe("accountDeviceStanding", () => {
         const standing = await accountDeviceStanding("user-1", CHROME);
         expect(standing.settled).toBe(true);
         // And does not go looking for a device it would not have used.
-        expect(accountDevice.findUnique).not.toHaveBeenCalled();
+        expect(accountDevice.findMany).not.toHaveBeenCalled();
         expect(accountDevice.findFirst).not.toHaveBeenCalled();
     });
 
@@ -91,7 +104,7 @@ describe("accountDeviceStanding", () => {
         const standing = await accountDeviceStanding("user-1", null);
         expect(standing.settled).toBe(false);
         expect(standing.settlesAt).toBeNull();
-        expect(accountDevice.findUnique).not.toHaveBeenCalled();
+        expect(accountDevice.findMany).not.toHaveBeenCalled();
     });
 
     it("never holds the device the account was opened from", async () => {
@@ -122,22 +135,66 @@ describe("accountDeviceStanding", () => {
         // Nothing wrote a row before this existed, and every sign-in since has.
         // Reading absence as "new" would hold every account the day it ships.
         graceOf(7);
-        accountDevice.findUnique.mockResolvedValue(null);
+        register();
         expect((await accountDeviceStanding("user-1", CHROME)).settled).toBe(true);
+    });
+});
+
+describe("a browser that updated itself", () => {
+    it("is the device it always was", async () => {
+        // The bug this was reported as: the owner, on the machine they had used
+        // all year, told their device was new - and told it again after the next
+        // update. A gate that only ever fires on the person it protects is not
+        // a gate.
+        graceOf(7);
+        register({ userAgent: CHROME, days: 300 });
+        expect((await accountDeviceStanding("user-1", CHROME_NEXT)).settled).toBe(true);
+    });
+
+    it("is dated from the first version of it that was seen", async () => {
+        graceOf(7);
+        register({ userAgent: CHROME, days: 30 }, { userAgent: CHROME_NEXT, days: 1 });
+        const standing = await accountDeviceStanding("user-1", CHROME_NEXT);
+        expect(standing.settled).toBe(true);
+        expect(Date.now() - (standing.firstSeenAt?.getTime() ?? 0)).toBeGreaterThan(29 * DAY_MS);
+    });
+
+    it("is still the device the account was opened from", async () => {
+        graceOf(7);
+        openedFrom(CHROME);
+        register({ userAgent: CHROME, days: 0 });
+        expect((await accountDeviceStanding("user-1", CHROME_NEXT)).settled).toBe(true);
+    });
+
+    it("does not hand a different browser the standing of an old one", async () => {
+        // Only the version numbers are set aside. Everything else describing the
+        // machine still has to match, or an account with one long-standing
+        // device would settle every device that ever signed in to it.
+        //
+        // Both rows are here because a sign-in writes one before this is ever
+        // asked: the browser arriving today has its own row, and the question is
+        // only whose age it is dated by.
+        graceOf(7);
+        register({ userAgent: SAFARI, days: 400 }, { userAgent: CHROME, days: 0 });
+        expect((await accountDeviceStanding("user-1", CHROME)).settled).toBe(false);
     });
 });
 
 describe("sessionDeviceStanding", () => {
     it("judges the device the session was opened with, not the request in hand", async () => {
+        // Two devices on the account: the one better-auth wrote against the
+        // session long ago, which has served its wait, and the one Polaris keeps
+        // following, which has not. Only the second answer is unsettled, so the
+        // verdict says which of the two was judged.
         graceOf(7);
-        firstSeenDaysAgo(1);
-        session.findFirst.mockResolvedValue({ userAgent: "stale", state: { userAgent: CHROME } });
+        register({ userAgent: SAFARI, days: 400 }, { userAgent: CHROME, days: 1 });
+        session.findFirst.mockResolvedValue({ userAgent: SAFARI, state: { userAgent: CHROME } });
 
         expect((await sessionDeviceStanding("user-1", "session-1")).settled).toBe(false);
-        // Polaris's own copy wins over better-auth's, which is written once and
-        // never followed - and neither comes from the caller's headers.
-        expect(accountDevice.findUnique).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { userId_userAgent: { userId: "user-1", userAgent: CHROME } } })
+        // Read from the register rather than from the caller's headers: a caller
+        // that could pick which device it was judged as would pick an old one.
+        expect(accountDevice.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { userId: "user-1" } })
         );
     });
 
