@@ -95,6 +95,21 @@ export interface FilteredMic {
      *  graph that is only there to make a quiet microphone louder, with no model
      *  in it at all. */
     readonly using: "enhanced" | "light" | "licensed" | "gain";
+    /**
+     * Why the model somebody asked for is not the one running, or null when
+     * nothing went wrong.
+     *
+     * Both loaders used to swallow their error whole - `catch { return null }` -
+     * and that is how a deployment where the filter has never once started
+     * looks identical to one where it works: the setting says enhanced, the
+     * call is quieter, and there is nothing anywhere to read. Nobody could find
+     * out why, including whoever wrote it.
+     *
+     * So the reason is kept. It is a browser's own message about a file on this
+     * origin, not anything about the person, and it is what turns "noise
+     * suppression is off" into something somebody can act on.
+     */
+    readonly problem: string | null;
 }
 
 /**
@@ -167,7 +182,14 @@ export async function filterMic(
     // anybody, both ends were reported as fine, and the only thing wrong was a
     // model that had failed to load on a browser where somebody had also moved
     // the level.
-    const built = model ? await buildNode(context, filter, licensed) : null;
+    const attempt = model ? await buildNode(context, filter, licensed) : null;
+    // Narrowed to the shape the rest of this function uses, so the node is not
+    // re-checked at every connection below.
+    const built =
+        attempt && attempt.node
+            ? { node: attempt.node, dispose: attempt.dispose, using: attempt.using }
+            : null;
+    const problem = attempt?.problem ?? null;
     if (model && !built && gain === 1) {
         source.disconnect();
         await context.close().catch(() => undefined);
@@ -212,6 +234,7 @@ export async function filterMic(
     return {
         track: out,
         using: built ? built.using : "gain",
+        problem: built ? null : (problem ?? null),
         stop: async () => {
             built?.dispose();
             source.disconnect();
@@ -223,54 +246,94 @@ export async function filterMic(
     };
 }
 
-/** The node that does the work, with the free model chosen last. */
+/** What a build attempt came back with: the node, or the reason there is none. */
+type BuildAttempt = {
+    node: AudioNode | null;
+    dispose: () => void;
+    using: FilteredMic["using"];
+    problem: string | null;
+};
+
+/**
+ * The node that does the work, with the free model chosen last.
+ *
+ * Every attempt reports why it did not work rather than returning a bare null.
+ * A filter that has never once started in a deployment looked exactly like one
+ * that works - the setting still said enhanced, the call was simply quieter -
+ * and the reason was thrown away three functions down where nobody would ever
+ * see it. The last reason survives, because the last one is the one that
+ * decided the outcome.
+ */
 async function buildNode(
     context: AudioContext,
     filter: MicFilter,
     licensed?: { moduleUrl: string; token: string } | null
-): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
+): Promise<BuildAttempt> {
+    let problem: string | null = null;
+
     if (filter === "licensed") {
-        const node = await licensedNode(context, licensed);
-        if (node) return node;
+        const attempt = await licensedNode(context, licensed);
+        if (attempt.node) return attempt;
+        problem = attempt.problem;
         // Falls through to the free model rather than to nothing: a licence that
         // failed to load should not leave somebody worse off than a person who
         // never had one.
     }
 
-    const better = await gtcrnNode(context);
-    if (better) return better;
-    return await rnnoiseNode(context);
+    const better = await modelNode(context, "enhanced");
+    if (better.node) return better;
+    const light = await modelNode(context, "light");
+    return { ...light, problem: light.problem ?? problem };
 }
 
-async function gtcrnNode(
-    context: AudioContext
-): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
+/**
+ * One of the two free models, loaded from this origin.
+ *
+ * Both are the same three steps in the same order - the package, the weights,
+ * the worklet - so they are one function rather than two that drift apart. The
+ * assets are served from `public/audio` and are copies of what the package
+ * ships; `mic-filter.test.ts` fails if they stop matching, because a worklet
+ * from one version over weights from another fails here, silently, in exactly
+ * the way this whole file exists to stop being silent.
+ */
+async function modelNode(
+    context: AudioContext,
+    which: "enhanced" | "light"
+): Promise<BuildAttempt> {
+    const empty = { node: null, dispose: () => {}, using: which } as const;
     try {
-        const { GtcrnWorkletNode, loadGtcrn } = await suppressors();
-        const wasmBinary = await loadGtcrn({ url: `${ASSETS}/gtcrn.wasm` });
-        await context.audioWorklet.addModule(`${ASSETS}/gtcrn-worklet.js`);
-        const node = new GtcrnWorkletNode(context, { maxChannels: 1, wasmBinary });
-        return { node, dispose: () => node.destroy(), using: "enhanced" };
-    } catch {
-        return null;
-    }
-}
-
-async function rnnoiseNode(
-    context: AudioContext
-): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
-    try {
-        const { RnnoiseWorkletNode, loadRnnoise } = await suppressors();
-        const wasmBinary = await loadRnnoise({
+        const suppressor = await suppressors();
+        if (which === "enhanced") {
+            const wasmBinary = await suppressor.loadGtcrn({ url: `${ASSETS}/gtcrn.wasm` });
+            await context.audioWorklet.addModule(`${ASSETS}/gtcrn-worklet.js`);
+            const node = new suppressor.GtcrnWorkletNode(context, { maxChannels: 1, wasmBinary });
+            return { node, dispose: () => node.destroy(), using: "enhanced", problem: null };
+        }
+        const wasmBinary = await suppressor.loadRnnoise({
             url: `${ASSETS}/rnnoise.wasm`,
             simdUrl: `${ASSETS}/rnnoise_simd.wasm`
         });
         await context.audioWorklet.addModule(`${ASSETS}/rnnoise-worklet.js`);
-        const node = new RnnoiseWorkletNode(context, { maxChannels: 1, wasmBinary });
-        return { node, dispose: () => node.destroy(), using: "light" };
-    } catch {
-        return null;
+        const node = new suppressor.RnnoiseWorkletNode(context, { maxChannels: 1, wasmBinary });
+        return { node, dispose: () => node.destroy(), using: "light", problem: null };
+    } catch (caught) {
+        return { ...empty, problem: reasonOf(caught) };
     }
+}
+
+/**
+ * A failure in words, and deliberately the browser's own.
+ *
+ * Not translated into something reassuring: "the module could not be loaded"
+ * and "WebAssembly.instantiate failed" send somebody to two different places,
+ * and the screen that prints this is the only place either of them appears.
+ * Trimmed, because it goes on a line under a setting.
+ */
+function reasonOf(caught: unknown): string {
+    const message = caught instanceof Error ? caught.message : String(caught ?? "");
+    const said = message.trim().replace(/\s+/g, " ");
+    if (!said) return "It would not start, and said nothing about why.";
+    return said.length > 160 ? `${said.slice(0, 157)}...` : said;
 }
 
 /**
@@ -284,20 +347,27 @@ async function rnnoiseNode(
 async function licensedNode(
     context: AudioContext,
     licensed?: { moduleUrl: string; token: string } | null
-): Promise<{ node: AudioNode; dispose: () => void; using: FilteredMic["using"] } | null> {
-    if (!licensed?.moduleUrl) return null;
+): Promise<BuildAttempt> {
+    const empty = { node: null, dispose: () => {}, using: "licensed" } as const;
+    if (!licensed?.moduleUrl) {
+        return { ...empty, problem: "No filter has been connected to this instance." };
+    }
     try {
         const module = (await import(/* webpackIgnore: true */ licensed.moduleUrl)) as {
             default?: LicensedFilter;
             filter?: LicensedFilter;
         };
         const found = module.filter ?? module.default;
-        if (!found?.createNode) return null;
+        if (!found?.createNode) {
+            return { ...empty, problem: "That filter is not the shape Polaris can use." };
+        }
 
         const node = await found.createNode(context, { token: licensed.token });
-        if (!(node instanceof AudioNode)) return null;
-        return { node, dispose: () => found.dispose?.(), using: "licensed" };
-    } catch {
-        return null;
+        if (!(node instanceof AudioNode)) {
+            return { ...empty, problem: "That filter did not return something a call can carry." };
+        }
+        return { node, dispose: () => found.dispose?.(), using: "licensed", problem: null };
+    } catch (caught) {
+        return { ...empty, problem: reasonOf(caught) };
     }
 }
