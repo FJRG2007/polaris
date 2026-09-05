@@ -55,6 +55,58 @@ export async function stylesFor(ids: readonly string[]): Promise<Map<string, cor
 }
 
 /**
+ * What has changed since a browser last asked, out of the people it is drawing.
+ *
+ * The half that makes an appearance live without making it expensive. A screen
+ * holds a few dozen faces, so this is asked about a few dozen ids and answered
+ * from one indexed lookup - the cost is proportional to the people being looked
+ * at, never to the number of accounts. A million accounts changing nothing costs
+ * nothing, and one person changing their decoration is read by the handful of
+ * browsers that happen to have their face on screen.
+ *
+ * `styled` is the other half of the answer, and the reason it is needed is that
+ * turning everything off deletes the row (see `setProfileStyle`). A row that is
+ * gone cannot be found by "changed since", so the browser says which of the
+ * people it is drawing it currently believes are decorated, and anybody in that
+ * list with no row has gone back to plain. It is a short list: almost nobody has
+ * chosen anything.
+ */
+export interface StyleChanges {
+    /** Only the people whose appearance is different from what the browser has. */
+    readonly changed: Map<string, core.ProfileStyle>;
+    /** People the browser is drawing decorated who are not decorated any more. */
+    readonly cleared: string[];
+}
+
+export async function styleChangesSince(
+    ids: readonly string[],
+    since: Date,
+    styled: readonly string[]
+): Promise<StyleChanges> {
+    const wanted = [...new Set(ids)];
+    const changed = new Map<string, core.ProfileStyle>();
+    if (wanted.length === 0) return { changed, cleared: [] };
+
+    const rows = await prisma.userProfileStyle.findMany({
+        where: { userId: { in: wanted }, updatedAt: { gt: since } },
+        select: { userId: true, ...COLUMNS }
+    });
+    for (const row of rows) changed.set(row.userId, core.readProfileStyle(row));
+
+    // Whose row has gone. Asked only about the ones the browser is drawing
+    // decorated, so this is a lookup over a handful of ids rather than over the
+    // page.
+    const believed = [...new Set(styled)].filter((id) => wanted.includes(id) && !changed.has(id));
+    if (believed.length === 0) return { changed, cleared: [] };
+    const alive = await prisma.userProfileStyle.findMany({
+        where: { userId: { in: believed } },
+        select: { userId: true }
+    });
+    const living = new Set(alive.map((row) => row.userId));
+    return { changed, cleared: believed.filter((id) => !living.has(id)) };
+}
+
+/**
  * Save your own.
  *
  * A style that says nothing takes its row away rather than storing five nulls:
