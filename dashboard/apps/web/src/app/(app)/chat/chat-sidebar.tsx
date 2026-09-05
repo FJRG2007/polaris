@@ -31,6 +31,7 @@ import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { NotifyOptions } from "./notify-menu";
@@ -352,6 +353,11 @@ export function ChatSidebar() {
                                     unread={channel.unread}
                                     muted={channel.muted}
                                     label={channel.name}
+                                    personId={
+                                        channel.others.length === 1
+                                            ? channel.others[0]?.id ?? null
+                                            : null
+                                    }
                                     icon={
                                         channel.others.length === 1 && channel.others[0] ? (
                                             // Twenty rather than eighteen, which
@@ -643,9 +649,11 @@ function ChannelRows({
                         {inside.length > 0 && (
                             <ul className="mb-1 ml-7 flex flex-col gap-0.5">
                                 {inside.map((person) => (
-                                    <li
+                                    <PersonRow
+                                        as="li"
                                         key={person.id}
-                                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                                        personId={person.userId}
+                                        className="flex items-center gap-1.5 rounded px-1 text-xs text-muted-foreground"
                                         title={person.name}
                                     >
                                         <Avatar
@@ -660,9 +668,9 @@ function ChannelRows({
                                             }}
                                         />
                                         <span className="truncate" title={person.name}>
-                                            {person.name}
+                                            <PersonName id={person.userId} name={person.name} />
                                         </span>
-                                    </li>
+                                    </PersonRow>
                                 ))}
                             </ul>
                         )}
@@ -767,6 +775,7 @@ function Row({
     muted,
     label,
     icon,
+    personId,
     channel,
     onManage
 }: {
@@ -776,6 +785,15 @@ function Row({
     muted: boolean;
     label: string;
     icon: React.ReactNode;
+    /**
+     * Whose conversation it is, for a direct message with one other person.
+     *
+     * The label of such a row IS somebody's name, so it wears what they chose:
+     * their plate behind the row and their colours across the letters. Absent on
+     * a group, a channel or the link to what you saved - a plate belongs to a
+     * person, and a room of four has no one person to take it from.
+     */
+    personId?: string | null;
     /** What a right-click acts on. Absent on the rows that are not a
      *  conversation, such as the link to what somebody has saved. */
     channel?: ChatChannelView;
@@ -787,17 +805,24 @@ function Row({
     // about them, which is the difference between muting and leaving.
     const shout = unread > 0 && !muted;
     const row = (
-        <Link
+        <PersonRow
+            as={Link}
+            personId={personId}
             href={href}
             className={cn(
                 "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
-                active ? "bg-card-hover text-foreground" : "text-muted-foreground",
+                // The plate a person chose paints over the tint that says which
+                // conversation is open, so a plated row is marked with an edge
+                // instead - see `data-plated` on PersonRow.
+                active
+                    ? "bg-card-hover text-foreground data-[plated]:ring-1 data-[plated]:ring-inset data-[plated]:ring-border-strong"
+                    : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
         >
             {icon}
             <span className="min-w-0 flex-1 truncate" title={label}>
-                {label}
+                <PersonName id={personId} name={label} />
             </span>
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
@@ -816,7 +841,7 @@ function Row({
                     {unread > 98 ? "99+" : unread}
                 </span>
             )}
-        </Link>
+        </PersonRow>
     );
 
     return channel ? (

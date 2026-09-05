@@ -311,15 +311,25 @@ dialog.pdfSlick-dialog .dialogButton {
 /*
  * Profile decorations.
  *
- * The two things a chosen appearance does that an inline style cannot say: a
- * ring that turns behind a face, and a band of light walking across a card. Both
- * are ornament by definition, so both stop for somebody who asked for less
+ * What a chosen appearance does that an inline style cannot say: keyframes. A
+ * layer of a decoration that turns, breathes or twinkles, the colours walking
+ * across somebody's name, and the light crossing a profile card. All of it is
+ * ornament by definition, so all of it stops for somebody who asked for less
  * motion - which the rule in tokens.css already does for every animation in the
  * product, rather than each of these having to remember.
  *
- * Slow on purpose. A ring that turns once every nine seconds is noticed once and
- * then forgotten; one that turns every second is a spinner, and a spinner beside
- * somebody's name means their account is loading.
+ * Every one of them is a CLOSED loop: the last frame is the first frame, so the
+ * cycle repeats without a moment where something visibly ends and starts again.
+ * That is not a detail. A profile card is on screen for as long as somebody is
+ * reading it, and an ornament that restarts in front of them four times a minute
+ * reads as a fault in the page rather than as decoration. Each rule below says
+ * what closes its own loop.
+ *
+ * Slow on purpose. Something that turns once every nine seconds is noticed once
+ * and then forgotten; one that turns every second is a spinner, and a spinner
+ * beside somebody's name means their account is loading. A decoration's layers
+ * each carry their own pace in the catalogue in @polaris/core, applied over
+ * these as an inline duration, so a slower ring does not want a new class.
  */
 @keyframes polaris-ring-turn {
     to {
@@ -327,23 +337,94 @@ dialog.pdfSlick-dialog .dialogButton {
     }
 }
 
-.profile-ring-turn {
+/*
+ * A layer of a decoration, turning. The whole turn is the loop.
+ *
+ * `transform-box: view-box` is what makes this work on an SVG group: without it
+ * the origin is the group's own bounding box, so a layer that does not sit
+ * centred - a single bead, a piece of an arc - orbits its own middle instead of
+ * the face's, which looks like a glyph vibrating rather than a bead going round.
+ */
+.profile-spin {
     animation: polaris-ring-turn 9s linear infinite;
+    transform-box: view-box;
+    transform-origin: 50% 50%;
 }
 
-@keyframes polaris-sheen {
-    0% {
-        transform: translateX(-130%);
-    }
-    /* Most of the cycle is the wait. A sheen that crosses continuously is a
-       loading skeleton; one that crosses now and then is a surface catching the
-       light. */
-    60%,
+/* Points of light coming and going. Starts and ends at the same opacity, so
+   there is no step between the last frame and the first. */
+@keyframes polaris-twinkle {
+    0%,
     100% {
-        transform: translateX(230%);
+        opacity: 0.35;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.profile-twinkle {
+    animation: polaris-twinkle 3s ease-in-out infinite;
+}
+
+/* A ring breathing. Same rule: it comes back to where it began. */
+@keyframes polaris-pulse {
+    0%,
+    100% {
+        opacity: 0.45;
+        transform: scale(0.94);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.profile-pulse {
+    animation: polaris-pulse 3s ease-in-out infinite;
+    transform-box: view-box;
+    transform-origin: 50% 50%;
+}
+
+/*
+ * The light crossing a profile card.
+ *
+ * The layer is four card widths of a tile two cards wide, and one cycle walks it
+ * left by exactly one tile - which is a frame identical to the one it started
+ * from. That is the whole fix: the old version pushed a narrow band across the
+ * card, parked it off the right edge for two fifths of the cycle, and teleported
+ * it back to the left. See `sheenCss` and `SHEEN_LAYER` for the other half of
+ * the arithmetic; changing either width means changing this.
+ */
+@keyframes polaris-sheen {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
     }
 }
 
 .profile-sheen {
-    animation: polaris-sheen 7s ease-in-out infinite;
+    animation: polaris-sheen 9s linear infinite;
+}
+
+/*
+ * Colours walking across a name.
+ *
+ * The gradient is tiled at twice the width of the text and moved by exactly one
+ * tile, and the catalogue guarantees the last colour is the first - so the end
+ * of the cycle is indistinguishable from its start. See `nameStyleCss`.
+ */
+@keyframes polaris-name-flow {
+    from {
+        background-position: 0% center;
+    }
+    to {
+        background-position: 200% center;
+    }
+}
+
+.profile-name-flow {
+    animation: polaris-name-flow 6s linear infinite;
 }

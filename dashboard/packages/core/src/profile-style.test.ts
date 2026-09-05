@@ -118,16 +118,95 @@ describe("the catalogues", () => {
         // into CSS, so a stray character in the catalogue itself would be the one
         // way in that no amount of checking the input would catch.
         const colors = [
-            ...style.AVATAR_DECORATIONS.flatMap((entry) => [...entry.colors, entry.glow ?? "#000000"]),
+            ...style.AVATAR_DECORATIONS.flatMap((entry) => style.decorationColors(entry)),
             ...style.NAMEPLATES.flatMap((entry) => [entry.from, entry.to]),
             ...style.PROFILE_EFFECTS.flatMap((entry) => [
                 entry.sheen ?? "#000000",
                 entry.frame?.from ?? "#000000",
                 entry.frame?.to ?? "#000000"
             ]),
-            ...style.NAME_STYLES.flatMap((entry) => [entry.from, entry.to])
+            ...style.NAME_STYLES.flatMap((entry) => [...entry.colors])
         ];
         for (const color of colors) expect(style.readHex(color)).toBe(color);
+    });
+});
+
+describe("a decoration", () => {
+    it("stays inside the band the face gives it", () => {
+        // The two ways a decoration breaks the product rather than itself: paint
+        // outside the box the layout reserved, and it is cut in half by the first
+        // scrolling panel it sits in; paint inside the band, and it covers the
+        // photograph somebody chose. Both are geometry, so both are checked here
+        // rather than looked at.
+        for (const decoration of style.AVATAR_DECORATIONS) {
+            expect(decoration.layers.length).toBeGreaterThan(0);
+            for (const layer of decoration.layers) {
+                const reach = style.layerReach(layer);
+                expect(reach.outer).toBeLessThanOrEqual(0.5);
+                expect(reach.inner).toBeGreaterThanOrEqual(0.5 - decoration.width);
+            }
+        }
+    });
+
+    it("says whether it moves", () => {
+        // What the picker prints, so somebody who does not want movement picks
+        // without trying each one in turn.
+        const still = style.decorationOf("ink");
+        const turning = style.decorationOf("rose");
+        expect(still && style.decorationMoves(still)).toBe(false);
+        expect(turning && style.decorationMoves(turning)).toBe(true);
+    });
+
+    it("spaces an orbit from the top and clockwise", () => {
+        const [top, right, bottom, left] = style.orbitPoints(4, 0.5);
+        expect(top).toEqual({ x: expect.closeTo(0, 6), y: -0.5 });
+        expect(right).toEqual({ x: 0.5, y: expect.closeTo(0, 6) });
+        expect(bottom).toEqual({ x: expect.closeTo(0, 6), y: 0.5 });
+        expect(left).toEqual({ x: -0.5, y: expect.closeTo(0, 6) });
+    });
+
+    it("puts a single glyph at the top rather than wherever the arithmetic lands", () => {
+        expect(style.orbitPoints(1, 0.46)).toEqual([{ x: expect.closeTo(0, 6), y: -0.46 }]);
+    });
+
+    it("has nothing to place for an orbit of nobody", () => {
+        expect(style.orbitPoints(0, 0.46)).toEqual([]);
+    });
+
+    it("fits a dash pattern to the circle it goes round", () => {
+        // Otherwise the last dash meets the first as a stub, and on a ring that
+        // turns that seam is carried past the reader over and over.
+        const [on, off] = style.fittedDash([0.07, 0.05], 0.45);
+        const circumference = 2 * Math.PI * 0.45;
+        const repeats = circumference / (on + off);
+        expect(repeats).toBeCloseTo(Math.round(repeats), 9);
+        // Nudged, not redesigned: the proportions the catalogue asked for hold.
+        expect(on / off).toBeCloseTo(0.07 / 0.05, 9);
+    });
+
+    it("leaves a pattern alone when there is no circle to fit it to", () => {
+        expect(style.fittedDash([0.07, 0.05], 0)).toEqual([0.07, 0.05]);
+        expect(style.fittedDash([0, 0], 0.45)).toEqual([0, 0]);
+    });
+});
+
+describe("a name style", () => {
+    it("closes the loop when it moves", () => {
+        // A moving name walks one whole tile of its gradient per cycle, so the
+        // frame it ends on has to be the frame it started from. If the last
+        // colour is not the first, the walk snaps back in front of the reader -
+        // several times a minute, in every list its owner appears in.
+        for (const entry of style.NAME_STYLES) {
+            expect(entry.colors.length).toBeGreaterThanOrEqual(2);
+            if (!entry.moving) continue;
+            expect(entry.colors.length).toBeGreaterThanOrEqual(3);
+            expect(entry.colors.at(-1)).toBe(entry.colors[0]);
+        }
+    });
+
+    it("offers both kinds", () => {
+        expect(style.NAME_STYLES.some((entry) => entry.moving)).toBe(true);
+        expect(style.NAME_STYLES.some((entry) => !entry.moving)).toBe(true);
     });
 });
 

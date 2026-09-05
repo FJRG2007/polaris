@@ -23,6 +23,7 @@ import { AssigneePicker, Avatar } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { TaskShareView } from "@/lib/tasks/share-service";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { Globe, Link2, Loader2, Mail, UserPlus, X } from "lucide-react";
 import {
     Button,
@@ -204,12 +205,14 @@ export function ShareDialog({
                             >
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     {chosen.map((person) => (
-                                        <span
+                                        <PersonRow
+                                            as="span"
                                             key={person.id}
+                                            personId={person.id}
                                             className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-2 text-xs"
                                         >
                                             <Avatar person={person} size={18} />
-                                            {person.name}
+                                            <PersonName id={person.id} name={person.name} />
                                             <button
                                                 type="button"
                                                 aria-label={`Remove ${person.name}`}
@@ -222,7 +225,7 @@ export function ShareDialog({
                                             >
                                                 <X className="size-3" />
                                             </button>
-                                        </span>
+                                        </PersonRow>
                                     ))}
                                     {emails.map((address) => (
                                         <span

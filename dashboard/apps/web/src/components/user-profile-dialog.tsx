@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { Ban, Loader2 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { PersonName } from "@/components/person-name";
 import { Badge, Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import {
     banUserAction,
@@ -96,7 +97,9 @@ export function UserProfileDialog({
                             />
                             <div className="min-w-0">
                                 <p className="flex items-center gap-1.5 font-medium">
-                                    <span className="truncate">{profile.name}</span>
+                                    <span className="truncate">
+                                        <PersonName id={userId} name={profile.name} />
+                                    </span>
                                     {profile.isAdmin ? <Badge variant="neutral">Admin</Badge> : null}
                                     {profile.banned ? <Badge variant="danger">Banned</Badge> : null}
                                 </p>

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { Trash2, MessageSquare } from "lucide-react";
 import { Button, EmptyState, cn } from "@polaris/ui";
+import { PersonName } from "@/components/person-name";
 import { RelativeTime } from "@/components/relative-time";
 import type { CommentView } from "@/lib/comments/comments";
 import { RichText } from "@/components/rich-text/rich-text";
@@ -81,7 +82,10 @@ export function Discussion({
                             <div className="group min-w-0 flex-1">
                                 <div className="flex flex-wrap items-baseline gap-2">
                                     <span className="text-[0.8125rem] font-medium">
-                                        {comment.author?.name ?? "Polaris"}
+                                        <PersonName
+                                            id={comment.author?.id}
+                                            name={comment.author?.name ?? "Polaris"}
+                                        />
                                     </span>
                                     <span className="text-[0.6875rem] text-foreground-subtle">
                                         <RelativeTime iso={comment.createdAt} />

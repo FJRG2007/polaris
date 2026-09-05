@@ -35,12 +35,12 @@ import { Avatar, OrgAvatar } from "@/components/avatar";
 import { MutualPanel } from "@/components/mutual-panel";
 import { usePresence } from "@/components/presence-store";
 import type { PublicProfile } from "@/lib/profile-service";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
+import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { effectOf, linkLabel, nameStyleOf } from "@polaris/core";
-import { frameCss, nameStyleCss, sheenCss } from "@/lib/profile-style-css";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
+import { frameCss, nameStyleClass, nameStyleCss, sheenCss, SHEEN_LAYER } from "@/lib/profile-style-css";
 
 export function ProfileCard({
     profile,
@@ -72,7 +72,15 @@ export function ProfileCard({
     const painted = nameStyleOf(profile.style.nameStyle);
 
     return (
-        <Card className={frame ? "relative overflow-hidden border-2" : "overflow-hidden"} style={frame ?? undefined}>
+        // `relative` whether or not there is a frame. The light is an absolutely
+        // positioned layer, and a card that is not positioned is not its
+        // containing block: the layer was measured against whatever ancestor
+        // happened to be positioned, so it neither sat on the card nor was
+        // clipped by it - which is what a "Sheen" with no frame looked like.
+        <Card
+            className={cn("relative overflow-hidden", frame && "border-2")}
+            style={frame ?? undefined}
+        >
             {sheen ? (
                 // Above the card and below nothing: it crosses the banner and the
                 // top of the body, which is what makes it read as light on a
@@ -81,7 +89,7 @@ export function ProfileCard({
                 // covers every animation in the product.
                 <span
                     aria-hidden="true"
-                    className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12" // enigma: not a panel - a band of light crossing the card, a third of its width at every size; nothing to dismiss and nothing behind it
+                    className={SHEEN_LAYER} // enigma: not a panel - a layer of light crossing the card; nothing to dismiss and nothing behind it
                     style={sheen}
                 />
             ) : null}
@@ -121,7 +129,12 @@ export function ProfileCard({
 
                 <div className="flex flex-col gap-0.5">
                     <h1 className="flex flex-wrap items-baseline gap-2 text-lg font-semibold leading-tight tracking-tight">
-                        <span style={painted ? nameStyleCss(painted) : undefined}>{profile.name}</span>
+                        <span
+                            className={nameStyleClass(painted)}
+                            style={painted ? nameStyleCss(painted) : undefined}
+                        >
+                            {profile.name}
+                        </span>
                         {/* Beside the name, because that is what it is about -
                             and only when they have said. */}
                         {profile.pronouns ? (

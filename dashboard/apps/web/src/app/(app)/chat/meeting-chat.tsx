@@ -33,6 +33,7 @@ import { useAppUrl } from "@/components/app-url";
 import { MessageSquare, Download } from "lucide-react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { RelativeTime } from "@/components/relative-time";
+import { PersonName } from "@/components/person-name";
 import { RichText } from "@/components/rich-text/rich-text";
 import { MAX_MEETING_LINE } from "@/lib/chat/meeting-limits";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -241,7 +242,7 @@ export function MeetingChat({
                                                     "text-primary"
                                             )}
                                         >
-                                            {line.name}
+                                            <PersonName id={line.userId} name={line.name} />
                                         </span>
                                         {/* Said beside the name, because who is
                                             from outside decides how somebody

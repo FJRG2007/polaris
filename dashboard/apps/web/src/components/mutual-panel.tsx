@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { Hash, Users } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { PersonName, PersonRow } from "@/components/person-name";
 
 export interface MutualPanelProps {
     readonly friends: {
@@ -47,15 +48,17 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                     <ul className="flex flex-col gap-0.5">
                         {friends.people.map((person) => (
                             <li key={person.id}>
-                                <Link
+                                <PersonRow
+                                    as={Link}
+                                    personId={person.id}
                                     href={`/u/${person.username}`}
                                     className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm transition-colors hover:bg-muted"
                                 >
                                     <Avatar person={person} size={compact ? 18 : 22} status={false} />
                                     <span className="min-w-0 flex-1 truncate" title={person.name}>
-                                        {person.name}
+                                        <PersonName id={person.id} name={person.name} />
                                     </span>
-                                </Link>
+                                </PersonRow>
                             </li>
                         ))}
                     </ul>

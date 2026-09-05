@@ -727,7 +727,41 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Profile",
             href: "/account",
             icon: UserCog,
-            keywords: ["name", "email", "avatar"]
+            keywords: [
+                "name",
+                "display name",
+                "username",
+                "handle",
+                "avatar",
+                "photo",
+                "banner",
+                "bio",
+                "appearance",
+                "decoration",
+                "nameplate",
+                "company"
+            ]
+        },
+        // Everything the profile publishes nothing of: the name held on the
+        // account, the addresses that sign it in, the number a code goes to.
+        // Split out of the profile because the consequence of a field is the
+        // difference between the two screens - what a colleague sees, against
+        // how Polaris reaches you - and one form could not say which was which.
+        {
+            label: "Account",
+            href: "/account/details",
+            icon: IdCard,
+            keywords: [
+                "email",
+                "email address",
+                "addresses",
+                "phone",
+                "number",
+                "sign in",
+                "first name",
+                "last name",
+                "legal name"
+            ]
         },
         {
             label: "Account standing",

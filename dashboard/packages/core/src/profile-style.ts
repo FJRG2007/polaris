@@ -1,14 +1,14 @@
 /**
  * How somebody has decided their profile should look.
  *
- * Four decisions, and none of them is a picture: a background for the band when
- * there is no banner over it, a ring around the face, a plate behind the name,
- * and a treatment on the card itself. They are catalogue choices rather than
- * uploads on purpose. A decoration somebody uploads is an image served next to
- * every face in the product - which is a moderation queue, a storage bill and a
- * way to put anything at all beside your name in a list of colleagues. A
- * catalogue is none of those, and it is the reason this can simply be on for
- * everybody instead of being sold.
+ * Five decisions, and none of them is a picture: a background for the band when
+ * there is no banner over it, something worn around the face, a plate behind the
+ * name, colours across the name itself, and a treatment on the card. They are
+ * catalogue choices rather than uploads on purpose. A decoration somebody
+ * uploads is an image served next to every face in the product - which is a
+ * moderation queue, a storage bill and a way to put anything at all beside your
+ * name in a list of colleagues. A catalogue is none of those, and it is the
+ * reason this can simply be on for everybody instead of being sold.
  *
  * Everything in the catalogues is drawn from parameters - colours, an angle, a
  * width - rather than named art. So there is no asset to fetch, nothing to go
@@ -108,49 +108,435 @@ export function fillCss(fill: BannerFill): string {
 }
 
 /**
- * A ring around a face.
+ * One painted layer of a decoration.
  *
- * `colors` are the stops of a conic gradient, so one entry describes both a flat
- * ring (the same colour twice) and something that turns. A ring that turns says
- * so with `spin`, and everything that spins is behind `prefers-reduced-motion`
- * where it is drawn - a decoration is exactly the kind of ornament somebody
- * turns animation off to be rid of.
+ * A decoration is a small stack of these rather than a single band of colour,
+ * which is the whole difference between a ring and something worth choosing: a
+ * quiet track with one bright bead running round it, a dashed edge turning under
+ * a still one, four points of light that come and go. Three families cover all
+ * of it - a circle, a piece of a circle, and a handful of glyphs spaced around
+ * one - so the renderer stays one small piece of code instead of a switch that
+ * grows an arm per entry, and a new decoration is a line in a list here.
+ *
+ * Every distance is a fraction of the face's width, never a length: the same
+ * decoration is drawn at 20 pixels beside a message and at 72 on a card, and a
+ * geometry in pixels would be a different ornament at each of them. `at` is the
+ * radius the layer is drawn on, measured from the middle of the face, so 0.5 is
+ * its outer edge.
+ *
+ * `spin`, `twinkle` and `pulse` are the seconds one whole cycle takes, and every
+ * cycle ends exactly where it began - a turn is a full turn, a twinkle comes
+ * back to the opacity it started at. An animation that visibly finishes and
+ * starts again reads as a fault rather than as an ornament, which is the one
+ * thing an ornament may not do. `spin` is signed, and negative turns the other
+ * way: two rings turning opposite ways is what makes them read as two rings.
+ *
+ * Everything that moves is behind `prefers-reduced-motion` where it is drawn - a
+ * decoration is exactly the kind of ornament somebody turns animation off to be
+ * rid of.
+ */
+export type DecorationLayer =
+    | {
+          readonly kind: "ring";
+          readonly at: number;
+          readonly thickness: number;
+          /** One colour for a flat ring, two for a gradient across it. */
+          readonly colors: readonly string[];
+          readonly opacity?: number;
+          /** How long a painted piece is and how long the gap after it, in the
+           *  same fractions of the face. A dashed ring reads as machined where a
+           *  solid one reads as a border. */
+          readonly dash?: readonly [number, number];
+          readonly spin?: number;
+          readonly pulse?: number;
+      }
+    | {
+          readonly kind: "arc";
+          readonly at: number;
+          readonly thickness: number;
+          readonly colors: readonly string[];
+          /** How much of the circle it covers, in degrees, and where it starts -
+           *  zero being the top. */
+          readonly sweep: number;
+          readonly start?: number;
+          readonly opacity?: number;
+          readonly spin?: number;
+      }
+    | {
+          readonly kind: "orbit";
+          readonly shape: "dot" | "star" | "petal";
+          readonly at: number;
+          /** How wide one glyph is, as a fraction of the face. */
+          readonly size: number;
+          readonly count: number;
+          /** Taken in turn, so two colours alternate around the circle. */
+          readonly colors: readonly string[];
+          readonly opacity?: number;
+          readonly spin?: number;
+          readonly twinkle?: number;
+      };
+
+/**
+ * Something worn around a face.
+ *
+ * `width` is the band the decoration is given on every side, and it is the only
+ * field the rest of the product reads: the picture is drawn inward by that much
+ * so a decoration never grows the face, never changes a layout, and is never cut
+ * in half by a scrolling panel. What somebody gives up for one is a couple of
+ * pixels of their own photograph.
  */
 export interface AvatarDecoration {
     readonly id: string;
     readonly label: string;
-    readonly colors: readonly string[];
-    /** How thick the ring is, as a fraction of the face's width. Small: this
-     *  sits around faces drawn at 20 pixels in a list as well as at 72 on a
-     *  card. */
+    /** How much of the face's width the decoration takes on each side, as a
+     *  fraction. Small: this sits around faces drawn at 20 pixels in a list as
+     *  well as at 72 on a card. */
     readonly width: number;
+    readonly layers: readonly DecorationLayer[];
     readonly glow?: string;
-    readonly spin?: boolean;
 }
 
+/**
+ * The gallery.
+ *
+ * Every one of them is free and every one is available to everybody. That is the
+ * point of a catalogue drawn from parameters: it costs nothing to give away, so
+ * there is nothing here to buy, earn or unlock.
+ *
+ * The seven ids at the top are the ones profiles already hold, so they keep
+ * their names and are only drawn better. An id withdrawn from this list stops
+ * being drawn everywhere at once - see `readProfileStyle`.
+ */
 export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     {
         id: "aurora",
         label: "Aurora",
-        colors: ["#3fd0c9", "#5b8def", "#a06bff", "#3fd0c9"],
-        width: 0.08,
+        width: 0.09,
         glow: "#5b8def",
-        spin: true
+        layers: [
+            { kind: "ring", at: 0.45, thickness: 0.035, colors: ["#3fd0c9", "#a06bff"], opacity: 0.5 },
+            {
+                kind: "arc",
+                at: 0.45,
+                thickness: 0.045,
+                colors: ["#5b8def", "#a06bff"],
+                sweep: 110,
+                spin: 6
+            }
+        ]
     },
     {
         id: "ember",
         label: "Ember",
-        colors: ["#ff9a3c", "#ff5a5f", "#ffcc66", "#ff9a3c"],
-        width: 0.08,
+        width: 0.09,
         glow: "#ff7043",
-        spin: true
+        layers: [
+            {
+                kind: "ring",
+                at: 0.45,
+                thickness: 0.05,
+                colors: ["#ff9a3c", "#ff5a5f"],
+                dash: [0.07, 0.05],
+                spin: 12
+            },
+            {
+                kind: "orbit",
+                shape: "star",
+                at: 0.455,
+                size: 0.05,
+                count: 3,
+                colors: ["#ffcc66"],
+                twinkle: 3
+            }
+        ]
     },
-    { id: "frost", label: "Frost", colors: ["#8fd8ff", "#c7ecff"], width: 0.07, glow: "#8fd8ff" },
-    { id: "gold", label: "Gold", colors: ["#e8c26a", "#b8862b", "#f4dc9a", "#e8c26a"], width: 0.07 },
-    { id: "moss", label: "Moss", colors: ["#7bc47f", "#3f8f5b"], width: 0.07 },
-    { id: "rose", label: "Rose", colors: ["#ff9ec4", "#d94f8a"], width: 0.07, glow: "#ff7fb2" },
-    { id: "ink", label: "Ink", colors: ["#4a4f5a", "#20242c"], width: 0.07 }
+    {
+        id: "frost",
+        label: "Frost",
+        width: 0.075,
+        glow: "#8fd8ff",
+        layers: [
+            { kind: "ring", at: 0.475, thickness: 0.018, colors: ["#c7ecff"], opacity: 0.8 },
+            { kind: "ring", at: 0.44, thickness: 0.03, colors: ["#8fd8ff", "#c7ecff"] }
+        ]
+    },
+    {
+        id: "gold",
+        label: "Gold",
+        width: 0.08,
+        layers: [
+            { kind: "ring", at: 0.482, thickness: 0.014, colors: ["#f4dc9a"], opacity: 0.85 },
+            { kind: "ring", at: 0.445, thickness: 0.036, colors: ["#e8c26a", "#b8862b"] },
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.463,
+                size: 0.022,
+                count: 8,
+                colors: ["#f4dc9a"],
+                opacity: 0.9
+            }
+        ]
+    },
+    {
+        id: "moss",
+        label: "Moss",
+        width: 0.09,
+        layers: [
+            { kind: "ring", at: 0.443, thickness: 0.026, colors: ["#3f8f5b", "#7bc47f"] },
+            {
+                kind: "orbit",
+                shape: "petal",
+                at: 0.468,
+                size: 0.055,
+                count: 10,
+                colors: ["#7bc47f", "#3f8f5b"]
+            }
+        ]
+    },
+    {
+        id: "rose",
+        label: "Rose",
+        width: 0.08,
+        glow: "#ff7fb2",
+        layers: [
+            { kind: "ring", at: 0.448, thickness: 0.03, colors: ["#ff9ec4", "#d94f8a"] },
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.476,
+                size: 0.028,
+                count: 6,
+                colors: ["#ffc0d8"],
+                spin: 18
+            }
+        ]
+    },
+    {
+        id: "ink",
+        label: "Ink",
+        width: 0.075,
+        layers: [
+            { kind: "ring", at: 0.472, thickness: 0.022, colors: ["#4a4f5a"] },
+            { kind: "ring", at: 0.442, thickness: 0.024, colors: ["#20242c"] }
+        ]
+    },
+    {
+        id: "orbit",
+        label: "Orbit",
+        width: 0.07,
+        glow: "#5b8def",
+        layers: [
+            { kind: "ring", at: 0.465, thickness: 0.012, colors: ["#5b8def"], opacity: 0.4 },
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.465,
+                size: 0.05,
+                count: 1,
+                colors: ["#8fd8ff"],
+                spin: 5
+            }
+        ]
+    },
+    {
+        id: "pulse",
+        label: "Pulse",
+        width: 0.08,
+        layers: [
+            { kind: "ring", at: 0.452, thickness: 0.03, colors: ["#3fd0c9", "#134e5e"] },
+            {
+                kind: "ring",
+                at: 0.484,
+                thickness: 0.014,
+                colors: ["#3fd0c9"],
+                opacity: 0.7,
+                pulse: 3.2
+            }
+        ]
+    },
+    {
+        id: "circuit",
+        label: "Circuit",
+        width: 0.085,
+        layers: [
+            {
+                kind: "ring",
+                at: 0.478,
+                thickness: 0.014,
+                colors: ["#3fd0c9"],
+                dash: [0.03, 0.03],
+                opacity: 0.75,
+                spin: 20
+            },
+            {
+                kind: "ring",
+                at: 0.443,
+                thickness: 0.028,
+                colors: ["#134e5e", "#3fd0c9"],
+                dash: [0.1, 0.04],
+                spin: -14
+            }
+        ]
+    },
+    {
+        id: "nova",
+        label: "Nova",
+        width: 0.09,
+        glow: "#a06bff",
+        layers: [
+            {
+                kind: "ring",
+                at: 0.448,
+                thickness: 0.028,
+                colors: ["#a06bff", "#ff9ec4"],
+                opacity: 0.75
+            },
+            {
+                kind: "orbit",
+                shape: "star",
+                at: 0.47,
+                size: 0.06,
+                count: 4,
+                colors: ["#ffffff", "#ffc0d8"],
+                twinkle: 2.4
+            }
+        ]
+    },
+    {
+        id: "bloom",
+        label: "Bloom",
+        width: 0.095,
+        layers: [
+            { kind: "ring", at: 0.428, thickness: 0.02, colors: ["#d94f8a"], opacity: 0.8 },
+            {
+                kind: "orbit",
+                shape: "petal",
+                at: 0.462,
+                size: 0.06,
+                count: 8,
+                colors: ["#ff9ec4", "#a06bff"],
+                spin: 30
+            }
+        ]
+    },
+    {
+        id: "eclipse",
+        label: "Eclipse",
+        width: 0.08,
+        layers: [
+            { kind: "ring", at: 0.465, thickness: 0.016, colors: ["#4d5561"], opacity: 0.6 },
+            {
+                kind: "arc",
+                at: 0.465,
+                thickness: 0.048,
+                colors: ["#e8c26a", "#b8862b"],
+                sweep: 220,
+                start: 200
+            }
+        ]
+    },
+    {
+        id: "tide",
+        label: "Tide",
+        width: 0.09,
+        glow: "#3c8ce7",
+        layers: [
+            {
+                kind: "arc",
+                at: 0.468,
+                thickness: 0.028,
+                colors: ["#8fd8ff", "#3c8ce7"],
+                sweep: 140,
+                spin: 8
+            },
+            {
+                kind: "arc",
+                at: 0.432,
+                thickness: 0.028,
+                colors: ["#3c8ce7", "#134e5e"],
+                sweep: 140,
+                start: 180,
+                spin: -8
+            }
+        ]
+    }
 ];
+
+/**
+ * How far out and how far in a layer reaches, as fractions of the face's width.
+ *
+ * The one thing a decoration must not do is escape the band reserved for it: a
+ * ring wider than its `width` covers the picture, and one wider than half the
+ * face is drawn outside the box the layout gave it and is cut in half by the
+ * first panel it scrolls inside. Written out here so the catalogue can be
+ * checked rather than eyeballed - see the test beside this file.
+ */
+export function layerReach(layer: DecorationLayer): { readonly outer: number; readonly inner: number } {
+    const half = layer.kind === "orbit" ? layer.size / 2 : layer.thickness / 2;
+    return { outer: layer.at + half, inner: layer.at - half };
+}
+
+/**
+ * A dash pattern stretched so a whole number of them goes round the circle.
+ *
+ * A dashed ring is drawn from one point and painted round; if the pattern does
+ * not divide the circumference, the last dash meets the first as a stub, and
+ * that seam is the one place on the ring the eye lands. Worse on a ring that
+ * turns, where the flaw is carried round and round in front of the reader.
+ *
+ * So the pattern is nudged rather than the ring: the closest whole number of
+ * repeats is chosen and the dash and the gap are scaled to fit it exactly. The
+ * dash asked for in the catalogue is what it looks like, not what it measures.
+ */
+export function fittedDash(
+    dash: readonly [number, number],
+    radius: number
+): readonly [number, number] {
+    const circumference = 2 * Math.PI * radius;
+    const pattern = dash[0] + dash[1];
+    if (pattern <= 0 || circumference <= 0) return dash;
+    const repeats = Math.max(1, Math.round(circumference / pattern));
+    const scale = circumference / (repeats * pattern);
+    return [dash[0] * scale, dash[1] * scale];
+}
+
+/** Every colour a decoration paints with, so they can all be checked at once. */
+export function decorationColors(decoration: AvatarDecoration): readonly string[] {
+    const colors = decoration.layers.flatMap((layer) => [...layer.colors]);
+    return decoration.glow ? [...colors, decoration.glow] : colors;
+}
+
+/** Whether anything in a decoration moves. What the picker says out loud, so
+ *  somebody who does not want movement can pick without trying each one. */
+export function decorationMoves(decoration: AvatarDecoration): boolean {
+    return decoration.layers.some(
+        (layer) =>
+            ("spin" in layer && layer.spin !== undefined) ||
+            ("twinkle" in layer && layer.twinkle !== undefined) ||
+            ("pulse" in layer && layer.pulse !== undefined)
+    );
+}
+
+/**
+ * Where the glyphs of an orbit sit, as offsets from the middle of the face in
+ * fractions of its width.
+ *
+ * From the top and clockwise, because that is where the eye starts and a single
+ * bead parked at three o'clock looks like a mistake. Fractions rather than
+ * coordinates so whatever draws them owns its own units.
+ */
+export function orbitPoints(
+    count: number,
+    at: number
+): readonly { readonly x: number; readonly y: number }[] {
+    const points: { x: number; y: number }[] = [];
+    for (let index = 0; index < count; index += 1) {
+        const angle = (index / count) * Math.PI * 2 - Math.PI / 2;
+        points.push({ x: at * Math.cos(angle), y: at * Math.sin(angle) });
+    }
+    return points;
+}
 
 /**
  * The plate a name is drawn on in a list.
@@ -216,17 +602,53 @@ export const PROFILE_EFFECTS: readonly ProfileEffect[] = [
 export interface NameStyle {
     readonly id: string;
     readonly label: string;
-    readonly from: string;
-    readonly to: string;
+    /** The stops, in order. Two for a still name; three or more for one that
+     *  moves, and then the last has to be the first again - see `moving`. */
+    readonly colors: readonly string[];
+    /**
+     * Whether the colours walk across the letters.
+     *
+     * The walk is one tile of the gradient per cycle, so the frame it ends on is
+     * the frame it started from and there is no moment where it snaps back. That
+     * only holds while the last colour equals the first, which is why the two
+     * live together and why the test beside this file checks it: a moving name
+     * that jumps is a name that looks broken several times a minute, in every
+     * list its owner appears in.
+     */
+    readonly moving?: boolean;
 }
 
 export const NAME_STYLES: readonly NameStyle[] = [
-    { id: "aurora", label: "Aurora", from: "#3fd0c9", to: "#a06bff" },
-    { id: "ember", label: "Ember", from: "#ffcc66", to: "#ff5a5f" },
-    { id: "tide", label: "Tide", from: "#8fd8ff", to: "#3c8ce7" },
-    { id: "moss", label: "Moss", from: "#a8e06b", to: "#3f8f5b" },
-    { id: "gold", label: "Gold", from: "#f4dc9a", to: "#c99a2e" },
-    { id: "rose", label: "Rose", from: "#ffc0d8", to: "#d94f8a" }
+    { id: "aurora", label: "Aurora", colors: ["#3fd0c9", "#a06bff"] },
+    { id: "ember", label: "Ember", colors: ["#ffcc66", "#ff5a5f"] },
+    { id: "tide", label: "Tide", colors: ["#8fd8ff", "#3c8ce7"] },
+    { id: "moss", label: "Moss", colors: ["#a8e06b", "#3f8f5b"] },
+    { id: "gold", label: "Gold", colors: ["#f4dc9a", "#c99a2e"] },
+    { id: "rose", label: "Rose", colors: ["#ffc0d8", "#d94f8a"] },
+    {
+        id: "flow",
+        label: "Flow",
+        colors: ["#3fd0c9", "#5b8def", "#a06bff", "#3fd0c9"],
+        moving: true
+    },
+    {
+        id: "blaze",
+        label: "Blaze",
+        colors: ["#ffcc66", "#ff5a5f", "#ff9a3c", "#ffcc66"],
+        moving: true
+    },
+    {
+        id: "prism",
+        label: "Prism",
+        colors: ["#8fd8ff", "#a06bff", "#ff9ec4", "#8fd8ff"],
+        moving: true
+    },
+    {
+        id: "shimmer",
+        label: "Shimmer",
+        colors: ["#f4dc9a", "#c99a2e", "#fff3cf", "#f4dc9a"],
+        moving: true
+    }
 ];
 
 function pick<T extends { readonly id: string }>(catalogue: readonly T[], id: unknown): T | null {

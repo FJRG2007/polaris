@@ -16,9 +16,11 @@
  * moderation queue, no storage, and no way to put an arbitrary image beside your
  * name in a list of colleagues.
  *
- * Every option is a button in a row rather than a dropdown, because the answer
- * is the picture on the button. A menu that says "Aurora" is a menu somebody has
- * to open five times to find out what five words mean.
+ * Every option is a button rather than an entry in a dropdown, because the
+ * answer is the picture on the button. A menu that says "Aurora" is a menu
+ * somebody has to open five times to find out what five words mean. The
+ * decorations go further and are a gallery of faces wearing them: they are
+ * drawings, and a swatch of a drawing is not a smaller drawing.
  */
 
 import * as core from "@polaris/core";
@@ -34,8 +36,9 @@ import {
     frameCss,
     nameStyleCss,
     nameplateCss,
-    ringBackground,
-    sheenCss
+    nameStyleClass,
+    sheenCss,
+    SHEEN_LAYER
 } from "@/lib/profile-style-css";
 
 /** The colours a background starts from when somebody turns one on, so the first
@@ -110,7 +113,7 @@ export function AppearanceCard({
                         // painted on one thing.
                         <span
                             aria-hidden="true"
-                            className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12" // enigma: not a panel - a band of light crossing the card, a third of its width at every size; nothing to dismiss and nothing behind it
+                            className={SHEEN_LAYER} // enigma: not a panel - a layer of light crossing the card; nothing to dismiss and nothing behind it
                             style={sheen}
                         />
                     ) : null}
@@ -131,7 +134,12 @@ export function AppearanceCard({
                             </span>
                         </div>
                         <p className="text-base font-semibold leading-tight">
-                            <span style={painted ? nameStyleCss(painted) : undefined}>{name}</span>
+                            <span
+                                className={nameStyleClass(painted)}
+                                style={painted ? nameStyleCss(painted) : undefined}
+                            >
+                                {name}
+                            </span>
                         </p>
                         {/* What a plate actually looks like: a row in a list, not
                             a pill on a card. It is the only place one is drawn,
@@ -147,7 +155,12 @@ export function AppearanceCard({
                                 status={false}
                             />
                             <span className="truncate text-sm">
-                                <span style={painted ? nameStyleCss(painted) : undefined}>{name}</span>
+                                <span
+                                    className={nameStyleClass(painted)}
+                                    style={painted ? nameStyleCss(painted) : undefined}
+                                >
+                                    {name}
+                                </span>
                             </span>
                         </span>
                     </div>
@@ -230,23 +243,45 @@ export function AppearanceCard({
                 <section className="flex flex-col gap-2">
                     <Field
                         label="Around your face"
-                        hint="Drawn on your picture everywhere it appears, at whatever size it is drawn."
+                        hint="Drawn on your picture everywhere it appears, at whatever size it is drawn. Every one of them is free."
                     />
-                    <div className="flex flex-wrap gap-1.5">
-                        <Choice chosen={!style.decoration} onClick={() => set({ decoration: null })} label="None" />
+                    {/* A gallery rather than a row of chips, because a decoration
+                        is a drawing and the only useful way to choose between
+                        fourteen drawings is to see them. Each tile is your own
+                        face wearing the thing, drawn by the component that will
+                        draw it in every list you appear in - so what is on the
+                        tile is what other people get, not an impression of it. */}
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-1.5">
+                        <Tile
+                            chosen={!style.decoration}
+                            onClick={() => set({ decoration: null })}
+                            label="None"
+                        >
+                            <Avatar
+                                person={{ id: userId, name }}
+                                size={44}
+                                decoration={null}
+                                status={false}
+                            />
+                        </Tile>
                         {core.AVATAR_DECORATIONS.map((decoration) => (
-                            <Choice
+                            <Tile
                                 key={decoration.id}
                                 chosen={style.decoration === decoration.id}
                                 onClick={() => set({ decoration: decoration.id })}
                                 label={decoration.label}
+                                // Said out loud rather than left to be discovered
+                                // one press at a time, for somebody choosing
+                                // between them who does not want movement.
+                                note={core.decorationMoves(decoration) ? "Moves" : undefined}
                             >
-                                <span
-                                    aria-hidden="true"
-                                    className="size-4 shrink-0 rounded-full"
-                                    style={{ background: ringBackground(decoration) }}
+                                <Avatar
+                                    person={{ id: userId, name }}
+                                    size={44}
+                                    decoration={decoration.id}
+                                    status={false}
                                 />
-                            </Choice>
+                            </Tile>
                         ))}
                     </div>
                 </section>
@@ -278,7 +313,10 @@ export function AppearanceCard({
                 </section>
 
                 <section className="flex flex-col gap-2">
-                    <Field label="Your name" hint="Two colours across the letters. Nothing else changes: not the size, not the weight." />
+                    <Field
+                        label="Your name"
+                        hint="Colours across the letters, still or moving. Nothing else changes: not the size, not the weight."
+                    />
                     <div className="flex flex-wrap gap-1.5">
                         <Choice chosen={!style.nameStyle} onClick={() => set({ nameStyle: null })} label="Plain" />
                         {core.NAME_STYLES.map((entry) => (
@@ -287,6 +325,11 @@ export function AppearanceCard({
                                 chosen={style.nameStyle === entry.id}
                                 onClick={() => set({ nameStyle: entry.id })}
                                 label={entry.label}
+                                // The word on the button is painted the way the
+                                // name will be, moving one included, so the
+                                // choice is made by looking rather than by
+                                // guessing what "Prism" means.
+                                labelClass={nameStyleClass(entry)}
                                 style={nameStyleCss(entry)}
                             />
                         ))}
@@ -388,12 +431,16 @@ function Choice({
     onClick,
     label,
     style,
+    labelClass,
     children
 }: {
     chosen: boolean;
     onClick: () => void;
     label: string;
     style?: React.CSSProperties;
+    /** For a treatment that needs keyframes as well as properties - the colours
+     *  of a moving name are a class, since a `style` attribute cannot hold one. */
+    labelClass?: string;
     children?: React.ReactNode;
 }) {
     return (
@@ -409,7 +456,56 @@ function Choice({
             )}
         >
             {children}
-            <span style={style}>{label}</span>
+            <span className={labelClass} style={style}>
+                {label}
+            </span>
+        </button>
+    );
+}
+
+/**
+ * One tile of the gallery: a drawing, its name, and whether it moves.
+ *
+ * A tile rather than a chip because what is being chosen is a picture. The name
+ * under it is what a screen reader announces and what somebody says out loud
+ * when they want the one their colleague has; it is not what the choice is made
+ * on.
+ */
+function Tile({
+    chosen,
+    onClick,
+    label,
+    note,
+    children
+}: {
+    chosen: boolean;
+    onClick: () => void;
+    label: string;
+    note?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={chosen}
+            title={note ? `${label} - ${note.toLowerCase()}` : label}
+            className={cn(
+                "flex flex-col items-center gap-1 rounded-lg border px-1 py-2 transition-colors",
+                chosen
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"
+            )}
+        >
+            {children}
+            <span className="w-full truncate px-1 text-center text-[0.6875rem] leading-tight">
+                {label}
+            </span>
+            {/* Only on the ones it is true of, so the row of words under the
+                gallery stays quiet. */}
+            {note ? (
+                <span className="text-muted-foreground text-[0.625rem] leading-none">{note}</span>
+            ) : null}
         </button>
     );
 }

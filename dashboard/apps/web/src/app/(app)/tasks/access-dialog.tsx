@@ -27,6 +27,7 @@ import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import {
     Button,
     Dialog,
@@ -244,12 +245,19 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                             // the role off them would leave the space with none.
                             const fixed = member.inherited || member.role === "owner" || !canManage;
                             return (
-                                <li
+                                <PersonRow
+                                    as="li"
                                     key={member.userId}
+                                    personId={member.userId}
                                     className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
                                 >
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm" title={member.name}>{member.name}</p>
+                                        <p className="truncate text-sm" title={member.name}>
+                                            <PersonName
+                                                id={member.userId}
+                                                name={member.name}
+                                            />
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {member.through ? `Through ${member.through}` : member.contact}
                                         </p>
@@ -312,7 +320,7 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                                             </button>
                                         </>
                                     )}
-                                </li>
+                                </PersonRow>
                             );
                         })}
                     </ul>

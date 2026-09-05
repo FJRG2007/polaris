@@ -1,16 +1,30 @@
 /**
- * Profile page (/account): the signed-in user's own name, username, company, and
- * the ways they can be reached - the address that signs in, any alternates, and
- * the phone number. Credentials, sessions, network rules, and API keys each have
- * their own page under the same section. Server component that loads the
- * editable fields and hands them to the client view.
+ * Profile page (/account): what everybody else sees - the pictures, the display
+ * name and handle, the paragraph, the appearance, and where the person says they
+ * work.
+ *
+ * The account behind it - the name held on the account, the addresses that sign
+ * in, the phone number - is next door at /account/details. The split is between
+ * publishing and plumbing: every field here is a decision about what a colleague
+ * sees, and every field there is a decision about how Polaris reaches you. They
+ * were one form, which meant the consequence of a field changed halfway down it
+ * with nothing but a line of grey text to say so.
+ *
+ * This page keeps the address it always had, so the "your profile" links across
+ * the product - the one on the public page, the one after confirming an email -
+ * still land where they say they do, and no redirect had to be invented for a
+ * screen that never moved. Credentials, sessions, network rules and API keys
+ * each have their own page under the same section.
+ *
+ * Server component that loads the editable fields and hands them to the client
+ * views.
  */
 
 import { prisma } from "@polaris/db";
 import { ProfilePicturesCard } from "./avatar-card";
 import { AppearanceCard } from "./appearance-card";
 import { requireUser } from "@/lib/session";
-import { AccountView } from "./account-view";
+import { ProfileView } from "./profile-view";
 import { CompaniesCard } from "./companies-card";
 import { DetailsCard } from "./details-card";
 import {
@@ -21,21 +35,18 @@ import {
 } from "@/lib/profile-service";
 import { getSetting } from "@/lib/setting-store";
 import { getProfileStyle } from "@/lib/profile-style-service";
-import { getAuthMailStatus } from "@/lib/auth-mail";
 import {
     usernameChangeAllowedAt,
     usernameCooldownDays,
     usernameCooldownRemaining,
     USERNAME_COOLDOWN_KEY
 } from "@polaris/core";
-import { getUserPhone, listUserEmails } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
     const session = await requireUser();
-    const [user, photo, banner, style, emails, mail, phone, whatsappChannel, organizations, shown] =
-        await Promise.all([
+    const [user, photo, banner, style, organizations, shown] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
             select: {
@@ -60,15 +71,6 @@ export default async function AccountPage() {
         // What they chose their profile to look like, so the panel opens on what
         // is already true rather than on nothing and then correcting itself.
         getProfileStyle(session.id),
-        listUserEmails(session.id),
-        getAuthMailStatus(),
-        getUserPhone(session.id),
-        // Confirming a number is sent the same way a sign-in code is, so the card
-        // needs to know whether there is anything to send with.
-        prisma.channel.findFirst({
-            where: { ownerId: session.id, platform: "whatsapp", status: "connected" },
-            select: { id: true }
-        }),
         // Where they work: the organizations here they could show, and the ones
         // they have. Both read from one place, so the list somebody picks from
         // and the list their page publishes cannot drift.
@@ -94,7 +96,9 @@ export default async function AccountPage() {
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">Profile</h1>
-                <p className="text-sm text-muted-foreground">How you appear in Polaris, and how you sign in.</p>
+                <p className="text-sm text-muted-foreground">
+                    How you appear to everybody else in Polaris.
+                </p>
             </div>
             <ProfilePicturesCard
                 userId={session.id}
@@ -102,8 +106,11 @@ export default async function AccountPage() {
                 hasPhoto={photo !== null}
                 hasBanner={banner !== null}
             />
-            <AccountView
+            <ProfileView
                 name={user?.name ?? session.name}
+                // Not edited here - the account screen owns them - but the handle
+                // field builds its suggestions out of what somebody is called,
+                // and suggestions built out of nothing are worse.
                 firstName={user?.firstName ?? ""}
                 lastName={user?.lastName ?? ""}
                 username={user?.username ?? ""}
@@ -112,10 +119,6 @@ export default async function AccountPage() {
                 // refused is the version that wastes somebody's time.
                 usernameChangeIn={usernameChangeIn}
                 description={user?.description ?? ""}
-                emails={emails}
-                mailReady={mail.channelId !== null}
-                phone={phone}
-                canSendWhatsApp={whatsappChannel !== null}
             />
             <AppearanceCard
                 userId={session.id}

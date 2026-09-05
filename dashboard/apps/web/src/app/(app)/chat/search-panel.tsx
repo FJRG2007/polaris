@@ -18,6 +18,7 @@
 
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
+import { PersonName } from "@/components/person-name";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { useEffect, useMemo, useState } from "react";
@@ -213,7 +214,12 @@ export function SearchPanel({
                                             hit.message.authorId === viewerId && "text-primary"
                                         )}
                                     >
-                                        {hit.message.authorName ?? "Somebody who has left"}
+                                        <PersonName
+                                            id={hit.message.authorId}
+                                            name={
+                                                hit.message.authorName ?? "Somebody who has left"
+                                            }
+                                        />
                                     </span>
                                     {/* Clamped rather than truncated: a hit is
                                         usually a paragraph, and one line of it

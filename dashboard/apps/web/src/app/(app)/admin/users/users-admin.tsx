@@ -28,8 +28,9 @@ import type { InviteListItem } from "@/lib/invite-service";
 import type { DirectoryUser } from "@/lib/user-admin-service";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
-import { isOnline, OnlineDot, useNow } from "@/components/presence";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
 import { deleteUserAction, revokeInviteAction, unbanUserAction } from "./actions";
@@ -272,11 +273,18 @@ export function UsersAdmin({
                                     )}
                                 >
                                     <td className="px-3 py-2">
-                                        <div className="flex items-center gap-3">
+                                        {/* The plate goes on this rather than on
+                                            the row: a table row painted edge to
+                                            edge is a band across the whole
+                                            directory, not somebody's nameplate. */}
+                                        <PersonRow
+                                            personId={user.id}
+                                            className="flex items-center gap-3 rounded-md px-1.5 py-0.5"
+                                        >
                                             <Avatar person={user} size={36} />
                                             <div className="min-w-0">
                                                 <p className="flex items-center gap-1.5 truncate font-medium">
-                                                    {user.name}
+                                                    <PersonName id={user.id} name={user.name} />
                                                     {user.id === viewerId ? (
                                                         <span className="text-xs text-muted-foreground">
                                                             (you)
@@ -287,7 +295,7 @@ export function UsersAdmin({
                                                     {user.email}
                                                 </p>
                                             </div>
-                                        </div>
+                                        </PersonRow>
                                     </td>
                                     <td className="hidden px-3 py-2 sm:table-cell">
                                         <div className="flex flex-wrap items-center gap-1">

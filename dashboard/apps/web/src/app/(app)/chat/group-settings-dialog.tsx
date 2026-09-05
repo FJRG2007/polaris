@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
 import { listMembersAction, setGroupOptionsAction, transferGroupAction } from "./actions";
 import {
@@ -113,8 +114,10 @@ export function GroupSettingsDialog({
                         ) : (
                             <ul className="flex flex-col gap-1">
                                 {others.map((member) => (
-                                    <li
+                                    <PersonRow
+                                        as="li"
                                         key={member.userId}
+                                        personId={member.userId}
                                         className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                                     >
                                         <Avatar
@@ -122,7 +125,7 @@ export function GroupSettingsDialog({
                                             person={{ id: member.userId, name: member.name }}
                                         />
                                         <span className="min-w-0 flex-1 truncate text-sm">
-                                            {member.name}
+                                            <PersonName id={member.userId} name={member.name} />
                                         </span>
                                         {handingTo === member.userId ? (
                                             <>
@@ -157,7 +160,7 @@ export function GroupSettingsDialog({
                                                 Make owner
                                             </Button>
                                         )}
-                                    </li>
+                                    </PersonRow>
                                 ))}
                             </ul>
                         )}

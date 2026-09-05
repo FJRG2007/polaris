@@ -23,6 +23,7 @@
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search, UserMinus, UserPlus, X } from "lucide-react";
@@ -179,14 +180,19 @@ function FriendsCard({
                 {waiting.length > 0 && (
                     <ul className="flex flex-col gap-1">
                         {waiting.map((request) => (
-                            <li
+                            <PersonRow
+                                as="li"
                                 key={request.id}
+                                personId={request.person.id}
                                 className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                             >
                                 <Avatar openable person={request.person} size={24} />
                                 <span className="min-w-0 flex-1">
                                     <span className="block truncate text-sm">
-                                        {request.person.name}
+                                        <PersonName
+                                            id={request.person.id}
+                                            name={request.person.name}
+                                        />
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
                                         {request.outgoing ? "You asked them" : "Wants to be added"}
@@ -215,7 +221,7 @@ function FriendsCard({
                                 >
                                     <X className="size-3.5" />
                                 </Button>
-                            </li>
+                            </PersonRow>
                         ))}
                     </ul>
                 )}
@@ -229,14 +235,16 @@ function FriendsCard({
                     <>
                         <ul className="flex flex-col gap-1">
                             {people.map((friend) => (
-                                <li
+                                <PersonRow
+                                    as="li"
                                     key={friend.id}
+                                    personId={friend.id}
                                     className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                                 >
                                     <Avatar openable person={friend} size={24} />
                                     <span className="min-w-0 flex-1">
                                         <span className="block truncate text-sm" title={friend.name}>
-                                            {friend.name}
+                                            <PersonName id={friend.id} name={friend.name} />
                                         </span>
                                         <span className="block truncate text-xs text-muted-foreground">
                                             {friend.contact}
@@ -252,7 +260,7 @@ function FriendsCard({
                                     >
                                         <UserMinus className="size-3.5" />
                                     </Button>
-                                </li>
+                                </PersonRow>
                             ))}
                         </ul>
                         <MoreWhenSeen enabled={cursor !== null} loading={loading} onReach={loadMore}>
@@ -425,7 +433,9 @@ function AddFriend({
                 <ul className="flex flex-col">
                     {offered.map((person) => (
                         <li key={person.id}>
-                            <button
+                            <PersonRow
+                                as="button"
+                                personId={person.id}
                                 type="button"
                                 onClick={() => {
                                     setQuery("");
@@ -435,9 +445,11 @@ function AddFriend({
                                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                             >
                                 <Avatar person={person} size={20} />
-                                <span className="min-w-0 flex-1 truncate">{person.name}</span>
+                                <span className="min-w-0 flex-1 truncate">
+                                    <PersonName id={person.id} name={person.name} />
+                                </span>
                                 <UserPlus className="size-3.5 shrink-0 text-muted-foreground" />
-                            </button>
+                            </PersonRow>
                         </li>
                     ))}
                 </ul>
