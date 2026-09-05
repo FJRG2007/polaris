@@ -178,7 +178,9 @@ function readCsv(text: string): ImportedVault {
         const favorite = cell(row, "favorite").trim().toLowerCase();
         item.favorite = favorite === "1" || favorite === "true" || favorite === "yes";
         const uri = cell(row, "uri").trim();
-        item.login.uris = uri ? [uri] : [];
+        // A CSV carries one address and no rule for it, so it lands on the
+        // vault's own default rather than on a guess.
+        item.login.uris = uri ? [{ uri, match: null }] : [];
         // A secure note that carried a password would be a login the file
         // mislabelled; keeping both costs nothing and loses nothing.
         items.push(item);
@@ -228,8 +230,14 @@ function readBitwardenJson(text: string): ImportedVault {
             item.login.totp = String(login.totp ?? "");
             const uris = Array.isArray(login.uris) ? login.uris : [];
             item.login.uris = uris
-                .map((entry) => String((entry as Record<string, unknown>)?.uri ?? ""))
-                .filter(Boolean);
+                .map((entry) => {
+                    const row = entry as Record<string, unknown>;
+                    // The rule travels with the address: an export that carried
+                    // "this exact page" and came back as "the whole site" would
+                    // widen where a credential is offered, silently.
+                    return { uri: String(row?.uri ?? ""), match: core.readUriMatch(row?.match) };
+                })
+                .filter((entry) => entry.uri.length > 0);
         }
         const card = raw.card as Record<string, string> | undefined;
         if (card) item.card = { ...item.card, ...card };
@@ -314,7 +322,7 @@ function readKeePassXml(text: string): ImportedVault {
                 item.notes = strings.get("Notes") ?? "";
                 item.login.totp = strings.get("otp") ?? strings.get("TOTP Seed") ?? "";
                 const uri = (strings.get("URL") ?? "").trim();
-                item.login.uris = uri ? [uri] : [];
+                item.login.uris = uri ? [{ uri, match: null }] : [];
                 // Anything KeePass did not have a column for was a custom field
                 // there and stays one here.
                 for (const [key, value] of strings) {
@@ -405,7 +413,7 @@ function writeBitwardenJson(
                           username: item.login.username || null,
                           password: item.login.password || null,
                           totp: item.login.totp || null,
-                          uris: item.login.uris.map((uri) => ({ uri, match: null }))
+                          uris: item.login.uris.map((entry) => ({ uri: entry.uri, match: entry.match }))
                       }
                     : undefined,
             card: item.type === core.CIPHER_CARD ? item.card : undefined,
@@ -458,7 +466,7 @@ function writeCsv(
                 item.notes,
                 item.fields.map((field) => `${field.name}: ${field.value}`).join("\n"),
                 "0",
-                item.login.uris[0] ?? "",
+                item.login.uris[0]?.uri ?? "",
                 item.login.username,
                 item.login.password,
                 item.login.totp
@@ -506,7 +514,7 @@ function writeKeePassXml(
             field("Title", item.name || "Untitled"),
             field("UserName", item.login.username),
             field("Password", item.login.password, true),
-            field("URL", item.login.uris[0] ?? ""),
+            field("URL", item.login.uris[0]?.uri ?? ""),
             field("Notes", item.notes)
         ];
         if (item.login.totp) lines.push(field("otp", item.login.totp, true));

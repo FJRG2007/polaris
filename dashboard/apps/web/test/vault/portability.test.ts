@@ -32,7 +32,10 @@ describe("readImportFile - CSV", () => {
             login: { username: "ana", password: "hunter2" },
             notes: "the work one"
         });
-        expect(read.items[0]?.login.uris).toEqual(["https://github.com"]);
+        // The address comes back with the rule that decides when it counts. A
+        // CSV carries no rule, so it lands on the vault's own default rather
+        // than on a guess.
+        expect(read.items[0]?.login.uris).toEqual([{ uri: "https://github.com", match: null }]);
     });
 
     it("reads a KeePass 1 export, where the title column is called Account", () => {

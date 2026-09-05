@@ -26,7 +26,22 @@ export interface VaultItem {
     organizationId: string | null;
     deleted: boolean;
     revisionDate: string;
-    login: { username: string; password: string; totp: string; uris: string[] };
+    login: {
+        username: string;
+        password: string;
+        totp: string;
+        /**
+         * Every address this login belongs to, with the rule that decides when
+         * it counts. One login is rarely one URL - the account is used at the
+         * site, at its accounts subdomain, and in an app whose callback is
+         * something else - and a vault that holds one is a vault whose owner
+         * ends up keeping the same credential three times.
+         *
+         * `match` is Bitwarden's number, kept as it was stored: null means
+         * "whatever the vault's default is", which is the base domain.
+         */
+        uris: { uri: string; match: core.UriMatch | null }[];
+    };
     card: {
         cardholderName: string;
         brand: string;
@@ -121,8 +136,11 @@ export async function decryptItem(
         const uris = Array.isArray(login.uris) ? login.uris : [];
         item.login.uris = [];
         for (const entry of uris) {
-            const uri = await open((entry as Record<string, unknown>)?.uri, key);
-            if (uri) item.login.uris.push(uri);
+            const row = entry as Record<string, unknown>;
+            const uri = await open(row?.uri, key);
+            // The match is not encrypted - Bitwarden stores it in the clear, and
+            // it is a number rather than a secret - so it is read as it stands.
+            if (uri) item.login.uris.push({ uri, match: core.readUriMatch(row?.match) });
         }
     }
 
@@ -205,8 +223,15 @@ export async function encryptItem(
             totp: await seal(item.login.totp, key),
             uris: await Promise.all(
                 item.login.uris
-                    .filter((uri) => uri.trim().length > 0)
-                    .map(async (uri) => ({ uri: await seal(uri.trim(), key), match: null }))
+                    .filter((entry) => entry.uri.trim().length > 0)
+                    .map(async (entry) => {
+                        // What somebody typed becomes what a client can read:
+                        // `*.example.com` is stored as the site with the
+                        // base-domain match, which is the same thing said in the
+                        // vocabulary every other client already speaks.
+                        const stored = core.readUriEntry(entry.uri, entry.match);
+                        return { uri: await seal(stored.uri, key), match: stored.match };
+                    })
             )
         };
     } else if (item.type === core.CIPHER_CARD) {

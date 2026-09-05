@@ -499,8 +499,15 @@ export function VaultApp() {
                                             {current.login.totp ? (
                                                 <TotpCode value={current.login.totp} />
                                             ) : null}
-                                            {current.login.uris.map((uri) => (
-                                                <Field key={uri} label="Website" value={uri} link />
+                                            {current.login.uris.map((entry) => (
+                                                <Field
+                                                    key={entry.uri}
+                                                    label={core.URI_MATCH_LABELS[
+                                                        entry.match ?? core.DEFAULT_URI_MATCH
+                                                    ]}
+                                                    value={entry.uri}
+                                                    link
+                                                />
                                             ))}
                                         </>
                                     ) : null}

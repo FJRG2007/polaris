@@ -75,6 +75,8 @@ export * from "./vacant-page.js";
 export * from "./waf-block-page.js";
 export * from "./tasks.js";
 export * from "./vault.js";
+export * from "./vault-uris.js";
+export * from "./vault-items.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";
 export * from "./schemas/database.js";

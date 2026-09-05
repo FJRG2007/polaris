@@ -16,7 +16,9 @@ import { useEffect, useState } from "react";
 import { useVaultSession } from "./vault-session";
 import { useVaultCollections } from "./use-vault-collections";
 import { PasswordGenerator, generate } from "@/components/password-generator";
-import { FolderPlus, Loader2, Lock, LockOpen, Plus, RefreshCw, X } from "lucide-react";
+import { QrScanDialog } from "./qr-scan";
+import { parseTotp } from "@/lib/vault/totp-browser";
+import { FolderPlus, Loader2, Lock, LockOpen, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
 import { emptyItem, IDENTITY_FIELDS, type VaultFolder, type VaultItem } from "./vault-model";
 import {
     Button,
@@ -31,6 +33,19 @@ import {
     Textarea,
     useDeferredFocus
 } from "@polaris/ui";
+
+/** One address in the list replaced, with the list grown to reach it - the row
+ *  drawn for an item that has none yet is index 0 of a list that is still
+ *  empty. */
+function replaceUri(
+    uris: VaultItem["login"]["uris"],
+    index: number,
+    entry: VaultItem["login"]["uris"][number]
+): VaultItem["login"]["uris"] {
+    const next = [...uris];
+    next[index] = entry;
+    return next;
+}
 
 const TYPE_OPTIONS = core.CIPHER_TYPES.map((type) => ({
     value: String(type),
@@ -69,6 +84,9 @@ export function ItemDialog({
     const { vaults, vaultKeys } = useVaultSession();
     const [draft, setDraft] = useState<VaultItem>(emptyItem(core.CIPHER_LOGIN));
     const [generator, setGenerator] = useState(false);
+    /** Whether the QR reader is open. Its own state rather than a route, because
+     *  it belongs to the field beside it. */
+    const [scanning, setScanning] = useState(false);
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -348,33 +366,157 @@ export function ItemDialog({
                                     />
                                 </div>
                             ) : null}
-                            <label className="flex flex-col gap-1 text-sm">
-                                Authenticator key (optional)
-                                <Input
-                                    value={draft.login.totp}
-                                    onChange={(event) =>
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>Authenticator key (optional)</span>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        className="flex-1 font-mono text-xs"
+                                        value={draft.login.totp}
+                                        onChange={(event) =>
+                                            patch({
+                                                login: { ...draft.login, totp: event.target.value }
+                                            })
+                                        }
+                                        placeholder="The secret, or the whole otpauth:// link"
+                                        autoComplete="off"
+                                    />
+                                    {/* The square a site shows is an otpauth://
+                                        link, and the secret under it is
+                                        thirty-two characters of base32 with no
+                                        word breaks - which is why people
+                                        screenshot it and then have nowhere to
+                                        put the screenshot. */}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setScanning(true)}
+                                    >
+                                        <QrCode className="size-4 shrink-0" />
+                                        Scan
+                                    </Button>
+                                </div>
+                                {draft.login.totp.trim() && !parseTotp(draft.login.totp) ? (
+                                    // Said while it is being typed rather than
+                                    // when the code fails to appear later: a key
+                                    // that cannot be read is a two-factor login
+                                    // somebody thinks they have saved.
+                                    <span className="text-xs text-danger">
+                                        That is not a key this can read. It should be an
+                                        otpauth:// link, or the base32 secret on its own.
+                                    </span>
+                                ) : null}
+                            </div>
+                            {/* Several, because one login is rarely one URL: the
+                                site, its accounts subdomain, and the app whose
+                                callback is something else again. A vault that
+                                held one is a vault where the same credential
+                                gets saved three times. */}
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>Websites</span>
+                                <div className="flex flex-col gap-2">
+                                    {(draft.login.uris.length > 0
+                                        ? draft.login.uris
+                                        : [{ uri: "", match: null }]
+                                    ).map((entry, index) => (
+                                        <div key={index} className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    className="flex-1"
+                                                    value={entry.uri}
+                                                    onChange={(event) =>
+                                                        patch({
+                                                            login: {
+                                                                ...draft.login,
+                                                                uris: replaceUri(draft.login.uris, index, {
+                                                                    ...entry,
+                                                                    uri: event.target.value
+                                                                })
+                                                            }
+                                                        })
+                                                    }
+                                                    placeholder="https://example.com or *.example.com"
+                                                    autoComplete="off"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    aria-label="Remove this website"
+                                                    title="Remove this website"
+                                                    disabled={draft.login.uris.length === 0}
+                                                    onClick={() =>
+                                                        patch({
+                                                            login: {
+                                                                ...draft.login,
+                                                                uris: draft.login.uris.filter(
+                                                                    (_, at) => at !== index
+                                                                )
+                                                            }
+                                                        })
+                                                    }
+                                                >
+                                                    <Trash2 className="size-4 shrink-0" />
+                                                </Button>
+                                            </div>
+                                            {/* Said as it is typed rather than on
+                                                save: an address that cannot
+                                                match anything is a saved login
+                                                that is silently never offered,
+                                                and finding that out weeks later
+                                                is finding it out at the worst
+                                                moment. */}
+                                            {core.uriProblem(entry.uri, entry.match) ? (
+                                                <span className="text-xs text-danger">
+                                                    {core.uriProblem(entry.uri, entry.match)}
+                                                </span>
+                                            ) : null}
+                                            {/* The rule is only worth a line once
+                                                there is an address for it to be
+                                                about. */}
+                                            {entry.uri.trim() ? (
+                                                <Select
+                                                    className="h-7 text-xs"
+                                                    aria-label="When this login is offered here"
+                                                    value={String(entry.match ?? core.DEFAULT_URI_MATCH)}
+                                                    onValueChange={(next) =>
+                                                        patch({
+                                                            login: {
+                                                                ...draft.login,
+                                                                uris: replaceUri(draft.login.uris, index, {
+                                                                    ...entry,
+                                                                    match: core.readUriMatch(Number(next))
+                                                                })
+                                                            }
+                                                        })
+                                                    }
+                                                    options={core.URI_MATCHES.map((match) => ({
+                                                        value: String(match),
+                                                        label: core.URI_MATCH_LABELS[match]
+                                                    }))}
+                                                />
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="self-start"
+                                    onClick={() =>
                                         patch({
-                                            login: { ...draft.login, totp: event.target.value }
+                                            login: {
+                                                ...draft.login,
+                                                uris: [...draft.login.uris, { uri: "", match: null }]
+                                            }
                                         })
                                     }
-                                    placeholder="The secret, or the whole otpauth:// link"
-                                    autoComplete="off"
-                                    className="font-mono text-xs"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                Website
-                                <Input
-                                    value={draft.login.uris[0] ?? ""}
-                                    onChange={(event) =>
-                                        patch({
-                                            login: { ...draft.login, uris: [event.target.value] }
-                                        })
-                                    }
-                                    placeholder="https://example.com"
-                                    autoComplete="off"
-                                />
-                            </label>
+                                >
+                                    <Plus className="size-4 shrink-0" />
+                                    Another website
+                                </Button>
+                            </div>
                         </>
                     ) : null}
 
@@ -640,6 +782,20 @@ export function ItemDialog({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            {/* On top of this one rather than inside it: a camera preview in a
+                form that already scrolls is a camera nobody can aim. */}
+            <QrScanDialog
+                open={scanning}
+                onOpenChange={setScanning}
+                onFound={(value) => {
+                    // Whatever the square said, as it said it. An otpauth link
+                    // carries the issuer, the digits and the period as well as
+                    // the secret, and throwing those away to keep the secret
+                    // alone would break a site that uses eight digits.
+                    patch({ login: { ...draft.login, totp: value.trim() } });
+                }}
+            />
         </Dialog>
     );
 }
