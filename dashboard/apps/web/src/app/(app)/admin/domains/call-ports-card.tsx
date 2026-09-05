@@ -19,7 +19,8 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RouterSteps } from "./router-steps";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
+import { repairCallAddressAction } from "./actions";
 import { useLiveResource } from "@/components/use-live-resource";
 import { CALL_FORWARD_RULES, type CallPortsReading } from "@/lib/chat/call-ports";
 
@@ -124,6 +125,14 @@ export function CallPortsCard() {
                     ))}
                 </ul>
 
+                {/* The other way calls die, and the one this card used to blame
+                    the router for. Shown always rather than only when it is
+                    wrong: somebody debugging a silent call needs to be able to
+                    see what address their sound is being sent to, and a control
+                    that only appears once Polaris has already noticed is a
+                    control nobody finds while they are looking. */}
+                <AddressRow reading={reading} onDone={live.refresh} />
+
                 {/* Only when the router is the thing in the way. A stopped media
                     server answers nothing on any port, and sending somebody into
                     their router over that is an hour spent on a rule that was
@@ -149,5 +158,79 @@ export function CallPortsCard() {
                 )}
             </CardBody>
         </Card>
+    );
+}
+
+/**
+ * The address callers are sent to, and the button that makes it current.
+ *
+ * The media server asks a STUN server for this line's public address as it
+ * starts and hands that answer to every browser until it restarts. On a line
+ * whose address is not permanent that goes wrong silently: the call connects,
+ * both faces appear, and the sound is sent somewhere that stopped being here.
+ * Every port on this card stays green throughout, because the forwarding was
+ * always right - which is what sent people into their routers for an evening.
+ *
+ * Polaris watches for it and restarts the server itself. This is the button for
+ * the minutes before it notices, and for the person who wants to rule the whole
+ * theory in or out now rather than in ten minutes.
+ */
+function AddressRow({
+    reading,
+    onDone
+}: {
+    reading: CallPortsReading;
+    onDone: () => void;
+}) {
+    const [busy, setBusy] = useState(false);
+    const [said, setSaid] = useState("");
+
+    return (
+        <div
+            className={cn(
+                "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
+                reading.addressStale ? "border-warning/40 bg-warning/5" : "border-border bg-muted/40"
+            )}
+        >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium text-foreground">
+                    {reading.addressStale
+                        ? "The call server is handing out an old address"
+                        : "The address callers are sent to"}
+                </p>
+                {reading.publicIp && (
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{reading.publicIp}</code>
+                )}
+            </div>
+            <p className="text-muted-foreground">
+                {reading.addressStale
+                    ? "This line's public address has changed since the call server last started, so the sound is being sent to an address that is no longer this one. The port forwarding is not the problem. Restarting it is."
+                    : "The call server asks for it once, when it starts, and hands it out until it restarts. If this line's address changes, calls from outside go quiet while everything here stays green."}
+                {reading.askedAt
+                    ? ` It last asked on ${new Date(reading.askedAt).toLocaleString()}.`
+                    : ""}
+            </p>
+            {said && <p className="text-muted-foreground">{said}</p>}
+            <div>
+                <Button
+                    size="sm"
+                    variant={reading.addressStale ? "primary" : "secondary"}
+                    disabled={busy}
+                    onClick={async () => {
+                        setBusy(true);
+                        setSaid("");
+                        const result = await repairCallAddressAction().catch(() => ({
+                            ok: false,
+                            message: "That could not be done from here."
+                        }));
+                        setSaid(result.message);
+                        setBusy(false);
+                        onDone();
+                    }}
+                >
+                    {busy ? "Restarting..." : "Ask for this network's address again"}
+                </Button>
+            </div>
+        </div>
     );
 }

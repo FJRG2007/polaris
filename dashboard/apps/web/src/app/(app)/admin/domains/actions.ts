@@ -10,6 +10,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { setOwnerDomainPolicy, type OwnerDomainPolicy } from "@/lib/owner-domains";
 import { checkedAddresses, removeAddress, type CheckedAddress } from "@/lib/address-health";
 import { getPortBlocks, getPortPolicy, setPortBlock, setPortPolicy } from "@/lib/apps/port-block-store";
@@ -246,4 +247,27 @@ export async function saveNetworkConfigAction(input: z.input<typeof networkSchem
     await recordAudit({ actorId: user.id, action: "network.configure", targetType: "setting", targetId: "network" });
     revalidatePath("/admin/domains");
     return getNetworkStatus();
+}
+
+/**
+ * Make the call server ask for this network's address again.
+ *
+ * Polaris does this by itself when it notices the address has moved - see
+ * `call-address-watch` - and this is the button for the minutes before it
+ * notices. Somebody who has just watched a call go quiet should not have to wait
+ * out a ten-minute timer to find out whether that is the reason, and pressing it
+ * either fixes the calls or rules the whole theory out.
+ */
+export async function repairCallAddressAction(): Promise<{ ok: boolean; message: string }> {
+    const user = await requireAdmin();
+    const result = await repairCallAddress();
+    await recordAudit({
+        actorId: user.id,
+        action: "calls.address.repair",
+        targetType: "setting",
+        targetId: "chat.calls",
+        metadata: { ok: result.ok }
+    });
+    revalidatePath("/admin/domains");
+    return result;
 }
