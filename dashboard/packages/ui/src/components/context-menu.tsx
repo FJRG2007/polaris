@@ -9,6 +9,7 @@
 import { cn } from "../lib/cn";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
+import { applePlatform, formatShortcut } from "../lib/shortcut";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
 import * as RadixMenu from "@radix-ui/react-context-menu";
@@ -17,6 +18,7 @@ import {
     forwardRef,
     useMemo,
     useState,
+    useSyncExternalStore,
     type ComponentPropsWithoutRef,
     type ElementRef,
     type ReactNode
@@ -136,15 +138,39 @@ function mergeRefs<T>(
  * ("Rename (F2)"), which reads as part of the name of the thing rather than as a
  * key to press.
  *
+ * Give it `keys` rather than text wherever a modifier is involved: `Mod+C` is
+ * printed as `Ctrl+C` on a PC and as `⌘C` on a Mac, and a hint hard-coded as one
+ * of those is wrong on half the machines that read it - which is worse than no
+ * hint, because somebody tries it. Plain children stay for the keys that are the
+ * same everywhere, `F2` and the like.
+ *
  * `ml-auto` on purpose: the keys sit against the right-hand edge whatever the
  * label does, so a column of them lines up.
  */
-export function MenuShortcut({ children, className }: { children: ReactNode; className?: string }) {
+export function MenuShortcut({
+    keys,
+    children,
+    className
+}: {
+    /** Platform-neutral, as in `Mod+Shift+K`. */
+    keys?: string;
+    children?: ReactNode;
+    className?: string;
+}) {
+    // The server renders the PC form and this corrects it on the machine that is
+    // actually reading, which is the whole of why it is not read during render.
+    const apple = useSyncExternalStore(subscribeNothing, applePlatform, () => false);
     return (
         <span className={cn("ml-auto pl-6 text-[0.6875rem] text-foreground-subtle", className)}>
-            {children}
+            {keys ? formatShortcut(keys, apple) : children}
         </span>
     );
+}
+
+/** The platform does not change while the page is open, so there is nothing to
+ *  subscribe to - only a snapshot that differs between the server and here. */
+function subscribeNothing(): () => void {
+    return () => {};
 }
 
 export const ContextMenuItem = forwardRef<
