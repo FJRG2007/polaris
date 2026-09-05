@@ -198,6 +198,49 @@ export async function findLocalPathAction(
     }
 }
 
+/**
+ * Find a server that has moved, and move Polaris with it. One call, no question.
+ *
+ * The two-step above exists because there is usually a decision in between:
+ * a machine reachable at its public name still works, and taking the short way
+ * round is an improvement somebody chooses. This is the other case, and it has
+ * no decision in it. The recorded address answers nothing, the machine was found
+ * by presenting the host key this server is already pinned to, and leaving it
+ * unreachable while somebody reads a sentence about it helps nobody.
+ *
+ * It writes ONLY when the address on record had stopped working. A server that
+ * answers where it is stays where it is - this is a repair, not a preference.
+ */
+export async function recoverServerAddressAction(
+    hostId: unknown
+): Promise<{ error?: string; found?: string; path?: LocalPath }> {
+    const user = await requirePermission("system.manage");
+    const parsed = z.string().uuid().safeParse(hostId);
+    if (!parsed.success) return { error: "Server not found" };
+
+    let path: LocalPath;
+    try {
+        path = await findLocalPath(parsed.data, user.id);
+    } catch {
+        return { error: "Could not look for this server on the network" };
+    }
+    if (path.kind !== "found" || !path.moved) return { path };
+
+    // Verified a second time inside, against the same pinned key.
+    const result = await useLocalPath(parsed.data, user.id, path.address);
+    if (result.error) return { error: result.error, path };
+    await recordAudit({
+        actorId: user.id,
+        action: "server.address.recovered",
+        targetType: "host",
+        targetId: parsed.data,
+        metadata: { address: path.address }
+    });
+    revalidatePath("/drive");
+    revalidatePath(`/apps/servers/${parsed.data}`);
+    return { found: path.address, path };
+}
+
 export async function useLocalPathAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = z

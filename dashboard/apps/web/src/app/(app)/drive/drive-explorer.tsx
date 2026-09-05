@@ -22,6 +22,7 @@
 import Link from "next/link";
 import { FilesView } from "./files-view";
 import * as driveActions from "./actions";
+import * as serverActions from "../apps/servers/actions";
 import { driveJobFraction, driveJobSummary } from "@polaris/core";
 import type { DriveJobView } from "@/lib/drive-jobs";
 import type { DriveAbilities } from "@/lib/drive-authz";
@@ -61,6 +62,7 @@ import {
     KeyRound,
     Loader2,
     Pencil,
+    Radar,
     RefreshCw,
     ShieldCheck,
     Trash2,
@@ -700,6 +702,11 @@ export function DriveExplorer({
                         serverHref={
                             isServerSource(connectionId)
                                 ? `/apps/servers/${connectionId.slice("host:".length)}`
+                                : null
+                        }
+                        hostId={
+                            isServerSource(connectionId)
+                                ? connectionId.slice("host:".length)
                                 : null
                         }
                         onRecheck={recheckSources}
@@ -1352,6 +1359,7 @@ function UnreachableServer({
     detail,
     endpoint,
     serverHref,
+    hostId,
     onRecheck
 }: {
     name: string;
@@ -1362,8 +1370,63 @@ function UnreachableServer({
     /** This machine's own page, when the source is a registered server. Null for
      *  a NAS or anything else without one. */
     serverHref: string | null;
+    /** The server's id, when the source is one. What the search needs. */
+    hostId: string | null;
     onRecheck: () => void;
 }) {
+    /**
+     * Look for the machine on this network, and move Polaris to it if it is
+     * found.
+     *
+     * Started here rather than waited for. A server whose DHCP lease moved is
+     * the commonest reason this panel is on screen, the search needs nothing
+     * from anybody, and telling somebody to open another screen and press a
+     * button there is telling them to do what Polaris could have done - which is
+     * the one thing this product is not allowed to do. The manual button stays
+     * for a second go.
+     *
+     * Every candidate is checked against the host key this server is already
+     * pinned to, so nothing is believed on the strength of having answered.
+     */
+    const [search, setSearch] = useState<
+        | { kind: "idle" }
+        | { kind: "looking" }
+        | { kind: "found"; address: string }
+        | { kind: "elsewhere" }
+        | { kind: "nowhere-to-look" }
+        | { kind: "failed" }
+    >({ kind: "idle" });
+
+    const look = useCallback(async () => {
+        if (!hostId) return;
+        setSearch({ kind: "looking" });
+        const result = await serverActions.recoverServerAddressAction(hostId);
+        if (result.found) {
+            setSearch({ kind: "found", address: result.found });
+            onRecheck();
+            return;
+        }
+        if (result.error) {
+            setSearch({ kind: "failed" });
+            return;
+        }
+        // Polaris not knowing its own address is a different answer from the
+        // machine not being there, and saying the second when the first is true
+        // sends somebody looking at the wrong thing.
+        setSearch({
+            kind: result.path?.kind === "unknown" ? "nowhere-to-look" : "elsewhere"
+        });
+    }, [hostId, onRecheck]);
+
+    // Once per machine. A second attempt is the button, so a network that is
+    // genuinely down does not get swept every time this panel re-renders.
+    const started = useRef<string | null>(null);
+    useEffect(() => {
+        if (!hostId || started.current === hostId) return;
+        started.current = hostId;
+        void look();
+    }, [hostId, look]);
+
     return (
         <div className="rounded-md border border-danger/40 bg-danger/10 p-6">
             <div className="flex items-start gap-3">
@@ -1381,9 +1444,32 @@ function UnreachableServer({
                     {endpoint ? (
                         <p className="text-xs text-muted-foreground">
                             Polaris tried <span className="font-mono">{endpoint}</span>.
-                            {serverHref
-                                ? " If the machine has moved - a new address from the router is the usual reason - open it below and press Check on this network."
-                                : ""}
+                        </p>
+                    ) : null}
+                    {/* What Polaris is doing about it, without being asked. */}
+                    {search.kind === "looking" ? (
+                        <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="size-3 animate-spin" />
+                            Looking for it on this network...
+                        </p>
+                    ) : search.kind === "found" ? (
+                        <p className="text-xs text-success">
+                            Found it at <span className="font-mono">{search.address}</span> and
+                            switched to it. A lease from the router had moved.
+                        </p>
+                    ) : search.kind === "elsewhere" ? (
+                        <p className="text-xs text-muted-foreground">
+                            It is not on this network either, so the machine itself is off or the
+                            link to it is down.
+                        </p>
+                    ) : search.kind === "nowhere-to-look" ? (
+                        <p className="text-xs text-muted-foreground">
+                            Polaris does not know its own address on this network, so it cannot say
+                            what is near it.
+                        </p>
+                    ) : search.kind === "failed" ? (
+                        <p className="text-xs text-muted-foreground">
+                            Polaris could not search this network from here.
                         </p>
                     ) : null}
                     <div className="mt-1 flex flex-wrap gap-2">
@@ -1391,6 +1477,17 @@ function UnreachableServer({
                             <RefreshCw className="size-4" />
                             Check again
                         </Button>
+                        {hostId ? (
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={search.kind === "looking"}
+                                onClick={() => void look()}
+                            >
+                                <Radar className="size-4" />
+                                Look for it on this network
+                            </Button>
+                        ) : null}
                         <Button size="sm" variant="ghost" asChild>
                             <Link href={serverHref ?? "/apps/servers"}>
                                 {serverHref ? `Open ${name}` : "Open Servers"}
