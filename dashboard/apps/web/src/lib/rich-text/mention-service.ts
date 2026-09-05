@@ -131,7 +131,12 @@ async function searchPeople(
             ...(scope ? { id: { in: scope } } : {}),
             ...(contains ? { OR: [{ name: contains }, { email: contains }] } : {})
         },
-        select: { id: true, name: true, username: true, image: true },
+        // Not the picture. Whatever an OAuth provider handed better-auth is one
+        // of several sources for somebody's face, and the last word on which of
+        // them wins belongs to the avatar route - which puts an upload first.
+        // Read here, it silently outranked the photo the person had actually
+        // chosen, and kept being drawn after they took it down.
+        select: { id: true, name: true, username: true },
         orderBy: { name: "asc" },
         take: limit
     });
@@ -156,7 +161,8 @@ async function searchPeople(
             id: user.id,
             label: user.name || handle(user.username),
             detail: user.name ? handle(user.username) : "",
-            image: user.image
+            // Resolved from the id, like every other face in Polaris.
+            image: null
         }));
 }
 
@@ -193,7 +199,7 @@ export async function searchAccounts(
                 ? { OR: [{ name: contains }, { email: contains }, { username: contains }] }
                 : {})
         },
-        select: { id: true, name: true, username: true, email: true, image: true },
+        select: { id: true, name: true, username: true, email: true },
         orderBy: { name: "asc" },
         take: limit
     });
@@ -213,7 +219,7 @@ export async function searchAccounts(
             name: user.name || handle(user.username),
             username: user.username,
             email: contacts.has(user.id) ? user.email : "",
-            image: user.image
+            image: null
         }))
         .filter((candidate) => candidate.username || candidate.email);
 }
