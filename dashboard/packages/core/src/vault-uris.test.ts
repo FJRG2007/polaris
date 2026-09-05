@@ -27,6 +27,21 @@ describe("the wildcard people actually type", () => {
         });
     });
 
+    it("takes the wildcard off an address that carries a scheme too", () => {
+        // What a browser gets sent is what is stored, and `*` is not a hostname.
+        expect(uris.readUriEntry("https://*.goldenowl.ai", null)).toEqual({
+            uri: "https://goldenowl.ai",
+            match: wire.URI_MATCH_DOMAIN
+        });
+    });
+
+    it("leaves a pattern alone, where a star is the author's own quantifier", () => {
+        expect(uris.readUriEntry("^https://.*[.]example[.]com/", wire.URI_MATCH_REGEX)).toEqual({
+            uri: "^https://.*[.]example[.]com/",
+            match: wire.URI_MATCH_REGEX
+        });
+    });
+
     it("leaves an ordinary address as it was typed", () => {
         // A URL somebody pasted is a URL they may want to read again.
         expect(uris.readUriEntry("https://example.com/login?next=x", null)).toEqual({
@@ -173,5 +188,20 @@ describe("choosing between several saved addresses", () => {
             { uri: "other.test", match: wire.URI_MATCH_DOMAIN }
         ];
         expect(uris.urisCovering(entries, "https://example.com")).toHaveLength(1);
+    });
+});
+
+describe("withoutWildcard", () => {
+    it("takes off a leading wildcard label, with or without a scheme", () => {
+        expect(uris.withoutWildcard("*.example.com")).toBe("example.com");
+        expect(uris.withoutWildcard("https://*.example.com/login")).toBe("https://example.com/login");
+    });
+
+    it("leaves a star that is part of a label, rather than inventing another site", () => {
+        expect(uris.withoutWildcard("foo*.example.com")).toBe("foo*.example.com");
+    });
+
+    it("leaves an ordinary address untouched", () => {
+        expect(uris.withoutWildcard("https://example.com")).toBe("https://example.com");
     });
 });

@@ -136,9 +136,30 @@ export function baseDomain(host: string): string {
  */
 export function readUriEntry(typed: string, match: UriMatch | null): { uri: string; match: UriMatch | null } {
     const value = typed.trim();
-    const wildcard = /^\*\.(.+)$/.exec(value);
-    if (wildcard?.[1]) return { uri: wildcard[1], match: URI_MATCH_DOMAIN };
-    return { uri: value, match };
+    // A pattern is somebody's own regular expression, in which a `*` is a
+    // quantifier and taking it out would change what they wrote into something
+    // else. Everything else that carries a wildcard means the domain.
+    if ((match ?? DEFAULT_URI_MATCH) === URI_MATCH_REGEX) return { uri: value, match };
+    const bare = withoutWildcard(value);
+    return bare === value ? { uri: value, match } : { uri: bare, match: URI_MATCH_DOMAIN };
+}
+
+/**
+ * The same address with the wildcard label taken off, or unchanged.
+ *
+ * `*.example.com` and `https://*.example.com/login` are both written by people
+ * who mean the site and everything under it, and neither is somewhere a browser
+ * can go: `*` is not a hostname. So the label comes off and what is left is a
+ * real address - which is what gets stored, and what a link on this screen has
+ * to open, since a vault filled in before this existed still holds the starred
+ * form and clicking it must not lead to a name that does not resolve.
+ *
+ * Only the leading label, and only when it is the whole label: `*.example.com`
+ * loses it, `foo*.example.com` is left alone rather than quietly turned into a
+ * different site.
+ */
+export function withoutWildcard(value: string): string {
+    return value.replace(/^(\*\.)+/, "").replace(/^([a-z][a-z0-9+.-]*:\/\/)(?:\*\.)+/i, "$1");
 }
 
 /**
@@ -173,8 +194,7 @@ export function uriProblem(typed: string, match: UriMatch | null): string | null
     }
 
     // The wildcard is checked as the address it stands for.
-    const address = /^\*\.(.+)$/.exec(value)?.[1] ?? value;
-    return hostOf(address) ? null : "That does not look like a web address.";
+    return hostOf(withoutWildcard(value)) ? null : "That does not look like a web address.";
 }
 
 /**
@@ -207,7 +227,7 @@ export function uriMatches(saved: string, match: UriMatch | null, candidate: str
         }
     }
 
-    const savedHost = hostOf(savedValue);
+    const savedHost = hostOf(withoutWildcard(savedValue));
     const candidateHost = hostOf(candidateValue);
     if (!savedHost || !candidateHost) return false;
     if (rule === URI_MATCH_HOST) return savedHost === candidateHost;

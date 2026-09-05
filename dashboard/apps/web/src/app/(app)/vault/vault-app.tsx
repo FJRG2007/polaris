@@ -24,6 +24,7 @@ import { ItemDialog } from "./item-dialog";
 import { MoveDialog } from "./move-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
+import { addressLines, IDENTITY_GROUPS, identityLabel } from "./identity-fields";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import {
     AmexMark,
@@ -33,7 +34,7 @@ import {
     MastercardMark,
     VisaMark
 } from "@/components/brand-icons";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -48,6 +49,7 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
+    MenuShortcut,
     Select
 } from "@polaris/ui";
 import {
@@ -100,11 +102,20 @@ const TYPE_ICON: Record<number, typeof KeyRound> = {
     [core.CIPHER_SSH_KEY]: Terminal
 };
 
-/** An address as a browser will actually open it. What people type into a vault
- *  is `example.com` as often as not, and a link to that is a link to a page on
- *  this site. */
-function openableUri(value: string): string {
-    return /^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
+/**
+ * An address as a browser will actually open it, or null when there is nothing
+ * to open.
+ *
+ * Two corrections, both to things people really type into a vault. A bare host
+ * is completed, because `example.com` means the site rather than a page on this
+ * one. And the wildcard label comes off: `https://*.goldenowl.ai` is how
+ * somebody writes "this site and everything under it", and following it verbatim
+ * leads to a hostname that does not resolve.
+ */
+function openableUri(value: string): string | null {
+    const bare = core.withoutWildcard(value.trim());
+    if (!bare) return null;
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(bare) ? bare : `https://${bare}`;
 }
 
 /**
@@ -239,6 +250,32 @@ export function VaultApp() {
 
     const current = visible.find((item) => item.id === selected) ?? null;
 
+    /** The recovery codes on the open item, which are stored as a hidden custom
+     *  field so every other Bitwarden client can read them. */
+    const recoveryCodes = current
+        ? core.fieldValue(current.fields, core.RECOVERY_CODES_FIELD)
+        : "";
+
+    /**
+     * The custom fields nothing else on this screen has already drawn.
+     *
+     * The recovery codes, the issuing bank and the chosen icon live as custom
+     * fields for compatibility, and listing them again at the bottom printed the
+     * codes twice - the second time as a row of dots nobody could do anything
+     * with. The index is carried along because it is what the copy state is
+     * keyed by.
+     */
+    const extraFields = useMemo(() => {
+        const managed = new Set<string>([
+            core.RECOVERY_CODES_FIELD,
+            core.BANK_FIELD,
+            core.ICON_FIELD
+        ]);
+        return (current?.fields ?? [])
+            .map((field, index) => ({ field, index }))
+            .filter(({ field }) => !managed.has(field.name));
+    }, [current]);
+
     /** Which vault an item belongs to, by the id the item carries. */
     function ownerName(vaultId: string): string {
         return vaults.find((vault) => vault.vaultId === vaultId)?.name ?? "Another vault";
@@ -320,6 +357,33 @@ export function VaultApp() {
         await load(key);
     }
 
+    /**
+     * The keys the context menu says these actions have.
+     *
+     * Bound on the row rather than on the window, so they act on the item under
+     * the hand and never on whatever happens to be selected while somebody is
+     * typing in the search box. A menu that prints a key nothing listens for is
+     * the same defect as no hint at all, pointing the other way.
+     */
+    function onRowKey(event: React.KeyboardEvent, item: VaultItem): void {
+        const mod = event.metaKey || event.ctrlKey;
+        if (mod && event.shiftKey && event.key.toLowerCase() === "c") {
+            event.preventDefault();
+            void copy("username", item.login.username);
+        } else if (mod && event.key.toLowerCase() === "c") {
+            event.preventDefault();
+            void copy("password", item.login.password);
+        } else if (event.key === "F2" || event.key === "Enter") {
+            // Enter on a focused button would otherwise fire the click that only
+            // selects it, which is the thing the row is already showing.
+            event.preventDefault();
+            setEditing(item);
+        } else if (event.key === "Delete") {
+            event.preventDefault();
+            void onDelete(item);
+        }
+    }
+
     async function onRestore(item: VaultItem): Promise<void> {
         if (!key) return;
         const result = await restoreItemAction(item.id);
@@ -366,437 +430,489 @@ export function VaultApp() {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="relative min-w-0 flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search your vault"
-                        className="pl-9"
-                    />
-                </div>
-                <Select
-                    value={filter}
-                    onValueChange={(value) => setFilter(value as Filter)}
-                    aria-label="Show"
-                    className="max-w-[14rem]"
-                    options={[
-                        { value: "all", label: "Everything" },
-                        { value: "favorites", label: "Favorites" },
-                        // Only worth offering once there is more than one vault
-                        // to tell apart.
-                        ...(readable.length > 0
-                            ? [
-                                  { value: "vault:mine", label: "My own vault" },
-                                  ...readable.map((vault) => ({
-                                      value: `vault:${vault.vaultId}`,
-                                      label: vault.name
-                                  }))
-                              ]
-                            : []),
-                        ...core.CIPHER_TYPES.map((type) => ({
-                            value: `type:${type}`,
-                            label: core.CIPHER_TYPE_LABEL[type]
-                        })),
-                        ...folders.map((folder) => ({
-                            value: `folder:${folder.id}`,
-                            label: folder.name || "Untitled folder"
-                        })),
-                        { value: "trash", label: "Trash" }
-                    ]}
-                />
-                <Button
-                    size="icon"
-                    variant="secondary"
-                    title="Folders"
-                    aria-label="Manage folders"
-                    onClick={() => setManagingFolders(true)}
-                >
-                    <FolderCog className="size-4" />
-                </Button>
-            </div>
+            {/* The shape every password manager settled on, and for a reason:
+                the list is a column somebody scans while the item they picked
+                stays put beside it. Searching and filtering belong over the list
+                they narrow rather than over the whole screen, since neither has
+                anything to do with the item on the right. */}
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+                <Card className="lg:sticky lg:top-4">
+                    <CardBody className="flex flex-col gap-2 p-2">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Search your vault"
+                                className="pl-9"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Select
+                                value={filter}
+                                onValueChange={(value) => setFilter(value as Filter)}
+                                aria-label="Show"
+                                className="min-w-0 flex-1"
+                                options={[
+                                    { value: "all", label: "Everything" },
+                                    { value: "favorites", label: "Favorites" },
+                                    // Only worth offering once there is more than
+                                    // one vault to tell apart.
+                                    ...(readable.length > 0
+                                        ? [
+                                              { value: "vault:mine", label: "My own vault" },
+                                              ...readable.map((vault) => ({
+                                                  value: `vault:${vault.vaultId}`,
+                                                  label: vault.name
+                                              }))
+                                          ]
+                                        : []),
+                                    ...core.CIPHER_TYPES.map((type) => ({
+                                        value: `type:${type}`,
+                                        label: core.CIPHER_TYPE_LABEL[type]
+                                    })),
+                                    ...folders.map((folder) => ({
+                                        value: `folder:${folder.id}`,
+                                        label: folder.name || "Untitled folder"
+                                    })),
+                                    { value: "trash", label: "Trash" }
+                                ]}
+                            />
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                title="Folders"
+                                aria-label="Manage folders"
+                                onClick={() => setManagingFolders(true)}
+                            >
+                                <FolderCog className="size-4" />
+                            </Button>
+                        </div>
 
-            {loading ? (
-                <Card>
-                    <CardBody className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" />
-                        Opening your vault...
-                    </CardBody>
-                </Card>
-            ) : visible.length === 0 ? (
-                <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        {items.length === 0
-                            ? "Nothing in here yet. Add a login, a note, a card or a key."
-                            : "Nothing matches that."}
-                    </CardBody>
-                </Card>
-            ) : (
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                    <div className="flex flex-col gap-1">
-                        {visible.map((item) => {
-                            const Icon = TYPE_ICON[item.type] ?? KeyRound;
-                            return (
-                                // Right-click does what right-click does
-                                // everywhere else in Polaris. Copying the
-                                // password is the thing people came here for,
-                                // and reaching it used to mean opening the item
-                                // and finding the button - three actions for the
-                                // one action.
-                                <ContextMenu key={item.id}>
-                                    <ContextMenuTrigger asChild>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelected(item.id);
-                                                setRevealed(false);
-                                            }}
-                                            onContextMenu={() => {
-                                                setSelected(item.id);
-                                                setRevealed(false);
-                                            }}
-                                            className={`flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
-                                                item.id === selected
-                                                    ? "border-primary/40 bg-primary/5"
-                                                    : "border-transparent hover:bg-card-hover"
-                                            }`}
-                                        >
-                                            {item.type === core.CIPHER_LOGIN ? (
-                                                <ItemIcon item={item} favicons={favicons} />
-                                            ) : (
-                                                <Icon className="size-4 shrink-0 text-muted-foreground" />
-                                            )}
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-medium">
-                                                    {item.name || "Untitled"}
-                                                </p>
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {item.login.username ||
-                                                        core.CIPHER_TYPE_LABEL[
-                                                            item.type as core.CipherType
-                                                        ]}
-                                                </p>
-                                            </div>
-                                            {item.favorite ? (
-                                                <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
-                                            ) : null}
-                                        </button>
-                                    </ContextMenuTrigger>
-                                    <ContextMenuContent>
-                                        <ContextMenuLabel title={item.name || "Untitled"}>
-                                            {item.name || "Untitled"}
-                                        </ContextMenuLabel>
-                                        {item.type === core.CIPHER_LOGIN ? (
-                                            <>
-                                                <ContextMenuItem
-                                                    disabled={!item.login.username}
-                                                    onSelect={() =>
-                                                        void copy("username", item.login.username)
-                                                    }
-                                                >
-                                                    <Copy className="size-4" />
-                                                    Copy {core.looksLikeEmail(item.login.username)
-                                                        ? "email"
-                                                        : "username"}
-                                                </ContextMenuItem>
-                                                <ContextMenuItem
-                                                    disabled={!item.login.password}
-                                                    onSelect={() =>
-                                                        void copy("password", item.login.password)
-                                                    }
-                                                >
-                                                    <Copy className="size-4" />
-                                                    Copy password
-                                                </ContextMenuItem>
-                                                {item.login.totp ? (
-                                                    <ContextMenuItem
-                                                        onSelect={() => void copyTotp(item)}
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+                                <Loader2 className="size-4 animate-spin" />
+                                Opening your vault...
+                            </div>
+                        ) : visible.length === 0 ? (
+                            <p className="p-8 text-center text-sm text-muted-foreground">
+                                {items.length === 0
+                                    ? "Nothing in here yet. Add a login, a note, a card or a key."
+                                    : "Nothing matches that."}
+                            </p>
+                        ) : (
+                            <ul className="-mr-1 flex max-h-[calc(100vh-16rem)] flex-col gap-0.5 overflow-y-auto pr-1">
+                                {visible.map((item) => {
+                                    const Icon = TYPE_ICON[item.type] ?? KeyRound;
+                                    return (
+                                        // Right-click does what right-click does
+                                        // everywhere else in Polaris. Copying the
+                                        // password is the thing people came here
+                                        // for, and reaching it used to mean
+                                        // opening the item and finding the button
+                                        // - three actions for the one action.
+                                        <li key={item.id}>
+                                            <ContextMenu>
+                                                <ContextMenuTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelected(item.id);
+                                                            setRevealed(false);
+                                                        }}
+                                                        onContextMenu={() => {
+                                                            setSelected(item.id);
+                                                            setRevealed(false);
+                                                        }}
+                                                        onKeyDown={(event) => onRowKey(event, item)}
+                                                        className={`flex w-full items-center gap-3 rounded-md border p-2.5 text-left transition-colors ${
+                                                            item.id === selected
+                                                                ? "border-primary/40 bg-primary/5"
+                                                                : "border-transparent hover:bg-card-hover"
+                                                        }`}
                                                     >
-                                                        <Copy className="size-4" />
-                                                        Copy the six digits
-                                                    </ContextMenuItem>
-                                                ) : null}
-                                                {item.login.uris[0]?.uri ? (
-                                                    <ContextMenuItem asChild>
-                                                        <a
-                                                            href={openableUri(item.login.uris[0].uri)}
-                                                            target="_blank"
-                                                            rel="noreferrer noopener"
-                                                        >
-                                                            <ExternalLink className="size-4" />
-                                                            Open the website
-                                                        </a>
-                                                    </ContextMenuItem>
-                                                ) : null}
-                                                <ContextMenuSeparator />
-                                            </>
-                                        ) : null}
-                                        <ContextMenuItem onSelect={() => setEditing(item)}>
-                                            <Pencil className="size-4" />
-                                            Edit
-                                        </ContextMenuItem>
-                                        <ContextMenuItem
-                                            onSelect={() =>
-                                                void onSave({ ...item, favorite: !item.favorite }, [])
-                                            }
-                                        >
-                                            <Star className="size-4" />
-                                            {item.favorite ? "Remove from favourites" : "Favourite"}
-                                        </ContextMenuItem>
-                                        <ContextMenuItem onSelect={() => setMoving(item)}>
-                                            <FolderInput className="size-4" />
-                                            Move
-                                        </ContextMenuItem>
-                                        <ContextMenuSeparator />
-                                        <ContextMenuItem variant="danger" onSelect={() => void onDelete(item)}>
-                                            <Trash2 className="size-4" />
-                                            {item.deleted ? "Delete for good" : "Move to trash"}
-                                        </ContextMenuItem>
-                                    </ContextMenuContent>
-                                </ContextMenu>
-                            );
-                        })}
-                    </div>
-
-                    <div>
-                        {current ? (
-                            <Card>
-                                <CardBody className="flex flex-col gap-3">
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <h2 className="truncate text-sm font-medium">
-                                                {current.name || "Untitled"}
-                                            </h2>
-                                            <p className="text-xs text-muted-foreground">
-                                                {
-                                                    core.CIPHER_TYPE_LABEL[
-                                                        current.type as core.CipherType
-                                                    ]
-                                                }
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {current.deleted ? (
-                                                <Badge variant="neutral">In the trash</Badge>
-                                            ) : null}
-                                            {current.organizationId ? (
-                                                <Badge variant="neutral">
-                                                    <Building2 className="size-3" />
-                                                    {ownerName(current.organizationId)}
-                                                </Badge>
-                                            ) : null}
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                title={current.favorite ? "Unstar" : "Star"}
-                                                aria-label={
-                                                    current.favorite
-                                                        ? `Unstar ${current.name}`
-                                                        : `Star ${current.name}`
-                                                }
-                                                onClick={async () => {
-                                                    await setItemFavoriteAction(
-                                                        current.id,
-                                                        !current.favorite
-                                                    );
-                                                    if (key) await load(key);
-                                                }}
-                                            >
-                                                <Star
-                                                    className={`size-4 ${current.favorite ? "fill-amber-400 text-amber-400" : ""}`}
-                                                />
-                                            </Button>
-                                            {/* Only when there is somewhere to
-                                                move it: another vault whose key
-                                                this account holds, or back to its
-                                                own when it is already elsewhere. */}
-                                            {!current.deleted &&
-                                            (readable.some(
-                                                (vault) => vault.vaultId !== current.organizationId
-                                            ) ||
-                                                current.organizationId) ? (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    title="Move to another vault"
-                                                    aria-label={`Move ${current.name}`}
-                                                    onClick={() => setMoving(current)}
-                                                >
-                                                    <MoveRight className="size-4" />
-                                                </Button>
-                                            ) : null}
-                                            {current.deleted ? (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    title="Put it back"
-                                                    aria-label={`Restore ${current.name}`}
-                                                    onClick={() => onRestore(current)}
-                                                >
-                                                    <RotateCcw className="size-4" />
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={() => setEditing(current)}
-                                                >
-                                                    Edit
-                                                </Button>
-                                            )}
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                title="Delete"
-                                                aria-label={`Delete ${current.name}`}
-                                                onClick={() => onDelete(current)}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    {current.type === core.CIPHER_LOGIN ? (
-                                        <>
-                                            <Field
-                                                label="Username"
-                                                value={current.login.username}
-                                                copied={copied === "username"}
-                                                onCopy={() =>
-                                                    copy("username", current.login.username)
-                                                }
-                                            />
-                                            <Field
-                                                label="Password"
-                                                value={current.login.password}
-                                                secret={!revealed}
-                                                copied={copied === "password"}
-                                                onCopy={() =>
-                                                    copy("password", current.login.password)
-                                                }
-                                                onReveal={() => setRevealed((prev) => !prev)}
-                                                revealed={revealed}
-                                            />
-                                            {/* Said every time the item is opened,
-                                                which is the moment somebody is
-                                                about to use this password
-                                                somewhere. A password that was
-                                                fine when it was chosen is in a
-                                                breach corpus a year later, and
-                                                nothing would ever have told
-                                                them. */}
-                                            {current.login.password ? (
-                                                <PasswordState password={current.login.password} />
-                                            ) : null}
-                                            {current.login.totp ? (
-                                                <TotpCode value={current.login.totp} />
-                                            ) : null}
-                                            {core.fieldValue(
-                                                current.fields,
-                                                core.RECOVERY_CODES_FIELD
-                                            ) ? (
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Recovery codes
-                                                    </span>
-                                                    <RecoveryCodes
-                                                        value={core.fieldValue(
-                                                            current.fields,
-                                                            core.RECOVERY_CODES_FIELD
+                                                        {item.type === core.CIPHER_LOGIN ? (
+                                                            <ItemIcon item={item} favicons={favicons} />
+                                                        ) : (
+                                                            <Icon className="size-4 shrink-0 text-muted-foreground" />
                                                         )}
-                                                        onChange={(next) =>
-                                                            void onSave(
-                                                                {
-                                                                    ...current,
-                                                                    fields: core.withField(
-                                                                        current.fields,
-                                                                        core.RECOVERY_CODES_FIELD,
-                                                                        next,
-                                                                        core.FIELD_HIDDEN
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="truncate text-sm font-medium">
+                                                                {item.name || "Untitled"}
+                                                            </p>
+                                                            <p className="truncate text-xs text-muted-foreground">
+                                                                {item.login.username ||
+                                                                    core.CIPHER_TYPE_LABEL[
+                                                                        item.type as core.CipherType
+                                                                    ]}
+                                                            </p>
+                                                        </div>
+                                                        {item.favorite ? (
+                                                            <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
+                                                        ) : null}
+                                                    </button>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent>
+                                                    <ContextMenuLabel title={item.name || "Untitled"}>
+                                                        {item.name || "Untitled"}
+                                                    </ContextMenuLabel>
+                                                    {item.type === core.CIPHER_LOGIN ? (
+                                                        <>
+                                                            <ContextMenuItem
+                                                                disabled={!item.login.username}
+                                                                onSelect={() =>
+                                                                    void copy(
+                                                                        "username",
+                                                                        item.login.username
                                                                     )
-                                                                },
+                                                                }
+                                                            >
+                                                                <Copy className="size-4" />
+                                                                Copy{" "}
+                                                                {core.looksLikeEmail(item.login.username)
+                                                                    ? "email"
+                                                                    : "username"}
+                                                                <MenuShortcut keys="Mod+Shift+C" />
+                                                            </ContextMenuItem>
+                                                            <ContextMenuItem
+                                                                disabled={!item.login.password}
+                                                                onSelect={() =>
+                                                                    void copy(
+                                                                        "password",
+                                                                        item.login.password
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Copy className="size-4" />
+                                                                Copy password
+                                                                <MenuShortcut keys="Mod+C" />
+                                                            </ContextMenuItem>
+                                                            {item.login.totp ? (
+                                                                <ContextMenuItem
+                                                                    onSelect={() => void copyTotp(item)}
+                                                                >
+                                                                    <Copy className="size-4" />
+                                                                    Copy the six digits
+                                                                </ContextMenuItem>
+                                                            ) : null}
+                                                            {openableUri(item.login.uris[0]?.uri ?? "") ? (
+                                                                <ContextMenuItem asChild>
+                                                                    <a
+                                                                        href={
+                                                                            openableUri(
+                                                                                item.login.uris[0]?.uri ??
+                                                                                    ""
+                                                                            ) ?? "#"
+                                                                        }
+                                                                        target="_blank"
+                                                                        rel="noreferrer noopener"
+                                                                    >
+                                                                        <ExternalLink className="size-4" />
+                                                                        Open the website
+                                                                    </a>
+                                                                </ContextMenuItem>
+                                                            ) : null}
+                                                            <ContextMenuSeparator />
+                                                        </>
+                                                    ) : null}
+                                                    <ContextMenuItem onSelect={() => setEditing(item)}>
+                                                        <Pencil className="size-4" />
+                                                        Edit
+                                                        <MenuShortcut keys="F2" />
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem
+                                                        onSelect={() =>
+                                                            void onSave(
+                                                                { ...item, favorite: !item.favorite },
                                                                 []
                                                             )
                                                         }
-                                                    />
-                                                </div>
-                                            ) : null}
-                                            {current.login.uris.map((entry) => (
-                                                <Field
-                                                    key={entry.uri}
-                                                    label={core.URI_MATCH_LABELS[
-                                                        entry.match ?? core.DEFAULT_URI_MATCH
-                                                    ]}
-                                                    value={entry.uri}
-                                                    link
-                                                />
-                                            ))}
-                                        </>
-                                    ) : null}
+                                                    >
+                                                        <Star className="size-4" />
+                                                        {item.favorite
+                                                            ? "Remove from favourites"
+                                                            : "Favourite"}
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onSelect={() => setMoving(item)}>
+                                                        <FolderInput className="size-4" />
+                                                        Move
+                                                    </ContextMenuItem>
+                                                    <ContextMenuSeparator />
+                                                    <ContextMenuItem
+                                                        variant="danger"
+                                                        onSelect={() => void onDelete(item)}
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                        {item.deleted ? "Delete for good" : "Move to trash"}
+                                                        <MenuShortcut keys="Delete" />
+                                                    </ContextMenuItem>
+                                                </ContextMenuContent>
+                                            </ContextMenu>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </CardBody>
+                </Card>
 
-                                    {current.type === core.CIPHER_CARD ? (
-                                        <>
-                                            {/* The network's own mark, read from
-                                                the number, beside who issued it.
-                                                Two cards from one network look
-                                                identical in a list without the
-                                                bank. */}
-                                            {current.card.brand ||
-                                            core.fieldValue(current.fields, core.BANK_FIELD) ? (
-                                                <div className="flex items-center gap-2 text-sm">
-                                                    <CardMark number={current.card.number} />
-                                                    <span>
-                                                        {[
-                                                            current.card.brand,
-                                                            core.fieldValue(
-                                                                current.fields,
-                                                                core.BANK_FIELD
-                                                            )
-                                                        ]
-                                                            .filter(Boolean)
-                                                            .join(" - ")}
-                                                    </span>
-                                                </div>
-                                            ) : null}
-                                            <Field
-                                                label="Name"
-                                                value={current.card.cardholderName}
+                {current ? (
+                    <Card>
+                        <CardBody className="flex flex-col gap-5">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    {current.type === core.CIPHER_LOGIN ? (
+                                        <ItemIcon
+                                            item={current}
+                                            favicons={favicons}
+                                            className="size-10 rounded-lg"
+                                        />
+                                    ) : (
+                                        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted">
+                                            {(() => {
+                                                const Icon = TYPE_ICON[current.type] ?? KeyRound;
+                                                return <Icon className="size-5 text-muted-foreground" />;
+                                            })()}
+                                        </span>
+                                    )}
+                                    <div className="min-w-0">
+                                        <h2 className="truncate text-base font-medium">
+                                            {current.name || "Untitled"}
+                                        </h2>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {current.login.username ||
+                                                core.CIPHER_TYPE_LABEL[current.type as core.CipherType]}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {current.deleted ? (
+                                        <Badge variant="neutral">In the trash</Badge>
+                                    ) : null}
+                                    {current.organizationId ? (
+                                        <Badge variant="neutral">
+                                            <Building2 className="size-3" />
+                                            {ownerName(current.organizationId)}
+                                        </Badge>
+                                    ) : null}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        title={current.favorite ? "Unstar" : "Star"}
+                                        aria-label={
+                                            current.favorite
+                                                ? `Unstar ${current.name}`
+                                                : `Star ${current.name}`
+                                        }
+                                        onClick={async () => {
+                                            await setItemFavoriteAction(current.id, !current.favorite);
+                                            if (key) await load(key);
+                                        }}
+                                    >
+                                        <Star
+                                            className={`size-4 ${current.favorite ? "fill-amber-400 text-amber-400" : ""}`}
+                                        />
+                                    </Button>
+                                    {/* Only when there is somewhere to move it:
+                                        another vault whose key this account
+                                        holds, or back to its own when it is
+                                        already elsewhere. */}
+                                    {!current.deleted &&
+                                    (readable.some(
+                                        (vault) => vault.vaultId !== current.organizationId
+                                    ) ||
+                                        current.organizationId) ? (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            title="Move to another vault"
+                                            aria-label={`Move ${current.name}`}
+                                            onClick={() => setMoving(current)}
+                                        >
+                                            <MoveRight className="size-4" />
+                                        </Button>
+                                    ) : null}
+                                    {current.deleted ? (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            title="Put it back"
+                                            aria-label={`Restore ${current.name}`}
+                                            onClick={() => onRestore(current)}
+                                        >
+                                            <RotateCcw className="size-4" />
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditing(current)}
+                                        >
+                                            Edit
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        title="Delete"
+                                        aria-label={`Delete ${current.name}`}
+                                        onClick={() => onDelete(current)}
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {current.type === core.CIPHER_LOGIN ? (
+                                <>
+                                    <Section
+                                        title="Sign in"
+                                        when={Boolean(current.login.username || current.login.password)}
+                                    >
+                                        <Row
+                                            label={
+                                                core.looksLikeEmail(current.login.username)
+                                                    ? "Email"
+                                                    : "Username"
+                                            }
+                                            value={current.login.username}
+                                            copied={copied === "username"}
+                                            onCopy={() => copy("username", current.login.username)}
+                                        />
+                                        <Row
+                                            label="Password"
+                                            value={current.login.password}
+                                            secret={!revealed}
+                                            copied={copied === "password"}
+                                            onCopy={() => copy("password", current.login.password)}
+                                            onReveal={() => setRevealed((prev) => !prev)}
+                                            revealed={revealed}
+                                            /* Said every time the item is opened,
+                                               which is the moment somebody is
+                                               about to use this password
+                                               somewhere. A password that was fine
+                                               when it was chosen is in a breach
+                                               corpus a year later, and nothing
+                                               would ever have told them. The
+                                               answer is kept for a month rather
+                                               than asked for on every visit. */
+                                            note={
+                                                current.login.password ? (
+                                                    <PasswordState
+                                                        password={current.login.password}
+                                                        scope={current.id}
+                                                    />
+                                                ) : null
+                                            }
+                                        />
+                                    </Section>
+
+                                    <Section
+                                        title="Two-factor"
+                                        when={Boolean(current.login.totp || recoveryCodes)}
+                                    >
+                                        {current.login.totp ? (
+                                            <div className="px-3 py-2">
+                                                <TotpCode value={current.login.totp} />
+                                            </div>
+                                        ) : null}
+                                        {recoveryCodes ? (
+                                            <div className="flex flex-col gap-2 px-3 py-2">
+                                                <span className="text-xs text-muted-foreground">
+                                                    Recovery codes
+                                                </span>
+                                                <RecoveryCodes
+                                                    value={recoveryCodes}
+                                                    onChange={(next) =>
+                                                        void onSave(
+                                                            {
+                                                                ...current,
+                                                                fields: core.withField(
+                                                                    current.fields,
+                                                                    core.RECOVERY_CODES_FIELD,
+                                                                    next,
+                                                                    core.FIELD_HIDDEN
+                                                                )
+                                                            },
+                                                            []
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        ) : null}
+                                    </Section>
+
+                                    <Section title="Websites" when={current.login.uris.length > 0}>
+                                        {current.login.uris.map((entry) => (
+                                            <Row
+                                                key={entry.uri}
+                                                label={
+                                                    core.URI_MATCH_LABELS[
+                                                        entry.match ?? core.DEFAULT_URI_MATCH
+                                                    ]
+                                                }
+                                                value={entry.uri}
+                                                link
                                             />
-                                            <Field
-                                                label="Number"
-                                                // Grouped the way the card
-                                                // prints it, so it can be read
-                                                // back against the card in hand.
-                                                value={core.groupCardNumber(current.card.number)}
-                                                secret={!revealed}
-                                                revealed={revealed}
-                                                copied={copied === "number"}
-                                                onCopy={() => copy("number", current.card.number)}
-                                                onReveal={() => setRevealed((prev) => !prev)}
-                                            />
-                                            <Field
-                                                label="Expires"
-                                                value={core.writeCardExpiry({
-                                                    month: current.card.expMonth,
-                                                    year: current.card.expYear
-                                                })}
-                                            />
-                                            {/* Said where the card is read
-                                                rather than only where it is
-                                                edited: the moment somebody
-                                                opens this is the moment they
-                                                are about to use it. */}
-                                            {core.cardExpired(
+                                        ))}
+                                    </Section>
+                                </>
+                            ) : null}
+
+                            {current.type === core.CIPHER_CARD ? (
+                                <Section title="Card" when>
+                                    {/* The network's own mark, read from the
+                                        number, beside who issued it. Two cards
+                                        from one network look identical in a list
+                                        without the bank. */}
+                                    {current.card.brand ||
+                                    core.fieldValue(current.fields, core.BANK_FIELD) ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 text-sm">
+                                            <CardMark number={current.card.number} />
+                                            <span>
+                                                {[
+                                                    current.card.brand,
+                                                    core.fieldValue(current.fields, core.BANK_FIELD)
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(" - ")}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    <Row label="Name" value={current.card.cardholderName} />
+                                    <Row
+                                        label="Number"
+                                        // Grouped the way the card prints it, so
+                                        // it can be read back against the card in
+                                        // hand.
+                                        value={core.groupCardNumber(current.card.number)}
+                                        secret={!revealed}
+                                        revealed={revealed}
+                                        copied={copied === "number"}
+                                        onCopy={() => copy("number", current.card.number)}
+                                        onReveal={() => setRevealed((prev) => !prev)}
+                                    />
+                                    <Row
+                                        label="Expires"
+                                        value={core.writeCardExpiry({
+                                            month: current.card.expMonth,
+                                            year: current.card.expYear
+                                        })}
+                                        /* Said where the card is read rather than
+                                           only where it is edited: the moment
+                                           somebody opens this is the moment they
+                                           are about to use it. */
+                                        note={
+                                            core.cardExpired(
                                                 {
                                                     month: current.card.expMonth,
                                                     year: current.card.expYear
                                                 },
                                                 new Date()
                                             ) ? (
-                                                <p className="text-sm text-danger">
+                                                <span className="text-xs text-danger">
                                                     This card expired.
-                                                </p>
+                                                </span>
                                             ) : core.cardExpiringSoon(
                                                   {
                                                       month: current.card.expMonth,
@@ -804,91 +920,145 @@ export function VaultApp() {
                                                   },
                                                   new Date()
                                               ) ? (
-                                                <p className="text-sm text-warning">
+                                                <span className="text-xs text-warning">
                                                     This card expires soon.
-                                                </p>
-                                            ) : null}
-                                            <Field
-                                                label="Security code"
-                                                value={current.card.code}
-                                                secret={!revealed}
-                                                revealed={revealed}
-                                                onReveal={() => setRevealed((prev) => !prev)}
-                                            />
-                                        </>
-                                    ) : null}
+                                                </span>
+                                            ) : null
+                                        }
+                                    />
+                                    <Row
+                                        label="Security code"
+                                        value={current.card.code}
+                                        secret={!revealed}
+                                        revealed={revealed}
+                                        onReveal={() => setRevealed((prev) => !prev)}
+                                    />
+                                </Section>
+                            ) : null}
 
-                                    {current.type === core.CIPHER_IDENTITY
-                                        ? Object.entries(current.identity)
-                                              .filter(([, value]) => value)
-                                              .map(([field, value]) => (
-                                                  <Field key={field} label={field} value={value} />
-                                              ))
-                                        : null}
+                            {current.type === core.CIPHER_IDENTITY
+                                ? IDENTITY_GROUPS.map((group) => {
+                                      // The address is one thing, read the way an
+                                      // address is read; the rest are rows.
+                                      const lines =
+                                          group.title === "Address"
+                                              ? addressLines(current.identity)
+                                              : [];
+                                      const rows = group.fields.filter(
+                                          ({ field }) => current.identity[field]
+                                      );
+                                      return (
+                                          <Section
+                                              key={group.title}
+                                              title={group.title}
+                                              when={
+                                                  group.title === "Address"
+                                                      ? lines.length > 0
+                                                      : rows.length > 0
+                                              }
+                                          >
+                                              {group.title === "Address" ? (
+                                                  <div className="flex items-center gap-2 px-3 py-2">
+                                                      <p className="min-w-0 flex-1 whitespace-pre-line text-sm">
+                                                          {lines.join("\n")}
+                                                      </p>
+                                                      <Button
+                                                          size="icon"
+                                                          variant="ghost"
+                                                          title="Copy"
+                                                          aria-label="Copy the address"
+                                                          onClick={() =>
+                                                              copy("address", lines.join("\n"))
+                                                          }
+                                                      >
+                                                          {copied === "address" ? (
+                                                              <Check className="size-4 text-success" />
+                                                          ) : (
+                                                              <Copy className="size-4" />
+                                                          )}
+                                                      </Button>
+                                                  </div>
+                                              ) : (
+                                                  rows.map(({ field }) => (
+                                                      <Row
+                                                          key={field}
+                                                          label={identityLabel(field)}
+                                                          value={current.identity[field] ?? ""}
+                                                          copied={copied === `id-${field}`}
+                                                          onCopy={() =>
+                                                              copy(
+                                                                  `id-${field}`,
+                                                                  current.identity[field] ?? ""
+                                                              )
+                                                          }
+                                                      />
+                                                  ))
+                                              )}
+                                          </Section>
+                                      );
+                                  })
+                                : null}
 
-                                    {current.type === core.CIPHER_SSH_KEY ? (
-                                        <>
-                                            <Field
-                                                label="Public key"
-                                                value={current.sshKey.publicKey}
-                                                copied={copied === "public"}
-                                                onCopy={() =>
-                                                    copy("public", current.sshKey.publicKey)
-                                                }
-                                            />
-                                            <Field
-                                                label="Private key"
-                                                value={current.sshKey.privateKey}
-                                                secret={!revealed}
-                                                revealed={revealed}
-                                                copied={copied === "private"}
-                                                onCopy={() =>
-                                                    copy("private", current.sshKey.privateKey)
-                                                }
-                                                onReveal={() => setRevealed((prev) => !prev)}
-                                            />
-                                        </>
-                                    ) : null}
+                            {current.type === core.CIPHER_SSH_KEY ? (
+                                <Section title="Key" when>
+                                    <Row
+                                        label="Public key"
+                                        value={current.sshKey.publicKey}
+                                        copied={copied === "public"}
+                                        onCopy={() => copy("public", current.sshKey.publicKey)}
+                                    />
+                                    <Row
+                                        label="Private key"
+                                        value={current.sshKey.privateKey}
+                                        secret={!revealed}
+                                        revealed={revealed}
+                                        copied={copied === "private"}
+                                        onCopy={() => copy("private", current.sshKey.privateKey)}
+                                        onReveal={() => setRevealed((prev) => !prev)}
+                                    />
+                                </Section>
+                            ) : null}
 
-                                    {current.fields.map((field, index) => (
-                                        <Field
-                                            key={index}
-                                            label={field.name}
-                                            value={field.value}
-                                            secret={field.type === core.FIELD_HIDDEN && !revealed}
-                                            revealed={revealed}
-                                            copied={copied === `field-${index}`}
-                                            onCopy={() => copy(`field-${index}`, field.value)}
-                                            onReveal={
-                                                field.type === core.FIELD_HIDDEN
-                                                    ? () => setRevealed((prev) => !prev)
-                                                    : undefined
-                                            }
-                                        />
-                                    ))}
+                            {/* Only the fields nothing else on this screen has
+                                already drawn. The recovery codes, the bank and
+                                the chosen icon are stored as custom fields so
+                                other clients can read them, and listing them
+                                again here printed the codes twice - the second
+                                time as an unreadable row of dots. */}
+                            <Section title="More" when={extraFields.length > 0}>
+                                {extraFields.map(({ field, index }) => (
+                                    <Row
+                                        key={index}
+                                        label={field.name}
+                                        value={field.value}
+                                        secret={field.type === core.FIELD_HIDDEN && !revealed}
+                                        revealed={revealed}
+                                        copied={copied === `field-${index}`}
+                                        onCopy={() => copy(`field-${index}`, field.value)}
+                                        onReveal={
+                                            field.type === core.FIELD_HIDDEN
+                                                ? () => setRevealed((prev) => !prev)
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            </Section>
 
-                                    {current.notes ? (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-xs text-muted-foreground">
-                                                Notes
-                                            </span>
-                                            <p className="whitespace-pre-wrap text-sm">
-                                                {current.notes}
-                                            </p>
-                                        </div>
-                                    ) : null}
-                                </CardBody>
-                            </Card>
-                        ) : (
-                            <Card>
-                                <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                                    Pick something on the left to see it.
-                                </CardBody>
-                            </Card>
-                        )}
-                    </div>
-                </div>
-            )}
+                            <Section title="Notes" when={Boolean(current.notes)}>
+                                <p className="whitespace-pre-wrap px-3 py-2 text-sm">
+                                    {current.notes}
+                                </p>
+                            </Section>
+                        </CardBody>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardBody className="p-8 text-center text-sm text-muted-foreground">
+                            Pick something on the left to see it.
+                        </CardBody>
+                    </Card>
+                )}
+            </div>
 
             <ItemDialog
                 item={editing}
@@ -926,25 +1096,61 @@ export function VaultApp() {
  * everything else falls back to being read as text.
  *
  * A bare host is completed rather than refused - `example.com` in a saved login
- * means the site, not a path relative to the dashboard.
+ * means the site, not a path relative to the dashboard - and a wildcard label is
+ * dropped, since `https://*.example.com` is a site somebody meant and not a
+ * hostname anything can resolve.
  */
 function webLink(value: string): string | null {
+    const bare = core.withoutWildcard(value.trim());
+    if (!bare) return null;
     try {
-        const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`);
+        const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(bare) ? bare : `https://${bare}`);
         return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
     } catch {
         return null;
     }
 }
 
+/**
+ * A block of the record, with its own heading.
+ *
+ * Drawn only when it has something in it, which is why the caller says so rather
+ * than the section counting its children: a section that renders an empty
+ * bordered box is worse than no section, and half of these are conditional on
+ * fields the item may simply not have.
+ */
+function Section({
+    title,
+    when,
+    children
+}: {
+    title: string;
+    /** Whether there is anything to show. */
+    when: boolean;
+    children: ReactNode;
+}) {
+    if (!when) return null;
+    return (
+        <section className="flex flex-col gap-1.5">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {title}
+            </h3>
+            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+                {children}
+            </div>
+        </section>
+    );
+}
+
 /** One labelled value, with the affordances that value deserves. */
-function Field({
+function Row({
     label,
     value,
     secret = false,
     revealed = false,
     link = false,
     copied = false,
+    note,
     onCopy,
     onReveal
 }: {
@@ -954,13 +1160,16 @@ function Field({
     revealed?: boolean;
     link?: boolean;
     copied?: boolean;
+    /** A sentence about the value that belongs under it - how strong a password
+     *  is, whether a card has expired. */
+    note?: ReactNode;
     onCopy?: () => void;
     onReveal?: () => void;
 }) {
     if (!value) return null;
     const href = link ? webLink(value) : null;
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 px-3 py-2">
             <div className="min-w-0 flex-1">
                 <span className="text-xs capitalize text-muted-foreground">{label}</span>
                 {href ? (
@@ -981,6 +1190,7 @@ function Field({
                         {secret ? "••••••••••••" : value}
                     </p>
                 )}
+                {note ? <div className="mt-1">{note}</div> : null}
             </div>
             {onReveal ? (
                 <Button
