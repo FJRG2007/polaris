@@ -26,6 +26,7 @@ import {
 } from "@/lib/deploy/host-containers";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
     createHostSchema,
@@ -170,6 +171,50 @@ export async function setServerEnvironmentAction(input: unknown): Promise<{ erro
         metadata: { environment }
     });
     if (hostId) await notes.recordServerEvent(hostId, user.id, "environment", { to: environment });
+    revalidatePath(SERVERS_PATH);
+    return {};
+}
+
+/**
+ * Whether this server could be reached across the local network instead of
+ * around the world, and switching it to that address.
+ *
+ * Two actions rather than one because there is a decision in between: what comes
+ * back is shown to somebody, who then presses the button. Doing both in one call
+ * would move a server's address as a side effect of asking a question.
+ */
+export async function findLocalPathAction(
+    hostId: unknown
+): Promise<{ error?: string; path?: LocalPath }> {
+    const user = await requirePermission("system.manage");
+    const parsed = z.string().uuid().safeParse(hostId);
+    if (!parsed.success) return { error: "Server not found" };
+    try {
+        return { path: await findLocalPath(parsed.data, user.id) };
+    } catch {
+        // The reason is for the log; what a reader can do about it is the same
+        // either way, and the message would name internals.
+        return { error: "Could not ask this server about its network" };
+    }
+}
+
+export async function useLocalPathAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("system.manage");
+    const parsed = z
+        .object({ hostId: z.string().uuid(), address: z.string().trim().min(1).max(253) })
+        .safeParse(input);
+    if (!parsed.success) return { error: "Server not found" };
+
+    const result = await useLocalPath(parsed.data.hostId, user.id, parsed.data.address);
+    if (result.error) return result;
+    await recordAudit({
+        actorId: user.id,
+        action: "server.address.local",
+        targetType: "host",
+        targetId: parsed.data.hostId,
+        metadata: { address: parsed.data.address }
+    });
+    await notes.recordServerEvent(parsed.data.hostId, user.id, "address", { to: parsed.data.address });
     revalidatePath(SERVERS_PATH);
     return {};
 }

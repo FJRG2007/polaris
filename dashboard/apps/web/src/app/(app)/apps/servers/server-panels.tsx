@@ -13,7 +13,10 @@
 
 import { useState } from "react";
 import { Button, Input } from "@polaris/ui";
-import { renameServerAction } from "./actions";
+import { useRouter } from "next/navigation";
+import { runAction } from "@/lib/run-action";
+import type { LocalPath } from "@/lib/server-local-path";
+import { findLocalPathAction, renameServerAction, useLocalPathAction } from "./actions";
 import { CopyButton } from "@/components/copy-button";
 import type { ServerRow, ServerStatus } from "./types";
 
@@ -88,6 +91,115 @@ export function LocalNote() {
             Polaris has no login of its own on this machine, so there is nothing to copy here. Sign in the way you
             already do, or add it with Add server to get a shell and its files in Polaris too.
         </p>
+    );
+}
+
+/**
+ * Whether Polaris is reaching this machine the long way round, and moving it.
+ *
+ * A server enrolled through its public name is connected to at that name for the
+ * rest of its life, even when it turns out to be on the same switch: out to the
+ * router, back in through the port forward, for every file listing and every
+ * byte of every transfer. Nothing looks wrong, which is why nobody reports it -
+ * it is simply slower than it needs to be, and it stops working when the line
+ * does.
+ *
+ * Asked rather than watched. The check costs a connection to the machine and a
+ * connection to each address it names, so it happens when somebody presses the
+ * button rather than every time this page opens.
+ *
+ * Nothing moves without being verified: an address is only offered after it has
+ * answered with the host key this server is already pinned to, and it is checked
+ * again before it is written down.
+ */
+export function LocalPathPanel({ server }: { server: ServerRow }) {
+    const [path, setPath] = useState<LocalPath | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [moved, setMoved] = useState("");
+    const [error, setError] = useState("");
+    const router = useRouter();
+
+    if (!server.hostId) return null;
+    const hostId = server.hostId;
+
+    const check = async () => {
+        setBusy(true);
+        setError("");
+        setPath(null);
+        const result = await runAction(() => findLocalPathAction(hostId), setError);
+        setBusy(false);
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            return;
+        }
+        setPath(result.path ?? null);
+    };
+
+    const move = async (address: string) => {
+        setBusy(true);
+        setError("");
+        const result = await runAction(() => useLocalPathAction({ hostId, address }), setError);
+        setBusy(false);
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            return;
+        }
+        setMoved(address);
+        setPath(null);
+        router.refresh();
+    };
+
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col">
+                    <span className="text-sm font-medium">On this network</span>
+                    <span className="text-xs text-muted-foreground">
+                        Polaris reaches this server at {server.address}. If it is on the same network, a direct
+                        address is faster and keeps working when the internet does not.
+                    </span>
+                </div>
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => void check()}>
+                    {busy ? "Checking..." : "Check"}
+                </Button>
+            </div>
+
+            {moved ? (
+                <p className="text-sm text-success">Now reached at {moved}.</p>
+            ) : null}
+            {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+            {path?.kind === "found" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm">
+                        It answers directly at <span className="font-mono">{path.address}</span>.
+                    </p>
+                    <Button size="sm" disabled={busy} onClick={() => void move(path.address)}>
+                        Use it
+                    </Button>
+                </div>
+            ) : null}
+            {path?.kind === "already" ? (
+                <p className="text-sm text-muted-foreground">
+                    Already reached directly, at {path.address}.
+                </p>
+            ) : null}
+            {path?.kind === "none" ? (
+                <p className="text-sm text-muted-foreground">
+                    It has no address on this network, so it really is somewhere else.
+                </p>
+            ) : null}
+            {path?.kind === "unreachable" ? (
+                <p className="text-sm text-muted-foreground">
+                    It is not answering where Polaris knows it, so this cannot be worked out right now.
+                </p>
+            ) : null}
+            {path?.kind === "unknown" ? (
+                <p className="text-sm text-muted-foreground">
+                    Polaris does not know its own address on this network, so it cannot tell what is near it.
+                </p>
+            ) : null}
+        </div>
     );
 }
 

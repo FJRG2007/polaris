@@ -336,7 +336,11 @@ export async function claimEnrollment(
         }
     });
 
-    const candidates = enrollmentAddressCandidates(sourceIp, payload.addresses);
+    // Polaris' own address on the local network, so a machine that is on it is
+    // reached across the room rather than out through the router and back. Null
+    // on an install with no responder, and then this is the ordering it always
+    // had.
+    const candidates = enrollmentAddressCandidates(sourceIp, payload.addresses, await getHostLanIp().catch(() => null));
     if (candidates.length === 0) return await failClaim(row.id, "Could not work out an address to reach this machine at");
 
     const pins = payload.hostKeys.map(publicKeyBlob).filter((blob): blob is string => blob !== null);

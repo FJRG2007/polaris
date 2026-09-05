@@ -50,6 +50,37 @@ describe("enrollmentAddressCandidates", () => {
         expect(enrollmentAddressCandidates("", ["  "])).toEqual([]);
     });
 
+    /**
+     * The reason this exists at all: a machine on the same switch, enrolled
+     * through the public name it reached Polaris by, would otherwise be recorded
+     * at that name and reached through the router for the rest of its life -
+     * slower for every byte, and gone entirely when the line is.
+     */
+    it("prefers the address on Polaris's own network when it knows what that is", () => {
+        expect(
+            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5", "192.168.1.7"], "192.168.1.50")
+        ).toEqual(["192.168.1.7", "10.0.0.5", "203.0.113.8"]);
+    });
+
+    it("still knocks on the public address, second", () => {
+        // Being near is a reason to try first, never a reason to stop trying:
+        // the LAN address may be stale, and the public one may be the only one
+        // that answers.
+        expect(enrollmentAddressCandidates("203.0.113.8", ["192.168.1.7"], "192.168.1.50")).toContain(
+            "203.0.113.8"
+        );
+    });
+
+    it("orders nothing differently when Polaris is not on a local network itself", () => {
+        expect(
+            enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5"], "203.0.113.20")
+        ).toEqual(["203.0.113.8", "10.0.0.5"]);
+        expect(enrollmentAddressCandidates("203.0.113.8", ["10.0.0.5"], null)).toEqual([
+            "203.0.113.8",
+            "10.0.0.5"
+        ]);
+    });
+
     it("does not knock twice on the same address", () => {
         expect(enrollmentAddressCandidates("192.168.1.7", ["192.168.1.7", "10.0.0.5"])).toEqual([
             "192.168.1.7",

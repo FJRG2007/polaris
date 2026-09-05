@@ -10,6 +10,7 @@
  */
 
 import { readFile } from "node:fs/promises";
+import { isLocalAddress } from "@polaris/core";
 
 const IP_FILE = process.env.POLARIS_HOST_IP_FILE ?? "/run/polaris-host/host-ip";
 const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
@@ -21,13 +22,12 @@ const IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1
  * from a NIC that never got a lease, or a public one on a server that holds its
  * own, can both reach the file - and either would be turned into a gateway link
  * and a DHCP-reservation instruction for a network that does not exist.
+ *
+ * The rule itself lives in @polaris/core, where the rest of "is this machine on
+ * our own network" now lives: this was one of two copies of it, and two copies
+ * of a range check is how one of them quietly stops matching the other.
  */
-export function isLanAddress(value: string): boolean {
-    const [a = 0, b = 0] = value.split(".").map(Number);
-    if (a === 10) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    return a === 192 && b === 168;
-}
+export const isLanAddress = isLocalAddress;
 
 /**
  * The LAN IPv4 this server answers on, or null when it is not published - an
