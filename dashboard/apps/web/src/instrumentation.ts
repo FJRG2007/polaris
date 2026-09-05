@@ -17,8 +17,13 @@ export async function register(): Promise<void> {
     // And write them down. The console line is what somebody reading container
     // logs looks for; this is what somebody who was not watching finds
     // afterwards, on the same screen a deployed application reports to.
-    const { watchProcessFailures } = await import("./lib/telemetry/capture");
+    const { watchProcessFailures, watchLoggedFailures } = await import("./lib/telemetry/capture");
     watchProcessFailures();
+    // And the failures Polaris HANDLED, which is nearly all of them. A process
+    // falling over is the rare case; what actually happens is caught, logged,
+    // and carried on from - into a container log nobody running this is ever
+    // going to open, while the Telemetry screen promised to show it.
+    watchLoggedFailures();
 
     // Detect the edition and keep it live: probe polaris-hostd on startup and on
     // an interval, folding its capability report into the shared snapshot that

@@ -147,3 +147,78 @@ export function watchProcessFailures(): void {
         void captureInternal(reason, { level: "error", transaction: "unhandledRejection" });
     });
 }
+
+/** Set while an error is being written down, so a failure inside the writing
+ *  cannot report itself and start again. */
+let reporting = false;
+
+/**
+ * The failure Polaris HANDLED, which is nearly all of them.
+ *
+ * The two hooks above catch a process falling over, and a process that falls
+ * over is the rare case. What actually happens is caught, logged with
+ * `console.error`, and carried on from - the noise model that would not load,
+ * the route that could not be published, the storage that was away, the
+ * notification rules that could not be resolved. Every one of those is Polaris
+ * telling somebody what went wrong, into a container log the person running it
+ * is never going to open. The Telemetry screen said "and what Polaris reports
+ * about itself" and showed none of it.
+ *
+ * So the error console is the seam. One place, rather than a call added to two
+ * hundred catch blocks that the two hundred and first would then be missing -
+ * and it catches the ones written before this existed, which is the whole point.
+ *
+ * An `Error` among the arguments is used as the error, because it carries the
+ * stack that makes the grouping worth anything; otherwise the line itself is the
+ * message. The prefix Polaris writes - "polaris:", "avatars:", "mcp:" - becomes
+ * the transaction, so the list reads as a list of places rather than a wall of
+ * identical titles.
+ *
+ * The original console call always happens first and always happens: this adds a
+ * reader, it does not replace the one that exists.
+ */
+export function watchLoggedFailures(): void {
+    const original = console.error.bind(console);
+    console.error = (...args: unknown[]): void => {
+        original(...args);
+        // A failure inside the capture reaches this again, and a report that
+        // reports itself is how one bad minute becomes a full disk.
+        if (reporting) return;
+        reporting = true;
+        try {
+            const error = args.find((arg): arg is Error => arg instanceof Error);
+            const said = args
+                .filter((arg) => !(arg instanceof Error))
+                .map((arg) => (typeof arg === "string" ? arg : safeText(arg)))
+                .join(" ")
+                .trim();
+            // Nothing said and nothing thrown is a console call with no content
+            // to group on, and an issue with no title helps nobody.
+            if (!error && !said) return;
+            void captureInternal(error ?? said, {
+                transaction: placeOf(said),
+                tags: { via: "console" }
+            });
+        } finally {
+            reporting = false;
+        }
+    };
+}
+
+/** Where a logged line came from, from the prefix Polaris writes in front of
+ *  them. "console.error" for a line that carries none, which is honest about
+ *  knowing nothing rather than inventing a place. */
+function placeOf(said: string): string {
+    const prefix = /^([a-z][a-z0-9 -]{0,30}):/i.exec(said);
+    return prefix?.[1]?.trim() || "console.error";
+}
+
+/** Whatever this is, as one line, without throwing on something circular - which
+ *  is a real thing to be handed by a logger. */
+function safeText(value: unknown): string {
+    try {
+        return typeof value === "object" && value !== null ? JSON.stringify(value) : String(value);
+    } catch {
+        return String(value);
+    }
+}
