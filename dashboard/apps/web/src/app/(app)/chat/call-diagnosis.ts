@@ -76,6 +76,22 @@ export interface CallAudioFacts {
     /** This device is quiet on purpose because the one beside it carries the
      *  room - see `call-combine`. */
     readonly companion: boolean;
+    /**
+     * Whether one single audio packet has arrived from anybody since this call
+     * started.
+     *
+     * The whole of the difference between two faults that look identical from
+     * inside the call. Setting a call up goes over 443 with every other request,
+     * through the edge; the sound does not - it goes straight to this machine on
+     * its own port. So a call that says "connected" and has never once had a
+     * byte of audio is not a server having a moment: it is the media path, and
+     * telling somebody to leave and rejoin sends them round that loop for ever.
+     *
+     * True the moment anything arrives, and it stays true - a call that worked
+     * and then went quiet is a different fault, and the advice for it is not
+     * about ports.
+     */
+    readonly everHeard: boolean;
 }
 
 /** One row of the panel: a thing that was checked, and how it came out. */
@@ -108,6 +124,23 @@ export const UNKNOWN_AUDIO: CallAudioReport = { ok: true, headline: "", fix: "",
  *  two headlines, and it is the same sentence both times. */
 const REJOIN =
     "Leave the call and join it again. If it happens to everybody, an administrator can check the call server under Chat settings.";
+
+/**
+ * What a screen says when no sound has EVER arrived on this call.
+ *
+ * Named rather than written twice, because the two branches that reach it are
+ * the same fault seen from one step apart: nothing subscribed, and nothing
+ * arriving on what did.
+ *
+ * It says what is true and it says who can act. Setting a call up goes through
+ * the same port as every page; the sound arrives on its own, straight to the
+ * machine, and a router that has not been told to let it through drops every
+ * call to anybody outside the house while calls inside it work perfectly. That
+ * is exactly the shape of "it worked yesterday": yesterday both people were on
+ * the same network.
+ */
+const MEDIA_PATH =
+    "Sound has not reached this device at all on this call, which usually means the two of you are on different networks and the sound has no way through. An administrator can check this under Settings, Domains, Call ports - setting a call up uses the same port as the rest of Polaris, but the sound needs two of its own forwarded to this machine.";
 
 /** The call server, as a row. */
 function linkLine(link: CallLink): CallAudioLine {
@@ -258,13 +291,18 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
             audible.length === 1
                 ? `${audible[0]?.name} is in this call and no audio of theirs has reached this device.`
                 : "No audio has reached this device from anybody in this call.",
-            REJOIN
+            // Never once, on a link that is up, is the media path - see
+            // MEDIA_PATH. Rejoining is the answer to a call that had sound and
+            // lost it, and it is the wrong one here.
+            facts.everHeard ? REJOIN : MEDIA_PATH
         );
     }
     if (audible.every((person) => !person.arriving)) {
         return said(
             "Their audio is not reaching this device.",
-            "Sound is not getting through between here and the call server. Leave the call and join it again, and try a different network if it happens twice."
+            facts.everHeard
+                ? "Sound is not getting through between here and the call server. Leave the call and join it again, and try a different network if it happens twice."
+                : MEDIA_PATH
         );
     }
     if (audible.every((person) => !person.carrying)) {
