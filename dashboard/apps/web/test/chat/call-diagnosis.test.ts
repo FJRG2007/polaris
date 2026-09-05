@@ -26,6 +26,9 @@ function working(over: Partial<CallAudioFacts> = {}): CallAudioFacts {
         others: [heard()],
         deafened: false,
         companion: false,
+        // A working call has been heard. The cases about a call that never had
+        // a byte set this false for themselves.
+        everHeard: true,
         ...over
     };
 }
@@ -240,5 +243,38 @@ describe("what is arriving", () => {
             ]
         });
         expect(diagnoseCall(mixed).ok).toBe(true);
+    });
+});
+
+describe("a call that has never had a byte of sound", () => {
+    it("names the way sound reaches this machine rather than saying rejoin", () => {
+        // The fault the logs actually showed: signalling up, both names on
+        // screen, and not one packet of audio in either direction because the
+        // two people are on different networks and nothing relays between them.
+        // Telling somebody to leave and rejoin sends them round that loop for
+        // ever.
+        const report = diagnoseCall(
+            working({ everHeard: false, others: [heard({ subscribed: false })] })
+        );
+
+        expect(report.ok).toBe(false);
+        expect(report.fix).toContain("different networks");
+        expect(report.fix).toContain("Call ports");
+        expect(report.fix).not.toContain("Leave the call and join it again");
+    });
+
+    it("says the same when something subscribed but nothing ever arrived", () => {
+        const report = diagnoseCall(working({ everHeard: false, others: [heard({ arriving: false })] }));
+
+        expect(report.fix).toContain("different networks");
+    });
+
+    it("still says rejoin for a call that had sound and lost it", () => {
+        // A different fault with a different answer, and the reason the fact is
+        // "ever" rather than "now".
+        const report = diagnoseCall(working({ everHeard: true, others: [heard({ arriving: false })] }));
+
+        expect(report.fix).toContain("between here and the call server");
+        expect(report.fix).not.toContain("Call ports");
     });
 });

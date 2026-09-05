@@ -392,6 +392,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** When the room last changed under this browser. Nothing is judged for a
      *  moment afterwards - see `SETTLING_MS`. */
     const settledAt = useRef(0);
+    /** Whether a single audio packet has arrived from anybody on this call. It
+     *  is what tells "the sound stopped" from "the sound never had a way in" -
+     *  see `everHeard` in `call-diagnosis`. */
+    const everHeard = useRef(false);
 
     /** What the sampler needs about the room and cannot read off the connection:
      *  who is admitted, what they have said about themselves, and what this
@@ -1790,6 +1794,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (!meetingId) return;
         let stopped = false;
         settledAt.current = Date.now();
+        // A new call has heard nothing yet. Carried over from the last one, a
+        // call that never gets a byte would be told to rejoin rather than told
+        // what is actually wrong.
+        everHeard.current = false;
 
         /** How this browser stands with the call server. */
         function linkNow(current: Room | null): CallLink {
@@ -1906,12 +1914,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                       )
                     : [];
             if (stopped) return;
+            // Once anything has arrived it has arrived, for the rest of this
+            // call: a call that had sound and lost it is a different fault from
+            // one that never had any, and only the second is about the way
+            // sound reaches this machine at all.
+            if (others.some((person) => person.arriving)) everHeard.current = true;
             const facts: CallAudioFacts = {
                 link,
                 mic: micNow(current),
                 others,
                 deafened: deafenedRef.current,
-                companion: roleRef.current === "companion"
+                companion: roleRef.current === "companion",
+                everHeard: everHeard.current
             };
             // The rows are always worth showing; the verdict is held back
             // while the room is still settling, because a person who has just
