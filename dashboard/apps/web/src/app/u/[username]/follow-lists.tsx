@@ -34,6 +34,7 @@ import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Search } from "lucide-react";
 import { loadFollowListAction } from "./actions";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle, Input } from "@polaris/ui";
 
@@ -251,16 +252,20 @@ function PeopleDialog({
                 <ul ref={listBox} className="flex max-h-80 flex-col gap-1 overflow-y-auto">
                     {shown.map((person) => (
                         <li key={person.id}>
-                            <Link
+                            <PersonRow
+                                as={Link}
+                                personId={person.id}
                                 href={`/u/${person.username}`}
                                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
                             >
                                 <Avatar person={person} size={24} status={false} />
-                                <span className="min-w-0 flex-1 truncate" title={person.name}>{person.name}</span>
+                                <span className="min-w-0 flex-1 truncate" title={person.name}>
+                                    <PersonName id={person.id} name={person.name} />
+                                </span>
                                 <span className="text-muted-foreground shrink-0 text-xs">
                                     @{person.username}
                                 </span>
-                            </Link>
+                            </PersonRow>
                         </li>
                     ))}
                     {shown.length === 0 && loaded && !busy && !error ? (

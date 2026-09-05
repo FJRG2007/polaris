@@ -27,6 +27,7 @@ import { createPortal } from "react-dom";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { TOKEN_SEPARATOR, tokenAt } from "@/lib/token-field";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { searchAccountsAction } from "@/app/(app)/mention-actions";
 import type { AccountCandidate } from "@/lib/rich-text/mention-service";
 import { POPUP_CLASS, POPUP_ITEM_CLASS } from "@/components/rich-text/suggestion";
@@ -312,7 +313,9 @@ export function AccountInput({
                         const identity = identityOf(account);
                         return (
                             <li key={account.id}>
-                                <button
+                                <PersonRow
+                                    as="button"
+                                    personId={account.id}
                                     type="button"
                                     role="option"
                                     aria-selected={index === active}
@@ -334,7 +337,7 @@ export function AccountInput({
                                         size={20}
                                     />
                                     <span className="min-w-0 flex-1 truncate" title={account.name}>
-                                        {account.name}
+                                        <PersonName id={account.id} name={account.name} />
                                     </span>
                                     <span
                                         className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground"
@@ -342,7 +345,7 @@ export function AccountInput({
                                     >
                                         {identity}
                                     </span>
-                                </button>
+                                </PersonRow>
                             </li>
                         );
                     })}

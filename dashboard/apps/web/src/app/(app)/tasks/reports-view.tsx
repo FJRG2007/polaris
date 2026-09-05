@@ -13,6 +13,7 @@ import { ProgressBar } from "./pickers";
 import { Card, CardBody, cn } from "@polaris/ui";
 import type { TaskReport } from "@/lib/tasks/report-service";
 import { useDisplayFormat } from "@/components/display-format";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { CircleAlert, CircleCheck, Clock, ListTodo } from "lucide-react";
 
 function Stat({
@@ -176,8 +177,15 @@ export function ReportsView({
                     <h2 className="text-sm font-medium">Who is carrying what</h2>
                     <ul className="flex flex-col gap-2">
                         {report.load.map((person) => (
-                            <li key={person.userId} className="flex flex-wrap items-center gap-3 text-xs">
-                                <span className="w-36 shrink-0 truncate">{person.name}</span>
+                            <PersonRow
+                                as="li"
+                                key={person.userId}
+                                personId={person.userId}
+                                className="-mx-2 flex flex-wrap items-center gap-3 rounded-md px-2 py-0.5 text-xs"
+                            >
+                                <span className="w-36 shrink-0 truncate">
+                                    <PersonName id={person.userId} name={person.name} />
+                                </span>
                                 <div className="min-w-32 flex-1">
                                     <ProgressBar
                                         percent={(person.open / Math.max(1, report.load[0]?.open ?? 1)) * 100}
@@ -186,7 +194,7 @@ export function ReportsView({
                                 <span className="text-muted-foreground">{person.open} open</span>
                                 {person.overdue > 0 && <span className="text-danger">{person.overdue} overdue</span>}
                                 {person.points > 0 && <span className="text-muted-foreground">{person.points} pts</span>}
-                            </li>
+                            </PersonRow>
                         ))}
                         {report.load.length === 0 && (
                             <li className="text-xs text-muted-foreground">Nothing is assigned to anybody yet.</li>
@@ -200,8 +208,15 @@ export function ReportsView({
                     <h2 className="text-sm font-medium">Time tracked this week</h2>
                     <ul className="flex flex-col gap-2">
                         {timeByPerson.map((person) => (
-                            <li key={person.userId} className="flex items-center gap-3 text-xs">
-                                <span className="w-36 shrink-0 truncate">{person.name}</span>
+                            <PersonRow
+                                as="li"
+                                key={person.userId}
+                                personId={person.userId}
+                                className="-mx-2 flex items-center gap-3 rounded-md px-2 py-0.5 text-xs"
+                            >
+                                <span className="w-36 shrink-0 truncate">
+                                    <PersonName id={person.userId} name={person.name} />
+                                </span>
                                 <div className="min-w-32 flex-1">
                                     <ProgressBar
                                         percent={(person.seconds / Math.max(1, timeByPerson[0]?.seconds ?? 1)) * 100}
@@ -210,7 +225,7 @@ export function ReportsView({
                                 <span className="text-muted-foreground">
                                     {core.formatTrackedSeconds(person.seconds)}
                                 </span>
-                            </li>
+                            </PersonRow>
                         ))}
                         {timeByPerson.length === 0 && (
                             <li className="text-xs text-muted-foreground">No time tracked this week.</li>

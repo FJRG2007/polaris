@@ -18,8 +18,9 @@ import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMemberView } from "@/lib/orgs/org-service";
 import { useDisplayFormat } from "@/components/display-format";
-import { LogOut, MailQuestion, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { OrgInvitationView } from "@/lib/orgs/invitation-service";
+import { LogOut, MailQuestion, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     inviteOrgMemberAction,
@@ -131,8 +132,9 @@ export function PeopleView({
                             const self = member.userId === currentUserId;
                             const owner = member.role === "owner";
                             return (
-                                <div
+                                <PersonRow
                                     key={member.userId}
+                                    personId={member.userId}
                                     className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
                                 >
                                     <Avatar
@@ -141,13 +143,14 @@ export function PeopleView({
                                     />
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm">
-                                            {member.name}
-                                            {self ? (
-                                                <span className="text-muted-foreground">
-                                                    {" "}
-                                                    (you)
-                                                </span>
-                                            ) : null}
+                                            <PersonName id={member.userId} name={member.name}>
+                                                {self ? (
+                                                    <span className="text-muted-foreground">
+                                                        {" "}
+                                                        (you)
+                                                    </span>
+                                                ) : null}
+                                            </PersonName>
                                         </p>
                                         <p
                                             className="text-muted-foreground truncate text-xs"
@@ -222,7 +225,7 @@ export function PeopleView({
                                             )}
                                         </button>
                                     )}
-                                </div>
+                                </PersonRow>
                             );
                         })
                     )}
@@ -241,8 +244,9 @@ export function PeopleView({
                     </CardHeader>
                     <CardBody className="flex flex-col gap-1">
                         {invitations.map((invitation) => (
-                            <div
+                            <PersonRow
                                 key={invitation.id}
+                                personId={invitation.userId}
                                 className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
                             >
                                 <Avatar
@@ -251,7 +255,10 @@ export function PeopleView({
                                 />
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm" title={invitation.name}>
-                                        {invitation.name}
+                                        <PersonName
+                                            id={invitation.userId}
+                                            name={invitation.name}
+                                        />
                                     </p>
                                     <p className="text-muted-foreground truncate text-xs">
                                         Invited by {invitation.invitedBy}
@@ -285,7 +292,7 @@ export function PeopleView({
                                         <X className="size-4 shrink-0" />
                                     </button>
                                 )}
-                            </div>
+                            </PersonRow>
                         ))}
                     </CardBody>
                 </Card>

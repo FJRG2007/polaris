@@ -165,7 +165,12 @@ export async function updateProfileAction(input: {
         // does not reach into it.
         { cooldownDays: usernameCooldownDays(await getSetting(USERNAME_COOLDOWN_KEY)) }
     );
-    if (!result.error) revalidatePath("/account");
+    // Both screens: the display name and the handle are edited on the profile,
+    // the name on the account next door, and one action writes all four.
+    if (!result.error) {
+        revalidatePath("/account");
+        revalidatePath("/account/details");
+    }
     return result;
 }
 
@@ -254,7 +259,7 @@ export async function addEmailAction(input: unknown): Promise<{ error?: string }
     const result = await addUserEmail(user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.added" });
-        revalidatePath("/account");
+        revalidatePath("/account/details");
     }
     return result;
 }
@@ -268,7 +273,7 @@ export async function removeEmailAction(emailId: unknown): Promise<{ error?: str
     const result = await removeUserEmail(user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.removed" });
-        revalidatePath("/account");
+        revalidatePath("/account/details");
     }
     return result;
 }
@@ -285,7 +290,7 @@ export async function setEmailRecoveryAction(emailId: unknown, recovery: boolean
             actorId: user.id,
             action: recovery === true ? "account.email.recovery-set" : "account.email.recovery-cleared"
         });
-        revalidatePath("/account");
+        revalidatePath("/account/details");
     }
     return result;
 }
@@ -299,7 +304,7 @@ export async function promoteEmailAction(emailId: unknown, currentPassword: stri
     const result = await promoteUserEmail(auth, user.id, parsed.data, String(currentPassword));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.primary-changed" });
-        revalidatePath("/account");
+        revalidatePath("/account/details");
     }
     return result;
 }

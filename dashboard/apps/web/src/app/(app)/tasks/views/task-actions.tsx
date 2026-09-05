@@ -19,7 +19,19 @@ import { useMemo, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { SpaceContext } from "@/lib/tasks/facts";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { TaskBulkEdit, TaskEdit, TaskListRef, ViewProps } from "./shared";
+import {
+    AssigneePicker,
+    Avatar,
+    DuePicker,
+    PriorityPicker,
+    preloadAvatars,
+    StatusIcon,
+    StatusMarker,
+    TagPicker,
+    tagColorFor
+} from "../pickers";
 import {
     Archive,
     Ban,
@@ -35,17 +47,6 @@ import {
     Trash2,
     UserPlus
 } from "lucide-react";
-import {
-    AssigneePicker,
-    Avatar,
-    DuePicker,
-    PriorityPicker,
-    preloadAvatars,
-    StatusIcon,
-    StatusMarker,
-    TagPicker,
-    tagColorFor
-} from "../pickers";
 import {
     Button,
     cn,
@@ -550,8 +551,10 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         {matchingPeople.map((person) => {
                                             const on = assigned.has(person.id);
                                             return (
-                                                <ContextMenuItem
+                                                <PersonRow
+                                                    as={ContextMenuItem}
                                                     key={person.id}
+                                                    personId={person.id}
                                                     className="gap-2"
                                                     onSelect={() =>
                                                         commands.onApply(
@@ -567,9 +570,14 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                         from than a list of
                                                         people. */}
                                                     <Avatar person={person} size={20} />
-                                                    <span className="flex-1 truncate">{person.name}</span>
+                                                    <span className="flex-1 truncate">
+                                                        <PersonName
+                                                            id={person.id}
+                                                            name={person.name}
+                                                        />
+                                                    </span>
                                                     {on && <Check className="size-3.5 text-primary" />}
-                                                </ContextMenuItem>
+                                                </PersonRow>
                                             );
                                         })}
                                     </div>

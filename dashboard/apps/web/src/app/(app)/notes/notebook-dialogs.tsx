@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import { Import, Loader2, Trash2, Users } from "lucide-react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { ShelfPerson, ShelfTeam } from "@/lib/notes/shelf-service";
 import {
     Button,
@@ -256,7 +257,9 @@ export function NotebookPeopleDialog({
                                     .filter((person) => !already.has(person.id))
                                     .map((person) => (
                                         <li key={person.id}>
-                                            <button
+                                            <PersonRow
+                                                as="button"
+                                                personId={person.id}
                                                 type="button"
                                                 className="w-full rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                                                 onClick={() => {
@@ -271,8 +274,8 @@ export function NotebookPeopleDialog({
                                                     );
                                                 }}
                                             >
-                                                {person.name}
-                                            </button>
+                                                <PersonName id={person.id} name={person.name} />
+                                            </PersonRow>
                                         </li>
                                     ))}
                             </ul>
@@ -281,12 +284,20 @@ export function NotebookPeopleDialog({
 
                     <ul className="flex flex-col gap-1">
                         {people.map((person) => (
-                            <li key={person.userId} className="flex items-center gap-2">
+                            <PersonRow
+                                as="li"
+                                key={person.userId}
+                                personId={person.userId}
+                                className="-mx-1.5 flex items-center gap-2 rounded-md px-1.5 py-0.5"
+                            >
                                 <span className="min-w-0 flex-1 truncate text-sm" title={person.email}>
-                                    {person.name}
-                                    {person.owner && (
-                                        <span className="ml-1 text-xs text-muted-foreground">owner</span>
-                                    )}
+                                    <PersonName id={person.userId} name={person.name}>
+                                        {person.owner && (
+                                            <span className="ml-1 text-xs text-muted-foreground">
+                                                owner
+                                            </span>
+                                        )}
+                                    </PersonName>
                                 </span>
                                 {person.owner ? (
                                     <span className="text-xs text-muted-foreground">Runs it</span>
@@ -324,7 +335,7 @@ export function NotebookPeopleDialog({
                                         </button>
                                     </>
                                 )}
-                            </li>
+                            </PersonRow>
                         ))}
                     </ul>
 

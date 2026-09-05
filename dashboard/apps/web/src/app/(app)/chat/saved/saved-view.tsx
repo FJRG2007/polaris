@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useChat } from "../chat-context";
 import { Avatar } from "@/components/avatar";
 import { EmptyState, Skeleton } from "@polaris/ui";
+import { PersonName } from "@/components/person-name";
 import { starAction, starredAction } from "../actions";
 import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
@@ -83,7 +84,12 @@ export function SavedView() {
                                             />
                                         )}
                                         <span className="font-medium text-foreground">
-                                            {message.authorName ?? "Somebody who has left"}
+                                            <PersonName
+                                                id={message.authorId}
+                                                name={
+                                                    message.authorName ?? "Somebody who has left"
+                                                }
+                                            />
                                         </span>
                                         <RelativeTime iso={message.createdAt} />
                                         <span className="ml-auto flex items-center gap-1">

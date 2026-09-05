@@ -19,6 +19,7 @@ import type { RecentSearch } from "@polaris/core";
 import { Clock, CornerDownLeft, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { SearchScopeDefinition } from "@/lib/search/scopes";
 
 /** What every row is given, whatever it draws inside. */
@@ -38,10 +39,18 @@ function Row({
     onSelect,
     onHover,
     children,
-    label
-}: RowProps & { children: React.ReactNode; label: string }) {
+    label,
+    personId = null
+}: RowProps & {
+    children: React.ReactNode;
+    label: string;
+    /** Whose row it is, when the answer is a person. A task, a page or a command
+     *  is not somebody and passes nothing. */
+    personId?: string | null;
+}) {
     return (
-        <div
+        <PersonRow
+            personId={personId}
             id={id}
             role="option"
             aria-selected={selected}
@@ -55,7 +64,7 @@ function Row({
             )}
         >
             {children}
-        </div>
+        </PersonRow>
     );
 }
 
@@ -98,8 +107,9 @@ export function CommandRow({ scope, ...row }: RowProps & { scope: SearchScopeDef
  * live data with a state of their own, not entries in a list of screens.
  */
 export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
+    const personId = hit.scope === "users" ? hit.id : null;
     return (
-        <Row {...row} label={hit.label}>
+        <Row {...row} label={hit.label} personId={personId}>
             {hit.scope === "users" ? (
                 <Avatar person={{ id: hit.id, name: hit.label, image: hit.image ?? null }} size={22} />
             ) : hit.status ? (
@@ -119,7 +129,9 @@ export function HitRow({ hit, ...row }: RowProps & { hit: SearchHit }) {
                             {hit.reference}
                         </Badge>
                     ) : null}
-                    <span className="min-w-0 truncate text-sm" title={hit.label}>{hit.label}</span>
+                    <span className="min-w-0 truncate text-sm" title={hit.label}>
+                        <PersonName id={personId} name={hit.label} />
+                    </span>
                 </span>
                 {hit.detail ? (
                     <span className="block truncate text-xs text-muted-foreground" title={hit.detail}>{hit.detail}</span>

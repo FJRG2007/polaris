@@ -17,6 +17,7 @@ import { runAction } from "@/lib/run-action";
 import { ProgressBar, StatusDot } from "./pickers";
 import type { PersonRef } from "@/lib/tasks/facts";
 import type { FormView } from "@/lib/tasks/form-service";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AutomationsPanel, FormsPanel } from "./automations-panel";
 import type { AutomationView } from "@/lib/tasks/automation-service";
@@ -823,10 +824,15 @@ function PeopleTab({
             </p>
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {members.map((member) => (
-                    <li key={member.userId} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                    <PersonRow
+                        as="li"
+                        key={member.userId}
+                        personId={member.userId}
+                        className="flex flex-wrap items-center gap-3 px-3 py-2"
+                    >
                         <div className="min-w-0 flex-1">
                             <p className="truncate text-sm" title={member.name}>
-                                {member.name}
+                                <PersonName id={member.userId} name={member.name} />
                             </p>
                             <p
                                 className="truncate text-xs text-muted-foreground"
@@ -885,7 +891,7 @@ function PeopleTab({
                                 {core.SPACE_ROLE_LABELS[member.role]}
                             </span>
                         )}
-                    </li>
+                    </PersonRow>
                 ))}
             </ul>
 

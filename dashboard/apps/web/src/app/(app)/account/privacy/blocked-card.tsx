@@ -23,6 +23,7 @@ import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
 import { unblockPersonAction } from "./actions";
 import type { BlockedPerson } from "@/lib/blocks";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
@@ -56,8 +57,10 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                 ) : (
                     <ul className="flex flex-col gap-1">
                         {people.map((person) => (
-                            <li
+                            <PersonRow
+                                as="li"
                                 key={person.id}
+                                personId={person.id}
                                 className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
                             >
                                 <Avatar person={person} size={24} />
@@ -65,7 +68,7 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                                     className="min-w-0 flex-1 truncate text-sm"
                                     title={person.name}
                                 >
-                                    {person.name}
+                                    <PersonName id={person.id} name={person.name} />
                                 </span>
                                 <Button
                                     size="xs"
@@ -77,7 +80,7 @@ export function BlockedCard({ people }: { people: readonly BlockedPerson[] }) {
                                 >
                                     <ShieldBan className="size-3.5" />
                                 </Button>
-                            </li>
+                            </PersonRow>
                         ))}
                     </ul>
                 )}

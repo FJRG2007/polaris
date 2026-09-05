@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { RelativeTime } from "@/components/relative-time";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { ChatBanView } from "@/lib/chat/chat-service";
 import {
     Button,
@@ -97,13 +98,17 @@ export function BansDialog({
                 ) : (
                     <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
                         {bans.map((ban) => (
-                            <li
+                            <PersonRow
+                                as="li"
                                 key={ban.userId}
+                                personId={ban.userId}
                                 className="flex items-center gap-2 rounded-md px-2 py-1.5"
                             >
                                 <Avatar person={{ id: ban.userId, name: ban.name }} size={28} />
                                 <span className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm" title={ban.name}>{ban.name}</span>
+                                    <span className="truncate text-sm" title={ban.name}>
+                                        <PersonName id={ban.userId} name={ban.name} />
+                                    </span>
                                     <span className="truncate text-[0.6875rem] text-muted-foreground">
                                         {ban.reason || "No reason given"}
                                         {ban.byName ? ` - ${ban.byName}` : ""},{" "}
@@ -118,7 +123,7 @@ export function BansDialog({
                                 >
                                     Let back in
                                 </Button>
-                            </li>
+                            </PersonRow>
                         ))}
                     </ul>
                 )}

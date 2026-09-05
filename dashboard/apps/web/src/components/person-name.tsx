@@ -5,22 +5,27 @@
  *
  * A name is the one part of a profile that appears in places its owner does not
  * control - a member list, a task's assignees, the top of a conversation - so
- * what this is allowed to do is deliberately small: two colours across the
- * letters and nothing else. No weight, no size, no face. A name that is bigger
- * than everybody else's in a column is not personalisation, it is a fight over
- * the column, and the person who loses it is whoever is trying to read the list.
+ * what this is allowed to do is deliberately small: colours across the letters,
+ * still or walking, and nothing else. No weight, no size, no face. A name that is
+ * bigger than everybody else's in a column is not personalisation, it is a fight
+ * over the column, and the person who loses it is whoever is reading the list.
  *
  * It renders a plain `<span>` and inherits everything else, so it can be dropped
  * into a heading, a row or a caption without bringing its own typography. An
  * account that has chosen nothing renders exactly what was there before: the
  * name, in the surrounding colour.
+ *
+ * `PersonRow` at the bottom of this file is the other half: the plate that goes
+ * behind a person's row in a list. The two travel together - wherever a list
+ * draws somebody, it draws both - and they are here rather than in each screen
+ * so that adding a people list somewhere new does not mean deciding this again.
  */
 
 import { cn } from "@polaris/ui";
-import type { ReactNode } from "react";
-import { nameStyleCss } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { nameStyleOf, nameplateOf, type Nameplate } from "@polaris/core";
+import { nameStyleClass, nameStyleCss, nameplateCss } from "@/lib/profile-style-css";
+import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
 
 export function PersonName({
     id,
@@ -40,7 +45,10 @@ export function PersonName({
 }) {
     const style = nameStyleOf(useProfileStyle(id)?.nameStyle ?? null);
     return (
-        <span className={className} style={style ? nameStyleCss(style) : undefined}>
+        <span
+            className={cn(className, nameStyleClass(style))}
+            style={style ? nameStyleCss(style) : undefined}
+        >
             {name}
             {children}
         </span>
@@ -66,4 +74,54 @@ export const PLATED_ROW = "border-transparent hover:brightness-110";
 /** Convenience for the common case - a row that is plated or not. */
 export function platedRow(plate: Nameplate | null, className?: string): string {
     return cn(className, plate && PLATED_ROW);
+}
+
+/**
+ * A row that stands for a person, wearing their plate.
+ *
+ * The plate was chosen once and then drawn in exactly one list - the members of
+ * a conversation - because a nameplate needs a hook, a hook needs a component,
+ * and every other people list in the product maps its rows inline in the screen
+ * that owns them. So a decision somebody made about how they appear was visible
+ * in one place out of thirty, which is indistinguishable from it not working.
+ *
+ * This is that component, once. It IS the row rather than something inside it -
+ * `as` takes whatever element the list already used, an `li`, a `button`, a
+ * `Link`, a menu item - so adopting it is a changed tag rather than an extra box
+ * in every list, and the layout the screen already had is untouched.
+ *
+ * Somebody with no plate gets exactly what they got before: no background, no
+ * class, no extra element. That is most people, so it has to be free.
+ */
+export function PersonRow<T extends ElementType = "div">({
+    personId,
+    as,
+    className,
+    style,
+    ...rest
+}: {
+    /** Whose row it is. Null - a guest, a group, an organization - draws plainly
+     *  and asks the store about nobody. */
+    personId: string | null | undefined;
+    as?: T;
+} & Omit<ComponentPropsWithoutRef<T>, "as" | "personId">) {
+    const plate = usePersonNameplate(personId);
+    const Tag = (as ?? "div") as ElementType;
+    return (
+        <Tag
+            // Published so a list can say something a plate would otherwise
+            // swallow. An inline background beats every class, so a row that
+            // marked itself with `bg-*` - the conversation you are reading, the
+            // option under the pointer - simply stops being marked once somebody
+            // has a plate. `data-[plated]:` is where that row puts the ring or
+            // the outline it uses instead.
+            data-plated={plate ? "" : undefined}
+            className={platedRow(plate, className as string | undefined)}
+            // The screen's own properties win: a row that sets its own colour
+            // for a reason - a name that is yours, a row that is disabled - is
+            // making a statement the plate has no business overruling.
+            style={plate ? { ...nameplateCss(plate), ...(style as CSSProperties) } : style}
+            {...rest}
+        />
+    );
 }

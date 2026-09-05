@@ -23,8 +23,9 @@ import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 import { usePhotoOpenable } from "@/components/photo-access";
+import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
-import { ringBackground, ringGlow, ringWidth } from "@/lib/profile-style-css";
+import { AvatarDecorationArt } from "@/components/avatar-decoration";
 import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
 
 export interface AvatarPerson {
@@ -300,22 +301,18 @@ export function Avatar({
         face
     );
 
-    // The ring goes behind the face rather than around it: the face is opaque,
-    // so all that shows is the band at its edge - and a layer of its own is what
-    // lets the turning ones turn without turning somebody's photograph with them.
+    // The decoration goes behind the face rather than around it: the face is
+    // opaque, so all that shows is what falls in the band at its edge - and a
+    // layer of its own is what lets the turning parts turn without turning
+    // somebody's photograph with them.
     const shown = decoration ? (
         <span
-            className="relative inline-flex shrink-0 items-center justify-center"
-            style={{ width: size, height: size }}
+            className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+            // The glow is on this box rather than on the art: a shadow follows
+            // the element's border box, and the art's box is the whole square.
+            style={{ width: size, height: size, boxShadow: ringGlow(decoration, size) }}
         >
-            <span
-                aria-hidden="true"
-                className={cn(
-                    "pointer-events-none absolute inset-0 rounded-full",
-                    decoration.spin && "profile-ring-turn"
-                )}
-                style={{ background: ringBackground(decoration), boxShadow: ringGlow(decoration, size) }}
-            />
+            <AvatarDecorationArt decoration={decoration} />
             <span className="relative inline-flex">{pressable}</span>
         </span>
     ) : (

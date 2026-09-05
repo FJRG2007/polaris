@@ -14,14 +14,15 @@
  */
 
 import * as refs from "./references";
+import { AtSign } from "lucide-react";
 import { REFERENCE } from "./markdown";
 import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
 import Suggestion from "@tiptap/suggestion";
-import { AtSign } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
 import { PluginKey, type EditorState } from "@tiptap/pm/state";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { MentionCandidate } from "@/lib/rich-text/mention-service";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
@@ -175,7 +176,11 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
         <ul className={POPUP_CLASS}>
             {items.map((item, index) => (
                 <li key={`${item.kind}-${item.id}`}>
-                    <button
+                    <PersonRow
+                        as="button"
+                        // A team or a task is not somebody, and only a person
+                        // has a plate to wear.
+                        personId={item.kind === "user" ? item.id : null}
                         type="button"
                         // Pointer down rather than click: the editor takes the
                         // focus back on mouse up, and a click fired after that
@@ -205,14 +210,17 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                             </span>
                         )}
                         <span className="min-w-0 flex-1 truncate" title={item.label}>
-                            {item.label}
+                            <PersonName
+                                id={item.kind === "user" ? item.id : null}
+                                name={item.label}
+                            />
                         </span>
                         {item.detail && (
                             <span className="max-w-[9rem] shrink-0 truncate text-[0.6875rem] text-muted-foreground">
                                 {item.detail}
                             </span>
                         )}
-                    </button>
+                    </PersonRow>
                 </li>
             ))}
         </ul>

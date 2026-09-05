@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import { Filter, Plus, X } from "lucide-react";
 import { Button, Select, cn } from "@polaris/ui";
 import type { PersonRef } from "@/lib/tasks/facts";
+import { PersonName } from "@/components/person-name";
 import { Avatar, preloadAvatars } from "@/components/avatar";
 import type { CustomFieldView, StatusView, TagView } from "@/lib/tasks/space-service";
 
@@ -246,7 +247,19 @@ export function FilterBar({
                                                         )}
                                                     >
                                                         {choice.person && <Avatar person={choice.person} size={16} />}
-                                                        {choice.label}
+                                                        {/* Only the choices that
+                                                            are people carry one:
+                                                            a status or a tag has
+                                                            no name of its own to
+                                                            paint. */}
+                                                        {choice.person ? (
+                                                            <PersonName
+                                                                id={choice.person.id}
+                                                                name={choice.label}
+                                                            />
+                                                        ) : (
+                                                            choice.label
+                                                        )}
                                                     </button>
                                                 );
                                             })}

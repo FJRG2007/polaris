@@ -19,6 +19,7 @@ import Fuse from "fuse.js";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import { useMemo, useState, useTransition, type FormEvent } from "react";
 import {
     addGroupMemberAction,
@@ -329,10 +330,16 @@ function GroupDialog({
                         <p className="py-2 text-sm text-muted-foreground">Nobody is in it yet.</p>
                     ) : (
                         group.members.map((member) => (
-                            <div key={member.id} className="flex items-center gap-3 py-1">
+                            <PersonRow
+                                key={member.id}
+                                personId={member.id}
+                                className="flex items-center gap-3 rounded-md px-1.5 py-1"
+                            >
                                 <Avatar person={member} size={28} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={member.name}>{member.name}</p>
+                                    <p className="truncate text-sm" title={member.name}>
+                                        <PersonName id={member.id} name={member.name} />
+                                    </p>
                                     <p className="truncate text-xs text-muted-foreground">
                                         {member.email}
                                     </p>
@@ -349,7 +356,7 @@ function GroupDialog({
                                 >
                                     <X className="size-4" />
                                 </Button>
-                            </div>
+                            </PersonRow>
                         ))
                     )}
                 </div>

@@ -44,6 +44,7 @@ import {
     type MouseEvent as ReactMouseEvent,
     type ReactNode
 } from "react";
+import { PersonName } from "@/components/person-name";
 import { setVolumeFor, volumeFor } from "./call-volumes";
 import { memberActions } from "./member-actions";
 import { useOpenDirect } from "./use-open-direct";
@@ -310,7 +311,9 @@ export function MemberMenu({
                 align={openWith === "press" ? "end" : undefined}
                 onCloseAutoFocus={keepFocusOnClose}
             >
-                <menu.Label className="truncate">{member.name}</menu.Label>
+                <menu.Label className="truncate">
+                    <PersonName id={member.userId} name={member.name} />
+                </menu.Label>
                 <menu.Separator />
 
                 {!you && (

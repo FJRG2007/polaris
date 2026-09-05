@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { PriorityMark } from "@/components/priority-mark";
 import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { PersonRef, TagRef, TaskRow } from "@/lib/tasks/facts";
 import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { Ban, CalendarPlus, Check, ChevronDown, Plus, Settings2, UserPlus, X } from "lucide-react";
@@ -102,18 +103,22 @@ export function AssigneePicker({
                         </p>
                     )}
                     {matches.map((person) => (
-                        <DropdownMenuItem
+                        <PersonRow
+                            as={DropdownMenuItem}
                             key={person.id}
-                            onSelect={(event) => {
+                            personId={person.id}
+                            onSelect={(event: Event) => {
                                 event.preventDefault();
                                 toggle(person.id, event.currentTarget);
                             }}
                             className="gap-2"
                         >
                             <Avatar person={person} size={20} />
-                            <span className="flex-1 truncate">{person.name}</span>
+                            <span className="flex-1 truncate">
+                                <PersonName id={person.id} name={person.name} />
+                            </span>
                             {selected.includes(person.id) && <Check className="size-3.5 text-primary" />}
-                        </DropdownMenuItem>
+                        </PersonRow>
                     ))}
                 </div>
             </DropdownMenuContent>

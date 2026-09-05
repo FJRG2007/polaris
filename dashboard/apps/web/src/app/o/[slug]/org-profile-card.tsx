@@ -22,6 +22,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { AtSign, CalendarDays, Settings2 } from "lucide-react";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { ProfileBanner } from "@/components/profile-banner";
+import { PersonName, PersonRow } from "@/components/person-name";
 
 export function OrgProfileCard({ org }: { org: OrgProfile }) {
     const format = useDisplayFormat();
@@ -73,18 +74,20 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                         <ul className="flex flex-col gap-1">
                             {org.people.map((person) => (
                                 <li key={person.id}>
-                                    <Link
+                                    <PersonRow
+                                        as={Link}
+                                        personId={person.id}
                                         href={`/u/${person.username}`}
                                         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
                                     >
                                         <Avatar person={person} size={24} status={false} />
                                         <span className="min-w-0 flex-1 truncate" title={person.name}>
-                                            {person.name}
+                                            <PersonName id={person.id} name={person.name} />
                                         </span>
                                         <span className="text-muted-foreground shrink-0 text-xs">
                                             @{person.username}
                                         </span>
-                                    </Link>
+                                    </PersonRow>
                                 </li>
                             ))}
                         </ul>

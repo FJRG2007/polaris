@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
+import { PersonName, PersonRow } from "@/components/person-name";
 import type { TeamGrantView, TeamMemberView, TeamView } from "@/lib/orgs/org-service";
 import {
     Button,
@@ -129,19 +130,24 @@ export function TeamPanel({
                                 </p>
                             ) : (
                                 members.map((member) => (
-                                    <div
+                                    <PersonRow
                                         key={member.userId}
+                                        personId={member.userId}
                                         className="hover:bg-muted flex items-center gap-3 rounded-md px-2 py-1.5"
                                     >
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm">
-                                                {member.name}
-                                                {member.userId === currentUserId ? (
-                                                    <span className="text-muted-foreground">
-                                                        {" "}
-                                                        (you)
-                                                    </span>
-                                                ) : null}
+                                                <PersonName
+                                                    id={member.userId}
+                                                    name={member.name}
+                                                >
+                                                    {member.userId === currentUserId ? (
+                                                        <span className="text-muted-foreground">
+                                                            {" "}
+                                                            (you)
+                                                        </span>
+                                                    ) : null}
+                                                </PersonName>
                                             </p>
                                             <p
                                                 className="text-muted-foreground truncate text-xs"
@@ -205,7 +211,7 @@ export function TeamPanel({
                                                 <Trash2 className="size-4 shrink-0" />
                                             </button>
                                         )}
-                                    </div>
+                                    </PersonRow>
                                 ))
                             )}
                         </div>

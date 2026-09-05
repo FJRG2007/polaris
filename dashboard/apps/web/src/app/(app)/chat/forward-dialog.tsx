@@ -28,12 +28,13 @@
 
 import Fuse from "fuse.js";
 import { useChat } from "./chat-context";
-import { useEffect, useMemo, useState } from "react";
 import { forwardAction } from "./actions";
 import { runAction } from "@/lib/run-action";
+import { useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarStack } from "@/components/avatar";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { listedTargets, type Target } from "./forward-targets";
+import { PersonName, PersonRow } from "@/components/person-name";
 import {
     ChevronLeft,
     ChevronRight,
@@ -263,40 +264,54 @@ export function ForwardDialog({
                                     : "Nothing to forward to yet."}
                             </li>
                         ) : (
-                            listed.map((target) => (
-                                <li key={target.id}>
-                                    <button
-                                        type="button"
-                                        onClick={() => pick(target.id)}
-                                        aria-pressed={chosen.includes(target.id)}
-                                        className={cn(
-                                            "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                                            chosen.includes(target.id) && "bg-card-hover"
-                                        )}
-                                    >
-                                        <Face target={target} />
-                                        <span className="flex min-w-0 flex-1 flex-col">
-                                            <span className="truncate" title={target.name}>
-                                                {target.name}
+                            listed.map((target) => {
+                                // A conversation with exactly one other person in
+                                // it is that person, so the row carries their
+                                // name. A group or a channel is nobody's.
+                                const personId =
+                                    target.people.length === 1
+                                        ? (target.people[0]?.id ?? null)
+                                        : null;
+                                return (
+                                    <li key={target.id}>
+                                        <PersonRow
+                                            as="button"
+                                            personId={personId}
+                                            type="button"
+                                            onClick={() => pick(target.id)}
+                                            aria-pressed={chosen.includes(target.id)}
+                                            className={cn(
+                                                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                                chosen.includes(target.id) && "bg-card-hover"
+                                            )}
+                                        >
+                                            <Face target={target} />
+                                            <span className="flex min-w-0 flex-1 flex-col">
+                                                <span className="truncate" title={target.name}>
+                                                    <PersonName
+                                                        id={personId}
+                                                        name={target.name}
+                                                    />
+                                                </span>
+                                                {/* Only while searching: inside a
+                                                server every row is in it, and
+                                                repeating its name on all thirty
+                                                is noise. */}
+                                                {searching && target.place && (
+                                                    <span className="truncate text-xs text-muted-foreground">
+                                                        {target.place}
+                                                    </span>
+                                                )}
                                             </span>
-                                            {/* Only while searching: inside a
-                                            server every row is in it, and
-                                            repeating its name on all thirty
-                                            is noise. */}
-                                            {searching && target.place && (
-                                                <span className="truncate text-xs text-muted-foreground">
-                                                    {target.place}
+                                            {chosen.includes(target.id) && (
+                                                <span className="shrink-0 text-[0.6875rem] text-primary">
+                                                    chosen
                                                 </span>
                                             )}
-                                        </span>
-                                        {chosen.includes(target.id) && (
-                                            <span className="shrink-0 text-[0.6875rem] text-primary">
-                                                chosen
-                                            </span>
-                                        )}
-                                    </button>
-                                </li>
-                            ))
+                                        </PersonRow>
+                                    </li>
+                                );
+                            })
                         )}
                     </ul>
 

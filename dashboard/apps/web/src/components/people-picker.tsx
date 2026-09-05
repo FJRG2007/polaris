@@ -23,6 +23,7 @@ import { cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { Loader2, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { PersonName, PersonRow } from "@/components/person-name";
 
 export interface PickedPerson {
     readonly id: string;
@@ -100,10 +101,14 @@ export function PeoplePicker({
                 <ul className="flex flex-wrap gap-1">
                     {picked.map((person) => (
                         <li key={person.id}>
-                            <span className="flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-1.5 text-xs">
+                            <PersonRow
+                                as="span"
+                                personId={person.id}
+                                className="flex items-center gap-1 rounded-full bg-muted py-0.5 pl-0.5 pr-1.5 text-xs"
+                            >
                                 <Avatar person={person} size={18} />
                                 <span className="max-w-[10rem] truncate" title={person.name}>
-                                    {person.name}
+                                    <PersonName id={person.id} name={person.name} />
                                 </span>
                                 <button
                                     type="button"
@@ -115,7 +120,7 @@ export function PeoplePicker({
                                 >
                                     <X className="size-3" />
                                 </button>
-                            </span>
+                            </PersonRow>
                         </li>
                     ))}
                 </ul>
@@ -165,7 +170,9 @@ export function PeoplePicker({
                 ) : (
                     offered.map((person) => (
                         <li key={person.id}>
-                            <button
+                            <PersonRow
+                                as="button"
+                                personId={person.id}
                                 type="button"
                                 disabled={full}
                                 onClick={() => {
@@ -184,9 +191,9 @@ export function PeoplePicker({
                             >
                                 <Avatar person={person} size={20} />
                                 <span className="truncate" title={person.name}>
-                                    {person.name}
+                                    <PersonName id={person.id} name={person.name} />
                                 </span>
-                            </button>
+                            </PersonRow>
                         </li>
                     ))
                 )}
