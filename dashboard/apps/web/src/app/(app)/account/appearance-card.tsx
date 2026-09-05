@@ -104,10 +104,13 @@ export function AppearanceCard({
                     style={frame ?? undefined}
                 >
                     {sheen ? (
+                        // The light an effect walks across the card. Drawn over
+                        // the band and the top of the body, which is what makes
+                        // it read as light on a surface rather than as a stripe
+                        // painted on one thing.
                         <span
                             aria-hidden="true"
-                            // enigma: not a panel - the band of light an effect walks across the card, sized as a third of it on every screen.
-                            className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12"
+                            className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12" // enigma: not a panel - a band of light crossing the card, a third of its width at every size; nothing to dismiss and nothing behind it
                             style={sheen}
                         />
                     ) : null}

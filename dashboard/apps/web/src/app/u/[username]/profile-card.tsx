@@ -29,17 +29,17 @@
  */
 
 import Link from "next/link";
+import { FollowLists } from "./follow-lists";
+import { ProfileActions } from "./profile-actions";
 import { Avatar, OrgAvatar } from "@/components/avatar";
-import { Badge, Button, Card, CardBody } from "@polaris/ui";
+import { MutualPanel } from "@/components/mutual-panel";
+import { usePresence } from "@/components/presence-store";
 import type { PublicProfile } from "@/lib/profile-service";
+import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
-import { ProfileActions } from "./profile-actions";
-import { MutualPanel } from "@/components/mutual-panel";
-import { FollowLists } from "./follow-lists";
 import { effectOf, linkLabel, nameStyleOf } from "@polaris/core";
 import { frameCss, nameStyleCss, sheenCss } from "@/lib/profile-style-css";
-import { usePresence } from "@/components/presence-store";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
 export function ProfileCard({
@@ -81,8 +81,7 @@ export function ProfileCard({
                 // covers every animation in the product.
                 <span
                     aria-hidden="true"
-                    // enigma: not a panel - the band of light an effect walks across the card, sized as a third of it on every screen.
-                    className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12"
+                    className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12" // enigma: not a panel - a band of light crossing the card, a third of its width at every size; nothing to dismiss and nothing behind it
                     style={sheen}
                 />
             ) : null}
