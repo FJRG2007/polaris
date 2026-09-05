@@ -19,8 +19,12 @@ import { revalidatePath } from "next/cache";
 import * as account from "@/lib/vault/account";
 import * as ciphers from "@/lib/vault/ciphers";
 import * as folders from "@/lib/vault/folders";
+import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/session";
+import { verifyAccountPassword } from "@polaris/auth";
 import { sharingBaseUrl } from "@/lib/domain-service";
+import * as accessLog from "@/lib/vault/access-log";
+import type { ItemUseEntry } from "@/lib/vault/item-uses";
 
 /** What the vault screen needs before it can draw anything. */
 export interface VaultState {
@@ -79,11 +83,29 @@ export async function setUnlockTimeoutAction(minutes: number): Promise<{ error?:
 }
 
 /** Set this account's own vault up from keys the browser just minted. */
+/**
+ * The account password, checked, before a vault is created or rewrapped.
+ *
+ * Two reasons and they are separate. It proves this is the account holder rather
+ * than somebody sitting at an open session, which is the least that should be
+ * asked before the root secret of a vault is set. And the screen that collected
+ * it has already compared it with the master password in the browser - the only
+ * place that comparison can happen, since the master password never arrives
+ * here - so this is what makes that comparison something more than a suggestion
+ * the client could skip.
+ */
+async function accountPasswordOk(userId: string, password: string): Promise<boolean> {
+    return verifyAccountPassword(auth, userId, password);
+}
+
 export async function createAccountVaultAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    const parsed = core.vaultRegisterSchema.safeParse(input);
+    const parsed = core.vaultSetupSchema.safeParse(input);
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Those keys are not usable." };
+    }
+    if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
+        return { error: "That is not your Polaris password." };
     }
     const result = await account.createVault(user.id, {
         masterPasswordHash: parsed.data.masterPasswordHash,
@@ -115,9 +137,12 @@ export async function createAccountVaultAction(input: unknown): Promise<{ error?
 /** Change the master password, with the vault key re-wrapped by the browser. */
 export async function changeMasterPasswordAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    const parsed = core.vaultPasswordSchema.safeParse(input);
+    const parsed = core.vaultPasswordChangeSchema.safeParse(input);
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Invalid request" };
+    }
+    if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
+        return { error: "That is not your Polaris password." };
     }
     const current = await account.getVault(user.id);
     if (!current) return { error: "This account has no vault." };
@@ -278,6 +303,51 @@ export async function deleteFolderAction(folderId: string): Promise<{ error?: st
     return {};
 }
 
+/**
+ * What a browser needs to work out whether a candidate password opens this
+ * account's vault: the salt the derivation uses, and how it is stretched.
+ *
+ * Neither is a secret. The same two are handed to anybody who asks for them by
+ * email at prelogin, because a client cannot derive a key without them. What is
+ * NOT here is the wrapped key, so nothing about this answer helps somebody who
+ * does not already know the password.
+ */
+export async function vaultDerivationAction(): Promise<{
+    exists: boolean;
+    email: string;
+    kdf: core.KdfSettings;
+} | null> {
+    const user = await requirePermission("vault.use");
+    const vault = await account.getVault(user.id);
+    if (!vault) return { exists: false, email: user.email, kdf: core.DEFAULT_KDF_SETTINGS };
+    return {
+        exists: true,
+        email: user.email,
+        kdf: {
+            kdf: vault.kdf as core.KdfType,
+            kdfIterations: vault.kdfIterations,
+            kdfMemory: vault.kdfMemory,
+            kdfParallelism: vault.kdfParallelism
+        }
+    };
+}
+
+/**
+ * Whether a password somebody is about to set on their POLARIS account would
+ * also open their vault.
+ *
+ * The mirror of the check the vault screens make, and it has to be here because
+ * it is the only side that can be checked: the server holds a hash of the
+ * master password hash and cannot derive anything from a plaintext, so the
+ * browser derives the candidate and asks about the result. Nothing is written
+ * and nothing else is said - the answer is a boolean about this account's own
+ * vault, to this account.
+ */
+export async function passwordOpensVaultAction(clientHash: string): Promise<{ opens: boolean }> {
+    const user = await requirePermission("vault.use");
+    return { opens: await account.verifyMasterPassword(user.id, clientHash) };
+}
+
 /** Create a Send and hand back the link to give somebody. */
 export async function createSendAction(
     input: unknown
@@ -294,6 +364,28 @@ export async function createSendAction(
     // sign in before the page can even read the fragment. The key goes after
     // this, in the fragment, and the crypto is the same either way.
     return { send, url: `${await sharingBaseUrl()}/vs/${String(send.accessId)}` };
+}
+
+/**
+ * Record that somebody used one item, and read back what has been done with it.
+ *
+ * Reported by the browser, because the browser is the only place a vault is ever
+ * open - see `vault/access-log`, where the shape and the limits of that
+ * guarantee are written down. The use is validated against a fixed list here
+ * rather than taken as given, so the log cannot be filled with invented words,
+ * and the item is checked against what this account can actually reach.
+ */
+export async function recordItemUseAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("vault.use");
+    const parsed = core.itemUseSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not something an item can be used for." };
+    await accessLog.recordItemUse(user.id, parsed.data.itemId, parsed.data.use);
+    return {};
+}
+
+export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
+    const user = await requirePermission("vault.use");
+    return accessLog.listItemUses(user.id, itemId);
 }
 
 export async function deleteSendAction(sendId: string): Promise<{ error?: string }> {

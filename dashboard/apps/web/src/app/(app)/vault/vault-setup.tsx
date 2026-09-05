@@ -12,6 +12,16 @@
  * The keys are minted here, in the browser. What leaves is the wrapped key, the
  * public half of a new pair, and a hash of a hash - and none of that opens
  * anything.
+ *
+ * The Polaris password is asked for here, and it does two jobs. It proves this is
+ * the account holder rather than somebody who found an open session, which is
+ * the least that should be asked before a vault is created under their name. And
+ * it is the only way to check the thing that matters most about a master
+ * password: that it is not also the account password. Two secrets that are one
+ * secret protect nothing twice - a phishing page, a keylogger, or a reused
+ * password in somebody else's breach would then open the vault as well - and the
+ * comparison happens HERE, between two values in this browser, because the
+ * master password is not permitted to reach the server even to be compared.
  */
 
 import * as core from "@polaris/core";
@@ -39,6 +49,7 @@ export function VaultSetup({
 }) {
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
+    const [account, setAccount] = useState("");
     const [hint, setHint] = useState("");
     const [understood, setUnderstood] = useState(false);
     const [pending, setPending] = useState(false);
@@ -58,10 +69,16 @@ export function VaultSetup({
     // is only one kind of character is a password a list attacks first.
     const weak = core.masterPasswordProblem(password);
 
+    // The check this screen exists to make possible. Both values are here, in
+    // this browser, and neither goes anywhere to be compared.
+    const sameAsAccount = core.passwordsTooAlike(password, account);
+
     const ready =
         password.length >= MIN_LENGTH &&
         !weak &&
         confirm === password &&
+        account.length > 0 &&
+        !sameAsAccount &&
         understood &&
         !unsafe &&
         !hintLeaks;
@@ -78,6 +95,10 @@ export function VaultSetup({
                 core.DEFAULT_KDF_SETTINGS
             );
             const result = await createAccountVaultAction({
+                // Verified again on the server. Checked here as well because the
+                // comparison above needs it here, and a rule enforced only in a
+                // browser is not enforced.
+                accountPassword: account,
                 masterPasswordHash: keys.masterPasswordHash,
                 masterPasswordHint: hint.trim() || null,
                 key: keys.protectedKey,
@@ -153,6 +174,34 @@ export function VaultSetup({
                         </label>
                         {mismatch ? (
                             <p className="text-sm text-danger">Those do not match.</p>
+                        ) : null}
+
+                        <label className="flex flex-col gap-1 text-sm">
+                            Your Polaris password
+                            {/* enigma:allow-no-breach-check enigma:allow-identity-password
+                                Not a password being chosen - it is the existing
+                                account password, typed to prove who this is. Both
+                                checks were run when it was set, and re-running them
+                                on a value somebody is only confirming would refuse
+                                somebody entry to their own account over a corpus
+                                published since. */}
+                            <Input
+                                type="password"
+                                autoComplete="current-password"
+                                value={account}
+                                onChange={(event) => setAccount(event.target.value)}
+                                required
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                So Polaris knows it is you, and so it can check the two passwords
+                                are not the same one.
+                            </span>
+                        </label>
+                        {sameAsAccount ? (
+                            <p className="text-sm text-danger">
+                                That is your Polaris password. If they are the same, whoever learns
+                                one has the vault as well - which is the one thing the vault is for.
+                            </p>
                         ) : null}
 
                         <label className="flex flex-col gap-1 text-sm">

@@ -22,6 +22,7 @@ import { PasswordState } from "@/components/password-state";
 import { totpCode } from "@/lib/vault/totp-browser";
 import { ItemDialog } from "./item-dialog";
 import { MoveDialog } from "./move-dialog";
+import { ShareItemDialog } from "./share-item-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
 import { addressLines, IDENTITY_GROUPS, identityLabel } from "./identity-fields";
@@ -34,7 +35,9 @@ import {
     MastercardMark,
     VisaMark
 } from "@/components/brand-icons";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDisplayFormat } from "@/components/display-format";
+import { ITEM_USE_LABELS, type ItemUseEntry } from "@/lib/vault/item-uses";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -62,6 +65,8 @@ import {
 } from "./vault-model";
 import {
     deleteItemAction,
+    itemUsesAction,
+    recordItemUseAction,
     restoreItemAction,
     saveFolderAction,
     saveItemAction,
@@ -88,6 +93,7 @@ import {
     Plus,
     RotateCcw,
     Search,
+    Share2,
     Star,
     Terminal,
     Trash2
@@ -172,6 +178,8 @@ export function VaultApp() {
     const [editing, setEditing] = useState<VaultItem | null>(null);
     const [managingFolders, setManagingFolders] = useState(false);
     const [moving, setMoving] = useState<VaultItem | null>(null);
+    /** The item being handed out as a link, if any. */
+    const [sharing, setSharing] = useState<VaultItem | null>(null);
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     /**
@@ -193,6 +201,15 @@ export function VaultApp() {
         }
     }, []);
     const [confirm, confirmDialog] = useConfirm();
+    const format = useDisplayFormat();
+    /** What has been done with the open item, newest first. */
+    const [uses, setUses] = useState<ItemUseEntry[]>([]);
+    /**
+     * When each kind of use was last reported, so a hand that copies a password
+     * three times while filling a form writes one line rather than three. Kept in
+     * a ref because nothing on screen depends on it.
+     */
+    const reported = useRef(new Map<string, number>());
 
     /**
      * Pull everything and open it. Runs on unlock and after every write.
@@ -250,6 +267,20 @@ export function VaultApp() {
 
     const current = visible.find((item) => item.id === selected) ?? null;
 
+    useEffect(() => {
+        if (!selected) {
+            setUses([]);
+            return;
+        }
+        let live = true;
+        void itemUsesAction(selected).then((rows) => {
+            if (live) setUses(rows);
+        });
+        return () => {
+            live = false;
+        };
+    }, [selected]);
+
     /** The recovery codes on the open item, which are stored as a hidden custom
      *  field so every other Bitwarden client can read them. */
     const recoveryCodes = current
@@ -292,12 +323,37 @@ export function VaultApp() {
         window.setTimeout(() => setCopied(null), 2000);
     }
 
+    /**
+     * Say that somebody used an item, at most once a minute per kind.
+     *
+     * The browser reports it because the browser is the only place a vault is
+     * ever open - the server sees an encrypted blob leave and cannot tell a
+     * password being read from a page being drawn. What that does and does not
+     * guarantee is written down in `vault/access-log`.
+     */
+    function noteUse(item: VaultItem, use: "reveal" | "copy" | "totp" | "share"): void {
+        if (!item.id) return;
+        const at = Date.now();
+        const key = `${item.id}:${use}`;
+        const last = reported.current.get(key) ?? 0;
+        if (at - last < 60_000) return;
+        reported.current.set(key, at);
+        void recordItemUseAction({ itemId: item.id, use }).then(() => {
+            // Only the open item's history is on screen, and only then is it
+            // worth re-reading.
+            if (item.id === selected) void itemUsesAction(item.id).then(setUses);
+        });
+    }
+
     /** The six digits for an item, worked out now rather than shown: the menu is
      *  for taking a code away with you, and one that had to be read off the
      *  screen would be a code typed by hand. */
     async function copyTotp(item: VaultItem): Promise<void> {
         const code = await totpCode(item.login.totp);
-        if (code) await copy("totp", code);
+        if (code) {
+            await copy("totp", code);
+            noteUse(item, "totp");
+        }
     }
 
     async function onSave(item: VaultItem, collectionIds: string[]): Promise<string | null> {
@@ -373,6 +429,7 @@ export function VaultApp() {
         } else if (mod && event.key.toLowerCase() === "c") {
             event.preventDefault();
             void copy("password", item.login.password);
+            noteUse(item, "copy");
         } else if (event.key === "F2" || event.key === "Enter") {
             // Enter on a focused button would otherwise fire the click that only
             // selects it, which is the thing the row is already showing.
@@ -576,12 +633,13 @@ export function VaultApp() {
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 disabled={!item.login.password}
-                                                                onSelect={() =>
+                                                                onSelect={() => {
                                                                     void copy(
                                                                         "password",
                                                                         item.login.password
-                                                                    )
-                                                                }
+                                                                    );
+                                                                    noteUse(item, "copy");
+                                                                }}
                                                             >
                                                                 <Copy className="size-4" />
                                                                 Copy password
@@ -636,6 +694,10 @@ export function VaultApp() {
                                                     <ContextMenuItem onSelect={() => setMoving(item)}>
                                                         <FolderInput className="size-4" />
                                                         Move
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem onSelect={() => setSharing(item)}>
+                                                        <Share2 className="size-4" />
+                                                        Share by link
                                                     </ContextMenuItem>
                                                     <ContextMenuSeparator />
                                                     <ContextMenuItem
@@ -732,6 +794,21 @@ export function VaultApp() {
                                             <MoveRight className="size-4" />
                                         </Button>
                                     ) : null}
+                                    {/* Only for an item that is not on its way
+                                        out: a link to something in the trash is
+                                        a link to something about to stop
+                                        existing. */}
+                                    {current.deleted ? null : (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            title="Share by link"
+                                            aria-label={`Share ${current.name} by link`}
+                                            onClick={() => setSharing(current)}
+                                        >
+                                            <Share2 className="size-4" />
+                                        </Button>
+                                    )}
                                     {current.deleted ? (
                                         <Button
                                             size="sm"
@@ -784,8 +861,16 @@ export function VaultApp() {
                                             value={current.login.password}
                                             secret={!revealed}
                                             copied={copied === "password"}
-                                            onCopy={() => copy("password", current.login.password)}
-                                            onReveal={() => setRevealed((prev) => !prev)}
+                                            onCopy={() => {
+                                                void copy("password", current.login.password);
+                                                noteUse(current, "copy");
+                                            }}
+                                            onReveal={() => {
+                                                // Only on the way to showing it.
+                                                // Putting it back is not a use.
+                                                if (!revealed) noteUse(current, "reveal");
+                                                setRevealed((prev) => !prev);
+                                            }}
                                             revealed={revealed}
                                             /* Said every time the item is opened,
                                                which is the moment somebody is
@@ -1049,6 +1134,38 @@ export function VaultApp() {
                                     {current.notes}
                                 </p>
                             </Section>
+
+                            {/* Who has actually reached for this, which is the
+                                question a shared vault raises and nothing else
+                                answers. What it can and cannot promise is
+                                written down in `vault/access-log`; the sentence
+                                under the list is the short version, and it is
+                                there so nobody reads an empty history as proof
+                                of anything. */}
+                            <Section title="Who has used this" when={uses.length > 0}>
+                                {uses.map((entry) => (
+                                    <div
+                                        key={entry.id}
+                                        className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                                    >
+                                        <span className="min-w-0 truncate">
+                                            <span className="font-medium">
+                                                {entry.isSelf ? "You" : entry.actor}
+                                            </span>{" "}
+                                            <span className="text-muted-foreground">
+                                                {ITEM_USE_LABELS[entry.use].toLowerCase()}
+                                            </span>
+                                        </span>
+                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                            {format.dateTime(entry.at)}
+                                        </span>
+                                    </div>
+                                ))}
+                                <p className="px-3 py-2 text-xs text-muted-foreground">
+                                    Recorded by the app that opened it. Polaris never holds your
+                                    key, so it cannot see a password being read on its own.
+                                </p>
+                            </Section>
                         </CardBody>
                     </Card>
                 ) : (
@@ -1080,6 +1197,11 @@ export function VaultApp() {
                 item={moving}
                 onClose={() => setMoving(null)}
                 onMoved={() => (key ? load(key) : Promise.resolve())}
+            />
+            <ShareItemDialog
+                item={sharing}
+                onShared={(item) => noteUse(item, "share")}
+                onClose={() => setSharing(null)}
             />
             {confirmDialog}
         </div>

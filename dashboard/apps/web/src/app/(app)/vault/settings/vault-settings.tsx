@@ -67,6 +67,9 @@ export function VaultSettings() {
     const [current, setCurrent] = useState("");
     const [next, setNext] = useState("");
     const [confirmValue, setConfirmValue] = useState("");
+    /** The Polaris account password: proof of who is asking, and the value the
+     *  new master password is checked against. */
+    const [accountPassword, setAccountPassword] = useState("");
     const [nextKdf, setNextKdf] = useState(String(kdf.kdf));
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -103,6 +106,16 @@ export function VaultSettings() {
             setError(unsafe);
             return;
         }
+        // Compared here because this is the only place both values exist. The
+        // master password does not reach the server, even to be compared - and
+        // two secrets that are one secret protect nothing twice: whoever learns
+        // the Polaris password would have the vault with it.
+        if (core.passwordsTooAlike(next, accountPassword)) {
+            setError(
+                "That is your Polaris password. If they are the same, whoever learns one has the vault as well."
+            );
+            return;
+        }
 
         setPending("password");
         try {
@@ -122,6 +135,9 @@ export function VaultSettings() {
                     current
                 ),
                 newMasterPasswordHash: await crypto.masterPasswordHash(masterKey, next),
+                // Verified on the server as well: a rule enforced only in a
+                // browser is not enforced.
+                accountPassword,
                 key: await crypto.encryptBytes(crypto.symmetricKeyBytes(currentKey), stretched),
                 kdf: settings.kdf,
                 kdfIterations: settings.kdfIterations,
@@ -135,6 +151,7 @@ export function VaultSettings() {
             setCurrent("");
             setNext("");
             setConfirmValue("");
+            setAccountPassword("");
             setDone("Your master password has changed. Every app will ask for it again.");
         } finally {
             setPending(null);
@@ -215,6 +232,23 @@ export function VaultSettings() {
                                 value={confirmValue}
                                 onChange={(event) => setConfirmValue(event.target.value)}
                             />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            Your Polaris password
+                            {/* enigma:allow-no-breach-check enigma:allow-identity-password
+                                The existing account password, typed to prove who this
+                                is. Both checks ran when it was chosen; re-running them
+                                on a value somebody is confirming would lock them out of
+                                their own account over a corpus published since. */}
+                            <Input
+                                type="password"
+                                autoComplete="current-password"
+                                value={accountPassword}
+                                onChange={(event) => setAccountPassword(event.target.value)}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                Checked so the two passwords cannot end up being the same one.
+                            </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             How it is derived

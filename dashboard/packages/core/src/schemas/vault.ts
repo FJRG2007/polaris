@@ -248,6 +248,20 @@ export const sendSchema = z.object({
 
 export type SendInput = z.infer<typeof sendSchema>;
 
+/**
+ * A browser reporting that somebody used one saved item.
+ *
+ * The uses are a closed list because the log is read as a record of what
+ * happened: a free-text action would let anything at all be written into an
+ * item's history, and a history that can say anything says nothing.
+ */
+export const itemUseSchema = z.object({
+    itemId: z.string().uuid(),
+    use: z.enum(["reveal", "copy", "totp", "share"])
+});
+
+export type ItemUseInput = z.infer<typeof itemUseSchema>;
+
 /** What a client says about itself when it signs in. */
 export const deviceSchema = z.object({
     identifier: z.string().min(1).max(200),
@@ -284,6 +298,24 @@ export const vaultPasswordSchema = z.object({
     kdfIterations: z.number().int().positive().optional(),
     kdfMemory: z.number().int().positive().nullish(),
     kdfParallelism: z.number().int().positive().nullish()
+});
+
+/**
+ * The dashboard's own version of the two above: the same keys, plus the Polaris
+ * account password.
+ *
+ * Separate rather than a field added to the schemas beside them, because those
+ * two are also what an official Bitwarden client posts, and a client that has
+ * never heard of a Polaris account cannot be asked for its password. This one is
+ * only ever the dashboard talking to itself, where the password is both the
+ * proof of who is asking and the value the master password is checked against.
+ */
+export const vaultSetupSchema = vaultRegisterSchema.extend({
+    accountPassword: z.string().min(1).max(512)
+});
+
+export const vaultPasswordChangeSchema = vaultPasswordSchema.extend({
+    accountPassword: z.string().min(1).max(512)
 });
 
 /** Proving the master password again, for a screen that asks a second time. */

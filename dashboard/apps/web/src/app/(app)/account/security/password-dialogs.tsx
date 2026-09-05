@@ -9,12 +9,19 @@
  *
  * Either path ends every other session, since a password change is also how a
  * user evicts someone else.
+ *
+ * Both paths also refuse a password that already opens this account's vault. The
+ * vault exists to survive the account being taken, and it cannot do that if the
+ * two are one secret - so the candidate is derived in this browser and only the
+ * resulting hash is asked about, which is the same trade the vault makes
+ * everywhere else. See `vault/would-open`.
  */
 
 import { useState, type FormEvent } from "react";
 import { SECURITY_QUESTION_COUNT } from "@polaris/core";
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
 import { changePasswordAction, recoverPasswordAction } from "./actions";
+import { passwordWouldOpenVault, SAME_AS_VAULT } from "@/lib/vault/would-open";
 import { Feedback } from "./setting-card";
 
 export function ChangePasswordDialog({
@@ -38,6 +45,11 @@ export function ChangePasswordDialog({
         }
         setBusy(true);
         setError(null);
+        if (await passwordWouldOpenVault(next)) {
+            setBusy(false);
+            setError(SAME_AS_VAULT);
+            return;
+        }
         const result = await changePasswordAction(String(form.get("currentPassword") ?? ""), next);
         setBusy(false);
         if (result.error) {
@@ -128,6 +140,11 @@ export function RecoverPasswordDialog({
         }
         setBusy(true);
         setError(null);
+        if (await passwordWouldOpenVault(next)) {
+            setBusy(false);
+            setError(SAME_AS_VAULT);
+            return;
+        }
         const result = await recoverPasswordAction({
             newPassword: next,
             answers: method === "questions" ? answers : [],
