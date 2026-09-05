@@ -1106,6 +1106,22 @@ export function ListScreen({
                 <EmptyState
                     title="Nothing here yet."
                     description="Add the first task and it appears on every view of this list."
+                    // Saying "add the first task" and offering no way to add one
+                    // has told somebody they are stuck. The key is printed
+                    // beside it because it is the one people keep, and because
+                    // the line under this screen is the only other place it is
+                    // written down.
+                    action={
+                        createTarget ? (
+                            <Button
+                                size="sm"
+                                onClick={() => setCreating({ name: "", dueDate: null })}
+                            >
+                                <Plus className="size-4" />
+                                Add a task
+                            </Button>
+                        ) : undefined
+                    }
                 />
             )}
 

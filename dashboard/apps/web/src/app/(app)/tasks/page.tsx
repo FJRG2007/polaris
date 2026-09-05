@@ -70,7 +70,16 @@ export default async function TasksHomePage() {
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <SpaceTree spaces={tree} canCreate canManage={mayManage} />
-            <HomeView tasks={tasks} counts={counts} timer={timer} contexts={contexts} lists={toListRefs(lists)} />
+            <HomeView
+                tasks={tasks}
+                counts={counts}
+                timer={timer}
+                contexts={contexts}
+                lists={toListRefs(lists)}
+                // A first visit has nowhere to put a task, so the empty state
+                // below has to offer to make somewhere rather than advise.
+                hasSpaces={tree.length > 0}
+            />
         </div>
     );
 }

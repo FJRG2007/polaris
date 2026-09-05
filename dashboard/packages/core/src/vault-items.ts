@@ -79,6 +79,46 @@ export function couldBeMasterPassword(password: string): boolean {
     return password.length >= MASTER_PASSWORD_MIN;
 }
 
+/**
+ * Whether two passwords are close enough that one being learned gives away the
+ * other.
+ *
+ * The rule the vault needs, and the reason it exists is worth stating: if the
+ * master password is also the Polaris account password, then a phishing page,
+ * a keylogger, a reused-password breach or an administrator with the sign-in
+ * form is one credential away from the whole vault - and the vault is the thing
+ * that was supposed to survive that. Two secrets that are one secret protect
+ * nothing twice.
+ *
+ * Equality is the case that matters, but only after normalising: `Hunter2!` and
+ * `hunter 2 !` are the same password with different typing, and a rule that
+ * missed those would be a rule anybody can satisfy while changing nothing. So
+ * both sides are lowercased and stripped to letters and digits before they are
+ * compared.
+ *
+ * Containment counts too, from eight characters up - a master password that is
+ * the account password with `-vault` on the end falls to the same one guess. The
+ * floor is there because at three or four characters everything contains
+ * everything.
+ *
+ * Nothing shorter is compared and nothing empty is: a half-typed box is not yet
+ * an answer.
+ */
+export function passwordsTooAlike(left: string, right: string): boolean {
+    const bare = (value: string) =>
+        value
+            .normalize("NFKD")
+            .replace(/[̀-ͯ]/g, "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+    const a = bare(left);
+    const b = bare(right);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (a.length < 8 || b.length < 8) return false;
+    return a.includes(b) || b.includes(a);
+}
+
 /** One custom field, by name. Empty when the item has none - which is the
  *  ordinary case, since these are conventions rather than columns. */
 export function fieldValue(

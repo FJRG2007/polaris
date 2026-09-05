@@ -745,11 +745,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         // rather than a card under Preferences: what is answered here is a fact
         // about the machine in front of somebody, and it is the screen people
         // are sent to when a call goes wrong.
+        //
+        // Not called "Devices": everywhere else in Polaris that word means the
+        // browsers and phones an account is signed in on, and somebody hunting
+        // for their microphone had no reason to guess this one meant something
+        // else. "Devices" stays in the keywords, so looking for it still lands
+        // here.
         {
-            label: "Devices",
+            label: "Voice & Video",
             href: "/account/devices",
             icon: Mic,
             keywords: [
+                "devices",
+                "speakers",
+                "headset",
                 "microphone",
                 "camera",
                 "webcam",

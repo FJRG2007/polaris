@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as items from "./vault-items.js";
 import { itemInitials, looksLikeEmail, readRecoveryCodes, writeRecoveryCodes } from "./vault-items.js";
 
 describe("codes pasted out of whatever a site printed", () => {
@@ -77,5 +78,34 @@ describe("the letters on an item with no icon", () => {
 
     it("are something rather than nothing for an item with neither", () => {
         expect(itemInitials("", null)).toBe("?");
+    });
+});
+
+describe("two passwords that are one password", () => {
+    it("catches the same password typed the same way", () => {
+        expect(items.passwordsTooAlike("correct-horse-9", "correct-horse-9")).toBe(true);
+    });
+
+    it("catches it typed differently, which is the case a naive check misses", () => {
+        expect(items.passwordsTooAlike("Hunter2!Hunter", "hunter 2 hunter")).toBe(true);
+        expect(items.passwordsTooAlike("Café-passw0rd", "cafepassw0rd")).toBe(true);
+    });
+
+    it("catches one that is the other with something on the end", () => {
+        expect(items.passwordsTooAlike("myaccountpassword", "myaccountpassword-vault")).toBe(true);
+    });
+
+    it("leaves two genuinely different passwords alone", () => {
+        expect(items.passwordsTooAlike("correct-horse-9", "battery-staple-4")).toBe(false);
+    });
+
+    it("says nothing about a box nobody has finished", () => {
+        expect(items.passwordsTooAlike("", "anything")).toBe(false);
+        expect(items.passwordsTooAlike("anything", "")).toBe(false);
+    });
+
+    it("does not call two short passwords alike merely for sharing letters", () => {
+        // Under the floor everything contains everything.
+        expect(items.passwordsTooAlike("abc", "abcdefghijkl")).toBe(false);
     });
 });

@@ -9,20 +9,21 @@
  * order for a screen somebody opens at nine in the morning.
  */
 
+import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { TaskPanel } from "./task-panel";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useStableOrder } from "./stable-order";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import type { RunningTimer } from "@/lib/tasks/time-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { TaskMenu, type TaskCommands } from "./views/task-actions";
-import { Card, CardBody, ConfirmDeleteDialog, EmptyState, cn } from "@polaris/ui";
+import { Button, Card, CardBody, ConfirmDeleteDialog, EmptyState, cn } from "@polaris/ui";
 import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import type { TaskBulkEdit, TaskEdit, TaskListRef } from "./views/shared";
-import { CircleAlert, Clock, ListChecks, Play, Square } from "lucide-react";
+import { CircleAlert, Clock, ListChecks, Loader2, Play, Plus, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { AvatarStack, DueBadge, PriorityMark, StatusDot, StatusMarker, TaskLocation } from "./pickers";
 
@@ -51,7 +52,8 @@ export function HomeView({
     counts,
     timer,
     contexts,
-    lists
+    lists,
+    hasSpaces
 }: {
     tasks: readonly TaskRow[];
     counts: HomeCounts;
@@ -62,12 +64,28 @@ export function HomeView({
     /** Where work can be moved to, so the menu here offers what it offers on a
      *  board. Empty until there is anywhere to move it. */
     lists: readonly TaskListRef[];
+    /** Whether this account can reach any space at all. False is a first visit,
+     *  and it needs a different sentence and a button rather than advice about
+     *  a list that does not exist. */
+    hasSpaces: boolean;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
     const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+    const [starting, startTransition] = useTransition();
     const [deleting, setDeleting] = useState<TaskRow | null>(null);
     const [error, setError] = useState("");
+    /** Make the first space and go straight into it. Landing back on this screen
+     *  with a space that now exists somewhere off to the left would be the same
+     *  empty page again, one press later. */
+    function start(): void {
+        startTransition(async () => {
+            const result = await runAction(() => actions.startTasksAction(), setError);
+            if (!result?.spaceId) return;
+            router.push(result.listId ? `/tasks/l/${result.listId}` : `/tasks/s/${result.spaceId}`);
+            router.refresh();
+        });
+    }
 
     // Optimistic overlay: what a menu changed before the server said so. Dropped
     // wholesale on the reload that follows, which is what the server derived from the
@@ -229,9 +247,35 @@ export function HomeView({
                 </p>
             )}
 
-            {groups.length === 0 && (
-                <EmptyState title="Nothing is assigned to you." description="Open a list and put your name on something." />
-            )}
+            {groups.length === 0 &&
+                (hasSpaces ? (
+                    <EmptyState title="Nothing is assigned to you." description="Open a list and put your name on something." />
+                ) : (
+                    /* A first visit. "Open a list and put your name on
+                       something" is advice about a list that does not exist -
+                       and the hierarchy it assumes is obvious once you have seen
+                       one of each and opaque before that, so the way out is a
+                       press rather than an explanation. */
+                    <EmptyState
+                        title="Nothing here yet."
+                        description="Work lives in a space, a space holds lists, and a list holds tasks. Polaris can set the first one up for you."
+                        action={
+                            <>
+                                <Button size="sm" disabled={starting} onClick={() => void start()}>
+                                    {starting ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Plus className="size-4" />
+                                    )}
+                                    Set up my first space
+                                </Button>
+                                <Button size="sm" variant="ghost" asChild>
+                                    <Link href="/tasks/spaces">Do it myself</Link>
+                                </Button>
+                            </>
+                        }
+                    />
+                ))}
 
             {groups.map((group) => (
                 <section key={group.bucket} className="flex flex-col gap-1">
