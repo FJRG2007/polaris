@@ -37,6 +37,7 @@
 
 import { z } from "zod";
 import * as quality from "./call-quality";
+import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
@@ -64,6 +65,15 @@ import {
     type CombineMessage,
     type CombineRequest
 } from "./call-combine";
+import {
+    diagnoseCall,
+    UNKNOWN_AUDIO,
+    type CallAudioFacts,
+    type CallAudioReport,
+    type CallLink,
+    type HeardFrom,
+    type MicSending
+} from "./call-diagnosis";
 
 /** How often the server is told this browser is still on the call. Comfortably
  *  inside the window it sweeps on. */
@@ -131,6 +141,48 @@ const SCREEN_AUDIO = "screen_share_audio" as Track.Source;
  *  reason. */
 const CONNECTED = "connected" as Room["state"];
 
+/** The other three the sampler has to tell apart, spelled out for the same
+ *  reason. A client putting itself back together is not one that has given up,
+ *  and saying so is the difference between a reader waiting a moment and a
+ *  reader rejoining a call that was about to come back. */
+const CONNECTING = "connecting" as Room["state"];
+const RECONNECTING = "reconnecting" as Room["state"];
+const SIGNAL_RECONNECTING = "signalReconnecting" as Room["state"];
+
+/**
+ * How often the call is asked whether sound is actually flowing.
+ *
+ * Slow on purpose. This is a diagnosis rather than a meter: it exists to answer
+ * "why can nobody hear anything" a few seconds after somebody starts wondering,
+ * and reading a connection's statistics is not free.
+ */
+const AUDIO_CHECK_MS = 3_000;
+
+/**
+ * How long a counter may sit still before it is treated as stopped.
+ *
+ * Two windows, because the two counters stop for different reasons. Bytes keep
+ * arriving through a pause - audio is sent discontinuously, so silence is cheap
+ * frames rather than no frames - and a gap of several seconds in those is a
+ * connection that has stopped carrying. Energy is the opposite: it only moves
+ * while somebody is making a sound, so it has to be allowed to sit still for as
+ * long as a person can reasonably listen without saying anything, or the call
+ * would accuse every quiet participant of a broken microphone.
+ */
+const ARRIVING_WITHIN_MS = 8_000;
+const CARRYING_WITHIN_MS = 30_000;
+
+/**
+ * How long the room is left alone after it changes before anything is judged.
+ *
+ * Somebody admitted to a call is on the roster before their browser has asked
+ * for a ticket, connected, opened a microphone and published it. Every one of
+ * those seconds looks exactly like a person whose audio never arrived, and a
+ * panel that says so the moment they appear is a panel that is wrong on every
+ * single join.
+ */
+const SETTLING_MS = 10_000;
+
 /**
  * The meeting's own stream, which is about people rather than media.
  *
@@ -154,6 +206,26 @@ const frameSchema = z.discriminatedUnion("kind", [
     /** Another browser of this same account took the call. */
     z.object({ kind: z.literal("claimed"), deviceId: z.string().optional() })
 ]);
+
+/** Whether two verdicts say the same thing, so a call that has not changed does
+ *  not re-render every screen drawing one every few seconds. */
+function sameReport(left: CallAudioReport, right: CallAudioReport): boolean {
+    return (
+        left.ok === right.ok &&
+        left.headline === right.headline &&
+        left.fix === right.fix &&
+        left.lines.length === right.lines.length &&
+        left.lines.every((line, index) => {
+            const other = right.lines[index];
+            return (
+                other !== undefined &&
+                line.label === other.label &&
+                line.value === other.value &&
+                line.state === other.state
+            );
+        })
+    );
+}
 
 /** What asking for a ticket answers. Named so a request that could not be made
  *  at all can be turned into the same shape and read the same way. */
@@ -218,6 +290,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
+
+    /**
+     * Whether sound is actually flowing, and what to say when it is not.
+     *
+     * Sampled rather than derived, because every fact worth having here is a
+     * counter that has to be looked at twice - see `call-diagnosis`.
+     */
+    const [audio, setAudio] = useState<CallAudioReport>(UNKNOWN_AUDIO);
 
     /**
      * How much picture this browser sends, and how much it is sending now.
@@ -295,6 +375,32 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** The scan currently running, so a roster change can stop it and start one
      *  against the roster it actually belongs to. */
     const scan = useRef<AbortController | null>(null);
+
+    /**
+     * When each person in the call was last heard, in the two senses.
+     *
+     * A counter is only evidence read twice, and neither of these may be read as
+     * "right now": audio is sent discontinuously, so a person who has stopped
+     * talking stops adding bytes and stops adding energy without anything being
+     * wrong. What is kept is therefore the moment each counter last moved, and
+     * the question asked of it is how long ago that was.
+     */
+    const flow = useRef(
+        new Map<string, { bytes: number; energy: number; bytesAt: number; energyAt: number }>()
+    );
+
+    /** When the room last changed under this browser. Nothing is judged for a
+     *  moment afterwards - see `SETTLING_MS`. */
+    const settledAt = useRef(0);
+
+    /** What the sampler needs about the room and cannot read off the connection:
+     *  who is admitted, what they have said about themselves, and what this
+     *  browser has decided about its own ears. Held in a ref so the sampler is
+     *  started once per call rather than on every roster change. */
+    const watching = useRef<{
+        others: { id: string; name: string; volumeKey: string }[];
+        states: ReadonlyMap<string, PeerState>;
+    }>({ others: [], states: new Map() });
 
     /**
      * The rung in force right now, for one of the two ladders.
@@ -419,7 +525,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     publication.source === SCREEN || publication.source === SCREEN_AUDIO;
                 (onScreen ? display : camera).push(track);
             }
-            faces.set(participant.identity, camera);
+            // Only where there is something live in it, exactly as a shared
+            // screen is. A participant who has published nothing yet used to be
+            // given an empty `MediaStream` all the same, and an empty stream is
+            // not the same thing as no stream: it is a source an audio element
+            // will accept and then refuse to play, which is recorded as this
+            // browser having been blocked from starting audio. That is where
+            // "Press to hear the call" came from in a call with nothing to hear
+            // - and pressing it asked the same element to play the same nothing,
+            // which is why it did nothing.
+            if (camera.length > 0) faces.set(participant.identity, camera);
             // A screen tile with nothing live in it is not a screen: left out, so
             // the big tile closes when somebody stops sharing rather than
             // freezing on the last frame they sent.
@@ -1637,6 +1752,193 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [meetingId, senderHealth, settleLevels]);
 
     /**
+     * What the sampler is looking at, refreshed on every render.
+     *
+     * Written here rather than passed in, so the interval below is started once
+     * per call instead of being torn down and rebuilt every time somebody mutes
+     * themselves or joins.
+     */
+    watching.current = {
+        others: (meeting?.participants ?? [])
+            .filter((person) => person.admission === "admitted" && person.id !== participantId)
+            .map((person) => ({
+                id: person.id,
+                name: person.name,
+                // The same key the sound is played under, so "turned down to
+                // nothing" here means what it means there.
+                volumeKey: person.userId ?? person.id
+            })),
+        states
+    };
+
+    /**
+     * Whether sound is actually flowing, asked of the connection itself.
+     *
+     * The reason this exists: everything else on a call screen is drawn from
+     * things that are true long before any sound has moved. A face appears when
+     * somebody takes a seat, a ring lights up because the server said they are
+     * talking, and a track is handed over when the connection is described -
+     * none of which is evidence that a single packet has arrived. So a call
+     * where neither person could hear the other looked, on both screens,
+     * exactly like a call that was working.
+     *
+     * What is actually true is in the counters, and a counter is only evidence
+     * when it is read twice. This is that second reading; the rules it feeds are
+     * in `call-diagnosis`, where they can be checked without a browser.
+     */
+    useEffect(() => {
+        if (!meetingId) return;
+        let stopped = false;
+        settledAt.current = Date.now();
+
+        /** How this browser stands with the call server. */
+        function linkNow(current: Room | null): CallLink {
+            // No room yet is a call still being joined rather than a failure:
+            // the ticket is asked for first, and somebody in the waiting room
+            // has not been given one. What went wrong on that path is already
+            // said in `error`.
+            if (!current) return "connecting";
+            if (current.state === CONNECTED) return "connected";
+            if (current.state === CONNECTING) return "connecting";
+            if (current.state === RECONNECTING || current.state === SIGNAL_RECONNECTING) {
+                return "reconnecting";
+            }
+            return "lost";
+        }
+
+        /**
+         * What this browser is doing with its own voice.
+         *
+         * Read off the device and the publication rather than off the controls,
+         * because the whole point is to catch the case where they disagree: the
+         * microphone button is drawn from what somebody pressed, and a track
+         * that ended underneath it looks identical.
+         */
+        function micNow(current: Room | null): MicSending {
+            const device = mic.current;
+            if (!device) return "no-device";
+            const publication = current?.localParticipant.getTrackPublication(MICROPHONE);
+            // Deliberate silence first, so a muted person is never told their
+            // microphone is broken.
+            if (!device.enabled || publication?.isMuted) return "muted";
+            if (device.readyState !== "live") return "dead";
+            // The browser's own flag: the device has stopped handing over data.
+            // A headset switched off at the cable reads exactly like somebody
+            // who has decided not to talk, and this is what tells them apart.
+            if (device.muted) return "no-input";
+            if (!publication?.track) return "unpublished";
+            return "sending";
+        }
+
+        /** What has arrived from one person since the last look. */
+        async function heardFrom(
+            current: Room,
+            person: { id: string; name: string; volumeKey: string },
+            at: number
+        ): Promise<HeardFrom> {
+            const muted = watching.current.states.get(person.id)?.muted ?? false;
+            const turnedDown = volumeFor(person.volumeKey) === 0;
+            const publication = current.remoteParticipants
+                .get(person.id)
+                ?.getTrackPublication(MICROPHONE);
+            const live = publication?.track?.mediaStreamTrack.readyState === "live";
+            // Structurally, as the sender statistics are read: naming the media
+            // client's own class here would drag the module into every bundle -
+            // see `livekit` at the top of this file.
+            const receiver = publication?.track as
+                | {
+                      getReceiverStats?: () => Promise<
+                          { bytesReceived?: number; totalAudioEnergy?: number } | undefined
+                      >;
+                  }
+                | undefined;
+            if (!live || !receiver?.getReceiverStats) {
+                flow.current.delete(person.id);
+                return {
+                    id: person.id,
+                    name: person.name,
+                    muted,
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false,
+                    turnedDown
+                };
+            }
+
+            const stats = await receiver.getReceiverStats().catch(() => undefined);
+            const bytes = stats?.bytesReceived ?? 0;
+            const energy = stats?.totalAudioEnergy ?? 0;
+            // The first reading of somebody is given the benefit of the doubt.
+            // Nothing has stopped yet, and a call is not accused of silence in
+            // the three seconds it has been up.
+            const before = flow.current.get(person.id) ?? {
+                bytes,
+                energy,
+                bytesAt: at,
+                energyAt: at
+            };
+            const moved = {
+                bytes,
+                energy,
+                bytesAt: bytes > before.bytes ? at : before.bytesAt,
+                energyAt: energy > before.energy ? at : before.energyAt
+            };
+            flow.current.set(person.id, moved);
+            return {
+                id: person.id,
+                name: person.name,
+                muted,
+                subscribed: true,
+                arriving: at - moved.bytesAt < ARRIVING_WITHIN_MS,
+                carrying: at - moved.energyAt < CARRYING_WITHIN_MS,
+                turnedDown
+            };
+        }
+
+        async function sample(): Promise<void> {
+            const current = room.current;
+            const at = Date.now();
+            const link = linkNow(current);
+            const others =
+                current && link === "connected"
+                    ? await Promise.all(
+                          watching.current.others.map((person) => heardFrom(current, person, at))
+                      )
+                    : [];
+            if (stopped) return;
+            const facts: CallAudioFacts = {
+                link,
+                mic: micNow(current),
+                others,
+                deafened: deafenedRef.current,
+                companion: roleRef.current === "companion"
+            };
+            // The rows are always worth showing; the verdict is held back
+            // while the room is still settling, because a person who has just
+            // been admitted has not connected yet and reads exactly like one
+            // whose audio never arrived.
+            const judged = diagnoseCall(facts);
+            const report =
+                at - settledAt.current < SETTLING_MS
+                    ? { ...UNKNOWN_AUDIO, lines: judged.lines }
+                    : judged;
+            // Compared before it is set, because this runs on a timer and a new
+            // object every three seconds is every screen holding one rendering
+            // again for a verdict that has not changed.
+            setAudio((held) => (sameReport(held, report) ? held : report));
+        }
+
+        void sample();
+        const timer = setInterval(() => void sample(), AUDIO_CHECK_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+            flow.current.clear();
+            setAudio(UNKNOWN_AUDIO);
+        };
+    }, [meetingId]);
+
+    /**
      * Settle what this browser should be doing about audio.
      *
      * Everything is worked out from what everybody has said about themselves and
@@ -1724,6 +2026,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         .join(" ");
     useEffect(() => {
         seats.current = listening ? listening.split(" ") : [];
+        // The room changed, so the sound in it is given a moment to catch up
+        // before anything is said about it - see `SETTLING_MS`.
+        settledAt.current = Date.now();
         if (!meetingId || !nearbyEnabled()) return;
         if (seats.current.length < 2) {
             setNearby(new Set());
@@ -1802,6 +2107,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         answerCombine,
         leaveCombine,
         recording,
-        setRecording
+        setRecording,
+        audio,
+        outgoing: filteredTrack ?? micTrack
     };
 }

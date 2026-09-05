@@ -29,9 +29,9 @@ import { usePresenceRefresh } from "@/components/presence-store";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
 import { takeRememberedCall } from "./call-resume";
-import { Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
+import { AlertTriangle, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
 
 // The context and the two hooks that read it live in `call-hold`, which has no
 // runtime dependency of its own - see the note there. Passed on from here so
@@ -219,6 +219,21 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
                     {others.length + 1}
                 </span>
+                {/* The call has no sound and the reader is not on the screen
+                    that says why. Said here too, because walking away from the
+                    room is exactly what somebody does while wondering whether
+                    the other person can hear them - and a bar that looks
+                    perfectly healthy is what made this take twenty minutes to
+                    notice. The way back is the link beside it. */}
+                {!call.audio.ok && (
+                    <span
+                        title={call.audio.headline}
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-warning"
+                    >
+                        <AlertTriangle className="size-2.5 shrink-0" />
+                        No sound
+                    </span>
+                )}
                 {recorded && (
                     <span
                         title="This call is being recorded"

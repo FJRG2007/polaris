@@ -158,11 +158,20 @@ export async function filterMic(
 
     // No model when the graph is only here to change the level, and a model that
     // will not start is not a reason to throw the level away with it.
+    //
+    // The context has to survive that, and once did not. Closing it here and
+    // then going on to build the rest of the graph on it was a call publishing
+    // silence: a destination node on a closed context still hands back a live
+    // track, and a live track carrying nothing is indistinguishable from a
+    // working microphone at every point a screen can look. Nobody could hear
+    // anybody, both ends were reported as fine, and the only thing wrong was a
+    // model that had failed to load on a browser where somebody had also moved
+    // the level.
     const built = model ? await buildNode(context, filter, licensed) : null;
-    if (model && !built) {
+    if (model && !built && gain === 1) {
         source.disconnect();
         await context.close().catch(() => undefined);
-        if (gain === 1) return null;
+        return null;
     }
 
     // The model, then the level it cost and the level somebody asked for, then
@@ -188,7 +197,14 @@ export async function filterMic(
     limiter.connect(sink);
 
     const out = sink.stream.getAudioTracks()[0];
-    if (!out) {
+    // A context that would not start produces silence, and a suspended one is
+    // not visible anywhere else: the track is live, the publication is up, the
+    // level meter on the settings screen reads zero and so does everybody
+    // else's ears. Handing the microphone back untouched is worse audio and a
+    // call people can have.
+    if (!out || context.state !== "running") {
+        built?.dispose();
+        source.disconnect();
         await context.close().catch(() => undefined);
         return null;
     }
