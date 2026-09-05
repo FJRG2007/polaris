@@ -319,6 +319,11 @@ export function DriveExplorer({
         },
         [reachability]
     );
+    /** Where Polaris dialled for the source being looked at. The reason on its own
+     *  is not something anybody can act on: what has to be fixed depends on which
+     *  address was tried. */
+    const downEndpoint =
+        (connectionId && reachability?.find((entry) => entry.id === connectionId)?.endpoint) || null;
     const unreachable = downReason(connectionId);
     const anyDown = connections.some((connection) => downReason(connection.id) !== null);
 
@@ -686,6 +691,7 @@ export function DriveExplorer({
                     <UnreachableServer
                         name={selectedConnection?.name ?? "This server"}
                         detail={unreachable}
+                        endpoint={downEndpoint}
                         onRecheck={recheckSources}
                     />
                 ) : selectedConnection?.needsRekey ? (
@@ -1334,10 +1340,14 @@ function ScheduleDeleteDialog({
 function UnreachableServer({
     name,
     detail,
+    endpoint,
     onRecheck
 }: {
     name: string;
     detail: string;
+    /** Where Polaris dialled, as `host:port`. Null for a source whose address
+     *  could not be worked out at all. */
+    endpoint: string | null;
     onRecheck: () => void;
 }) {
     return (
@@ -1349,6 +1359,18 @@ function UnreachableServer({
                     <p className="text-sm text-muted-foreground">
                         {detail}. Its files are unavailable until it is back.
                     </p>
+                    {/* The address it dialled, which is what turns a reason into
+                        something somebody can act on: "that address does not
+                        resolve" is a different afternoon depending on whether it
+                        is a public name, a machine name only the office knows, or
+                        an IP that has since moved. */}
+                    {endpoint ? (
+                        <p className="text-xs text-muted-foreground">
+                            Polaris tried <span className="font-mono">{endpoint}</span>. If this
+                            server is on the same network, open it in Servers and check whether it
+                            can be reached there directly.
+                        </p>
+                    ) : null}
                     <div className="mt-1 flex flex-wrap gap-2">
                         <Button size="sm" variant="secondary" onClick={onRecheck}>
                             <RefreshCw className="size-4" />

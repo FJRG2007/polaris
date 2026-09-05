@@ -94,7 +94,12 @@ function render(source: ConnectionSummary, status: SourceStatus[]): string {
 describe("a Drive source whose machine is down", () => {
     it("says so instead of showing the file browser", () => {
         const markup = render(SERVER, [
-            { id: SERVER.id, state: "down", detail: "No answer within 3 seconds" }
+            {
+                id: SERVER.id,
+                state: "down",
+                detail: "No answer within 3 seconds",
+                endpoint: "lirio-2.example.test:22"
+            }
         ]);
 
         expect(markup).toContain("lirio-2 is not answering");
@@ -103,8 +108,35 @@ describe("a Drive source whose machine is down", () => {
         expect(markup).not.toContain("files-view");
     });
 
+    it("names the address it dialled", () => {
+        // The reason on its own cannot be acted on: "does not resolve" is a
+        // different afternoon depending on whether the address is a public name,
+        // a machine name only the office knows, or an IP that has since moved.
+        const markup = render(SERVER, [
+            {
+                id: SERVER.id,
+                state: "down",
+                detail: "That address does not resolve",
+                endpoint: "lirio-2:22"
+            }
+        ]);
+
+        expect(markup).toContain("lirio-2:22");
+    });
+
+    it("says nothing about an address when there was none to try", () => {
+        const markup = render(SERVER, [
+            { id: SERVER.id, state: "down", detail: "No answer", endpoint: null }
+        ]);
+
+        expect(markup).toContain("is not answering");
+        expect(markup).not.toContain("Polaris tried");
+    });
+
     it("marks it in the connection rail and stops it being opened", () => {
-        const markup = render(SERVER, [{ id: SERVER.id, state: "down", detail: null }]);
+        const markup = render(SERVER, [
+            { id: SERVER.id, state: "down", detail: null, endpoint: null }
+        ]);
 
         expect(markup).toContain("no answer");
         expect(markup).toContain('aria-disabled="true"');
@@ -114,7 +146,12 @@ describe("a Drive source whose machine is down", () => {
 
     it("treats a NAS the same as a server", () => {
         const markup = render(NAS, [
-            { id: NAS.id, state: "down", detail: "No route to that address" }
+            {
+                id: NAS.id,
+                state: "down",
+                detail: "No route to that address",
+                endpoint: "10.0.0.9:445"
+            }
         ]);
 
         expect(markup).toContain("unas-pro is not answering");
@@ -124,7 +161,9 @@ describe("a Drive source whose machine is down", () => {
     });
 
     it("browses normally once it answers", () => {
-        const markup = render(SERVER, [{ id: SERVER.id, state: "up", detail: null }]);
+        const markup = render(SERVER, [
+            { id: SERVER.id, state: "up", detail: null, endpoint: "lirio-2.example.test:22" }
+        ]);
 
         expect(markup).toContain("files-view");
         expect(markup).toContain("/drive?c=");

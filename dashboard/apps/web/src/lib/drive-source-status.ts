@@ -81,7 +81,14 @@ export async function driveSourceStatuses(userId: string): Promise<SourceStatus[
             const endpoint = sourceEndpoint(parseConfig(connection.config));
             if (!endpoint) return null;
             const { detail } = await probeTcp(endpoint.host, endpoint.port);
-            return { id: connection.id, state: detail === null ? "up" : "down", detail };
+            return {
+                id: connection.id,
+                state: detail === null ? "up" : "down",
+                detail,
+                // What was dialled, so a refusal names something the reader can
+                // act on rather than only what went wrong.
+                endpoint: `${endpoint.host}:${endpoint.port}`
+            };
         })
     );
     return probed.filter((status): status is SourceStatus => status !== null);

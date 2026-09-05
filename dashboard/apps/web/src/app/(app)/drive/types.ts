@@ -30,6 +30,17 @@ export interface SourceStatus {
     state: "up" | "down";
     /** Why it is not answering, in the words the connection used. */
     detail: string | null;
+    /**
+     * Where Polaris dialled, as `host:port`.
+     *
+     * Carried because the reason on its own is not actionable: "that address does
+     * not resolve" is a different afternoon depending on whether the address is a
+     * public name, a machine name only the office DNS knows, or an IP that has
+     * since been reassigned - and the one person who can tell them apart is the
+     * one reading the screen. It is nothing they cannot already see on the
+     * connection itself.
+     */
+    endpoint: string | null;
 }
 
 /**
