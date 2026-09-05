@@ -16,7 +16,14 @@
  */
 
 import type { CSSProperties } from "react";
-import type { AvatarDecoration, NameStyle, Nameplate, ProfileEffect } from "@polaris/core";
+import type {
+    AvatarDecoration,
+    NameFont,
+    NameLook,
+    NameStyle,
+    Nameplate,
+    ProfileEffect
+} from "@polaris/core";
 
 /**
  * How wide the band a decoration is drawn in is, in pixels, for a face of this
@@ -66,20 +73,141 @@ export function nameplateCss(plate: Nameplate): CSSProperties {
  * a slanted gradient meets the next tile at a slightly different colour on every
  * line of the letters, and the join stops being invisible.
  */
-export function nameStyleCss(style: NameStyle): CSSProperties {
-    const stops = style.colors
+/**
+ * The letterforms, as stacks the machine already has.
+ *
+ * Not fetched. A display name is drawn in every list in the product, so a face
+ * that arrives over the network is a hundred names reflowing a moment after the
+ * page settles, and one that fails to arrive is a hundred names in a fallback
+ * nobody picked. Everything here can be promised at any size, offline, on the
+ * first paint.
+ *
+ * `caps` is the one that is not a family. Small capitals are a real typographic
+ * variation of the face already in use, which is a different letterform for no
+ * file at all - and on a name it reads as deliberate where a second sans would
+ * read as a mistake.
+ */
+const FACES: Record<NameFont, CSSProperties> = {
+    sans: {},
+    serif: { fontFamily: 'ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif' },
+    mono: { fontFamily: "var(--font-mono)" },
+    rounded: {
+        fontFamily:
+            'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Segoe UI Variable", var(--font-sans)'
+    },
+    caps: { fontVariantCaps: "small-caps", letterSpacing: "0.03em" }
+};
+
+/** The stops of a gradient, evenly spaced. */
+function ramp(colors: readonly string[]): string {
+    if (colors.length === 1) return `${colors[0]}, ${colors[0]}`;
+    return colors
         .map((color, index, all) => `${color} ${Math.round((index / (all.length - 1)) * 100)}%`)
         .join(", ");
+}
+
+/** Paint poured through the letters rather than behind them. */
+function throughLetters(image: string, moving: boolean): CSSProperties {
     return {
-        color: style.colors[0],
-        backgroundImage: `linear-gradient(${style.moving ? 90 : 92}deg, ${stops})`,
-        ...(style.moving
-            ? { backgroundSize: "200% 100%", backgroundRepeat: "repeat-x" }
-            : null),
+        backgroundImage: image,
+        ...(moving ? { backgroundSize: "200% 100%", backgroundRepeat: "repeat-x" } : null),
         backgroundClip: "text",
         WebkitBackgroundClip: "text",
         WebkitTextFillColor: "transparent"
     } as CSSProperties;
+}
+
+/**
+ * A name, painted the way its owner chose.
+ *
+ * Seven effects, and the reason there are seven rather than one is that a
+ * gradient was the only thing the old catalogue could make - so every name that
+ * was anything at all was the same idea in different colours.
+ *
+ * What none of them touch is the size or the face's metrics. `toon` and `pop`
+ * carry weight because an outline needs a stem to sit on and a hard shadow needs
+ * something to cast one, and that is as far as it goes: a name a row taller than
+ * its neighbours is not personalisation, it is a fight over a column.
+ */
+export function nameLookCss(look: NameLook): CSSProperties {
+    const face = FACES[look.font];
+    const first = look.colors[0] ?? "#ffffff";
+    const second = look.colors[1] ?? first;
+
+    switch (look.effect) {
+        case "solid":
+            return { ...face, color: first };
+
+        case "neon":
+            // The glow is three shadows of the same colour at growing radii,
+            // which is what makes it read as light coming off the letters
+            // rather than as a blurred copy behind them.
+            return {
+                ...face,
+                color: first,
+                textShadow: `0 0 4px ${first}66, 0 0 10px ${first}59, 0 0 22px ${first}40`
+            };
+
+        case "toon":
+            // Painted, then outlined under it: `paint-order` is what stops the
+            // stroke eating half the stem from the inside, which on a name at
+            // list size is the difference between bold and smudged.
+            return {
+                ...face,
+                color: first,
+                fontWeight: 700,
+                WebkitTextStrokeWidth: "0.06em",
+                WebkitTextStrokeColor: "rgba(0,0,0,0.65)",
+                paintOrder: "stroke fill"
+            } as CSSProperties;
+
+        case "pop":
+            // A sticker: one hard offset, no blur. The offset is in em so it is
+            // the same picture at twenty pixels and at forty.
+            return {
+                ...face,
+                color: first,
+                fontWeight: 700,
+                textShadow: `0.055em 0.055em 0 rgba(0,0,0,0.55)`
+            };
+
+        case "gummy":
+            // Two tones down the letters rather than across them, with a soft
+            // light under the top edge. Vertical because that is where a
+            // rounded, wet-looking thing takes its highlight from.
+            return {
+                ...face,
+                fontWeight: 700,
+                ...throughLetters(`linear-gradient(180deg, ${ramp([first, second])})`, false),
+                filter: `drop-shadow(0 0.04em 0.02em ${second}55)`
+            };
+
+        case "prism":
+            return {
+                ...face,
+                color: first,
+                ...throughLetters(`linear-gradient(90deg, ${ramp(look.colors)})`, true)
+            };
+
+        case "gradient":
+        default:
+            return {
+                ...face,
+                color: first,
+                ...throughLetters(`linear-gradient(92deg, ${ramp([first, second])})`, false)
+            };
+    }
+}
+
+/** The old shape, kept for the catalogue entries the picker still draws as
+ *  swatches. Everything that paints a real name goes through `nameLookCss`. */
+export function nameStyleCss(style: NameStyle): CSSProperties {
+    return nameLookCss({
+        effect: style.moving ? "prism" : "gradient",
+        font: "sans",
+        colors: style.colors,
+        moving: style.moving === true
+    });
 }
 
 /**
@@ -90,7 +218,9 @@ export function nameStyleCss(style: NameStyle): CSSProperties {
  * `polaris-name-flow` in globals.css. Kept beside the properties it belongs with
  * so a caller cannot apply one without the other.
  */
-export function nameStyleClass(style: NameStyle | null | undefined): string | undefined {
+export function nameStyleClass(
+    style: { readonly moving?: boolean } | null | undefined
+): string | undefined {
     return style?.moving ? "profile-name-flow" : undefined;
 }
 

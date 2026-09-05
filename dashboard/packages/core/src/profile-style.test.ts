@@ -140,6 +140,21 @@ describe("a decoration", () => {
         for (const decoration of style.AVATAR_DECORATIONS) {
             expect(decoration.layers.length).toBeGreaterThan(0);
             for (const layer of decoration.layers) {
+                if (layer.kind === "art") {
+                    // A drawing is bounded by the box, not by the circle drawn
+                    // inside it. The box is what the overlay paints in and what
+                    // a clipping ancestor would cut at; the corners of it are
+                    // perfectly good places for the tip of a wing.
+                    const [x, y, width, height] = layer.bounds;
+                    expect(x).toBeGreaterThanOrEqual(0);
+                    expect(y).toBeGreaterThanOrEqual(0);
+                    expect(x + width).toBeLessThanOrEqual(1);
+                    expect(y + height).toBeLessThanOrEqual(1);
+                    continue;
+                }
+                // A ring is bounded by the circle, because that is the shape it
+                // is: painted past it, it is cut off at the sides and nowhere
+                // else, which reads as a mistake rather than as a decoration.
                 expect(style.layerReach(layer).outer).toBeLessThanOrEqual(0.5);
             }
         }

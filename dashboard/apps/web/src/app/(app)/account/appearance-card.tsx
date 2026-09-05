@@ -45,7 +45,7 @@ import {
 } from "@polaris/ui";
 import {
     frameCss,
-    nameStyleCss,
+    nameLookCss,
     nameplateCss,
     nameStyleClass,
     sheenCss,
@@ -91,7 +91,7 @@ export function AppearanceCard({
     const background: Background = style.banner?.kind ?? "photo";
     const effect = core.effectOf(style.effect);
     const plate = core.nameplateOf(style.nameplate);
-    const painted = core.nameStyleOf(style.nameStyle);
+    const painted = core.nameLookOf(style.nameStyle);
     const frame = effect ? frameCss(effect) : null;
     const sheen = effect ? sheenCss(effect) : null;
 
@@ -189,7 +189,7 @@ export function AppearanceCard({
                         <p className="text-base font-semibold leading-tight">
                             <span
                                 className={nameStyleClass(painted)}
-                                style={painted ? nameStyleCss(painted) : undefined}
+                                style={painted ? nameLookCss(painted) : undefined}
                             >
                                 {name}
                             </span>
@@ -210,7 +210,7 @@ export function AppearanceCard({
                             <span className="truncate text-sm">
                                 <span
                                     className={nameStyleClass(painted)}
-                                    style={painted ? nameStyleCss(painted) : undefined}
+                                    style={painted ? nameLookCss(painted) : undefined}
                                 >
                                     {name}
                                 </span>
@@ -221,7 +221,7 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Behind your name"
+                        label="Banner"
                         hint="The band across the top of your profile, under your banner picture."
                     />
                     <div className="flex flex-wrap gap-1.5">
@@ -295,7 +295,7 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Around your face"
+                        label="Avatar decoration"
                         hint="Drawn on your picture everywhere it appears, at whatever size it is drawn. Every one of them is free."
                     />
                     {/* A gallery rather than a row of chips, because a decoration
@@ -341,7 +341,7 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Behind your row"
+                        label="Nameplate"
                         hint="Where your name appears in a list of people, like the members of a conversation."
                     />
                     <div className="flex flex-wrap gap-1.5">
@@ -367,30 +367,14 @@ export function AppearanceCard({
 
                 <section className="flex flex-col gap-2">
                     <Field
-                        label="Your name"
-                        hint="Colours across the letters, still or moving. Nothing else changes: not the size, not the weight."
+                        label="Display name style"
+                        hint="An effect, letterforms and your own colours. Nothing changes the size, so a name is never taller than the row it is in."
                     />
-                    <div className="flex flex-wrap gap-1.5">
-                        <Choice chosen={!style.nameStyle} onClick={() => set({ nameStyle: null })} label="Plain" />
-                        {core.NAME_STYLES.map((entry) => (
-                            <Choice
-                                key={entry.id}
-                                chosen={style.nameStyle === entry.id}
-                                onClick={() => set({ nameStyle: entry.id })}
-                                label={entry.label}
-                                // The word on the button is painted the way the
-                                // name will be, moving one included, so the
-                                // choice is made by looking rather than by
-                                // guessing what "Prism" means.
-                                labelClass={nameStyleClass(entry)}
-                                style={nameStyleCss(entry)}
-                            />
-                        ))}
-                    </div>
+                    <NameStylePicker value={style.nameStyle} onChange={(next) => set({ nameStyle: next })} />
                 </section>
 
                 <section className="flex flex-col gap-2">
-                    <Field label="Your profile card" hint="An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion." />
+                    <Field label="Profile effect" hint="An edge, a slow band of light, or both. It stops for anybody who has asked their machine for less motion." />
                     <div className="flex flex-wrap gap-1.5">
                         <Choice chosen={!style.effect} onClick={() => set({ effect: null })} label="None" />
                         {core.PROFILE_EFFECTS.map((entry) => (
@@ -562,5 +546,133 @@ function Tile({
                 <span className="text-muted-foreground text-[0.625rem] leading-none">{note}</span>
             ) : null}
         </button>
+    );
+}
+
+/** What each effect is called on the button, and what it is for. */
+const EFFECT_LABELS: Record<core.NameEffect, string> = {
+    solid: "Solid",
+    gradient: "Gradient",
+    neon: "Neon",
+    toon: "Toon",
+    pop: "Pop",
+    gummy: "Gummy",
+    prism: "Prism"
+};
+
+const FONT_LABELS: Record<core.NameFont, string> = {
+    sans: "Default",
+    serif: "Serif",
+    mono: "Mono",
+    rounded: "Rounded",
+    caps: "Small caps"
+};
+
+/** Where a name starts when somebody turns one on, so the first thing they see
+ *  is a painted name rather than black on black. */
+const FIRST_INK = "#5b8def";
+const SECOND_INK = "#a06bff";
+
+/**
+ * Choosing how a name is painted.
+ *
+ * Three questions, in the order they matter: what it does, what it is set in,
+ * and in which colours. Every button is drawn in the thing it selects - the word
+ * "Neon" glows, "Serif" is set in a serif - because the alternative is a list of
+ * nouns somebody has to try one at a time to find out what they mean.
+ *
+ * The catalogue that came before this is not offered any more, and does not need
+ * to be: everything in it was a gradient between two colours, which is one of
+ * the seven with the colour pickers underneath it. What is still read is the
+ * stored ids, so nobody's name changes because the screen did.
+ */
+function NameStylePicker({
+    value,
+    onChange
+}: {
+    value: string | null;
+    onChange: (next: string | null) => void;
+}) {
+    const look = core.nameLookOf(value);
+    const on = look !== null;
+    const effect = look?.effect ?? "gradient";
+    const font = look?.font ?? "sans";
+    const first = look?.colors[0] ?? FIRST_INK;
+    const second = look?.colors[1] ?? SECOND_INK;
+
+    /** Write the whole look every time. It is one value in one column, so there
+     *  is no half-changed state to be in. */
+    const put = (part: Partial<core.NameLook>) =>
+        onChange(
+            core.writeNameLook({
+                effect: part.effect ?? effect,
+                font: part.font ?? font,
+                colors: part.colors ?? [first, second],
+                moving: false
+            })
+        );
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-1.5">
+                <Choice chosen={!on} onClick={() => onChange(null)} label="Plain" />
+                {core.NAME_EFFECTS.map((entry) => (
+                    <Choice
+                        key={entry}
+                        chosen={on && effect === entry}
+                        onClick={() => put({ effect: entry })}
+                        label={EFFECT_LABELS[entry]}
+                        // Painted as the thing it selects, in the colours
+                        // already chosen, so the choice is made by looking.
+                        labelClass={nameStyleClass({ moving: entry === "prism" })}
+                        style={nameLookCss({
+                            effect: entry,
+                            font,
+                            colors: [first, second],
+                            moving: entry === "prism"
+                        })}
+                    />
+                ))}
+            </div>
+
+            {on && (
+                <>
+                    <div className="flex flex-wrap gap-1.5">
+                        {core.NAME_FONTS.map((entry) => (
+                            <Choice
+                                key={entry}
+                                chosen={font === entry}
+                                onClick={() => put({ font: entry })}
+                                label={FONT_LABELS[entry]}
+                                style={nameLookCss({
+                                    effect: "solid",
+                                    font: entry,
+                                    colors: ["currentColor"],
+                                    moving: false
+                                })}
+                            />
+                        ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <ColorPicker
+                            label={core.effectTakesTwo(effect) ? "From" : "Colour"}
+                            value={first}
+                            onChange={(next) => put({ colors: [next, second] })}
+                        />
+                        {/* Only for the effects that actually run between two.
+                            A second picker on Solid is a control that changes
+                            nothing, which is worse than one that is missing. */}
+                        {core.effectTakesTwo(effect) && (
+                            <ColorPicker
+                                label="To"
+                                value={second}
+                                onChange={(next) => put({ colors: [first, next] })}
+                            />
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
     );
 }

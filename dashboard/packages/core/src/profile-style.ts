@@ -524,126 +524,135 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     // ---------------------------------------------------------------------
     // Worn
     //
-    // Not rings. A thing sitting on somebody's head, which is a different kind
-    // of ornament and needed a different kind of layer - see `art`. They are
-    // drawn here as shapes and coordinates for the same reason the rings are
-    // parameters: there is no file to fetch, nothing to go missing behind a
-    // proxy, nothing to license, and adding one is a line in a list.
+    // Not rings. Things sitting on somebody's head, which is a different kind of
+    // ornament and needed a different kind of layer - see `art`. Drawn here as
+    // shapes and coordinates for the same reason the rings are parameters: no
+    // file to fetch, nothing to go missing behind a proxy, nothing to license,
+    // and adding one is a line in a list.
     //
-    // They stir only under a pointer. Thirty faces in a list all fidgeting on
-    // their own is a list nobody can read down; the same thirty waking one at a
-    // time as somebody moves across them is the charm.
+    // The band is drawn OUTSIDE the face (see `Avatar`), so the picture is
+    // never made smaller by wearing one and these sit above the head rather than
+    // over the top of it. In this box the face fills the middle and the band is
+    // the ring around it: at a width of 0.12 the face reaches to about r 40 of
+    // 50, so anything above y 10 is clear of it and anything below is on it.
+    //
+    // They stir only under a pointer. Thirty faces in a list all twitching on
+    // their own timers is a list nobody can read down; the same thirty waking one
+    // at a time as somebody moves across them is the charm.
     // ---------------------------------------------------------------------
     {
         id: "cat",
-        label: "Cat",
-        width: 0.1,
+        label: "Cat ears",
+        width: 0.12,
         layers: [
             {
                 kind: "art",
-                // Sits on the rim and hangs over it, which is why it is drawn in
-                // front. Behind the photograph this is two ears and no cat.
-                bounds: [0.27, 0.06, 0.46, 0.26],
+                // Two ears on the crown and nothing else. A whole animal at the
+                // size a face is drawn in a member list is a smudge with a tail;
+                // two triangles at the right angle read as a cat at twenty
+                // pixels, which is the size that has to work.
+                bounds: [0.16, 0.0, 0.68, 0.34],
                 front: true,
-                wake: 2.4,
+                wake: 1.6,
                 motion: "sway",
                 marks: [
-                    // The tail first, so the body sits over where it joins.
+                    // Left ear. Set at an angle rather than upright: an ear that
+                    // stands straight up reads as a horn.
+                    { shape: "path", d: "M 22 34 L 27 6 L 48 24 Z", fill: "#f2a25c" },
+                    { shape: "path", d: "M 27 31 L 30 14 L 41 25 Z", fill: "#f7c0ad" },
+                    // Right ear, mirrored about the middle.
+                    { shape: "path", d: "M 78 34 L 73 6 L 52 24 Z", fill: "#f2a25c" },
+                    { shape: "path", d: "M 73 31 L 70 14 L 59 25 Z", fill: "#f7c0ad" },
+                    // A whisker of shadow where each meets the head, so they sit
+                    // on it rather than float above it.
                     {
                         shape: "path",
-                        d: "M 35 30 C 28 30 28 21 33 19",
-                        stroke: "#e8934a",
-                        width: 3.4
-                    },
-                    { shape: "ellipse", cx: 47, cy: 25, rx: 13, ry: 7, fill: "#f2a25c" },
-                    // Ears before the head, so their bases are covered by it and
-                    // they read as growing out of it rather than stuck on.
-                    { shape: "path", d: "M 56 17 L 57 8.5 L 63.5 14 Z", fill: "#f2a25c" },
-                    { shape: "path", d: "M 66 13 L 71.5 8 L 71.5 16.5 Z", fill: "#f2a25c" },
-                    { shape: "path", d: "M 57.6 15 L 58.2 11 L 61.6 14 Z", fill: "#f6bda6" },
-                    { shape: "path", d: "M 67.4 13.4 L 70.2 10.6 L 70.2 15.2 Z", fill: "#f6bda6" },
-                    { shape: "circle", cx: 62, cy: 22, r: 8, fill: "#f2a25c" },
-                    // Asleep: two closed curves rather than two dots, which is
-                    // the whole difference between a sleeping cat and a staring
-                    // one.
-                    {
-                        shape: "path",
-                        d: "M 57.6 22.4 q 2 2.2 4 0",
-                        stroke: "#5a3a22",
-                        width: 1.1
+                        d: "M 23 33 Q 35 29 47 25",
+                        stroke: "#d18341",
+                        opacity: 0.33,
+                        width: 1.6
                     },
                     {
                         shape: "path",
-                        d: "M 63.4 22.4 q 2 2.2 4 0",
-                        stroke: "#5a3a22",
-                        width: 1.1
-                    },
-                    { shape: "path", d: "M 61 25.6 L 63.4 25.6 L 62.2 27 Z", fill: "#d1705a" }
+                        d: "M 77 33 Q 65 29 53 25",
+                        stroke: "#d18341",
+                        opacity: 0.33,
+                        width: 1.6
+                    }
                 ]
             }
         ],
         glow: "#f2a25c"
     },
     {
-        id: "wings",
-        label: "Wings",
-        width: 0.1,
+        id: "horns",
+        label: "Horns",
+        width: 0.12,
         layers: [
             {
                 kind: "art",
-                bounds: [0.1, 0.2, 0.8, 0.34],
+                bounds: [0.14, 0.0, 0.72, 0.32],
                 front: true,
-                opacity: 0.94,
-                wake: 3.2,
+                wake: 2.6,
+                motion: "sway",
+                marks: [
+                    // Curved, and thickest where they leave the head. A horn of
+                    // even width is a spike.
+                    {
+                        shape: "path",
+                        d: "M 26 32 C 16 24 14 12 20 4 C 26 12 30 22 34 27 Z",
+                        fill: "#c0403f"
+                    },
+                    {
+                        shape: "path",
+                        d: "M 74 32 C 84 24 86 12 80 4 C 74 12 70 22 66 27 Z",
+                        fill: "#c0403f"
+                    },
+                    { shape: "path", d: "M 24 27 C 19 21 18 14 21 9", stroke: "#8f2726", width: 1.4 },
+                    { shape: "path", d: "M 76 27 C 81 21 82 14 79 9", stroke: "#8f2726", width: 1.4 }
+                ]
+            }
+        ],
+        glow: "#c0403f"
+    },
+    {
+        id: "wings",
+        label: "Wings",
+        width: 0.14,
+        layers: [
+            {
+                kind: "art",
+                // Out to the sides and behind, which is where wings are. They
+                // reach the edge of the band on both sides because a small wing
+                // is a fin.
+                bounds: [0.086, 0.22, 0.828, 0.42],
+                front: true,
+                opacity: 0.96,
+                wake: 3,
                 motion: "bob",
                 marks: [
                     {
                         shape: "path",
-                        d: "M 40 26 C 26 24 14 32 12 44 C 20 40 26 42 30 46 C 30 38 34 30 40 26 Z",
+                        d: "M 36 30 C 23 26 11 34 9 50 C 17 44 22 45 27 50 C 26 41 30 34 36 30 Z",
                         fill: "#eef3ff",
-                        stroke: "#c3d0ea",
+                        stroke: "#bfcde9",
                         width: 1
                     },
                     {
                         shape: "path",
-                        d: "M 60 26 C 74 24 86 32 88 44 C 80 40 74 42 70 46 C 70 38 66 30 60 26 Z",
+                        d: "M 64 30 C 77 26 89 34 91 50 C 83 44 78 45 73 50 C 74 41 70 34 64 30 Z",
                         fill: "#eef3ff",
-                        stroke: "#c3d0ea",
+                        stroke: "#bfcde9",
                         width: 1
                     },
-                    // The feather lines. Three each, because the shape reads as a
-                    // wing only once something inside it runs the way feathers do.
-                    { shape: "path", d: "M 36 30 C 28 32 22 38 19 44", stroke: "#c3d0ea", width: 0.8 },
-                    { shape: "path", d: "M 34 35 C 28 37 24 41 22 46", stroke: "#c3d0ea", width: 0.8 },
-                    { shape: "path", d: "M 64 30 C 72 32 78 38 81 44", stroke: "#c3d0ea", width: 0.8 },
-                    { shape: "path", d: "M 66 35 C 72 37 76 41 78 46", stroke: "#c3d0ea", width: 0.8 }
+                    { shape: "path", d: "M 32 34 C 23 37 16 43 12 50", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 30 41 C 23 43 18 47 15 52", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 68 34 C 77 37 84 43 88 50", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 70 41 C 77 43 82 47 85 52", stroke: "#bfcde9", width: 0.9 }
                 ]
             }
         ],
         glow: "#dbe6ff"
-    },
-    {
-        id: "party",
-        label: "Party hat",
-        width: 0.1,
-        layers: [
-            {
-                kind: "art",
-                bounds: [0.34, 0.05, 0.32, 0.22],
-                front: true,
-                wake: 1.8,
-                motion: "bob",
-                marks: [
-                    { shape: "path", d: "M 50 6.5 L 60 24 L 40 24 Z", fill: "#5b8def" },
-                    // Two stripes rather than a pattern: at twenty pixels a
-                    // pattern is a texture, and a texture on a cone is a smudge.
-                    { shape: "path", d: "M 46.2 13 L 53.8 13 L 55.6 16 L 44.4 16 Z", fill: "#f6c445" },
-                    { shape: "ellipse", cx: 50, cy: 24, rx: 10.6, ry: 2.6, fill: "#3f6fd0" },
-                    { shape: "circle", cx: 50, cy: 6.2, r: 3, fill: "#f6c445" }
-                ]
-            }
-        ],
-        glow: "#5b8def"
     }
 ];
 
@@ -798,6 +807,109 @@ export const PROFILE_EFFECTS: readonly ProfileEffect[] = [
 ];
 
 /**
+ * A name painted the way its owner chose, rather than the way a catalogue did.
+ *
+ * The catalogue below came first and is still here, because profiles hold its
+ * ids. What it could not do is the thing people actually asked for: their own
+ * colours, and something other than a gradient. So a name style is now either
+ * one of those ids or a composed value, and which it is is decided by whether
+ * there is a separator in it - the same trick the banner uses, for the same
+ * reason. One column, one value, read and written whole, and a new effect is an
+ * arm in a parser rather than a migration on a table every account has a row in.
+ *
+ * Deliberately still small. A name appears in a hundred places its owner does
+ * not control, so what this can change is the paint and the letterforms and
+ * nothing else - no size, no weight beyond what an effect needs to exist, no
+ * face that would make one row of a list taller than the others. A name bigger
+ * than everybody else's is not personalisation, it is a fight over a column, and
+ * the person who loses it is whoever is reading.
+ */
+export const NAME_EFFECTS = [
+    "solid",
+    "gradient",
+    "neon",
+    "toon",
+    "pop",
+    "gummy",
+    "prism"
+] as const;
+
+export type NameEffect = (typeof NAME_EFFECTS)[number];
+
+/**
+ * The letterforms on offer.
+ *
+ * Stacks the machine already has, not files fetched from anywhere. A display
+ * name is drawn in every list in the product, so a face that arrives over the
+ * network is a hundred names that reflow a moment after the page settles - and
+ * one that fails to arrive is a hundred names in a fallback nobody chose. What
+ * is here is what can be promised at any size, offline, on the first paint.
+ */
+export const NAME_FONTS = ["sans", "serif", "mono", "rounded", "caps"] as const;
+
+export type NameFont = (typeof NAME_FONTS)[number];
+
+export interface NameLook {
+    readonly effect: NameEffect;
+    readonly font: NameFont;
+    /** One colour for most effects, two for the ones that run between them.
+     *  Always at least one; the second is optional everywhere. */
+    readonly colors: readonly string[];
+    /** Whether the paint walks across the letters. A property of the effect
+     *  rather than a choice, so it cannot be asked for on one that would jump. */
+    readonly moving: boolean;
+}
+
+/** Whether an effect runs between two colours or paints with one. */
+export function effectTakesTwo(effect: NameEffect): boolean {
+    return effect === "gradient" || effect === "gummy" || effect === "prism";
+}
+
+/** How a composed value is written. Effect, letterforms, then the colours. */
+export function writeNameLook(look: NameLook): string {
+    const colors = effectTakesTwo(look.effect) ? look.colors.slice(0, 2) : look.colors.slice(0, 1);
+    return [look.effect, look.font, ...colors].join(":");
+}
+
+/**
+ * A stored value as a look, whichever of the two shapes it is in.
+ *
+ * Null for anything that is neither - a catalogue id that has been withdrawn, a
+ * colour that is not one, an effect from a version that is not this one. A name
+ * that cannot be read is drawn plain, which is what it was drawn as before
+ * anybody chose anything.
+ */
+export function nameLookOf(value: string | null | undefined): NameLook | null {
+    if (!value) return null;
+    if (!value.includes(":")) {
+        const entry = pick(NAME_STYLES, value);
+        if (!entry) return null;
+        // The catalogue as a look: the gradients it always was, and the walk it
+        // always had.
+        return {
+            effect: entry.moving ? "prism" : "gradient",
+            font: "sans",
+            colors: entry.colors,
+            moving: entry.moving === true
+        };
+    }
+    const [effect, font, ...colors] = value.split(":");
+    if (!NAME_EFFECTS.includes(effect as NameEffect)) return null;
+    if (!NAME_FONTS.includes(font as NameFont)) return null;
+    const read = colors.map((color) => readHex(color)).filter((color): color is string => color !== null);
+    if (read.length === 0) return null;
+    return {
+        effect: effect as NameEffect,
+        font: font as NameFont,
+        colors: effectTakesTwo(effect as NameEffect) ? read.slice(0, 2) : read.slice(0, 1),
+        // Only the one that was built to come back to where it began. Every
+        // other effect is a still picture, and a still picture that animates is
+        // a name that flickers in every list its owner appears in.
+        moving: effect === "prism"
+    };
+}
+
+/**
  * How the display name is painted.
  *
  * A name is the one piece of somebody's profile that appears in a hundred places
@@ -901,7 +1013,12 @@ export function readProfileStyle(row: {
         decoration: decorationOf(row.decoration)?.id ?? null,
         nameplate: nameplateOf(row.nameplate)?.id ?? null,
         effect: effectOf(row.effect)?.id ?? null,
-        nameStyle: nameStyleOf(row.nameStyle)?.id ?? null
+        // Kept as it was written rather than reduced to a catalogue id: a
+        // composed look IS the value, and there is no id to reduce it to. Read
+        // through the same function that decides whether it is one, so nothing
+        // reaches a `style` attribute without having been recognised.
+        nameStyle:
+            typeof row.nameStyle === "string" && nameLookOf(row.nameStyle) ? row.nameStyle : null
     };
 }
 

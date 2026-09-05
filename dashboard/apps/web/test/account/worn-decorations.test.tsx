@@ -15,7 +15,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
-import { AVATAR_DECORATIONS, decorationOf, decorationMoves, layerReach } from "@polaris/core";
+import { AVATAR_DECORATIONS, decorationOf, decorationMoves } from "@polaris/core";
 
 function pass(id: string, front: boolean): string {
     return renderToStaticMarkup(
@@ -64,20 +64,31 @@ describe("a decoration that is a drawing", () => {
         expect(decorationMoves(decorationOf("cat")!)).toBe(true);
     });
 
-    it("never leaves the box the layout reserved", () => {
-        // The one rule with no exception. Paint outside it and the first
-        // scrolling panel cuts the drawing in half.
-        for (const decoration of WORN) {
-            for (const layer of decoration.layers) {
-                expect(layerReach(layer).outer).toBeLessThanOrEqual(0.5);
-            }
-        }
-    });
-
     it("draws each mark it was given", () => {
         const html = pass("cat", true);
         const marks = (html.match(/<(circle|path|ellipse)\b/g) ?? []).length;
-        // Body, head, two ears, two inner ears, two eyes, a nose and a tail.
-        expect(marks).toBeGreaterThanOrEqual(10);
+        // Two ears, two inner ears, and the shadow where each meets the head.
+        // Ears rather than a whole animal: at the size a face is drawn in a
+        // member list, a cat is a smudge with a tail, and two triangles at the
+        // right angle read as one at twenty pixels.
+        expect(marks).toBeGreaterThanOrEqual(6);
+    });
+
+    it("never leaves the box the overlay paints in", () => {
+        // The rule that replaced "stay inside the circle" once the band moved
+        // outside the face. The overlay is a square, a clipping ancestor cuts at
+        // its edges, and the corners of it are perfectly good places for the tip
+        // of a wing - which the circle rule forbade for no reason a reader could
+        // see.
+        for (const decoration of WORN) {
+            for (const layer of decoration.layers) {
+                if (layer.kind !== "art") continue;
+                const [x, y, width, height] = layer.bounds;
+                expect(x).toBeGreaterThanOrEqual(0);
+                expect(y).toBeGreaterThanOrEqual(0);
+                expect(x + width).toBeLessThanOrEqual(1);
+                expect(y + height).toBeLessThanOrEqual(1);
+            }
+        }
     });
 });

@@ -23,8 +23,8 @@
 
 import { cn } from "@polaris/ui";
 import { useProfileStyle } from "@/components/profile-style-store";
-import { nameStyleOf, nameplateOf, type Nameplate } from "@polaris/core";
-import { nameStyleClass, nameStyleCss, nameplateCss } from "@/lib/profile-style-css";
+import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
+import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
 
 export function PersonName({
@@ -43,11 +43,11 @@ export function PersonName({
      *  that ends the name. */
     children?: ReactNode;
 }) {
-    const style = nameStyleOf(useProfileStyle(id)?.nameStyle ?? null);
+    const style = nameLookOf(useProfileStyle(id)?.nameStyle ?? null);
     return (
         <span
             className={cn(className, nameStyleClass(style))}
-            style={style ? nameStyleCss(style) : undefined}
+            style={style ? nameLookCss(style) : undefined}
         >
             {name}
             {children}
