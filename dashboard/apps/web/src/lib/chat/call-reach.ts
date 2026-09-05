@@ -21,6 +21,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { answering, callServer } from "@/lib/chat/call-server";
 import { probeTcpPort, publicProbeHost } from "@/lib/net/port-probe";
 import { CALL_PORTS, CALL_TCP_PORT, type CallPortsReading } from "@/lib/chat/call-ports";
+import { callAddressFacts } from "@/lib/chat/call-address-watch";
 
 /** Where the proof is kept once there is any. A setting rather than a row: it is
  *  one fact about this deployment, and it outlives every call it was learned in. */
@@ -47,10 +48,13 @@ export function forgetProbe(): void {
  * out a timeout, and a page must not wait on it to paint.
  */
 export async function readCallPorts(probe = false): Promise<CallPortsReading> {
-    const [endpoint, lanIp, reachedAt] = await Promise.all([
+    const [endpoint, lanIp, reachedAt, address] = await Promise.all([
         callServer(),
         getHostLanIp().catch(() => null),
-        getSetting(REACHED_AT)
+        getSetting(REACHED_AT),
+        // Read, never repaired. A page that restarted a container by being
+        // opened is a page nobody can open to look at.
+        callAddressFacts().catch(() => ({ current: null, startedAt: null, stale: false }))
     ]);
 
     const base = {
@@ -64,7 +68,10 @@ export async function readCallPorts(probe = false): Promise<CallPortsReading> {
         shipped: endpoint?.shipped ?? false,
         lanIp,
         confirmedAt: reachedAt || null,
-        confirmed: Boolean(reachedAt)
+        confirmed: Boolean(reachedAt),
+        publicIp: address.current,
+        askedAt: address.startedAt,
+        addressStale: address.stale
     };
 
     // Nothing here is about a server somebody else runs, and nothing can be

@@ -235,6 +235,15 @@ export async function register(): Promise<void> {
     // "connected" in the DB but dead at the bridge until manually reconnected.
     const { startChannelReconcile } = await import("./lib/messaging-service");
     startChannelReconcile();
+
+    // Watch the address this line hands out to callers. A media server asks for
+    // it once, as it starts, and hands out that answer for the life of the
+    // container - so a connection whose address is not permanent silently starts
+    // sending everybody's sound to somebody else's address, while every screen
+    // in the product says the call is healthy. Restarting it is the whole
+    // repair, so Polaris does that itself and tells an administrator afterwards.
+    const { startCallAddressWatch } = await import("./lib/chat/call-address-watch");
+    startCallAddressWatch();
 }
 
 /** How long each further attempt waits, in order. Backed off rather than

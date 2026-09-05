@@ -67,4 +67,19 @@ export interface CallPortsReading {
     /** Why nothing could be knocked on, when nothing could. Null when a probe
      *  ran - which still proves nothing on silence, only on an answer. */
     readonly cannotProbe: string | null;
+    /**
+     * The address callers are sent to, and whether it is still this network's.
+     *
+     * The other way calls die, and the one that looks exactly like a router
+     * nobody configured: the media server asks for this line's public address
+     * once, as it starts, and hands that answer out until it restarts. A line
+     * whose address is not permanent therefore starts sending everybody's sound
+     * to an address that belongs to somebody else, while every port on this card
+     * stays green - because the ports ARE forwarded and always were.
+     */
+    readonly publicIp: string | null;
+    /** When the call server last asked, which is when it last started. */
+    readonly askedAt: string | null;
+    /** Whether what it is handing out predates the last change of address. */
+    readonly addressStale: boolean;
 }
