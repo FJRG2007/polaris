@@ -17,6 +17,14 @@ import { useVaultSession } from "./vault-session";
 import { useVaultCollections } from "./use-vault-collections";
 import { PasswordGenerator, generate } from "@/components/password-generator";
 import { QrScanDialog } from "./qr-scan";
+import {
+    AmexMark,
+    DinersClubMark,
+    DiscoverMark,
+    JcbMark,
+    MastercardMark,
+    VisaMark
+} from "@/components/brand-icons";
 import { parseTotp } from "@/lib/vault/totp-browser";
 import { FolderPlus, Loader2, Lock, LockOpen, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
 import { emptyItem, IDENTITY_FIELDS, type VaultFolder, type VaultItem } from "./vault-model";
@@ -31,6 +39,7 @@ import {
     Input,
     Select,
     Textarea,
+    cn,
     useDeferredFocus
 } from "@polaris/ui";
 
@@ -53,6 +62,68 @@ const TYPE_OPTIONS = core.CIPHER_TYPES.map((type) => ({
 }));
 
 /** Turn a field key like `postalCode` into "Postal code". */
+/**
+ * The identity, in the groups it is actually made of.
+ *
+ * Seventeen fields two abreast is a wall, and it puts "Address 2" beside
+ * "Passport number" as though they were the same kind of question. These are
+ * four questions - who they are, how to reach them, where they live, and the
+ * numbers a government gave them - and the address gets the shape an address
+ * has rather than a share of the grid.
+ */
+const IDENTITY_GROUPS: readonly {
+    title: string;
+    fields: readonly { field: (typeof IDENTITY_FIELDS)[number]; span?: "full" }[];
+}[] = [
+    {
+        title: "Name",
+        fields: [
+            { field: "title" },
+            { field: "firstName" },
+            { field: "middleName" },
+            { field: "lastName" },
+            { field: "company", span: "full" }
+        ]
+    },
+    {
+        title: "Getting hold of them",
+        fields: [{ field: "email" }, { field: "phone" }, { field: "username" }]
+    },
+    {
+        title: "Address",
+        fields: [
+            { field: "address1", span: "full" },
+            { field: "address2", span: "full" },
+            { field: "city" },
+            { field: "state" },
+            { field: "postalCode" },
+            { field: "country" }
+        ]
+    },
+    {
+        title: "Numbers they were given",
+        fields: [{ field: "ssn" }, { field: "passportNumber" }, { field: "licenseNumber" }]
+    }
+];
+
+/** Where the derived label reads badly. `Address 1` is what the field is called
+ *  and not what anybody would write on an envelope. */
+const IDENTITY_LABELS: Partial<Record<(typeof IDENTITY_FIELDS)[number], string>> = {
+    address1: "Street",
+    address2: "Flat, suite, building",
+    state: "County or state",
+    postalCode: "Postcode",
+    ssn: "National insurance or social security number",
+    licenseNumber: "Driving licence number",
+    username: "Username on file"
+};
+
+/** A hint only where the field's own name does not say what goes in it. */
+const IDENTITY_HINTS: Partial<Record<(typeof IDENTITY_FIELDS)[number], string>> = {
+    title: "Mr, Ms, Dr",
+    address2: "Optional"
+};
+
 function humanize(field: string): string {
     const spaced = field
         .replace(/([A-Z])/g, " $1")
@@ -87,6 +158,18 @@ export function ItemDialog({
     /** Whether the QR reader is open. Its own state rather than a route, because
      *  it belongs to the field beside it. */
     const [scanning, setScanning] = useState(false);
+    /**
+     * The expiry as one box, because a card prints one.
+     *
+     * Its own state beside the two stored fields rather than derived from them:
+     * somebody typing `0` has typed something that is not yet a month, and a box
+     * that rewrote itself from a half-parsed value on every keystroke would take
+     * the caret with it.
+     */
+    const [expiry, setExpiry] = useState("");
+    /** Who issued the card. The cipher model has the network and nothing for the
+     *  bank, so it lives in a custom field - see `BANK_FIELD`. */
+    const [bank, setBank] = useState("");
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -105,9 +188,65 @@ export function ItemDialog({
         if (!item) return;
         setDraft(item);
         setGenerator(false);
+        setScanning(false);
         setNewFolder(null);
         setError(null);
+        // The one-box expiry and the bank are drawn from what was stored: two
+        // fields the cipher model has, and one custom field it does not.
+        setExpiry(
+            item.card.expMonth || item.card.expYear
+                ? core.writeCardExpiry({ month: item.card.expMonth, year: item.card.expYear })
+                : ""
+        );
+        setBank(core.fieldValue(item.fields, core.BANK_FIELD));
     }, [item]);
+
+    /**
+     * What to say about the expiry, or nothing.
+     *
+     * A card that has already expired is worth saying loudly; one that goes in a
+     * month or two is worth mentioning before the day it stops working rather
+     * than after, which is when somebody finds out otherwise.
+     */
+    const expiryNote = (() => {
+        if (!draft.card.expMonth || !draft.card.expYear) {
+            return expiry.trim() && !core.readCardExpiry(expiry)
+                ? { tone: "danger" as const, text: "That is not a month and a year." }
+                : null;
+        }
+        const stored = { month: draft.card.expMonth, year: draft.card.expYear };
+        const now = new Date();
+        if (core.cardExpired(stored, now)) {
+            return { tone: "danger" as const, text: "This card has expired." };
+        }
+        if (core.cardExpiringSoon(stored, now)) {
+            return { tone: "warning" as const, text: "This card expires soon." };
+        }
+        return null;
+    })();
+
+    /** The network's own mark, when there is one for it. UnionPay and Maestro
+     *  have no official mark in the set Polaris ships, so they are named rather
+     *  than drawn - see `brand-icons`. */
+    const cardMark = (() => {
+        const size = "size-6 text-muted-foreground";
+        switch (core.cardBrand(draft.card.number)) {
+            case "Visa":
+                return <VisaMark className={size} />;
+            case "Mastercard":
+                return <MastercardMark className={size} />;
+            case "Amex":
+                return <AmexMark className={size} />;
+            case "Discover":
+                return <DiscoverMark className={size} />;
+            case "JCB":
+                return <JcbMark className={size} />;
+            case "Diners Club":
+                return <DinersClubMark className={size} />;
+            default:
+                return null;
+        }
+    })();
 
     // Land on the first collection of whichever vault is picked, and never keep
     // an id belonging to the vault chosen before it.
@@ -142,7 +281,17 @@ export function ItemDialog({
         }
         setPending(true);
         setError(null);
-        const failure = await onSave(draft, intoVault ? [collectionId] : []);
+        // The conventions that live in custom fields are folded in here rather
+        // than kept in the draft as it is edited: they are one value each, and
+        // the field list is what actually gets stored.
+        const saving: VaultItem = {
+            ...draft,
+            fields:
+                draft.type === core.CIPHER_CARD
+                    ? core.withField(draft.fields, core.BANK_FIELD, bank, core.FIELD_TEXT)
+                    : draft.fields
+        };
+        const failure = await onSave(saving, intoVault ? [collectionId] : []);
         setPending(false);
         if (failure) {
             setError(failure);
@@ -536,47 +685,85 @@ export function ItemDialog({
                                     }
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                Number
-                                <Input
-                                    value={draft.card.number}
-                                    onChange={(event) =>
-                                        patch({
-                                            card: { ...draft.card, number: event.target.value }
-                                        })
-                                    }
-                                    className="font-mono"
-                                    autoComplete="off"
-                                />
-                            </label>
-                            <div className="grid grid-cols-3 gap-3">
-                                <label className="flex flex-col gap-1 text-sm">
-                                    Month
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>Number</span>
+                                <div className="relative">
                                     <Input
-                                        value={draft.card.expMonth}
+                                        value={draft.card.number}
                                         onChange={(event) =>
                                             patch({
                                                 card: {
                                                     ...draft.card,
-                                                    expMonth: event.target.value
+                                                    number: event.target.value,
+                                                    // The brand is read from the
+                                                    // digits rather than asked
+                                                    // for: it is on the card, and
+                                                    // a field somebody has to
+                                                    // fill in themselves is a
+                                                    // field that ends up wrong.
+                                                    brand: core.cardBrand(event.target.value) ?? ""
                                                 }
                                             })
                                         }
-                                        placeholder="MM"
+                                        className="pr-12 font-mono"
+                                        autoComplete="off"
+                                        placeholder="4111 1111 1111 1111"
                                     />
-                                </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    Year
+                                    {cardMark ? (
+                                        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                                            {cardMark}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {core.cardNumberProblem(draft.card.number) ? (
+                                    // Said once the number is long enough to be
+                                    // judged, never at the fourth digit: a card
+                                    // number is wrong for most of the time it is
+                                    // being typed.
+                                    <span className="text-xs text-danger">
+                                        {core.cardNumberProblem(draft.card.number)}
+                                    </span>
+                                ) : draft.card.brand ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        {draft.card.brand}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1 text-sm">
+                                    {/* One box, because a card prints one. People
+                                        type 0830, 08/30 or 08 / 2030 and all of
+                                        them mean the same August. */}
+                                    <span>Expires</span>
                                     <Input
-                                        value={draft.card.expYear}
-                                        onChange={(event) =>
+                                        value={expiry}
+                                        onChange={(event) => {
+                                            setExpiry(event.target.value);
+                                            const read = core.readCardExpiry(event.target.value);
                                             patch({
-                                                card: { ...draft.card, expYear: event.target.value }
-                                            })
-                                        }
-                                        placeholder="YYYY"
+                                                card: {
+                                                    ...draft.card,
+                                                    expMonth: read?.month ?? "",
+                                                    expYear: read?.year ?? ""
+                                                }
+                                            });
+                                        }}
+                                        placeholder="MM/YY"
+                                        inputMode="numeric"
+                                        autoComplete="off"
                                     />
-                                </label>
+                                    {expiryNote ? (
+                                        <span
+                                            className={
+                                                expiryNote.tone === "danger"
+                                                    ? "text-xs text-danger"
+                                                    : "text-xs text-warning"
+                                            }
+                                        >
+                                            {expiryNote.text}
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <label className="flex flex-col gap-1 text-sm">
                                     Security code
                                     <Input
@@ -591,27 +778,63 @@ export function ItemDialog({
                                     />
                                 </label>
                             </div>
+                            <label className="flex flex-col gap-1 text-sm">
+                                {/* Optional, and worth having: two cards from the
+                                    same network look identical in a list, and
+                                    the bank is what tells them apart. */}
+                                Bank (optional)
+                                <Input
+                                    value={bank}
+                                    onChange={(event) => setBank(event.target.value)}
+                                    placeholder="Who issued it"
+                                    autoComplete="off"
+                                />
+                            </label>
                         </>
                     ) : null}
 
                     {draft.type === core.CIPHER_IDENTITY ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            {IDENTITY_FIELDS.map((field) => (
-                                <label key={field} className="flex flex-col gap-1 text-sm">
-                                    {humanize(field)}
-                                    <Input
-                                        value={draft.identity[field] ?? ""}
-                                        onChange={(event) =>
-                                            patch({
-                                                identity: {
-                                                    ...draft.identity,
-                                                    [field]: event.target.value
-                                                }
-                                            })
-                                        }
-                                        autoComplete="off"
-                                    />
-                                </label>
+                        // Grouped and laid out rather than seventeen boxes two
+                        // abreast. An identity is three different things - who
+                        // somebody is, how to reach them, where they live, and
+                        // the numbers governments gave them - and a flat grid
+                        // put "Address 2" beside "Passport number" as if they
+                        // were the same kind of answer. The address itself gets
+                        // the shape an address has: the street lines full width,
+                        // the town, county and postcode on one row.
+                        <div className="flex flex-col gap-4">
+                            {IDENTITY_GROUPS.map((group) => (
+                                <fieldset key={group.title} className="flex flex-col gap-2">
+                                    <legend className="text-xs font-medium text-muted-foreground">
+                                        {group.title}
+                                    </legend>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {group.fields.map(({ field, span }) => (
+                                            <label
+                                                key={field}
+                                                className={cn(
+                                                    "flex flex-col gap-1 text-sm",
+                                                    span === "full" && "col-span-2"
+                                                )}
+                                            >
+                                                {IDENTITY_LABELS[field] ?? humanize(field)}
+                                                <Input
+                                                    value={draft.identity[field] ?? ""}
+                                                    onChange={(event) =>
+                                                        patch({
+                                                            identity: {
+                                                                ...draft.identity,
+                                                                [field]: event.target.value
+                                                            }
+                                                        })
+                                                    }
+                                                    placeholder={IDENTITY_HINTS[field]}
+                                                    autoComplete="off"
+                                                />
+                                            </label>
+                                        ))}
+                                    </div>
+                                </fieldset>
                             ))}
                         </div>
                     ) : null}

@@ -24,7 +24,7 @@ import { KeyRound, Loader2, ShieldAlert } from "lucide-react";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 
 /** Under this, a master password is not protecting anything. */
-const MIN_LENGTH = 12;
+const MIN_LENGTH = core.MASTER_PASSWORD_MIN;
 
 export function VaultSetup({
     email,
@@ -54,8 +54,13 @@ export function VaultSetup({
         password.length > 0 &&
         hint.toLowerCase().includes(password.toLowerCase());
 
+    // The shape rule, beside the two this screen already applied: a password that
+    // is only one kind of character is a password a list attacks first.
+    const weak = core.masterPasswordProblem(password);
+
     const ready =
         password.length >= MIN_LENGTH &&
+        !weak &&
         confirm === password &&
         understood &&
         !unsafe &&
@@ -127,10 +132,8 @@ export function VaultSetup({
                                 At least {MIN_LENGTH} characters. Longer is better than stranger.
                             </span>
                         </label>
-                        {tooShort ? (
-                            <p className="text-sm text-danger">
-                                Use at least {MIN_LENGTH} characters.
-                            </p>
+                        {tooShort || weak ? (
+                            <p className="text-sm text-danger">{weak}</p>
                         ) : null}
                         {unsafe ? <p className="text-sm text-danger">{unsafe}</p> : null}
 

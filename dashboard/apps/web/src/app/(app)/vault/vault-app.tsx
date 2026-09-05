@@ -16,15 +16,37 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { TotpCode } from "./totp-code";
+import { totpCode } from "@/lib/vault/totp-browser";
 import { ItemDialog } from "./item-dialog";
 import { MoveDialog } from "./move-dialog";
 import { FolderDialog } from "./folder-dialog";
 import { useVaultSession } from "./vault-session";
 import * as vaultCrypto from "@/lib/vault/crypto";
+import {
+    AmexMark,
+    DinersClubMark,
+    DiscoverMark,
+    JcbMark,
+    MastercardMark,
+    VisaMark
+} from "@/components/brand-icons";
 import { useEffect, useMemo, useState } from "react";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    Input,
+    Select
+} from "@polaris/ui";
 import {
     decryptFolders,
     decryptItem,
@@ -45,11 +67,14 @@ import {
     Check,
     Copy,
     CreditCard,
+    ExternalLink,
     Eye,
     EyeOff,
     FileText,
     FolderCog,
+    FolderInput,
     Contact,
+    Pencil,
     MoveRight,
     Building2,
     KeyRound,
@@ -71,6 +96,41 @@ const TYPE_ICON: Record<number, typeof KeyRound> = {
     [core.CIPHER_IDENTITY]: Contact,
     [core.CIPHER_SSH_KEY]: Terminal
 };
+
+/** An address as a browser will actually open it. What people type into a vault
+ *  is `example.com` as often as not, and a link to that is a link to a page on
+ *  this site. */
+function openableUri(value: string): string {
+    return /^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
+}
+
+/**
+ * The payment network's own mark, from the number.
+ *
+ * Read rather than stored, so it is right for a card whose number was corrected
+ * and cannot disagree with the digits above it. Nothing is drawn for UnionPay or
+ * Maestro: Polaris ships no official mark for either, and something drawn to
+ * look approximately like a logo is worse than the name on its own.
+ */
+function CardMark({ number }: { number: string }) {
+    const size = "size-5 text-muted-foreground";
+    switch (core.cardBrand(number)) {
+        case "Visa":
+            return <VisaMark className={size} />;
+        case "Mastercard":
+            return <MastercardMark className={size} />;
+        case "Amex":
+            return <AmexMark className={size} />;
+        case "Discover":
+            return <DiscoverMark className={size} />;
+        case "JCB":
+            return <JcbMark className={size} />;
+        case "Diners Club":
+            return <DinersClubMark className={size} />;
+        default:
+            return <CreditCard className={size} />;
+    }
+}
 
 /** What the list can be narrowed to. */
 type Filter =
@@ -167,6 +227,14 @@ export function VaultApp() {
         await navigator.clipboard.writeText(value);
         setCopied(label);
         window.setTimeout(() => setCopied(null), 2000);
+    }
+
+    /** The six digits for an item, worked out now rather than shown: the menu is
+     *  for taking a code away with you, and one that had to be read off the
+     *  screen would be a code typed by hand. */
+    async function copyTotp(item: VaultItem): Promise<void> {
+        const code = await totpCode(item.login.totp);
+        if (code) await copy("totp", code);
     }
 
     async function onSave(item: VaultItem, collectionIds: string[]): Promise<string | null> {
@@ -344,35 +412,119 @@ export function VaultApp() {
                         {visible.map((item) => {
                             const Icon = TYPE_ICON[item.type] ?? KeyRound;
                             return (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => {
-                                        setSelected(item.id);
-                                        setRevealed(false);
-                                    }}
-                                    className={`flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
-                                        item.id === selected
-                                            ? "border-primary/40 bg-primary/5"
-                                            : "border-transparent hover:bg-card-hover"
-                                    }`}
-                                >
-                                    <Icon className="size-4 shrink-0 text-muted-foreground" />
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">
+                                // Right-click does what right-click does
+                                // everywhere else in Polaris. Copying the
+                                // password is the thing people came here for,
+                                // and reaching it used to mean opening the item
+                                // and finding the button - three actions for the
+                                // one action.
+                                <ContextMenu key={item.id}>
+                                    <ContextMenuTrigger asChild>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelected(item.id);
+                                                setRevealed(false);
+                                            }}
+                                            onContextMenu={() => {
+                                                setSelected(item.id);
+                                                setRevealed(false);
+                                            }}
+                                            className={`flex items-center gap-3 rounded-md border p-3 text-left transition-colors ${
+                                                item.id === selected
+                                                    ? "border-primary/40 bg-primary/5"
+                                                    : "border-transparent hover:bg-card-hover"
+                                            }`}
+                                        >
+                                            <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium">
+                                                    {item.name || "Untitled"}
+                                                </p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {item.login.username ||
+                                                        core.CIPHER_TYPE_LABEL[
+                                                            item.type as core.CipherType
+                                                        ]}
+                                                </p>
+                                            </div>
+                                            {item.favorite ? (
+                                                <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
+                                            ) : null}
+                                        </button>
+                                    </ContextMenuTrigger>
+                                    <ContextMenuContent>
+                                        <ContextMenuLabel title={item.name || "Untitled"}>
                                             {item.name || "Untitled"}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {item.login.username ||
-                                                core.CIPHER_TYPE_LABEL[
-                                                    item.type as core.CipherType
-                                                ]}
-                                        </p>
-                                    </div>
-                                    {item.favorite ? (
-                                        <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
-                                    ) : null}
-                                </button>
+                                        </ContextMenuLabel>
+                                        {item.type === core.CIPHER_LOGIN ? (
+                                            <>
+                                                <ContextMenuItem
+                                                    disabled={!item.login.username}
+                                                    onSelect={() =>
+                                                        void copy("username", item.login.username)
+                                                    }
+                                                >
+                                                    <Copy className="size-4" />
+                                                    Copy {core.looksLikeEmail(item.login.username)
+                                                        ? "email"
+                                                        : "username"}
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    disabled={!item.login.password}
+                                                    onSelect={() =>
+                                                        void copy("password", item.login.password)
+                                                    }
+                                                >
+                                                    <Copy className="size-4" />
+                                                    Copy password
+                                                </ContextMenuItem>
+                                                {item.login.totp ? (
+                                                    <ContextMenuItem
+                                                        onSelect={() => void copyTotp(item)}
+                                                    >
+                                                        <Copy className="size-4" />
+                                                        Copy the six digits
+                                                    </ContextMenuItem>
+                                                ) : null}
+                                                {item.login.uris[0]?.uri ? (
+                                                    <ContextMenuItem asChild>
+                                                        <a
+                                                            href={openableUri(item.login.uris[0].uri)}
+                                                            target="_blank"
+                                                            rel="noreferrer noopener"
+                                                        >
+                                                            <ExternalLink className="size-4" />
+                                                            Open the website
+                                                        </a>
+                                                    </ContextMenuItem>
+                                                ) : null}
+                                                <ContextMenuSeparator />
+                                            </>
+                                        ) : null}
+                                        <ContextMenuItem onSelect={() => setEditing(item)}>
+                                            <Pencil className="size-4" />
+                                            Edit
+                                        </ContextMenuItem>
+                                        <ContextMenuItem
+                                            onSelect={() =>
+                                                void onSave({ ...item, favorite: !item.favorite }, [])
+                                            }
+                                        >
+                                            <Star className="size-4" />
+                                            {item.favorite ? "Remove from favourites" : "Favourite"}
+                                        </ContextMenuItem>
+                                        <ContextMenuItem onSelect={() => setMoving(item)}>
+                                            <FolderInput className="size-4" />
+                                            Move
+                                        </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuItem variant="danger" onSelect={() => void onDelete(item)}>
+                                            <Trash2 className="size-4" />
+                                            {item.deleted ? "Delete for good" : "Move to trash"}
+                                        </ContextMenuItem>
+                                    </ContextMenuContent>
+                                </ContextMenu>
                             );
                         })}
                     </div>
@@ -514,13 +666,38 @@ export function VaultApp() {
 
                                     {current.type === core.CIPHER_CARD ? (
                                         <>
+                                            {/* The network's own mark, read from
+                                                the number, beside who issued it.
+                                                Two cards from one network look
+                                                identical in a list without the
+                                                bank. */}
+                                            {current.card.brand ||
+                                            core.fieldValue(current.fields, core.BANK_FIELD) ? (
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <CardMark number={current.card.number} />
+                                                    <span>
+                                                        {[
+                                                            current.card.brand,
+                                                            core.fieldValue(
+                                                                current.fields,
+                                                                core.BANK_FIELD
+                                                            )
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(" - ")}
+                                                    </span>
+                                                </div>
+                                            ) : null}
                                             <Field
                                                 label="Name"
                                                 value={current.card.cardholderName}
                                             />
                                             <Field
                                                 label="Number"
-                                                value={current.card.number}
+                                                // Grouped the way the card
+                                                // prints it, so it can be read
+                                                // back against the card in hand.
+                                                value={core.groupCardNumber(current.card.number)}
                                                 secret={!revealed}
                                                 revealed={revealed}
                                                 copied={copied === "number"}
@@ -529,8 +706,37 @@ export function VaultApp() {
                                             />
                                             <Field
                                                 label="Expires"
-                                                value={`${current.card.expMonth}/${current.card.expYear}`}
+                                                value={core.writeCardExpiry({
+                                                    month: current.card.expMonth,
+                                                    year: current.card.expYear
+                                                })}
                                             />
+                                            {/* Said where the card is read
+                                                rather than only where it is
+                                                edited: the moment somebody
+                                                opens this is the moment they
+                                                are about to use it. */}
+                                            {core.cardExpired(
+                                                {
+                                                    month: current.card.expMonth,
+                                                    year: current.card.expYear
+                                                },
+                                                new Date()
+                                            ) ? (
+                                                <p className="text-sm text-danger">
+                                                    This card expired.
+                                                </p>
+                                            ) : core.cardExpiringSoon(
+                                                  {
+                                                      month: current.card.expMonth,
+                                                      year: current.card.expYear
+                                                  },
+                                                  new Date()
+                                              ) ? (
+                                                <p className="text-sm text-warning">
+                                                    This card expires soon.
+                                                </p>
+                                            ) : null}
                                             <Field
                                                 label="Security code"
                                                 value={current.card.code}

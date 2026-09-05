@@ -118,6 +118,7 @@ export function QrScanDialog({
         }
     }, [open]);
 
+
     const readPicture = async (picture: File) => {
         setReading(true);
         setError("");
@@ -152,6 +153,44 @@ export function QrScanDialog({
         }
     };
 
+    /**
+     * Paste, because that is what somebody with a screenshot actually does.
+     *
+     * Taking a picture of the code and pressing Ctrl+V is one gesture; saving it
+     * to a file, opening a chooser and finding it again is four. The listener is
+     * on the window rather than on a field, since there is no field here to
+     * paste into and nobody would think to look for one.
+     *
+     * Text is taken too: the same clipboard often holds the `otpauth://` link
+     * itself, offered beside the square as "can't scan it?", and refusing that
+     * because it is not a picture would be refusing the easier half of the same
+     * gesture.
+     */
+    useEffect(() => {
+        if (!open) return;
+        const onPaste = (event: ClipboardEvent) => {
+            const data = event.clipboardData;
+            if (!data) return;
+            const picture = [...data.files].find((entry) => entry.type.startsWith("image/"));
+            if (picture) {
+                event.preventDefault();
+                void readPicture(picture);
+                return;
+            }
+            const text = data.getData("text/plain").trim();
+            if (text.toLowerCase().startsWith("otpauth://")) {
+                event.preventDefault();
+                onFound(text);
+                onOpenChange(false);
+            }
+        };
+        window.addEventListener("paste", onPaste);
+        return () => window.removeEventListener("paste", onPaste);
+        // `onFound` and `onOpenChange` are the caller's closures and change on
+        // its every render; rebinding for that would be rebinding constantly.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -160,8 +199,9 @@ export function QrScanDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <p className="text-sm text-muted-foreground">
-                        Point the camera at the square the site is showing, or hand over a
-                        screenshot of it. Neither leaves this browser.
+                        Point the camera at the square the site is showing, paste a
+                        screenshot with Ctrl+V, or choose the picture. None of it leaves this
+                        browser.
                     </p>
 
                     {scanning ? (

@@ -12,6 +12,7 @@
  * is why the button says what it is doing: a second of nothing looks broken.
  */
 
+import * as core from "@polaris/core";
 import { Loader2, Lock } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { KdfSettings } from "@polaris/core";
@@ -79,8 +80,28 @@ export function VaultUnlock({
                             value={password}
                             onChange={(event) => setPassword(event.target.value)}
                         />
+                        {/* Said rather than left to a button that does nothing:
+                            a disabled control with no explanation reads as a
+                            broken page. */}
+                        {password.length > 0 && !core.couldBeMasterPassword(password) ? (
+                            <p className="text-xs text-muted-foreground">
+                                A master password here is at least {core.MASTER_PASSWORD_MIN}{" "}
+                                characters, so this cannot be it yet.
+                            </p>
+                        ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending || password.length === 0}>
+                        {/* Nothing that could never have been the password is
+                            sent: a wrong guess costs a key derivation on this
+                            machine and a request the server has to rate-limit.
+                            Only the length is checked - a vault made before a
+                            rule existed still has to open, and refusing on
+                            anything newer would lock somebody out of their own
+                            vault to enforce a rule invented after they filled
+                            it. */}
+                        <Button
+                            type="submit"
+                            disabled={pending || !core.couldBeMasterPassword(password)}
+                        >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                             {pending ? "Deriving your key..." : "Unlock"}
                         </Button>

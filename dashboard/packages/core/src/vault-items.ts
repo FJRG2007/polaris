@@ -19,10 +19,93 @@
 /** The field a login's recovery codes live in. */
 export const RECOVERY_CODES_FIELD = "Recovery codes";
 
+/** The field a card's issuing bank lives in. The cipher model has the network -
+ *  Visa, Mastercard - and nothing for who issued it, and two cards from one
+ *  network look identical in a list without it. */
+export const BANK_FIELD = "Bank";
+
 /** The field a chosen icon lives in. One or two characters - an emoji - so it
  *  costs nothing to store, nothing to fetch, and cannot be a picture of
  *  something else. */
 export const ICON_FIELD = "Icon";
+
+/**
+ * How short a master password may be.
+ *
+ * The number that has always been enforced, and the reason it is a named
+ * constant rather than a literal in a form: the unlock screen refuses anything
+ * shorter before asking the server, and that is only safe while it is the same
+ * number the setup screen has always used. Raise it and every vault created
+ * under the old one still has to open.
+ */
+export const MASTER_PASSWORD_MIN = 12;
+
+/**
+ * What is wrong with a master password somebody is CHOOSING, or null.
+ *
+ * Length first and hardest, because it is the only one that reliably buys
+ * anything against an offline attack on a stolen database. The character classes
+ * are the weaker rule and are asked for as a pair rather than as four boxes to
+ * tick: "a capital, a number and a symbol" is how people end up with
+ * `Password1!`, which is four classes and one guess.
+ */
+export function masterPasswordProblem(password: string): string | null {
+    if (password.length === 0) return null;
+    if (password.length < MASTER_PASSWORD_MIN) {
+        return `Use at least ${MASTER_PASSWORD_MIN} characters.`;
+    }
+    const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((shape) => shape.test(password)).length;
+    if (classes < 2) {
+        return "Mix at least two kinds of character - letters and numbers, or letters and punctuation.";
+    }
+    return null;
+}
+
+/**
+ * Whether this could even be the master password of an existing vault.
+ *
+ * Deliberately weaker than the rule above, and the difference is the whole
+ * point. A vault made before a rule existed still has to open, so the unlock
+ * screen may only refuse what could never have been accepted at any point -
+ * which is the length, and nothing else. Refusing on the character classes here
+ * would lock somebody out of their own vault to enforce a rule invented after
+ * they filled it.
+ *
+ * What it saves is real: a wrong guess costs a key derivation on this machine
+ * and a request the server has to rate-limit, and neither is worth spending on
+ * something that cannot be the answer.
+ */
+export function couldBeMasterPassword(password: string): boolean {
+    return password.length >= MASTER_PASSWORD_MIN;
+}
+
+/** One custom field, by name. Empty when the item has none - which is the
+ *  ordinary case, since these are conventions rather than columns. */
+export function fieldValue(
+    fields: readonly { name: string; value: string }[],
+    name: string
+): string {
+    return fields.find((field) => field.name === name)?.value ?? "";
+}
+
+/**
+ * The fields with one of them set, added or removed.
+ *
+ * Removed when the value is emptied, rather than kept as an empty field: a
+ * vault item that accumulates blank fields nobody can see the purpose of is a
+ * vault item somebody has to tidy by hand.
+ */
+export function withField<T extends { name: string; value: string; type: number }>(
+    fields: readonly T[],
+    name: string,
+    value: string,
+    type: number
+): T[] {
+    const rest = fields.filter((field) => field.name !== name);
+    if (!value.trim()) return rest;
+    const existing = fields.find((field) => field.name === name);
+    return [...rest, { ...(existing ?? ({} as T)), name, value, type }];
+}
 
 /**
  * The codes in whatever was pasted in.
