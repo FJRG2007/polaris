@@ -22,6 +22,7 @@
  */
 
 import { refused } from "@/app/(app)/chat/call-media";
+import { filterMic, type FilteredMic } from "@/app/(app)/chat/mic-filter";
 import { Camera, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
@@ -81,6 +82,10 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
     const [cleanup, setCleanup] = useMicCleanup();
     const [gain, setGain] = useMicGain();
     const [testing, setTesting] = useState(false);
+    /** What the noise model did when it was actually asked to start. Null until
+     *  the test has run, and null again when it is stopped. */
+    const [filterState, setFilterState] = useState<FilteredMic | null>(null);
+    const filter = useRef<FilteredMic | null>(null);
     const [level, setLevel] = useState(0);
     const [error, setError] = useState("");
     const stream = useRef<MediaStream | null>(null);
@@ -89,10 +94,16 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
     const stop = useCallback(() => {
         if (reading.current) clearInterval(reading.current);
         reading.current = null;
+        // The graph goes before the device does: it holds an audio context, and
+        // a context left open on a screen somebody wandered away from is the
+        // same light left on as an open microphone.
+        void filter.current?.stop();
+        filter.current = null;
         for (const track of stream.current?.getTracks() ?? []) track.stop();
         stream.current = null;
         setTesting(false);
         setLevel(0);
+        setFilterState(null);
     }, []);
 
     // Never left running. A tab closed on an open microphone is a light that
@@ -101,6 +112,7 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
 
     const start = async () => {
         setError("");
+        setFilterState(null);
         try {
             // The same constraints a call opens with, so what is measured here
             // is what the room will hear. A test through a different chain is a
@@ -121,6 +133,17 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
                 if (!stream.current) return;
                 setLevel(meter.read());
             }, 60);
+
+            // Built for real, with the settings on this screen, because the only
+            // honest answer to "is the noise model working" is to start it. It
+            // used to fail silently: the setting still said enhanced, the call
+            // was simply quieter, and there was nowhere at all to find out - so
+            // this is the screen that finds out, and the reason comes with it.
+            if (track) {
+                const built = await filterMic(track, cleanup);
+                setFilterState(built);
+                filter.current = built;
+            }
         } catch (caught) {
             setError(refused(caught, "microphone"));
             stop();
@@ -209,6 +232,21 @@ function MicrophoneCard({ threshold, showThreshold }: { threshold: number; showT
                     <span className="text-xs text-muted-foreground">
                         {NOISE_LEVELS.find((entry) => entry.value === cleanup)?.help ?? ""}
                     </span>
+                    {/* What the model DID, once it has been asked to. A setting
+                        that says "enhanced" while the model has never started is
+                        the state that took a call's sound away and left nothing
+                        anywhere to read; this is where it is readable. */}
+                    {filterState?.problem ? (
+                        <span className="text-xs text-warning">
+                            It could not start, so you are going out unfiltered: {filterState.problem}
+                        </span>
+                    ) : filterState ? (
+                        <span className="text-xs text-success">
+                            {filterState.using === "gain"
+                                ? "Running, with no model - only the volume above."
+                                : `Running: the ${filterState.using} model started.`}
+                        </span>
+                    ) : null}
                 </label>
 
                 <div className="flex flex-col gap-1">
