@@ -132,18 +132,42 @@ describe("the catalogues", () => {
 });
 
 describe("a decoration", () => {
-    it("stays inside the band the face gives it", () => {
-        // The two ways a decoration breaks the product rather than itself: paint
-        // outside the box the layout reserved, and it is cut in half by the first
-        // scrolling panel it sits in; paint inside the band, and it covers the
-        // photograph somebody chose. Both are geometry, so both are checked here
-        // rather than looked at.
+    it("stays inside the box the layout reserved", () => {
+        // The way a decoration breaks the product rather than itself: paint
+        // outside the box, and it is cut in half by the first scrolling panel it
+        // sits in. Geometry, so it is checked here rather than looked at, and it
+        // holds for every kind of layer without exception.
         for (const decoration of style.AVATAR_DECORATIONS) {
             expect(decoration.layers.length).toBeGreaterThan(0);
             for (const layer of decoration.layers) {
-                const reach = style.layerReach(layer);
-                expect(reach.outer).toBeLessThanOrEqual(0.5);
-                expect(reach.inner).toBeGreaterThanOrEqual(0.5 - decoration.width);
+                expect(style.layerReach(layer).outer).toBeLessThanOrEqual(0.5);
+            }
+        }
+    });
+
+    it("keeps a ring out of the photograph, and lets a worn thing sit on it", () => {
+        // The other half of the old rule, which turned out to have an exception
+        // rather than being wrong. A ring painted inside the band covers the
+        // picture somebody chose and gives nothing back - that is a mistake, and
+        // it stays checked.
+        //
+        // A cat asleep on somebody's head is the exception: it rests on the rim
+        // and a paw hangs over it, and drawn strictly outside the face it is two
+        // ears and no cat. Those declare `front`, are drawn over the photograph
+        // on purpose, and are the wearer's own decision about their own picture.
+        for (const decoration of style.AVATAR_DECORATIONS) {
+            for (const layer of decoration.layers) {
+                if (layer.kind === "art") {
+                    // A drawing that reaches inside has to say so, or it is a
+                    // drawing nobody will ever see.
+                    if (style.layerReach(layer).inner < 0.5 - decoration.width) {
+                        expect(layer.front).toBe(true);
+                    }
+                    continue;
+                }
+                expect(style.layerReach(layer).inner).toBeGreaterThanOrEqual(
+                    0.5 - decoration.width
+                );
             }
         }
     });

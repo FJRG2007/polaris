@@ -37,6 +37,7 @@ import { useId, type CSSProperties } from "react";
 import {
     fittedDash,
     orbitPoints,
+    type ArtMark,
     type AvatarDecoration,
     type DecorationLayer
 } from "@polaris/core";
@@ -101,7 +102,73 @@ function paint(colors: readonly string[], gradientId: string): string {
     return colors.length > 1 ? `url(#${gradientId})` : (colors[0] ?? "#ffffff");
 }
 
+/** How a drawing is paced when somebody points at it. Idle otherwise: nothing
+ *  here runs until the face is under a pointer, which is what keeps a list of
+ *  thirty faces still. */
+function waking(layer: Extract<DecorationLayer, { kind: "art" }>) {
+    if (layer.wake === undefined) return {};
+    return {
+        className: layer.motion === "bob" ? "profile-wake-bob" : "profile-wake-sway",
+        style: { animationDuration: `${layer.wake}s` }
+    };
+}
+
+function Mark({ mark }: { mark: ArtMark }) {
+    // Strokes are round everywhere: a tail cut square is a tail that was
+    // snapped off, and every line in a drawing this small is a limb or a
+    // feather rather than a rule.
+    const paints = {
+        fill: mark.fill ?? "none",
+        stroke: mark.stroke,
+        strokeWidth: mark.width,
+        strokeLinecap: "round" as const,
+        strokeLinejoin: "round" as const,
+        opacity: mark.opacity
+    };
+    if (mark.shape === "circle") {
+        return <circle cx={mark.cx} cy={mark.cy} r={mark.r} {...paints} />;
+    }
+    if (mark.shape === "ellipse") {
+        return (
+            <ellipse
+                cx={mark.cx}
+                cy={mark.cy}
+                rx={mark.rx}
+                ry={mark.ry}
+                transform={
+                    mark.rotate === undefined
+                        ? undefined
+                        : `rotate(${mark.rotate} ${mark.cx} ${mark.cy})`
+                }
+                {...paints}
+            />
+        );
+    }
+    return <path d={mark.d} {...paints} />;
+}
+
 function Layer({ layer, gradientId }: { layer: DecorationLayer; gradientId: string }) {
+    if (layer.kind === "art") {
+        const wake = waking(layer);
+        return (
+            <g
+                opacity={layer.opacity}
+                className={wake.className}
+                style={{
+                    ...wake.style,
+                    // Turned about the middle of what is drawn rather than the
+                    // middle of the box, so a tail sways from where it joins and
+                    // a hat tips on its own point.
+                    transformOrigin: `${round(units(layer.bounds[0] + layer.bounds[2] / 2))}px ${round(units(layer.bounds[1] + layer.bounds[3]))}px`
+                }}
+            >
+                {layer.marks.map((mark, index) => (
+                    <Mark key={index} mark={mark} />
+                ))}
+            </g>
+        );
+    }
+
     if (layer.kind === "orbit") {
         const radius = units(layer.size) / 2;
         const spark = layer.shape === "star" ? sparkPath(radius) : null;
@@ -213,10 +280,22 @@ function Layer({ layer, gradientId }: { layer: DecorationLayer; gradientId: stri
  */
 export function AvatarDecorationArt({
     decoration,
+    front = false,
     className,
     style
 }: {
     decoration: AvatarDecoration;
+    /**
+     * Which half to draw.
+     *
+     * Almost everything goes behind the picture, where only the band shows - a
+     * ring is a ring precisely because the face covers its middle. A worn thing
+     * is the other case: it rests on the rim and hangs over it, so it is drawn
+     * again on top. Two passes rather than one because there is a photograph in
+     * between them, and SVG cannot be interleaved with something that is not in
+     * the same document.
+     */
+    front?: boolean;
     className?: string;
     style?: CSSProperties;
 }) {
@@ -226,6 +305,13 @@ export function AvatarDecorationArt({
     // React's own ids carry colons, and a colon in a fragment identifier is a
     // reference some browsers decline to resolve. Dropped rather than escaped.
     const seed = useId().replace(/:/g, "");
+    const layers = decoration.layers
+        .map((layer, index) => ({ layer, index }))
+        .filter(({ layer }) => (layer.kind === "art" && layer.front === true) === front);
+    // A pass with nothing in it draws no element at all: most decorations have
+    // no front half, and an empty overlay on every face in a list is thirty
+    // nodes for nothing.
+    if (layers.length === 0) return null;
     return (
         <svg
             aria-hidden="true"
@@ -235,8 +321,8 @@ export function AvatarDecorationArt({
             style={style}
         >
             <defs>
-                {decoration.layers.map((layer, index) =>
-                    layer.colors.length > 1 ? (
+                {layers.map(({ layer, index }) =>
+                    layer.kind !== "art" && layer.colors.length > 1 ? (
                         <linearGradient key={index} id={`${seed}-${index}`} x1="0" y1="0" x2="1" y2="1">
                             {layer.colors.map((color, stop, all) => (
                                 <stop
@@ -249,7 +335,7 @@ export function AvatarDecorationArt({
                     ) : null
                 )}
             </defs>
-            {decoration.layers.map((layer, index) => (
+            {layers.map(({ layer, index }) => (
                 <Layer key={index} layer={layer} gradientId={`${seed}-${index}`} />
             ))}
         </svg>

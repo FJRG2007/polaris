@@ -351,6 +351,61 @@ dialog.pdfSlick-dialog .dialogButton {
     transform-origin: 50% 50%;
 }
 
+/*
+ * A worn decoration stirring while somebody looks at it.
+ *
+ * The whole reason these are hover-only. A cat asleep on a face is charming; a
+ * list of thirty faces with thirty cats all twitching on their own timers is a
+ * page nobody can read down, and it is the same on the member list, the mention
+ * picker and every avatar in a thread. So they sit perfectly still, and wake one
+ * at a time as a pointer crosses them.
+ *
+ * Written as the animation only existing under `:hover` rather than as a
+ * paused one that resumes: a paused animation still holds a compositor layer for
+ * every face on the screen, which is the cost this was avoiding.
+ *
+ * `transform-box: view-box` for the same reason the turning layers need it - the
+ * origin is set from the drawing's own coordinates, and without this it would be
+ * the group's bounding box instead.
+ */
+@keyframes polaris-wake-sway {
+    0%,
+    100% {
+        transform: rotate(0deg);
+    }
+    35% {
+        transform: rotate(-4deg);
+    }
+    70% {
+        transform: rotate(3deg);
+    }
+}
+
+@keyframes polaris-wake-bob {
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        transform: translateY(-2.5px) scale(1.03);
+    }
+}
+
+.profile-wake-sway,
+.profile-wake-bob {
+    transform-box: view-box;
+}
+
+.profile-worn:hover .profile-wake-sway,
+.profile-worn:focus-within .profile-wake-sway {
+    animation: polaris-wake-sway 2.4s ease-in-out infinite;
+}
+
+.profile-worn:hover .profile-wake-bob,
+.profile-worn:focus-within .profile-wake-bob {
+    animation: polaris-wake-bob 3s ease-in-out infinite;
+}
+
 /* Points of light coming and going. Starts and ends at the same opacity, so
    there is no step between the last frame and the first. */
 @keyframes polaris-twinkle {
