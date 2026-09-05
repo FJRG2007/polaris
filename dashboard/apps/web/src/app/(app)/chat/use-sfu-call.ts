@@ -555,7 +555,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (!current) return;
         const next = new Map<string, PeerState>();
         for (const participant of current.remoteParticipants.values()) {
-            next.set(participant.identity, peerState(participant));
+            // Whether there is a microphone on the connection at all, which the
+            // client's own flag cannot be asked: it answers false both for
+            // somebody who muted themselves and for somebody whose media never
+            // arrived, and those are different things to say about a person.
+            next.set(
+                participant.identity,
+                peerState({
+                    attributes: participant.attributes,
+                    isMicrophoneEnabled: participant.isMicrophoneEnabled,
+                    hasMicrophone: participant.getTrackPublication(MICROPHONE) !== undefined
+                })
+            );
         }
         setStates(next);
     }, []);
