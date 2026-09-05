@@ -35,6 +35,14 @@ vi.mock("@/components/use-live-resource", () => ({
     })
 }));
 vi.mock("../../src/app/(app)/drive/actions", () => ({}));
+// The panel looks for a server that has moved, and the module that does it is a
+// server action file: it reaches the session and the configuration as it is
+// imported. Stubbed as a promise that never settles, so the markup asserted
+// below is what a reader sees while the search is still running - which is the
+// state this panel is in for the first second every time it appears.
+vi.mock("../../src/app/(app)/apps/servers/actions", () => ({
+    recoverServerAddressAction: () => new Promise(() => {})
+}));
 vi.mock("../../src/app/(app)/drive/files-view", () => ({
     FilesView: () => <div data-testid="files-view" />
 }));
@@ -122,6 +130,26 @@ describe("a Drive source whose machine is down", () => {
         ]);
 
         expect(markup).toContain("lirio-2:22");
+    });
+
+    it("offers to find the machine here rather than sending the reader elsewhere", () => {
+        // The panel used to print the address and then tell somebody to open
+        // another screen and press a button there. Polaris knew how to find the
+        // machine, so the search lives here now - and starts by itself, which is
+        // an effect and therefore not in this markup: static rendering runs no
+        // effects. What can be asserted is that the way to run it is on this
+        // panel, and that the instruction to go somewhere else has gone.
+        const markup = render(SERVER, [
+            {
+                id: SERVER.id,
+                state: "down",
+                detail: "No route to that address",
+                endpoint: "192.168.1.138:22"
+            }
+        ]);
+
+        expect(markup).toContain("Look for it on this network");
+        expect(markup).not.toContain("press Check on this network");
     });
 
     it("says nothing about an address when there was none to try", () => {
