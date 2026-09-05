@@ -29,7 +29,8 @@ import {
 } from "@/components/brand-icons";
 import { parseTotp } from "@/lib/vault/totp-browser";
 import { FolderPlus, Loader2, Lock, LockOpen, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
-import { emptyItem, IDENTITY_FIELDS, type VaultFolder, type VaultItem } from "./vault-model";
+import { emptyItem, type VaultFolder, type VaultItem } from "./vault-model";
+import { humanize, IDENTITY_GROUPS, IDENTITY_HINTS, IDENTITY_LABELS } from "./identity-fields";
 import {
     Button,
     Dialog,
@@ -63,76 +64,14 @@ const TYPE_OPTIONS = core.CIPHER_TYPES.map((type) => ({
     label: core.CIPHER_TYPE_LABEL[type]
 }));
 
-/** Turn a field key like `postalCode` into "Postal code". */
-/**
- * The identity, in the groups it is actually made of.
- *
- * Seventeen fields two abreast is a wall, and it puts "Address 2" beside
- * "Passport number" as though they were the same kind of question. These are
- * four questions - who they are, how to reach them, where they live, and the
- * numbers a government gave them - and the address gets the shape an address
- * has rather than a share of the grid.
- */
-const IDENTITY_GROUPS: readonly {
-    title: string;
-    fields: readonly { field: (typeof IDENTITY_FIELDS)[number]; span?: "full" }[];
-}[] = [
-    {
-        title: "Name",
-        fields: [
-            { field: "title" },
-            { field: "firstName" },
-            { field: "middleName" },
-            { field: "lastName" },
-            { field: "company", span: "full" }
-        ]
-    },
-    {
-        title: "Getting hold of them",
-        fields: [{ field: "email" }, { field: "phone" }, { field: "username" }]
-    },
-    {
-        title: "Address",
-        fields: [
-            { field: "address1", span: "full" },
-            { field: "address2", span: "full" },
-            { field: "city" },
-            { field: "state" },
-            { field: "postalCode" },
-            { field: "country" }
-        ]
-    },
-    {
-        title: "Numbers they were given",
-        fields: [{ field: "ssn" }, { field: "passportNumber" }, { field: "licenseNumber" }]
-    }
-];
-
-/** Where the derived label reads badly. `Address 1` is what the field is called
- *  and not what anybody would write on an envelope. */
-const IDENTITY_LABELS: Partial<Record<(typeof IDENTITY_FIELDS)[number], string>> = {
-    address1: "Street",
-    address2: "Flat, suite, building",
-    state: "County or state",
-    postalCode: "Postcode",
-    ssn: "National insurance or social security number",
-    licenseNumber: "Driving licence number",
-    username: "Username on file"
-};
-
-/** A hint only where the field's own name does not say what goes in it. */
-const IDENTITY_HINTS: Partial<Record<(typeof IDENTITY_FIELDS)[number], string>> = {
-    title: "Mr, Ms, Dr",
-    address2: "Optional"
-};
-
-function humanize(field: string): string {
-    const spaced = field
-        .replace(/([A-Z])/g, " $1")
-        .toLowerCase()
-        .trim();
-    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
+/** The custom fields this form draws with an editor of its own. They are stored
+ *  as custom fields for compatibility with every other Bitwarden client, not
+ *  because anybody should be editing them as name-and-value pairs. */
+const MANAGED_FIELDS = new Set<string>([
+    core.RECOVERY_CODES_FIELD,
+    core.BANK_FIELD,
+    core.ICON_FIELD
+]);
 
 /** The folder picker's own entry for making one, rather than picking one. */
 const NEW_FOLDER = "__new-folder__";
@@ -944,7 +883,18 @@ export function ItemDialog({
                                 Add
                             </Button>
                         </div>
-                        {draft.fields.map((field, index) => (
+                        {/* Everything except the fields this form already has a
+                            box of its own for. The recovery codes, the bank and
+                            the chosen icon are kept as custom fields so other
+                            clients can read them, and listing them here as well
+                            put the codes on screen twice - once in their own
+                            editor and once as a raw pair somebody could break by
+                            renaming. The index is the real one, since that is
+                            what every edit below writes through. */}
+                        {draft.fields
+                            .map((field, index) => ({ field, index }))
+                            .filter(({ field }) => !MANAGED_FIELDS.has(field.name))
+                            .map(({ field, index }) => (
                             <div key={index} className="flex items-center gap-2">
                                 <Input
                                     value={field.name}
@@ -1027,7 +977,7 @@ export function ItemDialog({
                                     <X className="size-4" />
                                 </Button>
                             </div>
-                        ))}
+                            ))}
                     </div>
                 </div>
 

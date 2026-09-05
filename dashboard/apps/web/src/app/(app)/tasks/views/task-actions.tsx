@@ -712,7 +712,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                 <ContextMenuItem onSelect={commands.onCopy}>
                                     <ClipboardCopy className="size-3.5" />
                                     {many ? `Copy ${targets.length} tasks` : "Copy"}
-                                    <MenuShortcut>Ctrl+C</MenuShortcut>
+                                    <MenuShortcut keys="Mod+C" />
                                 </ContextMenuItem>
                             )}
                             {!many && (

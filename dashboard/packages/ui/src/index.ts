@@ -6,6 +6,7 @@
  */
 
 export { cn } from "./lib/cn";
+export { applePlatform, formatShortcut } from "./lib/shortcut";
 export { keepFocusOnClose } from "./lib/menu-focus";
 export { useDeferredFocus } from "./lib/use-deferred-focus";
 export { MenuSearch, menuSearchMatches } from "./components/menu-search";

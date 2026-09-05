@@ -27,6 +27,7 @@
  * span the setting is about.
  */
 
+import { forgetBreaches } from "@/lib/breach-cache";
 import * as core from "@polaris/core";
 import { VaultSetup } from "./vault-setup";
 import { VaultUnlock } from "./vault-unlock";
@@ -168,6 +169,11 @@ export function VaultSessionProvider({
         setPrivateKey(null);
         setLockNotice(reason ?? null);
         window.sessionStorage.removeItem(STORAGE_KEY);
+        // The breach answers are keyed by sixteen bits of each password, which
+        // is deliberately too little to be worth anything - but a locked vault
+        // should leave nothing behind at all, and this is a removal rather than
+        // a decision.
+        forgetBreaches();
     }, []);
 
     /**

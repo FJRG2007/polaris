@@ -22,6 +22,7 @@
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { passwordBreachCount } from "@/lib/pwned-passwords";
+import { rememberBreach, rememberedBreach } from "@/lib/breach-cache";
 import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 
 /** Long enough that the corpus is not asked about every keystroke. */
@@ -65,8 +66,17 @@ export type BreachState = "unknown" | "checking" | "clear" | "breached";
  * Debounced, with the in-flight request abandoned the moment the password
  * changes - so an answer about a password three characters old can never land on
  * the current one.
+ *
+ * A saved item passes its id as the scope, and then the answer is remembered for
+ * a month rather than asked for again every time the item is opened - see
+ * `breach-cache`, where what is written down and what deliberately is not is the
+ * whole of the design. Without a scope nothing is kept: a password being typed
+ * into a form is asked about once and forgotten.
  */
-export function usePasswordBreach(password: string): { state: BreachState; count: number } {
+export function usePasswordBreach(
+    password: string,
+    scope?: string
+): { state: BreachState; count: number } {
     const [answer, setAnswer] = useState<{ state: BreachState; count: number }>({
         state: "unknown",
         count: 0
@@ -77,22 +87,35 @@ export function usePasswordBreach(password: string): { state: BreachState; count
             setAnswer({ state: "unknown", count: 0 });
             return;
         }
+        // Answered from what this machine already knows, with no request and no
+        // "checking..." in between - which is what makes opening an item feel
+        // like reading a record rather than running one.
+        const known = scope ? rememberedBreach(scope, password) : null;
+        if (known !== null) {
+            setAnswer({ state: known > 0 ? "breached" : "clear", count: known });
+            return;
+        }
         setAnswer({ state: "checking", count: 0 });
         const controller = new AbortController();
         const timer = setTimeout(() => {
             void passwordBreachCount(password, controller.signal).then((count) => {
                 if (controller.signal.aborted) return;
                 // Null is "could not ask", which is not "safe" and is not drawn
-                // as it.
-                if (count === null) setAnswer({ state: "unknown", count: 0 });
-                else setAnswer({ state: count > 0 ? "breached" : "clear", count });
+                // as it - nor written down, since an outage must not become a
+                // month of silence.
+                if (count === null) {
+                    setAnswer({ state: "unknown", count: 0 });
+                    return;
+                }
+                setAnswer({ state: count > 0 ? "breached" : "clear", count });
+                if (scope) rememberBreach(scope, password, count);
             });
         }, DEBOUNCE_MS);
         return () => {
             controller.abort();
             clearTimeout(timer);
         };
-    }, [password]);
+    }, [password, scope]);
 
     return answer;
 }
@@ -103,8 +126,19 @@ export function usePasswordBreach(password: string): { state: BreachState; count
  * Drawn as one line rather than two rows of chrome. It is a caption, not a
  * dashboard - the point is that somebody reads it without being asked to.
  */
-export function PasswordState({ password, className }: { password: string; className?: string }) {
-    const breach = usePasswordBreach(password);
+export function PasswordState({
+    password,
+    scope,
+    className
+}: {
+    password: string;
+    /** The id of the item this password belongs to, where there is one. Its
+     *  breach answer is then kept for a month instead of being asked for on
+     *  every visit. */
+    scope?: string;
+    className?: string;
+}) {
+    const breach = usePasswordBreach(password, scope);
     const strength = passwordStrength(password);
     if (!password) return null;
 

@@ -1216,12 +1216,12 @@ export function FilesView({
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
                     <Copy className="size-4" />
                     {many ? `Copy ${targets.length} items` : "Copy"}
-                    <MenuShortcut>Ctrl+C</MenuShortcut>
+                    <MenuShortcut keys="Mod+C" />
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
                     {many ? `Cut ${targets.length} items` : "Cut"}
-                    <MenuShortcut>Ctrl+X</MenuShortcut>
+                    <MenuShortcut keys="Mod+X" />
                 </ContextMenuItem>
                 {abilities.write ? (
                     <>

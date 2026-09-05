@@ -302,7 +302,7 @@ export function MessageMenu({
                     <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
                         <Copy className="size-3.5" />
                         Copy text
-                        <MenuShortcut>Ctrl+C</MenuShortcut>
+                        <MenuShortcut keys="Mod+C" />
                     </ContextMenuItem>
                 )}
                 {!message.deleted &&
