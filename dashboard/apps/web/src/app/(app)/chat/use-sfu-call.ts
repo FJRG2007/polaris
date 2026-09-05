@@ -933,6 +933,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 .on(RoomEvent.ParticipantConnected, () => {
                     resort();
                     resortStates();
+                    // Say what this browser is again, to whoever just walked in.
+                    //
+                    // An attribute is meant to be handed to somebody arriving
+                    // afterwards, and mostly it is. But everything on the way in
+                    // is a race - the publication, the attribute, the moment the
+                    // server settles who is in the room - and losing that race
+                    // puts a mute icon on somebody who is talking, which is the
+                    // one wrong state nobody thinks to question. It is a few
+                    // bytes per person joining, and it makes arriving order stop
+                    // mattering.
+                    say({ [MUTED]: mic.current?.enabled ? "0" : "1" });
                 })
                 .on(RoomEvent.ParticipantDisconnected, () => {
                     resort();
@@ -974,21 +985,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // published before the connection existed, so this is the one place
             // the first publication happens.
             await publish(MICROPHONE, outgoingMic());
-            // Walked in muted, and now that there is a publication, said so.
-            // The device being disabled is what stops the sound; muting the
-            // publication is what puts the icon on this browser's tile for
-            // everybody else. Without the second half somebody who came into a
-            // room muted looked exactly like somebody who could hear the room
-            // perfectly well and was choosing not to answer.
-            if (mic.current && !mic.current.enabled) setVoiceEnabled(false);
-            // Said even when there was nothing to mute, so that an absent
-            // attribute means one thing only: a browser from before this
-            // existed, which is the one case the publication is read for.
-            else {
-                await joined.localParticipant
-                    .setAttributes({ [MUTED]: mic.current ? "0" : "1" })
-                    .catch(() => undefined);
-            }
+            // Both halves of the truth, whichever it is - and the second half
+            // used to be missing on the way in.
+            //
+            // Walking in muted did the two things: the device is disabled, and
+            // the publication is muted, which is what puts the icon on this
+            // browser's tile for everybody else. Walking in *unmuted* only ever
+            // said so in an attribute and never touched the publication - so a
+            // publication that had come up muted stayed muted, and the only
+            // thing that could clear it was the person muting and unmuting
+            // themselves. Which is exactly what people were doing, and exactly
+            // what they reported: "they see me muted until I press it twice".
+            //
+            // A publication comes up muted more easily than it looks. The track
+            // handed to `publishTrack` is disabled for the whole of a call
+            // joined from a browser that remembered being muted, and a track
+            // rebuilt by the filter a moment earlier is a *different* track from
+            // the one the publication was made with. Rather than reason about
+            // which of those happened, the state is asserted here, in full, in
+            // both directions.
+            setVoiceEnabled(mic.current ? mic.current.enabled : false);
             await publish(CAMERA, camera.current);
             if (screen.current) await publish(SCREEN, screen.current);
             if (deafenedRef.current) {
@@ -1214,6 +1230,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         refresh,
         resort,
         resortStates,
+        say,
         setVoiceEnabled,
         startFilter,
         withVideo
