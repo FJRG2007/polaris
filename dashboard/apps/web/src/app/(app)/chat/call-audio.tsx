@@ -187,8 +187,17 @@ function RemoteAudio({
         if (!audio) return;
         resumeBoost();
         // A source that is not there cannot be played, and asking anyway is what
-        // records a refusal nothing can clear.
-        if (!audio.srcObject) {
+        // records a refusal nothing can clear. An EMPTY stream counts as not
+        // there: it is a truthy srcObject with no track in it, play() rejects
+        // with NotSupportedError, and that reads exactly like a browser refusing
+        // to start audio - which is how a participant who had published nothing
+        // yet put the prompt on screen for a room that was working.
+        // Asked of the object rather than through `instanceof MediaStream`: the
+        // constructor is not defined everywhere this component is rendered, and a
+        // reference error here would take the whole call screen down with it.
+        const source = audio.srcObject as MediaStream | null;
+        const tracks = typeof source?.getAudioTracks === "function" ? source.getAudioTracks() : null;
+        if (!source || tracks?.length === 0) {
             onPlayState(id, false, start);
             return;
         }

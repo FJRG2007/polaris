@@ -45,6 +45,7 @@ import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
+import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { stagesOf, stagingOf } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
@@ -325,13 +326,21 @@ export function CallRoom({
                 </p>
             )}
 
+            {/* Why the call is silent, when it is. Everything else on this
+                screen is true before any sound has moved, so a call carrying
+                nothing looked exactly like one that worked. See
+                `call-diagnosis`. */}
+            <CallDiagnosisPanel audio={call.audio} />
+
             {/* A microphone that opened but is picking nothing up looks exactly
                 like somebody who is not talking, and the person it is happening
-                to has no way of telling. See `no-audio-notice`. */}
-            <NoAudioNotice
-                track={call.localStream?.getAudioTracks()[0] ?? null}
-                micOn={call.micOn}
-            />
+                to has no way of telling. See `no-audio-notice`.
+
+                Watching what is published rather than the device behind it: with
+                a noise filter running they are two different tracks, and a graph
+                that has stopped producing anything leaves the device reading
+                perfectly while the call carries silence. */}
+            <NoAudioNotice track={call.outgoing} micOn={call.micOn} />
 
             {/* Said before anything else on the screen, and to everybody: a
                 call being written down is the one fact in a room that changes

@@ -8,6 +8,7 @@
  */
 
 import type { MeetingView } from "@/lib/chat/meetings";
+import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import type { CallLevel, CallQuality } from "./call-quality";
 import type { AudioRole, CombineRequest } from "./call-combine";
@@ -131,4 +132,24 @@ export interface CallState {
      *  half everybody else in the call can see. */
     readonly recording: boolean;
     setRecording: (on: boolean) => void;
+
+    /**
+     * Whether sound is actually flowing, and what to say when it is not.
+     *
+     * Everything else here is true long before any sound has moved - a face, a
+     * ring, a subscribed track - so a call that carried nothing looked exactly
+     * like one that worked. This is the half read off the counters; see
+     * `call-diagnosis`.
+     */
+    readonly audio: CallAudioReport;
+
+    /**
+     * The track this browser is actually publishing as its voice.
+     *
+     * Not the same object as the microphone whenever a filter is running: what
+     * goes out is then the model's output, and watching the device instead would
+     * miss a graph that had stopped producing anything - which is the exact way
+     * a call publishes silence while every control on screen says it is fine.
+     */
+    readonly outgoing: MediaStreamTrack | null;
 }
