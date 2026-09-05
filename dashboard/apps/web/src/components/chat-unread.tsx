@@ -22,6 +22,7 @@ import { z } from "zod";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
+import { announceAppearance } from "@/components/profile-style-store";
 
 export interface ChatUnread {
     readonly messages: number;
@@ -87,9 +88,21 @@ export function ChatUnreadProvider({
         if (!enabled) return;
         const stop = subscribeSharedStream(STREAM_PATH, scope, ({ data }) => {
             let kind: unknown;
+            let frame: { kind?: unknown; actorId?: unknown };
             try {
-                kind = (JSON.parse(data) as { kind?: unknown }).kind;
+                frame = JSON.parse(data) as { kind?: unknown; actorId?: unknown };
+                kind = frame.kind;
             } catch {
+                return;
+            }
+            // Carried on this connection rather than on one of its own. It is
+            // the only stream open above every screen, the frame is an id and a
+            // word, and opening a second connection for something that happens
+            // a handful of times in an account's life would cost more than it
+            // could ever save. Handed straight on: what a face looks like is
+            // none of this provider's business.
+            if (kind === "appearance") {
+                if (typeof frame.actorId === "string") announceAppearance([frame.actorId]);
                 return;
             }
             if (typeof kind !== "string" || !COUNTED.has(kind)) return;

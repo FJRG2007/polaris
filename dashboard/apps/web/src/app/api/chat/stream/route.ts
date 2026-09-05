@@ -123,6 +123,21 @@ export async function GET(request: Request): Promise<Response> {
             unsubscribe = subscribeChatChanges((change) => {
                 if (closed) return;
 
+                // Somebody's face changed. Sent on whether this reader shares
+                // a room with them, which is the same question as whether their
+                // face could be on this screen, and it carries the id alone -
+                // what they now look like is pulled by the browser through the
+                // endpoint that answers for every other face.
+                //
+                // Their own browser is skipped: it changed it, and it already
+                // redrew.
+                if (change.kind === "appearance") {
+                    if (change.actorId === actor.id) return;
+                    if (!change.channels?.some((id) => reachable.has(id))) return;
+                    send({ kind: "appearance", actorId: change.actorId });
+                    return;
+                }
+
                 // A change about who is in what is not about a channel this
                 // reader necessarily reaches yet - being added is exactly the
                 // case - so the audience decides, and the set is re-resolved.

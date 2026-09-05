@@ -23,6 +23,8 @@ import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { setProfileStyle } from "@/lib/profile-style-service";
 import { getSetting } from "@/lib/setting-store";
+import { publishChatChange } from "@/lib/chat/live";
+import { reachableChannelIds } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import {
@@ -209,6 +211,30 @@ export async function saveProfileStyleAction(input: unknown): Promise<{ error?: 
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check what you picked" };
 
     await setProfileStyle(user.id, parsed.data);
+    // Everybody else's screens, without a reload and without telling anybody who
+    // was not going to be looking.
+    //
+    // The frame goes to the rooms this person is in, so the fan-out is their own
+    // membership rather than the size of the instance, and it carries the id
+    // alone - a browser drawing that face pulls the new one through the endpoint
+    // every face already uses, and a browser not drawing it does nothing. Faces
+    // further away pick it up on their next revalidation; see
+    // `profile-style-store`.
+    //
+    // Best effort on purpose: this must never turn a saved decoration into an
+    // error message.
+    try {
+        const channels = await reachableChannelIds({ id: user.id });
+        if (channels.size > 0) {
+            publishChatChange({
+                kind: "appearance",
+                actorId: user.id,
+                channels: [...channels]
+            });
+        }
+    } catch (caught) {
+        console.error("polaris: could not announce an appearance change:", caught);
+    }
     // Their own public page is rendered per request, so there is nothing to
     // revalidate there: the next reader gets what was just saved.
     revalidatePath("/account");

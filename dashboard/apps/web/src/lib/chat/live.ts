@@ -36,11 +36,15 @@ export interface ChatChange {
      *  channels - what this person can reach changed, redraw the rail.
      *  typing - somebody is composing right now.
      *  call - a call in this conversation started, moved or ended.
+     *  appearance - somebody changed what their face looks like. Carries the id
+     *      and nothing about the appearance: a browser drawing that face pulls
+     *      it through the same endpoint it pulled the first one through, and a
+     *      browser not drawing it does nothing at all.
      *  read - somebody caught up here. Two screens act on it and nobody else:
      *      their own other devices, which have an unread count to take down, and
      *      the person they were reading, whose ticks have just moved. Addressed
      *      through `audience`, because who may know is a setting. */
-    readonly kind: "posted" | "channels" | "typing" | "call" | "read";
+    readonly kind: "posted" | "channels" | "typing" | "call" | "appearance" | "read";
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is
@@ -71,6 +75,17 @@ export interface ChatChange {
      * rather than to sit in a room that has quietly emptied.
      */
     readonly movedTo?: { readonly meetingId: string; readonly channelId: string };
+    /**
+     * Only on `appearance`: the conversations the person is in.
+     *
+     * How the fan-out is kept honest. Somebody changing their decoration is
+     * news to the people who might be looking at their face, which is the people
+     * they share a room with - so the frame carries the rooms and every stream
+     * keeps it only if the reader reaches one of them. Bounded by that one
+     * person's own membership, which is dozens, rather than by how many accounts
+     * exist.
+     */
+    readonly channels?: readonly string[];
     /**
      * Only on `call`.
      *
