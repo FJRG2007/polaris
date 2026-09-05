@@ -10,13 +10,19 @@
  */
 
 import Link from "next/link";
-import { useState } from "react";
 import { Button, cn } from "@polaris/ui";
+import { useMemo, useState } from "react";
 import type { AlarmView } from "@/lib/watch-service";
 import { ArrowLeft, Bell, ExternalLink } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { ProjectWebhooks } from "@/components/project-webhooks";
+import type { BreakdownMetric } from "@/lib/watch/breakdown-shape";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
+import {
+    BREAKDOWN_LABELS,
+    MetricBreakdownDialog,
+    type OpenBreakdown
+} from "@/app/(app)/watch/watch-metric-breakdown";
 
 const STATE_LABEL: Record<string, string> = { ok: "OK", alarm: "Alarm", insufficient: "No data" };
 
@@ -27,7 +33,8 @@ export function WatchSubjectDetail({
     detail,
     projectId,
     serviceHref,
-    alarms
+    alarms,
+    breakdowns
 }: {
     kind: "server" | "service";
     id: string;
@@ -37,9 +44,14 @@ export function WatchSubjectDetail({
     projectId?: string;
     serviceHref?: string;
     alarms: AlarmView[];
+    /** The metrics whose cards may be opened to see what is behind them. Worked
+     *  out on the server, because whether there is an answer depends on what is
+     *  deployed here and on what the reader is allowed to see of the machine. */
+    breakdowns: BreakdownMetric[];
 }) {
     const display = useDisplayFormat();
     const [tab, setTab] = useState<"metrics" | "alarms" | "webhooks">("metrics");
+    const [opened, setOpened] = useState<OpenBreakdown | null>(null);
     const tabs: { id: typeof tab; label: string }[] = [
         { id: "metrics", label: "Metrics" },
         { id: "alarms", label: `Alarms (${alarms.length})` },
@@ -50,6 +62,26 @@ export function WatchSubjectDetail({
     // reuses the endpoint the Deploy panel already reads.
     const endpoint =
         kind === "server" ? `/api/watch/hosts/${id}/metrics/history` : `/api/deploy/apps/${id}/metrics/history`;
+
+    // The same four charts every consumption screen draws, with a way in under
+    // the ones that have something behind them. The window comes from the chart
+    // rather than from here, so the panel answers for the range on screen.
+    const metrics = useMemo(
+        () =>
+            CONSUMPTION_METRICS.map((metric) => {
+                const offered = breakdowns.find((entry) => entry === metric.key);
+                if (!offered) return metric;
+                return {
+                    ...metric,
+                    breakdown: {
+                        label: BREAKDOWN_LABELS[offered].strip,
+                        open: (window: { from: number; to: number }) =>
+                            setOpened({ metric: offered, ...window })
+                    }
+                };
+            }),
+        [breakdowns]
+    );
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -98,7 +130,7 @@ export function WatchSubjectDetail({
 
             {tab === "metrics" && (
                 <div className="flex flex-col gap-2">
-                    <MetricsHistory endpoint={endpoint} metrics={CONSUMPTION_METRICS} />
+                    <MetricsHistory endpoint={endpoint} metrics={metrics} />
                     <p className="text-xs text-muted-foreground">
                         {kind === "server"
                             ? "Measured from the containers running on this server, against what the machine has."
@@ -162,6 +194,12 @@ export function WatchSubjectDetail({
             )}
 
             {tab === "webhooks" && projectId && <ProjectWebhooks projectId={projectId} />}
+
+            <MetricBreakdownDialog
+                subject={{ kind, id }}
+                open={opened}
+                onClose={() => setOpened(null)}
+            />
         </div>
     );
 }

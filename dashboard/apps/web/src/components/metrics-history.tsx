@@ -7,8 +7,8 @@
  * window; this component only picks the range, fetches, and draws.
  */
 
-import { Loader2 } from "lucide-react";
 import { formatBytes } from "@polaris/core";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -45,6 +45,20 @@ export interface MetricSpec<T = Point> {
     /** How the header number summarizes the window (default "last"): "sum" for a
      *  count like requests, "avg" for a rate, "max" for a peak. */
     summary?: "last" | "sum" | "avg" | "max";
+    /**
+     * What is behind this number, for the metrics that have an answer.
+     *
+     * Only where there is one. Every chart looking openable and half of them
+     * opening a panel that says "nothing to show here" teaches a reader to stop
+     * clicking, so a metric with nothing behind it stays exactly the chart it was.
+     * The window is handed over because a breakdown answers for the range on
+     * screen, not for this instant.
+     */
+    breakdown?: {
+        /** The words on the strip under the chart - what it will answer. */
+        label: string;
+        open: (window: { from: number; to: number }) => void;
+    };
 }
 
 type Window = { kind: "preset"; preset: RangePreset } | { kind: "custom"; from: number; to: number };
@@ -279,24 +293,48 @@ export function MetricsHistory<T extends { t: number } = Point>({
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
-                {metrics.map((metric) => (
-                    <TimeSeriesChart
-                        key={metric.key}
-                        label={metric.label}
-                        points={(points ?? []).map<TimePoint>((point) => ({
-                            t: point.t,
-                            v: metric.value(point),
-                            note: metric.describe?.(point) ?? undefined
-                        }))}
-                        from={from}
-                        to={to}
-                        max={metric.max}
-                        tone={metric.tone}
-                        format={metric.format}
-                        formatTime={stampOf}
-                        summary={metric.summary}
-                    />
-                ))}
+                {metrics.map((metric) => {
+                    const breakdown = metric.breakdown;
+                    const chart = (
+                        <TimeSeriesChart
+                            key={metric.key}
+                            label={metric.label}
+                            points={(points ?? []).map<TimePoint>((point) => ({
+                                t: point.t,
+                                v: metric.value(point),
+                                note: metric.describe?.(point) ?? undefined
+                            }))}
+                            from={from}
+                            to={to}
+                            max={metric.max}
+                            tone={metric.tone}
+                            format={metric.format}
+                            formatTime={stampOf}
+                            summary={metric.summary}
+                            // Joined to the strip below rather than floated above
+                            // it: two stacked cards read as two things, and this
+                            // is one card with a way in at the bottom.
+                            className={breakdown ? "rounded-b-none border-b-0" : undefined}
+                        />
+                    );
+                    if (!breakdown) return chart;
+                    return (
+                        <div key={metric.key} className="flex flex-col">
+                            {chart}
+                            {/* Its own control rather than the whole card: pressing
+                                the plot is how the value under the pointer is read,
+                                and on a phone that is the only way. */}
+                            <button
+                                type="button"
+                                onClick={() => breakdown.open({ from, to })}
+                                className="flex items-center justify-between gap-2 rounded-b-lg border border-border/60 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                {breakdown.label}
+                                <ChevronRight className="size-3.5 shrink-0" />
+                            </button>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
