@@ -15,6 +15,25 @@ import type { AudioRole, CombineRequest } from "./call-combine";
 
 /** What somebody else's controls are set to, as far as they have said. */
 export interface PeerState {
+    /**
+     * Whether their microphone is off, as far as anybody here can honestly say.
+     *
+     * `unknown` is the state this used to be missing, and it is the difference
+     * between a claim about somebody and a fact. A person who has said nothing
+     * about themselves and has no microphone on the connection is not somebody
+     * who muted themselves - they are somebody this browser has never heard
+     * from. Drawing a mute icon over them says they chose to be quiet, and it is
+     * the wrong answer badly enough that people press their own mute button
+     * twice trying to fix it.
+     *
+     * Reachable in practice only when a connection did not finish, because a
+     * browser that gets as far as talking to the call server announces itself
+     * either way - including a browser that joined with no microphone at all,
+     * which says so.
+     */
+    readonly mic: "on" | "muted" | "unknown";
+    /** Kept as the plain question the tiles ask. True only when it is actually
+     *  known to be off. */
     readonly muted: boolean;
     readonly deafened: boolean;
     /** Whether they are writing this call to a file. */

@@ -47,17 +47,37 @@ export const RECORDING = "recording";
  *  one. */
 export interface PeerFacts {
     readonly attributes?: Record<string, string> | undefined;
-    /** The publication's own flag, as the client works it out. A participant
-     *  with no microphone published at all reads as muted, which is right. */
+    /** The publication's own flag, as the client works it out. */
     readonly isMicrophoneEnabled: boolean;
+    /**
+     * Whether there is a microphone on the connection at all.
+     *
+     * The two cases `isMicrophoneEnabled` folds into one false. A publication
+     * that is muted is somebody being quiet; no publication is somebody this
+     * browser has not heard from, and reading the second as the first is what
+     * put a mute icon on people whose media never arrived. Optional so a caller
+     * that cannot tell is treated as it always was.
+     */
+    readonly hasMicrophone?: boolean;
 }
 
 export function peerState(participant: PeerFacts): PeerState {
     const said = participant.attributes?.[MUTED];
+    // Their own word first, because it is the only one that survives being said
+    // before this browser arrived. Failing that, the publication - and failing
+    // that, nothing, which is a state of its own rather than a mute.
+    const mic: PeerState["mic"] = said
+        ? said === "1"
+            ? "muted"
+            : "on"
+        : participant.hasMicrophone === false
+          ? "unknown"
+          : participant.isMicrophoneEnabled
+            ? "on"
+            : "muted";
     return {
-        // Their own word first, because it is the only one that survives being
-        // said before this browser arrived.
-        muted: said ? said === "1" : !participant.isMicrophoneEnabled,
+        mic,
+        muted: mic === "muted",
         deafened: participant.attributes?.[DEAFENED] === "1",
         recording: participant.attributes?.[RECORDING] === "1",
         // An empty attribute is how a browser takes back something it said, so

@@ -307,13 +307,20 @@ export function Avatar({
     // somebody's photograph with them.
     const shown = decoration ? (
         <span
-            className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+            // `profile-worn` is what a drawn decoration wakes under: it stirs
+            // while somebody is pointing at the face and is still otherwise, so
+            // a list of thirty faces does not fidget at everybody at once.
+            className="profile-worn relative inline-flex shrink-0 items-center justify-center rounded-full"
             // The glow is on this box rather than on the art: a shadow follows
             // the element's border box, and the art's box is the whole square.
             style={{ width: size, height: size, boxShadow: ringGlow(decoration, size) }}
         >
             <AvatarDecorationArt decoration={decoration} />
             <span className="relative inline-flex">{pressable}</span>
+            {/* The half that rests on the rim rather than behind it - a cat, a
+                hat. Draws nothing at all for a decoration that has none, which
+                is almost all of them. */}
+            <AvatarDecorationArt decoration={decoration} front />
         </span>
     ) : (
         pressable

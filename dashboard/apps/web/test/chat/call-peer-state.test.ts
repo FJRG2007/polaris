@@ -75,3 +75,51 @@ describe("the two facts a call cannot work out for itself", () => {
         expect(peerState({ isMicrophoneEnabled: true }).group).toBeNull();
     });
 });
+
+/**
+ * The state that was missing, and the wrong answer it used to give.
+ *
+ * A person whose media never arrived has no microphone on the connection, and
+ * the client's own flag answers that the same way it answers a person who muted
+ * themselves: false. So somebody sitting on a phone whose sound could not get
+ * through was drawn with a mute icon over them - a claim that they had chosen to
+ * be quiet, about somebody who was talking. People pressed their own mute button
+ * twice trying to fix it, which is the tell that the product was lying to them.
+ *
+ * A browser that reaches the call server always says which it is, including one
+ * that joined with no microphone at all. So "nothing was said and there is no
+ * microphone" is only ever a connection that did not finish.
+ */
+describe("somebody this browser has not heard from", () => {
+    it("is not called muted", () => {
+        const state = peerState({ isMicrophoneEnabled: false, hasMicrophone: false });
+
+        expect(state.mic).toBe("unknown");
+        expect(state.muted).toBe(false);
+    });
+
+    it("is still muted when they published one and turned it off", () => {
+        const state = peerState({ isMicrophoneEnabled: false, hasMicrophone: true });
+
+        expect(state.mic).toBe("muted");
+        expect(state.muted).toBe(true);
+    });
+
+    it("takes their own word over the connection, either way", () => {
+        // Somebody who joined with no microphone says so, and that is a fact
+        // about them rather than a guess about their network.
+        expect(peerState({ attributes: { muted: "1" }, isMicrophoneEnabled: false, hasMicrophone: false }).mic).toBe(
+            "muted"
+        );
+        expect(peerState({ attributes: { muted: "0" }, isMicrophoneEnabled: false, hasMicrophone: false }).mic).toBe(
+            "on"
+        );
+    });
+
+    it("reads a browser that predates any of this exactly as it did", () => {
+        // No word and no way to ask about the publication: the old fallback,
+        // unchanged, so an old tab in the room is not suddenly drawn differently.
+        expect(peerState({ isMicrophoneEnabled: false }).muted).toBe(true);
+        expect(peerState({ isMicrophoneEnabled: true }).muted).toBe(false);
+    });
+});

@@ -135,6 +135,29 @@ export function fillCss(fill: BannerFill): string {
  * decoration is exactly the kind of ornament somebody turns animation off to be
  * rid of.
  */
+/**
+ * One mark in a drawn decoration.
+ *
+ * Shapes rather than only path data, because most of what a drawing is made of
+ * is circles and ellipses and writing those as arcs is how a cat ends up with
+ * one ear. Coordinates are in the same 100-unit box everything else is drawn in,
+ * so a mark is placed once and is the same ornament at 20 pixels in a list and
+ * at 96 on a card.
+ */
+export type ArtMark = { readonly fill?: string; readonly stroke?: string; readonly width?: number; readonly opacity?: number } & (
+    | { readonly shape: "path"; readonly d: string }
+    | { readonly shape: "circle"; readonly cx: number; readonly cy: number; readonly r: number }
+    | {
+          readonly shape: "ellipse";
+          readonly cx: number;
+          readonly cy: number;
+          readonly rx: number;
+          readonly ry: number;
+          /** Degrees, clockwise, about its own centre. */
+          readonly rotate?: number;
+      }
+);
+
 export type DecorationLayer =
     | {
           readonly kind: "ring";
@@ -161,6 +184,42 @@ export type DecorationLayer =
           readonly start?: number;
           readonly opacity?: number;
           readonly spin?: number;
+      }
+    | {
+          readonly kind: "art";
+          /**
+           * The corner and size of what is drawn, as fractions of the face.
+           *
+           * Declared rather than measured: path data cannot be asked how big it
+           * is without a browser, and the one thing every decoration has to
+           * promise - that it never grows the layout - has to be checkable in a
+           * test. So the author states the box and `layerReach` believes them,
+           * and a drawing that wandered outside it is a drawing that was clipped
+           * rather than one that pushed a row apart.
+           */
+          readonly bounds: readonly [number, number, number, number];
+          readonly marks: readonly ArtMark[];
+          /**
+           * Drawn over the face rather than behind it.
+           *
+           * The one exception to "a decoration paints in the band". A cat asleep
+           * on somebody's head is on their head: it rests on the rim and a paw
+           * hangs over it, and drawn behind the photograph it is a pair of ears
+           * with no cat. Covering a corner of your own picture is the whole
+           * point of wearing one, which is not true of a ring.
+           */
+          readonly front?: boolean;
+          readonly opacity?: number;
+          /**
+           * Seconds, and only while somebody is pointing at the face.
+           *
+           * A drawing that moves on its own is a drawing that moves in thirty
+           * places at once on a busy screen, which is a fidgeting list rather
+           * than an ornament. Waking when it is looked at is the whole charm and
+           * costs nothing when nobody is.
+           */
+          readonly wake?: number;
+          readonly motion?: "sway" | "bob";
       }
     | {
           readonly kind: "orbit";
@@ -460,6 +519,131 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
                 spin: -8
             }
         ]
+    },
+
+    // ---------------------------------------------------------------------
+    // Worn
+    //
+    // Not rings. A thing sitting on somebody's head, which is a different kind
+    // of ornament and needed a different kind of layer - see `art`. They are
+    // drawn here as shapes and coordinates for the same reason the rings are
+    // parameters: there is no file to fetch, nothing to go missing behind a
+    // proxy, nothing to license, and adding one is a line in a list.
+    //
+    // They stir only under a pointer. Thirty faces in a list all fidgeting on
+    // their own is a list nobody can read down; the same thirty waking one at a
+    // time as somebody moves across them is the charm.
+    // ---------------------------------------------------------------------
+    {
+        id: "cat",
+        label: "Cat",
+        width: 0.1,
+        layers: [
+            {
+                kind: "art",
+                // Sits on the rim and hangs over it, which is why it is drawn in
+                // front. Behind the photograph this is two ears and no cat.
+                bounds: [0.27, 0.06, 0.46, 0.26],
+                front: true,
+                wake: 2.4,
+                motion: "sway",
+                marks: [
+                    // The tail first, so the body sits over where it joins.
+                    {
+                        shape: "path",
+                        d: "M 35 30 C 28 30 28 21 33 19",
+                        stroke: "#e8934a",
+                        width: 3.4
+                    },
+                    { shape: "ellipse", cx: 47, cy: 25, rx: 13, ry: 7, fill: "#f2a25c" },
+                    // Ears before the head, so their bases are covered by it and
+                    // they read as growing out of it rather than stuck on.
+                    { shape: "path", d: "M 56 17 L 57 8.5 L 63.5 14 Z", fill: "#f2a25c" },
+                    { shape: "path", d: "M 66 13 L 71.5 8 L 71.5 16.5 Z", fill: "#f2a25c" },
+                    { shape: "path", d: "M 57.6 15 L 58.2 11 L 61.6 14 Z", fill: "#f6bda6" },
+                    { shape: "path", d: "M 67.4 13.4 L 70.2 10.6 L 70.2 15.2 Z", fill: "#f6bda6" },
+                    { shape: "circle", cx: 62, cy: 22, r: 8, fill: "#f2a25c" },
+                    // Asleep: two closed curves rather than two dots, which is
+                    // the whole difference between a sleeping cat and a staring
+                    // one.
+                    {
+                        shape: "path",
+                        d: "M 57.6 22.4 q 2 2.2 4 0",
+                        stroke: "#5a3a22",
+                        width: 1.1
+                    },
+                    {
+                        shape: "path",
+                        d: "M 63.4 22.4 q 2 2.2 4 0",
+                        stroke: "#5a3a22",
+                        width: 1.1
+                    },
+                    { shape: "path", d: "M 61 25.6 L 63.4 25.6 L 62.2 27 Z", fill: "#d1705a" }
+                ]
+            }
+        ],
+        glow: "#f2a25c"
+    },
+    {
+        id: "wings",
+        label: "Wings",
+        width: 0.1,
+        layers: [
+            {
+                kind: "art",
+                bounds: [0.1, 0.2, 0.8, 0.34],
+                front: true,
+                opacity: 0.94,
+                wake: 3.2,
+                motion: "bob",
+                marks: [
+                    {
+                        shape: "path",
+                        d: "M 40 26 C 26 24 14 32 12 44 C 20 40 26 42 30 46 C 30 38 34 30 40 26 Z",
+                        fill: "#eef3ff",
+                        stroke: "#c3d0ea",
+                        width: 1
+                    },
+                    {
+                        shape: "path",
+                        d: "M 60 26 C 74 24 86 32 88 44 C 80 40 74 42 70 46 C 70 38 66 30 60 26 Z",
+                        fill: "#eef3ff",
+                        stroke: "#c3d0ea",
+                        width: 1
+                    },
+                    // The feather lines. Three each, because the shape reads as a
+                    // wing only once something inside it runs the way feathers do.
+                    { shape: "path", d: "M 36 30 C 28 32 22 38 19 44", stroke: "#c3d0ea", width: 0.8 },
+                    { shape: "path", d: "M 34 35 C 28 37 24 41 22 46", stroke: "#c3d0ea", width: 0.8 },
+                    { shape: "path", d: "M 64 30 C 72 32 78 38 81 44", stroke: "#c3d0ea", width: 0.8 },
+                    { shape: "path", d: "M 66 35 C 72 37 76 41 78 46", stroke: "#c3d0ea", width: 0.8 }
+                ]
+            }
+        ],
+        glow: "#dbe6ff"
+    },
+    {
+        id: "party",
+        label: "Party hat",
+        width: 0.1,
+        layers: [
+            {
+                kind: "art",
+                bounds: [0.34, 0.05, 0.32, 0.22],
+                front: true,
+                wake: 1.8,
+                motion: "bob",
+                marks: [
+                    { shape: "path", d: "M 50 6.5 L 60 24 L 40 24 Z", fill: "#5b8def" },
+                    // Two stripes rather than a pattern: at twenty pixels a
+                    // pattern is a texture, and a texture on a cone is a smudge.
+                    { shape: "path", d: "M 46.2 13 L 53.8 13 L 55.6 16 L 44.4 16 Z", fill: "#f6c445" },
+                    { shape: "ellipse", cx: 50, cy: 24, rx: 10.6, ry: 2.6, fill: "#3f6fd0" },
+                    { shape: "circle", cx: 50, cy: 6.2, r: 3, fill: "#f6c445" }
+                ]
+            }
+        ],
+        glow: "#5b8def"
     }
 ];
 
@@ -473,6 +657,21 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
  * checked rather than eyeballed - see the test beside this file.
  */
 export function layerReach(layer: DecorationLayer): { readonly outer: number; readonly inner: number } {
+    // A drawing is a box rather than a radius, so its reach is how far its
+    // corners are from the middle. The near corner can be well inside the band -
+    // that is what `front` is for - and the far one is what must not leave the
+    // square.
+    if (layer.kind === "art") {
+        const [x, y, width, height] = layer.bounds;
+        const corners = [
+            [x, y],
+            [x + width, y],
+            [x, y + height],
+            [x + width, y + height]
+        ];
+        const spans = corners.map(([px = 0, py = 0]) => Math.hypot(px - 0.5, py - 0.5));
+        return { outer: Math.max(...spans), inner: Math.min(...spans) };
+    }
     const half = layer.kind === "orbit" ? layer.size / 2 : layer.thickness / 2;
     return { outer: layer.at + half, inner: layer.at - half };
 }
@@ -503,7 +702,11 @@ export function fittedDash(
 
 /** Every colour a decoration paints with, so they can all be checked at once. */
 export function decorationColors(decoration: AvatarDecoration): readonly string[] {
-    const colors = decoration.layers.flatMap((layer) => [...layer.colors]);
+    const colors = decoration.layers.flatMap((layer) =>
+        layer.kind === "art"
+            ? layer.marks.flatMap((mark) => [mark.fill, mark.stroke].filter((c): c is string => !!c))
+            : [...layer.colors]
+    );
     return decoration.glow ? [...colors, decoration.glow] : colors;
 }
 
@@ -514,7 +717,11 @@ export function decorationMoves(decoration: AvatarDecoration): boolean {
         (layer) =>
             ("spin" in layer && layer.spin !== undefined) ||
             ("twinkle" in layer && layer.twinkle !== undefined) ||
-            ("pulse" in layer && layer.pulse !== undefined)
+            ("pulse" in layer && layer.pulse !== undefined) ||
+            // Counted, even though it only stirs under a pointer. Somebody who
+            // turns movement off is telling the product they do not want to be
+            // surprised by it, and "only when you touch it" is still a surprise.
+            ("wake" in layer && layer.wake !== undefined)
     );
 }
 

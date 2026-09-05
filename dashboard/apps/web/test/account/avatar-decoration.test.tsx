@@ -22,8 +22,21 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
 import { AVATAR_DECORATIONS, decorationOf, decorationMoves } from "@polaris/core";
 
+/**
+ * Both passes, as a face draws them.
+ *
+ * A decoration is drawn twice with the photograph in between: the rings go
+ * behind, and a worn thing - a cat, a hat - goes on top, because resting on the
+ * rim is the whole of what makes it worn. Either pass on its own is half a
+ * decoration, and a check that only looked at the back one would have said the
+ * cat drew nothing.
+ */
 function drawn(id: string): string {
-    return renderToStaticMarkup(<AvatarDecorationArt decoration={decorationOf(id)!} />);
+    const decoration = decorationOf(id)!;
+    return (
+        renderToStaticMarkup(<AvatarDecorationArt decoration={decoration} />) +
+        renderToStaticMarkup(<AvatarDecorationArt decoration={decoration} front />)
+    );
 }
 
 describe("a decoration on a face", () => {
