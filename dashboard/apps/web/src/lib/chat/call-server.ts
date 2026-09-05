@@ -244,9 +244,21 @@ export async function joinToken(
         roomJoin: true,
         canPublish: true,
         canSubscribe: true,
-        // The data channel carries nothing here: everything Polaris has to say
-        // about a call goes through Polaris, where it can be checked.
-        canPublishData: false,
+        // Two browsers in a call need to be able to say one thing to each other
+        // that Polaris is not in the middle of: "go quiet, I will carry this
+        // room" and the refusal of it - see `call-combine`. Asking a server to
+        // relay that would put a round trip inside a gesture that has to feel
+        // immediate, for a message that means nothing outside the call it was
+        // sent in.
+        //
+        // It was denied here while the browser sent it anyway, so every one of
+        // those was rejected by the server and swallowed by a `.catch`, and the
+        // feature simply did not work with nothing anywhere saying why.
+        //
+        // Safe because nothing is trusted on the way in: what arrives is parsed
+        // and validated as strictly as a request body, and anything that does
+        // not fit is dropped without a word.
+        canPublishData: true,
         // One thing a browser is allowed to say about itself, and only about
         // itself: whether its headphones are off. Nothing else can tell - a
         // person who has stopped listening publishes exactly what an attentive

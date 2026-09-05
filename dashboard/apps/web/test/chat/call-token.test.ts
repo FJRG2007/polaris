@@ -5,8 +5,8 @@
  * not ask Polaris anything else, so every limit on what somebody can do in a
  * call has to already be inside it. That makes the grant worth asserting field
  * by field rather than trusting the shape of the call that built it - a token
- * that accidentally carried no room, or carried permission to publish data, or
- * never expired, would work perfectly in every manual test.
+ * that accidentally carried no room, or carried permission to let somebody else
+ * in, or never expired, would work perfectly in every manual test.
  *
  * The name is checked too, and for the same reason it is read from the database
  * rather than passed in: whatever is in the token is what everybody else in the
@@ -95,13 +95,21 @@ describe("the ticket for the media server", () => {
         expect(video.canSubscribe).toBe(true);
     });
 
-    it("carries nothing on the data channel", async () => {
+    it("lets two browsers say one thing to each other directly", async () => {
         const grant = claims(await calls.joinToken(endpoint, "meeting-9", "seat-1"));
 
-        // Everything Polaris has to say about a call goes through Polaris, where
-        // it can be checked. A browser that could publish data to the room could
-        // say things about the call that nothing verified.
-        expect((grant.video as Record<string, unknown>).canPublishData).toBe(false);
+        // Asking one device to go quiet so the one next to it can carry the
+        // room, and the refusal of it - see `call-combine`. It is sent between
+        // two browsers in the same call and means nothing outside it, so routing
+        // it through Polaris would put a round trip inside a gesture that has to
+        // feel immediate.
+        //
+        // This asserted `false` while the client called `publishData` anyway, so
+        // the server rejected every one of them and a `.catch` swallowed it:
+        // the feature did not work, and the test said the design was working as
+        // intended. Nothing arriving that way is trusted - it is validated as
+        // strictly as a request body - which is what makes the grant safe.
+        expect((grant.video as Record<string, unknown>).canPublishData).toBe(true);
     });
 
     it("lets a browser say it has stopped listening, and nothing else", async () => {
