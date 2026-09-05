@@ -46,6 +46,7 @@ import {
 } from "./listing-cache";
 import {
     isSavedConnection,
+    isServerSource,
     mayBeUnreachable,
     type ConnectionSummary,
     type DriveEntry,
@@ -692,6 +693,15 @@ export function DriveExplorer({
                         name={selectedConnection?.name ?? "This server"}
                         detail={unreachable}
                         endpoint={downEndpoint}
+                        // Straight to the machine's own page rather than to the
+                        // list: that page is where the button that looks for it
+                        // lives, and a server that is not answering is exactly
+                        // when somebody needs it.
+                        serverHref={
+                            isServerSource(connectionId)
+                                ? `/apps/servers/${connectionId.slice("host:".length)}`
+                                : null
+                        }
                         onRecheck={recheckSources}
                     />
                 ) : selectedConnection?.needsRekey ? (
@@ -1341,6 +1351,7 @@ function UnreachableServer({
     name,
     detail,
     endpoint,
+    serverHref,
     onRecheck
 }: {
     name: string;
@@ -1348,6 +1359,9 @@ function UnreachableServer({
     /** Where Polaris dialled, as `host:port`. Null for a source whose address
      *  could not be worked out at all. */
     endpoint: string | null;
+    /** This machine's own page, when the source is a registered server. Null for
+     *  a NAS or anything else without one. */
+    serverHref: string | null;
     onRecheck: () => void;
 }) {
     return (
@@ -1366,9 +1380,10 @@ function UnreachableServer({
                         an IP that has since moved. */}
                     {endpoint ? (
                         <p className="text-xs text-muted-foreground">
-                            Polaris tried <span className="font-mono">{endpoint}</span>. If this
-                            server is on the same network, open it in Servers and check whether it
-                            can be reached there directly.
+                            Polaris tried <span className="font-mono">{endpoint}</span>.
+                            {serverHref
+                                ? " If the machine has moved - a new address from the router is the usual reason - open it below and press Check on this network."
+                                : ""}
                         </p>
                     ) : null}
                     <div className="mt-1 flex flex-wrap gap-2">
@@ -1377,7 +1392,9 @@ function UnreachableServer({
                             Check again
                         </Button>
                         <Button size="sm" variant="ghost" asChild>
-                            <Link href="/apps/servers">Open Servers</Link>
+                            <Link href={serverHref ?? "/apps/servers"}>
+                                {serverHref ? `Open ${name}` : "Open Servers"}
+                            </Link>
                         </Button>
                     </div>
                 </div>

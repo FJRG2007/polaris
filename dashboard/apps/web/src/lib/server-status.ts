@@ -29,18 +29,29 @@ export interface ServerStatus {
     readonly detail: string | null;
 }
 
-/** Time a TCP handshake against one endpoint. Never rejects: a refusal and a
- *  timeout are both answers about the machine, not errors in this code. */
-export async function probeTcp(address: string, port: number): Promise<{ latencyMs: number; detail: string | null }> {
+/**
+ * Time a TCP handshake against one endpoint. Never rejects: a refusal and a
+ * timeout are both answers about the machine, not errors in this code.
+ *
+ * `timeoutMs` is for the one caller that asks about many addresses rather than
+ * one: waiting three seconds on each of 254 of them is a wait nobody sits
+ * through, and a machine on the same switch answers in single-digit
+ * milliseconds or is not there.
+ */
+export async function probeTcp(
+    address: string,
+    port: number,
+    timeoutMs: number = PROBE_TIMEOUT_MS
+): Promise<{ latencyMs: number; detail: string | null }> {
     const started = Date.now();
     return new Promise((resolve) => {
-        const socket = connect({ host: address, port, timeout: PROBE_TIMEOUT_MS });
+        const socket = connect({ host: address, port, timeout: timeoutMs });
         const settle = (detail: string | null): void => {
             socket.destroy();
             resolve({ latencyMs: Date.now() - started, detail });
         };
         socket.once("connect", () => settle(null));
-        socket.once("timeout", () => settle("No answer within 3 seconds"));
+        socket.once("timeout", () => settle(`No answer within ${Math.round(timeoutMs / 1000)} seconds`));
         socket.once("error", (error: NodeJS.ErrnoException) => settle(reason(error)));
     });
 }

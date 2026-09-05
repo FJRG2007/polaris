@@ -155,8 +155,9 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
                 <div className="flex flex-col">
                     <span className="text-sm font-medium">On this network</span>
                     <span className="text-xs text-muted-foreground">
-                        Polaris reaches this server at {server.address}. If it is on the same network, a direct
-                        address is faster and keeps working when the internet does not.
+                        Polaris reaches this server at {server.address}. A direct address on this
+                        network is faster and keeps working when the internet does not - and if the
+                        machine has moved, this is what finds it again.
                     </span>
                 </div>
                 <Button size="sm" variant="outline" disabled={busy} onClick={() => void check()}>
@@ -172,7 +173,14 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
             {path?.kind === "found" ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm">
-                        It answers directly at <span className="font-mono">{path.address}</span>.
+                        {path.moved
+                            ? // Found by looking rather than by asking, which
+                              // means the address on record had stopped reaching
+                              // it - almost always a DHCP lease that moved.
+                              "It is not where Polaris had it recorded any more."
+                            : "It answers directly at"}{" "}
+                        <span className="font-mono">{path.address}</span>
+                        {path.moved ? " is this same server - its host key proves it." : "."}
                     </p>
                     <Button size="sm" disabled={busy} onClick={() => void move(path.address)}>
                         Use it
@@ -191,7 +199,8 @@ export function LocalPathPanel({ server }: { server: ServerRow }) {
             ) : null}
             {path?.kind === "unreachable" ? (
                 <p className="text-sm text-muted-foreground">
-                    It is not answering where Polaris knows it, so this cannot be worked out right now.
+                    It is not answering where Polaris knows it, and nothing on this network answers
+                    with its host key. It is switched off, or somewhere else.
                 </p>
             ) : null}
             {path?.kind === "unknown" ? (
