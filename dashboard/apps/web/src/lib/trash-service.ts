@@ -88,15 +88,6 @@ export async function moveManyToTrash(
 
     const moved: string[] = [];
     const failures: { path: string; reason: string }[] = [];
-    const rows: {
-        ownerId: string;
-        connectionId: string;
-        name: string;
-        originalPath: string;
-        trashPath: string;
-        kind: string;
-        size: bigint;
-    }[] = [];
 
     const driver = await getDriver(connectionId, ownerId);
     try {
@@ -124,14 +115,31 @@ export async function moveManyToTrash(
                 const name = baseName(source) || source;
                 const trashPath = `${TRASH_DIR}/${randomBytes(6).toString("hex")}-${name}`;
                 await driver.move(source, trashPath);
-                rows.push({
-                    ownerId,
-                    connectionId,
-                    name,
-                    originalPath: source,
-                    trashPath,
-                    kind: stat.kind,
-                    size: stat.size
+                // Recorded immediately, not with the others at the end.
+                //
+                // The row is what makes a file in the bin a thing anybody can
+                // see or put back; without it the file is in a hidden folder
+                // with nothing pointing at it, and this product's first rule is
+                // that a terminal is not a requirement for anything. Batching
+                // the writes left up to a hundred files in that state at once,
+                // for as long as the batch took - and a container that goes away
+                // mid-rollover is exactly when it would happen.
+                //
+                // What the batching was avoiding is real and is still avoided:
+                // the row is written after its own move, never before, so a move
+                // that fails leaves no bin entry pointing at a file that is
+                // still where it was. One insert against the local database, per
+                // file that has just crossed a network - it does not show.
+                await prisma.trashItem.create({
+                    data: {
+                        ownerId,
+                        connectionId,
+                        name,
+                        originalPath: source,
+                        trashPath,
+                        kind: stat.kind,
+                        size: stat.size
+                    }
                 });
                 moved.push(source);
             } catch (caught) {
@@ -145,10 +153,6 @@ export async function moveManyToTrash(
         await driver.dispose();
     }
 
-    // One insert rather than one per file, and after the moves rather than
-    // between them: a row written for a move that then failed is a bin entry
-    // pointing at a file that is still where it was.
-    if (rows.length > 0) await prisma.trashItem.createMany({ data: rows });
     for (const path of moved) await invalidateFolderSizes(connectionId, path);
     return { moved, failures };
 }

@@ -90,11 +90,7 @@ export default async function SpacePage({
                 members={members}
                 automations={automations}
                 forms={forms}
-                people={members.map((member) => ({
-                    id: member.userId,
-                    name: member.name,
-                    image: member.image
-                }))}
+                people={members.map((member) => ({ id: member.userId, name: member.name }))}
                 canManage={canManage}
                 baseUrl={baseUrl}
                 initialTab={tab}

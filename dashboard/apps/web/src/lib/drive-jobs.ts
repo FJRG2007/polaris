@@ -105,6 +105,43 @@ export async function listDriveJobs(ownerId: string): Promise<DriveJobView[]> {
  * between the insert and the kick, the scheduled sweep finds the row still
  * queued and takes it.
  */
+/**
+ * What is already being removed on a connection, by anybody.
+ *
+ * A job takes minutes, and everything it has not reached yet is still on the
+ * screen - so a reload shows the files again and they can be selected and
+ * deleted a second time. Two jobs then race over one file: the second finds it
+ * gone, records a failure nobody caused, and the person is told part of their
+ * deletion did not work.
+ *
+ * By connection rather than by owner, because that is what is shared. Two people
+ * looking at the same NAS folder are two people who can start the same deletion,
+ * and neither is doing anything wrong.
+ *
+ * The paths still pending, not the paths a job started with: what has already
+ * been moved is gone from the listing anyway, and keeping it here would grey out
+ * rows that no longer exist.
+ */
+export async function pathsInFlight(connectionId: string): Promise<Set<string>> {
+    const rows = await prisma.driveJob.findMany({
+        where: { connectionId, state: { in: ["queued", "running"] } },
+        select: { pending: true }
+    });
+    const paths = new Set<string>();
+    for (const row of rows) {
+        for (const path of readPaths(row.pending)) paths.add(path);
+    }
+    return paths;
+}
+
+/** Nothing was left to do once what is already in flight was taken out. */
+export class AlreadyGoingError extends Error {
+    constructor() {
+        super("Those items are already being removed.");
+        this.name = "AlreadyGoingError";
+    }
+}
+
 export async function startDriveJob(input: {
     ownerId: string;
     connectionId: string;
@@ -112,7 +149,14 @@ export async function startDriveJob(input: {
     label: string;
     paths: readonly string[];
 }): Promise<DriveJobView> {
-    const paths = [...new Set(input.paths.filter(Boolean))].slice(0, DRIVE_JOB_MAX_PATHS);
+    const asked = [...new Set(input.paths.filter(Boolean))].slice(0, DRIVE_JOB_MAX_PATHS);
+    // Whatever another job - this person's or somebody else's - is already
+    // working through is dropped rather than queued twice. Two jobs over one file
+    // is a race whose loser reports a failure nobody caused.
+    const going = await pathsInFlight(input.connectionId);
+    const paths = asked.filter((path) => !going.has(path));
+    if (paths.length === 0) throw new AlreadyGoingError();
+
     const row = await prisma.driveJob.create({
         data: {
             ownerId: input.ownerId,

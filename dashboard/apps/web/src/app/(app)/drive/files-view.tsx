@@ -291,6 +291,36 @@ function downloadSelection(connectionId: string, entries: DriveEntry[]) {
     anchor.remove();
 }
 
+/**
+ * What is in the folder, in words.
+ *
+ * Folders and files counted apart. "48 items" in a folder of 40 folders is a
+ * different place from one of 40 files, and the count on its own makes somebody
+ * scroll to find out which.
+ */
+function folderTally(entries: readonly DriveEntry[]): string {
+    const folders = entries.filter((entry) => entry.kind === "dir").length;
+    const files = entries.length - folders;
+    const parts: string[] = [];
+    if (folders > 0) parts.push(folders === 1 ? "1 folder" : `${folders} folders`);
+    if (files > 0) parts.push(files === 1 ? "1 file" : `${files} files`);
+    return parts.join(", ");
+}
+
+/** What has been picked, and how much it weighs when that is knowable. A folder
+ *  has no size of its own here, so a selection holding one says nothing about
+ *  bytes rather than under-reporting them. */
+function selectionTally(entries: readonly DriveEntry[]): string {
+    const count = entries.length === 1 ? "1 selected" : `${entries.length} selected`;
+    if (entries.some((entry) => entry.kind === "dir")) return count;
+    const bytes = entries.reduce((total, entry) => total + BigInt(entry.size || "0"), 0n);
+    return `${count} - ${formatBytes(bytes)}`;
+}
+
+/** Nothing on its way out, shared so a view that is passed none does not mint a
+ *  new empty set on every render. */
+const EMPTY_PATHS: ReadonlySet<string> = new Set();
+
 export function FilesView({
     connectionId,
     path,
@@ -326,7 +356,8 @@ export function FilesView({
     onEmptyFolder,
     onScheduleDelete,
     onSaved,
-    headerActions
+    headerActions,
+    going
 }: {
     connectionId: string;
     path: string;
@@ -336,6 +367,16 @@ export function FilesView({
      *  everything above it is theirs to see the name of, not to walk into. */
     rootPath?: string;
     entries: DriveEntry[];
+    /**
+     * Paths a job is already removing.
+     *
+     * A job takes minutes, and everything it has not reached is still in this
+     * listing - so a reload showed the files again and they could be deleted a
+     * second time, which queued a second job that raced the first and reported a
+     * failure nobody caused. Drawn as going, and not selectable: the server
+     * refuses them as well, because another person's job counts the same.
+     */
+    going?: ReadonlySet<string>;
     loading: boolean;
     error: string | null;
     pending: boolean;
@@ -427,6 +468,9 @@ export function FilesView({
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
 
+    /** What is on its way out, defaulted so every other caller of this view -
+     *  and every test - can leave it out. */
+    const leaving = going ?? EMPTY_PATHS;
     const [selected, setSelected] = useState<Set<string>>(new Set());
     // Anchor for shift-range selection; keyboard cursor is tracked separately so a
     // shift+arrow can extend from a fixed anchor while the cursor keeps moving.
@@ -620,6 +664,10 @@ export function FilesView({
     /** Windows-style row click: plain selects only this, ctrl toggles, shift extends. */
     function rowClick(event: MouseEvent, index: number, entry: DriveEntry) {
         if (renaming === entry.path) return;
+        // Nothing to do to a file that is already going. Ignored rather than
+        // refused with a sentence: it is about to stop existing, and the row
+        // already says so.
+        if (leaving.has(entry.path)) return;
         cursorRef.current = index;
         if (event.shiftKey) {
             selectRange(index);
@@ -691,7 +739,7 @@ export function FilesView({
             moveCursor(visible.length, event.shiftKey);
         } else if (mod && key === "a") {
             event.preventDefault();
-            setSelected(new Set(visible.map((entry) => entry.path)));
+            setSelected(new Set(selectable.map((entry) => entry.path)));
         }
     }
 
@@ -934,8 +982,11 @@ export function FilesView({
         insights
     ]);
 
-    const selectedEntries = visible.filter((entry) => selected.has(entry.path));
-    const allSelected = visible.length > 0 && selectedEntries.length === visible.length;
+    /** Everything that can still be acted on: what is already being removed is
+     *  drawn, so it can be seen going, but is not part of a selection. */
+    const selectable = visible.filter((entry) => !leaving.has(entry.path));
+    const selectedEntries = selectable.filter((entry) => selected.has(entry.path));
+    const allSelected = selectable.length > 0 && selectedEntries.length === selectable.length;
     // Anything but a single file comes down as an archive, and the button says so.
     const zipLabel =
         selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
@@ -1097,7 +1148,9 @@ export function FilesView({
         const hiding = targets.some((item) => !item.hidden);
         return (
             <ContextMenuContent onCloseAutoFocus={keepFocusOnClose}>
-                <ContextMenuLabel>{label}</ContextMenuLabel>
+                {/* The whole name on hover: the heading is capped so one very
+                    long file name cannot stretch the menu off the screen. */}
+                <ContextMenuLabel title={label}>{label}</ContextMenuLabel>
                 {many ? (
                     <ContextMenuItem onSelect={() => downloadSelection(connectionId, targets)}>
                         <Download className="size-4" />
@@ -1568,7 +1621,7 @@ export function FilesView({
     }
 
     function toggleAll() {
-        setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.path)));
+        setSelected(allSelected ? new Set() : new Set(selectable.map((entry) => entry.path)));
     }
 
     function startRename(entry: DriveEntry) {
@@ -2223,6 +2276,13 @@ export function FilesView({
                                                                             "opacity-50",
                                                                         cutPaths?.has(entry.path) &&
                                                                             "opacity-40",
+                                                                        // Being removed: dimmed,
+                                                                        // and deaf to the pointer
+                                                                        // so it cannot be picked,
+                                                                        // dragged or right-clicked
+                                                                        // into a second deletion.
+                                                                        leaving.has(entry.path) &&
+                                                                            "pointer-events-none opacity-40",
                                                                         dropFolder === entry.path &&
                                                                             "border-primary bg-primary/10 ring-2 ring-primary"
                                                                     )}
@@ -2373,6 +2433,8 @@ export function FilesView({
                                                                                 : "hover:bg-card-hover",
                                                                             entry.hidden &&
                                                                                 "opacity-50",
+                                                                            leaving.has(entry.path) &&
+                                                                                "pointer-events-none opacity-40",
                                                                             cutPaths?.has(
                                                                                 entry.path
                                                                             ) && "opacity-40",
@@ -2602,6 +2664,26 @@ export function FilesView({
                                     )}
                                 </div>
                             )}
+                            {/* What is in front of you, counted - the line every
+                                file manager has along its bottom edge. It answers
+                                the question a listing raises and does not answer:
+                                how much is in here. Folders and files apart,
+                                because "48 items" in a folder of 40 folders is a
+                                different place from one of 40 files.
+
+                                It counts what is on screen rather than what is in
+                                the folder, so a search or a filter is reflected
+                                rather than contradicted, and it says what has been
+                                picked when anything has - which is the other thing
+                                that line is read for. */}
+                            {visible.length > 0 ? (
+                                <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
+                                    <span>{folderTally(visible)}</span>
+                                    {selectedEntries.length > 0 ? (
+                                        <span>{selectionTally(selectedEntries)}</span>
+                                    ) : null}
+                                </div>
+                            ) : null}
                             {dragUpload ? (
                                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-primary/5 text-sm font-medium text-primary">
                                     Drop files to upload here

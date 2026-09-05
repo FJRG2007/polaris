@@ -145,6 +145,16 @@ export async function listAttachments(taskId: string): Promise<AttachmentView[]>
  * behind to explain. The reverse - a row for a file that was never written -
  * would put a permanent broken link on the task.
  */
+/** The comment id, if it names a comment on this task, and null otherwise -
+ *  including for an id that is not a comment at all. */
+async function commentOnTask(commentId: string, taskId: string): Promise<string | null> {
+    const comment = await prisma.comment.findFirst({
+        where: { id: commentId, subjectType: "task", subjectId: taskId },
+        select: { id: true }
+    });
+    return comment?.id ?? null;
+}
+
 export async function storeAttachment(input: {
     taskId: string;
     uploadedById: string;
@@ -156,6 +166,16 @@ export async function storeAttachment(input: {
      *  files. It is on both either way; this is what lets the thread draw it. */
     commentId?: string | null;
 }): Promise<AttachmentView> {
+    // The comment has to be one on this task.
+    //
+    // It arrives as a query parameter beside the task id, and the access check
+    // is run on the task - so without this, somebody who may write on task A
+    // could hand over the id of a comment on task B and have their file drawn in
+    // that thread, in a conversation they cannot read. The task is what was
+    // authorized, so the comment is only believed while it belongs to it, and is
+    // dropped rather than refused: the file itself was legitimately uploaded to
+    // the task, and losing the thread it was written beside is the smaller loss.
+    const commentId = input.commentId ? await commentOnTask(input.commentId, input.taskId) : null;
     // The storage uploads are sent to, or this server when that one cannot be
     // opened. A share that is away must not be the reason somebody cannot
     // attach a file to their work; the row records where it really went.
@@ -179,7 +199,7 @@ export async function storeAttachment(input: {
                 connectionId: target.targetId === LOCAL_TARGET ? null : target.targetId,
                 path: stored,
                 uploadedById: input.uploadedById,
-                commentId: input.commentId ?? null
+                commentId
             },
             select: {
                 id: true,

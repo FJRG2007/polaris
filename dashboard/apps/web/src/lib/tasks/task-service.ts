@@ -88,7 +88,7 @@ const ROW_SELECT = {
     // where each task lives, and that is one join rather than a query per row.
     list: { select: { name: true, folder: { select: { name: true } } } },
     status: { select: { id: true, name: true, color: true, type: true } },
-    assignees: { select: { user: { select: { id: true, name: true, image: true } } } },
+    assignees: { select: { user: { select: { id: true, name: true } } } },
     tags: { select: { tag: { select: { id: true, name: true, color: true } } } },
     fieldValues: { select: { fieldId: true, value: true } },
     _count: { select: { subtasks: true } }
@@ -333,7 +333,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
         listTasks({ parentId: taskId }, { includeArchived: true }),
         prisma.follow.findMany({
             where: { subjectType: "task", subjectId: taskId },
-            select: { user: { select: { id: true, name: true, image: true } } }
+            select: { user: { select: { id: true, name: true } } }
         }),
         prisma.taskChecklist.findMany({
             where: { taskId },
@@ -357,7 +357,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                 assignedToId: true,
                 resolvedAt: true,
                 createdAt: true,
-                user: { select: { id: true, name: true, image: true } }
+                user: { select: { id: true, name: true } }
             }
         }),
         prisma.taskDependency.findMany({

@@ -28,7 +28,8 @@ import {
     HOST_CONNECTION_PREFIX
 } from "@/lib/storage-service";
 import {
-    findLockForPath,
+    connectionLocks,
+    coveringLock,
     lockUnlockCookie,
     verifyLockUnlock,
     type LockInfo
@@ -115,25 +116,76 @@ export class DriveLockedError extends Error {
 
 /** The lock guarding a path if it is currently gated (not unlocked), else null. */
 async function lockedGate(connectionId: string, path: string): Promise<LockInfo | null> {
-    const lock = await findLockForPath(connectionId, path);
-    if (!lock) return null;
-    const store = await cookies();
-    const value = store.get(lockUnlockCookie(lock.id))?.value;
-    return verifyLockUnlock(lock.id, value, loadEnv().POLARIS_AUTH_SECRET) ? null : lock;
+    const gate = await lockGate(connectionId);
+    return gate(path);
 }
 
 /**
- * Assert a user may perform a Drive verb on a path, throwing DriveAccessError or
- * DriveLockedError otherwise. Pass `skipLock` for lock-management operations,
- * which must run even while the path is locked.
+ * The lock question for a connection, asked once and answered many times.
+ *
+ * Both halves of it are per connection rather than per path - the locks on it,
+ * and which of them this browser has already unlocked - so a list of three
+ * thousand paths that each read the lock table and the cookie jar was reading
+ * the same two answers three thousand times.
+ *
+ * The matching itself is `findLockForPath`'s rule, kept here in one place: the
+ * deepest lock whose path covers the target, with an empty path standing for the
+ * whole connection.
  */
-export async function authorizeDrive(
+async function lockGate(connectionId: string): Promise<(path: string) => LockInfo | null> {
+    const locks = await connectionLocks(connectionId);
+    if (locks.length === 0) return () => null;
+    const store = await cookies();
+    const secret = loadEnv().POLARIS_AUTH_SECRET;
+    // Which locks this browser has already answered, worked out once: verifying a
+    // signature is cheap, and doing it per path per lock is not.
+    const open = new Set(
+        locks
+            .filter((lock) => verifyLockUnlock(lock.id, store.get(lockUnlockCookie(lock.id))?.value, secret))
+            .map((lock) => lock.id)
+    );
+    return (path: string) => {
+        const lock = coveringLock(locks, path);
+        return lock && !open.has(lock.id) ? lock : null;
+    };
+}
+
+/**
+ * What is left to decide once the reader and the connection are known.
+ *
+ * Splitting this out is what makes a list of paths affordable. Nearly everything
+ * `authorizeDrive` asks - who is this, do they own it, are they an administrator,
+ * do they hold the capability - has the same answer for every path in one call,
+ * and asking it per path is how moving three thousand files to the trash became
+ * fourteen thousand queries before the first byte moved. What genuinely varies
+ * with the path is here, and only here.
+ *
+ * It is one description used by both entry points rather than two copies of the
+ * rules. A second implementation of an access check is a second implementation
+ * that can disagree with the first, and the one that is wrong is whichever
+ * nobody is reading.
+ */
+type PathCheck =
+    /** Nothing further to ask: an administrator, an owner who holds the
+     *  capability, or a source with no per-path rules at all. */
+    | { readonly kind: "settled" }
+    /** An organization's Drive: the folder rules decide, with membership as the
+     *  fallback when they say nothing. */
+    | { readonly kind: "org"; readonly memberAllowed: boolean }
+    /** Somebody who is not the owner: they need an explicit allow for the path. */
+    | { readonly kind: "acl" };
+
+/**
+ * Who this is and what this connection allows them, before any path is named.
+ *
+ * Throws exactly where `authorizeDrive` always threw: a connection that is not
+ * there, an owner without the capability. What it does not do is look at a path.
+ */
+async function resolveReader(
     userId: string,
     connectionId: string,
-    path: string,
-    action: DriveAction,
-    opts?: { skipLock?: boolean }
-): Promise<void> {
+    action: DriveAction
+): Promise<PathCheck> {
     // A container source is a deployed service's filesystem, owned by whoever owns
     // the app's project. It has no StorageConnection row, ACLs, or access locks:
     // ownership (or admin) plus the global Drive capability is the whole gate.
@@ -149,10 +201,9 @@ export async function authorizeDrive(
         if (!app) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (app.environment.project.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
-                throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         }
-        return;
+        return { kind: "settled" };
     }
 
     // A registered server browsed over SFTP. Like a container source it has no
@@ -168,10 +219,9 @@ export async function authorizeDrive(
         if (!host) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
             if (host.ownerId !== userId) throw new DriveAccessError();
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
-                throw new DriveAccessError();
+            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
         }
-        return;
+        return { kind: "settled" };
     }
 
     const [user, connection] = await Promise.all([
@@ -183,34 +233,98 @@ export async function authorizeDrive(
     ]);
     if (!connection) throw new DriveAccessError();
 
-    if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
-        if (connection.orgId) {
-            // An organization's Drive, which belongs to no account at all. The
-            // rules are asked first and asked always: they are what narrows the
-            // roster to a folder only Legal opens, and a deny they carry has to
-            // win here as it does everywhere else - consulting them only after
-            // the roster has refused makes every deny written against a member
-            // silently do nothing.
-            const rules = await resolveDriveDecision(userId, connectionId, path, action);
-            if (rules === "deny") throw new DriveAccessError();
-            if (rules !== "allow" && !(await allowedInOrgDrive(userId, connection.orgId, action))) {
-                // An allow is still the other way in, for somebody the roster
-                // does not reach at all: a contractor given one directory.
-                throw new DriveAccessError();
-            }
-        } else if (connection.ownerId === userId) {
-            // Owner: gated by the coarse global capability, as the app always has.
-            if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
-                throw new DriveAccessError();
-        } else if (!(await canAccessDrive(userId, connectionId, path, action))) {
-            // Non-owner: needs an explicit ACL/policy allow for this resource.
-            throw new DriveAccessError();
-        }
-    }
+    if (await effectiveIsAdmin(userId, user?.isAdmin === true)) return { kind: "settled" };
 
+    if (connection.orgId) {
+        // An organization's Drive, which belongs to no account at all. The rules
+        // are asked first and asked always - they are what narrows the roster to
+        // a folder only Legal opens - so what membership answers is carried
+        // alongside them rather than instead of them.
+        return {
+            kind: "org",
+            memberAllowed: await allowedInOrgDrive(userId, connection.orgId, action)
+        };
+    }
+    if (connection.ownerId === userId) {
+        // Owner: gated by the coarse global capability, as the app always has.
+        if (!(await effectiveCan(userId, OWNER_CAPABILITY[action]))) throw new DriveAccessError();
+        return { kind: "settled" };
+    }
+    // Non-owner: needs an explicit ACL/policy allow, and that is per path.
+    return { kind: "acl" };
+}
+
+/** The part of the check that is about this path, given what the reader is. */
+async function checkPath(
+    check: PathCheck,
+    userId: string,
+    connectionId: string,
+    path: string,
+    action: DriveAction
+): Promise<void> {
+    if (check.kind === "org") {
+        const rules = await resolveDriveDecision(userId, connectionId, path, action);
+        if (rules === "deny") throw new DriveAccessError();
+        // An allow is still the other way in, for somebody the roster does not
+        // reach at all: a contractor given one directory.
+        if (rules !== "allow" && !check.memberAllowed) throw new DriveAccessError();
+        return;
+    }
+    if (check.kind === "acl" && !(await canAccessDrive(userId, connectionId, path, action))) {
+        throw new DriveAccessError();
+    }
+}
+
+/**
+ * Assert a user may perform a Drive verb on every one of these paths.
+ *
+ * For the jobs. Moving three thousand files to the trash is three thousand
+ * authorizations, and each one used to re-read the account, the connection, the
+ * capability and the entire lock table - so the button sat there for a minute
+ * before a single file moved, which is the cost the job was written to remove.
+ * Here the reader is resolved once and the locks are read once, and what a path
+ * costs is the check that is genuinely about that path: for the common case -
+ * your own connection, no locks - nothing at all.
+ *
+ * Every path, not a sample of them: a list somebody may not have read to the end
+ * has its one untouchable file in the middle, and that is exactly what this is
+ * for.
+ */
+export async function authorizeDrivePaths(
+    userId: string,
+    connectionId: string,
+    paths: readonly string[],
+    action: DriveAction
+): Promise<void> {
+    if (paths.length === 0) return;
+    const check = await resolveReader(userId, connectionId, action);
+    // The lock table and the cookie jar do not change between two paths of one
+    // request, so they are read once and matched in memory.
+    const gate = await lockGate(connectionId);
+    for (const path of paths) {
+        await checkPath(check, userId, connectionId, path, action);
+        const locked = gate(path);
+        if (locked) throw new DriveLockedError(locked);
+    }
+}
+
+/**
+ * Assert a user may perform a Drive verb on a path, throwing DriveAccessError or
+ * DriveLockedError otherwise. Pass `skipLock` for lock-management operations,
+ * which must run even while the path is locked.
+ */
+export async function authorizeDrive(
+    userId: string,
+    connectionId: string,
+    path: string,
+    action: DriveAction,
+    opts?: { skipLock?: boolean }
+): Promise<void> {
+    const check = await resolveReader(userId, connectionId, action);
+    await checkPath(check, userId, connectionId, path, action);
     if (!opts?.skipLock) {
-        const gate = await lockedGate(connectionId, path);
-        if (gate) throw new DriveLockedError(gate);
+        const locked = await lockedGate(connectionId, path);
+        if (locked) throw new DriveLockedError(locked);
     }
 }
 

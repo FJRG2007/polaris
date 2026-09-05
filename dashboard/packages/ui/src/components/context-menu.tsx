@@ -233,10 +233,26 @@ export function ContextMenuSeparator({ className }: { className?: string }) {
     return <RadixMenu.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} />;
 }
 
+/**
+ * The heading on a menu, which is usually the name of the thing it is about.
+ *
+ * Width-capped, and that is the whole of what is interesting here. `truncate`
+ * alone does nothing in a menu: the menu is sized to its widest child, so a file
+ * called something forty words long made the menu forty words wide - off the
+ * side of the window, with the actions somewhere out there with it. The cap is
+ * what gives the truncation something to truncate against, and it is in viewport
+ * units as well so a narrow phone does not get a menu wider than the phone.
+ *
+ * Give it a `title` where the text can be long; the ellipsis is only acceptable
+ * when the whole name is still readable somehow.
+ */
 export function ContextMenuLabel({ className, ...props }: ComponentPropsWithoutRef<typeof RadixMenu.Label>) {
     return (
         <RadixMenu.Label
-            className={cn("truncate px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+            className={cn(
+                "max-w-[min(18rem,70vw)] truncate px-2 py-1.5 text-xs font-medium text-muted-foreground",
+                className
+            )}
             {...props}
         />
     );

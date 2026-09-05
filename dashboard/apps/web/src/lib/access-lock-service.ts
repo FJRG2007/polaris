@@ -47,11 +47,32 @@ export async function findLockForPath(
     connectionId: string,
     path: string
 ): Promise<LockInfo | null> {
-    if (!isUuid(connectionId)) return null;
-    const locks = await prisma.accessLock.findMany({
-        where: { connectionId },
-        select: { id: true, path: true }
-    });
+    return coveringLock(await connectionLocks(connectionId), path);
+}
+
+/**
+ * Every lock on a connection, for a caller that is about to ask about more than
+ * one path.
+ *
+ * The read is the same one `findLockForPath` makes; what it saves is making it
+ * again for the next path. A job that authorizes three thousand files was
+ * reading the whole lock table three thousand times.
+ */
+export async function connectionLocks(connectionId: string): Promise<LockInfo[]> {
+    // A non-UUID source (an ephemeral `container:<id>` connection) can hold no
+    // locks, and its id is not a value the column can even hold.
+    if (!isUuid(connectionId)) return [];
+    return prisma.accessLock.findMany({ where: { connectionId }, select: { id: true, path: true } });
+}
+
+/**
+ * The nearest of these locks at or above a path, or null when none covers it.
+ *
+ * Pure, so the rule that decides which lock wins - the deepest matching
+ * ancestor, with an empty path standing for the whole connection - is stated
+ * once and can be read without a database.
+ */
+export function coveringLock(locks: readonly LockInfo[], path: string): LockInfo | null {
     if (locks.length === 0) return null;
     const target = normalizeRelPath(path);
     let best: LockInfo | null = null;

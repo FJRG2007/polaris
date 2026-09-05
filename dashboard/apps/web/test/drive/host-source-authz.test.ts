@@ -45,6 +45,11 @@ vi.mock("@/lib/drive-acl-service", () => ({
     resolveDriveDecision: async () => "implicit-deny"
 }));
 vi.mock("@/lib/access-lock-service", () => ({
+    // Read once for a whole call now, rather than per path: `connectionLocks`
+    // is what the guard asks, and `coveringLock` is the pure rule over what it
+    // hands back.
+    connectionLocks: async () => [],
+    coveringLock: () => null,
     findLockForPath: async () => null,
     lockUnlockCookie: (id: string) => `lock_${id}`,
     verifyLockUnlock: () => false

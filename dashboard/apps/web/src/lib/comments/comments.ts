@@ -31,7 +31,10 @@ export interface CommentView {
     readonly assignedToId: string | null;
     readonly resolvedAt: string | null;
     readonly createdAt: string;
-    readonly author: { readonly id: string; readonly name: string; readonly image: string | null } | null;
+    /** Who wrote it. No picture: a face is resolved from the id, through the one
+     *  route that decides between an upload, a linked account's picture and a
+     *  Gravatar. */
+    readonly author: { readonly id: string; readonly name: string } | null;
     /**
      * What was sent with it.
      *
@@ -98,15 +101,25 @@ export async function thread(
             assignedToId: true,
             resolvedAt: true,
             createdAt: true,
-            user: { select: { id: true, name: true, image: true } }
+            // Not the picture an OAuth provider handed better-auth: a face is
+            // resolved from the account id, through the one route that puts an
+            // uploaded photo first. Read here, it outranked the photo somebody
+            // chose and went on being drawn after they took it down.
+            user: { select: { id: true, name: true } }
         }
     });
     // What was sent with them, in one read rather than one per comment. Only a
     // task has files in its thread, so nothing else pays for the query.
+    //
+    // Matched on the task as well as on the comment. A row carries both, and the
+    // pair is the only thing that says a file belongs in this conversation: on
+    // the comment alone, a row written against a comment of another task - by an
+    // older Polaris, or by somebody who tried - would be drawn here, in a thread
+    // its uploader may never have been able to read.
     const files =
         subjectType === "task" && rows.length > 0
             ? await prisma.taskAttachment.findMany({
-                  where: { commentId: { in: rows.map((row) => row.id) } },
+                  where: { taskId: subjectId, commentId: { in: rows.map((row) => row.id) } },
                   orderBy: { createdAt: "asc" },
                   select: { id: true, name: true, mime: true, size: true, commentId: true }
               })

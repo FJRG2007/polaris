@@ -70,7 +70,9 @@ export function ColorPicker({
      *  something that is not a colour yet. */
     const [typed, setTyped] = useState(value);
     const square = useRef<HTMLDivElement>(null);
-    const dragging = useRef(false);
+    /** Whether the pointer is down on the square. State, so the window listeners
+     *  below appear and disappear with the press rather than one render late. */
+    const [dragging, setDragging] = useState(false);
 
     // A colour changed from outside - a preset pressed, a different gradient stop
     // selected - moves the handles. A colour this picker just emitted does not:
@@ -78,7 +80,7 @@ export function ColorPicker({
     useEffect(() => {
         setTyped(value);
         const incoming = hexToHsv(value);
-        if (!incoming || dragging.current) return;
+        if (!incoming || dragging) return;
         if (hsvToHex(hsv) === value.toLowerCase()) return;
         setHsv(incoming);
         // Only when the value came from elsewhere, which is what the guard above
@@ -109,15 +111,25 @@ export function ColorPicker({
         [onChange]
     );
 
-    // Listened for on the window rather than the square: a drag that leaves the
-    // square is still a drag, and a handle that stops at the edge while the
-    // pointer keeps going is the one thing that makes a picker feel broken.
+    /**
+     * A drag that leaves the square is still a drag.
+     *
+     * Listened for on the window rather than on the square, because a handle
+     * that stops at the edge while the pointer keeps going is the one thing that
+     * makes a picker feel broken.
+     *
+     * `dragging` is state rather than a ref, and that is the fix rather than a
+     * detail: as a ref, whether to listen was read during render, so the
+     * listeners were only added on the render after the press and only taken
+     * away on the render after the release - which meant the first pointer move
+     * after letting go still moved the colour. State makes the effect re-run
+     * when the press starts and when it ends, which is exactly when the
+     * listeners should appear and disappear.
+     */
     useEffect(() => {
-        if (!dragging.current) return;
+        if (!dragging) return;
         const move = (event: PointerEvent) => aim(event);
-        const stop = () => {
-            dragging.current = false;
-        };
+        const stop = () => setDragging(false);
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", stop);
         window.addEventListener("pointercancel", stop);
@@ -126,7 +138,7 @@ export function ColorPicker({
             window.removeEventListener("pointerup", stop);
             window.removeEventListener("pointercancel", stop);
         };
-    });
+    }, [dragging, aim]);
 
     const hex = hsvToHex(hsv);
 
@@ -142,7 +154,7 @@ export function ColorPicker({
                         "linear-gradient(to top, #000000, rgba(0,0,0,0)), linear-gradient(to right, #ffffff, rgba(255,255,255,0))"
                 }}
                 onPointerDown={(event) => {
-                    dragging.current = true;
+                    setDragging(true);
                     event.currentTarget.setPointerCapture?.(event.pointerId);
                     aim(event);
                 }}

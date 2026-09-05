@@ -21,7 +21,9 @@ import { writeArchiveToDriver, zipSourcesFor } from "@/lib/drive-archive";
 import { createScheduledDeletion } from "@/lib/scheduled-deletion-service";
 import { deleteTrashForever, emptyTrash, moveToTrash, restoreTrash } from "@/lib/trash-service";
 import {
+    AlreadyGoingError,
     cancelDriveJob,
+    pathsInFlight,
     DRIVE_JOB_MAX_PATHS,
     listDriveJobs,
     startDriveJob,
@@ -29,6 +31,7 @@ import {
 } from "@/lib/drive-jobs";
 import {
     authorizeDrive,
+    authorizeDrivePaths,
     requireDriveDriver,
     DriveAccessError,
     DriveLockedError
@@ -653,12 +656,12 @@ export async function startDriveJobAction(
     }
 
     try {
-        // Every path, not a sample of them. A job is a list somebody may not have
-        // read to the end, and the one path in the middle that they could not
-        // touch is exactly the one this has to catch.
-        for (const path of paths) {
-            await authorizeDrive(user.id, connectionId, path, "delete");
-        }
+        // Every path, not a sample of them: a list somebody may not have read to
+        // the end has its one untouchable file in the middle. In one call rather
+        // than one per path, so the reader and the locks are resolved once - the
+        // per-path version left this button sitting for a minute on a big
+        // selection, before a single file had moved.
+        await authorizeDrivePaths(user.id, connectionId, paths, "delete");
     } catch (caught) {
         return { error: driveErrorMessage(caught, "Those items could not be removed.") };
     }
@@ -685,15 +688,47 @@ export async function startDriveJobAction(
         });
         return { job };
     } catch (caught) {
+        // Said plainly rather than as a failure: somebody pressing delete on
+        // files already on their way out has done nothing wrong, and the
+        // sentence has to say that is what happened.
+        if (caught instanceof AlreadyGoingError) return { error: caught.message };
         return { error: driveErrorMessage(caught, "That could not be started.") };
     }
 }
 
-/** What this account has running, for the panel. Cheap on purpose: it is polled
- *  while a job is going and answers from one indexed read. */
-export async function driveJobsAction(): Promise<{ jobs: DriveJobView[] }> {
+/**
+ * What is running, for the panel, and what is on its way out of the folder being
+ * looked at.
+ *
+ * Polled while a job is going, so both halves are one indexed read each. The
+ * second half is what stops a file being deleted twice: everything a job has not
+ * reached yet is still in the listing, so a reload shows it again and it can be
+ * selected again - and the second deletion then races the first, loses, and
+ * reports a failure nobody caused.
+ *
+ * Narrowed to the folder on screen rather than sent whole. A job may carry fifty
+ * thousand paths; what this screen can draw is the handful of them that are in
+ * front of somebody.
+ */
+export async function driveJobsAction(
+    connectionId?: string,
+    folder?: string
+): Promise<{ jobs: DriveJobView[]; going: string[] }> {
     const user = await requireUser();
-    return { jobs: await listDriveJobs(user.id) };
+    const jobs = await listDriveJobs(user.id);
+    if (!connectionId) return { jobs, going: [] };
+
+    // Everybody's jobs on this connection, not only this account's: two people
+    // looking at the same shared folder are two people who can start the same
+    // deletion, and the one who did not start it is the one who needs telling.
+    // Nothing about the source is disclosed by it - these are paths they are
+    // already looking at.
+    const here = normalizeRelPath(folder ?? "");
+    const going = [...(await pathsInFlight(connectionId))].filter((path) => {
+        const parent = path.slice(0, Math.max(0, path.lastIndexOf("/")));
+        return parent === here;
+    });
+    return { jobs, going };
 }
 
 /** Stop one. What has already moved stays moved - this is "stop", not "undo". */

@@ -510,17 +510,6 @@ export interface OrgMemberView {
      * it - and it used to hand every one of them everybody's address.
      */
     readonly contact: string;
-    /**
-     * A picture from somewhere else, which for a person is nothing.
-     *
-     * Kept as a field because the shape is shared, and left null on purpose: a
-     * face is resolved from the account id, through the one route that decides
-     * between an upload, a linked account's picture and a Gravatar. Filling this
-     * in from what an OAuth provider handed better-auth is how a provider's
-     * picture came to outrank the photo somebody had chosen here - and to go on
-     * being drawn after they took that photo down.
-     */
-    readonly image: string | null;
     /** The role's slug, or "owner". */
     readonly role: string;
     /** What that role is called here. */
@@ -537,14 +526,14 @@ export async function listOrgMembers(orgId: string, viewer: OrgActor): Promise<O
         where: { id: orgId },
         select: {
             createdAt: true,
-            owner: { select: { id: true, name: true, email: true, username: true, image: true } },
+            owner: { select: { id: true, name: true, email: true, username: true } },
             members: {
                 orderBy: { createdAt: "asc" },
                 select: {
                     role: true,
                     createdAt: true,
                     user: {
-                        select: { id: true, name: true, email: true, username: true, image: true }
+                        select: { id: true, name: true, email: true, username: true }
                     }
                 }
             },
@@ -569,14 +558,13 @@ export async function listOrgMembers(orgId: string, viewer: OrgActor): Promise<O
     ]);
 
     const row = (
-        user: { id: string; name: string; image: string | null },
+        user: { id: string; name: string },
         role: string,
         joinedAt: Date
     ): OrgMemberView => ({
         userId: user.id,
         name: user.name,
         contact: contacts.get(user.id) ?? "",
-        image: null,
         role,
         roleName: role === "owner" ? "Owner" : roleDisplayName(org.roles, role),
         joinedAt: joinedAt.toISOString(),
@@ -674,7 +662,6 @@ export interface TeamMemberView {
     readonly name: string;
     /** As on the roster: their address only if they allow this reader it. */
     readonly contact: string;
-    readonly image: string | null;
     readonly role: core.TeamRole;
 }
 
@@ -683,7 +670,7 @@ export async function listTeamMembers(teamId: string, viewer: OrgActor): Promise
         where: { teamId },
         select: {
             role: true,
-            user: { select: { id: true, name: true, email: true, username: true, image: true } }
+            user: { select: { id: true, name: true, email: true, username: true } }
         }
     });
     const contacts = await contactLines(
@@ -695,7 +682,6 @@ export async function listTeamMembers(teamId: string, viewer: OrgActor): Promise
             userId: row.user.id,
             name: row.user.name,
             contact: contacts.get(row.user.id) ?? "",
-            image: row.user.image,
             role: row.role as core.TeamRole
         }))
         .sort((left, right) => left.name.localeCompare(right.name));

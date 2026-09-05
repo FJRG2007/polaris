@@ -187,6 +187,27 @@ export function DriveExplorer({
      * is closed, and a second tab watching the same Drive sees the same bar.
      */
     const [jobs, setJobs] = useState<DriveJobView[]>([]);
+    /**
+     * What is on its way out of the folder being looked at.
+     *
+     * A job takes minutes and everything it has not reached is still in the
+     * listing, so a reload shows those files again - and pressing delete on them
+     * a second time used to queue a second job that raced the first, lost, and
+     * reported a failure nobody had caused. They are drawn as going and cannot be
+     * chosen again; the server refuses them too, because another person's job is
+     * just as real as this tab's.
+     */
+    const [going, setGoing] = useState<ReadonlySet<string>>(new Set());
+    /**
+     * Where the reader is, for the poll below to read.
+     *
+     * The poll is deliberately started once and never restarted - depending on
+     * the folder would restart it on every step through a tree - so it cannot
+     * close over the folder. A ref is the folder it can read on the tick it
+     * actually runs.
+     */
+    const here = useRef({ connectionId, path });
+    here.current = { connectionId, path };
     /** Recomputed on a timer so the estimate under a bar moves without waiting
      *  for the next poll. */
     const [tick, setTick] = useState(() => Date.now());
@@ -239,9 +260,12 @@ export function DriveExplorer({
         let timer: ReturnType<typeof setTimeout> | null = null;
 
         const look = async () => {
-            const result = await driveActions.driveJobsAction().catch(() => null);
+            const result = await driveActions
+                .driveJobsAction(here.current.connectionId ?? undefined, here.current.path)
+                .catch(() => null);
             if (!live) return;
             const running = result?.jobs ?? [];
+            setGoing(new Set(result?.going ?? []));
             setJobs((before) => {
                 // A job that has just left the list finished, and the listing on
                 // screen is the one it changed.
@@ -709,6 +733,7 @@ export function DriveExplorer({
                 ) : (
                     <FilesView
                         abilities={abilities}
+                        going={going}
                         connectionId={connectionId}
                         path={path}
                         segments={segments}

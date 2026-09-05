@@ -16,10 +16,18 @@ import type { CustomFieldView, StatusView, TagView } from "./space-service";
 import type { TaskFacts, TaskPriority, TaskStatusType } from "@polaris/core";
 
 /** A person as any picker or avatar renders them. */
+/**
+ * Somebody a task points at: an assignee, a watcher, whoever created it.
+ *
+ * No picture. A face is resolved from the account id, through the one route that
+ * decides between an uploaded photo, the picture the account they signed in with
+ * has, and a Gravatar - carrying a URL here meant whatever an OAuth provider
+ * handed better-auth was drawn instead, outranking the photo the person chose
+ * and surviving their taking it down.
+ */
 export interface PersonRef {
     readonly id: string;
     readonly name: string;
-    readonly image: string | null;
 }
 
 export interface TagRef {

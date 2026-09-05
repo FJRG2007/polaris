@@ -91,7 +91,7 @@ export default async function EverythingPage({
                     { taskFolderMemberships: { some: { folder: { spaceId: { in: spaceIds } } } } }
                 ]
             },
-            select: { id: true, name: true, image: true }
+            select: { id: true, name: true }
         })
     ]);
 

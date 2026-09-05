@@ -327,7 +327,6 @@ export interface SpaceMemberView {
     /** Their address if they show it to whoever is looking, their handle
      *  otherwise. Never the address itself - see `contactLines`. */
     readonly contact: string;
-    readonly image: string | null;
     readonly role: core.SpaceRole | "owner";
 }
 
@@ -345,13 +344,13 @@ export async function listSpaceMembers(
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
         select: {
-            owner: { select: { id: true, name: true, email: true, username: true, image: true } },
+            owner: { select: { id: true, name: true, email: true, username: true } },
             members: {
                 orderBy: { createdAt: "asc" },
                 select: {
                     role: true,
                     user: {
-                        select: { id: true, name: true, email: true, username: true, image: true }
+                        select: { id: true, name: true, email: true, username: true }
                     }
                 }
             }
@@ -366,14 +365,12 @@ export async function listSpaceMembers(
             userId: space.owner.id,
             name: space.owner.name,
             contact: contacts.get(space.owner.id) ?? "",
-            image: space.owner.image,
             role: "owner" as const
         },
         ...space.members.map((member) => ({
             userId: member.user.id,
             name: member.user.name,
             contact: contacts.get(member.user.id) ?? "",
-            image: member.user.image,
             role: member.role as core.SpaceRole
         }))
     ];
@@ -432,7 +429,7 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
  */
 export async function spacePeople(
     spaceId: string
-): Promise<{ id: string; name: string; image: string | null }[]> {
+): Promise<{ id: string; name: string }[]> {
     const [space, grantees, spaceTeams, folderTeams] = await Promise.all([
         // Its own read rather than `listSpaceMembers`: a picker needs a name and
         // a face, and asking for the roster would work out what each of them is
@@ -440,13 +437,13 @@ export async function spacePeople(
         prisma.taskSpace.findUnique({
             where: { id: spaceId },
             select: {
-                owner: { select: { id: true, name: true, image: true } },
-                members: { select: { user: { select: { id: true, name: true, image: true } } } }
+                owner: { select: { id: true, name: true } },
+                members: { select: { user: { select: { id: true, name: true } } } }
             }
         }),
         prisma.taskFolderMember.findMany({
             where: { folder: { spaceId } },
-            select: { user: { select: { id: true, name: true, image: true } } }
+            select: { user: { select: { id: true, name: true } } }
         }),
         prisma.taskSpaceTeam.findMany({
             where: { spaceId },
@@ -454,7 +451,7 @@ export async function spacePeople(
                 team: {
                     select: {
                         members: {
-                            select: { user: { select: { id: true, name: true, image: true } } }
+                            select: { user: { select: { id: true, name: true } } }
                         }
                     }
                 }
@@ -466,7 +463,7 @@ export async function spacePeople(
                 team: {
                     select: {
                         members: {
-                            select: { user: { select: { id: true, name: true, image: true } } }
+                            select: { user: { select: { id: true, name: true } } }
                         }
                     }
                 }
@@ -495,7 +492,6 @@ export interface FolderMemberView {
     readonly name: string;
     /** As on a space: their address only if they show it to whoever is looking. */
     readonly contact: string;
-    readonly image: string | null;
     readonly role: core.SpaceRole;
     /** The folder the grant was actually made on. Equal to the folder being
      *  looked at, or an ancestor when the access is inherited. */
@@ -560,7 +556,7 @@ export async function listFolderMembers(
         select: {
             folderId: true,
             role: true,
-            user: { select: { id: true, name: true, email: true, username: true, image: true } }
+            user: { select: { id: true, name: true, email: true, username: true } }
         }
     });
     const names = new Map(chain.map((entry) => [entry.id, entry.name]));
@@ -572,7 +568,6 @@ export async function listFolderMembers(
         userId: grant.user.id,
         name: grant.user.name,
         contact: contacts.get(grant.user.id) ?? "",
-        image: grant.user.image,
         role: grant.role as core.SpaceRole,
         folderId: grant.folderId,
         folderName: names.get(grant.folderId) ?? "",
@@ -831,7 +826,7 @@ export interface CreateContext {
     readonly spaceId: string;
     readonly statuses: StatusView[];
     readonly tags: TagView[];
-    readonly people: { id: string; name: string; image: string | null }[];
+    readonly people: { id: string; name: string }[];
     readonly lists: { id: string; name: string }[];
 }
 
