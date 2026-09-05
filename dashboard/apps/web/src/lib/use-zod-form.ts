@@ -20,6 +20,17 @@ export interface ZodForm<T> {
     markTouched: (name: string) => void;
     /** Validate on submit; returns parsed data or null and reveals all errors. */
     submit: (values: unknown) => T | null;
+    /**
+     * Whether these values would pass, for a submit that should not offer itself
+     * before it could work.
+     *
+     * Separate from `error`, which stays quiet until a field has been left: a
+     * button is not shouting at anybody, so it can answer from the values
+     * themselves rather than from what has been touched. A form whose submit is
+     * live before anything is typed teaches people to press it and read the
+     * failure, which is the slowest way to fill in a form.
+     */
+    complete: (values: unknown) => boolean;
 }
 
 function collect(schema: ZodType, values: unknown): Record<string, string> {
@@ -63,5 +74,7 @@ export function useZodForm<T>(schema: ZodType<T>): ZodForm<T> {
         [schema]
     );
 
-    return { error, revalidate, markTouched, submit };
+    const complete = useCallback((values: unknown) => schema.safeParse(values).success, [schema]);
+
+    return { error, revalidate, markTouched, submit, complete };
 }

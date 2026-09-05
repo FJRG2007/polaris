@@ -17,6 +17,7 @@ import { acceptInviteAction } from "./actions";
 import { useZodForm } from "@/lib/use-zod-form";
 import { useState, type FormEvent } from "react";
 import { EnrollView } from "@/app/oauth/enroll/enroll-view";
+import { PasswordState } from "@/components/password-state";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { acceptInviteSchema, normalizePersonName } from "@polaris/core";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
@@ -171,6 +172,11 @@ export function AcceptInviteForm({
                             {form.error("password") ?? passwordError ? (
                                 <p className="text-xs text-danger">{form.error("password") ?? passwordError}</p>
                             ) : null}
+                            {/* And what is true about it either way. The refusal
+                                above only appears once the password is long
+                                enough to be judged, so without this the breach
+                                check is invisible until it fails. */}
+                            <PasswordState password={values.password} />
                         </div>
                         {needsPassword ? (
                             <div className="flex flex-col gap-1">
@@ -187,7 +193,20 @@ export function AcceptInviteForm({
                             </div>
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <Button type="submit" disabled={pending || (needsPassword && oneTimePassword === "")}>
+                        {/* Not live before there is anything to send. A submit
+                            that offers itself over an empty form teaches people
+                            to press it and read the failure, which is the
+                            slowest way to fill one in - and here the failure
+                            costs a round trip that creates nothing. */}
+                        <Button
+                            type="submit"
+                            disabled={
+                                pending ||
+                                !form.complete(values) ||
+                                Boolean(passwordError) ||
+                                (needsPassword && oneTimePassword === "")
+                            }
+                        >
                             {pending ? "Joining..." : "Join Polaris"}
                         </Button>
                     </form>

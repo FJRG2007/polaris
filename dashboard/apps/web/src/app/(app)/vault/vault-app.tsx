@@ -16,6 +16,9 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { TotpCode } from "./totp-code";
+import { ItemIcon } from "./item-icon";
+import { RecoveryCodes } from "./recovery-codes";
+import { PasswordState } from "@/components/password-state";
 import { totpCode } from "@/lib/vault/totp-browser";
 import { ItemDialog } from "./item-dialog";
 import { MoveDialog } from "./move-dialog";
@@ -132,6 +135,11 @@ function CardMark({ number }: { number: string }) {
     }
 }
 
+/** Where this browser's choice about favicons is kept. A habit of the person
+ *  looking rather than a property of the vault, and one whose cost is a request
+ *  to somebody else's site. */
+const FAVICON_KEY = "polaris.vault.favicons";
+
 /** What the list can be narrowed to. */
 type Filter =
     | "all"
@@ -155,6 +163,24 @@ export function VaultApp() {
     const [moving, setMoving] = useState<VaultItem | null>(null);
     const [revealed, setRevealed] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
+    /**
+     * Whether to fetch a site's own favicon for the list.
+     *
+     * Off unless it is turned on, and kept in this browser rather than in the
+     * vault: it is not a property of the vault, it is a disclosure this person
+     * is choosing to make from this machine. The request goes from here to that
+     * site, and a site that receives it learns somebody with a Polaris vault has
+     * an account there - which is why it never goes through the server, and
+     * never through an icon service.
+     */
+    const [favicons, setFavicons] = useState(false);
+    useEffect(() => {
+        try {
+            setFavicons(window.localStorage.getItem(FAVICON_KEY) === "on");
+        } catch {
+            // Storage off, or a private window. Letters are a fine answer.
+        }
+    }, []);
     const [confirm, confirmDialog] = useConfirm();
 
     /**
@@ -436,7 +462,11 @@ export function VaultApp() {
                                                     : "border-transparent hover:bg-card-hover"
                                             }`}
                                         >
-                                            <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                            {item.type === core.CIPHER_LOGIN ? (
+                                                <ItemIcon item={item} favicons={favicons} />
+                                            ) : (
+                                                <Icon className="size-4 shrink-0 text-muted-foreground" />
+                                            )}
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">
                                                     {item.name || "Untitled"}
@@ -648,8 +678,49 @@ export function VaultApp() {
                                                 onReveal={() => setRevealed((prev) => !prev)}
                                                 revealed={revealed}
                                             />
+                                            {/* Said every time the item is opened,
+                                                which is the moment somebody is
+                                                about to use this password
+                                                somewhere. A password that was
+                                                fine when it was chosen is in a
+                                                breach corpus a year later, and
+                                                nothing would ever have told
+                                                them. */}
+                                            {current.login.password ? (
+                                                <PasswordState password={current.login.password} />
+                                            ) : null}
                                             {current.login.totp ? (
                                                 <TotpCode value={current.login.totp} />
+                                            ) : null}
+                                            {core.fieldValue(
+                                                current.fields,
+                                                core.RECOVERY_CODES_FIELD
+                                            ) ? (
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Recovery codes
+                                                    </span>
+                                                    <RecoveryCodes
+                                                        value={core.fieldValue(
+                                                            current.fields,
+                                                            core.RECOVERY_CODES_FIELD
+                                                        )}
+                                                        onChange={(next) =>
+                                                            void onSave(
+                                                                {
+                                                                    ...current,
+                                                                    fields: core.withField(
+                                                                        current.fields,
+                                                                        core.RECOVERY_CODES_FIELD,
+                                                                        next,
+                                                                        core.FIELD_HIDDEN
+                                                                    )
+                                                                },
+                                                                []
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
                                             ) : null}
                                             {current.login.uris.map((entry) => (
                                                 <Field

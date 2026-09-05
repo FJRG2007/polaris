@@ -17,6 +17,8 @@ import { useVaultSession } from "./vault-session";
 import { useVaultCollections } from "./use-vault-collections";
 import { PasswordGenerator, generate } from "@/components/password-generator";
 import { QrScanDialog } from "./qr-scan";
+import { RecoveryCodes } from "./recovery-codes";
+import { PasswordState } from "@/components/password-state";
 import {
     AmexMark,
     DinersClubMark,
@@ -170,6 +172,10 @@ export function ItemDialog({
     /** Who issued the card. The cipher model has the network and nothing for the
      *  bank, so it lives in a custom field - see `BANK_FIELD`. */
     const [bank, setBank] = useState("");
+    /** The recovery codes, one per line with a leading dash for a used one. A
+     *  hidden custom field, so they are encrypted like the password and read as
+     *  a field by any other client. */
+    const [codes, setCodes] = useState("");
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -199,6 +205,7 @@ export function ItemDialog({
                 : ""
         );
         setBank(core.fieldValue(item.fields, core.BANK_FIELD));
+        setCodes(core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD));
     }, [item]);
 
     /**
@@ -289,7 +296,16 @@ export function ItemDialog({
             fields:
                 draft.type === core.CIPHER_CARD
                     ? core.withField(draft.fields, core.BANK_FIELD, bank, core.FIELD_TEXT)
-                    : draft.fields
+                    : draft.type === core.CIPHER_LOGIN
+                      ? core.withField(
+                            draft.fields,
+                            core.RECOVERY_CODES_FIELD,
+                            codes,
+                            // Hidden, because a recovery code is a password and
+                            // belongs behind the same press as one.
+                            core.FIELD_HIDDEN
+                        )
+                      : draft.fields
         };
         const failure = await onSave(saving, intoVault ? [collectionId] : []);
         setPending(false);
@@ -505,6 +521,11 @@ export function ItemDialog({
                                     {generator ? "Hide the generator" : "Open the generator"}
                                 </button>
                             </label>
+                            {/* What is true about it, while it is being chosen.
+                                Strength is arithmetic about its shape; the
+                                breach answer is a fact about the world, and no
+                                amount of strength fixes it. */}
+                            <PasswordState password={draft.login.password} />
                             {generator ? (
                                 <div className="rounded-md border border-border p-3">
                                     <PasswordGenerator
@@ -556,6 +577,22 @@ export function ItemDialog({
                                     </span>
                                 ) : null}
                             </div>
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>Recovery codes (optional)</span>
+                                <span className="text-xs text-muted-foreground">
+                                    The ones a site gives you for the day the authenticator is
+                                    gone. Paste them however they were printed, or hand over the
+                                    file the site offered.
+                                </span>
+                                {/* Encrypted exactly like the password and the
+                                    authenticator key: it is a hidden field, which
+                                    is what a recovery code is. */}
+                                <RecoveryCodes
+                                    value={codes}
+                                    onChange={setCodes}
+                                />
+                            </div>
+
                             {/* Several, because one login is rarely one URL: the
                                 site, its accounts subdomain, and the app whose
                                 callback is something else again. A vault that

@@ -14,12 +14,21 @@ import * as core from "@polaris/core";
 import * as crypto from "@/lib/vault/crypto";
 import { VaultImport } from "./vault-import";
 import { VaultExport } from "./vault-export";
-import { useState, type FormEvent } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
 import { usePasswordSafety } from "@/lib/use-password-safety";
 import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Select,
+    Switch
+} from "@polaris/ui";
 import {
     changeMasterPasswordAction,
     deauthorizeVaultAction,
@@ -35,11 +44,26 @@ const KDF_OPTIONS = [
     { value: String(core.KDF_ARGON2ID), label: "Argon2id - harder to attack, slower to unlock" }
 ];
 
+/** Where this browser's choice about site icons is kept. The same key the list
+ *  reads - see `vault-app`. */
+const FAVICON_KEY = "polaris.vault.favicons";
+
 export function VaultSettings() {
     const { state, name, key: vaultKey, lock, unlockTimeout } = useVaultSession();
     const { email, kdf } = state;
     const protectedKey = state.protectedKey ?? "";
     const [lockAfter, setLockAfter] = useState(String(unlockTimeout));
+    /** Whether the list may fetch a site's own icon. Read after mount, like every
+     *  other browser-kept preference: what is in this browser's storage is not
+     *  what the server built the markup from. */
+    const [favicons, setFavicons] = useState(false);
+    useEffect(() => {
+        try {
+            setFavicons(window.localStorage.getItem(FAVICON_KEY) === "on");
+        } catch {
+            // Storage off, or a private window. Off is the right default anyway.
+        }
+    }, []);
     const [current, setCurrent] = useState("");
     const [next, setNext] = useState("");
     const [confirmValue, setConfirmValue] = useState("");
@@ -218,6 +242,39 @@ export function VaultSettings() {
                             </Button>
                         </div>
                     </form>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Site icons</CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground">
+                        Items can show the icon of the website they belong to. Off by default,
+                        because it is not only a preference: the icon is fetched from that
+                        website, by this browser, so a site that receives the request learns
+                        somebody with a Polaris vault has an account there. It never goes
+                        through Polaris and never through an icon service - either of those
+                        would hand over every domain in a vault nobody is supposed to be able
+                        to read.
+                    </p>
+                    <label className="flex items-center gap-3 text-sm">
+                        <Switch
+                            checked={favicons}
+                            onChange={(next) => {
+                                setFavicons(next);
+                                try {
+                                    window.localStorage.setItem(FAVICON_KEY, next ? "on" : "off");
+                                } catch {
+                                    // The list is still drawn; it simply will not
+                                    // remember, which is the right thing to lose.
+                                }
+                            }}
+                            aria-label="Fetch website icons"
+                        />
+                        Fetch website icons in this browser
+                    </label>
                 </CardBody>
             </Card>
 
