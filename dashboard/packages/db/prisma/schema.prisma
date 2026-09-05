@@ -1069,6 +1069,16 @@ model UserSecurity {
     // they retype on a phone turns it on for themselves; nothing turns it on for
     // them.
     emailLinkSignIn      Boolean   @default(false)
+    // Whether this account can be signed in to by its username as well as by its
+    // address.
+    //
+    // On by default, because it is how the account has always worked and
+    // switching it off for everybody would lock out whoever signs in that way.
+    // Worth turning off, and the screen says so: a username is public here - it
+    // is how somebody is mentioned, searched for and linked to - so leaving this
+    // on means the first half of the credential is published. Off, an attacker
+    // needs the address as well, which this deployment does not hand out.
+    usernameSignIn       Boolean   @default(true)
     // Second-factor delivery methods the account accepts, beyond the
     // authenticator, which is always accepted while the factor is on. JSON
     // string array for SQLite portability; empty means authenticator only.

@@ -12,6 +12,7 @@
  * never going to be accepted.
  */
 
+import { prisma } from "@polaris/db";
 import { auth } from "@/lib/auth";
 import { requireUser } from "@/lib/session";
 import { SecurityView } from "./security-view";
@@ -83,7 +84,8 @@ export default async function SecurityPage() {
         instancePolicy,
         successor,
         mail,
-        lifecycle
+        lifecycle,
+        account
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -110,7 +112,10 @@ export default async function SecurityPage() {
         getAuthMailStatus(),
         // What the account is doing to itself: locked down, switched off, or on
         // its way out.
-        accountLifecycle(user.id)
+        accountLifecycle(user.id),
+        // The handle itself, so the username switch names it rather than talking
+        // about a concept.
+        prisma.user.findUnique({ where: { id: user.id }, select: { username: true } })
     ]);
     const lock = standing.settled ? undefined : { reason: newDeviceWaitMessage(standing) };
 
@@ -134,6 +139,8 @@ export default async function SecurityPage() {
                 sessionMaxMinutes={settings.sessionMaxMinutes}
                 requireLoginApproval={settings.requireLoginApproval}
                 emailLinkSignIn={settings.emailLinkSignIn}
+                usernameSignIn={settings.usernameSignIn}
+                username={account?.username ?? ""}
                 canSendMail={mail.channelId !== null}
                 twoFactorEnabled={hasTwoFactor}
                 backupCodesRemaining={backupCodes}

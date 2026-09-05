@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasskeysCard } from "./passkeys-card";
 import { EmailLinkCard } from "./email-link-card";
+import { UsernameSignInCard } from "./username-sign-in-card";
 import { ShieldAlert, Trash2 } from "lucide-react";
 import { BackupCodesCard } from "./backup-codes-card";
 import type { PasskeyView } from "@/lib/passkey-directory";
@@ -74,6 +75,8 @@ export function SecurityView({
     sessionMaxMinutes,
     requireLoginApproval,
     emailLinkSignIn,
+    usernameSignIn,
+    username,
     canSendMail,
     twoFactorEnabled,
     backupCodesRemaining,
@@ -107,6 +110,10 @@ export function SecurityView({
     requireLoginApproval: boolean;
     /** Whether a link emailed to this account signs it in. Off unless asked for. */
     emailLinkSignIn: boolean;
+    /** Whether the username may stand in for the address at sign-in. */
+    usernameSignIn: boolean;
+    /** The handle itself, so the card can name it. */
+    username: string;
     /** Whether this Polaris has a way to send mail at all, which is what decides
      *  whether the switch above it can do anything. */
     canSendMail: boolean;
@@ -227,6 +234,11 @@ export function SecurityView({
 
                     {/* Ways in, next to the ones they stand beside: a link to the
                         address, and the outside accounts that were connected. */}
+                    <UsernameSignInCard
+                        enabled={usernameSignIn}
+                        username={username}
+                        lock={lock}
+                    />
                     <EmailLinkCard enabled={emailLinkSignIn} canSend={canSendMail} lock={lock} />
 
                     <ConnectedSignInCard

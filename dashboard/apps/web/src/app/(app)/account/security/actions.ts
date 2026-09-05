@@ -43,6 +43,7 @@ import {
     setNewDeviceGrace,
     setConnectionSignInChallenge,
     setEmailLinkSignIn,
+    setUsernameSignIn,
     clearQuickPin,
     clearSecurityQuestions,
     getUserSecurity,
@@ -134,6 +135,28 @@ export async function setConnectionSignInChallengeAction(challenge: boolean): Pr
  * working on its own within ten minutes. Both directions are recorded: this is
  * the kind of change an account's owner should be able to find afterwards.
  */
+/**
+ * Whether this account's username may stand in for its address at sign-in.
+ *
+ * Behind the new-device gate like every other setting that changes what guards
+ * the account: somebody who has just taken a password must not be able to widen
+ * or narrow the ways in from a browser the owner has never seen.
+ */
+export async function setUsernameSignInAction(enabled: boolean): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    await setUsernameSignIn(user.id, enabled === true);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.username-sign-in",
+        metadata: { enabled: enabled === true }
+    });
+    revalidatePath("/account/security");
+    return {};
+}
+
 export async function setEmailLinkSignInAction(enabled: boolean): Promise<ActionResult> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);

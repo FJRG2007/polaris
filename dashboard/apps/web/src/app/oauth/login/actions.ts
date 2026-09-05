@@ -16,7 +16,7 @@ import { loadEnv } from "@polaris/config";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { passkeyRelyingPartyId } from "@polaris/core";
-import { emailLinkSignInAllowed } from "@polaris/auth";
+import { emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
 import {
     openSignInCode,
     redeemSignInCode,
@@ -33,8 +33,13 @@ const PASSKEY_HINT_WINDOW_MS = 10 * 60 * 1000;
 export async function resolveIdentifier(identifier: string): Promise<string | null> {
     const value = identifier.trim().toLowerCase();
     if (value.includes("@")) return value;
-    const user = await prisma.user.findUnique({ where: { username: value }, select: { email: true } });
-    return user?.email ?? null;
+    // Only when that account accepts its username here. A username is public -
+    // it is how somebody is mentioned, searched for and linked to - so an
+    // account that turns this off is asking for the address to be required as
+    // well, and this is the one place that has to honour it. A username nobody
+    // has and one that has turned this off answer alike, so the screen cannot be
+    // used to find out which is which.
+    return emailForUsername(value);
 }
 
 /**

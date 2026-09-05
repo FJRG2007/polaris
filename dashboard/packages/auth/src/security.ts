@@ -36,6 +36,8 @@ export interface UserSecuritySettings {
     /** A link emailed to this account signs it in, with no password. Off unless
      *  the account asked for it. */
     emailLinkSignIn: boolean;
+    /** Whether the username may stand in for the address at sign-in. */
+    usernameSignIn: boolean;
     /** Second-factor methods that send a code, beyond the authenticator. */
     twoFactorMethods: TwoFactorDeliveryMethod[];
     /** The method the challenge offers first. */
@@ -66,6 +68,9 @@ const DEFAULTS: UserSecuritySettings = {
     requireLoginApproval: false,
     challengeConnectionSignIn: false,
     emailLinkSignIn: false,
+    // On, because it is how every account has always worked: an account with no
+    // row of its own must behave exactly as it did before this setting existed.
+    usernameSignIn: true,
     twoFactorMethods: [],
     twoFactorPreferred: "totp",
     // An account with no row of its own armed its factor through better-auth
@@ -134,6 +139,7 @@ export async function getUserSecurity(userId: string): Promise<UserSecuritySetti
         requireLoginApproval: row.requireLoginApproval,
         challengeConnectionSignIn: row.challengeConnectionSignIn,
         emailLinkSignIn: row.emailLinkSignIn,
+        usernameSignIn: row.usernameSignIn,
         twoFactorMethods: parseDeliveryMethods(row.twoFactorMethods),
         twoFactorPreferred: parsePreferredMethod(row.twoFactorPreferred),
         totpUnclaimed: row.totpUnclaimed,
@@ -197,6 +203,34 @@ export async function setConnectionSignInChallenge(userId: string, challenge: bo
  */
 export async function setEmailLinkSignIn(userId: string, enabled: boolean): Promise<void> {
     await upsertSecurity(userId, { emailLinkSignIn: enabled });
+}
+
+export async function setUsernameSignIn(userId: string, enabled: boolean): Promise<void> {
+    await upsertSecurity(userId, { usernameSignIn: enabled });
+}
+
+/**
+ * The address behind a username, when that account allows being reached that
+ * way.
+ *
+ * The whole of the setting is here. A username is public in this deployment - it
+ * is how somebody is mentioned, searched for and linked to - so an account that
+ * accepts it at sign-in has published the first half of its credential. Turning
+ * this off means an attacker needs the address as well, which is not handed out.
+ *
+ * Null for a username nobody has, for an account that has turned this off, and
+ * for one that is banned - all the same answer, so the sign-in screen cannot be
+ * used to find out which usernames exist or which have this on.
+ */
+export async function emailForUsername(username: string): Promise<string | null> {
+    const value = username.trim().toLowerCase();
+    if (!value) return null;
+    const user = await prisma.user.findUnique({
+        where: { username: value },
+        select: { id: true, email: true, bannedAt: true }
+    });
+    if (!user || user.bannedAt) return null;
+    return (await getUserSecurity(user.id)).usernameSignIn ? user.email : null;
 }
 
 /**

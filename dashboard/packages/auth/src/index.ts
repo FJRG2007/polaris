@@ -69,6 +69,8 @@ export {
     setConnectionSignInChallenge,
     setEmailLinkSignIn,
     emailLinkSignInAllowed,
+    setUsernameSignIn,
+    emailForUsername,
     setTwoFactorPreferences,
     setTotpUnclaimed,
     hashSecret,
