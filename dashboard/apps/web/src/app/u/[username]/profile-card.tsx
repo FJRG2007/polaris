@@ -38,9 +38,9 @@ import type { PublicProfile } from "@/lib/profile-service";
 import { ProfileBanner } from "@/components/profile-banner";
 import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
-import { effectOf, linkLabel, nameStyleOf } from "@polaris/core";
+import { effectOf, linkLabel, nameLookOf } from "@polaris/core";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
-import { frameCss, nameStyleClass, nameStyleCss, sheenCss, SHEEN_LAYER } from "@/lib/profile-style-css";
+import { frameCss, nameStyleClass, nameLookCss, sheenCss, SHEEN_LAYER } from "@/lib/profile-style-css";
 
 export function ProfileCard({
     profile,
@@ -69,7 +69,7 @@ export function ProfileCard({
     const effect = effectOf(profile.style.effect);
     const frame = effect ? frameCss(effect) : null;
     const sheen = effect ? sheenCss(effect) : null;
-    const painted = nameStyleOf(profile.style.nameStyle);
+    const painted = nameLookOf(profile.style.nameStyle);
 
     return (
         // `relative` whether or not there is a frame. The light is an absolutely
@@ -131,7 +131,7 @@ export function ProfileCard({
                     <h1 className="flex flex-wrap items-baseline gap-2 text-lg font-semibold leading-tight tracking-tight">
                         <span
                             className={nameStyleClass(painted)}
-                            style={painted ? nameStyleCss(painted) : undefined}
+                            style={painted ? nameLookCss(painted) : undefined}
                         >
                             {profile.name}
                         </span>

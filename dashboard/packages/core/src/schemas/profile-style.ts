@@ -17,7 +17,7 @@ import { z } from "zod";
 import {
     AVATAR_DECORATIONS,
     NAMEPLATES,
-    NAME_STYLES,
+    nameLookOf,
     PROFILE_EFFECTS,
     readAngle,
     readHex
@@ -60,7 +60,22 @@ export const profileStyleSchema = z.object({
     decoration: idField(AVATAR_DECORATIONS, "decoration"),
     nameplate: idField(NAMEPLATES, "nameplate"),
     effect: idField(PROFILE_EFFECTS, "profile effect"),
-    nameStyle: idField(NAME_STYLES, "name style")
+    /**
+     * Either a catalogue id or a composed look - see `nameLookOf`, which is the
+     * one place that decides which it is. Validated by round-tripping through
+     * the reader rather than by a second parser here: two things that both
+     * decide what a name style is are two things that drift, and the one that
+     * would drift is the one deciding what is safe to put in a `style`
+     * attribute.
+     */
+    nameStyle: z
+        .string()
+        .trim()
+        .max(80)
+        .nullable()
+        .refine((value) => value === null || nameLookOf(value) !== null, {
+            message: "Pick a name style Polaris ships"
+        })
 });
 
 export type ProfileStyleInput = z.infer<typeof profileStyleSchema>;

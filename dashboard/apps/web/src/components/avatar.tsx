@@ -16,7 +16,7 @@
  */
 
 import { cn } from "@polaris/ui";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Volume2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ImageViewer } from "@/components/image-viewer";
@@ -27,6 +27,19 @@ import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
 import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
+
+/**
+ * The box the decoration paints in: the face, plus its band on every side.
+ *
+ * Negative insets rather than a bigger element, so the art overflows the layout
+ * without being part of it. Nothing measures this, nothing moves for it, and the
+ * photograph underneath is untouched - which is the whole point, because drawing
+ * it inward made wearing a decoration cost you a visibly smaller face.
+ */
+function reach(band: number): CSSProperties | undefined {
+    if (band <= 0) return undefined;
+    return { inset: `-${band}px`, width: "auto", height: "auto" };
+}
 
 export interface AvatarPerson {
     /**
@@ -206,16 +219,28 @@ export function Avatar({
     const stored = useProfileStyle(square || chosen !== undefined ? null : person.id);
     const decoration = decorationOf(chosen === undefined ? stored?.decoration ?? null : chosen);
     /**
-     * The ring is drawn inside the size the caller asked for, not around it.
+     * The decoration is drawn around the picture, and the picture stays the size
+     * it was asked for.
      *
-     * A decoration that grows outward is a face that changes size when somebody
-     * else edits their profile - and, worse, one that is cut in half by every
-     * scrolling panel and rounded row it happens to sit in. Drawn inward the
-     * layout is exactly what it was, nothing is ever clipped, and what somebody
-     * gives up is a couple of pixels of their own photograph.
+     * It used to be drawn inward, on the reasoning that a decoration growing
+     * outward is a face that changes size when somebody else edits their
+     * profile. The premise was right and the cure was worse: wearing one made
+     * your own photograph visibly smaller than everybody else's, which is not a
+     * decoration, it is a penalty for choosing one.
+     *
+     * So the band goes outward, and the layout is protected the other way - the
+     * art is an absolutely positioned overlay with negative insets, so it paints
+     * past the box without occupying anything. Nothing measures it, nothing
+     * moves for it, and the picture is exactly the size it would be with no
+     * decoration at all.
+     *
+     * What is given up is the tips of a decoration inside a container that clips
+     * its overflow. That is a band of a tenth of the face - two pixels on a face
+     * drawn at twenty - against a photograph that was being shrunk on every
+     * screen in the product.
      */
     const band = decoration ? ringWidth(decoration, size) : 0;
-    const inner = size - band * 2;
+    const inner = size;
     const where = presence ? { status: presence, inCall: false } : known;
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
@@ -315,12 +340,12 @@ export function Avatar({
             // the element's border box, and the art's box is the whole square.
             style={{ width: size, height: size, boxShadow: ringGlow(decoration, size) }}
         >
-            <AvatarDecorationArt decoration={decoration} />
+            <AvatarDecorationArt decoration={decoration} style={reach(band)} />
             <span className="relative inline-flex">{pressable}</span>
             {/* The half that rests on the rim rather than behind it - a cat, a
                 hat. Draws nothing at all for a decoration that has none, which
                 is almost all of them. */}
-            <AvatarDecorationArt decoration={decoration} front />
+            <AvatarDecorationArt decoration={decoration} front style={reach(band)} />
         </span>
     ) : (
         pressable
