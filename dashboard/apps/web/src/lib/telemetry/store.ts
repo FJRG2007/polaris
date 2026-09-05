@@ -69,11 +69,20 @@ export async function captureEvent(project: IngestProject, event: core.CapturedE
                 url: event.url,
                 method: event.method,
                 userLabel: event.user,
+                // One JSON column rather than five tables. What goes in here is
+                // read whole, by one screen, and never queried across - and a
+                // schema for it would be a migration every time a client starts
+                // sending something new, which is the one thing an ingest for
+                // other people's programs cannot afford.
                 detail: JSON.stringify({
                     frames: event.frames,
                     breadcrumbs: event.breadcrumbs,
                     tags: event.tags,
-                    platform: event.platform
+                    platform: event.platform,
+                    contexts: event.contexts,
+                    request: event.request,
+                    sdk: event.sdk,
+                    ip: event.ip
                 }),
                 at: event.at
             }

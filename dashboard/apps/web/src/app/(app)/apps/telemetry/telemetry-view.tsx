@@ -16,11 +16,14 @@
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { ReporterRules } from "./reporter-rules";
+import { ProjectsGrid } from "./projects-grid";
+import { DEFAULT_SECTION, SECTIONS, sectionFor } from "./project-sections";
 import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { RelativeTime } from "@/components/relative-time";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { EventDetail, IssueDetail, IssueRow } from "@/lib/telemetry/report-service";
+import { EventPanel } from "./event-detail";
+import type { IssueDetail, IssueRow } from "@/lib/telemetry/report-service";
 import {
     ArrowLeft,
     Bug,
@@ -38,7 +41,6 @@ import {
     EmptyState,
     Input,
     SegmentedControl,
-    Select,
     Skeleton
 } from "@polaris/ui";
 
@@ -64,11 +66,14 @@ const LEVEL_TONE: Record<string, string> = {
 export function TelemetryView({
     projectId,
     issueId,
-    status
+    status,
+    section
 }: {
     projectId: string | null;
     issueId: string | null;
     status: string;
+    /** Which part of the project is open. Only read once a project is. */
+    section: string;
 }) {
     const router = useRouter();
     const [data, setData] = useState<Overview | null>(null);
@@ -90,10 +95,15 @@ export function TelemetryView({
         void load();
     }, [load]);
 
+    // Only what the link actually names. It used to fall back to the first
+    // project, which is what made "the telemetry app" a screen rather than a
+    // shelf: there was no state in which nothing was open, so there was nowhere
+    // to put a list of projects.
     const project = useMemo(
-        () => data?.projects.find((entry) => entry.id === projectId) ?? data?.projects[0] ?? null,
+        () => data?.projects.find((entry) => entry.id === projectId) ?? null,
         [data, projectId]
     );
+    const open = sectionFor(section);
 
     useEffect(() => {
         if (!issueId || !project) {
@@ -111,15 +121,25 @@ export function TelemetryView({
         };
     }, [issueId, project]);
 
-    const go = (next: { project?: string; issue?: string | null; status?: string }) => {
+    const go = (next: {
+        project?: string | null;
+        issue?: string | null;
+        status?: string;
+        section?: string;
+    }) => {
         const params = new URLSearchParams();
-        const chosen = next.project ?? project?.id;
+        const chosen = next.project === undefined ? project?.id : next.project;
         if (chosen) params.set("project", chosen);
         const wanted = next.issue === undefined ? issueId : next.issue;
         if (wanted) params.set("issue", wanted);
         params.set("status", next.status ?? status);
+        const wantedSection = next.section ?? open;
+        if (wantedSection !== DEFAULT_SECTION) params.set("section", wantedSection);
         router.push(`/apps/telemetry?${params.toString()}`);
     };
+
+    /** A link straight into a project, for the cards. */
+    const hrefFor = (id: string) => `/apps/telemetry?project=${encodeURIComponent(id)}`;
 
     const act = async (run: () => Promise<{ error?: string }>) => {
         setBusy(true);
@@ -156,21 +176,37 @@ export function TelemetryView({
         );
     }
 
+    // Nothing chosen: the shelf. A project is a thing you go into, so the app
+    // opens on the list of them with the state of each on its face, rather than
+    // on one of them picked arbitrarily by a dropdown.
+    if (!project) {
+        return (
+            <div className="flex flex-col gap-4">
+                <ProjectsGrid
+                    projects={data.projects}
+                    hrefFor={hrefFor}
+                    action={<NewProject onDone={load} />}
+                />
+                {error && (
+                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                        {error}
+                    </p>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <Select
-                    value={project?.id ?? ""}
-                    onValueChange={(value) => go({ project: value, issue: null })}
-                    className="w-64"
-                    options={data.projects.map((entry) => ({
-                        value: entry.id,
-                        label: entry.openIssues > 0 ? `${entry.name} (${entry.openIssues})` : entry.name
-                    }))}
-                />
-                <NewProject onDone={load} />
-                <div className="ml-auto flex items-center gap-2">
-                    <div className="relative">
+                <Button variant="ghost" size="sm" onClick={() => go({ project: null, issue: null })}>
+                    <ArrowLeft className="size-3.5" />
+                    Projects
+                </Button>
+                <span className="text-muted-foreground/40">/</span>
+                <h2 className="min-w-0 truncate text-sm font-medium">{project.name}</h2>
+                {open === "issues" && (
+                    <div className="relative ml-auto">
                         <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                         <input
                             value={query}
@@ -180,15 +216,8 @@ export function TelemetryView({
                             className="h-8 w-52 rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
                         />
                     </div>
-                </div>
+                )}
             </div>
-
-            {project && (
-                <>
-                    <ProjectAddress project={project} onDone={load} />
-                    <ReporterRules project={project} onDone={load} />
-                </>
-            )}
 
             {error && (
                 <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -196,42 +225,175 @@ export function TelemetryView({
                 </p>
             )}
 
-            {issue && project ? (
-                <IssuePanel
-                    issue={issue}
-                    busy={busy}
-                    onBack={() => go({ issue: null })}
-                    onStatus={(next) =>
-                        act(() => actions.setIssueStatusAction(project.id, issue.id, next))
-                    }
-                    onDelete={async () => {
-                        const result = await act(() => actions.deleteIssueAction(project.id, issue.id));
-                        if (!result?.error) go({ issue: null });
-                    }}
-                />
-            ) : (
-                <>
-                    <SegmentedControl
-                        value={status}
-                        onValueChange={(value) => go({ status: value, issue: null })}
-                        options={STATUS_TABS.map((tab) => ({
-                            value: tab.value,
-                            label:
-                                data.counts[tab.value] === undefined
-                                    ? tab.label
-                                    : `${tab.label} ${data.counts[tab.value]}`
-                        }))}
-                    />
-                    <IssueList
-                        issues={data.issues}
-                        windowDays={data.windowDays}
-                        onOpen={(id) => go({ issue: id })}
-                    />
-                </>
-            )}
+            <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+                <SectionNav open={open} onOpen={(key) => go({ section: key, issue: null })} />
+                <div className="min-w-0 flex-1">
+                    {open === "client" && <ProjectAddress project={project} onDone={load} />}
+                    {open === "reporters" && <ReporterRules project={project} onDone={load} />}
+                    {open === "settings" && <ProjectSettings project={project} onDone={load} />}
+                    {open === "issues" &&
+                        (issue ? (
+                            <IssuePanel
+                                issue={issue}
+                                busy={busy}
+                                onBack={() => go({ issue: null })}
+                                onStatus={(next) =>
+                                    act(() => actions.setIssueStatusAction(project.id, issue.id, next))
+                                }
+                                onDelete={async () => {
+                                    const result = await act(() =>
+                                        actions.deleteIssueAction(project.id, issue.id)
+                                    );
+                                    if (!result?.error) go({ issue: null });
+                                }}
+                            />
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                <SegmentedControl
+                                    value={status}
+                                    onValueChange={(value) => go({ status: value, issue: null })}
+                                    options={STATUS_TABS.map((tab) => ({
+                                        value: tab.value,
+                                        label:
+                                            data.counts[tab.value] === undefined
+                                                ? tab.label
+                                                : `${tab.label} ${data.counts[tab.value]}`
+                                    }))}
+                                />
+                                <IssueList
+                                    issues={data.issues}
+                                    windowDays={data.windowDays}
+                                    onOpen={(id) => go({ issue: id })}
+                                />
+                            </div>
+                        ))}
+                </div>
+            </div>
         </div>
     );
 }
+
+/**
+ * The rail down the side of a project.
+ *
+ * A column beside the content on a wide screen and a scrolling row above it on a
+ * narrow one, which is the shape Deploy uses for the same thing - a vertical
+ * rail on a phone costs more height than the content it introduces.
+ */
+function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => void }) {
+    return (
+        <nav className="lg:w-48 lg:shrink-0">
+            <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
+                {SECTIONS.map((section) => {
+                    const active = section.key === open;
+                    const Icon = section.icon;
+                    return (
+                        <li key={section.key} className="shrink-0 lg:shrink">
+                            <button
+                                type="button"
+                                title={section.hint}
+                                aria-current={active ? "page" : undefined}
+                                onClick={() => onOpen(section.key)}
+                                className={cn(
+                                    "flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-sm transition-colors hover:bg-muted",
+                                    active
+                                        ? "bg-muted font-medium text-foreground"
+                                        : "text-muted-foreground"
+                                )}
+                            >
+                                <Icon className="size-3.5 shrink-0" />
+                                {section.label}
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </nav>
+    );
+}
+
+/** How long this project keeps what it is sent, and whether it is listening at
+ *  all. The two things about a project that are not its address. */
+function ProjectSettings({
+    project,
+    onDone
+}: {
+    project: Overview["projects"][number];
+    onDone: () => Promise<void>;
+}) {
+    const [days, setDays] = useState(String(project.retentionDays));
+    const [error, setError] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => setDays(String(project.retentionDays)), [project.retentionDays]);
+
+    return (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+            <div>
+                <p className="text-sm font-medium">Keep events for</p>
+                <p className="text-xs text-muted-foreground">
+                    Between 1 and 365 days. How often each fault happened is kept for a year
+                    whatever this says, so a chart never develops a hole where the events were
+                    removed.
+                </p>
+            </div>
+            <div className="flex items-center gap-2">
+                <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={days}
+                    onChange={(event) => setDays(event.target.value)}
+                    aria-label="Days to keep events for"
+                    className="w-28"
+                />
+                <span className="text-xs text-muted-foreground">days</span>
+                <Button
+                    size="sm"
+                    disabled={saving || days === String(project.retentionDays)}
+                    onClick={async () => {
+                        setSaving(true);
+                        await runAction(
+                            () =>
+                                actions.updateTelemetryProjectAction(project.id, {
+                                    retentionDays: Number(days)
+                                }),
+                            setError
+                        );
+                        setSaving(false);
+                        await onDone();
+                    }}
+                >
+                    Save
+                </Button>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+                <input
+                    type="checkbox"
+                    checked={project.enabled}
+                    onChange={async (event) => {
+                        await runAction(
+                            () =>
+                                actions.updateTelemetryProjectAction(project.id, {
+                                    enabled: event.target.checked
+                                }),
+                            setError
+                        );
+                        await onDone();
+                    }}
+                    className="size-4 rounded border-border"
+                />
+                Accept reports
+            </label>
+            <p className="text-xs text-muted-foreground">
+                Turned off, the address keeps answering and nothing is stored - which is what
+                stops a crash loop filling this project while somebody works on it.
+            </p>
+            {error && <p className="text-xs text-danger">{error}</p>}
+        </div>
+    );
+}
+
 
 function NewProject({ onDone }: { onDone: () => Promise<void> }) {
     const [name, setName] = useState("");
@@ -534,91 +696,6 @@ function Fact({ label, value }: { label: string; value: React.ReactNode }) {
             <dd className="truncate text-sm font-medium" title={typeof value === "string" ? value : undefined}>
                 {value}
             </dd>
-        </div>
-    );
-}
-
-/** The occurrence itself: the stack, then what was happening around it. */
-function EventPanel({ event, kept }: { event: EventDetail; kept: number }) {
-    const tags = Object.entries(event.tags);
-    return (
-        <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>
-                    Most recent of {kept === 1 ? "one kept occurrence" : `${kept} kept occurrences`}
-                </span>
-                {event.method && event.url && (
-                    <code className="truncate rounded bg-muted px-1.5 py-0.5 font-mono">
-                        {event.method} {event.url}
-                    </code>
-                )}
-                {event.serverName && <span>on {event.serverName}</span>}
-                {event.userLabel && <span>for {event.userLabel}</span>}
-            </div>
-
-            {event.frames.length > 0 && (
-                <div className="overflow-hidden rounded-lg border border-border">
-                    <p className="border-b border-border bg-surface px-3 py-1.5 text-xs font-medium">
-                        Stack
-                    </p>
-                    <ol className="divide-y divide-border">
-                        {/* Innermost last, which is the order every client sends
-                            and every debugger prints. */}
-                        {event.frames.map((frame, at) => (
-                            <li
-                                key={`${frame.file}:${frame.line}:${at}`}
-                                className={cn(
-                                    "flex flex-wrap items-baseline gap-x-2 px-3 py-1.5 font-mono text-xs",
-                                    frame.inApp ? "bg-transparent" : "bg-muted/40 text-muted-foreground"
-                                )}
-                            >
-                                <span className="font-medium">{frame.function || "<anonymous>"}</span>
-                                <span className="min-w-0 truncate" title={frame.file}>{frame.file}</span>
-                                {frame.line !== null && <span className="text-muted-foreground">:{frame.line}</span>}
-                                {frame.context && (
-                                    <span className="w-full truncate pt-0.5 text-muted-foreground">
-                                        {frame.context.trim()}
-                                    </span>
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-            )}
-
-            {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                    {tags.map(([name, value]) => (
-                        <span
-                            key={name}
-                            className="rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground"
-                        >
-                            {name}: <span className="text-foreground">{value}</span>
-                        </span>
-                    ))}
-                </div>
-            )}
-
-            {event.breadcrumbs.length > 0 && (
-                <div className="overflow-hidden rounded-lg border border-border">
-                    <p className="border-b border-border bg-surface px-3 py-1.5 text-xs font-medium">
-                        What happened before it
-                    </p>
-                    <ol className="divide-y divide-border">
-                        {event.breadcrumbs.map((crumb, at) => (
-                            <li
-                                key={`${crumb.at ?? at}:${at}`}
-                                className="flex items-baseline gap-2 px-3 py-1.5 text-xs"
-                            >
-                                <span className="w-20 shrink-0 truncate text-muted-foreground">
-                                    {crumb.category || crumb.type}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate" title={crumb.message}>{crumb.message}</span>
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-            )}
         </div>
     );
 }

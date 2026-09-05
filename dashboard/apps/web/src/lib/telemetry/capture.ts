@@ -17,6 +17,7 @@
  * replace the crash being reported with a crash in the reporting.
  */
 
+import * as os from "node:os";
 import * as core from "@polaris/core";
 import { captureEvent } from "./store";
 import { buildStamp } from "@/lib/build-stamp";
@@ -62,12 +63,73 @@ function framesOf(error: Error): core.StackFrame[] {
             line: Number.parseInt(match[3] ?? "0", 10) || null,
             column: Number.parseInt(match[4] ?? "0", 10) || null,
             inApp: !/node_modules|^node:|^internal[\\/]/.test(file),
-            context: null
+            context: null,
+            // Nothing to read: a Node stack carries a file and a line and not
+            // the line itself. What would fill these is a source map, which is
+            // the difference between a frame that says `48572.js:1` and one
+            // that names a file somebody wrote.
+            pre: [],
+            post: []
         });
     }
     // A stack is written innermost-first and every client sends it the other way
     // round, so this reverses it rather than teaching the reader two orders.
     return frames.reverse().slice(-40);
+}
+
+/**
+ * Where this is running, in the shape every other reporter sends it.
+ *
+ * Read fresh each time rather than once at startup: memory is the field that
+ * moves, and a crash that happened with 200 MB free is a different crash from
+ * the same line with 4 GB free. Everything else is constant and costs nothing
+ * to read again.
+ *
+ * Deliberately the same group names Sentry's own clients use - `runtime`, `os`,
+ * `device`, `app` - so Polaris' own events sit in the same screen, under the
+ * same headings, as the events from an application that reports here. A project
+ * that displayed its own reports differently from everybody else's would be a
+ * second thing to learn to read.
+ */
+function hereContexts(): core.ContextGroup[] {
+    const memory = process.memoryUsage?.().rss;
+    return [
+        {
+            name: "runtime",
+            fields: [
+                { key: "name", value: "node" },
+                { key: "version", value: process.version }
+            ]
+        },
+        {
+            name: "os",
+            fields: [
+                { key: "name", value: os.type() },
+                { key: "version", value: os.release() },
+                { key: "arch", value: os.arch() }
+            ]
+        },
+        {
+            name: "device",
+            fields: [
+                { key: "processor_count", value: String(os.cpus()?.length ?? 0) },
+                { key: "memory_size", value: String(os.totalmem()) },
+                { key: "free_memory", value: String(os.freemem()) },
+                { key: "boot_time", value: new Date(Date.now() - os.uptime() * 1000).toISOString() }
+            ]
+        },
+        {
+            name: "app",
+            fields: [
+                { key: "app_memory", value: memory === undefined ? "" : String(memory) },
+                {
+                    key: "app_start_time",
+                    value: new Date(Date.now() - process.uptime() * 1000).toISOString()
+                },
+                { key: "build", value: buildStamp() ?? "" }
+            ].filter((field) => field.value !== "")
+        }
+    ];
 }
 
 /**
@@ -113,8 +175,11 @@ export async function captureInternal(
                 "",
             platform: "node",
             release: buildStamp(),
+            // The container this ran in. Left null, every one of Polaris' own
+            // events looked like it came from the same nowhere, which on a
+            // deployment with more than one of anything is the first question.
             environment: process.env.NODE_ENV === "production" ? "production" : "development",
-            serverName: null,
+            serverName: os.hostname() || null,
             transaction: where.transaction ?? null,
             url: null,
             method: null,
@@ -122,6 +187,15 @@ export async function captureInternal(
             tags: { ...where.tags, source: "polaris" },
             frames,
             breadcrumbs: [],
+            // The same facts Polaris asks every other reporter for. Without
+            // them its own events were the thinnest thing on the screen - a
+            // sentence, one minified frame, and no way to tell which machine,
+            // which build or which runtime - on the one project where nobody
+            // can go and add an SDK to find out.
+            contexts: hereContexts(),
+            request: null,
+            sdk: { name: "polaris", version: buildStamp() ?? "" },
+            ip: null,
             at: new Date(),
             fingerprint: core.fingerprintOf(read)
         });

@@ -49,6 +49,13 @@ export interface EventDetail {
     readonly breadcrumbs: readonly core.Breadcrumb[];
     readonly tags: Readonly<Record<string, string>>;
     readonly platform: string | null;
+    /** Where the program was running. Empty for an event stored before these
+     *  were kept, which is why every reader of it treats absent as "not sent"
+     *  rather than as a shape to be surprised by. */
+    readonly contexts: readonly core.ContextGroup[];
+    readonly request: core.RequestFacts | null;
+    readonly sdk: core.SdkFacts | null;
+    readonly ip: string | null;
 }
 
 export interface IssueDetail extends IssueRow {
@@ -175,6 +182,10 @@ function detailOf(event: {
         frames?: core.StackFrame[];
         breadcrumbs?: core.Breadcrumb[];
         tags?: Record<string, string>;
+        contexts?: core.ContextGroup[];
+        request?: core.RequestFacts | null;
+        sdk?: core.SdkFacts | null;
+        ip?: string | null;
         platform?: string | null;
     } = {};
     try {
@@ -189,6 +200,10 @@ function detailOf(event: {
         frames: parsed.frames ?? [],
         breadcrumbs: parsed.breadcrumbs ?? [],
         tags: parsed.tags ?? {},
+        contexts: parsed.contexts ?? [],
+        request: parsed.request ?? null,
+        sdk: parsed.sdk ?? null,
+        ip: parsed.ip ?? null,
         platform: parsed.platform ?? null
     };
 }

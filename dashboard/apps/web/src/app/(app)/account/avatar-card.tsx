@@ -109,7 +109,7 @@ interface Picture {
  * everything else - the cropper, the formats, the cache dance after a replace,
  * the sentence when it fails - is the same for both.
  */
-function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
+export function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
     const input = useRef<HTMLInputElement>(null);
     const [chosen, setChosen] = useState<Blob | null>(null);
     const [sending, setSending] = useState(false);
@@ -338,7 +338,7 @@ function actionsFor(label: string, picture: Picture, exists: boolean): PictureAc
  * because both of those elements are cut to them: a caller reaching for
  * `className` would be laying its positioning over the sheet as well.
  */
-function PictureEditor({
+export function PictureEditor({
     label,
     icon: Icon,
     picture,
