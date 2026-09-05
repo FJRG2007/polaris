@@ -24,6 +24,7 @@ import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
+import { PersonName } from "@/components/person-name";
 import { MessageMenu } from "./message-menu";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -826,11 +827,13 @@ function Message({
                                         onClick={() => void direct.open(writer)}
                                         className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
                                     >
-                                        {author}
+                                        <PersonName id={message.authorId} name={author} />
                                     </button>
                                 </Writer>
                             ) : (
-                                <span className="text-sm font-medium">{author}</span>
+                                <span className="text-sm font-medium">
+                                    <PersonName id={message.authorId} name={author} />
+                                </span>
                             )}
                             <span
                                 className="text-[0.6875rem] text-foreground-subtle"

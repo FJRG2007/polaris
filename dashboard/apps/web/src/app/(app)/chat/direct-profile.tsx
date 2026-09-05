@@ -56,6 +56,7 @@ import { MutualPanel } from "@/components/mutual-panel";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { usePresence } from "@/components/presence-store";
 import { ProfileBanner } from "@/components/profile-banner";
+import { PersonName } from "@/components/person-name";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Skeleton } from "@polaris/ui";
 
@@ -135,7 +136,7 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                         the rest of the panel was not, which read as a mistake
                         rather than as emphasis. */}
                     <p className="flex items-baseline gap-1.5 truncate text-sm font-medium" title={name}>
-                        {name}
+                        <PersonName id={person.id} name={name} />
                         {/* Beside the name, because that is what it is about -
                             and only when they have said. */}
                         {profile?.pronouns ? (

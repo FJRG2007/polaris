@@ -54,7 +54,11 @@ vi.mock("@polaris/db", () => ({
         // A reader with no session is answered from the stored row rather than
         // through the audience layer, so there has to be one to read.
         userPrivacy: { findUnique: async () => null },
-        friendship: { findFirst: async () => null }
+        friendship: { findFirst: async () => null },
+        // Carried on the profile because a public page is drawn for readers with
+        // no account, and there is no store above one to ask. Nothing here turns
+        // on it, so an account that chose nothing is answer enough.
+        userProfileStyle: { findUnique: async () => null }
     }
 }));
 

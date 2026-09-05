@@ -37,7 +37,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ProfileActions } from "./profile-actions";
 import { MutualPanel } from "@/components/mutual-panel";
 import { FollowLists } from "./follow-lists";
-import { linkLabel } from "@polaris/core";
+import { effectOf, linkLabel, nameStyleOf } from "@polaris/core";
+import { frameCss, nameStyleCss, sheenCss } from "@/lib/profile-style-css";
 import { usePresence } from "@/components/presence-store";
 import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
 
@@ -63,10 +64,29 @@ export function ProfileCard({
     // Null for a reader with no account: there is no store around a public page,
     // and presence is not published to people who are not signed in.
     const where = usePresence(profile.id);
+    // Handed down with the profile rather than asked for: this page is drawn for
+    // readers who may not be signed in, and there is no store above it.
+    const effect = effectOf(profile.style.effect);
+    const frame = effect ? frameCss(effect) : null;
+    const sheen = effect ? sheenCss(effect) : null;
+    const painted = nameStyleOf(profile.style.nameStyle);
 
     return (
-        <Card className="overflow-hidden">
-            <ProfileBanner person={person} className="h-28" />
+        <Card className={frame ? "relative overflow-hidden border-2" : "overflow-hidden"} style={frame ?? undefined}>
+            {sheen ? (
+                // Above the card and below nothing: it crosses the banner and the
+                // top of the body, which is what makes it read as light on a
+                // surface rather than as a stripe drawn on one thing. It stops
+                // for anybody who asked for less motion - the rule in tokens.css
+                // covers every animation in the product.
+                <span
+                    aria-hidden="true"
+                    // enigma: not a panel - the band of light an effect walks across the card, sized as a third of it on every screen.
+                    className="profile-sheen pointer-events-none absolute inset-y-0 left-0 z-10 w-1/3 skew-x-12"
+                    style={sheen}
+                />
+            ) : null}
+            <ProfileBanner person={person} fill={profile.style.banner} className="h-28" />
             <CardBody className="flex flex-col gap-4">
                 <div className="-mt-12 flex items-end gap-3">
                     <span className="rounded-full ring-4 ring-card">
@@ -102,7 +122,7 @@ export function ProfileCard({
 
                 <div className="flex flex-col gap-0.5">
                     <h1 className="flex flex-wrap items-baseline gap-2 text-lg font-semibold leading-tight tracking-tight">
-                        {profile.name}
+                        <span style={painted ? nameStyleCss(painted) : undefined}>{profile.name}</span>
                         {/* Beside the name, because that is what it is about -
                             and only when they have said. */}
                         {profile.pronouns ? (

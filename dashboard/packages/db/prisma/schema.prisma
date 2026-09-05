@@ -227,6 +227,7 @@ model User {
     phone               UserPhone?
     avatar              UserAvatar?
     banner              UserBanner?
+    profileStyle        UserProfileStyle?
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
@@ -732,6 +733,36 @@ model UserBanner {
     mime         String
     size         Int      @default(0)
     updatedAt    DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// What somebody has chosen their profile to look like: a background for the band
+// when no banner is over it, a ring around their face, a plate behind their name
+// and a treatment on the card.
+//
+// Catalogue ids and colours, never files. A decoration somebody could upload
+// would be an image drawn beside their name in every list in the product, which
+// is a moderation queue and a storage bill; the catalogue is neither, which is
+// why all of it is simply on for everybody. What each id means, and every check
+// applied to what is stored here, is `profile-style.ts` in @polaris/core - an id
+// withdrawn there stops being drawn everywhere at once, and a row still naming
+// it reads as nothing rather than as something to guess about.
+//
+// One row per account and only for accounts that chose something: a profile with
+// no row is the ordinary profile, which is almost all of them.
+model UserProfileStyle {
+    userId String @id @db.Uuid
+    // The band's background, as one tagged string - `solid:#1b6ac9`, or
+    // `gradient:135:#1b6ac9:#8b3ad6`. One value that is only ever read and
+    // written whole, so a third kind of background is an arm in the parser
+    // rather than a migration on a table every account has a row in.
+    banner     String?
+    decoration String?
+    nameplate  String?
+    effect     String?
+    nameStyle  String?
+    updatedAt  DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

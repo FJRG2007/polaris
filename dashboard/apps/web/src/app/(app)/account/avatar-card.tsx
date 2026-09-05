@@ -70,6 +70,18 @@ import {
     cn
 } from "@polaris/ui";
 
+/**
+ * Whether these bytes are a moving picture.
+ *
+ * Only GIF today. Animated WebP exists and is not detectable from the type - the
+ * still and the moving one are both `image/webp`, and telling them apart means
+ * reading the chunks - so a WebP is framed like any other picture, which is what
+ * it was before this and is right for the still ones almost all of them are.
+ */
+function animated(type: string): boolean {
+    return type === "image/gif";
+}
+
 /** One picture, and the three things that can be done to it. */
 interface Picture {
     /** Something is happening to it, which the handle says with a spinner. */
@@ -164,6 +176,13 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
                 setError("Could not open that picture again");
                 return;
             }
+            // The same reason as above, said at the point somebody would find
+            // out the hard way: reframing this would replace a moving picture
+            // with one still frame of itself.
+            if (animated(blob.type)) {
+                setError("A moving picture cannot be reframed - replace it to change how it sits");
+                return;
+            }
             setChosen(blob);
         } catch {
             setError("Could not reach the server");
@@ -193,7 +212,19 @@ function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Pic
                         // Cleared first, so picking the same file twice after a
                         // failure still counts as a change.
                         event.target.value = "";
-                        if (file) setChosen(file);
+                        if (!file) return;
+                        // A moving picture does not go through the cropper.
+                        // Framing happens on a canvas, and a canvas holds one
+                        // frame: an animated banner put through it would arrive
+                        // as its first frame, still, with nothing on screen
+                        // saying why. So it is sent as it is - the band is
+                        // already the shape of a banner, and the face is already
+                        // cut to a circle by the page rather than by the bytes.
+                        if (animated(file.type)) {
+                            void upload(file);
+                            return;
+                        }
+                        setChosen(file);
                     }}
                 />
                 {chosen ? (
@@ -252,7 +283,9 @@ function actionsFor(label: string, picture: Picture, exists: boolean): PictureAc
             : []),
         {
             label: exists ? "Replace" : `Upload ${label}`,
-            note: "Choose a picture from this device",
+            // Said here because it is where somebody decides which file to
+            // reach for, which is the only moment the answer is useful.
+            note: "Choose a picture from this device - a GIF keeps moving",
             Icon: Upload,
             onSelect: picture.choose
         },

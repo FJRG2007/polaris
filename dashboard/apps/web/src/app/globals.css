@@ -307,3 +307,43 @@ dialog.pdfSlick-dialog .dialogButton {
     background-color: hsl(var(--muted));
     border-radius: 0.375rem;
 }
+
+/*
+ * Profile decorations.
+ *
+ * The two things a chosen appearance does that an inline style cannot say: a
+ * ring that turns behind a face, and a band of light walking across a card. Both
+ * are ornament by definition, so both stop for somebody who asked for less
+ * motion - which the rule in tokens.css already does for every animation in the
+ * product, rather than each of these having to remember.
+ *
+ * Slow on purpose. A ring that turns once every nine seconds is noticed once and
+ * then forgotten; one that turns every second is a spinner, and a spinner beside
+ * somebody's name means their account is loading.
+ */
+@keyframes polaris-ring-turn {
+    to {
+        transform: rotate(1turn);
+    }
+}
+
+.profile-ring-turn {
+    animation: polaris-ring-turn 9s linear infinite;
+}
+
+@keyframes polaris-sheen {
+    0% {
+        transform: translateX(-130%);
+    }
+    /* Most of the cycle is the wait. A sheen that crosses continuously is a
+       loading skeleton; one that crosses now and then is a surface catching the
+       light. */
+    60%,
+    100% {
+        transform: translateX(230%);
+    }
+}
+
+.profile-sheen {
+    animation: polaris-sheen 7s ease-in-out infinite;
+}

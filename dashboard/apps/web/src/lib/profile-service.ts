@@ -31,6 +31,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { getProfileStyle } from "@/lib/profile-style-service";
 import * as core from "@polaris/core";
 import { blockedBy, blockersOf } from "@/lib/blocks";
 import { areFriends } from "@/lib/friends-service";
@@ -113,6 +114,18 @@ export interface PublicProfile {
     readonly description: string;
     /** Whether their photo may be drawn for this reader. Initials otherwise. */
     readonly showsAvatar: boolean;
+    /**
+     * What they chose their profile to look like.
+     *
+     * Carried on the profile rather than asked for by the page, because this
+     * page is drawn for readers who may have no account at all - there is no
+     * store above it to ask, and a signed-out reader is exactly who a public
+     * profile is for.
+     *
+     * Not a privacy decision: it is five choices out of a catalogue Polaris
+     * shipped, and a decoration nobody can see is a setting with no effect.
+     */
+    readonly style: core.ProfileStyle;
     /**
      * The organizations on this Polaris they have marked as theirs. Verified in
      * the only sense Polaris can verify anything: these are rosters it holds, and
@@ -514,12 +527,13 @@ async function draw(
             : [];
 
     const full = [user.firstName ?? "", user.lastName ?? ""].join(" ").trim();
-    const [counts, standing, mutual] = await Promise.all([
+    const [counts, standing, mutual, style] = await Promise.all([
         followCounts(user.id),
         standingOf(user.id, viewer, own),
         // Nothing to have in common with yourself, and a reader with no account
         // shares nothing with anybody.
-        viewer && !own ? mutualsBetween(viewer.id, user.id) : Promise.resolve(null)
+        viewer && !own ? mutualsBetween(viewer.id, user.id) : Promise.resolve(null),
+        getProfileStyle(user.id)
     ]);
     return {
         id: user.id,
@@ -528,6 +542,7 @@ async function draw(
         fullName: allowed.fullName ? full : "",
         description: user.description,
         showsAvatar: allowed.avatar,
+        style,
         organizations,
         companies: allowed.companies ? typedCompanies(user) : [],
         email: allowed.email ? user.email : "",
