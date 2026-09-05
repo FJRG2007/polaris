@@ -375,12 +375,29 @@ const EMPTY_SCOPE: TaskScope = {
     partialRoles: {}
 };
 
+/**
+ * What this account can see in Tasks.
+ *
+ * Being an instance administrator is deliberately NOT a way into everybody's
+ * personal spaces here, and that is a change from how this once worked. Running
+ * the instance is a job about the instance - the roster, the settings, the
+ * machines - and it is not a standing invitation into the private list somebody
+ * keeps their own work in. An admin who opened Tasks used to find every account's
+ * spaces mixed in with their own, which is both a privacy failure and a
+ * completely unusable screen.
+ *
+ * Nothing about that locks an operator out. `resolveSpaceRole` still reads an admin as
+ * an owner, so a link to a space or a task opens, an admin can be sent one and
+ * act on it, and there is no space in the instance that cannot be reached. What
+ * has gone is the reaching happening by itself, unasked, into work nobody
+ * offered - and the way to go and look at somebody's own workspace on purpose is
+ * to impersonate them, which is a deliberate act and is written down in the log.
+ *
+ * The split is the one this file already draws elsewhere: what a screen LISTS
+ * and what an account may READ are different questions, and only the second is
+ * about permission.
+ */
 export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
-    if (actor.isAdmin) {
-        const all = await prisma.taskSpace.findMany({ where: { archived: false }, select: { id: true } });
-        return { ...EMPTY_SCOPE, spaceIds: all.map((space) => space.id) };
-    }
-
     // Which organizations this account runs, and which it merely belongs to.
     // The first opens every space they own; the second only opens the ones the
     // organization marked internal.
