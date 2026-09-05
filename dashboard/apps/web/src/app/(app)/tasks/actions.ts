@@ -88,6 +88,49 @@ function refresh(
 // Spaces, folders, lists
 // ---------------------------------------------------------------------------
 
+/**
+ * The first space, made in one press.
+ *
+ * A brand-new account arrived at Tasks with nothing at all - no space, no
+ * folder, no list - and was told to add a task, which it had nowhere to put. The
+ * hierarchy is three words long and completely obvious once you have seen one of
+ * each, and completely opaque before that; making somebody build it from an
+ * empty screen to find out what the product does is a tax charged at exactly the
+ * wrong moment. Every tool this resembles opens with a space already there.
+ *
+ * Made on the first press rather than at sign-up, and that is deliberate: an
+ * account that never opens Tasks should not have a space sitting in the database
+ * for ever, and a press costs the same as a page load did.
+ *
+ * Refuses to make a second one. Two presses on a slow connection, or two tabs,
+ * would otherwise leave somebody with two identical spaces to tidy up on their
+ * first minute in the product - so an account that already has a space of its
+ * own is handed that one back instead.
+ */
+export async function startTasksAction(): Promise<{ spaceId?: string; listId?: string; error?: string }> {
+    const caller = await actor();
+
+    const existing = await prisma.taskSpace.findFirst({
+        where: { ownerId: caller.id, archived: false, orgId: null },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, lists: { where: { archived: false }, select: { id: true }, take: 1 } }
+    });
+    if (existing) {
+        return { spaceId: existing.id, listId: existing.lists[0]?.id };
+    }
+
+    // Named for what it is rather than after the person: "My work" reads the
+    // same on the day it is made and on the day somebody else is invited into
+    // it, and it is one rename away from whatever they actually want.
+    const space = await createSpaceAction({ name: "My work" });
+    if (space.error || !space.id) return { error: space.error ?? "Could not set up your first space" };
+
+    const list = await createListAction({ spaceId: space.id, name: "To do" });
+    // A space with no list is still a space somebody can work in, so a list that
+    // would not be made is not worth failing the whole thing over.
+    return { spaceId: space.id, listId: list.id };
+}
+
 export async function createSpaceAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const caller = await actor();
     const parsed = core.spaceSchema.safeParse(input);

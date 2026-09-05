@@ -186,6 +186,12 @@ function RemoteAudio({
         const audio = element.current;
         if (!audio) return;
         resumeBoost();
+        // A source that is not there cannot be played, and asking anyway is what
+        // records a refusal nothing can clear.
+        if (!audio.srcObject) {
+            onPlayState(id, false, start);
+            return;
+        }
         void audio
             .play()
             .then(() => onPlayState(id, false, start))
@@ -194,10 +200,22 @@ function RemoteAudio({
 
     useEffect(() => {
         const audio = element.current;
-        if (!audio || !stream) return;
+        if (!audio) return;
+        if (!stream) {
+            // Nothing to play. Let go of whatever was attached and take back any
+            // refusal recorded against this person - the prompt is drawn while
+            // ANYBODY is refused, and a refusal left behind for a stream that no
+            // longer exists is a prompt that stays on screen and cannot be
+            // satisfied: pressing it calls play() on an element with no source,
+            // which fails again, silently, for ever. That is the "it does
+            // nothing" people were reporting.
+            audio.srcObject = null;
+            onPlayState(id, false, start);
+            return;
+        }
         audio.srcObject = stream;
         start();
-    }, [stream, start]);
+    }, [id, stream, start, onPlayState]);
 
     /**
      * Who plays this person: the element, or the graph.
