@@ -152,6 +152,27 @@ describe("a Drive source whose machine is down", () => {
         expect(markup).not.toContain("press Check on this network");
     });
 
+    it("does not claim the machine Polaris runs on is off", () => {
+        // It is holding up the page the sentence would be printed on. What has
+        // failed is Polaris reaching its own host from inside its container,
+        // which sends somebody somewhere completely different.
+        const markup = render(SERVER, [
+            {
+                id: SERVER.id,
+                state: "down",
+                local: true,
+                detail: "No route to that address",
+                endpoint: "192.168.1.138:22"
+            }
+        ]);
+
+        expect(markup).toContain("cannot reach lirio-2 from inside itself");
+        expect(markup).not.toContain("lirio-2 is not answering");
+        // And the search is not offered: it skips Polaris' own address by
+        // design, so it could only ever come back with "not on this network".
+        expect(markup).not.toContain("Look for it on this network");
+    });
+
     it("says nothing about an address when there was none to try", () => {
         const markup = render(SERVER, [
             { id: SERVER.id, state: "down", detail: "No answer", endpoint: null }

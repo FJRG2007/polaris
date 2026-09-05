@@ -366,7 +366,7 @@ export function ChatSidebar() {
                                             // list was the one place in Polaris
                                             // where somebody's face did not say
                                             // whether they were there.
-                                            <Avatar person={channel.others[0]} size={20} />
+                                            <Avatar person={channel.others[0]} size={24} />
                                         ) : (
                                             // A group is its picture, or the
                                             // faces of the people in it. An
@@ -378,7 +378,7 @@ export function ChatSidebar() {
                                                 id={channel.id}
                                                 name={channel.name}
                                                 members={channel.others}
-                                                size={18}
+                                                size={24}
                                             />
                                         )
                                     }
@@ -809,14 +809,16 @@ function Row({
             as={Link}
             personId={personId}
             href={href}
+            // Held back until this is the row under the pointer or the
+            // conversation that is open. A gradient behind every row down a
+            // column of thirty makes the column unreadable and paints over the
+            // marks that said where you were - so here the plate IS those
+            // marks.
+            plate="active"
+            data-active={active ? "" : undefined}
             className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
-                // The plate a person chose paints over the tint that says which
-                // conversation is open, so a plated row is marked with an edge
-                // instead - see `data-plated` on PersonRow.
-                active
-                    ? "bg-card-hover text-foreground data-[plated]:ring-1 data-[plated]:ring-inset data-[plated]:ring-border-strong"
-                    : "text-muted-foreground",
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
+                active ? "bg-card-hover text-foreground" : "text-muted-foreground",
                 shout && "font-medium text-foreground"
             )}
         >

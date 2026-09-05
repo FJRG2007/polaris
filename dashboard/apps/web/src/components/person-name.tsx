@@ -71,6 +71,26 @@ export function usePersonNameplate(id: string | null | undefined): Nameplate | n
  *  underneath it would both fight the gradient. */
 export const PLATED_ROW = "border-transparent hover:brightness-110";
 
+/**
+ * The class that holds a plate back until the row is the one being pointed at.
+ *
+ * For lists where every row is a person and the list is long - the direct
+ * messages down the side of Chat is the one this was written for. Painting a
+ * gradient behind every row there does two things at once, and both are bad: the
+ * column stops being scannable, and the hover and open-conversation tints are
+ * painted over, so the list loses the only marks that said where you were.
+ *
+ * So the plate becomes the hover: it is what appears under the pointer, under
+ * the keyboard focus, and under the conversation that is open. The values ride
+ * as custom properties rather than as an inline background, because an inline
+ * background wins over every rule and there would be nothing left to reveal. The
+ * rule itself lives in `globals.css`.
+ *
+ * A list of a dozen people whose whole point is who they are - a roster, the
+ * members of a conversation - keeps the plate on every row. That is the default.
+ */
+export const PLATE_ON_ACTIVE = "plate-on-active";
+
 /** Convenience for the common case - a row that is plated or not. */
 export function platedRow(plate: Nameplate | null, className?: string): string {
     return cn(className, plate && PLATED_ROW);
@@ -96,6 +116,7 @@ export function platedRow(plate: Nameplate | null, className?: string): string {
 export function PersonRow<T extends ElementType = "div">({
     personId,
     as,
+    plate: when = "always",
     className,
     style,
     ...rest
@@ -104,9 +125,14 @@ export function PersonRow<T extends ElementType = "div">({
      *  and asks the store about nobody. */
     personId: string | null | undefined;
     as?: T;
-} & Omit<ComponentPropsWithoutRef<T>, "as" | "personId">) {
+    /** When to actually paint it. `always` for a list about who people are;
+     *  `active` for a long navigation list, where the plate becomes the hover
+     *  instead of covering it - see `PLATE_ON_ACTIVE`. */
+    plate?: "always" | "active";
+} & Omit<ComponentPropsWithoutRef<T>, "as" | "personId" | "plate">) {
     const plate = usePersonNameplate(personId);
     const Tag = (as ?? "div") as ElementType;
+    const held = plate && when === "active";
     return (
         <Tag
             // Published so a list can say something a plate would otherwise
@@ -115,13 +141,39 @@ export function PersonRow<T extends ElementType = "div">({
             // option under the pointer - simply stops being marked once somebody
             // has a plate. `data-[plated]:` is where that row puts the ring or
             // the outline it uses instead.
-            data-plated={plate ? "" : undefined}
-            className={platedRow(plate, className as string | undefined)}
+            data-plated={plate && !held ? "" : undefined}
+            className={cn(
+                held ? PLATE_ON_ACTIVE : platedRow(plate, undefined),
+                className as string | undefined
+            )}
             // The screen's own properties win: a row that sets its own colour
             // for a reason - a name that is yours, a row that is disabled - is
             // making a statement the plate has no business overruling.
-            style={plate ? { ...nameplateCss(plate), ...(style as CSSProperties) } : style}
+            //
+            // Held back, the same two values ride as custom properties instead:
+            // an inline background beats every rule, and there would be nothing
+            // left for the hover to reveal.
+            style={
+                plate
+                    ? held
+                        ? ({
+                              ...plateVariables(plate),
+                              ...(style as CSSProperties)
+                          } as CSSProperties)
+                        : { ...nameplateCss(plate), ...(style as CSSProperties) }
+                    : style
+            }
             {...rest}
         />
     );
+}
+
+/** The plate as two custom properties, for a row that reveals it rather than
+ *  wearing it. Read by the `.plate-on-active` rule in `globals.css`. */
+function plateVariables(plate: Nameplate): CSSProperties {
+    const painted = nameplateCss(plate);
+    return {
+        "--plate-bg": painted.background,
+        "--plate-fg": painted.color
+    } as CSSProperties;
 }

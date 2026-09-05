@@ -428,3 +428,38 @@ dialog.pdfSlick-dialog .dialogButton {
 .profile-name-flow {
     animation: polaris-name-flow 6s linear infinite;
 }
+
+/**
+ * A nameplate held back until the row is the one being pointed at.
+ *
+ * For the long people lists - the direct messages down the side of Chat - where
+ * a gradient behind every row makes the column unscannable and paints over the
+ * hover and open-conversation tints that were the only marks saying where you
+ * were. So the plate BECOMES those marks: it is what appears under the pointer,
+ * under keyboard focus, and on the conversation that is open.
+ *
+ * The values arrive as custom properties from `PersonRow`, because an inline
+ * background would win over this rule and leave nothing to reveal. A row whose
+ * person has no plate sets neither property and is untouched by all of it.
+ */
+.plate-on-active {
+    transition:
+        background 120ms ease,
+        color 120ms ease;
+}
+
+.plate-on-active:hover,
+.plate-on-active:focus-visible,
+.plate-on-active[data-active],
+.plate-on-active[data-state="open"] {
+    background: var(--plate-bg);
+    color: var(--plate-fg);
+}
+
+/* Nothing moves for somebody who asked their machine for less of it. The plate
+   still appears - it is information, not decoration - it simply arrives. */
+@media (prefers-reduced-motion: reduce) {
+    .plate-on-active {
+        transition: none;
+    }
+}
