@@ -130,6 +130,16 @@ export function MessageMenu({
     // itself: a picture opens into a viewer that offers it and a document is a
     // link, but a player is a player. So the menu is where it lives.
     const recordings = message.attachments.filter((file) => isPlayable(file.contentType));
+    /**
+     * Everything else attached, which had no way out of this menu at all.
+     *
+     * The reasoning above was that a picture opens into a viewer that offers it
+     * and a document is a link - true, and it is two steps and a guess. Right
+     * clicking a picture is where people look for "save this", and what they got
+     * was a menu about the message with nothing about the thing under the
+     * pointer, or the browser's own menu arriving late behind it.
+     */
+    const saveable = message.attachments.filter((file) => !isPlayable(file.contentType));
 
     /**
      * Save one, in the format that was asked for.
@@ -305,6 +315,24 @@ export function MessageMenu({
                         <MenuShortcut keys="Mod+C" />
                     </ContextMenuItem>
                 )}
+                {/* An ordinary download: the route serves it as an
+                    attachment, so it is a link rather than anything this has to
+                    do. Named only when there is more than one, since a message
+                    with a single picture has nothing to disambiguate. */}
+                {!message.deleted &&
+                    saveable.map((file) => (
+                        <ContextMenuItem key={file.id} asChild>
+                            <a
+                                href={`/api/chat/attachments/${file.id}?download=1`}
+                                download={file.name}
+                            >
+                                <Download className="size-3.5" />
+                                <span className="min-w-0 truncate">
+                                    {saveable.length === 1 ? "Download" : file.name}
+                                </span>
+                            </a>
+                        </ContextMenuItem>
+                    ))}
                 {!message.deleted &&
                     recordings.map((file) => (
                         <ContextMenuSub key={file.id}>
