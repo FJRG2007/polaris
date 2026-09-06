@@ -1140,13 +1140,18 @@ export function ChannelView({
     const send = async (
         body: string,
         files: readonly File[] = [],
-        sounds: readonly RecordedSound[] = []
+        sounds: readonly RecordedSound[] = [],
+        spoilers: readonly number[] = []
     ) => {
         if (files.length > 0) {
             following.current = true;
             const form = new FormData();
             form.set("body", body);
             if (replyingTo) form.set("replyToId", replyingTo.id);
+            // Which of them arrive covered, by position. Sent only when there
+            // are any, which is nearly never - an empty field on every message
+            // in Polaris to say "none" is a field nobody needed.
+            if (spoilers.length > 0) form.set("spoilers", spoilers.join(","));
             for (const file of files) form.append("files", file);
             // A still per video, in the same order as the files and with an
             // empty one standing in for everything that is not a video - so the

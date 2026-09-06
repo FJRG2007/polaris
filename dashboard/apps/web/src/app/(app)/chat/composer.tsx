@@ -197,7 +197,10 @@ export function Composer({
     onSend: (
         body: string,
         files: readonly File[],
-        sounds?: readonly RecordedSound[]
+        sounds?: readonly RecordedSound[],
+        /** Which of those arrive covered, by position in `files`. Empty for
+         *  nearly every message ever sent - see the `Spoiler` component. */
+        spoilers?: readonly number[]
     ) => void | Promise<void>;
     /**
      * The same message, at an hour that has not happened yet.
@@ -464,14 +467,16 @@ export function Composer({
         // "here" before they can send a screenshot is a tax on the common case.
         if (disabled || tooLong || (!text && files.length === 0)) return;
         const sending = files;
+        const hidden = [...covered].sort((one, other) => one - other);
         setBody("");
         setFiles([]);
+        setCovered(new Set());
         setRefused("");
         setGeneration((current) => current + 1);
         // It is somewhere that is not a browser now.
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
-        else await onSend(text, sending);
+        else await onSend(text, sending, undefined, hidden);
     };
 
     /**
