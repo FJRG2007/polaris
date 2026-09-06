@@ -111,6 +111,14 @@ const nameBlock = localFont({
     preload: false
 });
 
+const nameBubble = localFont({
+    src: "../fonts/RubikBubbles-Regular.woff2",
+    weight: "400 900",
+    variable: "--font-name-bubble",
+    display: "swap",
+    preload: false
+});
+
 const nameTechno = localFont({
     src: "../fonts/Orbitron-Bold.woff2",
     weight: "400 900",
@@ -136,6 +144,7 @@ const NAME_FACES = [
     nameComic,
     nameScript,
     nameBlock,
+    nameBubble,
     nameTechno,
     namePixel
 ]

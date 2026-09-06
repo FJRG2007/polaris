@@ -100,6 +100,11 @@ const FACES: Record<NameFont, CSSProperties> = {
     comic: { fontFamily: "var(--font-name-comic), var(--font-sans)", letterSpacing: "0.01em" },
     script: { fontFamily: "var(--font-name-script), var(--font-sans)" },
     block: { fontFamily: "var(--font-name-block), var(--font-sans)" },
+    // Letters drawn as inflated balloons. It carries its own highlights, so an
+    // effect that would put a second shine on it - gummy, neon - is not made
+    // unavailable but simply reads as one thing on top of another; the face is
+    // already the ornament.
+    bubble: { fontFamily: "var(--font-name-bubble), var(--font-sans)" },
     techno: { fontFamily: "var(--font-name-techno), var(--font-sans)", letterSpacing: "0.02em" },
     // The one face that is genuinely wider than the rest, so its tracking is
     // pulled back in and it is set a shade smaller: a pixel face at the size of
@@ -120,6 +125,7 @@ const OWN_WEIGHT: ReadonlySet<NameFont> = new Set<NameFont>([
     "comic",
     "script",
     "block",
+    "bubble",
     "pixel"
 ]);
 

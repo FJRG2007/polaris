@@ -312,11 +312,33 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     {
         id: "frost",
         label: "Frost",
-        width: 0.075,
+        width: 0.095,
         glow: "#8fd8ff",
         layers: [
-            { kind: "ring", at: 0.475, thickness: 0.018, colors: ["#c7ecff"], opacity: 0.8 },
-            { kind: "ring", at: 0.44, thickness: 0.03, colors: ["#8fd8ff", "#c7ecff"] }
+            { kind: "ring", at: 0.478, thickness: 0.014, colors: ["#c7ecff"], opacity: 0.75 },
+            { kind: "ring", at: 0.44, thickness: 0.03, colors: ["#8fd8ff", "#c7ecff"] },
+            // The frost itself. Six of them, turning slowly the other way from
+            // the shorter arc above, so the two read as separate things rather
+            // than as one thick ring.
+            {
+                kind: "orbit",
+                shape: "star",
+                at: 0.462,
+                size: 0.06,
+                count: 6,
+                colors: ["#ffffff", "#c7ecff"],
+                twinkle: 3.6,
+                spin: -40
+            },
+            {
+                kind: "arc",
+                at: 0.478,
+                thickness: 0.02,
+                colors: ["#ffffff", "#8fd8ff"],
+                sweep: 70,
+                start: 300,
+                spin: 26
+            }
         ]
     },
     {
@@ -374,54 +396,114 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     {
         id: "ink",
         label: "Ink",
-        width: 0.075,
+        width: 0.095,
         layers: [
-            { kind: "ring", at: 0.472, thickness: 0.022, colors: ["#4a4f5a"] },
-            { kind: "ring", at: 0.442, thickness: 0.024, colors: ["#20242c"] }
+            {
+                kind: "ring",
+                at: 0.482,
+                thickness: 0.01,
+                colors: ["#7b8598"],
+                dash: [0.012, 0.03],
+                opacity: 0.7
+            },
+            { kind: "ring", at: 0.462, thickness: 0.022, colors: ["#4a4f5a", "#20242c"] },
+            { kind: "ring", at: 0.436, thickness: 0.02, colors: ["#20242c"] },
+            // Four beads at the quarters, which is what turns two grey rings
+            // into something somebody chose rather than a default border.
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.462,
+                size: 0.05,
+                count: 4,
+                colors: ["#c9ced8", "#4a4f5a"]
+            }
         ]
     },
     {
         id: "orbit",
         label: "Orbit",
-        width: 0.07,
+        width: 0.095,
         glow: "#5b8def",
         layers: [
-            { kind: "ring", at: 0.465, thickness: 0.012, colors: ["#5b8def"], opacity: 0.4 },
+            { kind: "ring", at: 0.478, thickness: 0.008, colors: ["#5b8def"], opacity: 0.35 },
+            { kind: "ring", at: 0.44, thickness: 0.008, colors: ["#a06bff"], opacity: 0.3 },
+            // Two moons on two paths, turning at different speeds and opposite
+            // ways. One dot on one circle was a loading spinner.
             {
                 kind: "orbit",
                 shape: "dot",
-                at: 0.465,
+                at: 0.47,
                 size: 0.05,
                 count: 1,
                 colors: ["#8fd8ff"],
                 spin: 5
+            },
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.44,
+                size: 0.038,
+                count: 1,
+                colors: ["#c9a6ff"],
+                spin: -8
+            },
+            {
+                kind: "orbit",
+                shape: "star",
+                at: 0.462,
+                size: 0.04,
+                count: 3,
+                colors: ["#ffffff"],
+                opacity: 0.8,
+                twinkle: 2.8
             }
         ]
     },
     {
         id: "pulse",
         label: "Pulse",
-        width: 0.08,
+        width: 0.1,
+        glow: "#3fd0c9",
         layers: [
-            { kind: "ring", at: 0.452, thickness: 0.03, colors: ["#3fd0c9", "#134e5e"] },
+            { kind: "ring", at: 0.445, thickness: 0.03, colors: ["#3fd0c9", "#134e5e"] },
             {
                 kind: "ring",
-                at: 0.484,
+                at: 0.486,
                 thickness: 0.014,
                 colors: ["#3fd0c9"],
                 opacity: 0.7,
                 pulse: 3.2
+            },
+            // A second wave, half a cycle behind the first: one ring breathing
+            // is a ring, two are a signal going out.
+            {
+                kind: "ring",
+                at: 0.466,
+                thickness: 0.01,
+                colors: ["#8ff0ea"],
+                opacity: 0.55,
+                pulse: 1.6
+            },
+            {
+                kind: "arc",
+                at: 0.466,
+                thickness: 0.026,
+                colors: ["#8ff0ea", "#3fd0c9"],
+                sweep: 90,
+                spin: 4
             }
         ]
     },
     {
         id: "circuit",
         label: "Circuit",
-        width: 0.085,
+        width: 0.1,
+        glow: "#3fd0c9",
         layers: [
             {
                 kind: "ring",
-                at: 0.478,
+                at: 0.484,
                 thickness: 0.014,
                 colors: ["#3fd0c9"],
                 dash: [0.03, 0.03],
@@ -435,6 +517,27 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
                 colors: ["#134e5e", "#3fd0c9"],
                 dash: [0.1, 0.04],
                 spin: -14
+            },
+            // The nodes the traces run between, and one bright packet moving
+            // along them. Dashes alone read as a stitched border.
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.463,
+                size: 0.036,
+                count: 6,
+                colors: ["#3fd0c9", "#134e5e"],
+                opacity: 0.9,
+                spin: 20
+            },
+            {
+                kind: "orbit",
+                shape: "dot",
+                at: 0.463,
+                size: 0.05,
+                count: 1,
+                colors: ["#c7fffb"],
+                spin: -6
             }
         ]
     },
@@ -482,16 +585,39 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     {
         id: "eclipse",
         label: "Eclipse",
-        width: 0.08,
+        width: 0.1,
+        glow: "#e8c26a",
         layers: [
-            { kind: "ring", at: 0.465, thickness: 0.016, colors: ["#4d5561"], opacity: 0.6 },
+            { kind: "ring", at: 0.462, thickness: 0.016, colors: ["#4d5561"], opacity: 0.6 },
             {
                 kind: "arc",
-                at: 0.465,
+                at: 0.462,
                 thickness: 0.048,
                 colors: ["#e8c26a", "#b8862b"],
                 sweep: 220,
                 start: 200
+            },
+            // The corona: a thin bright edge outside the dark ring, and the
+            // handful of stars a covered sun makes visible. Without them this
+            // was a gold arc on a grey circle.
+            {
+                kind: "arc",
+                at: 0.488,
+                thickness: 0.008,
+                colors: ["#fff3cf"],
+                sweep: 250,
+                start: 190,
+                opacity: 0.75
+            },
+            {
+                kind: "orbit",
+                shape: "star",
+                at: 0.47,
+                size: 0.045,
+                count: 4,
+                colors: ["#ffffff", "#c9ced8"],
+                opacity: 0.85,
+                twinkle: 4
             }
         ]
     },
@@ -618,41 +744,237 @@ export const AVATAR_DECORATIONS: readonly AvatarDecoration[] = [
     {
         id: "wings",
         label: "Wings",
-        width: 0.14,
+        // A wider band than anything else here, and that is the whole fix. At
+        // the width the rings use, everything drawn sits over the photograph -
+        // so a pair of wings was a pair of shapes across somebody's face rather
+        // than a pair of wings beside it. The band is drawn outside the picture,
+        // so asking for more of it costs nothing but the room it takes.
+        width: 0.2,
         layers: [
             {
                 kind: "art",
-                // Out to the sides and behind, which is where wings are. They
-                // reach the edge of the band on both sides because a small wing
-                // is a fin.
-                bounds: [0.086, 0.22, 0.828, 0.42],
+                // Out past the edge on both sides. The face fills a circle of
+                // radius 30 in this box, so anything left of x 20 or right of
+                // x 80 is clear of it: the wing bodies live there and only
+                // their roots reach in far enough to look attached.
+                bounds: [0.0, 0.28, 1.0, 0.28],
                 front: true,
-                opacity: 0.96,
+                opacity: 0.97,
                 wake: 3,
                 motion: "bob",
                 marks: [
                     {
                         shape: "path",
-                        d: "M 36 30 C 23 26 11 34 9 50 C 17 44 22 45 27 50 C 26 41 30 34 36 30 Z",
+                        d: "M 30 34 C 17 30 6 37 1 49 C 9 44 15 44 20 50 C 20 43 24 37 30 34 Z",
                         fill: "#eef3ff",
                         stroke: "#bfcde9",
                         width: 1
                     },
                     {
                         shape: "path",
-                        d: "M 64 30 C 77 26 89 34 91 50 C 83 44 78 45 73 50 C 74 41 70 34 64 30 Z",
+                        d: "M 70 34 C 83 30 94 37 99 49 C 91 44 85 44 80 50 C 80 43 76 37 70 34 Z",
                         fill: "#eef3ff",
                         stroke: "#bfcde9",
                         width: 1
                     },
-                    { shape: "path", d: "M 32 34 C 23 37 16 43 12 50", stroke: "#bfcde9", width: 0.9 },
-                    { shape: "path", d: "M 30 41 C 23 43 18 47 15 52", stroke: "#bfcde9", width: 0.9 },
-                    { shape: "path", d: "M 68 34 C 77 37 84 43 88 50", stroke: "#bfcde9", width: 0.9 },
-                    { shape: "path", d: "M 70 41 C 77 43 82 47 85 52", stroke: "#bfcde9", width: 0.9 }
+                    // The feathers, as the lines between them. Two a side: three
+                    // is a texture nobody can see at twenty pixels and one reads
+                    // as a crease.
+                    { shape: "path", d: "M 26 37 C 18 39 11 43 5 48", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 27 42 C 21 43 16 46 13 50", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 74 37 C 82 39 89 43 95 48", stroke: "#bfcde9", width: 0.9 },
+                    { shape: "path", d: "M 73 42 C 79 43 84 46 87 50", stroke: "#bfcde9", width: 0.9 }
                 ]
             }
         ],
         glow: "#dbe6ff"
+    },
+    {
+        id: "flowers",
+        label: "Flower crown",
+        width: 0.14,
+        layers: [
+            {
+                kind: "art",
+                // Five blossoms following the curve of the head rather than sat
+                // in a straight line across it, which is the difference between
+                // a crown and a sticker.
+                bounds: [0.1, 0.0, 0.8, 0.3],
+                front: true,
+                wake: 2.8,
+                motion: "sway",
+                marks: [
+                    { shape: "path", d: "M 20 24 C 26 19 34 17 41 18", stroke: "#4f8f5b", width: 2 },
+                    { shape: "path", d: "M 80 24 C 74 19 66 17 59 18", stroke: "#4f8f5b", width: 2 },
+                    { shape: "ellipse", cx: 32, cy: 22, rx: 5, ry: 2.6, rotate: -28, fill: "#5fa86c" },
+                    { shape: "ellipse", cx: 68, cy: 22, rx: 5, ry: 2.6, rotate: 28, fill: "#5fa86c" },
+                    // Left blossom.
+                    { shape: "circle", cx: 19, cy: 19, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 25, cy: 17, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 25, cy: 23, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 19, cy: 25, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 22, cy: 21, r: 2.4, fill: "#f4dc9a" },
+                    // Left inner.
+                    { shape: "circle", cx: 32, cy: 11, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 39, cy: 10, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 39, cy: 17, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 32, cy: 18, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 35.5, cy: 14, r: 2.5, fill: "#f4dc9a" },
+                    // Middle, and the largest, because that is where an eye goes.
+                    { shape: "circle", cx: 45, cy: 8, r: 4, fill: "#ff9ec4" },
+                    { shape: "circle", cx: 55, cy: 8, r: 4, fill: "#ff9ec4" },
+                    { shape: "circle", cx: 46, cy: 15, r: 4, fill: "#ff9ec4" },
+                    { shape: "circle", cx: 54, cy: 15, r: 4, fill: "#ff9ec4" },
+                    { shape: "circle", cx: 50, cy: 11.5, r: 2.8, fill: "#f4dc9a" },
+                    // Right inner.
+                    { shape: "circle", cx: 68, cy: 11, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 61, cy: 10, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 61, cy: 17, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 68, cy: 18, r: 3.6, fill: "#fff3f7" },
+                    { shape: "circle", cx: 64.5, cy: 14, r: 2.5, fill: "#f4dc9a" },
+                    // Right blossom.
+                    { shape: "circle", cx: 81, cy: 19, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 75, cy: 17, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 75, cy: 23, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 81, cy: 25, r: 3.4, fill: "#ffc0d8" },
+                    { shape: "circle", cx: 78, cy: 21, r: 2.4, fill: "#f4dc9a" }
+                ]
+            }
+        ],
+        glow: "#ff9ec4"
+    },
+    {
+        id: "headphones",
+        label: "Headphones",
+        width: 0.16,
+        layers: [
+            {
+                kind: "art",
+                // The band arcs over the head and the cups sit past the edge of
+                // it on both sides, which is where a real pair sits. Drawn as
+                // one stroke rather than as a filled crescent: a crescent has to
+                // be two arcs that agree, and they stop agreeing at 20 pixels.
+                bounds: [0.04, 0.06, 0.92, 0.62],
+                front: true,
+                wake: 2.4,
+                motion: "bob",
+                marks: [
+                    {
+                        shape: "path",
+                        d: "M 9 54 C 9 22 30 8 50 8 C 70 8 91 22 91 54",
+                        stroke: "#2c313c",
+                        width: 7
+                    },
+                    {
+                        shape: "path",
+                        d: "M 13 46 C 15 26 31 14 50 14 C 69 14 85 26 87 46",
+                        stroke: "#59606f",
+                        width: 2
+                    },
+                    // The cups. Rounded, and deeper than they are wide, or they
+                    // read as buttons stuck to the side of somebody's head.
+                    {
+                        shape: "path",
+                        d: "M 4 50 C 4 45 8 42 12 42 C 16 42 20 45 20 50 L 20 62 C 20 67 16 70 12 70 C 8 70 4 67 4 62 Z",
+                        fill: "#2c313c"
+                    },
+                    {
+                        shape: "path",
+                        d: "M 96 50 C 96 45 92 42 88 42 C 84 42 80 45 80 50 L 80 62 C 80 67 84 70 88 70 C 92 70 96 67 96 62 Z",
+                        fill: "#2c313c"
+                    },
+                    { shape: "ellipse", cx: 12, cy: 56, rx: 4.4, ry: 8, fill: "#5b8def", opacity: 0.9 },
+                    { shape: "ellipse", cx: 88, cy: 56, rx: 4.4, ry: 8, fill: "#5b8def", opacity: 0.9 },
+                    { shape: "path", d: "M 8 48 C 8 52 8 58 9 63", stroke: "#7b8598", width: 1.4 },
+                    { shape: "path", d: "M 92 48 C 92 52 92 58 91 63", stroke: "#7b8598", width: 1.4 }
+                ]
+            }
+        ],
+        glow: "#5b8def"
+    },
+    {
+        id: "halo",
+        label: "Halo",
+        width: 0.13,
+        layers: [
+            {
+                kind: "art",
+                // Flat, wide and above the head, which is what makes a circle
+                // read as a ring seen edge-on rather than as a bubble drawn
+                // around somebody.
+                bounds: [0.2, 0.0, 0.6, 0.22],
+                front: true,
+                wake: 3.4,
+                motion: "bob",
+                marks: [
+                    {
+                        shape: "ellipse",
+                        cx: 50,
+                        cy: 11,
+                        rx: 27,
+                        ry: 7.5,
+                        stroke: "#f4dc9a",
+                        width: 6,
+                        opacity: 0.35
+                    },
+                    { shape: "ellipse", cx: 50, cy: 11, rx: 27, ry: 7.5, stroke: "#e8c26a", width: 3.4 },
+                    {
+                        shape: "ellipse",
+                        cx: 50,
+                        cy: 9.6,
+                        rx: 25,
+                        ry: 6.2,
+                        stroke: "#fff3cf",
+                        width: 1.2,
+                        opacity: 0.9
+                    },
+                    { shape: "circle", cx: 24, cy: 6, r: 1.6, fill: "#fff3cf" },
+                    { shape: "circle", cx: 74, cy: 17, r: 1.4, fill: "#fff3cf" },
+                    { shape: "circle", cx: 62, cy: 3, r: 1.2, fill: "#fff3cf" }
+                ]
+            }
+        ],
+        glow: "#f4dc9a"
+    },
+    {
+        id: "crown",
+        label: "Crown",
+        width: 0.14,
+        layers: [
+            {
+                kind: "art",
+                // Three points and a band. The middle one taller, because a
+                // crown with three equal points is a fence.
+                bounds: [0.16, 0.0, 0.68, 0.32],
+                front: true,
+                wake: 2.2,
+                motion: "sway",
+                marks: [
+                    {
+                        shape: "path",
+                        d: "M 20 27 L 24 8 L 35 19 L 50 3 L 65 19 L 76 8 L 80 27 Z",
+                        fill: "#e8c26a",
+                        stroke: "#b8862b",
+                        width: 1.2
+                    },
+                    {
+                        shape: "path",
+                        d: "M 19 26 L 81 26 L 81 32 L 19 32 Z",
+                        fill: "#d1a441",
+                        stroke: "#b8862b",
+                        width: 1
+                    },
+                    { shape: "circle", cx: 50, cy: 29, r: 2.6, fill: "#ff5a5f" },
+                    { shape: "circle", cx: 33, cy: 29, r: 2, fill: "#3fd0c9" },
+                    { shape: "circle", cx: 67, cy: 29, r: 2, fill: "#3fd0c9" },
+                    // The light on the tips, so the gold has a direction.
+                    { shape: "circle", cx: 24, cy: 8, r: 2.2, fill: "#fff3cf" },
+                    { shape: "circle", cx: 50, cy: 3.4, r: 2.6, fill: "#fff3cf" },
+                    { shape: "circle", cx: 76, cy: 8, r: 2.2, fill: "#fff3cf" }
+                ]
+            }
+        ],
+        glow: "#e8c26a"
     }
 ];
 
@@ -878,6 +1200,7 @@ export const NAME_FONTS = [
     "comic",
     "script",
     "block",
+    "bubble",
     "techno",
     "pixel"
 ] as const;
