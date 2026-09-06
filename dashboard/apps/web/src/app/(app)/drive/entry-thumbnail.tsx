@@ -20,6 +20,14 @@
  *     either.
  *   - The version is in the URL, so the browser can hold the answer for a year
  *     and an edited file is a different address rather than a stale picture.
+ *
+ * A video is the exception, and it is drawn here rather than on the server. The
+ * server would have to hold a decoder to open one, and the browser already has
+ * one: it is handed the address of the file, asked for the metadata and one
+ * frame a moment in, and it fetches only the bytes it needs to answer - the
+ * download route honours Range, so a four-gigabyte film costs the first chunk of
+ * it and nothing else. A tenth of a second in rather than the very first frame,
+ * which in most recordings is black.
  */
 
 import { cn } from "@polaris/ui";
@@ -34,11 +42,15 @@ export function EntryThumbnail({
     connectionId,
     path,
     version,
+    moving = false,
     className,
     children
 }: {
     readonly connectionId: string;
     readonly path: string;
+    /** A video, which the browser draws for itself from the file rather than
+     *  being handed a picture the server made. */
+    readonly moving?: boolean;
     /** What makes this file this version of itself - when it changed and how big
      *  it is. In the URL so the answer can be cached forever and still never be
      *  wrong. */
@@ -81,12 +93,35 @@ export function EntryThumbnail({
         return () => watch.disconnect();
     }, [asked, connectionId, path, version]);
 
-    const source = `/api/drive/thumbnail?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
+    const source = moving
+        ? // The frame a tenth of a second in. `metadata` is what keeps this
+          // cheap: the browser reads the header, seeks, draws, and never
+          // downloads the rest.
+          `/api/drive/download?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}#t=0.1`
+        : `/api/drive/thumbnail?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(path)}&v=${encodeURIComponent(version)}`;
 
     return (
         <span ref={holder} className={cn("relative flex items-center justify-center", className)}>
             {drawn ? null : children}
-            {asked ? (
+            {asked && moving ? (
+                <video
+                    src={source}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    // A frame arriving is the only thing that says this worked;
+                    // a format the browser cannot open fires neither and keeps
+                    // its icon, which is the same outcome as a picture the
+                    // server could not draw.
+                    onLoadedData={() => setDrawn(true)}
+                    onError={() => setDrawn(false)}
+                    className={cn(
+                        "max-h-full max-w-full rounded-sm object-contain",
+                        drawn ? "" : "hidden"
+                    )}
+                />
+            ) : null}
+            {asked && !moving ? (
                 <img
                     src={source}
                     alt=""

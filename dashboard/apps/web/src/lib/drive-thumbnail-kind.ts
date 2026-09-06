@@ -32,6 +32,27 @@ const IMAGE_TYPES = new Set([
 export type ThumbnailKind = "image" | "pdf";
 
 /**
+ * The videos a browser will draw a frame of for itself.
+ *
+ * Deliberately not part of `thumbnailKind`: nothing on the server opens these.
+ * The browser already holds a decoder, the download route honours Range, and a
+ * four-gigabyte film therefore costs the first chunk of itself and nothing else
+ * - where drawing it here would mean a decoder in the image and the whole file
+ * read into memory to produce four kilobytes.
+ *
+ * The list is what every browser plays rather than everything that exists: a
+ * name that is not here keeps its icon, which is what it did before.
+ */
+const MOVING_TYPES = new Set([".mp4", ".m4v", ".webm", ".ogv", ".mov"]);
+
+/** Whether the tile should hand this to a video element rather than ask the
+ *  server for a picture. */
+export function drawsItsOwnFrame(name: string): boolean {
+    const dot = name.lastIndexOf(".");
+    return dot >= 0 && MOVING_TYPES.has(name.slice(dot).toLowerCase());
+}
+
+/**
  * The ceilings, past which a file simply keeps its icon.
  *
  * Not arbitrary: the original has to be held in memory to be drawn, and a

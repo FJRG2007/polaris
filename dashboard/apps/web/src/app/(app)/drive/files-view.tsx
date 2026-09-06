@@ -27,7 +27,7 @@ import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
-import { thumbnailKind } from "@/lib/drive-thumbnail-kind";
+import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
 import { activityKey, prefetchListing } from "./listing-cache";
 import { useDisplayFormat } from "@/components/display-format";
@@ -3217,7 +3217,9 @@ const THUMBNAIL_BOX = "size-14";
  */
 function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveEntry }) {
     const icon = <EntryIcon entry={entry} className="size-10" />;
-    if (entry.kind !== "file" || !thumbnailKind(entry.name)) {
+    // A picture the server draws, or a frame the browser draws for itself.
+    const moving = entry.kind === "file" && drawsItsOwnFrame(entry.name);
+    if (entry.kind !== "file" || (!thumbnailKind(entry.name) && !moving)) {
         return (
             <span className={cn(THUMBNAIL_BOX, "flex items-center justify-center")}>{icon}</span>
         );
@@ -3227,6 +3229,7 @@ function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveE
             connectionId={connectionId}
             path={entry.path}
             version={`${entry.modifiedAt}-${entry.size}`}
+            moving={moving}
             className={THUMBNAIL_BOX}
         >
             {icon}
