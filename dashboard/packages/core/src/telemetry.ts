@@ -650,6 +650,150 @@ export function readEvent(payload: unknown, now: Date): CapturedEvent | null {
 }
 
 // ---------------------------------------------------------------------------
+// Reading one back
+// ---------------------------------------------------------------------------
+
+/**
+ * What was kept beside an event's own columns.
+ *
+ * The mirror of what `captureEvent` writes into its JSON column, and the reason
+ * that column can stay schemaless: the shape of a crash report grows every time
+ * a client starts sending something new, so a row is read against what the
+ * screen needs today rather than against what was true the day it was written.
+ */
+export interface StoredEventFacts {
+    readonly frames: readonly StackFrame[];
+    readonly breadcrumbs: readonly Breadcrumb[];
+    readonly tags: Readonly<Record<string, string>>;
+    readonly contexts: readonly ContextGroup[];
+    readonly request: RequestFacts | null;
+    readonly sdk: SdkFacts | null;
+    readonly ip: string | null;
+    readonly platform: string | null;
+}
+
+/**
+ * Read a stored event's detail column.
+ *
+ * Total, in the sense that matters: every list is a list and every group has its
+ * fields, whatever the column actually holds - an older shape, a truncated
+ * write, or something that is not JSON at all. A stored row is not input that
+ * can be validated at the door and then trusted, because the door it came
+ * through was a previous release, and a screen that reads a list that release
+ * did not write is a screen that is blank for everything reported before an
+ * update.
+ */
+export function readStoredEvent(detail: string): StoredEventFacts {
+    const stored = asRecord(parseJson(detail));
+    return {
+        frames: storedFrames(stored.frames),
+        breadcrumbs: storedBreadcrumbs(stored.breadcrumbs),
+        tags: tagsOf(stored.tags),
+        contexts: storedContexts(stored.contexts),
+        request: storedRequest(stored.request),
+        sdk: sdkOf(stored.sdk),
+        ip: asString(stored.ip, 60) || null,
+        platform: asString(stored.platform, 40) || null
+    };
+}
+
+function storedFrames(value: unknown): StackFrame[] {
+    if (!Array.isArray(value)) return [];
+    return value.slice(-MAX_FRAMES).map((entry) => {
+        const frame = asRecord(entry);
+        return {
+            file: asString(frame.file, MAX_CULPRIT),
+            function: asString(frame.function, MAX_TAG),
+            line: typeof frame.line === "number" ? frame.line : null,
+            column: typeof frame.column === "number" ? frame.column : null,
+            inApp: frame.inApp === true,
+            context: asString(frame.context, MAX_CULPRIT) || null,
+            pre: sourceLines(frame.pre).slice(-MAX_SNIPPET),
+            post: sourceLines(frame.post).slice(0, MAX_SNIPPET)
+        };
+    });
+}
+
+/**
+ * Name/value pairs as they were stored.
+ *
+ * `secret` is recomputed when the row does not carry one rather than defaulted
+ * to false: a row written before headers were marked still has an authorization
+ * header in it, and the one outcome this whole screen may not have is a live
+ * token drawn in the open because of the release the row happens to date from.
+ */
+function storedFields(value: unknown): HeaderField[] {
+    if (!Array.isArray(value)) return [];
+    const fields: HeaderField[] = [];
+    for (const entry of value.slice(0, MAX_HEADERS)) {
+        const field = asRecord(entry);
+        const name = asString(field.name, 80);
+        if (!name) continue;
+        fields.push({
+            name,
+            value: asString(field.value, MAX_VALUE),
+            secret: typeof field.secret === "boolean" ? field.secret : headerIsSecret(name)
+        });
+    }
+    return fields;
+}
+
+/** The flattened key/value lists a context group and a breadcrumb both carry. */
+function storedPairs(value: unknown, limit: number): { key: string; value: string }[] {
+    if (!Array.isArray(value)) return [];
+    const pairs: { key: string; value: string }[] = [];
+    for (const entry of value.slice(0, limit)) {
+        const field = asRecord(entry);
+        const key = asString(field.key, 60);
+        const said = asString(field.value, MAX_VALUE);
+        if (key && said) pairs.push({ key, value: said });
+    }
+    return pairs;
+}
+
+function storedContexts(value: unknown): ContextGroup[] {
+    if (!Array.isArray(value)) return [];
+    const groups: ContextGroup[] = [];
+    for (const entry of value.slice(0, MAX_CONTEXTS)) {
+        const group = asRecord(entry);
+        const name = asString(group.name, 60);
+        const fields = storedPairs(group.fields, MAX_CONTEXT_FIELDS);
+        if (name && fields.length > 0) groups.push({ name, fields });
+    }
+    return groups;
+}
+
+function storedBreadcrumbs(value: unknown): Breadcrumb[] {
+    if (!Array.isArray(value)) return [];
+    return value.slice(-MAX_BREADCRUMBS).map((entry) => {
+        const crumb = asRecord(entry);
+        return {
+            at: asString(crumb.at, 40) || null,
+            type: asString(crumb.type, 40) || "default",
+            category: asString(crumb.category, MAX_TAG),
+            message: asString(crumb.message, MAX_TITLE),
+            level: levelOf(crumb.level),
+            data: storedPairs(crumb.data, MAX_CRUMB_DATA)
+        };
+    });
+}
+
+/** The request, or null when none was stored - which is what an older row that
+ *  kept only the URL and the method also amounts to, since both of those are
+ *  columns of their own and are drawn from there. */
+function storedRequest(value: unknown): RequestFacts | null {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+    const request = asRecord(value);
+    const url = asString(request.url, 2000) || null;
+    const method = asString(request.method, 10).toUpperCase() || null;
+    const query = storedFields(request.query);
+    const headers = storedFields(request.headers);
+    const body = typeof request.body === "string" ? request.body.slice(0, MAX_BODY) : null;
+    if (!url && !method && headers.length === 0 && query.length === 0 && !body) return null;
+    return { url, method, query, headers, body };
+}
+
+// ---------------------------------------------------------------------------
 // Which issue this is
 // ---------------------------------------------------------------------------
 

@@ -70,17 +70,29 @@ export interface SftpSessionOptions extends SftpDriverBase {
 export type SftpDriverOptions = SftpConnectOptions | SftpSessionOptions;
 
 /**
- * Turn a failed stat into the right error. Only SSH_FX_NO_SUCH_FILE means the
- * path is not there; a permission failure has to say so, because a caller asking
- * whether a name is free would otherwise be told a name it cannot see is spare
- * and would write over the file living under it.
+ * Turn a failed SFTP request into the right error.
+ *
+ * Only SSH_FX_NO_SUCH_FILE (2) means the path is not there; a permission failure
+ * (3) has to say so, because a caller asking whether a name is free would
+ * otherwise be told a name it cannot see is spare and would write over the file
+ * living under it.
+ *
+ * Every operation goes through this, not only stat. A listing that answered
+ * `not_found` whatever went wrong is what made `/root` and `/lost+found` -
+ * folders this account simply may not read - indistinguishable from a folder
+ * that was deleted, and left the screen with nothing to say but that it could
+ * not list the location.
+ *
+ * The server's own error is kept as the cause: it is what the reason shown to an
+ * administrator is classified from, and a driver that flattens it into a
+ * sentence of its own leaves nothing upstream to classify.
  */
-function sftpStatError(error: Error & { code?: number }, path: string): StorageError {
-    if (error.code === 3) return new StorageError("permission_denied", `Not permitted: ${path}`);
+function sftpError(error: Error & { code?: number }, what: string): StorageError {
+    if (error.code === 3) return new StorageError("permission_denied", `Not permitted: ${what}`, error);
     if (error.code !== undefined && error.code !== 2) {
-        return new StorageError("io_error", `Cannot read ${path} (code ${error.code})`);
+        return new StorageError("io_error", `Cannot ${what} (code ${error.code})`, error);
     }
-    return new StorageError("not_found", `Not found: ${path}`);
+    return new StorageError("not_found", `Not found: ${what}`, error);
 }
 
 /** Whether these options lend a session rather than describe a connection. */
@@ -159,7 +171,7 @@ export class SftpDriver implements StorageDriver {
         const sftp = this.channel();
         const items = await new Promise<Array<{ filename: string; attrs: Stats }>>((resolve, reject) => {
             sftp.readdir(abs, (error, list) =>
-                error ? reject(new StorageError("not_found", `Cannot list ${path}`)) : resolve(list as never)
+                error ? reject(sftpError(error, `list ${path || "this location"}`)) : resolve(list as never)
             );
         });
         const entries: StatEntry[] = items
@@ -177,7 +189,7 @@ export class SftpDriver implements StorageDriver {
         const sftp = this.channel();
         const attrs = await new Promise<Stats>((resolve, reject) => {
             sftp.stat(this.resolve(rel), (error, stats) =>
-                error ? reject(sftpStatError(error, path)) : resolve(stats as never)
+                error ? reject(sftpError(error, `read ${path || "this location"}`)) : resolve(stats as never)
             );
         });
         return toEntry(baseName(rel) || rel, rel, attrs);
@@ -220,9 +232,7 @@ export class SftpDriver implements StorageDriver {
         await this.mkdirp(parentOf(normalizeRelPath(to)));
         const sftp = this.channel();
         await new Promise<void>((resolve, reject) => {
-            sftp.rename(src, dst, (error) =>
-                error ? reject(new StorageError("io_error", `Failed to move ${from}`)) : resolve()
-            );
+            sftp.rename(src, dst, (error) => (error ? reject(sftpError(error, `move ${from}`)) : resolve()));
         });
     }
 
@@ -263,13 +273,13 @@ export class SftpDriver implements StorageDriver {
 
     private async rmdir(abs: string): Promise<void> {
         await new Promise<void>((resolve, reject) => {
-            this.channel().rmdir(abs, (error) => (error ? reject(new StorageError("io_error", "rmdir failed")) : resolve()));
+            this.channel().rmdir(abs, (error) => (error ? reject(sftpError(error, "remove this folder")) : resolve()));
         });
     }
 
     private async unlink(abs: string): Promise<void> {
         await new Promise<void>((resolve, reject) => {
-            this.channel().unlink(abs, (error) => (error ? reject(new StorageError("io_error", "delete failed")) : resolve()));
+            this.channel().unlink(abs, (error) => (error ? reject(sftpError(error, "delete this file")) : resolve()));
         });
     }
 }

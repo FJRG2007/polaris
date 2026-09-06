@@ -28,6 +28,8 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
+import { githubAppInstallationToken } from "@/lib/github-service";
+import { noteDeploymentsRefused } from "@/lib/connections/health";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
 import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
 
@@ -42,6 +44,10 @@ interface Announceable {
     /** The service, for the one line GitHub shows beside the state. */
     label: string;
     production: boolean;
+    /** Whose linked account this was announced as, so a refusal reaches them. */
+    ownerId: string;
+    /** Reassigned when the personal link is refused and the App is not: the
+     *  states that follow have to be posted with whatever actually minted it. */
     token: string;
 }
 
@@ -127,6 +133,7 @@ async function announceable(deploymentId: string): Promise<AnnounceTarget> {
             environment: `${environmentName}/${app.slug}`,
             label: `${app.environment.project.name} / ${app.name}`,
             production: environmentName.toLowerCase() === "production",
+            ownerId: app.environment.project.ownerId,
             token
         }
     };
@@ -195,8 +202,18 @@ async function logUrl(applicationId: string): Promise<string | null> {
  * fine-grained token does not carry unless it was ticked.
  */
 export function announceRefusal(status: number, owner: string, repo: string): string {
-    if (status === 403 || status === 404) {
-        return `[warn] GitHub will not show this deploy on the commit: the connected account needs Deployments: Read and write on ${owner}/${repo}. Add it to the token under Connected accounts, or connect the account through the GitHub App.`;
+    // 403 and 404 were one sentence, and they are not one problem: GitHub answers
+    // 404 for a repository a credential cannot see at all, which on a private
+    // repository is what "the App is not installed here" looks like, and 403 for
+    // one it can see but may not write deployments on. The old message asserted
+    // the second for both, so half the time it named a permission that was
+    // already granted and sent somebody to add it again. The status is quoted
+    // now, because the next thing anybody does with this line is check it.
+    if (status === 404) {
+        return `[warn] GitHub will not show this deploy on the commit (404): no credential here can see ${owner}/${repo} well enough to write a deployment on it. Install the Polaris GitHub App on that repository, or link an account that reaches it, under Connected accounts.`;
+    }
+    if (status === 403) {
+        return `[warn] GitHub will not show this deploy on the commit (403): the credential reaching ${owner}/${repo} may read it but not write deployments on it. Grant Deployments: Read and write - on the GitHub App's installation, or on the token under Connected accounts.`;
     }
     if (status === 409) {
         return `[warn] GitHub will not show this deploy on the commit: ${owner}/${repo} answered that this commit conflicts with the branch it deploys.`;
@@ -222,17 +239,40 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
         }
         const info = target.info;
 
-        const minted = await createDeployment({
-            owner: info.owner,
-            repo: info.repo,
-            ref: info.commitSha,
-            environment: info.environment,
-            description: `Deploying ${info.label} on Polaris`,
-            production: info.production,
-            token: info.token
-        });
+        const mint = (token: string): Promise<AnnounceResult> =>
+            createDeployment({
+                owner: info.owner,
+                repo: info.repo,
+                ref: info.commitSha,
+                environment: info.environment,
+                description: `Deploying ${info.label} on Polaris`,
+                production: info.production,
+                token
+            });
+
+        let minted = await mint(info.token);
+        // The personal link is preferred everywhere in Deploy, and for writing a
+        // deployment it is the weaker of the two: a user-to-server token carries
+        // what the person may do, and the App installed on the repository carries
+        // deployments outright. Vercel and Railway appear on a commit because they
+        // post as their App, and this is Polaris doing the same rather than
+        // reporting that somebody's own account was not enough.
+        if (!minted.id && (minted.status === 403 || minted.status === 404)) {
+            const installed = await githubAppInstallationToken(info.owner).catch(() => null);
+            if (installed && installed !== info.token) {
+                const retried = await mint(installed);
+                if (retried.id) info.token = installed;
+                minted = retried.id ? retried : minted;
+            }
+        }
         if (!minted.id) {
             await noteOnDeploy(deploymentId, announceRefusal(minted.status, info.owner, info.repo));
+            // The log line is for whoever opens this build. The notice is for the
+            // person who can actually fix it, who has no reason to open a build
+            // that succeeded - which is why this went unexplained for so long.
+            if (minted.status === 403 || minted.status === 404) {
+                await noteDeploymentsRefused(info.ownerId, info.owner, info.repo);
+            }
             return;
         }
         const githubId = minted.id;
@@ -299,18 +339,34 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
         );
         if (!token) return;
 
-        const posted: AnnounceResult = await setDeploymentState({
-            owner: target.owner,
-            repo: target.repo,
-            deploymentId: target.id,
-            state,
-            // The reason a deploy failed says more than the word "failure", and it is
-            // the line somebody reads before deciding whether to open the log at all.
-            description: state === "failure" && deployment.error ? deployment.error : description,
-            environmentUrl: state === "success" ? await reachableUrl(deploymentId, deployment.deployableId) : null,
-            logUrl: await logUrl(deployment.deployableId),
-            token
-        });
+        // Resolved once rather than per attempt: neither depends on the credential,
+        // and the retry below would otherwise pay for both a second time.
+        const environmentUrl =
+            state === "success" ? await reachableUrl(deploymentId, deployment.deployableId) : null;
+        const where = await logUrl(deployment.deployableId);
+        const post = (as: string): Promise<AnnounceResult> =>
+            setDeploymentState({
+                owner: target.owner,
+                repo: target.repo,
+                deploymentId: target.id,
+                state,
+                // The reason a deploy failed says more than the word "failure", and
+                // it is the line somebody reads before deciding whether to open the
+                // log at all.
+                description: state === "failure" && deployment.error ? deployment.error : description,
+                environmentUrl,
+                logUrl: where,
+                token: as
+            });
+
+        let posted = await post(token);
+        // The same fallback the minting used, for the same reason: whichever
+        // credential was allowed to open the deployment is the one allowed to
+        // move it, and a box left reading "queued" forever is worse than none.
+        if (posted.status === 403 || posted.status === 404) {
+            const installed = await githubAppInstallationToken(target.owner).catch(() => null);
+            if (installed && installed !== token) posted = await post(installed);
+        }
         // Said once, when the deploy ends. A "queued" or "in progress" that GitHub
         // turned down is the same refusal as the verdict that follows it, and three
         // identical warnings in one log is noise nobody reads to the end of.

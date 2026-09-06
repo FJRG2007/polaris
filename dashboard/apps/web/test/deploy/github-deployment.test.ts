@@ -25,7 +25,9 @@ const mocks = vi.hoisted(() => ({
     deploymentUpdate: vi.fn(),
     applicationFindUnique: vi.fn(),
     noteOnDeploy: vi.fn(),
-    githubTokenForOwner: vi.fn()
+    githubTokenForOwner: vi.fn(),
+    githubAppInstallationToken: vi.fn(),
+    noteDeploymentsRefused: vi.fn()
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -43,6 +45,17 @@ vi.mock("@/lib/deploy/log-file", () => ({
 }));
 
 vi.mock("@/lib/github-access", () => ({ githubTokenForOwner: mocks.githubTokenForOwner }));
+
+// Only the App's credential is replaced; the two calls under test are the real
+// ones, because their bodies are half of what this file guards.
+vi.mock("@/lib/github-service", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/github-service")>()),
+    githubAppInstallationToken: mocks.githubAppInstallationToken
+}));
+
+vi.mock("@/lib/connections/health", () => ({
+    noteDeploymentsRefused: mocks.noteDeploymentsRefused
+}));
 
 // The deploy's own panel link. Absent here, which is what a Polaris nobody can
 // reach from outside answers anyway.
@@ -184,13 +197,25 @@ describe("posting a state against it", () => {
 describe("what the deploy log is told when GitHub refuses", () => {
     it("names the permission behind a refusal, and where to add it", () => {
         const said = announceRefusal(403, "acme", "widgets");
+        expect(said).toContain("403");
         expect(said).toContain("Deployments: Read and write");
         expect(said).toContain("acme/widgets");
         expect(said).toContain("Connected accounts");
     });
 
-    it("reads a repository it cannot see as the same thing to go and do", () => {
-        expect(announceRefusal(404, "acme", "widgets")).toContain("Deployments: Read and write");
+    // 403 and 404 said the same sentence, and they are not the same problem: a
+    // credential that may read a private repository and not write deployments on
+    // it answers 403, and one that cannot see the repository at all answers 404 -
+    // which is what an App that was never installed there looks like. Sending
+    // somebody to tick a permission that is already ticked is why this went
+    // around several times, so each one now names its own fix and quotes the
+    // status it is reading.
+    it("reads a repository it cannot see as a different thing to go and do", () => {
+        const said = announceRefusal(404, "acme", "widgets");
+        expect(said).toContain("404");
+        expect(said).toContain("acme/widgets");
+        expect(said).toContain("Install the Polaris GitHub App");
+        expect(said).not.toContain("Deployments: Read and write");
     });
 
     it("does not blame a permission for GitHub being unreachable", () => {
@@ -240,6 +265,9 @@ describe("why a deploy was not announced at all", () => {
         mocks.noteOnDeploy.mockReset();
         mocks.githubTokenForOwner.mockReset();
         mocks.githubTokenForOwner.mockResolvedValue("gho_test");
+        mocks.githubAppInstallationToken.mockReset();
+        mocks.githubAppInstallationToken.mockResolvedValue(null);
+        mocks.noteDeploymentsRefused.mockReset();
     });
 
     it("says nothing about an image, which was never going on a commit", async () => {
@@ -271,6 +299,56 @@ describe("why a deploy was not announced at all", () => {
         const said = String(mocks.noteOnDeploy.mock.calls[0]?.[1]);
         expect(said).toContain("acme/widgets");
         expect(said).toContain("Connected accounts");
+    });
+
+    /**
+     * The personal link is preferred everywhere in Deploy, and for writing a
+     * deployment it is the weaker credential: a user-to-server token carries what
+     * the person may do, while the App installed on the repository carries
+     * deployments outright. Vercel and Railway appear on a commit because they
+     * post as their App - so when somebody's own account is refused, this posts as
+     * the App rather than reporting that their account was not enough.
+     */
+    it("posts as the App when the person's own account is refused", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        let attempt = 0;
+        vi.stubGlobal("fetch", async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+            sent.push({ url, body: JSON.parse(init.body ?? "{}") as Record<string, unknown> });
+            attempt += 1;
+            // The first POST is the deployment, with the person's token; the App's
+            // retry is the second, and the third is the "queued" state on it.
+            const refused = attempt === 1;
+            return {
+                status: refused ? 403 : 201,
+                ok: !refused,
+                json: async () => ({ id: 4212 })
+            } as unknown as Response;
+        });
+
+        await announceDeployQueued("dep-1");
+
+        expect(mocks.deploymentUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: { githubRepo: "acme/widgets", githubDeploymentId: "4212" }
+            })
+        );
+        // Nothing to warn about and nobody to tell: it did appear on the commit.
+        expect(mocks.noteOnDeploy).not.toHaveBeenCalled();
+        expect(mocks.noteDeploymentsRefused).not.toHaveBeenCalled();
+    });
+
+    // The one case the log line could never fix: the person who can grant the
+    // permission has no reason to open a build that succeeded.
+    it("tells the project's owner once when the App cannot write it either", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        githubAnswers(403, { message: "Resource not accessible" });
+
+        await announceDeployQueued("dep-1");
+
+        expect(mocks.noteDeploymentsRefused).toHaveBeenCalledWith("owner-1", "acme", "widgets");
+        expect(String(mocks.noteOnDeploy.mock.calls[0]?.[1])).toContain("403");
     });
 
     it("stays quiet, and records the id, when it does reach GitHub", async () => {

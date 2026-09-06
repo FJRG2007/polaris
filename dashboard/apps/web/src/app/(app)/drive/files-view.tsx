@@ -14,7 +14,7 @@
 
 import Fuse from "fuse.js";
 import Link from "next/link";
-import type { DriveEntry } from "./types";
+import type { DriveEntry, ListingFailure } from "./types";
 import { FolderTree } from "./folder-tree";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
@@ -113,6 +113,7 @@ import {
     Lock,
     Palette,
     Pencil,
+    RotateCcw,
     Scissors,
     Search,
     Send,
@@ -121,6 +122,7 @@ import {
     SlidersHorizontal,
     Star,
     StickyNote,
+    TriangleAlert,
     Trash2,
     Upload,
     Users,
@@ -329,6 +331,7 @@ export function FilesView({
     entries,
     loading,
     error,
+    onRetry,
     pending,
     uploading,
     fileInput,
@@ -378,7 +381,11 @@ export function FilesView({
      */
     going?: ReadonlySet<string>;
     loading: boolean;
-    error: string | null;
+    error: ListingFailure | null;
+    /** Ask for this folder again. Offered beside a failure that could plausibly
+     *  answer differently, so a device that was merely busy costs a click rather
+     *  than a page reload. */
+    onRetry: () => void;
     pending: boolean;
     uploading: boolean;
     fileInput: React.RefObject<HTMLInputElement | null>;
@@ -2174,9 +2181,7 @@ export function FilesView({
                             {loading ? (
                                 <ListingSkeleton viewMode={viewMode} />
                             ) : error ? (
-                                <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
-                                    {error}
-                                </div>
+                                <ListingError error={error} onRetry={onRetry} />
                             ) : (
                                 <div>
                                     {viewMode === "list" ? (
@@ -3341,6 +3346,49 @@ function ListingSkeleton({ viewMode }: { viewMode: "list" | "grid" }) {
                     <div className="w-12 shrink-0" />
                 </div>
             ))}
+        </div>
+    );
+}
+
+/**
+ * A folder that would not open.
+ *
+ * The reason, what to do about it, and - when the same request could plausibly
+ * answer differently - the button that asks again. A NAS that was briefly busy
+ * is the common case here and it used to cost a full page reload to find out.
+ *
+ * `detail` is the device's own words and comes back only for somebody who
+ * administers this connection; it is drawn last and quietly, because it is the
+ * line to quote when the sentence above it was not enough.
+ */
+function ListingError({ error, onRetry }: { error: ListingFailure; onRetry: () => void }) {
+    return (
+        <div
+            role="alert"
+            className="flex flex-col gap-2 rounded-lg border border-danger/40 bg-danger/10 p-4"
+        >
+            <div className="flex items-start gap-2.5">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-danger">{error.reason}</p>
+                    {error.hint ? (
+                        <p className="mt-1 text-sm text-muted-foreground">{error.hint}</p>
+                    ) : null}
+                </div>
+            </div>
+            {error.retryable ? (
+                <div className="pl-[1.625rem]">
+                    <Button size="sm" variant="secondary" onClick={onRetry}>
+                        <RotateCcw className="size-4" />
+                        Try again
+                    </Button>
+                </div>
+            ) : null}
+            {error.detail ? (
+                <p className="break-words pl-[1.625rem] font-mono text-xs text-muted-foreground">
+                    {error.detail}
+                </p>
+            ) : null}
         </div>
     );
 }

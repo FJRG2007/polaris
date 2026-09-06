@@ -120,3 +120,21 @@ export interface DriveEntry {
     /** True when this folder is itself an access-gate (lock) root. */
     locked?: boolean;
 }
+
+/**
+ * Why a listing did not arrive.
+ *
+ * The API classifies the cause (`storageFailure`) so a screen can say something
+ * other than "it did not work" without publishing what the device said - the
+ * device's own words are `detail`, and they only come back for somebody who
+ * administers that connection.
+ */
+export interface ListingFailure {
+    readonly reason: string;
+    readonly hint: string | null;
+    readonly detail: string | null;
+    /** Whether asking again could plausibly answer differently. A folder that is
+     *  gone and an account that is refused would fail the same way twice, and a
+     *  button that promises otherwise is a button that lies. */
+    readonly retryable: boolean;
+}

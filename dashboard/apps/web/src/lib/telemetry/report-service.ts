@@ -178,33 +178,15 @@ function detailOf(event: {
     detail: string;
     at: Date;
 }): EventDetail {
-    let parsed: {
-        frames?: core.StackFrame[];
-        breadcrumbs?: core.Breadcrumb[];
-        tags?: Record<string, string>;
-        contexts?: core.ContextGroup[];
-        request?: core.RequestFacts | null;
-        sdk?: core.SdkFacts | null;
-        ip?: string | null;
-        platform?: string | null;
-    } = {};
-    try {
-        parsed = JSON.parse(event.detail) as typeof parsed;
-    } catch {
-        // A row written by a version that stored something else, or a truncated
-        // one. The columns beside it are still worth showing.
-    }
+    // `detail` itself never leaves this function. It is the raw column, it is
+    // the largest thing on the row, and everything in it is already on the
+    // object being returned - sending it as well would put every stack trace on
+    // the wire twice.
+    const { detail, ...columns } = event;
     return {
-        ...event,
+        ...columns,
         at: event.at.toISOString(),
-        frames: parsed.frames ?? [],
-        breadcrumbs: parsed.breadcrumbs ?? [],
-        tags: parsed.tags ?? {},
-        contexts: parsed.contexts ?? [],
-        request: parsed.request ?? null,
-        sdk: parsed.sdk ?? null,
-        ip: parsed.ip ?? null,
-        platform: parsed.platform ?? null
+        ...core.readStoredEvent(detail)
     };
 }
 

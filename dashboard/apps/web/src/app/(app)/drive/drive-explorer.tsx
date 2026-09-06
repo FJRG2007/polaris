@@ -51,6 +51,7 @@ import {
     mayBeUnreachable,
     type ConnectionSummary,
     type DriveEntry,
+    type ListingFailure,
     type SourceStatus
 } from "./types";
 import {
@@ -158,7 +159,10 @@ export function DriveExplorer({
 
     const [entries, setEntries] = useState<DriveEntry[]>([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    /** Why the listing did not arrive, as the panel draws it: the sentence, what
+     *  to do about it, and - for somebody who administers this connection - what
+     *  the device actually said. */
+    const [error, setError] = useState<ListingFailure | null>(null);
     const [needsSmbShare, setNeedsSmbShare] = useState(false);
     const [locked, setLocked] = useState<{ lockId: string; lockPath: string } | null>(null);
     const [accessTarget, setAccessTarget] = useState<AccessTarget | null>(null);
@@ -386,7 +390,12 @@ export function DriveExplorer({
                     setLocked({ lockId: body.lockId, lockPath: body.lockPath });
                 } else if (!res.ok) {
                     setEntries([]);
-                    setError(body.error ?? "Unable to list this location");
+                    setError({
+                        reason: body.error ?? "Polaris could not read this folder.",
+                        hint: typeof body.hint === "string" ? body.hint : null,
+                        detail: typeof body.detail === "string" ? body.detail : null,
+                        retryable: body.retryable !== false
+                    });
                 } else {
                     // Keep the current array (no re-render) when nothing actually
                     // changed - e.g. a background refresh after an optimistic rename
@@ -396,7 +405,17 @@ export function DriveExplorer({
                     writeListing(connectionId, path, next);
                 }
             } catch {
-                if (!signal.aborted) setError("Unable to list this location");
+                // The request itself never landed - the tab went offline, or the
+                // dashboard was restarting under it. Nothing was learned about
+                // the device, so the offer is simply to ask again.
+                if (!signal.aborted) {
+                    setError({
+                        reason: "Polaris could not be reached to read this folder.",
+                        hint: "The connection to Polaris itself dropped, not the one to this device.",
+                        detail: null,
+                        retryable: true
+                    });
+                }
             } finally {
                 if (!signal.aborted) setLoading(false);
             }
@@ -774,6 +793,7 @@ export function DriveExplorer({
                         entries={entries}
                         loading={loading}
                         error={error}
+                        onRetry={() => void load(true)}
                         pending={pending}
                         uploading={uploading}
                         fileInput={fileInput}

@@ -9,11 +9,16 @@
  * drivers need it.
  */
 
-import { normalizeRelPath } from "@polaris/core";
+import { normalizeRelPath, storageFailure, storageFailureDetail } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
-import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    canManageDriveConnection,
+    DriveAccessError,
+    DriveLockedError
+} from "@/lib/drive-authz";
 import { getMetaMap, resolveUserNames } from "@/lib/drive-meta-service";
 import { listLocks } from "@/lib/access-lock-service";
 import { isReservedRootPath } from "@/lib/system-paths";
@@ -68,9 +73,7 @@ export async function GET(request: Request): Promise<Response> {
         if (caught instanceof SmbShareRequiredError) {
             return Response.json({ needsSmbShare: true });
         }
-        // Never surface a driver/internal error verbatim to the client.
-        console.error("drive: connect failed", caught);
-        return Response.json({ error: "Could not connect to this location" }, { status: 502 });
+        return await failed(user, connectionId, caught, "connect");
     }
 
     try {
@@ -111,10 +114,34 @@ export async function GET(request: Request): Promise<Response> {
         });
         return Response.json({ entries });
     } catch (caught) {
-        // Log the real cause server-side; the client only ever sees a generic message.
-        console.error("drive: list failed", caught);
-        return Response.json({ error: "Could not list this location" }, { status: 502 });
+        return await failed(user, connectionId, caught, "list");
     } finally {
         await driver.dispose();
     }
+}
+
+/**
+ * What the client is told when a location would not answer.
+ *
+ * The reason is classified rather than repeated: a driver's own words name
+ * hosts, shares and paths, and somebody who was given a folder was not given
+ * the device behind it. The exact text goes to the log, and to the reader only
+ * when they administer this connection - on a deployment where nobody opens a
+ * terminal, an administrator with the reason removed has nowhere left to look.
+ */
+async function failed(
+    user: { id: string; isAdmin: boolean },
+    connectionId: string,
+    caught: unknown,
+    at: "connect" | "list"
+): Promise<Response> {
+    console.error(`drive: ${at} failed`, caught);
+    const failure = storageFailure(caught);
+    const detail = (await canManageDriveConnection(user.id, user.isAdmin, connectionId))
+        ? storageFailureDetail(caught)
+        : null;
+    return Response.json(
+        { error: failure.reason, hint: failure.hint, retryable: failure.retryable, detail },
+        { status: 502 }
+    );
 }

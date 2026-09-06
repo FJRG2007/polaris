@@ -50,7 +50,7 @@ export type LinkHealth = "working" | "expired" | "unknown" | "stale-scopes";
 
 /** What is written on the row once its owner has been told, so a sweep every few
  *  hours is not a notification every few hours. */
-type HealthNotice = "" | "expired" | "scopes";
+type HealthNotice = "" | "expired" | "scopes" | "deployments";
 
 /**
  * Ask GitHub whether this credential still speaks for anybody.
@@ -207,4 +207,47 @@ export async function noteConnectionRefused(userId: string, provider: string): P
         select: { id: true, userId: true, label: true, method: true, healthNotice: true }
     });
     for (const row of rows) await record(row, "expired").catch(() => undefined);
+}
+
+/**
+ * Say once that GitHub refused to show a deploy on its commit.
+ *
+ * This is the one refusal that costs nothing and so announces nothing: the
+ * deploy builds, the service comes up, and the only trace is a line in a build
+ * log nobody scrolls back through. Which is how a token that was pasted without
+ * "Deployments: Read and write" stayed that way for weeks while the repository
+ * kept showing Vercel's box and not this one.
+ *
+ * Not `expired`, and deliberately not written over one: the credential works.
+ * What it lacks is one permission, and the sentence says which - the person
+ * reading it is the only one who can add it, and only if they are told what to
+ * add.
+ */
+export async function noteDeploymentsRefused(
+    userId: string | null,
+    owner: string,
+    repo: string
+): Promise<void> {
+    if (!userId) return;
+    const rows = await prisma.userConnection.findMany({
+        where: { userId, provider: "github" },
+        select: { id: true, label: true, method: true, healthNotice: true }
+    });
+    for (const row of rows) {
+        // An expired link already says "link it again", which grants this too.
+        if (row.healthNotice === "expired" || row.healthNotice === "deployments") continue;
+        await notify({
+            userId,
+            event: "account.connection.scopes",
+            title: `Your deploys are not showing on ${owner}/${repo}`,
+            body:
+                row.method === "token"
+                    ? `GitHub refused to put the deploy on the commit: the token for ${row.label} does not carry Deployments: Read and write on that repository. Everything else about the deploy worked. Replace the token with one that has it, and the next deploy appears on the commit the way Vercel's and Railway's do.`
+                    : `GitHub refused to put the deploy on the commit: the account ${row.label} cannot write deployments on that repository. Everything else about the deploy worked. Installing the GitHub App on it, or connecting an account that may, is what puts the deploy on the commit.`,
+            href: "/account/connections"
+        }).catch(() => undefined);
+        await prisma.userConnection
+            .update({ where: { id: row.id }, data: { healthNotice: "deployments" } })
+            .catch(() => undefined);
+    }
 }

@@ -130,7 +130,7 @@ export async function openSmbSession(options: Omit<SmbConnectOptions, "id">): Pr
         // Surface the real cause so the user can act: STATUS_LOGON_FAILURE -> wrong
         // account, STATUS_BAD_NETWORK_NAME -> wrong share, ECONNREFUSED -> SMB off
         // or port closed.
-        throw new StorageError("connection_failed", `SMB connection failed: ${message(error)}`);
+        throw new StorageError("connection_failed", `SMB connection failed: ${message(error)}`, error);
     }
     return client;
 }
@@ -199,9 +199,13 @@ export class SmbDriver implements StorageDriver {
         try {
             raw = await this.c().readdir(this.smbPath(rel), { stats: true });
         } catch (error) {
+            // The cause travels with it: the share's own status word is what
+            // says whether this folder is gone, refused, or the session died,
+            // and it is the only thing upstream has to classify from.
             throw new StorageError(
                 "io_error",
-                `Cannot list ${path || "the share root"}: ${message(error)}`
+                `Cannot list ${path || "the share root"}: ${message(error)}`,
+                error
             );
         }
         // The client may return either a flat list or an array of batches.
@@ -227,8 +231,8 @@ export class SmbDriver implements StorageDriver {
         try {
             const stat = await this.c().stat(this.smbPath(rel));
             return toEntry(baseName(rel) || rel, rel, stat);
-        } catch {
-            throw new StorageError("not_found", `Not found: ${path}`);
+        } catch (caught) {
+            throw new StorageError("not_found", `Not found: ${path}`, caught);
         }
     }
 
@@ -273,7 +277,7 @@ export class SmbDriver implements StorageDriver {
             await this.c().rename(this.smbPath(normalizeRelPath(from)), this.smbPath(dstRel));
         } catch (caught) {
             const detail = caught instanceof Error && caught.message ? `: ${caught.message}` : "";
-            throw new StorageError("io_error", `Failed to move ${from}${detail}`);
+            throw new StorageError("io_error", `Failed to move ${from}${detail}`, caught);
         }
     }
 
@@ -292,7 +296,7 @@ export class SmbDriver implements StorageDriver {
             } catch (caught) {
                 const detail =
                     caught instanceof Error && caught.message ? `: ${caught.message}` : "";
-                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
+                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`, caught);
             }
         } else {
             try {
@@ -300,7 +304,7 @@ export class SmbDriver implements StorageDriver {
             } catch (caught) {
                 const detail =
                     caught instanceof Error && caught.message ? `: ${caught.message}` : "";
-                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`);
+                throw new StorageError("io_error", `Failed to delete ${rel}${detail}`, caught);
             }
         }
     }

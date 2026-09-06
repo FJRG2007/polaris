@@ -111,11 +111,19 @@ export interface StorageDriver {
     usage(): Promise<StorageUsage>;
 }
 
-/** Raised for storage-layer failures with a machine-readable code. */
+/**
+ * Raised for storage-layer failures with a machine-readable code.
+ *
+ * `cause` carries whatever the far end actually said, and is the difference
+ * between a screen that reads "Polaris could not read this folder" forever and
+ * one that reads "the account this connection uses is not allowed to". A driver
+ * that flattens its cause into a sentence of its own leaves nothing to classify
+ * upstream, so a driver that has one always passes it.
+ */
 export class StorageError extends Error {
     public readonly code: StorageErrorCode;
-    public constructor(code: StorageErrorCode, message: string) {
-        super(message);
+    public constructor(code: StorageErrorCode, message: string, cause?: unknown) {
+        super(message, cause === undefined ? undefined : { cause });
         this.name = "StorageError";
         this.code = code;
     }
