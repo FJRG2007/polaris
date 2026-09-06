@@ -22,6 +22,7 @@
 
 import Link from "next/link";
 import { refusalOf } from "./refusal";
+import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
 import { MailSearch } from "./mail-search";
@@ -30,8 +31,18 @@ import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
 import { actOnAction, snoozeAction, syncAllAction } from "./actions";
-import { useCallback, useMemo, useState, useTransition } from "react";
-import { Button, Checkbox, EmptyState, cn, useToast } from "@polaris/ui";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+    Button,
+    Checkbox,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    EmptyState,
+    cn,
+    useToast
+} from "@polaris/ui";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import {
     Archive,
@@ -73,10 +84,15 @@ export function MailView({
     cursor: string;
 }) {
     const router = useRouter();
-    const { accounts, accountColor, refresh } = useMail();
+    const { accounts, accountColor, openComposer, refresh } = useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
+    // Which row the keyboard is on. Separate from the selection on purpose: the
+    // pointer and the keyboard are two ways of pointing at a row, and a keyboard
+    // walk that ticked every checkbox on the way past would be unusable.
+    const [onIndex, setOnIndex] = useState(0);
+    const [helpOpen, setHelpOpen] = useState(false);
 
     // The lead message of each selected conversation. Every action here is
     // against messages rather than conversations, because a conversation lives
@@ -124,6 +140,68 @@ export function MailView({
         },
         [refresh, toast]
     );
+
+    const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
+    const rowMessageIds = onRow ? [onRow.leadMessageId].filter(Boolean) : [];
+
+    useMailKeys({
+        compose: () => openComposer({}),
+        next: () => setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
+        previous: () => setOnIndex((held) => Math.max(0, held - 1)),
+        open: () => {
+            if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
+        },
+        back: () => {
+            if (openThread) router.push(window.location.pathname, { scroll: false });
+        },
+        archive: () => {
+            if (context.canArchive) act("archive", rowMessageIds, "Archived.");
+        },
+        trash: () =>
+            act(
+                context.permanentDelete ? "delete" : "trash",
+                rowMessageIds,
+                context.permanentDelete ? "Deleted." : "Moved to the trash."
+            ),
+        junk: () => act("junk", rowMessageIds, "Moved to spam."),
+        star: () => {
+            if (!onRow) return;
+            act(
+                onRow.starred ? "unstar" : "star",
+                rowMessageIds,
+                onRow.starred ? "Unstarred." : "Starred."
+            );
+        },
+        markUnread: () => act("unread", rowMessageIds, "Marked as unread."),
+        search: () => {
+            const box = document.querySelector<HTMLInputElement>(SEARCH_BOX);
+            box?.focus();
+        },
+        refresh: () =>
+            startBusy(async () => {
+                await syncAllAction();
+                refresh();
+            })
+    });
+
+    // `?` is bound here rather than in the hook: it is about this screen's own
+    // help sheet, and a hook that owned it would have to know the sheet exists.
+    useEffect(() => {
+        function onKey(event: KeyboardEvent): void {
+            if (event.key !== "?" || event.metaKey || event.ctrlKey || event.altKey) return;
+            const target = event.target;
+            if (
+                target instanceof HTMLElement &&
+                (target.isContentEditable || EDITABLE.test(target.tagName))
+            ) {
+                return;
+            }
+            event.preventDefault();
+            setHelpOpen((held) => !held);
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, []);
 
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
@@ -262,6 +340,7 @@ export function MailView({
                                 <ThreadRow
                                     key={thread.id}
                                     thread={thread}
+                                    onCursor={onRow?.id === thread.id}
                                     open={openThread?.id === thread.id}
                                     picked={selected.includes(thread.id)}
                                     color={accountColor(thread.accountId)}
@@ -301,6 +380,8 @@ export function MailView({
                 </div>
             </section>
 
+            {helpOpen ? <ShortcutSheet onClose={() => setHelpOpen(false)} /> : null}
+
             <section className={cn("min-w-0 flex-1", openThread ? "flex" : "hidden lg:flex")} aria-label="Conversation">
                 {openThread ? (
                     <ThreadView thread={openThread} messages={openMessages} context={context} />
@@ -311,6 +392,36 @@ export function MailView({
                 )}
             </section>
         </div>
+    );
+}
+
+/** How `/` finds the search box, and which elements own a key press rather than
+ *  the screen. Named because two places read each. */
+const SEARCH_BOX = 'input[aria-label="Search mail"]';
+const EDITABLE = /^(?:INPUT|TEXTAREA|SELECT)$/;
+
+/** What the keys do. Reached with `?`, and from nowhere else - it is a reminder
+ *  for people who already use them, not a feature anybody has to find. */
+function ShortcutSheet({ onClose }: { onClose: () => void }) {
+    return (
+        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Keyboard</DialogTitle>
+                </DialogHeader>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+                    {MAIL_SHORTCUTS.map((entry) => (
+                        <div key={entry.keys} className="contents">
+                            <dt className="font-mono text-[12px] text-foreground">{entry.keys}</dt>
+                            <dd className="text-muted-foreground">{entry.what}</dd>
+                        </div>
+                    ))}
+                </dl>
+                <p className="mt-2 text-[12px] text-foreground-subtle">
+                    Every one of these has a button on screen as well.
+                </p>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -325,6 +436,7 @@ function tomorrowMorning(): Date {
 
 function ThreadRow({
     thread,
+    onCursor,
     open,
     picked,
     color,
@@ -333,6 +445,9 @@ function ThreadRow({
     onStar
 }: {
     thread: MailThreadView;
+    /** Whether the keyboard is on this row. Drawn as an edge rather than a fill,
+     *  so it stays legible over the fill an open or picked row already has. */
+    onCursor: boolean;
     open: boolean;
     picked: boolean;
     color: string;
@@ -347,7 +462,8 @@ function ThreadRow({
             className={cn(
                 "relative border-b border-border/60",
                 open ? "bg-card" : "hover:bg-card/60",
-                picked && "bg-card"
+                picked && "bg-card",
+                onCursor && "ring-1 ring-inset ring-border-strong"
             )}
         >
             {showColor ? (
