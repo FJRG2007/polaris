@@ -33,8 +33,25 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
-import { deleteUserAction, revokeInviteAction, unbanUserAction } from "./actions";
-import { Ban, Eye, Mail, MapPin, Search, Shield, Trash2, Undo2, UserPlus } from "lucide-react";
+import {
+    deleteUserAction,
+    revokeInviteAction,
+    setContactVerifiedAction,
+    unbanUserAction
+} from "./actions";
+import {
+    Ban,
+    Eye,
+    Mail,
+    MailCheck,
+    MapPin,
+    PhoneCall,
+    Search,
+    Shield,
+    Trash2,
+    Undo2,
+    UserPlus
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -158,6 +175,35 @@ export function UsersAdmin({
             router.refresh();
         },
         [router]
+    );
+
+    /**
+     * Say that an address or a number is theirs, without them proving it.
+     *
+     * Confirmed on the way in only when it is being turned ON, which is the
+     * direction that grants something. Taking it back is recoverable by doing it
+     * again, and asking twice about that would be a dialog for a shrug.
+     */
+    const verify = useCallback(
+        async (user: DirectoryUser, what: "email" | "phone", on: boolean) => {
+            const label = what === "email" ? user.email : (user.phone ?? "their number");
+            if (on) {
+                const ok = await confirm({
+                    title: `Mark ${label} as verified?`,
+                    description: `Polaris will treat it as proved even though ${user.name} has not confirmed it. This is recorded against your account in the audit trail.`,
+                    confirmLabel: "Mark verified"
+                });
+                if (!ok) return;
+            }
+            setError("");
+            const result = await setContactVerifiedAction(user.id, what, on);
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            router.refresh();
+        },
+        [confirm, router]
     );
 
     const remove = useCallback(
@@ -359,6 +405,43 @@ export function UsersAdmin({
                                             <Shield className="size-4" />
                                             Open their record
                                         </ContextMenuItem>
+                                        <ContextMenuSeparator />
+                                        {/* Asserting it rather than proving it,
+                                            which is what an administrator is
+                                            for here: an address on a domain
+                                            this instance cannot deliver to, or
+                                            a number in a country the message
+                                            never arrives in, left somebody
+                                            permanently half-signed-up. It goes
+                                            into the audit trail as an assertion,
+                                            because that is the difference
+                                            anybody later asking how we know
+                                            needs to see. */}
+                                        <ContextMenuItem
+                                            onSelect={() =>
+                                                void verify(user, "email", !user.emailVerified)
+                                            }
+                                        >
+                                            <MailCheck className="size-4" />
+                                            {user.emailVerified
+                                                ? "Mark the email unverified"
+                                                : "Mark the email verified"}
+                                        </ContextMenuItem>
+                                        {/* Nothing to verify where there is no
+                                            number: a factor confirmed and absent
+                                            is a state nobody can get out of. */}
+                                        {user.phone && (
+                                            <ContextMenuItem
+                                                onSelect={() =>
+                                                    void verify(user, "phone", !user.phoneVerified)
+                                                }
+                                            >
+                                                <PhoneCall className="size-4" />
+                                                {user.phoneVerified
+                                                    ? "Mark the number unverified"
+                                                    : "Mark the number verified"}
+                                            </ContextMenuItem>
+                                        )}
                                         {/* Not offered on your own row: viewing
                                             as yourself does nothing, and the
                                             three below are all refused by the

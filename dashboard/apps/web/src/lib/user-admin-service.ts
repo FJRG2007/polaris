@@ -36,6 +36,10 @@ export interface DirectoryUser {
     /** When the ban lifts by itself, for a suspension rather than a ban. */
     bannedUntil: string | null;
     emailVerified: boolean;
+    /** The number on the account, and whether it has been proved. Null where
+     *  there is none, which is the state in which there is nothing to verify. */
+    phone: string | null;
+    phoneVerified: boolean;
     twoFactorEnabled: boolean;
     /** Roles held directly, and the groups they belong to. */
     roles: string[];
@@ -68,6 +72,7 @@ const DIRECTORY_SELECT = {
     banReason: true,
     bannedUntil: true,
     emailVerified: true,
+    phone: { select: { phone: true, verifiedAt: true } },
     twoFactorEnabled: true,
     createdAt: true,
     roles: { select: { role: { select: { name: true } } } },
@@ -104,6 +109,8 @@ function toDirectoryUser(row: DirectoryRow): DirectoryUser {
         bannedAt: row.bannedAt?.toISOString() ?? null,
         bannedUntil: row.bannedUntil?.toISOString() ?? null,
         emailVerified: row.emailVerified,
+        phone: row.phone?.phone ?? null,
+        phoneVerified: row.phone?.verifiedAt !== null && row.phone?.verifiedAt !== undefined,
         twoFactorEnabled: row.twoFactorEnabled,
         roles: row.roles.map((entry) => entry.role.name),
         groups: row.groups.map((entry) => entry.group.name),
@@ -283,6 +290,53 @@ export async function setAdminAccess(
     await recordAudit({
         actorId,
         action: isAdmin ? "user.promote" : "user.demote",
+        targetType: "user",
+        targetId: userId
+    });
+    return {};
+}
+
+/**
+ * Mark an address or a number as verified, on somebody's word rather than on a
+ * code they typed.
+ *
+ * The ordinary path is the person proving it themselves, and it stays the
+ * ordinary path. This is for the cases that path cannot reach: an address on a
+ * domain whose mail this instance cannot deliver to, a number in a country the
+ * message never arrives in, an account made for somebody before they had either.
+ * Without it the answer was to leave them permanently half-signed-up, or to have
+ * them hand over a password so somebody else could do it as them.
+ *
+ * Recorded in the audit trail as what it is - an administrator asserting
+ * something rather than a person proving it - because that is the difference
+ * anybody later asking "how do we know this address is theirs" needs to see.
+ *
+ * A number that is not there at all cannot be marked: verifying nothing would
+ * put an account into a state where a factor is confirmed and absent.
+ */
+export async function setContactVerified(
+    actorId: string,
+    userId: string,
+    what: "email" | "phone",
+    verified: boolean
+): Promise<{ error?: string }> {
+    if (what === "email") {
+        await prisma.user.update({ where: { id: userId }, data: { emailVerified: verified } });
+    } else {
+        const phone = await prisma.userPhone.findUnique({ where: { userId }, select: { phone: true } });
+        if (!phone) return { error: "This account has no number to verify." };
+        await prisma.userPhone.update({
+            where: { userId },
+            // The code goes with it either way. One that is still outstanding
+            // would let somebody finish a proof that has just been made
+            // meaningless, and one left behind after a number is un-verified is
+            // a half-open door.
+            data: { verifiedAt: verified ? new Date() : null, codeHash: null, codeExpiresAt: null }
+        });
+    }
+    await recordAudit({
+        actorId,
+        action: verified ? `user.${what}.verify` : `user.${what}.unverify`,
         targetType: "user",
         targetId: userId
     });

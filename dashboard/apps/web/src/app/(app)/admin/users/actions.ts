@@ -34,6 +34,7 @@ import {
     revokeSessionForUser,
     revokeUserSessions,
     setAdminAccess,
+    setContactVerified,
     setUserLimits,
     setUserRole,
     unbanUser
@@ -119,6 +120,17 @@ export async function unbanUserAction(userId: string): Promise<{ error?: string 
 export async function setAdminAccessAction(userId: string, isAdmin: boolean): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const result = await setAdminAccess(admin.id, userId, isAdmin);
+    revalidatePath("/admin/users");
+    return result;
+}
+
+export async function setContactVerifiedAction(
+    userId: string,
+    what: "email" | "phone",
+    verified: boolean
+): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const result = await setContactVerified(admin.id, userId, what, verified);
     revalidatePath("/admin/users");
     return result;
 }
