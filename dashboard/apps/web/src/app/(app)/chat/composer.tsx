@@ -1258,18 +1258,24 @@ function StagedFile({
                     className="w-64"
                 />
             ) : (
-                // eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted
-                <img
-                    src={preview}
-                    alt={file.name}
-                    title={`${file.name} - ${readableSize(file.size)}`}
-                    className={cn(
-                        "size-20 rounded-md border border-border object-cover",
-                        // Shown as it will arrive. A cover that is only a
-                        // checkbox is one people press and then wonder about.
-                        covered && "blur-sm"
-                    )}
-                />
+                // Shown as it will arrive. A cover that is only a checkbox is one
+                // people press and then wonder about. The blur is clipped by the
+                // frame around it, the same way the conversation clips it: left
+                // unclipped it throws the picture's colour past its own edges as
+                // a halo, which reads as a broken thumbnail rather than a covered
+                // one.
+                <span className="border-border block size-20 overflow-hidden rounded-md border">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
+                    <img
+                        src={preview}
+                        alt={file.name}
+                        title={`${file.name} - ${readableSize(file.size)}`}
+                        className={cn(
+                            "size-full object-cover",
+                            covered && "scale-110 blur-md"
+                        )}
+                    />
+                </span>
             )}
             <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
                 {cover}
