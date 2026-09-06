@@ -270,17 +270,47 @@ services:
           # faster and the case that has to work before anybody has been near a
           # router.
           advertise_internal_ip: true
-          # A machine running containers has half a dozen bridge addresses no browser
-          # can reach, and each one offered is another dead pair for ICE to work
-          # through before it settles on the one that carries the call. Named
-          # exactly rather than matched: these two are Docker's own and libvirt's,
-          # so no real network is ever hidden by this. The per-project bridges are
-          # named after a hash and cannot be listed here; they cost a few wasted
-          # checks and nothing else.
-          interfaces:
+          # Never offer a container bridge as a place to call this server.
+          #
+          # A machine running containers has half a dozen of them, and every one
+          # is handed out beside the real address. The note that used to be here
+          # said they cost "a few wasted checks and nothing else". That was
+          # wrong, and a call on this deployment is what proved it: of two people
+          # joining, one settled on 172.18.0.1 - a bridge nothing outside a
+          # container can reach - and the other never connected at all and gave
+          # up after fifteen seconds. A browser works through the list it is
+          # given, and a list that is mostly dead addresses is a call that takes
+          # too long to find the live one or nominates a dead one first.
+          #
+          # It also decided which address is published as the public one. The
+          # server asks STUN from every interface at once, keeps the first answer
+          # and discards the rest as duplicates - so which local address the
+          # public one is attached to is a race between goroutines, settled anew
+          # on every restart. On this deployment it landed on br0 in August and
+          # on a container bridge in September, which is exactly the shape of
+          # "it worked for days and then stopped for no reason".
+          #
+          # Excluded by address rather than by name, which is the whole reason
+          # this is different from what it replaced: `docker0` and `virbr0` can
+          # be named, but a network created for a project is `br-` and a hash and
+          # there is no name to write down. An address there is always in one of
+          # these blocks.
+          ips:
             excludes:
-              - docker0
-              - virbr0
+              # Docker's default pool: docker0 at 172.17, then a /16 per network
+              # it creates, from 172.18 upwards. Written as the four blocks that
+              # cover 172.17-172.31 exactly rather than as 172.16/12, which would
+              # also swallow 172.16.0.0/16 - a range Docker does not allocate
+              # from and an office LAN occasionally sits in.
+              - 172.17.0.0/16
+              - 172.18.0.0/15
+              - 172.20.0.0/14
+              - 172.24.0.0/13
+              # libvirt's own bridge, at its default address.
+              - 192.168.122.0/24
+              # What a machine calls itself when nothing answered DHCP. It is
+              # never routable and never worth a check.
+              - 169.254.0.0/16
           # Named rather than left to the default list, which also reaches for a
           # commercial provider's server. One request at startup, to learn the
           # address on the far side of the router; nothing about a call is ever

@@ -132,15 +132,21 @@ const REJOIN =
  * the same fault seen from one step apart: nothing subscribed, and nothing
  * arriving on what did.
  *
- * It says what is true and it says who can act. Setting a call up goes through
- * the same port as every page; the sound arrives on its own, straight to the
- * machine, and a router that has not been told to let it through drops every
- * call to anybody outside the house while calls inside it work perfectly. That
- * is exactly the shape of "it worked yesterday": yesterday both people were on
- * the same network.
+ * It says what is true and it says who can act, and it no longer says why.
+ *
+ * It used to open with "the two of you are on different networks and the sound
+ * has no way through", and send the reader to the router. That was a guess
+ * dressed as a diagnosis, and on this deployment it was the wrong one: the ports
+ * were open, the two people were reachable, and the sound was failing because
+ * the call server was handing out addresses that only exist inside a container.
+ * Somebody spent days on a router that had nothing wrong with it, because a
+ * sentence on a screen told them that was where to look.
+ *
+ * So it names the one screen that measures rather than guesses, and stops
+ * there.
  */
 const MEDIA_PATH =
-    "Sound has not reached this device at all on this call, which usually means the two of you are on different networks and the sound has no way through. An administrator can check this under Settings, Domains, Call ports - setting a call up uses the same port as the rest of Polaris, but the sound needs two of its own forwarded to this machine.";
+    "Sound has not reached this device at all on this call. An administrator can see why under Settings, Domains, Call ports, which checks the connection from outside rather than guessing at it.";
 
 /** The call server, as a row. */
 function linkLine(link: CallLink): CallAudioLine {

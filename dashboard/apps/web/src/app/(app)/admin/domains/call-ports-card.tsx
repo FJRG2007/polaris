@@ -57,8 +57,9 @@ export function CallPortsCard() {
                     <p className="text-sm font-medium">Call ports</p>
                     <p className="text-xs text-muted-foreground">
                         Setting a call up goes through 443 with everything else. The sound does not:
-                        it arrives on the two ports below. Calls between devices on this network
-                        already work; calls from outside need these forwarded to this machine.
+                        it arrives on the two ports below. Most calls need neither forwarded:
+                        the call server reaches out first and the reply comes back the way it
+                        went. Forward them for the networks where that does not hold.
                     </p>
                 </div>
 
