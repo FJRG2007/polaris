@@ -41,6 +41,41 @@ export async function getProfileStyle(userId: string): Promise<core.ProfileStyle
  * and leaving the plain ones out would make it ask about them again on every
  * render for the rest of the session.
  */
+/**
+ * What everybody on screen is called, asked with what they look like.
+ *
+ * A name changes for the same reasons a decoration does and is drawn in the same
+ * places, and it was the one that did not move: somebody renamed themselves and
+ * every open conversation went on saying the old name until the tab was
+ * reloaded. It rides here rather than getting a pipe of its own because the pipe
+ * already exists, already batches, already pushes and already revalidates - and
+ * a second one asking the same server about the same forty people would be twice
+ * the requests for half the answer.
+ */
+export async function namesFor(ids: readonly string[]): Promise<Map<string, string>> {
+    const wanted = [...new Set(ids)];
+    if (wanted.length === 0) return new Map();
+    const rows = await prisma.user.findMany({
+        where: { id: { in: wanted } },
+        select: { id: true, name: true }
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
+}
+
+/** The names among those that have changed since a browser last asked. */
+export async function nameChangesSince(
+    ids: readonly string[],
+    since: Date
+): Promise<Map<string, string>> {
+    const wanted = [...new Set(ids)];
+    if (wanted.length === 0) return new Map();
+    const rows = await prisma.user.findMany({
+        where: { id: { in: wanted }, updatedAt: { gt: since } },
+        select: { id: true, name: true }
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
+}
+
 export async function stylesFor(ids: readonly string[]): Promise<Map<string, core.ProfileStyle>> {
     const answer = new Map<string, core.ProfileStyle>();
     const wanted = [...new Set(ids)];

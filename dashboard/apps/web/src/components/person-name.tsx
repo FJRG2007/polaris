@@ -23,7 +23,7 @@
 
 import { cn } from "@polaris/ui";
 import { createContext, useContext } from "react";
-import { useProfileStyle } from "@/components/profile-style-store";
+import { useProfileName, useProfileStyle } from "@/components/profile-style-store";
 import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
 import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
@@ -79,12 +79,17 @@ export function PersonName({
     const plain = useNamesArePlain();
     const chosen = nameLookOf(useProfileStyle(id)?.nameStyle ?? null);
     const style = plain ? null : chosen;
+    // What they are called now, where that is known, and what this screen was
+    // rendered with until it is. A name is changed as often as a decoration and
+    // was the one that did not move: somebody renamed themselves and every open
+    // conversation went on saying the old name until the tab was reloaded.
+    const live = useProfileName(id);
     return (
         <span
             className={cn(className, nameStyleClass(style))}
             style={style ? nameLookCss(style) : undefined}
         >
-            {name}
+            {live ?? name}
             {children}
         </span>
     );

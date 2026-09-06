@@ -22,7 +22,12 @@
 
 import { z } from "zod";
 import { apiUser } from "@/lib/api-session";
-import { stylesFor, styleChangesSince } from "@/lib/profile-style-service";
+import {
+    namesFor,
+    nameChangesSince,
+    stylesFor,
+    styleChangesSince
+} from "@/lib/profile-style-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,9 +62,20 @@ export async function POST(request: Request): Promise<Response> {
     const { ids, since, styled } = asked.data;
 
     if (since) {
-        const moved = await styleChangesSince(ids, new Date(since), styled ?? []);
+        const from = new Date(since);
+        const [moved, names] = await Promise.all([
+            styleChangesSince(ids, from, styled ?? []),
+            nameChangesSince(ids, from)
+        ]);
         return Response.json(
-            { people: Object.fromEntries(moved.changed), cleared: moved.cleared, at: at.toISOString() },
+            {
+                people: Object.fromEntries(moved.changed),
+                // What they are called, which changes for the same reasons and is
+                // drawn in the same places - see `namesFor`.
+                names: Object.fromEntries(names),
+                cleared: moved.cleared,
+                at: at.toISOString()
+            },
             // Never cached: the whole point of this shape is that it is the
             // question "what is new", and an answer from a minute ago is the
             // wrong answer to it.
@@ -67,9 +83,14 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
-    const found = await stylesFor(ids);
+    const [found, names] = await Promise.all([stylesFor(ids), namesFor(ids)]);
     return Response.json(
-        { people: Object.fromEntries(found), cleared: [], at: at.toISOString() },
+        {
+            people: Object.fromEntries(found),
+            names: Object.fromEntries(names),
+            cleared: [],
+            at: at.toISOString()
+        },
         { headers: { "Cache-Control": "private, max-age=120" } }
     );
 }

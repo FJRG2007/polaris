@@ -72,6 +72,9 @@ const REVALIDATE_MS = 45_000;
 
 interface Store {
     readonly people: ReadonlyMap<string, core.ProfileStyle>;
+    /** What each of them is called now, which is not always what the page was
+     *  rendered with - see `useProfileName`. */
+    readonly names: ReadonlyMap<string, string>;
     readonly watch: (id: string) => void;
     readonly refresh: () => void;
 }
@@ -100,6 +103,16 @@ export function announceAppearance(ids: readonly string[]): void {
 
 export function ProfileStyleProvider({ children }: { children: ReactNode }) {
     const [people, setPeople] = useState<ReadonlyMap<string, core.ProfileStyle>>(new Map());
+    /**
+     * What each of them is called, right now.
+     *
+     * Kept beside the decorations because it is the same kind of fact and it was
+     * the one that did not move: somebody renamed themselves and every open
+     * conversation went on saying the old name until the tab was reloaded. The
+     * name a screen was rendered with stays the fallback - this only ever
+     * replaces it once the server has answered.
+     */
+    const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
     /** Everybody drawn since this page loaded, which is what a revalidation asks
      *  about again. */
     const watched = useRef(new Set<string>());
@@ -143,12 +156,26 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
             if (!response.ok) return;
             const body = (await response.json()) as {
                 people?: Record<string, unknown>;
+                names?: Record<string, unknown>;
                 cleared?: string[];
                 at?: string;
             };
             if (typeof body.at === "string") at.current = body.at;
             const answered = Object.entries(body.people ?? {});
             const cleared = body.cleared ?? [];
+            const named = Object.entries(body.names ?? {}).filter(
+                (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1] !== ""
+            );
+            if (named.length > 0) {
+                setNames((current) => {
+                    // Nothing actually different is nothing to re-render for,
+                    // which is most revalidations.
+                    if (named.every(([id, name]) => current.get(id) === name)) return current;
+                    const next = new Map(current);
+                    for (const [id, name] of named) next.set(id, name);
+                    return next;
+                });
+            }
             // The ordinary revalidation: nothing moved. Not setting state here is
             // what makes an idle tab free rather than a re-render every minute.
             if (answered.length === 0 && cleared.length === 0) return;
@@ -246,7 +273,10 @@ export function ProfileStyleProvider({ children }: { children: ReactNode }) {
         };
     }, [ask, revalidate]);
 
-    const store = useMemo<Store>(() => ({ people, watch, refresh }), [people, watch, refresh]);
+    const store = useMemo<Store>(
+        () => ({ people, names, watch, refresh }),
+        [people, names, watch, refresh]
+    );
     return <Context.Provider value={store}>{children}</Context.Provider>;
 }
 
@@ -272,6 +302,26 @@ export function useProfileStyleRefresh(): () => void {
  * Safe outside the provider: a public page, a sign-in screen, an email preview -
  * all draw plain faces rather than throwing.
  */
+/**
+ * What somebody is called right now, or null until the server has said.
+ *
+ * Null rather than a guess, so the caller keeps the name the page was rendered
+ * with until there is a better answer - a name that blinked to empty and back
+ * would be worse than one that is a minute old.
+ */
+export function useProfileName(id: string | null | undefined): string | null {
+    const store = useContext(Context);
+    const watch = store?.watch;
+
+    useEffect(() => {
+        if (!id || !watch) return;
+        watch(id);
+    }, [id, watch]);
+
+    if (!id || !store) return null;
+    return store.names.get(id) ?? null;
+}
+
 export function useProfileStyle(id: string | null | undefined): core.ProfileStyle | null {
     const store = useContext(Context);
     const watch = store?.watch;

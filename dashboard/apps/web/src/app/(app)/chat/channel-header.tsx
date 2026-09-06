@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
+import { PersonName } from "@/components/person-name";
 import { LeaveDialog } from "./leave-dialog";
 import { NicknameDialog } from "./nickname-dialog";
 import { channelLink, copyText } from "./links";
@@ -177,8 +178,20 @@ export function ChannelHeader({
                         size={20}
                     />
                 )}
-                <span className="truncate text-sm font-semibold" title={channel.name}>
-                    {channel.name}
+                {/* A direct message is called after the person in it, so the bar
+                    has to follow a rename the way every other place their name
+                    is drawn does. A named channel is called what it is called,
+                    and `PersonName` with no id draws exactly the same span. */}
+                <span className="min-w-0 truncate" title={channel.name}>
+                    <PersonName
+                        id={
+                            !named && channel.others.length === 1
+                                ? (channel.others[0]?.id ?? null)
+                                : null
+                        }
+                        name={channel.name}
+                        className="text-sm font-semibold"
+                    />
                 </span>
                 {channel.topic && (
                     <>
