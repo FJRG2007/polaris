@@ -1435,6 +1435,52 @@ export function FilesView({
         // nothing until the next of these.
     }, [path, viewMode, loading, visible.length, selectedEntries.length]);
 
+    /**
+     * How much of the grid is actually built.
+     *
+     * The list has been windowed since it was written; the grid was not, and it
+     * built every tile in the folder at once - each one wrapped in its own
+     * context menu, with the whole menu tree constructed for every file whether
+     * or not anybody would ever right-click it. A folder of a few hundred clips
+     * therefore spent its time building menus nobody asked for, and the delay
+     * landed on the one thing that had to be instant: opening one.
+     *
+     * A page at a time, grown as the end of it comes into view. Not the row
+     * virtualiser the list uses, because a tile's height depends on how its name
+     * wraps and a virtualiser that guesses that wrong leaves gaps - and this is
+     * the whole of the problem either way: what is bounded is how much exists.
+     */
+    const GRID_PAGE = 60;
+    const [gridShown, setGridShown] = useState(GRID_PAGE);
+    const moreRef = useRef<HTMLDivElement>(null);
+    const shownInGrid = useMemo(
+        () => (viewMode === "grid" ? visible.slice(0, gridShown) : visible),
+        [viewMode, visible, gridShown]
+    );
+
+    // A different folder, a search, or a switch away from the grid all start it
+    // again: what was shown for the last set of files says nothing about this one.
+    useEffect(() => {
+        setGridShown(GRID_PAGE);
+    }, [path, viewMode, visible.length]);
+
+    // The next page, asked for by the end of this one coming into view.
+    useEffect(() => {
+        if (viewMode !== "grid") return;
+        const node = moreRef.current;
+        if (!node || typeof IntersectionObserver !== "function") return;
+        const watch = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setGridShown((shown) => shown + GRID_PAGE);
+                }
+            },
+            { rootMargin: "200px" }
+        );
+        watch.observe(node);
+        return () => watch.disconnect();
+    }, [viewMode, gridShown, visible.length]);
+
     // Windowed rendering: only the rows in view (plus a small overscan) are in the
     // DOM, so a folder with millions of entries scrolls smoothly - rows that leave
     // the viewport are removed and new ones added as you scroll.
@@ -1599,6 +1645,12 @@ export function FilesView({
                     : visible.length - 1
                 : Math.max(0, Math.min(visible.length - 1, start + delta));
         cursorRef.current = next;
+        // The keyboard can outrun what the grid has built - arrowing to the end
+        // of a long folder, or pressing End. Grown to reach it, so the cursor
+        // never lands on a tile that does not exist yet.
+        if (viewMode === "grid" && next >= gridShown) {
+            setGridShown(Math.ceil((next + 1) / GRID_PAGE) * GRID_PAGE);
+        }
         if (extend) {
             setRangeSelection(lastIndex.current ?? next, next);
         } else {
@@ -2246,7 +2298,7 @@ export function FilesView({
                                                 ref={gridRef}
                                                 className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
                                             >
-                                                {visible.map((entry, index) => {
+                                                {shownInGrid.map((entry, index) => {
                                                     const isSelected = selected.has(entry.path);
                                                     const isRenaming = renaming === entry.path;
                                                     return (
@@ -2366,6 +2418,13 @@ export function FilesView({
                                                     );
                                                 })}
                                             </div>
+                                            {/* Where the next page is asked for.
+                                                Drawn only while there is one, so
+                                                a folder that fits has no sentinel
+                                                and no observer. */}
+                                            {shownInGrid.length < visible.length ? (
+                                                <div ref={moreRef} className="h-8" aria-hidden />
+                                            ) : null}
                                         </div>
                                     ) : (
                                         <div
