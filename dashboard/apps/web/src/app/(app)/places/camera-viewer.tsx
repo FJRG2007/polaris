@@ -132,6 +132,10 @@ function Control({
     );
 }
 
+/** How long the controls stay up after the pointer stops, in fullscreen. Long
+ *  enough to reach one, short enough not to sit over the picture. */
+const CHROME_LINGER_MS = 2500;
+
 export function CameraViewer({
     camera,
     canControl,
@@ -142,6 +146,25 @@ export function CameraViewer({
     onClose: () => void;
 }) {
     const frame = useRef<HTMLDivElement | null>(null);
+    /** Takes the wheel listener off again, held here because the ref callback
+     *  that put it on is the only thing that knows about it. */
+    const detachWheel = useRef<(() => void) | null>(null);
+    /**
+     * Whether the chrome is showing because the pointer just moved.
+     *
+     * In the dialog the controls appear on hover, which is right: a live view
+     * with a bar across it is a smaller live view, and the pointer is always
+     * somewhere near. Fullscreen is the opposite - the picture fills the screen,
+     * the pointer is parked wherever it was when the button was pressed, and
+     * hover over an element that was already under it fires nothing. So the
+     * buttons were simply gone, with no way to find them but to guess that
+     * moving the mouse would bring them back.
+     *
+     * So in fullscreen they follow the pointer moving rather than hovering, and
+     * fade again when it stops - which is what every video player does.
+     */
+    const [chromeUp, setChromeUp] = useState(false);
+    const settling = useRef<ReturnType<typeof setTimeout> | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -302,6 +325,11 @@ export function CameraViewer({
         if (paused) element.pause();
     }, [muted, paused]);
 
+    /** What the wheel handler needs, read at the moment of the wheel rather than
+     *  captured when it was attached - the listener outlives every one of them. */
+    const covering = useRef(cover);
+    covering.current = cover;
+
     /**
      * The wheel zooms towards the pointer rather than scrolling the dialog.
      *
@@ -310,9 +338,19 @@ export function CameraViewer({
      * and the browser scrolls the dialog underneath anyway, which over a picture
      * taller than the window is the whole view sliding away while somebody tries
      * to zoom into it.
+     *
+     * On the ref rather than in an effect, and that is the bug this had. An
+     * effect runs once with whatever `frame.current` happens to be, and its
+     * dependencies were `pointAt` - which never changes - and `cover`, which is
+     * a shared constant until both shapes have been measured. So a first run
+     * that found no element never ran again, and the wheel did nothing for the
+     * rest of the dialog's life. A callback ref cannot miss it: it is called
+     * with the node the moment there is one, and with null when it goes.
      */
-    useEffect(() => {
-        const element = frame.current;
+    const holdFrame = useCallback((element: HTMLDivElement | null) => {
+        detachWheel.current?.();
+        detachWheel.current = null;
+        frame.current = element;
         if (!element) return;
         const onWheel = (event: WheelEvent) => {
             event.preventDefault();
@@ -322,11 +360,30 @@ export function CameraViewer({
             // picture that leaps past whatever was being aimed at.
             const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
             const amount = Math.max(-240, Math.min(240, event.deltaY * lines));
-            setZoom((current) => zoomBy(current, Math.exp(-amount / 320), pointAt(event), cover));
+            setZoom((current) =>
+                zoomBy(current, Math.exp(-amount / 320), pointAt(event), covering.current)
+            );
         };
         element.addEventListener("wheel", onWheel, { passive: false });
-        return () => element.removeEventListener("wheel", onWheel);
-    }, [pointAt, cover]);
+        detachWheel.current = () => element.removeEventListener("wheel", onWheel);
+    }, [pointAt]);
+
+    /** The pointer moved: show the chrome, and start the clock on hiding it. */
+    const wakeChrome = useCallback(() => {
+        setChromeUp(true);
+        if (settling.current) clearTimeout(settling.current);
+        settling.current = setTimeout(() => setChromeUp(false), CHROME_LINGER_MS);
+    }, []);
+
+    // Entering fullscreen counts as moving: the press that got here is the
+    // gesture, and the buttons have to be findable immediately afterwards.
+    useEffect(() => {
+        if (full) wakeChrome();
+        else setChromeUp(false);
+        return () => {
+            if (settling.current) clearTimeout(settling.current);
+        };
+    }, [full, wakeChrome]);
 
     const toggleFullscreen = () => {
         if (document.fullscreenElement) void document.exitFullscreen();
@@ -340,7 +397,7 @@ export function CameraViewer({
             <DialogContent className="max-w-5xl p-0" showClose={!full}>
                 <DialogTitle className="sr-only">{camera.name}</DialogTitle>
                 <div
-                    ref={frame}
+                    ref={holdFrame}
                     className={cn(
                         "group/frame relative overflow-hidden bg-black",
                         isZoomed(zoom) ? "cursor-grab active:cursor-grabbing" : "cursor-default"
@@ -365,6 +422,7 @@ export function CameraViewer({
                         dragging.current = to;
                         setZoom((current) => panBy(current, to.x - from.x, to.y - from.y, cover));
                     }}
+                    onPointerMoveCapture={full ? wakeChrome : undefined}
                     onPointerUp={() => (dragging.current = null)}
                     onPointerCancel={() => (dragging.current = null)}
                 >
@@ -482,7 +540,16 @@ export function CameraViewer({
                     {/* Over the picture, and faded until somebody is actually
                         looking for them - a live view with a bar of chrome across
                         it is a smaller live view. */}
-                    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 pr-12 opacity-0 transition-opacity group-hover/frame:opacity-100">
+                    <div
+                        className={cn(
+                            "pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 bg-gradient-to-b from-black/60 to-transparent p-3 pr-12 transition-opacity",
+                            full
+                                ? chromeUp
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                : "opacity-0 group-hover/frame:opacity-100"
+                        )}
+                    >
                         <div className="min-w-0">
                             <p className="truncate text-[0.8125rem] font-medium text-white" title={camera.name}>{camera.name}</p>
                             {camera.zone ? <p className="truncate text-[0.6875rem] text-white/70" title={camera.zone}>{camera.zone}</p> : null}
@@ -494,7 +561,16 @@ export function CameraViewer({
                         is looking for them, like the fullscreen button beside
                         them: a bar of chrome across a live view is a smaller
                         live view. */}
-                    <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 transition-opacity group-hover/frame:opacity-100">
+                    <div
+                        className={cn(
+                            "absolute bottom-3 left-3 flex items-center gap-1 transition-opacity",
+                            full
+                                ? chromeUp
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                : "opacity-0 group-hover/frame:opacity-100"
+                        )}
+                    >
                         <Control
                             label={full ? "Leave fullscreen" : "Fullscreen"}
                             onClick={toggleFullscreen}
