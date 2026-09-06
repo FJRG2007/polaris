@@ -7982,6 +7982,7 @@ model Place {
     updatedAt DateTime @updatedAt
 
     cameras Camera[]
+    devices PlaceDevice[]
 
     @@index([installedAppId])
 }
@@ -8334,6 +8335,121 @@ model CameraZone {
     // is the one thing the list has to be.
     @@unique([cameraId, name])
     @@index([cameraId])
+}
+
+// A thing at a place that Polaris can read and act on, as opposed to watch.
+//
+// A camera is looked at; a door is used. Everything below follows from that: it
+// carries a state rather than a stream, the screen it appears on is a set of
+// controls rather than a wall of pictures, and every press it answers is written
+// down, because "who opened the office at 03:00" is the question this table
+// exists for.
+//
+// One row per physical device, whatever it is reached through. The vendor's own
+// account is what Polaris talks to - a Nuki lock is reached through Nuki's Web
+// API rather than over the LAN - so `externalId` is the id that account uses and
+// `vendor` is what decides which driver makes the call. That is the whole of the
+// per-vendor knowledge in the database: a second make of lock is another driver
+// and no new table.
+//
+// Nothing here is a credential. The account's token is one per install and lives
+// in `Setting`, envelope-encrypted, because ten locks on one account is one
+// secret and ten copies of it is ten things to rotate.
+model PlaceDevice {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String  @db.Uuid
+    /// Which place it is at. Null until somebody says, which is what a device
+    /// that arrived from an account covering several addresses starts as.
+    placeId        String? @db.Uuid
+    /// nuki - whose account this is reached through.
+    vendor         String
+    /// lock | opener - what it does, which is what decides the buttons. Kept
+    /// apart from the vendor's own type number so a screen never reads one.
+    kind           String  @default("lock")
+    /// The vendor's id for it, which every call to them names. Text rather than
+    /// a number: it is theirs, and the next make will not use integers.
+    externalId     String
+    name           String
+    /// Where at that place it is ("Front door"). Free text, as a camera's zone.
+    zone           String?
+    model          String?
+    firmware       String?
+
+    /// Whether Polaris may act on it at all. Off is a device somebody wants on
+    /// the screen and off the controls - a lock on a door that is not theirs to
+    /// open - and it is refused in the service, not only hidden in the UI.
+    controllable Boolean @default(true)
+
+    // The last reading. Kept on the row rather than derived from the events so a
+    // list of twenty doors is one query, and refreshed by every sync.
+    /// locked | unlocked | unlatched | jammed | uncalibrated | unknown.
+    state          String    @default("unknown")
+    /// open | closed | unknown | none - the door itself, when a sensor is paired.
+    /// `none` is no sensor, which is not the same as not knowing.
+    doorState      String    @default("none")
+    batteryPercent Int?
+    batteryCritical Boolean  @default(false)
+    /// Whether the vendor could reach it when last asked. A lock nobody can
+    /// reach still draws, saying so, rather than disappearing.
+    online         Boolean   @default(true)
+    stateAt        DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place  Place?             @relation(fields: [placeId], references: [id], onDelete: SetNull)
+    events PlaceDeviceEvent[]
+
+    // One device per id per vendor. A sync runs on a schedule and on demand, and
+    // the two overlapping must not leave a house with the same door twice.
+    @@unique([vendor, externalId])
+    @@index([installedAppId])
+    @@index([placeId])
+}
+
+// One thing that happened to a device: it was locked, it was opened, the door
+// was left ajar.
+//
+// Kept rather than read from the vendor on demand for three reasons. It is what
+// the usage chart counts, and counting it means one query here instead of a
+// round trip per day drawn. It outlives the vendor's own retention, which is
+// weeks. And it is the record somebody comes back to months later, when the
+// question is who had the door open and the account it happened on may no longer
+// be connected.
+//
+// `externalId` is the vendor's id for the same entry, which is what makes a sync
+// idempotent: the log is re-read from a little before where it left off, and
+// everything already written is skipped rather than duplicated.
+model PlaceDeviceEvent {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    deviceId   String  @db.Uuid
+    externalId String?
+
+    /// lock | unlock | unlatch | lock-and-go | door-opened | door-closed |
+    /// door-ajar | calibrated | other - this app's word for it, so a screen
+    /// never has to know a vendor's numbering.
+    action  String
+    /// Who did it, in the words it should be read in: a person's name where the
+    /// vendor gave one, else the thing itself ("Keypad", "Auto lock").
+    actor   String?
+    /// app | keypad | fob | button | auto | manual | polaris | system - how it
+    /// was done. `polaris` is the one that matters: it is the only value that
+    /// means somebody pressed a button on this screen.
+    via     String  @default("system")
+    /// ok | failed - whether it finished. A jammed motor is an event too, and
+    /// leaving it out is how a log stops answering "why is the door still open".
+    outcome String  @default("ok")
+    /// The vendor's own words when it went wrong, for the one line a reader can
+    /// act on. Never their identifiers or addresses.
+    note    String?
+    at      DateTime
+
+    device PlaceDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+    @@unique([deviceId, externalId])
+    @@index([deviceId, at])
 }
 // A tracker somebody else runs, connected to a space in Tasks.
 //
@@ -8883,6 +8999,10 @@ model MailFolder {
     subscribed Boolean @default(false)
     // Kept out of the rail without unsubscribing it.
     hidden     Boolean @default(false)
+    // Whether a person said what this folder is for, rather than the server or a
+    // name match. Their answer outlives a resync: without this the next pass
+    // would read the role off the server again and forget what they told us.
+    roleLocked Boolean @default(false)
 
     // What the server said the last time it was asked. A changed uidValidity
     // means every uid held here is meaningless and the folder is resynced.

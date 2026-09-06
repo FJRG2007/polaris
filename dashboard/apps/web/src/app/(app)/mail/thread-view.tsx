@@ -20,7 +20,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { refusalOf } from "./refusal";
+import { missingFolderRole, refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import {
@@ -63,7 +63,7 @@ export function ThreadView({
     messages: MailMessageView[];
     context: MailViewContext;
 }) {
-    const { refresh, openComposer, accounts, accountColor } = useMail();
+    const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
     const newest = messages.at(-1);
@@ -80,6 +80,11 @@ export function ThreadView({
             const messageIds = messages.map((message) => message.id);
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds, action });
+                const missing = missingFolderRole(outcome);
+                if (missing) {
+                    askFolderRole(missing, () => act(action));
+                    return;
+                }
                 const said = refusalOf(outcome);
                 if (said) {
                     toast.show({ title: said });
@@ -88,7 +93,7 @@ export function ThreadView({
                 refresh();
             });
         },
-        [messages, refresh, toast]
+        [askFolderRole, messages, refresh, toast]
     );
 
     if (!newest) {

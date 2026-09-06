@@ -20,6 +20,7 @@ import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { MailRail } from "./mail-rail";
 import { Composer } from "./composer";
+import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
 import { Menu, PenLine } from "lucide-react";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
@@ -44,6 +45,15 @@ export interface MailContextValue {
     readonly accountColor: (accountId: string) => string;
     readonly openComposer: (draft: ComposerSeed | null) => void;
     readonly composing: ComposerSeed | null;
+    /**
+     * Ask which folder is this mailbox's Trash, Archive or Junk, and run `retry`
+     * once one holds the role.
+     *
+     * Raised from wherever an action refused for want of a folder, which is two
+     * screens and will be more - so the question lives in the shell rather than
+     * being drawn twice.
+     */
+    readonly askFolderRole: (missing: MissingFolderRole, retry: () => void) => void;
 }
 
 /** What the composer opens with. Null closes it. */
@@ -112,6 +122,7 @@ export function MailShell({
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
     const [railOpen, setRailOpen] = useState(false);
+    const [asking, setAsking] = useState<{ missing: MissingFolderRole; retry: () => void } | null>(null);
 
     const refresh = useCallback(() => router.refresh(), [router]);
     useMailStream(refresh);
@@ -124,6 +135,11 @@ export function MailShell({
         [accounts]
     );
 
+    const askFolderRole = useCallback(
+        (missing: MissingFolderRole, retry: () => void) => setAsking({ missing, retry }),
+        []
+    );
+
     const value = useMemo<MailContextValue>(
         () => ({
             accounts,
@@ -134,9 +150,10 @@ export function MailShell({
             refresh,
             accountColor,
             composing,
-            openComposer: setComposing
+            openComposer: setComposing,
+            askFolderRole
         }),
-        [accounts, folders, labels, unread, viewerName, refresh, accountColor, composing]
+        [accounts, folders, labels, unread, viewerName, refresh, accountColor, composing, askFolderRole]
     );
 
     // Inside a conversation on a phone the list steps aside, which is why this
@@ -214,6 +231,13 @@ export function MailShell({
                     they write. Rendered here rather than per screen, so opening
                     it from a rail button and from a Reply are the same thing. */}
                 <Composer />
+                {asking ? (
+                    <FolderRoleDialog
+                        missing={asking.missing}
+                        onClose={() => setAsking(null)}
+                        onSettled={asking.retry}
+                    />
+                ) : null}
             </div>
         </MailContext.Provider>
     );

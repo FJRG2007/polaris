@@ -57,34 +57,103 @@ const MOVE_ACTIONS: Partial<Record<MailAction, core.MailFolderRole>> = {
 };
 
 /**
- * The folder on this account with a given role, made if the server has none.
+ * Raised when an action needs a folder this mailbox has no equivalent of.
  *
- * Creating it is the right answer rather than refusing: a mailbox with no
- * Archive folder is common, and "archive" has an obvious meaning that the person
- * asking for it plainly wants. The name used is the English one, because that is
- * the name the SPECIAL-USE flag is attached to and every client will then
- * recognise it.
+ * It used to create one. That was wrong, and somebody found out the way people
+ * find these things out: a mailbox whose trash is called `Papelera` ended up
+ * with a second, empty `Trash` that Polaris had written into their mail server,
+ * and which they then saw in every other client they own. Making a folder in
+ * somebody else's mailbox is not a default, whatever the convenience.
+ *
+ * So it refuses, and carries what the screen needs to ask: which role, and what
+ * the account's folders are, so a reader can point at the one they already use.
+ */
+export class MailFolderRoleMissing extends Error {
+    public readonly role: core.MailFolderRole;
+    public readonly accountId: string;
+
+    public constructor(role: core.MailFolderRole, accountId: string) {
+        super(`This mailbox has no folder set as its ${role}.`);
+        this.name = "MailFolderRoleMissing";
+        this.role = role;
+        this.accountId = accountId;
+    }
+}
+
+/**
+ * The folder on this account with a given role.
+ *
+ * Never creates one. A mailbox that has no folder for a role either has one
+ * under a name nobody recognised - which its owner can point at, once - or
+ * genuinely has none, and then making it is their decision to take deliberately.
  */
 async function folderForRole(
-    client: ImapFlow,
     accountId: string,
     role: core.MailFolderRole
 ): Promise<{ id: string; path: string }> {
     const held = await prisma.mailFolder.findFirst({
         where: { accountId, role },
+        // A role its owner chose wins over one matched from a name, so pointing
+        // at the right folder settles it even where a wrong one still matches.
+        orderBy: { roleLocked: "desc" },
         select: { id: true, path: true }
     });
-    if (held) return held;
+    if (!held) throw new MailFolderRoleMissing(role, accountId);
+    return held;
+}
 
-    const name = role === "archive" ? "Archive" : role === "junk" ? "Junk" : role === "trash" ? "Trash" : "INBOX";
-    await client.mailboxCreate(name).catch(() => undefined);
+/**
+ * Say which folder is this mailbox's Trash, Archive or Junk.
+ *
+ * The answer sticks: `roleLocked` keeps the next sync from reading the role off
+ * the server again. Any other folder that was holding the role by a name match
+ * loses it, so the mailbox has exactly one of each.
+ */
+export async function setFolderRole(
+    userId: string,
+    folderId: string,
+    role: core.MailFolderRole
+): Promise<void> {
+    const folder = await prisma.mailFolder.findFirst({
+        where: { id: folderId, account: { userId } },
+        select: { id: true, accountId: true }
+    });
+    if (!folder) throw new MailAccessError("That folder is not yours.");
+    await prisma.$transaction([
+        prisma.mailFolder.updateMany({
+            where: { accountId: folder.accountId, role, id: { not: folder.id } },
+            data: { role: "none", roleLocked: false }
+        }),
+        prisma.mailFolder.update({ where: { id: folder.id }, data: { role, roleLocked: true } })
+    ]);
+}
+
+/**
+ * Make a folder for a role, because its owner asked for one.
+ *
+ * The only path that writes a folder into somebody else's mailbox, and it is
+ * reached from a button that says so. The English name is used because that is
+ * what the SPECIAL-USE flag attaches to, so every other client will recognise it.
+ */
+export async function createFolderForRole(
+    userId: string,
+    accountId: string,
+    role: core.MailFolderRole
+): Promise<string> {
+    const account = await ownedAccount(userId, accountId);
+    const name = role === "archive" ? "Archive" : role === "junk" ? "Junk" : role === "trash" ? "Trash" : "Archive";
+    await withImap(account, async (client) => {
+        await client.mailboxCreate(name).catch(() => undefined);
+        await client.mailboxSubscribe(name).catch(() => undefined);
+    });
     const created = await prisma.mailFolder.upsert({
         where: { accountId_path: { accountId, path: name } },
-        update: { role },
-        create: { accountId, path: name, name, role, subscribed: true },
-        select: { id: true, path: true }
+        update: { role, roleLocked: true, subscribed: true },
+        create: { accountId, path: name, name, role, roleLocked: true, subscribed: true },
+        select: { id: true }
     });
-    return created;
+    publishMail({ accountId, kind: "folders", actorId: userId });
+    return created.id;
 }
 
 /** Group a set of messages by the folder they are in, because every IMAP command
@@ -171,7 +240,7 @@ async function applyOne(
 
     const role = MOVE_ACTIONS[action];
     if (!role) return 0;
-    const target = await folderForRole(client, accountId, role);
+    const target = await folderForRole(accountId, role);
     if (target.id === folderId) return 0;
     const moved = await client.messageMove(uids, target.path, { uid: true });
     if (!moved) return 0;

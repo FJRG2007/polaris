@@ -29,6 +29,7 @@ import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
 import * as accounts from "@/lib/mailbox/accounts";
 import * as messages from "@/lib/mailbox/messages";
+import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
 import { MailAuthError } from "@/lib/mailbox/credentials";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
@@ -43,7 +44,19 @@ async function actorId(): Promise<string> {
 /** What a refusal looks like on the way out. Anything that is not one of the
  *  three the caller could act on is a fault rather than an answer, and is logged
  *  rather than described. */
-function failure(caught: unknown, fallback: string): { error: string; field?: string } {
+function failure(
+    caught: unknown,
+    fallback: string
+): { error: string; field?: string; needsFolderRole?: { role: string; accountId: string } } {
+    // The one refusal a screen answers with a question rather than a sentence:
+    // this mailbox has no folder for what was asked, and its owner can say which
+    // of theirs it is. Carried out structured so the dialog knows what to ask.
+    if (caught instanceof MailFolderRoleMissing) {
+        return {
+            error: caught.message,
+            needsFolderRole: { role: caught.role, accountId: caught.accountId }
+        };
+    }
     if (caught instanceof MailAccessError) return { error: caught.message };
     if (caught instanceof accounts.MailSetupError) return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
@@ -238,6 +251,40 @@ export async function trustSenderAction(accountId: string, input: unknown) {
         return {};
     } catch (caught) {
         return failure(caught, "That could not be saved.");
+    }
+}
+
+/**
+ * Say which of this mailbox's folders is its Trash, Archive or Junk.
+ *
+ * Asked once, when an action finds the mailbox has none under a name Polaris
+ * recognises. The answer sticks through every later sync.
+ */
+export async function setFolderRoleAction(folderId: string, role: string) {
+    const userId = await actorId();
+    const wanted = core.MAIL_FOLDER_ROLES.find((one) => one === role);
+    if (!wanted) return { error: "That is not a folder role." };
+    try {
+        await messages.setFolderRole(userId, folderId, wanted);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That could not be saved.");
+    }
+}
+
+/** Make the folder, on the mail server, because its owner asked for one. The
+ *  only path in the app that writes a folder into somebody else's mailbox. */
+export async function createFolderForRoleAction(accountId: string, role: string) {
+    const userId = await actorId();
+    const wanted = core.MAIL_FOLDER_ROLES.find((one) => one === role);
+    if (!wanted) return { error: "That is not a folder role." };
+    try {
+        const id = await messages.createFolderForRole(userId, accountId, wanted);
+        refresh();
+        return { id };
+    } catch (caught) {
+        return failure(caught, "That folder could not be made on the mail server.");
     }
 }
 

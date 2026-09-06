@@ -263,6 +263,28 @@ export function dedupeAddresses(entries: readonly MailAddress[]): readonly MailA
  */
 export type MailFolderRole = "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive" | "all" | "none";
 
+/**
+ * The roles a person may point a folder at.
+ *
+ * Not every role: an inbox is not a choice anybody makes, and an all-mail view
+ * is the server's own idea rather than a folder somebody files into. These four
+ * are the ones an action needs and a mailbox can plausibly have under a name
+ * nobody recognised.
+ */
+export const MAIL_FOLDER_ROLES = ["trash", "junk", "archive", "sent", "drafts"] as const satisfies readonly MailFolderRole[];
+
+/** What a role is called on screen. */
+export const MAIL_FOLDER_ROLE_LABELS: Readonly<Record<string, string>> = {
+    inbox: "Inbox",
+    sent: "Sent",
+    drafts: "Drafts",
+    trash: "Trash",
+    junk: "Spam",
+    archive: "Archive",
+    all: "All mail",
+    none: "No particular use"
+};
+
 const ROLE_BY_FLAG: Readonly<Record<string, MailFolderRole>> = {
     "\\Inbox": "inbox",
     "\\Sent": "sent",
@@ -273,44 +295,110 @@ const ROLE_BY_FLAG: Readonly<Record<string, MailFolderRole>> = {
     "\\All": "all"
 };
 
-/** Names servers use for a role when they announce no flag for it. Lowercased,
- *  and matched on the last segment of the path so `INBOX/Sent` still counts. */
+/**
+ * Names servers use for a role when they announce no flag for it.
+ *
+ * Longer than it looks like it needs to be, and every entry earns its place: a
+ * server that flags nothing and answers in its own language is the ordinary case
+ * outside English, and the cost of not recognising one is severe. Archiving would
+ * find no Archive folder, and a client that then CREATES one has written a folder
+ * into somebody else's mailbox that they will see in every other client they own.
+ * Polaris does not do that any more - it asks - but the ask is a worse experience
+ * than knowing, so the table is where the effort goes.
+ *
+ * Matched on the last segment of the path, lowercased, so `INBOX/Papelera` counts.
+ */
 const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
     inbox: "inbox",
+    "bandeja de entrada": "inbox",
+    "boîte de réception": "inbox",
+    posteingang: "inbox",
+    "posta in arrivo": "inbox",
+    "caixa de entrada": "inbox",
+    "postvak in": "inbox",
+
     sent: "sent",
     "sent items": "sent",
     "sent mail": "sent",
     "sent messages": "sent",
+    outbox: "sent",
     enviados: "sent",
     "elementos enviados": "sent",
+    "correo enviado": "sent",
     gesendet: "sent",
     "gesendete objekte": "sent",
+    "gesendete elemente": "sent",
     "envoyés": "sent",
+    "éléments envoyés": "sent",
+    "messages envoyés": "sent",
+    "posta inviata": "sent",
+    inviati: "sent",
+    "itens enviados": "sent",
+    verzonden: "sent",
+    "verzonden items": "sent",
+    skickat: "sent",
+
     drafts: "drafts",
     draft: "drafts",
     borradores: "drafts",
-    entwürfe: "drafts",
+    "entwürfe": "drafts",
     brouillons: "drafts",
+    bozze: "drafts",
+    rascunhos: "drafts",
+    concepten: "drafts",
+    utkast: "drafts",
+
     trash: "trash",
     "deleted items": "trash",
     "deleted messages": "trash",
     bin: "trash",
+    "recycle bin": "trash",
     papelera: "trash",
+    "papelera de reciclaje": "trash",
+    "elementos eliminados": "trash",
     papierkorb: "trash",
+    "gelöschte objekte": "trash",
     corbeille: "trash",
+    "éléments supprimés": "trash",
+    cestino: "trash",
+    lixeira: "trash",
+    "itens excluídos": "trash",
+    prullenbak: "trash",
+    "verwijderde items": "trash",
+    papperskorg: "trash",
+
     junk: "junk",
     spam: "junk",
     "junk e-mail": "junk",
     "junk email": "junk",
     "bulk mail": "junk",
-    correo_no_deseado: "junk",
     "correo no deseado": "junk",
+    "correo_no_deseado": "junk",
+    "no deseado": "junk",
+    "unerwünscht": "junk",
+    werbung: "junk",
+    "courrier indésirable": "junk",
+    indésirables: "junk",
+    "posta indesiderata": "junk",
+    "lixo eletrônico": "junk",
+    ongewenst: "junk",
+    skrappost: "junk",
+
     archive: "archive",
     archives: "archive",
     archivo: "archive",
+    archivados: "archive",
     archiv: "archive",
+    archivio: "archive",
+    arquivo: "archive",
+    archief: "archive",
+    arkiv: "archive",
+
     "all mail": "all",
-    "todos": "all"
+    "all messages": "all",
+    todos: "all",
+    "todo el correo": "all",
+    "alle nachrichten": "all"
 };
 
 /** The role of a folder, from what the server flagged it and then from its name. */

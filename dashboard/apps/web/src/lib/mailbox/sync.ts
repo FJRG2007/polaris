@@ -114,12 +114,15 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
         const role = core.folderRole(entry.path, [...entry.flags], entry.delimiter);
         const existing = await prisma.mailFolder.findUnique({
             where: { accountId_path: { accountId, path: entry.path } },
-            select: { id: true, subscribed: true }
+            select: { id: true, subscribed: true, roleLocked: true }
         });
         const data = {
             delimiter: entry.delimiter || "/",
             name: core.folderLabel(entry.path, entry.delimiter),
-            role,
+            // A role its owner chose survives every pass. Reading it off the
+            // server again would forget what they told us, which is what makes
+            // "this one is my Trash" worth asking for at all.
+            ...(existing?.roleLocked ? {} : { role }),
             total: entry.status?.messages ?? 0,
             unread: entry.status?.unseen ?? 0
         };

@@ -11,3 +11,18 @@ export function refusalOf(outcome: unknown): string {
     const said = (outcome as { error?: unknown }).error;
     return typeof said === "string" ? said : "";
 }
+
+/**
+ * The one refusal a screen answers with a question rather than a sentence.
+ *
+ * An action that needs a folder this mailbox has none of comes back naming the
+ * role and the mailbox, so the screen can ask which folder it is instead of
+ * telling somebody their archive failed.
+ */
+export function missingFolderRole(outcome: unknown): { role: string; accountId: string } | null {
+    if (typeof outcome !== "object" || outcome === null || !("needsFolderRole" in outcome)) return null;
+    const held = (outcome as { needsFolderRole?: unknown }).needsFolderRole;
+    if (typeof held !== "object" || held === null) return null;
+    const { role, accountId } = held as { role?: unknown; accountId?: unknown };
+    return typeof role === "string" && typeof accountId === "string" ? { role, accountId } : null;
+}

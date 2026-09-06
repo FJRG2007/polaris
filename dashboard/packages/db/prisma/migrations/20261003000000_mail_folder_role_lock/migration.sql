@@ -1,0 +1,13 @@
+-- Whether a person said what a folder is for.
+--
+-- Polaris used to CREATE a folder on somebody's mail server when it could not
+-- work out which one was the Trash - so a mailbox whose trash is called
+-- "Papelera" ended up with a second, empty "Trash" that its owner then saw in
+-- every other client they use. It asks now, and this column is what makes the
+-- answer stick: without it the next sync reads the role off the server again and
+-- forgets what they told us.
+--
+-- False for every folder that exists, which is what it was: nobody has been
+-- asked yet. IF NOT EXISTS because a migration that failed halfway has to be
+-- finishable by running it again.
+ALTER TABLE "MailFolder" ADD COLUMN IF NOT EXISTS "roleLocked" BOOLEAN NOT NULL DEFAULT false;

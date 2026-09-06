@@ -21,7 +21,7 @@
  */
 
 import Link from "next/link";
-import { refusalOf } from "./refusal";
+import { missingFolderRole, refusalOf } from "./refusal";
 import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
@@ -84,7 +84,7 @@ export function MailView({
     cursor: string;
 }) {
     const router = useRouter();
-    const { accounts, accountColor, openComposer, refresh } = useMail();
+    const { accounts, accountColor, askFolderRole, openComposer, refresh } = useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -112,6 +112,14 @@ export function MailView({
             if (messageIds.length === 0) return;
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds: [...messageIds], action });
+                // This mailbox has no folder for what was asked. Ask which one it
+                // is and do the action again once it is settled, so the answer
+                // costs one question rather than the action being lost.
+                const missing = missingFolderRole(outcome);
+                if (missing) {
+                    askFolderRole(missing, () => act(action, messageIds, announce));
+                    return;
+                }
                 const said = refusalOf(outcome);
                 if (said) {
                     toast.show({ title: said });
@@ -122,7 +130,7 @@ export function MailView({
                 refresh();
             });
         },
-        [refresh, toast]
+        [askFolderRole, refresh, toast]
     );
 
     const snooze = useCallback(
