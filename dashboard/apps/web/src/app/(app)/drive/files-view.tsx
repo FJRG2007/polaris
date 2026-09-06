@@ -2813,7 +2813,19 @@ export function FilesView({
             {selectedEntries.length === 1 && selectedEntries[0] ? (
                 <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
-                        <EntryIcon entry={selectedEntries[0]} className="size-10" />
+                        {/* The file, not a mark standing for its type. This panel
+                            exists to answer "which one is this", and for a
+                            picture, a page or a clip the only answer worth
+                            anything is the thing itself - the same thumbnail the
+                            grid draws, at the size there is room for. Anything
+                            that cannot produce one keeps its icon, which is what
+                            this drew for everything before. */}
+                        <GridIcon
+                            connectionId={connectionId}
+                            entry={selectedEntries[0]}
+                            className="size-24"
+                            iconClassName="size-10"
+                        />
                         <span className="break-all text-sm font-medium">
                             {selectedEntries[0].name}
                         </span>
@@ -3274,14 +3286,24 @@ const THUMBNAIL_BOX = "size-14";
  * with a grid of photographs and nothing reflows when a picture arrives after
  * the icon it replaces.
  */
-function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveEntry }) {
-    const icon = <EntryIcon entry={entry} className="size-10" />;
+function GridIcon({
+    connectionId,
+    entry,
+    className = THUMBNAIL_BOX,
+    iconClassName = "size-10"
+}: {
+    connectionId: string;
+    entry: DriveEntry;
+    /** How much room the picture gets. A tile in the grid and the details panel
+     *  want different amounts of it and nothing else about them differs. */
+    className?: string;
+    iconClassName?: string;
+}) {
+    const icon = <EntryIcon entry={entry} className={iconClassName} />;
     // A picture the server draws, or a frame the browser draws for itself.
     const moving = entry.kind === "file" && drawsItsOwnFrame(entry.name);
     if (entry.kind !== "file" || (!thumbnailKind(entry.name) && !moving)) {
-        return (
-            <span className={cn(THUMBNAIL_BOX, "flex items-center justify-center")}>{icon}</span>
-        );
+        return <span className={cn(className, "flex items-center justify-center")}>{icon}</span>;
     }
     return (
         <EntryThumbnail
@@ -3289,7 +3311,7 @@ function GridIcon({ connectionId, entry }: { connectionId: string; entry: DriveE
             path={entry.path}
             version={`${entry.modifiedAt}-${entry.size}`}
             moving={moving}
-            className={THUMBNAIL_BOX}
+            className={className}
         >
             {icon}
         </EntryThumbnail>

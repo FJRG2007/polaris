@@ -112,7 +112,11 @@ export async function GET(request: Request): Promise<Response> {
                 locked: lockedPaths.has(entry.path)
             };
         });
-        return Response.json({ entries });
+        // Never held. A listing is the answer to "what is in here NOW", and a
+        // browser that reuses a two-minute-old one shows a folder somebody has
+        // just uploaded into as it was before they did - which is what "the
+        // count does not change until I reload the page" was.
+        return Response.json({ entries }, { headers: { "cache-control": "no-store" } });
     } catch (caught) {
         return await failed(user, connectionId, caught, "list");
     } finally {

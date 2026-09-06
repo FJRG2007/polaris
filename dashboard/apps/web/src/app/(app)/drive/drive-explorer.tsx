@@ -379,7 +379,13 @@ export function DriveExplorer({
             try {
                 const query = new URLSearchParams({ c: connectionId });
                 if (path) query.set("p", path);
-                const res = await fetch(`/api/drive/list?${query.toString()}`, { signal });
+                // `no-store` as well as the header the route sends, because the
+                // request is what decides whether the browser may answer from
+                // its own cache before the server is asked at all.
+                const res = await fetch(`/api/drive/list?${query.toString()}`, {
+                    signal,
+                    cache: "no-store"
+                });
                 const body = await res.json();
                 if (signal.aborted) return;
                 if (body.needsSmbShare) {

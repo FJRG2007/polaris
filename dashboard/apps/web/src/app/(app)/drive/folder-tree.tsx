@@ -102,7 +102,8 @@ export function FolderTree({
                 const query = new URLSearchParams({ c: connectionId });
                 if (path) query.set("p", path);
                 const response = await fetch(`/api/drive/list?${query.toString()}`, {
-                    signal: controller.signal
+                    signal: controller.signal,
+                    cache: "no-store"
                 });
                 const body = await response.json();
                 if (controller.signal.aborted) return;
