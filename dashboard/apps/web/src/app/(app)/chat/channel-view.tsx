@@ -30,6 +30,7 @@ import type { PollDraft } from "./poll-dialog";
 import { CallRoom } from "./call-room";
 import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
+import { draftMessage } from "./draft-message";
 import * as calls from "./meeting-actions";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
@@ -130,7 +131,7 @@ export function ChannelView({
 }) {
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, channels, refresh, rulesFor, may, callsOff } = useChat();
+    const { viewerId, viewerName, channels, refresh, rulesFor, may, callsOff } = useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
@@ -1208,46 +1209,13 @@ export function ChannelView({
     };
 
     const sendText = async (body: string) => {
-        const draft: ChatMessageView = {
+        const draft = draftMessage({
             id: `pending:${++drafts.current}`,
             channelId,
             authorId: viewerId,
-            authorName: null,
-            kind: "text",
-            body,
-            parentId: null,
-            replyCount: 0,
-            lastReplyAt: null,
-            edited: false,
-            deleted: false,
-            reactions: [],
-            attachments: [],
-            // A draft is always a line of text. A poll is written in a dialog
-            // and posted from there, so there is nothing on screen for an
-            // optimistic one to replace.
-            poll: null,
-            quote: null,
-            starred: false,
-            // Nobody blocks themselves, and the menu that would offer it does
-            // not appear on your own row.
-            blocked: false,
-            // Resolved by the server on the reload a moment from now. A draft
-            // that guessed would draw a card and then replace it with a
-            // different one.
-            references: [],
-            // Your own words, which your own setting never stands between you and.
-            forwardable: true,
-            // The server has not looked at any link in it yet. Left as settled
-            // rather than pending on purpose: this draft is replaced by the real
-            // message a moment later, and that one asks.
-            link: null,
-            preview: null,
-            previewPending: false,
-            // Nothing has happened to it yet, not even leaving. The first tick
-            // arrives with the message the reload brings back.
-            receipt: null,
-            createdAt: new Date().toISOString()
-        };
+            authorName: viewerName,
+            body
+        });
         setPending((current) => [...current, draft]);
         following.current = true;
 

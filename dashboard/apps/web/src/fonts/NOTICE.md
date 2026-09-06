@@ -23,7 +23,7 @@ A display name can be set in a face of its owner's choosing, which is what the
 rest of the files here are. They are never used for the interface - only for
 somebody's name, in Chat, on a profile card, in a member list.
 
-All eight are under the SIL Open Font License, Version 1.1, and all eight were
+All nine are under the SIL Open Font License, Version 1.1, and all nine were
 taken from Google Fonts as the `latin` subset only:
 
 | Choice | Face | Copyright |
@@ -34,6 +34,7 @@ taken from Google Fonts as the `latin` subset only:
 | Comic | Bangers | Vernon Adams |
 | Script | Lobster | Impallari Type |
 | Block | Bungee | David Jonathan Ross |
+| Bubble | Rubik Bubbles | Hubert & Fischer, Meir Sadan, Cyreal |
 | Techno | Orbitron | Matt McInerney |
 | Pixel | Press Start 2P | Cody "CodeMan38" Boisclair |
 

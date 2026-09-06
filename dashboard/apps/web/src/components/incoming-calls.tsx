@@ -28,6 +28,7 @@ import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { claimForDevice } from "@/lib/device-once";
+import { ringDecision } from "@/lib/chat/ring-decision";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
@@ -105,37 +106,43 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         useCallback(
             (frame) => {
                 if (frame.kind !== "call") return;
-                if (frame.state === "ringing") {
-                    // Your own call. The frame is addressed to the conversation,
-                    // and the person who pressed the button is in it - so without
-                    // this, starting a call rang at the person starting it.
-                    if (frame.userId === viewerId) return;
-                    setRinging((current) =>
-                        current.some((entry) => entry.meetingId === frame.meetingId)
-                            ? current
-                            : [
-                                  ...current,
-                                  {
-                                      channelId: frame.channelId,
-                                      meetingId: frame.meetingId,
-                                      name: frame.name,
-                                      userId: frame.userId,
-                                      at: Date.now()
-                                  }
-                              ]
-                    );
-                    return;
-                }
-                // Nobody is left in it, or it is over. Either way there is
-                // nothing to answer, and a card offering to join an empty room
-                // is worse than no card.
-                if (frame.state === "ended" || frame.count === 0) {
-                    setRinging((current) =>
-                        current.filter((entry) => entry.meetingId !== frame.meetingId)
-                    );
+                // What the frame means is decided in one pure place, because
+                // "should this still be ringing" is the question and none of
+                // what is needed to draw a ringing card can be asked it. See
+                // `ring-decision`.
+                switch (ringDecision(frame, viewerId)) {
+                    case "ring":
+                        setRinging((current) =>
+                            current.some((entry) => entry.meetingId === frame.meetingId)
+                                ? current
+                                : [
+                                      ...current,
+                                      {
+                                          channelId: frame.channelId,
+                                          meetingId: frame.meetingId,
+                                          name: frame.name,
+                                          userId: frame.userId,
+                                          at: Date.now()
+                                      }
+                                  ]
+                        );
+                        return;
+                    case "settle":
+                        // Picked up on another of this person's devices. Told to
+                        // the other tabs of this browser through the same
+                        // channel one of them answering would have used, so the
+                        // card goes, the ringing stops, and the notice the
+                        // operating system drew is taken back with it.
+                        settle(frame.meetingId);
+                        return;
+                    case "drop":
+                        drop(frame.meetingId);
+                        return;
+                    case "ignore":
+                        return;
                 }
             },
-            [viewerId]
+            [drop, settle, viewerId]
         )
     );
 

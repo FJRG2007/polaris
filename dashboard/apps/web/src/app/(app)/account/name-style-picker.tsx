@@ -49,6 +49,7 @@ const FONT_LABELS: Record<core.NameFont, string> = {
     comic: "Comic",
     script: "Script",
     block: "Block",
+    bubble: "Bubble",
     techno: "Techno",
     pixel: "Pixel"
 };
