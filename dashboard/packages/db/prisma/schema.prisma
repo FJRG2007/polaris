@@ -7510,6 +7510,13 @@ model UserPrivacy {
     // organization counts as a friend for this and nothing else. Nothing lands
     // without being accepted whatever this says - it decides who may ASK.
     fileTransfers  String @default("friends")
+    // Who may ring this account. Friends by default, and for the same reason the
+    // transfer above it is: a call is the loudest thing one account can do to
+    // another - it takes over the screen of whatever they were doing and makes a
+    // noise in the room they are in. Joining a voice channel is a different
+    // question and is not this: that is a room somebody walked into, not a
+    // person being rung.
+    calls          String @default("friends")
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

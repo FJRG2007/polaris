@@ -30,7 +30,13 @@ const blockedBetween = vi.fn();
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
 vi.mock("@/lib/blocks", () => ({ blockedBetween }));
-vi.mock("@/lib/privacy-service", () => ({ allowedBy }));
+// The audience answer is stubbed; the colleague rule is not - it moved into
+// this module when a second setting wanted it, and these tests are what say it
+// still behaves the same from over here.
+vi.mock("@/lib/privacy-service", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/privacy-service")>()),
+    allowedBy
+}));
 vi.mock("@/lib/orgs/org-service", () => ({
     memberOrgIds,
     resolveOrgAccess,

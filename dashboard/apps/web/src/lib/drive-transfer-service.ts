@@ -23,7 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBetween } from "@/lib/blocks";
 import { pathExists } from "@/lib/upload-naming";
-import { allowedBy } from "@/lib/privacy-service";
+import { allowedBy, colleaguesAmong } from "@/lib/privacy-service";
 import { ensurePersonalDrive } from "@/lib/personal-drive";
 import { recordItemCreator } from "@/lib/drive-meta-service";
 import { getDriverForConnection } from "@/lib/storage-service";
@@ -111,33 +111,6 @@ export async function mayReceiveFrom(
     // not either.
     for (const id of await blockedBetween(senderId, [...allowed])) allowed.delete(id);
     return allowed;
-}
-
-/**
- * Which of these accounts share an organization with this one.
- *
- * The organization's owner is asked for separately, because an owner is never a
- * member row - otherwise the one account that answers for a company is the one
- * nobody in it can send anything to.
- */
-async function colleaguesAmong(
-    senderId: string,
-    candidateIds: readonly string[]
-): Promise<Set<string>> {
-    const mine = await memberOrgIds(senderId);
-    if (mine.length === 0) return new Set();
-    const ids = [...candidateIds];
-    const [members, owners] = await Promise.all([
-        prisma.organizationMember.findMany({
-            where: { orgId: { in: mine }, userId: { in: ids } },
-            select: { userId: true }
-        }),
-        prisma.organization.findMany({
-            where: { id: { in: mine }, ownerId: { in: ids } },
-            select: { ownerId: true }
-        })
-    ]);
-    return new Set([...members.map((row) => row.userId), ...owners.map((row) => row.ownerId)]);
 }
 
 /** Whether this account may put something on an organization's shelf, which is

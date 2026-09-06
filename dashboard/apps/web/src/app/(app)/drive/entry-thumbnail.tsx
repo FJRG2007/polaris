@@ -175,7 +175,11 @@ export function EntryThumbnail({
 
     return (
         <span ref={holder} className={cn("relative flex items-center justify-center", className)}>
-            {drawn ? null : children}
+            {/* The icon is what is there until a picture is, and it goes the
+                moment one arrives - whichever of the two arrived. A video's
+                frame sets `frame` rather than `drawn`, and leaving the icon out
+                of that put a film strip on top of the still. */}
+            {drawn || frame ? null : children}
             {frame ? (
                 <img
                     src={frame}

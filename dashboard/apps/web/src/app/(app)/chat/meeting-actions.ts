@@ -22,6 +22,7 @@ import * as meetings from "@/lib/chat/meetings";
 import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { requirePermission } from "@/lib/session";
+import { mayRing } from "@/lib/privacy-service";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { createNotification } from "@/lib/notification-service";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
@@ -76,6 +77,22 @@ export async function startCallAction(
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const off = await calls.callsUnavailable();
     if (off) return { error: off };
+    /**
+     * Their answer about being rung, asked before anybody's telephone does.
+     *
+     * Only in a one-to-one, and that is the whole distinction: ringing a person
+     * is something done TO them, while a call in a group or a channel is a room
+     * being opened - who may be in that room is the room's question, and making
+     * it depend on the settings of whoever happens to be in it would mean one
+     * member could close a channel to everybody else.
+     *
+     * Said as a refusal here rather than only by hiding the button, because a
+     * button hidden on one screen is not a rule.
+     */
+    const other = await chat.directCounterpart(user.id, channelId);
+    if (other && !(await mayRing({ id: user.id, isAdmin: user.isAdmin }, other))) {
+        return { error: "This person does not take calls from you." };
+    }
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );

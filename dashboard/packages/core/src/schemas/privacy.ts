@@ -101,6 +101,7 @@ export const PRIVACY_FIELD_LABELS = {
     followers: "The names behind your follower counts",
     friendRequests: "Who can ask to be your friend",
     fileTransfers: "Who can send you files",
+    calls: "Who can call you",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -125,6 +126,7 @@ export const PRIVACY_FIELD_NOTES = {
         "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered.",
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words.",
+    calls: "Who may ring you. A call takes over the screen of whatever you were doing and makes a noise in the room you are in, which is why this starts at your friends rather than at everybody. Joining a voice channel is not this: that is a room somebody walked into, and who may be in it is the room's own question. Anybody who cannot call you is simply not offered the button.",
     fileTransfers:
         "Who may offer you a file or a folder. Nothing ever lands without you accepting it, so this is about who may ask - anybody who cannot is simply not offered the button. People you share an organization with count as friends here; set to nobody, nobody can, including them."
 } as const;
@@ -141,6 +143,7 @@ export const PRIVACY_FIELDS = [
     "followers",
     "friendRequests",
     "fileTransfers",
+    "calls",
     "lastSeen",
     "readReceipts",
     "forwarding"
@@ -170,7 +173,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "reaching",
         label: "Reaching you",
-        fields: ["friendRequests", "fileTransfers"]
+        fields: ["friendRequests", "fileTransfers", "calls"]
     },
     {
         id: "presence",
@@ -355,6 +358,25 @@ export const privacySettingsSchema = z.object({
      * may ASK; the answer is always the recipient's.
      */
     fileTransfers: known,
+    /**
+     * Who may ring this account.
+     *
+     * Friends by default, which is the middle answer and the right one for the
+     * same reason the transfer above it takes it: a call is the loudest thing
+     * one account can do to another. It takes over the screen of whatever
+     * somebody was doing and makes a noise in the room they are in, and open by
+     * default would make every account here reachable that way by anybody who
+     * can type a username.
+     *
+     * Joining a voice channel is deliberately not this. That is a room somebody
+     * walked into, and who may be in it is the room's question rather than a
+     * property of the people already there - the setting would otherwise mean
+     * that being in a channel decided who else could use it.
+     *
+     * Anybody who may not is not told so: the button is not offered, which is
+     * the same shape every other refusal here takes.
+     */
+    calls: known,
     /**
      * Who is shown the address the account signs in with.
      *

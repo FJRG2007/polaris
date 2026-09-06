@@ -1290,6 +1290,26 @@ export async function setPinned(
 }
 
 /**
+ * The other person in a one-to-one, or null when this is not one.
+ *
+ * Asked by anything that has to treat "doing something to a person" differently
+ * from "doing something in a room" - ringing somebody is the first of those, and
+ * a group is the second however few people are in it.
+ */
+export async function directCounterpart(
+    viewerId: string,
+    channelId: string
+): Promise<string | null> {
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: channelId },
+        select: { kind: true, members: { select: { userId: true } } }
+    });
+    if (!channel || channel.kind !== "dm") return null;
+    const others = channel.members.map((member) => member.userId).filter((id) => id !== viewerId);
+    return others.length === 1 ? (others[0] ?? null) : null;
+}
+
+/**
  * The direct message with these people, opening it if it is the first time.
  *
  * A one-to-one conversation is keyed by the pair itself, so two tabs asking at

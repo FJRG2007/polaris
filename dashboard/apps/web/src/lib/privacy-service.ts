@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { friendIds } from "@/lib/friends-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { memberOrgIds } from "@/lib/orgs/org-service";
 
 /**
  * What a new account's follower lists are visible to.
@@ -68,6 +69,7 @@ const AUDIENCE_COLUMNS = {
     lastSeen: true,
     forwarding: true,
     fileTransfers: true,
+    calls: true,
     discoverable: true,
     readReceipts: true
 } as const;
@@ -126,6 +128,63 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
         )
     );
     return parsed.success ? parsed.data : core.DEFAULT_PRIVACY;
+}
+
+/**
+ * Which of these accounts share an organization with this one.
+ *
+ * The organization's owner is asked for separately, because an owner is never a
+ * member row - otherwise the one account that answers for a company is the one
+ * nobody in it can send anything to.
+ *
+ * Here rather than beside one of its callers: "a colleague counts as a friend"
+ * is a rule about privacy, and the second setting to want it - who may ring you
+ * - would otherwise have copied it.
+ */
+export async function colleaguesAmong(
+    senderId: string,
+    candidateIds: readonly string[]
+): Promise<Set<string>> {
+    const mine = await memberOrgIds(senderId);
+    if (mine.length === 0) return new Set();
+    const ids = [...candidateIds];
+    const [members, owners] = await Promise.all([
+        prisma.organizationMember.findMany({
+            where: { orgId: { in: mine }, userId: { in: ids } },
+            select: { userId: true }
+        }),
+        prisma.organization.findMany({
+            where: { id: { in: mine }, ownerId: { in: ids } },
+            select: { ownerId: true }
+        })
+    ]);
+    return new Set([...members.map((row) => row.userId), ...owners.map((row) => row.ownerId)]);
+}
+
+/**
+ * Whether one account may ring another.
+ *
+ * Its own function because a call is asked about one person at a time and the
+ * answer decides whether a button exists, so both the screen drawing it and the
+ * action behind it ask exactly the same question - a check that lived only in
+ * the action would be a button that fails when pressed, and one that lived only
+ * in the screen would be no check at all.
+ *
+ * Ringing yourself is allowed, because there is nothing to protect anybody from:
+ * a call to your own conversation is a call to your other devices.
+ *
+ * Colleagues count as friends, as they do for a transfer and for the same
+ * reason: being put in one organization is somebody with authority over both
+ * accounts saying they work together, which is a stronger statement than a
+ * friend request. An account that says nobody still means nobody.
+ */
+export async function mayRing(viewer: PrivacyViewer, targetId: string): Promise<boolean> {
+    if (viewer.id === targetId) return true;
+    const allowed = await allowedBy(viewer, "calls", [targetId]);
+    if (allowed.has(targetId)) return true;
+    const colleagues = await colleaguesAmong(viewer.id, [targetId]);
+    if (colleagues.size === 0) return false;
+    return (await allowedBy(viewer, "calls", [targetId], colleagues)).has(targetId);
 }
 
 /**
