@@ -82,8 +82,16 @@ export function TelemetryView({
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
 
+    // Through `runAction` rather than awaited bare. An action that rejects rather
+    // than returning `{ error }` - the server threw, or this tab is holding action
+    // ids from a build that has been replaced - used to leave the screen on its
+    // skeleton with nothing said and nothing to press.
     const load = useCallback(async () => {
-        const result = await actions.telemetryOverviewAction({ projectId, status, query });
+        const result = await runAction(
+            () => actions.telemetryOverviewAction({ projectId, status, query }),
+            setError
+        );
+        if (!result) return;
         if (result.error) {
             setError(result.error);
             return;
@@ -111,8 +119,12 @@ export function TelemetryView({
             return;
         }
         let live = true;
-        void actions.openIssueAction(project.id, issueId).then((result) => {
+        // The same rule as the list above, and this is the call it was written
+        // for: opening a fault from a tab whose build had been replaced refused
+        // silently, so the row was pressed and the screen did not move.
+        void runAction(() => actions.openIssueAction(project.id, issueId), setError).then((result) => {
             if (!live) return;
+            if (!result) return;
             if (result.error) setError(result.error);
             setIssue(result.issue ?? null);
         });

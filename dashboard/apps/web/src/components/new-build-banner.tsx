@@ -23,7 +23,13 @@ import { Button } from "@polaris/ui";
 import { ArrowUpCircle, RotateCcw } from "lucide-react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { rememberCall } from "@/app/(app)/chat/call-resume";
-import { checkForNewBuild, newBuildReady, rememberServedBuild, subscribeToBuild } from "@/lib/new-build";
+import {
+    checkForNewBuild,
+    newBuildReady,
+    rememberServedBuild,
+    subscribeToBuild,
+    watchForStaleFailures
+} from "@/lib/new-build";
 
 /** Slow on purpose. Nothing here is urgent - the failure it prevents needs the
  *  reader to click something first - and every open tab pays for it. */
@@ -60,8 +66,12 @@ export function NewBuildBanner({ served }: { served: string | null }) {
         };
         document.addEventListener("visibilitychange", onWake);
         window.addEventListener("focus", onWake);
+        // And whatever fails without anybody catching it, which is the case the
+        // poll is too slow for: the click has already been pressed.
+        const unwatch = watchForStaleFailures();
         return () => {
             clearInterval(timer);
+            unwatch();
             document.removeEventListener("visibilitychange", onWake);
             window.removeEventListener("focus", onWake);
         };
