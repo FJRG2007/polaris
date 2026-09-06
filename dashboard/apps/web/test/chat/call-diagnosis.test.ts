@@ -247,26 +247,30 @@ describe("what is arriving", () => {
 });
 
 describe("a call that has never had a byte of sound", () => {
-    it("names the way sound reaches this machine rather than saying rejoin", () => {
+    it("names the screen that measures rather than guessing at the cause", () => {
         // The fault the logs actually showed: signalling up, both names on
-        // screen, and not one packet of audio in either direction because the
-        // two people are on different networks and nothing relays between them.
-        // Telling somebody to leave and rejoin sends them round that loop for
-        // ever.
+        // screen, and not one packet of audio in either direction. Telling
+        // somebody to leave and rejoin sends them round that loop for ever.
+        //
+        // And it must not name a cause either. This used to open with "the two
+        // of you are on different networks", which on this deployment was
+        // false - the ports were open and the call server was handing out
+        // addresses that only exist inside a container - and it cost somebody
+        // days on a router that had nothing wrong with it.
         const report = diagnoseCall(
             working({ everHeard: false, others: [heard({ subscribed: false })] })
         );
 
         expect(report.ok).toBe(false);
-        expect(report.fix).toContain("different networks");
         expect(report.fix).toContain("Call ports");
+        expect(report.fix).not.toContain("different networks");
         expect(report.fix).not.toContain("Leave the call and join it again");
     });
 
     it("says the same when something subscribed but nothing ever arrived", () => {
         const report = diagnoseCall(working({ everHeard: false, others: [heard({ arriving: false })] }));
 
-        expect(report.fix).toContain("different networks");
+        expect(report.fix).toContain("Call ports");
     });
 
     it("still says rejoin for a call that had sound and lost it", () => {
