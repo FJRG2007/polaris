@@ -1,11 +1,16 @@
 /**
  * Handing writing back.
  *
- * A note, a folder, or a whole notebook, as a zip of Markdown files arranged the
- * way a vault is on disk. It is the mirror of the import and it exists for the
- * same reason the body is stored as Markdown in the first place: what somebody
- * wrote is theirs, and a place they cannot get it out of is a place they should
- * not have put it.
+ * A note, a folder, or a whole notebook, as Markdown files arranged the way a
+ * vault is on disk. It is the mirror of the import and it exists for the same
+ * reason the body is stored as Markdown in the first place: what somebody wrote
+ * is theirs, and a place they cannot get it out of is a place they should not
+ * have put it.
+ *
+ * A zip only where there is more than one file in it. Exporting one note handed
+ * back an archive holding a single `.md` - a folder to open and a file to drag
+ * out of it before anybody can read what they already had, and on a phone a
+ * format that mostly cannot be opened at all.
  *
  * The layout is decided by `@polaris/core/notes-export`, which is pure and
  * tested. What is here is which rows to read - and that is the half with the
@@ -30,6 +35,8 @@ export interface Archive {
     readonly name: string;
     readonly bytes: Uint8Array;
     readonly notes: number;
+    /** What it actually is, so the route does not have to assume a zip. */
+    readonly contentType: string;
 }
 
 const SELECT = {
@@ -52,11 +59,29 @@ export async function exportArchive(actor: access.NoteActor, scope: ExportScope)
     const { notes, folders, name } = await gather(actor, scope);
     const files = core.layOutExport(notes, folders);
 
+    // One file is handed over as the file. Its own name rather than the scope's,
+    // because the layout already decided what a note is called on disk, and two
+    // names for one download is how an export and a re-import stop agreeing.
+    const only = files.length === 1 ? files[0] : undefined;
+    if (only) {
+        return {
+            name: only.path.split("/").pop() || `${core.fileNameFor(name)}.md`,
+            bytes: new TextEncoder().encode(only.text),
+            notes: 1,
+            contentType: "text/markdown; charset=utf-8"
+        };
+    }
+
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     for (const file of files) zip.file(file.path, file.text);
     const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-    return { name: `${core.fileNameFor(name)}.zip`, bytes, notes: files.length };
+    return {
+        name: `${core.fileNameFor(name)}.zip`,
+        bytes,
+        notes: files.length,
+        contentType: "application/zip"
+    };
 }
 
 async function gather(

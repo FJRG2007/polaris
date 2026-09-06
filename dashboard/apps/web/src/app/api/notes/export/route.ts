@@ -2,10 +2,13 @@
  * Downloading writing as a folder of Markdown.
  *
  * A route rather than a server action because what comes back is a file: an
- * action returns a value into the page, and handing somebody a zip means the
- * browser has to do the downloading. It is a GET so the link can be an ordinary
- * link, which is also what makes it work from the right-click menu without any
- * of the machinery a form post would need.
+ * action returns a value into the page, and handing somebody a download means
+ * the browser has to do it. It is a GET so the link can be an ordinary link,
+ * which is also what makes it work from the right-click menu without any of the
+ * machinery a form post would need.
+ *
+ * A zip only when there is more than one file in it; one note comes back as the
+ * Markdown itself, so the content type is the archive's rather than assumed.
  *
  * Authorization is the app's own, not the route being unguarded: `notes.use` to
  * be here at all, and then `lib/notes/access` on the exact thing being asked
@@ -37,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
         const archive = await exportArchive({ id: user.id, isAdmin: user.isAdmin }, scope);
         return new Response(archive.bytes as BodyInit, {
             headers: {
-                "content-type": "application/zip",
+                "content-type": archive.contentType,
                 // The quoted form, because a notebook is allowed to be called
                 // "Q3 planning" and an unquoted header stops at the space.
                 "content-disposition": `attachment; filename="${archive.name.replace(/"/g, "")}"`,
