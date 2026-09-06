@@ -92,11 +92,17 @@ export function CallPortsCard() {
                                 </p>
                             </div>
                             {!entry.probeable ? (
-                                // Not a verdict. This port answers nothing a
-                                // stranger can send it, so calling it "not
-                                // confirmed" would put a warning on a port that
-                                // is very likely open.
-                                <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be checked from here - forward it alongside the other one">
+                                // Not a verdict, and no longer an instruction
+                                // either. It used to end "forward it alongside
+                                // the other one", which is how somebody spent
+                                // days on a router that was correct: measured
+                                // from a machine on another network, an
+                                // unsolicited packet to this port does not
+                                // arrive - and a call from that same machine
+                                // connects anyway, because the call server
+                                // reaches out first and the reply comes back the
+                                // way it went.
+                                <Badge title="Nothing answers an unsolicited packet on this port, so it cannot be tested from here. Calls do not depend on it: the call server reaches out first, and forwarding it only helps on networks where that does not work">
                                     Cannot be checked
                                 </Badge>
                             ) : !reading.running ? (
