@@ -15,7 +15,7 @@
  */
 
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import type { TaskRow } from "@/lib/tasks/facts";
 import type { SpaceContext } from "@/lib/tasks/facts";
@@ -201,25 +201,24 @@ export function TaskStatusMarker({ commands }: { commands: TaskCommands }) {
     );
 }
 
-/** What the menu is in the middle of making, or nothing. */
-type Draft = "tag" | "status";
-
 /**
- * Making a tag or a status from the task that needs it.
+ * Making a status from the task that needs one.
  *
  * The alternative is leaving the menu, finding the space's settings, adding the
  * thing, coming back and finding the task again - by which point the reason for
- * the tag has usually been forgotten. A dialog rather than a field inside the
- * menu because a status is not just a name: its kind is what decides whether
- * work sitting in it counts as finished, and guessing that from the word
- * somebody typed is how a board ends up reporting the wrong thing.
+ * it has usually been forgotten. A dialog because a status is not just a name:
+ * its kind is what decides whether work sitting in it counts as finished, and
+ * guessing that from the word somebody typed is how a board ends up reporting
+ * the wrong thing.
+ *
+ * A tag is only a name, so it is not made here. It is typed into the submenu's
+ * own search and created from there, which is what the picker inside a task has
+ * always done - the menu opening a dialog for the same act was the odd one out.
  */
-function CreateDialog({
-    what,
+function CreateStatusDialog({
     onClose,
     onCreate
 }: {
-    what: Draft;
     onClose: () => void;
     onCreate: (draft: { name: string; type: core.TaskStatusType; color: string }) => Promise<string | null>;
 }) {
@@ -229,9 +228,7 @@ function CreateDialog({
     const [busy, setBusy] = useState(false);
 
     const trimmed = name.trim();
-    // Until somebody picks one, a tag takes the colour its name always gets, so
-    // the same tag made here and made from the picker comes out the same.
-    const color = picked ?? (what === "tag" ? tagColorFor(trimmed || "tag") : "#64748b");
+    const color = picked ?? "#64748b";
 
     const submit = async () => {
         if (!trimmed || busy) return;
@@ -245,12 +242,8 @@ function CreateDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{what === "tag" ? "New tag" : "New status"}</DialogTitle>
-                    <DialogDescription>
-                        {what === "tag"
-                            ? "Added to this space and put on this task."
-                            : "Added to this space and set on this task."}
-                    </DialogDescription>
+                    <DialogTitle>New status</DialogTitle>
+                    <DialogDescription>Added to this space and set on this task.</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
@@ -258,7 +251,7 @@ function CreateDialog({
                         <Input
                             autoFocus
                             value={name}
-                            placeholder={what === "tag" ? "backend" : "On hold"}
+                            placeholder="On hold"
                             onChange={(event) => setName(event.target.value)}
                             onKeyDown={(event) => {
                                 if (event.key !== "Enter") return;
@@ -268,8 +261,7 @@ function CreateDialog({
                         />
                     </label>
 
-                    {what === "status" && (
-                        <div className="flex flex-col gap-1 text-sm">
+                    <div className="flex flex-col gap-1 text-sm">
                             Kind
                             <div className="flex flex-wrap gap-1">
                                 {core.TASK_STATUS_TYPES.map((entry) => (
@@ -289,16 +281,15 @@ function CreateDialog({
                                     </button>
                                 ))}
                             </div>
-                            <p className="text-xs text-muted-foreground">{core.TASK_STATUS_TYPE_HINTS[type]}</p>
-                        </div>
-                    )}
+                        <p className="text-xs text-muted-foreground">{core.TASK_STATUS_TYPE_HINTS[type]}</p>
+                    </div>
 
                     <label className="flex items-center gap-2 text-sm">
                         Colour
                         <input
                             type="color"
                             value={color}
-                            aria-label={what === "tag" ? "Tag color" : "Status color"}
+                            aria-label="Status color"
                             onChange={(event) => setPicked(event.target.value)}
                             className="size-8 cursor-pointer rounded border border-border bg-transparent"
                         />
@@ -337,7 +328,11 @@ function sharedBy(tasks: readonly TaskRow[], idsOf: (task: TaskRow) => readonly 
 export function TaskMenu({ commands, children }: { commands: TaskCommands; children: React.ReactNode }) {
     const { task, targets, context, canEdit } = commands;
     const baseUrl = useAppUrl();
-    const [drafting, setDrafting] = useState<Draft | null>(null);
+    const [drafting, setDrafting] = useState(false);
+    /** True while a tag typed into the submenu is being made, so a second enter
+     *  in the same tick does not make it twice - the picker inside a task guards
+     *  the same way and for the same reason. */
+    const makingTag = useRef(false);
     /**
      * What has been typed into each submenu that lists things a workspace keeps
      * adding to. Held here rather than inside the submenus because a submenu is
@@ -395,6 +390,11 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     const matchingStatuses = context.statuses.filter((status) => menuSearchMatches(status.name, statusQuery));
     const matchingPeople = context.people.filter((person) => menuSearchMatches(person.name, peopleQuery));
     const matchingTags = context.tags.filter((tag) => menuSearchMatches(tag.name, tagQuery));
+    // Whether what has been typed is a tag that does not exist yet, which is the
+    // only state in which making one is on offer.
+    const typedTagIsNew =
+        tagQuery.trim().length > 0 &&
+        !context.tags.some((tag) => tag.name.toLowerCase() === tagQuery.trim().toLowerCase());
     const matchingLists = destinations.filter((list) => menuSearchMatches(list.name, listQuery));
 
     // Two lists called "Tasks" in this menu is a question the reader cannot
@@ -406,19 +406,47 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
     );
 
     const create = async (draft: { name: string; type: core.TaskStatusType; color: string }) => {
-        if (drafting === "tag") {
-            const id = (await commands.onCreateTag?.(draft.name, draft.color)) ?? null;
-            if (id) commands.onApply({ addTagIds: [id] });
-            return id;
-        }
         const id = (await commands.onCreateStatus?.(draft.name, draft.type, draft.color)) ?? null;
         if (id) commands.onApply({ statusId: id });
         return id;
     };
 
+    /**
+     * The tag that has just been typed: put on the task if that name already
+     * exists, made first if it does not.
+     *
+     * The same act as the picker inside a task, in the same gesture - typing the
+     * name IS choosing it. The menu used to answer this with a dialog, which
+     * asked somebody to confirm a name they had just finished typing and to pick
+     * a colour they had no opinion about.
+     *
+     * Only an exact name counts as already existing. Typing "back" while
+     * "backend" is there means "back": picking the near miss is what leaves work
+     * filed under a tag nobody meant.
+     */
+    const applyTypedTag = async () => {
+        const name = tagQuery.trim();
+        if (!name || makingTag.current) return;
+        const existing = context.tags.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+            if (!tagged.has(existing.id)) commands.onApply({ addTagIds: [existing.id] });
+            setTagQuery("");
+            return;
+        }
+        if (!commands.onCreateTag) return;
+        makingTag.current = true;
+        try {
+            const id = await commands.onCreateTag(name, tagColorFor(name));
+            if (id) commands.onApply({ addTagIds: [id] });
+            setTagQuery("");
+        } finally {
+            makingTag.current = false;
+        }
+    };
+
     return (
         <>
-            {drafting && <CreateDialog what={drafting} onClose={() => setDrafting(null)} onCreate={create} />}
+            {drafting && <CreateStatusDialog onClose={() => setDrafting(false)} onCreate={create} />}
             {/* The people this space can assign are fetched the moment the menu
                 opens rather than when the Assign submenu does, so their faces are
                 already in the browser by the time anybody reaches them. */}
@@ -483,7 +511,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                             <ContextMenuSeparator />
                                             <ContextMenuItem
                                                 className="gap-2"
-                                                onSelect={() => setDrafting("status")}
+                                                onSelect={() => setDrafting(true)}
                                             >
                                                 <Plus className="size-3.5" />
                                                 New status
@@ -594,17 +622,29 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         Tags
                                     </ContextMenuSubTrigger>
                                     <ContextMenuSubContent className="w-56 pt-2">
-                                        {context.tags.length > 0 && (
+                                        {(context.tags.length > 0 || commands.onCreateTag) && (
                                             <MenuSearch
                                                 value={tagQuery}
                                                 onChange={setTagQuery}
-                                                placeholder="Find a tag"
+                                                onSubmit={() => void applyTypedTag()}
+                                                placeholder={
+                                                    commands.onCreateTag
+                                                        ? "Find or create a tag"
+                                                        : "Find a tag"
+                                                }
                                             />
                                         )}
                                         <div className="max-h-64 overflow-y-auto">
-                                            {context.tags.length > 0 && matchingTags.length === 0 && (
+                                            {context.tags.length > 0 &&
+                                                matchingTags.length === 0 &&
+                                                !typedTagIsNew && (
+                                                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                        No tag matches that.
+                                                    </p>
+                                                )}
+                                            {context.tags.length === 0 && !typedTagIsNew && (
                                                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                    No tag matches that.
+                                                    Type a name to make the first one.
                                                 </p>
                                             )}
                                             {matchingTags.map((tag) => {
@@ -632,17 +672,30 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 );
                                             })}
                                         </div>
-                                        {commands.onCreateTag && (
-                                            <>
-                                                {context.tags.length > 0 && <ContextMenuSeparator />}
-                                                <ContextMenuItem
-                                                    className="gap-2"
-                                                    onSelect={() => setDrafting("tag")}
-                                                >
-                                                    <Plus className="size-3.5" />
-                                                    New tag
-                                                </ContextMenuItem>
-                                            </>
+                                        {/* The offer is the name that has been
+                                            typed, not an empty "New tag" that
+                                            opens somewhere else to type it
+                                            again. */}
+                                        {commands.onCreateTag && typedTagIsNew && (
+                                            <ContextMenuItem
+                                                className="gap-2"
+                                                onSelect={(event) => {
+                                                    // Kept open: a task usually
+                                                    // gets more than one tag, and
+                                                    // the field is emptied ready
+                                                    // for the next.
+                                                    event.preventDefault();
+                                                    void applyTypedTag();
+                                                }}
+                                            >
+                                                <Plus className="size-3.5" />
+                                                <span className="flex-1 truncate">
+                                                    Create &ldquo;{tagQuery.trim()}&rdquo;
+                                                </span>
+                                                <span className="text-[0.625rem] text-muted-foreground">
+                                                    Enter
+                                                </span>
+                                            </ContextMenuItem>
                                         )}
                                     </ContextMenuSubContent>
                                 </ContextMenuSub>
