@@ -91,6 +91,18 @@ export interface CallState {
     readonly cameras: readonly CallDevice[];
     readonly microphoneId: string | null;
     readonly cameraId: string | null;
+    /**
+     * Whether your own tile is drawn the way a mirror would draw it.
+     *
+     * Yours only, and never what is sent: a camera pointed at a face already
+     * sends a picture that is the right way round for everybody watching it, and
+     * flipping that would turn the writing on your shirt backwards for them.
+     * Worked out from which way the camera faces, and overridable - see
+     * `call-mirror`.
+     */
+    readonly mirrored: boolean;
+    /** Draw it the other way round, and remember that for this browser. */
+    flipCamera: () => void;
     /** How much picture to send, as chosen. `auto` is the default and means the
      *  connection decides - see `call-quality`. */
     readonly cameraQuality: CallQuality;

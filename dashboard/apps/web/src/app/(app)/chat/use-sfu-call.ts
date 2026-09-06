@@ -52,6 +52,7 @@ import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { callDevices, openMedia, settle } from "./call-media";
+import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
@@ -257,6 +258,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     const [cameras, setCameras] = useState<readonly CallDevice[]>([]);
     const [microphoneId, setMicrophoneId] = useState<string | null>(null);
     const [cameraId, setCameraId] = useState<string | null>(null);
+    /**
+     * Which way round your own picture is drawn for you.
+     *
+     * Local to this browser and never sent: mirroring what other people receive
+     * would turn the writing on your shirt backwards for them. What is kept here
+     * is the camera's own answer about which way it faces, so the default can be
+     * the right one without anybody being asked - see `call-mirror`.
+     */
+    const [cameraFacing, setCameraFacing] = useState<string | null>(null);
+    const [mirror, setMirror] = useState<MirrorChoice>("auto");
+    useEffect(() => setMirror(mirrorChoice()), []);
     const [micFilter, setMicFilter] = useState<FilteredMic["using"] | null>(null);
     /**
      * The microphone as something the gate can watch.
@@ -798,15 +810,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          */
         let reported = "";
 
+        /**
+         * A permission the browser has not granted, which outranks everything
+         * else this call has to say.
+         *
+         * Somebody who never allowed the microphone joined, was told so, and
+         * then watched that sentence replaced a second later by one about the
+         * call server - a report about a call that was never going to carry
+         * anything either way. The server's news is true and it is not the
+         * answer, so while this stands nothing else writes over it.
+         */
+        let blocked = "";
+
         /** Say why the call has not started. */
         function report(message: string): void {
             reported = message;
+            if (blocked) return;
             setError(message);
         }
 
         /** Take back what the last failed attempt said, if it is still what the
          *  screen is showing. */
         function connected(): void {
+            // The devices are still refused, so the call server being reachable
+            // changes nothing the reader can see. Their message stays.
+            if (blocked) return;
             if (!reported) return;
             const stale = reported;
             reported = "";
@@ -969,7 +997,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     if (stopped) return;
                     setRemote(new Map());
                     setScreens(new Map());
-                    setError(
+                    report(
                         "This call lost the call server. Nothing more will be heard until it is back."
                     );
                 });
@@ -1111,6 +1139,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 }
                 setMicrophoneId(mic.current?.getSettings().deviceId ?? null);
                 setCameraId(camera.current?.getSettings().deviceId ?? null);
+                setCameraFacing(camera.current?.getSettings().facingMode ?? null);
                 publishLocalPreview();
                 void listDevices();
                 // Built before anything is published, so the first packet already
@@ -1122,6 +1151,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // What could not be opened is said out loud, because sitting in a
             // room where nobody can hear you and nothing says so is the worst
             // version of this.
+            //
+            // A permission that was refused is not that: it is a question only
+            // the reader can answer, and until they do nothing they try will
+            // work. It stands until the devices open.
+            if (opened.denied && !opened.stream) blocked = opened.note;
             if (opened.note) setError(opened.note);
 
             if (stopped) return;
@@ -1431,6 +1465,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 setHasCamera(track !== null);
                 setCameraOn(track !== null);
                 setCameraId(track?.getSettings().deviceId ?? null);
+                setCameraFacing(track?.getSettings().facingMode ?? null);
                 await publish(CAMERA, track);
                 publishLocalPreview();
                 void listDevices();
@@ -1543,6 +1578,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         track.enabled = cameraOn;
                         camera.current = track;
                         setCameraId(deviceId);
+                        setCameraFacing(track.getSettings().facingMode ?? null);
                         // The screen is its own publication, so a camera swap
                         // never touches it: picking a different camera is not a
                         // decision to stop sharing.
@@ -2125,6 +2161,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         cameras,
         microphoneId,
         cameraId,
+        /** Whether your own tile is drawn mirrored, and the way to flip it. */
+        mirrored: mirrorsPicture(mirror, cameraFacing),
+        flipCamera: () => {
+            const next: MirrorChoice = mirrorsPicture(mirror, cameraFacing) ? "off" : "on";
+            setMirror(next);
+            setMirrorChoice(next);
+        },
         cameraQuality: chosen.camera,
         screenQuality: chosen.screen,
         cameraLevel,

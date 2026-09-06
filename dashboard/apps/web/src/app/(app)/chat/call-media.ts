@@ -30,7 +30,7 @@ import { micConstraints } from "./mic-cleanup";
 export async function openMedia(
     withVideo: boolean,
     camera?: MediaTrackConstraints
-): Promise<{ stream: MediaStream | null; note: string }> {
+): Promise<{ stream: MediaStream | null; note: string; denied: boolean }> {
     const ask = (audio: boolean, video: boolean) =>
         navigator.mediaDevices.getUserMedia({
             // Echo, background noise and a level that keeps somebody audible
@@ -45,22 +45,47 @@ export async function openMedia(
         });
 
     try {
-        return { stream: await ask(true, withVideo), note: "" };
+        return { stream: await ask(true, withVideo), note: "", denied: false };
     } catch (first) {
-        if (!withVideo) return { stream: null, note: refused(first, "microphone") };
+        if (!withVideo) {
+            return { stream: null, note: refused(first, "microphone"), denied: isDenial(first) };
+        }
 
         // The camera is the likelier of the two to be busy, and the one nobody
         // needs. Try again without it before giving up on being heard.
         try {
-            return { stream: await ask(true, false), note: refused(first, "camera") };
+            return { stream: await ask(true, false), note: refused(first, "camera"), denied: false };
         } catch (second) {
             try {
-                return { stream: await ask(false, true), note: refused(second, "microphone") };
-            } catch {
-                return { stream: null, note: refused(second, "microphone or camera") };
+                return {
+                    stream: await ask(false, true),
+                    note: refused(second, "microphone"),
+                    denied: false
+                };
+            } catch (third) {
+                return {
+                    stream: null,
+                    note: refused(second, "microphone or camera"),
+                    denied: isDenial(second) || isDenial(third)
+                };
             }
         }
     }
+}
+
+/**
+ * Whether the browser refused rather than failed.
+ *
+ * The difference decides who has to do something. A device that is busy or
+ * missing is a fact about the machine and the call can go ahead without it; a
+ * permission that was never granted is a question the reader has to answer, and
+ * until they do, nothing they try will work - so it is the one failure that has
+ * to stay on screen instead of being replaced a second later by whatever the
+ * call server had to say about a call that was never going to carry anything.
+ */
+export function isDenial(error: unknown): boolean {
+    const name = error instanceof Error ? error.name : "";
+    return name === "NotAllowedError" || name === "SecurityError";
 }
 
 /**
@@ -73,7 +98,7 @@ export async function openMedia(
 export function refused(error: unknown, what: string): string {
     const name = error instanceof Error ? error.name : "";
     if (name === "NotAllowedError" || name === "SecurityError") {
-        return `Polaris was not allowed to use your ${what}. Allow it in the address bar and rejoin.`;
+        return `Polaris has not been allowed to use your ${what}. Your browser is blocking it, not Polaris: open the permissions beside the address and allow it, then rejoin.`;
     }
     if (name === "NotReadableError" || name === "AbortError") {
         return `Your ${what} is busy - another application is holding it. Close it, or pick a different device, and rejoin.`;

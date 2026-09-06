@@ -428,6 +428,7 @@ export function CallRoom({
                             name="You"
                             personId={mine?.userId ?? viewerId ?? null}
                             own
+                            mirrored={call.mirrored}
                             focused
                             onFocus={() => focus(live)}
                             cameraOff={!call.cameraOn}
@@ -482,6 +483,7 @@ export function CallRoom({
                         name="You"
                         personId={mine?.userId ?? viewerId ?? null}
                         own
+                        mirrored={call.mirrored}
                         speaking={
                             call.participantId !== null &&
                             call.speaking.has(call.participantId) &&
@@ -574,6 +576,8 @@ export function CallRoom({
                     level={call.cameraLevel}
                     onQuality={call.setCameraQuality}
                     qualityLabel="Video quality"
+                    mirrored={call.mirrored}
+                    onMirror={call.flipCamera}
                 />
 
                 <Split
@@ -719,7 +723,9 @@ function Split({
     quality,
     level,
     onQuality,
-    qualityLabel
+    qualityLabel,
+    mirrored,
+    onMirror
 }: {
     label: string;
     icon: React.ReactNode;
@@ -749,11 +755,20 @@ function Split({
     filterRunning?: FilteredMic["using"] | null;
     /** Whether this instance has a licensed filter to offer. */
     licensedOffered?: boolean;
+    /** Camera only: which way round your own picture is drawn for you. It lives
+     *  in this menu because it is a fact about this camera, and it is the menu
+     *  somebody opens when the picture looks wrong. */
+    mirrored?: boolean;
+    onMirror?: () => void;
 }) {
     // Worth a menu for the setting alone: a machine with one microphone still
     // sits in a room with a fan in it, and a machine with one screen still has a
     // choice to make about how much of it to send.
-    const hasMenu = devices.length > 1 || onCleanMic !== undefined || onQuality !== undefined;
+    const hasMenu =
+        devices.length > 1 ||
+        onCleanMic !== undefined ||
+        onQuality !== undefined ||
+        onMirror !== undefined;
     const showing = ladder && level ? ladder.rungs[level] : null;
 
     return (
@@ -788,6 +803,26 @@ function Split({
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" side="top" className="max-w-72">
+                        {onMirror && (
+                            <>
+                                <DropdownMenuItem onSelect={onMirror}>
+                                    <Check
+                                        className={cn(
+                                            "size-3.5 shrink-0",
+                                            mirrored ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    <span className="flex min-w-0 flex-col">
+                                        <span>Mirror my picture</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Only how you see yourself. Everybody else sees you the
+                                            way round your camera does.
+                                        </span>
+                                    </span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                            </>
+                        )}
                         {onQuality && ladder && quality && level && showing && (
                             <>
                                 <DropdownMenuLabel>{qualityLabel}</DropdownMenuLabel>
@@ -928,6 +963,7 @@ function Tile({
     name,
     personId,
     own = false,
+    mirrored = false,
     guest = false,
     cameraOff = false,
     sharing = false,
@@ -952,6 +988,9 @@ function Tile({
     /** Yours. The only tile whose picture may be cropped to fill the frame,
      *  because it is the only one this browser knows the shape of. */
     own?: boolean;
+    /** Draw it the way a mirror would. Your own tile only, and never what is
+     *  sent - see `call-mirror`. */
+    mirrored?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
     /** Whether you are sharing a screen. Said on your own tile because the
@@ -1132,6 +1171,11 @@ function Tile({
                     // sharing has its own tile up on the stage - so this no
                     // longer has to ask which of the two it is holding.
                     own ? "object-cover" : "object-contain",
+                    // Yours only. Everybody else's picture is already the right
+                    // way round for the person watching it, and flipping what
+                    // goes out would turn the writing on your shirt backwards
+                    // for them.
+                    mirrored && "-scale-x-100",
                     blank && "invisible"
                 )}
             />
