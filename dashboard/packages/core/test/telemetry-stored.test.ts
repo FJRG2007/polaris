@@ -43,6 +43,27 @@ describe("readStoredEvent", () => {
         expect(event.platform).toBe("node");
     });
 
+    /**
+     * Everything here crosses from a server action into a client component, and
+     * React refuses anything with a null prototype on that trip: "Only plain
+     * objects, and a few built-ins, can be passed to Client Components". The tag
+     * map is built by the ingest's own reader, which deliberately has no
+     * prototype so a key called `__proto__` from a crashing program reaches
+     * nothing - so it is the one value that has to be turned back into an
+     * ordinary object on the way out.
+     */
+    it("hands back values a client component can be given", () => {
+        const event = readStoredEvent(BEFORE);
+        expect(Object.getPrototypeOf(event.tags)).toBe(Object.prototype);
+    });
+
+    it("still does not let a stored key reach the prototype", () => {
+        const event = readStoredEvent(JSON.stringify({ tags: { __proto__: "owned", ok: "1" } }));
+        expect(event.tags.ok).toBe("1");
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+        expect(Object.getPrototypeOf(event.tags)).toBe(Object.prototype);
+    });
+
     it("reads a row in the current shape whole", () => {
         const event = readStoredEvent(
             JSON.stringify({

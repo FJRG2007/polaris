@@ -22,10 +22,43 @@
  */
 
 import { cn } from "@polaris/ui";
+import { createContext, useContext } from "react";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { nameLookOf, nameplateOf, type Nameplate } from "@polaris/core";
 import { nameStyleClass, nameLookCss, nameplateCss } from "@/lib/profile-style-css";
 import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from "react";
+
+/**
+ * The places a person is a row of data rather than a person.
+ *
+ * An account list under Administration, and any picker where somebody is being
+ * chosen for something, are both read by scanning: what is wanted is the name
+ * that matches, found among two hundred others, as fast as the eye can move down
+ * the column. A gradient across the letters and a plate behind the row are the
+ * two things that stop that working, and neither of them is what the reader came
+ * for - they are what their owner chose to say about themselves somewhere it is
+ * their turn to speak.
+ *
+ * So it is switched off by surface rather than by call site. `<PlainNames>`
+ * around a table or a picker, and every name and every plate inside it draws as
+ * everybody else's does, however deep it is and whichever list is added there
+ * next. The alternative - a prop on each of thirty call sites - is a rule that
+ * holds until the thirty-first.
+ *
+ * Everywhere else keeps them: Chat, a profile, the direct message list, the
+ * members of a server, the people already assigned to a task. Those are the
+ * screens the choice was made for.
+ */
+const PlainNamesContext = createContext(false);
+
+export function PlainNames({ children }: { children: ReactNode }) {
+    return <PlainNamesContext.Provider value={true}>{children}</PlainNamesContext.Provider>;
+}
+
+/** Whether this part of the screen draws people plainly. */
+export function useNamesArePlain(): boolean {
+    return useContext(PlainNamesContext);
+}
 
 export function PersonName({
     id,
@@ -43,7 +76,9 @@ export function PersonName({
      *  that ends the name. */
     children?: ReactNode;
 }) {
-    const style = nameLookOf(useProfileStyle(id)?.nameStyle ?? null);
+    const plain = useNamesArePlain();
+    const chosen = nameLookOf(useProfileStyle(id)?.nameStyle ?? null);
+    const style = plain ? null : chosen;
     return (
         <span
             className={cn(className, nameStyleClass(style))}
@@ -64,7 +99,9 @@ export function PersonName({
  * second element inside every list in the product.
  */
 export function usePersonNameplate(id: string | null | undefined): Nameplate | null {
-    return nameplateOf(useProfileStyle(id)?.nameplate ?? null);
+    const plain = useNamesArePlain();
+    const plate = nameplateOf(useProfileStyle(id)?.nameplate ?? null);
+    return plain ? null : plate;
 }
 
 /** The class a row wears while it is on a plate: the hover tint and the border

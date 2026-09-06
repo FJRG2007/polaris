@@ -688,7 +688,13 @@ export function readStoredEvent(detail: string): StoredEventFacts {
     return {
         frames: storedFrames(stored.frames),
         breadcrumbs: storedBreadcrumbs(stored.breadcrumbs),
-        tags: tagsOf(stored.tags),
+        // Spread onto an ordinary object. `tagsOf` builds one with no prototype,
+        // which is right at the ingest - a key called `__proto__` arriving from a
+        // crashing program must not reach anything - and wrong here, because this
+        // value is handed from a server action to a client component and React
+        // refuses to serialize a null prototype across that boundary. The spread
+        // copies own keys as data, so the protection it was made for still holds.
+        tags: { ...tagsOf(stored.tags) },
         contexts: storedContexts(stored.contexts),
         request: storedRequest(stored.request),
         sdk: sdkOf(stored.sdk),
