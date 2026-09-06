@@ -24,6 +24,7 @@
 import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
+import { usePresence } from "@/components/presence-store";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
 import { channelLink, copyText } from "./links";
@@ -808,6 +809,16 @@ function Row({
     // A muted conversation still counts its messages - it just does not shout
     // about them, which is the difference between muting and leaving.
     const shout = unread > 0 && !muted;
+    /**
+     * What they have said they are doing, under their name.
+     *
+     * Only on a row that is one person - a group of four has no one status to
+     * show - and only while they are actually here, which the presence store
+     * already decides: a note under a grey dot is a line from a day that is
+     * over. Truncated rather than wrapped, because the rail is narrow and a row
+     * that grows to three lines pushes the conversation below it off the screen.
+     */
+    const said = usePresence(personId)?.note?.trim() || "";
     const row = (
         <PersonRow
             as={Link}
@@ -827,8 +838,18 @@ function Row({
             )}
         >
             {icon}
-            <span className="min-w-0 flex-1 truncate" title={label}>
-                <PersonName id={personId} name={label} />
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                <span className="min-w-0 truncate" title={label}>
+                    <PersonName id={personId} name={label} />
+                </span>
+                {said && (
+                    <span
+                        className="min-w-0 truncate text-[0.6875rem] text-foreground-subtle"
+                        title={said}
+                    >
+                        {said}
+                    </span>
+                )}
             </span>
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
