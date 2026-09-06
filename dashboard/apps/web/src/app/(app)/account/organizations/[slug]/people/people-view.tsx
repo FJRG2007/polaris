@@ -18,9 +18,9 @@ import { Avatar } from "@/components/avatar";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMemberView } from "@/lib/orgs/org-service";
 import { useDisplayFormat } from "@/components/display-format";
-import { PersonName, PersonRow } from "@/components/person-name";
+import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { OrgInvitationView } from "@/lib/orgs/invitation-service";
-import { LogOut, MailQuestion, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { MailQuestion, Search, UserPlus, Users, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import {
     inviteOrgMemberAction,
@@ -93,224 +93,280 @@ export function PeopleView({
     };
 
     return (
-        <div className="flex flex-col gap-4">
-            {error && (
-                <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
-                    {error}
-                </p>
-            )}
+        <PlainNames>
+            <div className="flex flex-col gap-4">
+                {error && (
+                    <p role="alert" className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+                        {error}
+                    </p>
+                )}
 
-            <Card>
-                <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2">
-                        <Users className="size-4 shrink-0" /> People
-                        <span className="text-muted-foreground text-xs font-normal">
-                            {members.length}
-                            {memberLimit > 0 ? ` of ${memberLimit}` : ""}
-                        </span>
-                    </CardTitle>
-                    {members.length >= SEARCH_FROM && (
-                        <label className="relative w-full sm:w-56">
-                            <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2" />
-                            <Input
-                                value={query}
-                                placeholder="Search people"
-                                aria-label="Search people"
-                                className="h-8 pl-7 text-xs"
-                                onChange={(event) => setQuery(event.target.value)}
-                            />
-                        </label>
-                    )}
-                </CardHeader>
-                <CardBody className="flex flex-col gap-1">
-                    {shown.length === 0 ? (
-                        <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-sm">
-                            Nobody here matches &ldquo;{query.trim()}&rdquo;.
-                        </p>
-                    ) : (
-                        shown.map((member) => {
-                            const self = member.userId === currentUserId;
-                            const owner = member.role === "owner";
-                            return (
+                <Card>
+                    <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+                        <CardTitle className="flex items-center gap-2">
+                            <Users className="size-4 shrink-0" /> People
+                            <span className="text-muted-foreground text-xs font-normal">
+                                {members.length}
+                                {memberLimit > 0 ? ` of ${memberLimit}` : ""}
+                            </span>
+                        </CardTitle>
+                        {members.length >= SEARCH_FROM && (
+                            <label className="relative w-full sm:w-56">
+                                <Search className="text-muted-foreground pointer-events-none absolute left-2 top-1/2 size-3.5 shrink-0 -translate-y-1/2" />
+                                <Input
+                                    value={query}
+                                    placeholder="Search people"
+                                    aria-label="Search people"
+                                    className="h-8 pl-7 text-xs"
+                                    onChange={(event) => setQuery(event.target.value)}
+                                />
+                            </label>
+                        )}
+                    </CardHeader>
+                    <CardBody className="p-0">
+                        {/* A table, the way the account list under Administration
+                            draws one. A roster is read by scanning down a column -
+                            who is an owner, who joined when, who is on which team -
+                            and a stack of cards turns every one of those into a
+                            search instead of a glance. */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
+                                    <tr>
+                                        <th className="px-3 py-2 font-medium">Person</th>
+                                        <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                                            Teams
+                                        </th>
+                                        <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                            Joined
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">Role</th>
+                                        <th className="w-10 px-3 py-2" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {shown.length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan={5}
+                                                className="text-muted-foreground px-3 py-8 text-center"
+                                            >
+                                                Nobody here matches &ldquo;{query.trim()}&rdquo;.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        shown.map((member) => {
+                                            const self = member.userId === currentUserId;
+                                            const owner = member.role === "owner";
+                                            return (
+                                                <PersonRow
+                                                    as="tr"
+                                                    key={member.userId}
+                                                    personId={member.userId}
+                                                    className="border-border hover:bg-muted border-t"
+                                                >
+                                                    <td className="px-3 py-2">
+                                                        <span className="flex min-w-0 items-center gap-2">
+                                                            <Avatar
+                                                                person={{
+                                                                    id: member.userId,
+                                                                    name: member.name
+                                                                }}
+                                                                size={28}
+                                                            />
+                                                            <span className="flex min-w-0 flex-col leading-tight">
+                                                                <span className="truncate">
+                                                                    <PersonName
+                                                                        id={member.userId}
+                                                                        name={member.name}
+                                                                    >
+                                                                        {self ? (
+                                                                            <span className="text-muted-foreground">
+                                                                                {" "}
+                                                                                (you)
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </PersonName>
+                                                                </span>
+                                                                <span
+                                                                    className="text-muted-foreground truncate text-xs"
+                                                                    title={member.contact}
+                                                                >
+                                                                    {member.contact}
+                                                                </span>
+                                                            </span>
+                                                        </span>
+                                                    </td>
+                                                    <td
+                                                        className="text-muted-foreground hidden max-w-0 truncate px-3 py-2 text-xs sm:table-cell"
+                                                        title={member.teams.join(", ")}
+                                                    >
+                                                        {member.teams.length > 0
+                                                            ? member.teams.join(", ")
+                                                            : "None"}
+                                                    </td>
+                                                    <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
+                                                        {member.joinedAt
+                                                            ? format.date(member.joinedAt)
+                                                            : ""}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        {owner || !canManage ? (
+                                                            <Badge
+                                                                variant={owner ? "primary" : "neutral"}
+                                                            >
+                                                                {member.roleName}
+                                                            </Badge>
+                                                        ) : (
+                                                            <Select
+                                                                value={member.role}
+                                                                options={options}
+                                                                aria-label={`Role for ${member.name}`}
+                                                                className="h-8 w-32 text-xs"
+                                                                onValueChange={(next) =>
+                                                                    void run(() =>
+                                                                        setOrgMemberRoleAction(
+                                                                            orgId,
+                                                                            member.userId,
+                                                                            next
+                                                                        )
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        {!owner && (canManage || self) && (
+                                                            <button
+                                                                type="button"
+                                                                aria-label={
+                                                                    self
+                                                                        ? "Leave this organization"
+                                                                        : `Remove ${member.name}`
+                                                                }
+                                                                title={self ? "Leave" : "Remove"}
+                                                                className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                                                onClick={async () => {
+                                                                    const ok = await confirm({
+                                                                        title: self
+                                                                            ? "Leave this organization?"
+                                                                            : `Remove ${member.name}?`,
+                                                                        description: self
+                                                                            ? "You will lose everything its teams gave you."
+                                                                            : "They come off every team here as well, and lose what those teams reached.",
+                                                                        confirmLabel: self
+                                                                            ? "Leave"
+                                                                            : "Remove",
+                                                                        danger: true
+                                                                    });
+                                                                    if (!ok) return;
+                                                                    const done = await run(() =>
+                                                                        removeOrgMemberAction(
+                                                                            orgId,
+                                                                            member.userId
+                                                                        )
+                                                                    );
+                                                                    if (done && self) {
+                                                                        router.push(
+                                                                            "/account/organizations"
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <X className="size-4 shrink-0" />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </PersonRow>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardBody>
+                </Card>
+
+                {invitations.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <MailQuestion className="size-4 shrink-0" /> Waiting to accept
+                                <span className="text-muted-foreground text-xs font-normal">
+                                    {invitations.length}
+                                </span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardBody className="flex flex-col gap-1">
+                            {invitations.map((invitation) => (
                                 <PersonRow
-                                    key={member.userId}
-                                    personId={member.userId}
+                                    key={invitation.id}
+                                    personId={invitation.userId}
                                     className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
                                 >
                                     <Avatar
-                                        person={{ id: member.userId, name: member.name }}
+                                        person={{ id: invitation.userId, name: invitation.name }}
                                         size={32}
                                     />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm">
-                                            <PersonName id={member.userId} name={member.name}>
-                                                {self ? (
-                                                    <span className="text-muted-foreground">
-                                                        {" "}
-                                                        (you)
-                                                    </span>
-                                                ) : null}
-                                            </PersonName>
+                                        <p className="truncate text-sm" title={invitation.name}>
+                                            <PersonName
+                                                id={invitation.userId}
+                                                name={invitation.name}
+                                            />
                                         </p>
-                                        <p
-                                            className="text-muted-foreground truncate text-xs"
-                                            title={member.contact}
-                                        >
-                                            {member.teams.length > 0
-                                                ? member.teams.join(", ")
-                                                : member.contact}
+                                        <p className="text-muted-foreground truncate text-xs">
+                                            Invited by {invitation.invitedBy}
+                                            {invitation.contact ? ` - ${invitation.contact}` : ""}
                                         </p>
                                     </div>
-                                    {member.joinedAt && (
-                                        <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
-                                            Joined {format.date(member.joinedAt)}
-                                        </span>
-                                    )}
-                                    {owner || !canManage ? (
-                                        <Badge variant={owner ? "primary" : "neutral"}>
-                                            {member.roleName}
-                                        </Badge>
-                                    ) : (
-                                        <Select
-                                            value={member.role}
-                                            options={options}
-                                            aria-label={`Role for ${member.name}`}
-                                            className="h-8 w-32 text-xs"
-                                            onValueChange={(next) =>
-                                                void run(() =>
-                                                    setOrgMemberRoleAction(
-                                                        orgId,
-                                                        member.userId,
-                                                        next
-                                                    )
-                                                )
-                                            }
-                                        />
-                                    )}
-                                    {!owner && (canManage || self) && (
+                                    <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
+                                        Until {format.date(invitation.expiresAt)}
+                                    </span>
+                                    <Badge variant="neutral">{invitation.roleName}</Badge>
+                                    {canManage && (
                                         <button
                                             type="button"
-                                            aria-label={
-                                                self
-                                                    ? "Leave this organization"
-                                                    : `Remove ${member.name}`
-                                            }
-                                            title={self ? "Leave" : "Remove"}
+                                            title="Withdraw"
+                                            aria-label={`Withdraw the invitation to ${invitation.name}`}
                                             className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
                                             onClick={async () => {
                                                 const ok = await confirm({
-                                                    title: self
-                                                        ? "Leave this organization?"
-                                                        : `Remove ${member.name}?`,
-                                                    description: self
-                                                        ? "You will lose everything its teams gave you."
-                                                        : "They come off every team here as well, and lose what those teams reached.",
-                                                    confirmLabel: self ? "Leave" : "Remove",
+                                                    title: `Withdraw the invitation to ${invitation.name}?`,
+                                                    description:
+                                                        "They are not told. You can invite them again at any time.",
+                                                    confirmLabel: "Withdraw",
                                                     danger: true
                                                 });
                                                 if (!ok) return;
-                                                const done = await run(() =>
-                                                    removeOrgMemberAction(orgId, member.userId)
+                                                await run(() =>
+                                                    revokeOrgInvitationAction(orgId, invitation.id)
                                                 );
-                                                // Leaving means this page is no
-                                                // longer theirs to look at.
-                                                if (done && self)
-                                                    router.push("/account/organizations");
                                             }}
                                         >
-                                            {self ? (
-                                                <LogOut className="size-4 shrink-0" />
-                                            ) : (
-                                                <Trash2 className="size-4 shrink-0" />
-                                            )}
+                                            <X className="size-4 shrink-0" />
                                         </button>
                                     )}
                                 </PersonRow>
-                            );
-                        })
-                    )}
-                </CardBody>
-            </Card>
+                            ))}
+                        </CardBody>
+                    </Card>
+                )}
 
-            {invitations.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <MailQuestion className="size-4 shrink-0" /> Waiting to accept
-                            <span className="text-muted-foreground text-xs font-normal">
-                                {invitations.length}
-                            </span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardBody className="flex flex-col gap-1">
-                        {invitations.map((invitation) => (
-                            <PersonRow
-                                key={invitation.id}
-                                personId={invitation.userId}
-                                className="hover:bg-muted flex flex-wrap items-center gap-3 rounded-md px-2 py-1.5"
-                            >
-                                <Avatar
-                                    person={{ id: invitation.userId, name: invitation.name }}
-                                    size={32}
-                                />
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm" title={invitation.name}>
-                                        <PersonName
-                                            id={invitation.userId}
-                                            name={invitation.name}
-                                        />
-                                    </p>
-                                    <p className="text-muted-foreground truncate text-xs">
-                                        Invited by {invitation.invitedBy}
-                                        {invitation.contact ? ` - ${invitation.contact}` : ""}
-                                    </p>
-                                </div>
-                                <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
-                                    Until {format.date(invitation.expiresAt)}
-                                </span>
-                                <Badge variant="neutral">{invitation.roleName}</Badge>
-                                {canManage && (
-                                    <button
-                                        type="button"
-                                        title="Withdraw"
-                                        aria-label={`Withdraw the invitation to ${invitation.name}`}
-                                        className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
-                                        onClick={async () => {
-                                            const ok = await confirm({
-                                                title: `Withdraw the invitation to ${invitation.name}?`,
-                                                description:
-                                                    "They are not told. You can invite them again at any time.",
-                                                confirmLabel: "Withdraw",
-                                                danger: true
-                                            });
-                                            if (!ok) return;
-                                            await run(() =>
-                                                revokeOrgInvitationAction(orgId, invitation.id)
-                                            );
-                                        }}
-                                    >
-                                        <X className="size-4 shrink-0" />
-                                    </button>
-                                )}
-                            </PersonRow>
-                        ))}
-                    </CardBody>
-                </Card>
-            )}
-
-            {canManage && (
-                <InvitePerson
-                    orgId={orgId}
-                    orgSlug={orgSlug}
-                    roles={roles}
-                    options={options}
-                    full={full}
-                    memberLimit={memberLimit}
-                    onRun={run}
-                />
-            )}
-            {confirmElement}
-        </div>
+                {canManage && (
+                    <InvitePerson
+                        orgId={orgId}
+                        orgSlug={orgSlug}
+                        roles={roles}
+                        options={options}
+                        full={full}
+                        memberLimit={memberLimit}
+                        onRun={run}
+                    />
+                )}
+                {confirmElement}
+            </div>
+        </PlainNames>
     );
 }
 

@@ -85,65 +85,97 @@ export function TeamsView({
                         </Button>
                     )}
                 </CardHeader>
-                <CardBody className="flex flex-col gap-1">
-                    {teams.length === 0 ? (
-                        <p className="border-border text-muted-foreground rounded-md border border-dashed px-3 py-6 text-center text-sm">
-                            A team is what a space is given to. Nothing here reaches any work yet.
-                        </p>
-                    ) : (
+                <CardBody className="p-0">
+                    {/* A table, as the account list under Administration draws
+                        one: how many people are on a team and what it reaches
+                        are read down a column, and a stack of cards makes each
+                        of those a search rather than a glance. */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-surface/60 text-muted-foreground text-left text-xs">
+                                <tr>
+                                    <th className="px-3 py-2 font-medium">Team</th>
+                                    <th className="px-3 py-2 font-medium">People</th>
+                                    <th className="px-3 py-2 font-medium">Reaches</th>
+                                    <th className="w-10 px-3 py-2" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {teams.length === 0 ? (
+                                    <tr>
+                                        <td
+                                            colSpan={4}
+                                            className="text-muted-foreground px-3 py-8 text-center"
+                                        >
+                                            A team is what a space is given to. Nothing here
+                                            reaches any work yet.
+                                        </td>
+                                    </tr>
+                                ) : (
                         teams.map((team) => (
-                            <div
+                            <tr
                                 key={team.id}
-                                className="hover:bg-muted flex items-center gap-3 rounded-md px-2 py-1.5"
+                                className="border-border hover:bg-muted border-t"
                             >
-                                <button
-                                    type="button"
-                                    className="min-w-0 flex-1 text-left"
-                                    onClick={() => setOpen(team)}
-                                >
-                                    <p className="truncate text-sm" title={team.name}>
-                                        {team.name}
-                                    </p>
-                                    <p className="text-muted-foreground truncate text-xs">
-                                        @{team.slug} - {team.memberCount} member
-                                        {team.memberCount === 1 ? "" : "s"},{" "}
-                                        {team.spaceCount + team.folderCount === 0
-                                            ? "no access yet"
-                                            : `${team.spaceCount + team.folderCount} grant${
-                                                  team.spaceCount + team.folderCount === 1
-                                                      ? ""
-                                                      : "s"
-                                              }`}
-                                    </p>
-                                </button>
-                                {canManage && (
+                                <td className="px-3 py-2">
                                     <button
                                         type="button"
-                                        aria-label={`Delete ${team.name}`}
-                                        title="Delete"
-                                        className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
-                                        onClick={async () => {
-                                            const ok = await confirm({
-                                                title: `Delete ${team.name}?`,
-                                                description:
-                                                    "Everybody on it loses whatever this team reached. The work itself is untouched.",
-                                                confirmLabel: "Delete",
-                                                danger: true
-                                            });
-                                            if (!ok) return;
-                                            const result = await runAction(
-                                                () => deleteTeamAction(team.id),
-                                                setError
-                                            );
-                                            if (result && !result.error) router.refresh();
-                                        }}
+                                        className="min-w-0 text-left"
+                                        onClick={() => setOpen(team)}
                                     >
-                                        <Trash2 className="size-4 shrink-0" />
+                                        <span className="flex min-w-0 flex-col leading-tight">
+                                            <span className="truncate text-sm" title={team.name}>
+                                                {team.name}
+                                            </span>
+                                            <span className="text-muted-foreground truncate text-xs">
+                                                @{team.slug}
+                                            </span>
+                                        </span>
                                     </button>
+                                </td>
+                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs tabular-nums">
+                                    {team.memberCount}
+                                </td>
+                                <td className="text-muted-foreground whitespace-nowrap px-3 py-2 text-xs">
+                                    {team.spaceCount + team.folderCount === 0
+                                        ? "None yet"
+                                        : `${team.spaceCount + team.folderCount} grant${
+                                              team.spaceCount + team.folderCount === 1 ? "" : "s"
+                                          }`}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    {canManage && (
+                                        <button
+                                            type="button"
+                                            aria-label={`Delete ${team.name}`}
+                                            title="Delete"
+                                            className="text-muted-foreground hover:bg-danger/10 hover:text-danger rounded p-1 transition-colors"
+                                            onClick={async () => {
+                                                const ok = await confirm({
+                                                    title: `Delete ${team.name}?`,
+                                                    description:
+                                                        "Everybody on it loses whatever this team reached. The work itself is untouched.",
+                                                    confirmLabel: "Delete",
+                                                    danger: true
+                                                });
+                                                if (!ok) return;
+                                                const result = await runAction(
+                                                    () => deleteTeamAction(team.id),
+                                                    setError
+                                                );
+                                                if (result && !result.error) router.refresh();
+                                            }}
+                                        >
+                                            <Trash2 className="size-4 shrink-0" />
+                                        </button>
+                                    )}
+                                </td>
+                            </tr>
+                                ))
                                 )}
-                            </div>
-                        ))
-                    )}
+                            </tbody>
+                        </table>
+                    </div>
                     {full && (
                         <p className="text-muted-foreground text-xs">
                             This Polaris allows {teamLimit} teams per organization.
