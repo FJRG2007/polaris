@@ -14,6 +14,9 @@
 
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
+import { MailOnboarding } from "./onboarding";
+import { ownedAccountIds } from "@/lib/mailbox/access";
+import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { MailView, type MailViewContext } from "./mail-view";
 import { EMPTY_QUERY, listThreads, readThread, type MailListQuery, type MailThreadView } from "@/lib/mailbox/views";
 
@@ -38,6 +41,21 @@ export async function MailListPage({
 }) {
     const user = await requirePermission("mail.use");
     const params = await searchParams;
+
+    // Nothing connected yet. Every list route lands here rather than drawing an
+    // empty inbox, because an empty screen with a sentence in it reads as broken
+    // and this reads as the first step.
+    const accounts = await ownedAccountIds(user.id);
+    if (accounts.length === 0) {
+        const options = await mailConnectOptions(user.id);
+        return (
+            <MailOnboarding
+                links={options.links}
+                googleReady={options.googleReady}
+                microsoftReady={options.microsoftReady}
+            />
+        );
+    }
 
     const query: MailListQuery = {
         ...EMPTY_QUERY,

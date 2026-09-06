@@ -13,7 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { ownedAccount } from "./access";
+import { MailAccessError, ownedAccount } from "./access";
 
 export interface MailLabelView {
     readonly id: string;
@@ -182,15 +182,24 @@ export async function saveIdentity(
     }
 ): Promise<string> {
     await ownedAccount(userId, accountId);
-    const id = identityId
-        ? (
-              await prisma.mailIdentity.update({
-                  where: { id: identityId },
-                  data: identity,
-                  select: { id: true }
-              })
-          ).id
-        : (await prisma.mailIdentity.create({ data: { accountId, ...identity }, select: { id: true } })).id;
+
+    let id = identityId;
+    if (id) {
+        // Narrowed by the account in the same statement rather than checked and
+        // then updated. The account has just been proved to be this person's, so
+        // an identity that is not on it is not theirs - and updating by the id
+        // alone would let anybody who can guess one rewrite somebody else's
+        // sending address, reply-to and signature.
+        const changed = await prisma.mailIdentity.updateMany({
+            where: { id, accountId },
+            data: identity
+        });
+        // The same answer as an id that does not exist: telling the two apart
+        // would say whether an id is a real one on somebody else's mailbox.
+        if (changed.count === 0) throw new MailAccessError("That address is not on this mailbox.");
+    } else {
+        id = (await prisma.mailIdentity.create({ data: { accountId, ...identity }, select: { id: true } })).id;
+    }
 
     // One default, always. Set in the same transaction as the row that claimed
     // it, or two identities can both be the default and the composer picks

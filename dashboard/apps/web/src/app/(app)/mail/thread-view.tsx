@@ -36,7 +36,7 @@ import type { MailViewContext } from "./mail-view";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { actOnAction, applyLabelAction, openMessageAction, trustSenderAction } from "./actions";
 import {
@@ -337,6 +337,31 @@ function MessageCard({
             live = false;
         };
     }, [open, readable, message.id]);
+
+    /**
+     * Opening a message marks it read.
+     *
+     * The fetch above peeks rather than setting the flag, so this is the
+     * deliberate half, and it fires only when a message is actually expanded -
+     * which is somebody clicking the conversation or this header. Arrowing past
+     * a row in the list expands nothing and marks nothing, which is what a
+     * preview pane gets complained about for; the toolbar can always put it back.
+     *
+     * Guarded by a ref rather than by the flag on the row: the row is a server
+     * component's snapshot and does not change until the refresh lands, so
+     * reading the flag would fire this again on the way there.
+     */
+    const marked = useRef(false);
+    useEffect(() => {
+        if (!open || message.seen || marked.current) return;
+        marked.current = true;
+        void (async () => {
+            const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+            // A server that refused leaves it unread, which is the truth. Nothing
+            // is said about it: nobody asked for this, so a failure is not news.
+            if (!refusalOf(outcome)) refresh();
+        })();
+    }, [open, message.id, message.seen, refresh]);
 
     const sender = message.from[0];
 

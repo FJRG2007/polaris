@@ -236,6 +236,69 @@ export const MAIL_SERVICES: readonly MailService[] = [
         smtp: { host: "smtp.purelymail.com", port: 465, security: "tls" }
     },
     {
+        // IONOS runs one mail platform under several regional names, and a
+        // customer's own domain only ever names the region through its MX
+        // records - which is why this is reached from `serviceForExchangers`
+        // and never from a domain match. Each of these was confirmed to answer
+        // on its port rather than taken from a support page.
+        slug: "ionos-es",
+        name: "IONOS",
+        domains: [],
+        imap: { host: "imap.ionos.es", port: 993, security: "tls" },
+        smtp: { host: "smtp.ionos.es", port: 465, security: "tls" }
+    },
+    {
+        slug: "ionos-de",
+        name: "IONOS",
+        domains: [],
+        imap: { host: "imap.ionos.de", port: 993, security: "tls" },
+        smtp: { host: "smtp.ionos.de", port: 465, security: "tls" }
+    },
+    {
+        slug: "ionos-co-uk",
+        name: "IONOS",
+        domains: [],
+        imap: { host: "imap.ionos.co.uk", port: 993, security: "tls" },
+        smtp: { host: "smtp.ionos.co.uk", port: 465, security: "tls" }
+    },
+    {
+        slug: "ionos",
+        name: "IONOS",
+        domains: [],
+        imap: { host: "imap.ionos.com", port: 993, security: "tls" },
+        smtp: { host: "smtp.ionos.com", port: 465, security: "tls" }
+    },
+    {
+        // The German 1&1 brand on the same platform. It is the one name the
+        // shared autoconfig directory does list, under kundenserver.de.
+        slug: "1und1",
+        name: "1&1",
+        domains: ["1und1.de", "online.de"],
+        imap: { host: "imap.1und1.de", port: 993, security: "tls" },
+        smtp: { host: "smtp.1und1.de", port: 465, security: "tls" }
+    },
+    {
+        slug: "ovh",
+        name: "OVH",
+        domains: [],
+        imap: { host: "ssl0.ovh.net", port: 993, security: "tls" },
+        smtp: { host: "ssl0.ovh.net", port: 465, security: "tls" }
+    },
+    {
+        slug: "hostinger",
+        name: "Hostinger",
+        domains: [],
+        imap: { host: "imap.hostinger.com", port: 993, security: "tls" },
+        smtp: { host: "smtp.hostinger.com", port: 465, security: "tls" }
+    },
+    {
+        slug: "namecheap",
+        name: "Namecheap Private Email",
+        domains: [],
+        imap: { host: "mail.privateemail.com", port: 993, security: "tls" },
+        smtp: { host: "mail.privateemail.com", port: 465, security: "tls" }
+    },
+    {
         slug: "proton-bridge",
         name: "Proton Mail Bridge",
         // Never matched by domain. Proton's own servers speak no IMAP at all: the
@@ -274,17 +337,75 @@ export function findMailService(slug: string): MailService | undefined {
  * MX records that say everything, so this is the second question asked, and the
  * one that turns "some domain I have never heard of" into a Connect button.
  */
+/**
+ * Which service a mail exchanger belongs to, longest suffix first.
+ *
+ * This is the question that answers for a company. An address at a company's own
+ * domain says nothing about where its mail lives; its MX records say everything,
+ * and for most domains they are the ONLY thing that says anything - a small
+ * business on a hosting provider publishes no autoconfig document, is not in the
+ * shared directory, and has no `imap.` name of its own to guess at.
+ *
+ * The regional entries matter and are not noise: a provider that runs one
+ * platform under several country names still expects a mailbox to connect to the
+ * one its own MX names, and sending somebody to the wrong region is a login that
+ * is refused with nothing on screen explaining why.
+ *
+ * Ordered longest-suffix-first so `mx.zoho.eu` is not matched by a shorter rule
+ * that happens to be a tail of it.
+ */
+const EXCHANGER_SERVICES: readonly (readonly [suffix: string, slug: string])[] = [
+    ["aspmx.l.google.com", "google-workspace"],
+    ["googlemail.com", "google-workspace"],
+    ["google.com", "google-workspace"],
+    ["protection.outlook.com", "office365"],
+    ["outlook.com", "office365"],
+    ["icloud.com", "icloud"],
+    ["apple.com", "icloud"],
+    ["messagingengine.com", "fastmail"],
+    ["zoho.eu", "zoho"],
+    ["zoho.com", "zoho"],
+    ["yandex.net", "yandex"],
+    ["yandex.ru", "yandex"],
+    ["mailbox.org", "mailbox-org"],
+    ["migadu.com", "migadu"],
+    ["posteo.de", "posteo"],
+    // IONOS, by region. The suffixes are what a customer domain's MX actually
+    // carries - `mx00.ionos.es`, `mx00.kundenserver.de` - rather than the names
+    // the mailbox then connects to.
+    ["ionos.es", "ionos-es"],
+    ["1and1.es", "ionos-es"],
+    ["ionos.de", "ionos-de"],
+    ["kundenserver.de", "ionos-de"],
+    ["schlund.de", "ionos-de"],
+    ["ionos.co.uk", "ionos-co-uk"],
+    ["1and1.co.uk", "ionos-co-uk"],
+    ["ionos.com", "ionos"],
+    ["perfora.net", "ionos"],
+    ["1and1.com", "ionos"],
+    ["1und1.de", "1und1"],
+    ["ovh.net", "ovh"],
+    ["mail.ovh.net", "ovh"],
+    ["hostinger.com", "hostinger"],
+    ["privateemail.com", "namecheap"],
+    ["registrar-servers.com", "namecheap"]
+];
+
+/**
+ * The service behind a domain's mail exchangers.
+ *
+ * A company on a hosting provider has an address that says nothing and MX
+ * records that say everything, so this is the question that turns "some domain
+ * nobody has heard of" into a filled-in form. Null when the exchangers belong to
+ * nobody recognised, which is an answer and sends discovery on to the next step.
+ */
 export function serviceForExchangers(hosts: readonly string[]): MailService | null {
     const names = hosts.map((host) => host.trim().toLowerCase().replace(/\.$/, ""));
-    const has = (needle: string) => names.some((name) => name.endsWith(needle));
-    if (has("google.com") || has("googlemail.com")) return findMailService("google-workspace") ?? null;
-    if (has("outlook.com") || has("protection.outlook.com")) return findMailService("office365") ?? null;
-    if (has("icloud.com") || has("apple.com")) return findMailService("icloud") ?? null;
-    if (has("messagingengine.com")) return findMailService("fastmail") ?? null;
-    if (has("zoho.com") || has("zoho.eu")) return findMailService("zoho") ?? null;
-    if (has("yandex.net") || has("yandex.ru")) return findMailService("yandex") ?? null;
-    if (has("mailbox.org")) return findMailService("mailbox-org") ?? null;
-    if (has("migadu.com")) return findMailService("migadu") ?? null;
+    for (const [suffix, slug] of EXCHANGER_SERVICES) {
+        // Matched on a label boundary, so `notionos.es` is not IONOS.
+        const matched = names.some((name) => name === suffix || name.endsWith(`.${suffix}`));
+        if (matched) return findMailService(slug) ?? null;
+    }
     return null;
 }
 

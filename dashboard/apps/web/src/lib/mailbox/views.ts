@@ -17,7 +17,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { Prisma } from "@polaris/db";
-import { ownedAccountIds } from "./access";
+import { unifiedAccountIds } from "./access";
 import { addressesFrom } from "./json";
 
 /** One folder in the rail. */
@@ -147,7 +147,9 @@ export async function listThreads(
     userId: string,
     query: MailListQuery
 ): Promise<{ threads: MailThreadView[]; cursor: string }> {
-    const accountIds = query.accountId ? [query.accountId] : await ownedAccountIds(userId);
+    // A view that names a mailbox opens that one whatever its switch says; a
+    // merged view is only the mailboxes their owner put in it.
+    const accountIds = query.accountId ? [query.accountId] : await unifiedAccountIds(userId);
     if (accountIds.length === 0) return { threads: [], cursor: "" };
 
     const messageWhere: Prisma.MailMessageWhereInput = {

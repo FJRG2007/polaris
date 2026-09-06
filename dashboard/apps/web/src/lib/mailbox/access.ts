@@ -101,6 +101,23 @@ export async function ownedAccountIds(userId: string): Promise<string[]> {
 }
 
 /**
+ * The mailboxes that feed the merged views.
+ *
+ * Separate from `ownedAccountIds` because the two answer different questions and
+ * conflating them is what made the "in the shared inbox" switch do nothing: a
+ * merged list is only the mailboxes somebody put in it, while a view that names
+ * one mailbox has to open it whatever that switch says, or taking a mailbox out
+ * of the merged views would make it unreachable.
+ */
+export async function unifiedAccountIds(userId: string): Promise<string[]> {
+    const rows = await prisma.mailAccount.findMany({
+        where: { userId, unified: true },
+        select: { id: true }
+    });
+    return rows.map((row) => row.id);
+}
+
+/**
  * One folder, if the mailbox it is in is this person's.
  *
  * Narrowed by the owner in the same query rather than fetched and then checked:

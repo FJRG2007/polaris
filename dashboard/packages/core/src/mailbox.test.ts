@@ -16,6 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as mailbox from "./mailbox.js";
+import * as providers from "./mailbox-providers.js";
 import type { MailEnvelope, MailRule, MailRuleSubject } from "./mailbox.js";
 
 function envelope(over: Partial<MailEnvelope> = {}): MailEnvelope {
@@ -285,5 +286,34 @@ describe("privacy", () => {
         expect(mailbox.cleanLink("https://shop.example/item?id=7")).toBe("https://shop.example/item?id=7");
         expect(mailbox.cleanLink("mailto:someone@example.com")).toBe("mailto:someone@example.com");
         expect(mailbox.cleanLink("not a url")).toBe("not a url");
+    });
+});
+
+describe("working out where a domain's mail lives", () => {
+    it("recognises a company on a hosting provider by its exchangers, region and all", () => {
+        // The real records for a domain this was built against: nothing else
+        // about it says where its mail is, so this is the only thing that can
+        // answer.
+        expect(providers.serviceForExchangers(["mx00.ionos.es", "mx01.ionos.es"])?.slug).toBe("ionos-es");
+        expect(providers.serviceForExchangers(["mx00.kundenserver.de"])?.slug).toBe("ionos-de");
+        expect(providers.serviceForExchangers(["mx01.perfora.net"])?.slug).toBe("ionos");
+        expect(providers.serviceForExchangers(["aspmx.l.google.com"])?.slug).toBe("google-workspace");
+        expect(providers.serviceForExchangers(["acme-com.mail.protection.outlook.com"])?.slug).toBe("office365");
+    });
+
+    it("matches on a label boundary, so a domain that merely ends in one is not it", () => {
+        expect(providers.serviceForExchangers(["mx.notionos.es"])).toBeNull();
+        expect(providers.serviceForExchangers(["mail.example.com"])).toBeNull();
+        expect(providers.serviceForExchangers([])).toBeNull();
+    });
+
+    it("takes the trailing dot a resolver leaves on a name", () => {
+        expect(providers.serviceForExchangers(["mx00.ionos.es."])?.slug).toBe("ionos-es");
+    });
+
+    it("knows a consumer address by its domain without asking anything", () => {
+        expect(providers.serviceForAddress("someone@gmail.com")?.slug).toBe("gmail");
+        expect(providers.serviceForAddress("SOMEONE@Hotmail.com")?.slug).toBe("outlook");
+        expect(providers.serviceForAddress("someone@tpeoficial.com")).toBeNull();
     });
 });
