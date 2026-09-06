@@ -1,0 +1,309 @@
+"use client";
+
+/**
+ * The rail: every mailbox this person has, and every way into them.
+ *
+ * Built around one decision. **The merged views come first.** Somebody with
+ * three mailboxes nearly always wants one inbox holding all three, and having to
+ * visit each in turn is the thing that makes people keep three browser tabs open
+ * instead. So the top of the rail is Inbox, Starred, Snoozed, Drafts, Sent,
+ * Archive, Spam and Trash, each spanning every mailbox that has not been taken
+ * out of the merged views.
+ *
+ * Under that, the mailboxes themselves, each with its own colour and its own
+ * unread count, and each expanding to the folders that mailbox actually has on
+ * its server - which is where somebody goes when they want that mailbox alone,
+ * or a folder only it has.
+ *
+ * A mailbox that has stopped working says so here rather than by quietly
+ * receiving nothing, because the rail is the only screen somebody is guaranteed
+ * to be looking at.
+ */
+
+import Link from "next/link";
+import { cn } from "@polaris/ui";
+import { useState } from "react";
+import { useMail } from "./mail-shell";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+    Archive,
+    AlertTriangle,
+    Bug,
+    ChevronDown,
+    ChevronRight,
+    Clock,
+    FileText,
+    Inbox,
+    Layers,
+    Plus,
+    SendHorizontal,
+    Star,
+    Tag,
+    Trash2,
+    type LucideIcon
+} from "lucide-react";
+
+/** The merged views, in the order a mail client is read in. */
+const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: string }[] = [
+    { label: "Inbox", href: "/mail", icon: Inbox, role: "inbox" },
+    { label: "Starred", href: "/mail/starred", icon: Star },
+    { label: "Snoozed", href: "/mail/snoozed", icon: Clock },
+    { label: "Drafts", href: "/mail/drafts", icon: FileText, role: "drafts" },
+    { label: "Sent", href: "/mail/sent", icon: SendHorizontal, role: "sent" },
+    { label: "Archive", href: "/mail/archive", icon: Archive, role: "archive" },
+    { label: "Spam", href: "/mail/junk", icon: Bug, role: "junk" },
+    { label: "Trash", href: "/mail/trash", icon: Trash2, role: "trash" }
+];
+
+export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
+    const { accounts, folders, labels, unread } = useMail();
+    const pathname = usePathname();
+    const search = useSearchParams();
+    const [expanded, setExpanded] = useState<string[]>([]);
+
+    // The mailboxes that feed the merged views. One taken out of them still has
+    // its own entry below; it just stops adding to the counts above.
+    const merged = accounts.filter((account) => account.unified);
+    const mergedUnread = merged.reduce((total, account) => total + (unread.byAccount[account.id] ?? 0), 0);
+
+    return (
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4" aria-label="Mailboxes">
+            {accounts.length > 1 ? (
+                <p className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
+                    All mailboxes
+                </p>
+            ) : null}
+            <ul className="space-y-0.5">
+                {MERGED.map((entry) => (
+                    <li key={entry.href}>
+                        <RailLink
+                            href={entry.href}
+                            label={entry.label}
+                            icon={entry.icon}
+                            count={entry.role === "inbox" ? mergedUnread : 0}
+                            active={isActive(pathname, search, entry.href)}
+                            onNavigate={onNavigate}
+                        />
+                    </li>
+                ))}
+            </ul>
+
+            <div className="mt-4 flex items-center justify-between px-2 pb-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
+                    Mailboxes
+                </p>
+                <Link
+                    href="/mail/settings/accounts"
+                    className="text-foreground-subtle hover:text-foreground"
+                    aria-label="Add a mailbox"
+                    title="Add a mailbox"
+                    onClick={onNavigate}
+                >
+                    <Plus className="size-3.5 shrink-0" aria-hidden />
+                </Link>
+            </div>
+
+            {accounts.length === 0 ? (
+                <Link
+                    href="/mail/settings/accounts"
+                    onClick={onNavigate}
+                    className="mx-2 block rounded-md border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground hover:border-foreground-subtle hover:text-foreground"
+                >
+                    Connect your first mailbox to start reading mail here.
+                </Link>
+            ) : null}
+
+            <ul className="space-y-0.5">
+                {accounts.map((account) => {
+                    const open = expanded.includes(account.id);
+                    const own = folders.filter((folder) => folder.accountId === account.id);
+                    return (
+                        <li key={account.id}>
+                            <div className="flex items-center">
+                                <button
+                                    type="button"
+                                    className="flex size-6 shrink-0 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
+                                    aria-expanded={open}
+                                    aria-label={open ? `Hide ${account.address} folders` : `Show ${account.address} folders`}
+                                    onClick={() =>
+                                        setExpanded((held) =>
+                                            held.includes(account.id)
+                                                ? held.filter((id) => id !== account.id)
+                                                : [...held, account.id]
+                                        )
+                                    }
+                                >
+                                    {open ? (
+                                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
+                                    ) : (
+                                        <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+                                    )}
+                                </button>
+                                <AccountLink account={account} count={unread.byAccount[account.id] ?? 0} onNavigate={onNavigate} />
+                            </div>
+                            {open ? (
+                                <ul className="ml-6 space-y-0.5 border-l border-border pl-2">
+                                    {own.length === 0 ? (
+                                        <li className="px-2 py-1.5 text-[12px] text-foreground-subtle">
+                                            Nothing has been synced yet.
+                                        </li>
+                                    ) : null}
+                                    {own.map((folder) => (
+                                        <li key={folder.id}>
+                                            <RailLink
+                                                href={`/mail/f/${folder.id}`}
+                                                label={folder.name}
+                                                icon={Layers}
+                                                count={folder.unread}
+                                                active={pathname === `/mail/f/${folder.id}`}
+                                                onNavigate={onNavigate}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {labels.length > 0 ? (
+                <>
+                    <p className="mt-4 px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
+                        Labels
+                    </p>
+                    <ul className="space-y-0.5">
+                        {labels.map((label) => (
+                            <li key={label.id}>
+                                <Link
+                                    href={`/mail/label/${label.id}`}
+                                    onClick={onNavigate}
+                                    className={cn(
+                                        "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
+                                        pathname === `/mail/label/${label.id}`
+                                            ? "bg-card text-foreground"
+                                            : "text-muted-foreground hover:bg-card hover:text-foreground"
+                                    )}
+                                >
+                                    <Tag
+                                        className="size-3.5 shrink-0"
+                                        style={{ color: label.color }}
+                                        aria-hidden
+                                    />
+                                    <span className="min-w-0 flex-1 truncate" title={label.name}>{label.name}</span>
+                                    {label.count > 0 ? (
+                                        <span className="text-[11px] tabular-nums text-foreground-subtle">
+                                            {label.count}
+                                        </span>
+                                    ) : null}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            ) : null}
+        </nav>
+    );
+}
+
+/** Whether a merged view is the one being looked at. The inbox is the only one
+ *  whose href is a prefix of the others, so it is matched exactly. */
+function isActive(pathname: string, search: URLSearchParams, href: string): boolean {
+    void search;
+    return href === "/mail" ? pathname === "/mail" || pathname.startsWith("/mail/t/") : pathname === href;
+}
+
+function RailLink({
+    href,
+    label,
+    icon: Icon,
+    count,
+    active,
+    onNavigate
+}: {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    count: number;
+    active: boolean;
+    onNavigate?: () => void;
+}) {
+    return (
+        <Link
+            href={href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+                "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
+                active ? "bg-card font-medium text-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground"
+            )}
+        >
+            <Icon className="size-4 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+            {count > 0 ? (
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">{count}</span>
+            ) : null}
+        </Link>
+    );
+}
+
+/**
+ * One mailbox.
+ *
+ * The dot is the mailbox's colour, and it is the same colour a row in a merged
+ * list carries - that pairing is the whole reason somebody can read a merged
+ * inbox without checking every row's account.
+ *
+ * A mailbox whose credential the server has started refusing says so here, in
+ * the one place its owner is certain to be looking, and the whole row becomes
+ * the way to fix it.
+ */
+function AccountLink({
+    account,
+    count,
+    onNavigate
+}: {
+    account: ReturnType<typeof useMail>["accounts"][number];
+    count: number;
+    onNavigate?: () => void;
+}) {
+    const { accountColor } = useMail();
+    const pathname = usePathname();
+    const inbox = `/mail/a/${account.id}`;
+    const broken = account.state === "auth" || account.state === "unreachable";
+
+    return (
+        <Link
+            href={broken ? "/mail/settings/accounts" : inbox}
+            onClick={onNavigate}
+            aria-current={pathname === inbox ? "page" : undefined}
+            className={cn(
+                "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
+                pathname === inbox
+                    ? "bg-card font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-card hover:text-foreground"
+            )}
+            title={broken ? whyBroken(account.state) : account.address}
+        >
+            <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: accountColor(account.id) }}
+                aria-hidden
+            />
+            <span className="min-w-0 flex-1 truncate" title={account.label || account.address}>
+                {account.label || account.address}
+            </span>
+            {broken ? (
+                <AlertTriangle className="size-3.5 shrink-0 text-danger" aria-label={whyBroken(account.state)} />
+            ) : count > 0 ? (
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">{count}</span>
+            ) : null}
+        </Link>
+    );
+}
+
+function whyBroken(state: string): string {
+    return state === "auth"
+        ? "This mailbox needs connecting again."
+        : "Polaris cannot reach this mail server.";
+}

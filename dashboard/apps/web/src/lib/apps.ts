@@ -69,6 +69,7 @@ import {
     SquareCheckBig,
     Star,
     Store,
+    Tag,
     Target,
     Terminal,
     Timer,
@@ -214,6 +215,24 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: MessageCircle,
         href: "/chat",
         permission: "chat.use"
+    },
+    {
+        /**
+         * Somebody's own mail, read here instead of in a browser tab that
+         * belongs to somebody else.
+         *
+         * Its own app rather than a screen inside Chat, because they are not the
+         * same thing: Chat is the people inside Polaris talking to each other,
+         * and this is correspondence with everybody outside it, on servers
+         * Polaris does not own. Sharing a surface would make one of them a
+         * second-class version of the other.
+         */
+        id: "mail",
+        label: "Mail",
+        description: "Your mailboxes, read and answered here",
+        icon: Mail,
+        href: "/mail",
+        permission: "mail.use"
     },
     {
         id: "notes",
@@ -706,6 +725,125 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/tasks/trackers",
             icon: Link2,
             keywords: ["linear", "jira", "import", "sync", "issues", "two-way"]
+        }
+    ],
+    /**
+     * Mail draws no rail from here.
+     *
+     * What belongs in it is one account's folders as that server names them,
+     * which is a list only the server knows and which differs per mailbox - so
+     * the app renders its own, exactly as Chat does. Every entry below is hidden
+     * and exists so the global search can find a screen by name: somebody
+     * looking for "filters" or "away message" types that, not "mail".
+     */
+    mail: [
+        {
+            label: "Inbox",
+            href: "/mail",
+            icon: Inbox,
+            hidden: true,
+            keywords: ["email", "gmail", "imap", "unread", "messages", "correo"]
+        },
+        {
+            label: "Starred",
+            href: "/mail/starred",
+            icon: Star,
+            hidden: true,
+            keywords: ["flagged", "important"]
+        },
+        {
+            label: "Sent",
+            href: "/mail/sent",
+            icon: SendHorizontal,
+            hidden: true,
+            keywords: ["outbox", "what I sent"]
+        },
+        {
+            label: "Drafts",
+            href: "/mail/drafts",
+            icon: FileText,
+            hidden: true,
+            keywords: ["unsent", "scheduled", "send later", "unfinished"]
+        },
+        {
+            label: "Archive",
+            href: "/mail/archive",
+            icon: Archive,
+            hidden: true,
+            keywords: ["archived", "put away"]
+        },
+        {
+            label: "Spam",
+            href: "/mail/junk",
+            icon: Bug,
+            hidden: true,
+            keywords: ["junk", "phishing", "unwanted"]
+        },
+        { label: "Trash", href: "/mail/trash", icon: Trash2, hidden: true, keywords: ["deleted", "bin"] },
+        {
+            label: "Mailboxes",
+            href: "/mail/settings/accounts",
+            icon: Mail,
+            hidden: true,
+            keywords: [
+                "add mailbox",
+                "connect email",
+                "link gmail",
+                "outlook",
+                "imap",
+                "smtp",
+                "app password",
+                "server settings"
+            ]
+        },
+        {
+            label: "Send-as addresses",
+            href: "/mail/settings/identities",
+            icon: IdCard,
+            hidden: true,
+            keywords: ["alias", "identity", "from address", "send as"]
+        },
+        {
+            label: "Labels",
+            href: "/mail/settings/labels",
+            icon: Tag,
+            hidden: true,
+            keywords: ["tag", "colour", "group mail", "categories"]
+        },
+        {
+            label: "Filters",
+            href: "/mail/settings/rules",
+            icon: Workflow,
+            hidden: true,
+            keywords: ["rules", "sieve", "sort mail", "file automatically", "block sender"]
+        },
+        {
+            label: "Signature",
+            href: "/mail/settings/signature",
+            icon: NotebookPen,
+            hidden: true,
+            keywords: ["sign off", "footer"]
+        },
+        {
+            label: "Privacy",
+            href: "/mail/settings/privacy",
+            icon: EyeOff,
+            hidden: true,
+            keywords: [
+                "trackers",
+                "tracking pixel",
+                "remote images",
+                "block images",
+                "read receipt",
+                "clean links"
+            ]
+        },
+        {
+            label: "Away message",
+            href: "/mail/settings/away",
+            icon: CalendarClock,
+            hidden: true,
+            keywords: ["out of office", "vacation", "holiday", "auto reply", "autoresponder"]
         }
     ],
     notes: [
