@@ -57,7 +57,13 @@ import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
-import type { Participant, Room, Track, TrackPublication } from "livekit-client";
+import type {
+    LocalVideoTrack,
+    Participant,
+    Room,
+    Track,
+    TrackPublication
+} from "livekit-client";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 import {
     AUDIO_GROUP,
@@ -664,11 +670,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // survives being blurred; a video is the other way round.
                     // Which of the two this is was decided by the framerate on
                     // the rung - see `screenIsMotion`.
+                    //
+                    // A camera says so too now, rather than being left to the
+                    // client's default. That default is `maintain-framerate`,
+                    // which under any pressure at all spends the resolution
+                    // first and keeps thirty frames a second of a soft face -
+                    // while a shared screen, whose default is the opposite,
+                    // stayed sharp beside it. `balanced` is the honest middle
+                    // for a call: it gives ground on both rather than emptying
+                    // one of them, so a face stays legible without the freezing
+                    // that keeping every pixel on a thin uplink causes.
                     degradationPreference: screening
                         ? quality.screenIsMotion(level)
                             ? "maintain-framerate"
                             : "maintain-resolution"
-                        : undefined
+                        : "balanced"
                 })
                 .catch(() => undefined);
         },
@@ -892,17 +908,33 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // Fetched now rather than imported: see `livekit` above. It is one
             // request, cached, and it happens while the browser is already
             // waiting on the ticket.
-            const { Room, RoomEvent } = await livekit();
+            const { ParticipantEvent, Room, RoomEvent } = await livekit();
             if (stopped) {
                 connecting = false;
                 return;
             }
 
             const joined = new Room({
-                // Ask for the resolution the tile is actually drawn at, and stop
-                // the flow entirely while it is off screen. On a wall of eight
-                // faces this is most of the bandwidth.
-                adaptiveStream: true,
+                /**
+                 * Ask for the resolution the tile is actually drawn at, and stop
+                 * the flow entirely while it is off screen. On a wall of eight
+                 * faces this is most of the bandwidth.
+                 *
+                 * `pixelDensity: "screen"` is the half that was missing, and it
+                 * is why a shared screen looked sharp in this product while the
+                 * faces beside it did not. Left unset, the client asks for the
+                 * tile's size in CSS pixels and assumes one device pixel each -
+                 * so on a laptop that paints two, a 320-wide tile was fed a
+                 * 320-wide picture and then doubled to fill 640 real pixels.
+                 * That is upscaling, and it looks exactly like a soft camera. A
+                 * shared screen escaped it by being the biggest element on the
+                 * page: even halved it cleared the top layer.
+                 *
+                 * It costs bandwidth on a high-density display, which is the
+                 * documented trade and the one being asked for here: the picture
+                 * is the product.
+                 */
+                adaptiveStream: { pixelDensity: "screen" },
                 // Stop sending the quality layers nobody is subscribed to.
                 dynacast: true,
                 publishDefaults: {
@@ -958,6 +990,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 .on(RoomEvent.TrackPublished, () => resort())
                 .on(RoomEvent.TrackUnpublished, () => resort())
                 .on(RoomEvent.LocalTrackPublished, () => publishLocalPreview())
+
                 // The sharer's own copy of the same thing, and the button that
                 // says whether they are sharing along with it: what is true is
                 // whether this browser is still holding a screen, whichever of
@@ -1002,6 +1035,37 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         "This call lost the call server. Nothing more will be heard until it is back."
                     );
                 });
+
+            /**
+             * This machine cannot encode what it is being asked to send.
+             *
+             * The browser reports it as a CPU quality limitation, and what it
+             * does about it on its own is quietly send a worse picture - which
+             * is the other half of "my camera looks bad and freezes", and the
+             * half no setting on this screen explains. A laptop with four cores
+             * encoding 1080p is the ordinary case.
+             *
+             * So the client is told to stop trying: `prioritizePerformance`
+             * drops what the encoder is attempting to something the machine can
+             * hold, which is a smaller picture that arrives whole rather than a
+             * large one that stutters. Said out loud once - the browser reports
+             * the limitation continuously, and a sentence that reappears every
+             * few seconds is one people stop reading.
+             *
+             * On the local participant rather than on the room, which is where
+             * the client raises it.
+             */
+            joined.localParticipant.on(
+                ParticipantEvent.LocalTrackCpuConstrained,
+                (track: LocalVideoTrack) => {
+                    if (strained.current) return;
+                    strained.current = true;
+                    void track.prioritizePerformance().catch(() => undefined);
+                    setError(
+                        "This device cannot encode video at the size it was sending, so the picture has been made smaller. Closing other applications, or choosing a lower video quality, gives it back."
+                    );
+                }
+            );
 
             try {
                 await joined.connect(callServerUrl(ticket.url), ticket.token);
@@ -1423,6 +1487,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  Reopening a track that has ended is the same operation as picking a
      *  different one, and it is two hundred lines further down. */
     const reopen = useRef<((kind: "audio" | "video", deviceId: string) => void) | null>(null);
+    /** Whether this machine has already been told it cannot keep up. Said once
+     *  per call: the browser reports the limitation continuously, and a sentence
+     *  that reappears every few seconds is one people stop reading. */
+    const strained = useRef(false);
 
     const toggleMic = useCallback(() => {
         const track = mic.current;
