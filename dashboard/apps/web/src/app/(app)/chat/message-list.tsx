@@ -25,6 +25,7 @@ import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { PersonName } from "@/components/person-name";
+import { Spoiler } from "./spoiler";
 import { MessageMenu } from "./message-menu";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -920,6 +921,21 @@ function Message({
                         <ul className="mt-1 flex flex-col gap-1">
                             {message.attachments.map((file) => (
                                 <li key={file.id}>
+                                    {/* Covered where the sender said so. The
+                                        file is drawn underneath either way, so
+                                        uncovering it is the cover coming off
+                                        rather than a second load. */}
+                                    <Spoiler
+                                        kind={
+                                            file.inline
+                                                ? "picture"
+                                                : isWatchable(file.contentType)
+                                                  ? "video"
+                                                  : "file"
+                                        }
+                                        className={file.spoiler ? undefined : "contents"}
+                                        covered={file.spoiler}
+                                    >
                                     {file.inline ? (
                                         <KeepableImage
                                             href={`/api/chat/attachments/${file.id}`}
@@ -973,6 +989,7 @@ function Message({
                                             onOpen={onOpenFile}
                                         />
                                     )}
+                                    </Spoiler>
                                 </li>
                             ))}
                         </ul>

@@ -121,6 +121,15 @@ export async function POST(
     // everything that is not a video. Never required: a message whose thumbnails
     // did not arrive is a message.
     const posters = form.getAll("posters").filter((entry): entry is File => entry instanceof File);
+    // Which of them arrive covered, as a list of indexes: the composer marks
+    // them one at a time, because a message is often one picture worth hiding
+    // and a sentence that is not.
+    const covered = new Set(
+        String(form.get("spoilers") ?? "")
+            .split(",")
+            .map((entry) => Number.parseInt(entry, 10))
+            .filter((entry) => Number.isInteger(entry))
+    );
     if (files.length === 0 && !fields.data.body) {
         return Response.json({ error: "Write something, or attach a file" }, { status: 400 });
     }
@@ -169,7 +178,8 @@ export async function POST(
                         bytes: new Uint8Array(await file.arrayBuffer())
                     },
                     sounds.success ? sounds.data[at] : undefined,
-                    await posterBytes(posters[at])
+                    await posterBytes(posters[at]),
+                    covered.has(at)
                 )
             );
         }

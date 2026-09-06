@@ -7301,6 +7301,11 @@ model ChatAttachment {
     // Where that still is, on the same terms as the file itself: a storage that
     // moves next month must not orphan the ones already written.
     posterConnectionId String? @db.Uuid
+    // Whether it arrives covered, to be uncovered by whoever wants to see it.
+    // Chosen by the sender, per file rather than per message: a photograph of a
+    // spoiler and the sentence explaining it are usually sent together, and it
+    // is the picture that has to be hidden.
+    spoiler      Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -7374,6 +7379,9 @@ model ChatScheduledFile {
     // video arrives with the same thumbnail it would have had.
     posterPath   String?
     posterConnectionId String? @db.Uuid
+    // Carried across with everything else, so a message scheduled with something
+    // covered arrives covered rather than quietly uncovering itself on the way.
+    spoiler      Boolean  @default(false)
     createdAt    DateTime @default(now())
 
     scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)

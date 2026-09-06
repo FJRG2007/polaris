@@ -180,6 +180,8 @@ export interface StoredAttachment {
      *  everything that is not a video. */
     readonly posterPath: string | null;
     readonly posterConnectionId: string | null;
+    /** Whether it arrives covered - the sender's decision, per file. */
+    readonly spoiler: boolean;
 }
 
 /**
@@ -255,7 +257,12 @@ export async function storeAttachment(
      * not a failure to send the message: the worst case is a list that draws a
      * black rectangle where it would have drawn a frame.
      */
-    poster?: Uint8Array | null
+    poster?: Uint8Array | null,
+    /** Whether the sender marked it to arrive covered - see the `Spoiler`
+     *  component. Recorded on the file rather than on the message: a picture and
+     *  the sentence explaining it are usually sent together, and it is the
+     *  picture that has to be hidden. */
+    spoiler = false
 ): Promise<StoredAttachment> {
     if (file.bytes.length > MAX_ATTACHMENT_BYTES) throw new Error("That file is too big");
 
@@ -293,6 +300,7 @@ export async function storeAttachment(
         path,
         posterPath: still?.path ?? null,
         posterConnectionId: still?.connectionId ?? null,
+        spoiler,
         ...soundOf(sound)
     };
 }

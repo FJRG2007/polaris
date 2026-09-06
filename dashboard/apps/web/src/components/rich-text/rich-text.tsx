@@ -19,6 +19,8 @@ import * as refs from "./references";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { chipClass, chipLabel } from "./chip";
+import { splitSpoilers } from "@polaris/core";
+import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 
@@ -224,6 +226,30 @@ function Inline({ node }: { node: JSONContent }) {
     const marks = node.marks ?? [];
     let content: React.ReactNode = node.text ?? "";
     if (!marks.some((mark) => mark.type === "code")) {
+        // `||like this||`, which is the syntax people arrive already knowing.
+        // Handled here rather than as a mark in the schema: a mark would have to
+        // be added to the editor, the serializer and the renderer together, and
+        // it would leave every message where somebody already typed the bars
+        // reading as bars. Never inside code, where somebody has put the
+        // characters in order to show them.
+        const covers = splitSpoilers(node.text ?? "");
+        if (covers.some((part) => part.covered)) {
+            content = covers.map((part, index) =>
+                part.covered ? (
+                    <Spoiler key={index} kind="text">
+                        {part.text}
+                    </Spoiler>
+                ) : (
+                    <Fragment key={index}>{part.text}</Fragment>
+                )
+            );
+            for (const mark of marks) {
+                if (mark.type === "bold") content = <strong>{content}</strong>;
+                else if (mark.type === "italic") content = <em>{content}</em>;
+                else if (mark.type === "strike") content = <s>{content}</s>;
+            }
+            return <>{content}</>;
+        }
         const parts = splitChannelMentions(node.text ?? "");
         // Only when there is one to draw. Wrapping every run of text in an
         // element to find out would put a span around every word of every

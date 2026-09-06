@@ -48,6 +48,8 @@ import {
     Camera,
     ChevronDown,
     CornerUpLeft,
+    Eye,
+    EyeOff,
     Image as ImageIcon,
     Mic,
     MicOff,
@@ -230,6 +232,10 @@ export function Composer({
 }) {
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
+    /** Which of the staged files were marked to arrive covered, by index. Kept
+     *  beside the list rather than on it, because a `File` is the browser's own
+     *  object and not somewhere to write a decision. */
+    const [covered, setCovered] = useState<ReadonlySet<number>>(() => new Set());
     const [refused, setRefused] = useState("");
     /** Whether the "when" dialog is open, and what the server said about the
      *  last moment offered to it. */
@@ -674,9 +680,28 @@ export function Composer({
                         <StagedFile
                             key={`${file.name}:${file.lastModified}:${index}`}
                             file={file}
-                            onRemove={() =>
-                                setFiles((current) => current.filter((_, at) => at !== index))
+                            covered={covered.has(index)}
+                            onCover={() =>
+                                setCovered((current) => {
+                                    const next = new Set(current);
+                                    if (next.has(index)) next.delete(index);
+                                    else next.add(index);
+                                    return next;
+                                })
                             }
+                            onRemove={() => {
+                                setFiles((current) => current.filter((_, at) => at !== index));
+                                // The marks are by position, so removing one
+                                // shifts every mark after it.
+                                setCovered((current) => {
+                                    const next = new Set<number>();
+                                    for (const at of current) {
+                                        if (at < index) next.add(at);
+                                        else if (at > index) next.add(at - 1);
+                                    }
+                                    return next;
+                                });
+                            }}
                         />
                     ))}
                 </ul>
@@ -1132,7 +1157,18 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
  * The preview is a blob address made here and given back when the file goes.
  * Leaking one holds the whole file in memory for as long as the tab is open.
  */
-function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
+function StagedFile({
+    file,
+    covered,
+    onCover,
+    onRemove
+}: {
+    file: File;
+    /** Whether this one has been marked to arrive covered. */
+    covered: boolean;
+    onCover: () => void;
+    onRemove: () => void;
+}) {
     const [preview, setPreview] = useState<string | null>(null);
     const type = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
     const watchable = WATCHABLE.has(type);
@@ -1162,6 +1198,31 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
         </button>
     );
 
+    /**
+     * Send it covered.
+     *
+     * Per file rather than per message, because a message is usually one picture
+     * worth hiding and a sentence that is not - and the sentence is what tells
+     * anybody whether they want to look.
+     */
+    const cover = (
+        <button
+            type="button"
+            aria-pressed={covered}
+            aria-label={covered ? `Send ${file.name} uncovered` : `Send ${file.name} as a spoiler`}
+            title={covered ? "Sent as a spoiler" : "Send as a spoiler"}
+            onClick={onCover}
+            className={cn(
+                "rounded p-0.5 transition-colors",
+                covered
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+            )}
+        >
+            {covered ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+        </button>
+    );
+
     if (!preview) {
         return (
             <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
@@ -1170,6 +1231,7 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
                     {file.name}
                 </span>
                 <span className="text-muted-foreground">{readableSize(file.size)}</span>
+                {cover}
                 {remove}
             </li>
         );
@@ -1196,10 +1258,16 @@ function StagedFile({ file, onRemove }: { file: File; onRemove: () => void }) {
                     src={preview}
                     alt={file.name}
                     title={`${file.name} - ${readableSize(file.size)}`}
-                    className="size-20 rounded-md border border-border object-cover"
+                    className={cn(
+                        "size-20 rounded-md border border-border object-cover",
+                        // Shown as it will arrive. A cover that is only a
+                        // checkbox is one people press and then wonder about.
+                        covered && "blur-sm"
+                    )}
                 />
             )}
-            <span className="absolute -right-1.5 -top-1.5 rounded-full border border-border bg-elevated shadow-sm">
+            <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
+                {cover}
                 {remove}
             </span>
         </li>

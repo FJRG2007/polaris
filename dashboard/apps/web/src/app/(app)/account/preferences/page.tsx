@@ -3,6 +3,11 @@
  * temperatures and money written, and how big Polaris is drawn for them.
  * Anything left on "Platform default" follows what the operator set for the
  * deployment.
+ *
+ * A couple of the settings here are per browser rather than per account - what
+ * is cached on this device, and whether covers are taken off before they are
+ * seen. They say so on their own cards: they are statements about the screen
+ * somebody is reading on, not about the person.
  */
 
 import { requireUser } from "@/lib/session";
@@ -10,6 +15,7 @@ import { saveDisplayPreferencesAction, saveTextSizeAction } from "./actions";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { AccessibilityForm } from "@/components/accessibility-form";
 import { DeviceCacheCard } from "@/components/device-cache-card";
+import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import {
     getPlatformDisplayPreferences,
@@ -53,6 +59,7 @@ export default async function PreferencesPage() {
                 standard={resolveDisplayPreferences(platform).textSize}
                 save={saveTextSizeAction}
             />
+            <SpoilersCard />
             <DeviceCacheCard />
         </div>
     );

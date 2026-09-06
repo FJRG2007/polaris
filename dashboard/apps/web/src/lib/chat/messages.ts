@@ -148,6 +148,8 @@ export interface ChatAttachmentView {
     /** Whether there is a still to draw before anybody plays it. Not the still
      *  itself: it is fetched by its own route, like the file. */
     readonly hasPoster: boolean;
+    /** Sent covered, to be uncovered by whoever wants to see it. */
+    readonly spoiler: boolean;
 }
 
 /** The message a reply or a forward stands on, as the quote line draws it. */
@@ -1493,6 +1495,7 @@ export async function decorateMessages(
                 size: true,
                 waveform: true,
                 posterPath: true,
+                spoiler: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true
@@ -1560,6 +1563,7 @@ export async function decorateMessages(
             size: Number(file.size),
             waveform: file.waveform,
             hasPoster: file.posterPath !== null,
+            spoiler: file.spoiler,
             durationMs: file.durationMs,
             contentType: file.contentType,
             inline: isInlineImage(file.contentType)
