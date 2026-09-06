@@ -1301,6 +1301,79 @@ export async function setDeploymentState(input: {
     }
 }
 
+/**
+ * The line a commit shows in its list of checks.
+ *
+ * A deployment and a check are two different things on a commit, and Polaris
+ * only ever wrote the first. That is why a deploy turned up under Deployments
+ * and nowhere near "All checks have passed" - which is the row people actually
+ * read, and the one Vercel and Railway occupy with a sentence and a Details
+ * link.
+ *
+ * Only an App can write one. A user-to-server token is refused by this endpoint
+ * outright, which is not a problem here: the announcing path already falls back
+ * to the App installation, and this is asked with whatever minted the
+ * deployment.
+ *
+ * Idempotent by name. The check is looked up on the commit first and updated if
+ * it is there, so the three states of one deploy are one line that changes
+ * rather than three lines stacked on the commit.
+ */
+export async function publishCheck(input: {
+    owner: string;
+    repo: string;
+    sha: string;
+    /** What the row is called. One per service, so a repository holding several
+     *  gets a line each rather than one they take turns overwriting. */
+    name: string;
+    status: "queued" | "in_progress" | "completed";
+    /** Only on a completed one, and required there. */
+    conclusion?: "success" | "failure" | "cancelled";
+    /** The sentence beside the name, which is the whole of what most people
+     *  read: "Deployment has completed". */
+    summary: string;
+    /** Where Details goes. Left off rather than pointed at a name only this
+     *  network resolves. */
+    detailsUrl?: string | null;
+    token: string;
+}): Promise<AnnounceResult> {
+    try {
+        const base = `${API}/repos/${input.owner}/${input.repo}/check-runs`;
+        const body: Record<string, unknown> = {
+            name: input.name,
+            head_sha: input.sha,
+            status: input.status,
+            ...(input.status === "completed"
+                ? { conclusion: input.conclusion ?? "success", completed_at: new Date().toISOString() }
+                : { started_at: new Date().toISOString() }),
+            ...(input.detailsUrl ? { details_url: input.detailsUrl } : {}),
+            output: { title: shortDescription(input.summary), summary: input.summary }
+        };
+
+        // The one already on this commit, if there is one.
+        const found = await fetch(
+            `${API}/repos/${input.owner}/${input.repo}/commits/${encodeURIComponent(input.sha)}/check-runs?check_name=${encodeURIComponent(input.name)}&per_page=1`,
+            { headers: apiHeaders(input.token), cache: "no-store" }
+        ).catch(() => null);
+        const existing =
+            found?.ok === true
+                ? ((await found.json()) as { check_runs?: { id?: number }[] }).check_runs?.[0]?.id
+                : undefined;
+
+        const res = await fetch(existing ? `${base}/${existing}` : base, {
+            method: existing ? "PATCH" : "POST",
+            headers: { ...apiHeaders(input.token), "Content-Type": "application/json" },
+            cache: "no-store",
+            body: JSON.stringify(body)
+        });
+        if (res.status !== 200 && res.status !== 201) return { id: null, status: res.status };
+        const data = (await res.json()) as { id?: number };
+        return { id: typeof data.id === "number" ? String(data.id) : null, status: res.status };
+    } catch {
+        return { id: null, status: 0 };
+    }
+}
+
 /** The GitHub App's webhook secret (app method only), used to verify push events. */
 export async function getGithubWebhookSecret(): Promise<string | null> {
     const secrets = await getAppSecrets();

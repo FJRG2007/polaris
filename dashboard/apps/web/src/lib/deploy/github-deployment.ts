@@ -28,7 +28,7 @@ import { appBaseUrl } from "@/lib/domain-service";
 import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
-import { githubAppInstallationToken } from "@/lib/github-service";
+import { githubAppInstallationToken, publishCheck } from "@/lib/github-service";
 import { noteDeploymentsRefused } from "@/lib/connections/health";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
 import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
@@ -137,6 +137,13 @@ async function announceable(deploymentId: string): Promise<AnnounceTarget> {
             token
         }
     };
+}
+
+/** The facts a check needs, for a deploy that was already announced. Null where
+ *  it was not, which is the same set of reasons the deployment had. */
+async function announceableOf(deploymentId: string): Promise<Announceable | null> {
+    const target = await announceable(deploymentId);
+    return target.ok ? target.info : null;
 }
 
 /** The repository and id a deployment was announced as, or null when it never was. */
@@ -280,6 +287,7 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
             where: { id: deploymentId },
             data: { githubRepo: `${info.owner}/${info.repo}`, githubDeploymentId: githubId }
         });
+        await announceCheck(info, "queued", "Waiting for a build slot", deploymentId);
         await setDeploymentState({
             owner: info.owner,
             repo: info.repo,
@@ -291,6 +299,62 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
         });
     } catch (error) {
         console.error("polaris: could not announce this deploy to GitHub:", error);
+    }
+}
+
+/**
+ * The line the commit shows in its list of checks.
+ *
+ * A deployment and a check are different things on a commit, and only the first
+ * was ever written - which is why a Polaris deploy appeared under Deployments
+ * and nowhere near "All checks have passed". That row is the one people read,
+ * and it is the one Vercel and Railway occupy with a sentence and a Details
+ * link. This is the same thing, said by Polaris.
+ *
+ * Beside the deployment rather than instead of it: the deployment is what puts
+ * the environment and its address on the repository, and the check is what puts
+ * a line where somebody is already looking.
+ *
+ * Swallows everything. A check that cannot be written is not a reason for a
+ * deploy to fail, and the deployment beside it has already said whatever there
+ * was to say about the credential.
+ */
+async function announceCheck(
+    info: Announceable,
+    status: "queued" | "in_progress" | "completed",
+    summary: string,
+    deploymentId: string,
+    conclusion?: "success" | "failure" | "cancelled"
+): Promise<void> {
+    try {
+        const where = await logUrl(info.applicationId);
+        const live =
+            status === "completed" && conclusion === "success"
+                ? await reachableUrl(deploymentId, info.applicationId)
+                : null;
+        const posted = await publishCheck({
+            owner: info.owner,
+            repo: info.repo,
+            sha: info.commitSha,
+            // Named for the service, so a repository holding several gets a line
+            // each rather than one they take turns overwriting.
+            name: `Polaris - ${info.label}`,
+            status,
+            conclusion,
+            summary,
+            // Where it came up, when it did; the build log otherwise. A check
+            // whose Details goes nowhere is worse than one with no link.
+            detailsUrl: live ?? where,
+            token: info.token
+        });
+        // Only an App may write one, and only where it is installed. The
+        // deployment beside this has already reported the credential, so a
+        // refusal here is not worth a second line in the same log.
+        if (posted.status !== 200 && posted.status !== 201) {
+            console.warn(`polaris: could not put a check on ${info.owner}/${info.repo}`);
+        }
+    } catch (error) {
+        console.error("polaris: could not put a check on the commit:", error);
     }
 }
 
@@ -320,6 +384,21 @@ export async function announceDeployFinished(deploymentId: string, status: strin
 }
 
 /** One state, posted against whatever this deployment was announced as. */
+/** What the check row says for each state a deploy reaches. The words are the
+ *  ones somebody reads without opening anything, which is what that row is
+ *  for. */
+const CHECK_WORDS: Record<DeploymentState, { status: "queued" | "in_progress" | "completed"; conclusion?: "success" | "failure" | "cancelled"; summary: string }> = {
+    queued: { status: "queued", summary: "Waiting for a build slot" },
+    in_progress: { status: "in_progress", summary: "Deployment is building" },
+    success: { status: "completed", conclusion: "success", summary: "Deployment has completed" },
+    failure: { status: "completed", conclusion: "failure", summary: "Deployment failed" },
+    error: { status: "completed", conclusion: "cancelled", summary: "Deployment was stopped" },
+    // A release that has been retired by a newer one. Nothing is posted for it -
+    // the check on that commit already says what happened to that build, and
+    // rewriting it to "inactive" would replace the outcome with its housekeeping.
+    inactive: { status: "completed", conclusion: "success", summary: "Deployment has completed" }
+};
+
 async function postState(deploymentId: string, state: DeploymentState, description: string): Promise<void> {
     try {
         const target = await announced(deploymentId);
@@ -372,6 +451,19 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
         // identical warnings in one log is noise nobody reads to the end of.
         if (posted.status !== 201 && state !== "queued" && state !== "in_progress") {
             await noteOnDeploy(deploymentId, announceRefusal(posted.status, target.owner, target.repo));
+        }
+
+        // And the row on the commit, which moves with it.
+        const said = CHECK_WORDS[state];
+        const announceable = await announceableOf(deploymentId);
+        if (announceable) {
+            await announceCheck(
+                announceable,
+                said.status,
+                state === "failure" && deployment.error ? deployment.error : said.summary,
+                deploymentId,
+                said.conclusion
+            );
         }
     } catch (error) {
         console.error("polaris: could not update this deploy on GitHub:", error);

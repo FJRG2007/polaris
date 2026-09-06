@@ -26,6 +26,7 @@ import { usePhotoOpenable } from "@/components/photo-access";
 import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
+import { useNamesArePlain } from "@/components/person-name";
 import { decorationOf, PRESENCE_WORDS, type Presence } from "@polaris/core";
 
 /**
@@ -217,7 +218,15 @@ export function Avatar({
      * a person and has no appearance to wear, so it is not asked about.
      */
     const stored = useProfileStyle(square || chosen !== undefined ? null : person.id);
-    const decoration = decorationOf(chosen === undefined ? stored?.decoration ?? null : chosen);
+    // Not on a surface that draws people plainly. A ring around a face is the
+    // same kind of thing as a colour across a name: it belongs where somebody is
+    // being introduced, and not in a column of two hundred accounts being
+    // scanned for one - see `PlainNames`. An explicitly passed decoration is a
+    // preview of a choice being made, so it is drawn whatever the surface says.
+    const plain = useNamesArePlain();
+    const decoration = decorationOf(
+        chosen === undefined ? (plain ? null : (stored?.decoration ?? null)) : chosen
+    );
     /**
      * The decoration is drawn around the picture, and the picture stays the size
      * it was asked for.

@@ -5,4 +5,7 @@
 -- to another. Existing rows take the default, so nobody's answer changes except
 -- from "anybody could" to "the people you know can", which is the direction a
 -- privacy setting is allowed to move on its own.
-ALTER TABLE "UserPrivacy" ADD COLUMN "calls" TEXT NOT NULL DEFAULT 'friends';
+--
+-- `IF NOT EXISTS` because a migration that failed halfway has to be finishable
+-- by running it again, which is the rule every migration here follows.
+ALTER TABLE "UserPrivacy" ADD COLUMN IF NOT EXISTS "calls" TEXT NOT NULL DEFAULT 'friends';
