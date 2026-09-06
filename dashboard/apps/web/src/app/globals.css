@@ -511,6 +511,25 @@ dialog.pdfSlick-dialog .dialogButton {
     color: var(--plate-fg);
 }
 
+/*
+ * Everything on a plated row, in the plate's own ink.
+ *
+ * A row is a name and, under it, whatever that line says next - a status
+ * somebody set, the last message, a role. Those are drawn in the product's own
+ * greys, which are chosen against the product's own background and disappear
+ * into a gradient: a mid-grey status on a mid-grey plate is a line nobody can
+ * read. The ink is measured against both ends of the gradient where the plate
+ * is built (see `nameplateCss`), so following it here is the whole of the fix.
+ *
+ * `--plate-ink-soft` is that ink at reduced opacity rather than a second colour,
+ * which keeps the second line quieter than the first without leaving the
+ * contrast the ink was chosen for.
+ */
+[style*="--plate-ink"] .text-muted-foreground,
+[style*="--plate-ink"] .text-foreground-subtle {
+    color: var(--plate-ink-soft);
+}
+
 /* Nothing moves for somebody who asked their machine for less of it. The plate
    still appears - it is information, not decoration - it simply arrives. */
 @media (prefers-reduced-motion: reduce) {

@@ -15,6 +15,7 @@
  * anything gets here.
  */
 
+import { INK_LIGHT, inkFor } from "@polaris/core";
 import type { CSSProperties } from "react";
 import type {
     AvatarDecoration,
@@ -47,12 +48,21 @@ export function ringGlow(decoration: AvatarDecoration, size: number): string | u
 
 /** The plate a name sits on. */
 export function nameplateCss(plate: Nameplate): CSSProperties {
+    // Worked out rather than declared. It used to be a flag on the plate, which
+    // is a decision made once against a preview and then applied to a row whose
+    // second line - the status somebody set - is drawn in the product's own grey
+    // and disappeared into the gradient. Measured against BOTH stops, because
+    // the letters land on both and a choice made against one end fails at the
+    // other. See `@polaris/core/contrast`.
+    const ink = inkFor(plate.from, plate.to);
     return {
         background: `linear-gradient(${plate.angle}deg, ${plate.from} 0%, ${plate.to} 100%)`,
-        // A decision rather than a calculation: contrast against a gradient
-        // depends on where the letters land on it, which is not something a
-        // formula over two stops can answer.
-        color: plate.dark ? "#1c1917" : "#ffffff"
+        color: ink,
+        // Published so anything else on the row can be written in the same ink
+        // at its own weight - the status line under a name is the one that was
+        // unreadable, and it is not this element.
+        ["--plate-ink" as string]: ink,
+        ["--plate-ink-soft" as string]: ink === INK_LIGHT ? "#ffffffc4" : "#1c1917c4"
     };
 }
 

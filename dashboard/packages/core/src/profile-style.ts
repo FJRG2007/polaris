@@ -1089,17 +1089,33 @@ export interface Nameplate {
     readonly from: string;
     readonly to: string;
     readonly angle: number;
-    readonly dark?: boolean;
 }
 
+/**
+ * The plates, every one of which can carry text.
+ *
+ * Four of these could not. A plate is a gradient and a row is two lines - the
+ * name, and under it whatever that row says next - so the letters land on the
+ * light end as well as the dark one, and at the light end of Tide, Ember, Moss
+ * and Rose neither white nor near-black cleared the readable floor. Rose was the
+ * worst of them: the best either ink could do on `#ff9ec4` was 2.2:1, which is a
+ * status line nobody can read.
+ *
+ * So the light stops were brought down until white clears 4.5:1 across the whole
+ * sweep, which is the same measure a browser's accessibility panel reports.
+ * The hues are the hues they were - this is the same seven plates, a shade
+ * deeper at one end - and `contrast.test.ts` is what stops the next one being
+ * added by eye. `dark` is gone with them: which ink to write in is measured from
+ * the colours now (see `inkFor`) rather than declared once against a preview.
+ */
 export const NAMEPLATES: readonly Nameplate[] = [
     { id: "dusk", label: "Dusk", from: "#3b2f63", to: "#7b4397", angle: 100 },
-    { id: "tide", label: "Tide", from: "#134e5e", to: "#3c8ce7", angle: 100 },
-    { id: "ember", label: "Ember", from: "#7a2d1f", to: "#e0642c", angle: 100 },
-    { id: "moss", label: "Moss", from: "#1d4b31", to: "#5aa469", angle: 100 },
+    { id: "tide", label: "Tide", from: "#134d5d", to: "#3276c2", angle: 100 },
+    { id: "ember", label: "Ember", from: "#7a2d1f", to: "#be5525", angle: 100 },
+    { id: "moss", label: "Moss", from: "#1b462e", to: "#468052", angle: 100 },
     { id: "slate", label: "Slate", from: "#2b2f36", to: "#4d5561", angle: 100 },
-    { id: "gold", label: "Gold", from: "#b8862b", to: "#f4dc9a", angle: 100, dark: true },
-    { id: "rose", label: "Rose", from: "#8c2f52", to: "#ff9ec4", angle: 100 }
+    { id: "gold", label: "Gold", from: "#b8862b", to: "#f4dc9a", angle: 100 },
+    { id: "rose", label: "Rose", from: "#6c243f", to: "#9e627a", angle: 100 }
 ];
 
 /**

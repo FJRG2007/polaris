@@ -22,6 +22,7 @@ export * from "./local-network.js";
 export * from "./names.js";
 export * from "./passkeys.js";
 export * from "./colors.js";
+export * from "./contrast.js";
 export * from "./profile-style.js";
 export * from "./connection-providers.js";
 export * from "./sign-in-methods.js";
