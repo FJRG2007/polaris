@@ -25,6 +25,10 @@ import { expireTransfers } from "@/lib/drive-transfer-service";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { drainQueue } from "@/lib/apps/minecraft/queue-service";
 import { getServerPlayers } from "@/lib/apps/minecraft/service";
+import { wakeSnoozed } from "@/lib/mailbox/messages";
+import { sweepDueSends } from "@/lib/mailbox/compose";
+import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
+import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { sweepCameraReachability } from "@/lib/home/reachability";
@@ -53,6 +57,20 @@ async function syncTrackers(): Promise<number> {
     // connection and answers rather than throwing, and this is what makes that
     // promise true from the schedule even when something under it breaks it.
     for (const id of ids) await syncTracker(id).catch(() => undefined);
+    return ids.length;
+}
+
+/**
+ * Every mailbox due a pass, one each.
+ *
+ * A mailbox that fails leaves the reason on itself and does not stop the next
+ * one: somebody's expired password is not a reason for everybody else's mail to
+ * stop arriving. `syncAccount` already answers rather than throwing, and the
+ * catch here is the second line rather than the first.
+ */
+async function syncMailboxes(): Promise<number> {
+    const ids = await accountsToSync();
+    for (const id of ids) await syncAccount(id).catch(() => undefined);
     return ids.length;
 }
 
@@ -274,6 +292,45 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // wrote that it had been made, which is the one thing this must not do.
         leaseMs: 5 * HOUR,
         run: sweepConnectionHealth
+    },
+    {
+        key: "mail-sync",
+        // Every minute, but a mailbox is only asked when its own interval has
+        // passed - the default is five minutes and its owner can set it lower.
+        // The job running often is what makes that setting mean anything.
+        everyMs: Number(process.env.POLARIS_MAIL_SYNC_MS) || MINUTE,
+        // Leased. Two passes over the same mailbox at once is two IMAP sessions
+        // per account, which is how a client gets rate limited by Gmail.
+        leaseMs: 10 * MINUTE,
+        run: syncMailboxes
+    },
+    {
+        key: "mail-send",
+        // The safety net under the in-process timer, for anything a restart
+        // dropped. A message queued a moment before a deploy goes late rather
+        // than never.
+        everyMs: Number(process.env.POLARIS_MAIL_SEND_MS) || MINUTE,
+        // Leased, because sending twice is the one thing this must not do.
+        leaseMs: 5 * MINUTE,
+        run: sweepDueSends
+    },
+    {
+        key: "mail-snooze",
+        // A snooze is set to an hour, so a pass every five minutes is already
+        // finer than anybody chooses.
+        everyMs: 5 * MINUTE,
+        // Unleased: waking a message twice is setting the same column to null
+        // twice.
+        leaseMs: null,
+        run: wakeSnoozed
+    },
+    {
+        key: "mail-uploads",
+        // Files somebody attached in a composer they then closed. Nothing is
+        // waiting on this.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: sweepOrphanUploads
     },
     {
         key: "chat-scheduled",

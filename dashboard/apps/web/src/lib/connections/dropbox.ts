@@ -50,7 +50,7 @@ export function dropboxAuthorizeUrl(
     client: DropboxOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" = "link"
+    flow: "link" | "signin" | "storage" | "mail" = "link"
 ): string {
     const signIn = flow === "signin";
     const url = new URL(AUTHORIZE);

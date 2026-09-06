@@ -50,6 +50,17 @@ export const GOOGLE_SIGN_IN_SCOPES = ["openid", "email"];
  */
 export const GOOGLE_DRIVE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/drive.file"];
 
+/**
+ * What linking a Gmail mailbox asks for.
+ *
+ * `https://mail.google.com/` is the only scope Google issues that an IMAP and
+ * SMTP client can use, and it is a wide one: it reaches the whole mailbox. There
+ * is no narrower version of it, which is why this is asked for on its own screen
+ * rather than folded into the ordinary link - somebody connecting Google to see
+ * their calendar must never be shown a consent screen asking for their mail.
+ */
+export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"];
+
 export interface GoogleOAuthClient {
     readonly clientId: string;
     readonly clientSecret: string;
@@ -85,10 +96,16 @@ export function googleAuthorizeUrl(
     client: GoogleOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" = "link"
+    flow: "link" | "signin" | "storage" | "mail" = "link"
 ): string {
     const signIn = flow === "signin";
-    const scopes = signIn ? GOOGLE_SIGN_IN_SCOPES : flow === "storage" ? GOOGLE_DRIVE_SCOPES : GOOGLE_SCOPES;
+    const scopes = signIn
+        ? GOOGLE_SIGN_IN_SCOPES
+        : flow === "storage"
+          ? GOOGLE_DRIVE_SCOPES
+          : flow === "mail"
+            ? GOOGLE_MAIL_SCOPES
+            : GOOGLE_SCOPES;
     const url = new URL(OAUTH_AUTHORIZE);
     url.searchParams.set("client_id", client.clientId);
     url.searchParams.set("redirect_uri", redirectUri);

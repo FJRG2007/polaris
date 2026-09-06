@@ -52,6 +52,8 @@ import {
 
 const STATE_COOKIE = "polaris_connection_state";
 const CONNECTIONS_SCREEN = "/account/connections";
+/** Where a link started from the Mail app comes back to. */
+const MAIL_SCREEN = "/mail/settings/accounts";
 const LOGIN_SCREEN = "/oauth/login";
 const CHALLENGE_SCREEN = "/oauth/2fa";
 /** Where a finished sign-in lands when the screen asked for nothing else. The
@@ -69,9 +71,10 @@ const SIGN_IN_LIMIT = 10;
 const SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 
 /** What the round trip was started for. */
-/** `storage` is a link that also asks for access to the files Polaris creates.
- *  Everything downstream treats it as a link; only the consent screen differs. */
-type ConnectionMode = "link" | "signin" | "storage";
+/** `storage` is a link that also asks for access to the files Polaris creates,
+ *  and `mail` one that asks for the mailbox. Everything downstream treats both
+ *  as a link; only the consent screen and where it lands afterwards differ. */
+type ConnectionMode = "link" | "signin" | "storage" | "mail";
 
 /** What the round trip came back with, as the screen reads it. */
 export type LinkOutcome = "linked" | "cancelled" | "state_error" | "taken" | "limit" | "unavailable" | "error";
@@ -96,8 +99,8 @@ interface FlowState {
     target?: string;
 }
 
-function backToConnections(origin: string, provider: string, outcome: LinkOutcome): URL {
-    const url = new URL(CONNECTIONS_SCREEN, origin);
+function backToConnections(origin: string, provider: string, outcome: LinkOutcome, screen?: string): URL {
+    const url = new URL(screen ?? CONNECTIONS_SCREEN, origin);
     url.searchParams.set("provider", provider);
     url.searchParams.set("connection", outcome);
     return url;
@@ -237,7 +240,8 @@ export async function startConnectionLink(request: Request, provider: string): P
     if (!findConnectionProvider(provider) || !(await connectionLinkAvailable(provider, { admin: user.isAdmin }))) {
         return NextResponse.redirect(backToConnections(await connectionFlowOrigin(), provider, "unavailable"));
     }
-    return begin(request, provider, url.searchParams.get("scope") === "storage" ? "storage" : "link");
+    const scope = url.searchParams.get("scope");
+    return begin(request, provider, scope === "storage" ? "storage" : scope === "mail" ? "mail" : "link");
 }
 
 /**
@@ -284,9 +288,10 @@ export async function finishConnectionCallback(request: Request, provider: strin
     // Anything that is not a sign-in is a link, including a callback that
     // arrived with no cookie at all: it lands on the screen it was started from,
     // which for a link is the one that says what went wrong.
-    if (!code) return endLink(origin, provider, "cancelled");
-    if (!valid) return endLink(origin, provider, "state_error");
-    return finishLink(origin, provider, code);
+    const screen = held?.mode === "mail" ? MAIL_SCREEN : undefined;
+    if (!code) return endLink(origin, provider, "cancelled", screen);
+    if (!valid) return endLink(origin, provider, "state_error", screen);
+    return finishLink(origin, provider, code, screen);
 }
 
 /**
@@ -334,11 +339,16 @@ async function finishSteam(url: URL, origin: string, held: FlowState | null): Pr
 }
 
 /** Record the account the provider vouched for against the signed-in user. */
-async function finishLink(origin: string, provider: string, code: string): Promise<Response> {
+async function finishLink(
+    origin: string,
+    provider: string,
+    code: string,
+    screen?: string
+): Promise<Response> {
     const user = await requireUser();
 
     const client = await connectionOAuthClient(provider);
-    if (!client) return endLink(origin, provider, "unavailable");
+    if (!client) return endLink(origin, provider, "unavailable", screen);
 
     try {
         const authorized = await exchangeConnectionCode(provider, client, code, connectionCallbackUrl(provider, origin));
@@ -360,16 +370,16 @@ async function finishLink(origin: string, provider: string, code: string): Promi
         await markConnectionProven(provider);
         // Whatever it last refused, it does not refuse now.
         await clearConnectionFailure(provider);
-        return endLink(origin, provider, "linked");
+        return endLink(origin, provider, "linked", screen);
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
         // everything else is a provider that did not complete the authorization.
-        if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken");
-        if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit");
+        if (caught instanceof ConnectionClaimedError) return endLink(origin, provider, "taken", screen);
+        if (caught instanceof ConnectionLimitError) return endLink(origin, provider, "limit", screen);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
         await recordConnectionFailure(provider, describeFailure(caught));
-        return endLink(origin, provider, "error");
+        return endLink(origin, provider, "error", screen);
     }
 }
 
@@ -442,8 +452,16 @@ async function finishSignIn(
     return response;
 }
 
-function endLink(origin: string, provider: string, outcome: LinkOutcome): Response {
-    const response = NextResponse.redirect(backToConnections(origin, provider, outcome));
+/**
+ * Land the person back where they pressed Connect.
+ *
+ * `screen` is only ever one this deployment chose - the mail flow's, so somebody
+ * adding a mailbox comes back to the mailbox form rather than to the account's
+ * connections list, which would leave them to find their way back. It is never
+ * read from the request: that would make this an open redirect.
+ */
+function endLink(origin: string, provider: string, outcome: LinkOutcome, screen?: string): Response {
+    const response = NextResponse.redirect(backToConnections(origin, provider, outcome, screen));
     response.cookies.delete(STATE_COOKIE);
     return response;
 }
@@ -469,7 +487,10 @@ function readState(request: Request): FlowState | null {
         if (typeof held?.provider !== "string" || typeof held.state !== "string") return null;
         return {
             provider: held.provider,
-            mode: held.mode === "signin" ? "signin" : "link",
+            mode:
+                held.mode === "signin" || held.mode === "storage" || held.mode === "mail"
+                    ? held.mode
+                    : "link",
             state: held.state,
             target: typeof held.target === "string" ? held.target : undefined
         };

@@ -93,11 +93,17 @@ export interface ConnectionIdentity {
 /**
  * What the round trip is for. A sign-in asks for less than a link: it only has to
  * learn who is at the other end. `storage` asks for more than either - lasting
- * access to the files this application creates - and is kept separate so
- * somebody linking an account for one reason is never shown a consent screen
- * asking for the other.
+ * access to the files this application creates - and `mail` asks for the most of
+ * all, the whole mailbox, because neither Google nor Microsoft issues a narrower
+ * scope an IMAP client can use.
+ *
+ * Each is kept separate so somebody linking an account for one reason is never
+ * shown a consent screen asking for another. Providers that grant scopes
+ * cumulatively end up holding all of them without any authorization being
+ * repeated; the ones that do not are re-authorized per reason, which is the
+ * honest behaviour either way.
  */
-export type ConnectionFlow = "link" | "signin" | "storage";
+export type ConnectionFlow = "link" | "signin" | "storage" | "mail";
 
 interface ProviderOAuth {
     /** Where the provider returns somebody after they authorize. Registered on

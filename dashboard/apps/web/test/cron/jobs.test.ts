@@ -77,6 +77,12 @@ describe("the work Polaris runs on a schedule", () => {
             "home-recording",
             "home-retention",
             "host-space",
+            // Two passes over one mailbox is two IMAP sessions per account,
+            // which is how a client gets rate limited by the large services -
+            // and sending a queued message twice is the one thing the outgoing
+            // queue must never do.
+            "mail-send",
+            "mail-sync",
             "task-reminders",
             "task-trackers"
         ]);

@@ -1,0 +1,181 @@
+/**
+ * Preparing a message to be looked at.
+ *
+ * The privacy work in this app happens here and in the frame the result is drawn
+ * into, and neither is enough on its own:
+ *
+ * - **Nothing outside is fetched until somebody says so.** Every remote address
+ *   in the markup is moved onto a `data-remote-*` attribute before it leaves
+ *   this server, so a message cannot tell its sender it was opened. Pressing
+ *   "show pictures" puts them back in the browser, with nothing asked of this
+ *   server, so even that is one round trip to the sender rather than two.
+ * - **The trackers are named.** A message that says "4 blocked, from Mailchimp
+ *   and HubSpot" is one people leave the setting on for; a message that says
+ *   "some images were blocked" is one they switch it off for on the second day.
+ * - **Links lose what identifies the reader.** The address still goes where it
+ *   says; it stops carrying who followed it.
+ * - **A read receipt is never answered.** It is recorded and shown to the
+ *   reader, and that is the whole of what Polaris does with one.
+ *
+ * The markup itself is made safe in the browser rather than here: it is rendered
+ * into a sandboxed frame with no script, no same-origin and a policy that
+ * forbids every outside load, and it goes through a sanitizer on the way in. A
+ * regular expression here could not be that boundary and is not asked to be -
+ * what it does is decide what a message is allowed to want.
+ */
+
+import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
+import { addressesFrom } from "./json";
+
+/** How remote content is treated. Read off the account. */
+export type RemoteContentMode = "block" | "trusted" | "always";
+
+/** A message, ready to be drawn. */
+export interface ReadableMessage {
+    /** The markup, with remote addresses parked unless they are allowed. */
+    readonly html: string;
+    readonly text: string;
+    /** Whether the frame may put the pictures back without being asked. */
+    readonly remoteAllowed: boolean;
+    /** How many outside addresses this message carries. */
+    readonly remoteCount: number;
+    /** The ones that exist to count the reader, with the company where it is
+     *  one anybody has heard of. */
+    readonly trackers: readonly core.TrackerFinding[];
+    /** The companies, once each, for the line above the message. */
+    readonly trackerVendors: readonly string[];
+    /** Whether this message asked to be told it had been read. */
+    readonly wantsReceipt: boolean;
+    /** The one-click unsubscribe address the sender published, where they did.
+     *  A mailto or an https link, never anything else. */
+    readonly unsubscribe: string;
+}
+
+/** The account settings this reads. */
+export interface ReadingPolicy {
+    readonly remoteContent: string;
+    readonly cleanLinks: boolean;
+    readonly nameTrackers: boolean;
+}
+
+/**
+ * Whether this sender's pictures may load.
+ *
+ * `trusted` is the default and the one worth defending: nothing loads until the
+ * reader says a particular sender is fine, which is a decision about one
+ * newsletter rather than about the whole idea. `always` exists because some
+ * people do not care and would otherwise be pressing a button on every message.
+ */
+export async function remoteAllowedFor(
+    accountId: string,
+    mode: string,
+    from: readonly core.MailAddress[]
+): Promise<boolean> {
+    if (mode === "always") return true;
+    if (mode === "block") return false;
+    const sender = from[0]?.address;
+    if (!sender) return false;
+    const trusted = await prisma.mailTrustedSender.findUnique({
+        where: { accountId_address: { accountId, address: sender } },
+        select: { id: true }
+    });
+    return Boolean(trusted);
+}
+
+/**
+ * The unsubscribe address a sender published, if it is one worth offering.
+ *
+ * `List-Unsubscribe` carries one or two: a mailto and an https link. The https
+ * one is preferred where the sender also published `List-Unsubscribe-Post`,
+ * which is them saying a single POST is enough - that is the one-click
+ * unsubscribe, and it is the only version worth putting a button on. Otherwise
+ * the mailto is offered, because it works without the reader opening a browser
+ * on a page that asks them to sign in.
+ */
+export function unsubscribeAddress(headers: Record<string, string> | null): string {
+    const header = headers?.["list-unsubscribe"];
+    if (!header) return "";
+    const links = [...header.matchAll(/<([^>]+)>/g)].map((match) => match[1] ?? "");
+    const oneClick = Boolean(headers?.["list-unsubscribe-post"]);
+    const https = links.find((link) => /^https:\/\//i.test(link)) ?? "";
+    const mailto = links.find((link) => /^mailto:/i.test(link)) ?? "";
+    if (oneClick && https) return https;
+    return mailto || https;
+}
+
+/** Every link in the markup, with what identifies the reader taken off. */
+function cleanLinks(html: string): string {
+    return html.replace(
+        /\b(href)\s*=\s*(["'])(https?:\/\/[^"']*)\2/gi,
+        (_match, name: string, quote: string, url: string) => `${name}=${quote}${core.cleanLink(url)}${quote}`
+    );
+}
+
+/**
+ * Turn one stored message into something a reading pane can draw.
+ *
+ * The tracker scan runs against the original markup rather than the held one, so
+ * it sees the addresses as the sender wrote them. Held or not, the count is the
+ * same: allowing a sender's pictures does not stop Polaris saying what they are.
+ */
+export async function readableMessage(
+    accountId: string,
+    policy: ReadingPolicy,
+    message: {
+        readonly bodyHtml: string | null;
+        readonly bodyText: string | null;
+        readonly wantsReceipt: boolean;
+        readonly headers: unknown;
+        readonly fromJson: unknown;
+    }
+): Promise<ReadableMessage> {
+    const from = addressesFrom(message.fromJson);
+    const headers = (message.headers as Record<string, string> | null) ?? null;
+    const original = message.bodyHtml ?? "";
+    const resources = core.remoteResourcesIn(original);
+    const trackers = core.trackersIn(resources);
+    const allowed = await remoteAllowedFor(accountId, policy.remoteContent, from);
+
+    let html = original;
+    if (policy.cleanLinks) html = cleanLinks(html);
+    if (!allowed) html = core.holdRemoteContent(html);
+
+    return {
+        html,
+        text: message.bodyText ?? "",
+        remoteAllowed: allowed,
+        remoteCount: resources.length,
+        trackers: policy.nameTrackers ? trackers : [],
+        trackerVendors: policy.nameTrackers ? core.trackerVendors(trackers) : [],
+        wantsReceipt: message.wantsReceipt,
+        unsubscribe: unsubscribeAddress(headers)
+    };
+}
+
+/** Let this sender's pictures through from now on, or take that back. */
+export async function trustSender(
+    accountId: string,
+    address: string,
+    trusted: boolean
+): Promise<void> {
+    if (trusted) {
+        await prisma.mailTrustedSender.upsert({
+            where: { accountId_address: { accountId, address } },
+            update: {},
+            create: { accountId, address }
+        });
+        return;
+    }
+    await prisma.mailTrustedSender.deleteMany({ where: { accountId, address } });
+}
+
+/** Everybody whose pictures load on this mailbox, for the privacy screen. */
+export async function listTrustedSenders(accountId: string): Promise<string[]> {
+    const rows = await prisma.mailTrustedSender.findMany({
+        where: { accountId },
+        select: { address: true },
+        orderBy: { address: "asc" }
+    });
+    return rows.map((row) => row.address);
+}
