@@ -48,6 +48,7 @@ import type { FilteredMic, MicFilter } from "./mic-filter";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { useSpeakers } from "./speaker-device";
+import { useZoomPan } from "@/components/use-zoom-pan";
 import { stagesOf, stagingOf } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
@@ -417,6 +418,9 @@ export function CallRoom({
                             personId={null}
                             focused={live === stage.key}
                             onFocus={() => focus(stage.key)}
+                            // A shared screen is usually text, and the reason
+                            // anybody stares at one is to read a line of it.
+                            zoomable
                             volumeKey={undefined}
                         />
                     ))}
@@ -981,6 +985,7 @@ function Tile({
     personId,
     own = false,
     mirrored = false,
+    zoomable = false,
     guest = false,
     cameraOff = false,
     sharing = false,
@@ -1008,6 +1013,10 @@ function Tile({
     /** Draw it the way a mirror would. Your own tile only, and never what is
      *  sent - see `call-mirror`. */
     mirrored?: boolean;
+    /** Whether the wheel pushes into this picture and it can be dragged around.
+     *  For a shared screen, where reading one line of it is the whole reason
+     *  anybody is looking. */
+    zoomable?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
     /** Whether you are sharing a screen. Said on your own tile because the
@@ -1041,7 +1050,10 @@ function Tile({
     volumeKey?: string;
 }) {
     const video = useRef<HTMLVideoElement>(null);
-    const frame = useRef<HTMLDivElement>(null);
+    const frame = useRef<HTMLDivElement | null>(null);
+    /** Pushing into the picture. Held for every tile and used by the ones that
+     *  say so - a face in a grid of eight is not a thing anybody zooms. */
+    const look = useZoomPan();
     const [volume, setVolume] = useCallVolume(volumeKey ?? "");
 
     /**
@@ -1161,13 +1173,18 @@ function Tile({
 
     const tile = (
         <div
-            ref={frame}
+            ref={(node) => {
+                frame.current = node;
+                if (zoomable) look.frameRef(node);
+            }}
+            {...(zoomable ? look.frameProps : {})}
             className={cn(
                 "group/tile relative min-h-0 overflow-hidden rounded-lg bg-elevated ring-1 transition-shadow duration-fast",
                 // Two rings rather than a thicker one: a border that appears and
                 // disappears would move everything inside the tile by two pixels
                 // every time somebody drew breath.
-                speaking ? "ring-2 ring-success" : "ring-border"
+                speaking ? "ring-2 ring-success" : "ring-border",
+                zoomable && look.zoomed && "cursor-grab active:cursor-grabbing"
             )}
         >
             <video
@@ -1175,7 +1192,23 @@ function Tile({
                 autoPlay
                 playsInline
                 muted
+                // No transition on this. It is dragged and wheeled, and an eased
+                // transform lags a finger by its own duration.
+                style={zoomable ? { transform: look.transform } : undefined}
+                onLoadedMetadata={
+                    zoomable
+                        ? (event) => {
+                              const { videoWidth, videoHeight } = event.currentTarget;
+                              const box = frame.current?.getBoundingClientRect();
+                              look.measure(
+                                  videoHeight > 0 ? videoWidth / videoHeight : null,
+                                  box && box.height > 0 ? box.width / box.height : null
+                              );
+                          }
+                        : undefined
+                }
                 className={cn(
+                    zoomable && "origin-center will-change-transform",
                     "size-full",
                     // Letterboxed rather than cropped for anything that might be
                     // a screen - and from here, anybody else's picture might be:
@@ -1262,6 +1295,20 @@ function Tile({
                             ) : (
                                 <Expand className="size-3.5" />
                             )}
+                        </button>
+                    )}
+                    {/* Only where the wheel already does it, and only once it
+                        has been used: a button that says 1.0x is a button that
+                        says nothing. */}
+                    {zoomable && look.zoomed && (
+                        <button
+                            type="button"
+                            onClick={look.reset}
+                            aria-label="Fit the picture again"
+                            title="Fit the picture again"
+                            className="rounded bg-background/80 px-1.5 py-1 text-[0.625rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                            {look.zoom.scale.toFixed(1)}x
                         </button>
                     )}
                     <button
