@@ -89,14 +89,44 @@ export function nameplateCss(plate: Nameplate): CSSProperties {
  */
 const FACES: Record<NameFont, CSSProperties> = {
     sans: {},
-    serif: { fontFamily: 'ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif' },
+    // Small capitals are a real variation of the face already loaded, so this is
+    // a different letterform for no file at all. The tracking is the part that
+    // makes it read as deliberate: small caps set solid look like a mistake.
+    caps: { fontVariantCaps: "small-caps", letterSpacing: "0.04em" },
+    serif: { fontFamily: "var(--font-name-serif), var(--font-sans)" },
     mono: { fontFamily: "var(--font-mono)" },
-    rounded: {
-        fontFamily:
-            'ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Segoe UI Variable", var(--font-sans)'
-    },
-    caps: { fontVariantCaps: "small-caps", letterSpacing: "0.03em" }
+    rounded: { fontFamily: "var(--font-name-rounded), var(--font-sans)" },
+    hand: { fontFamily: "var(--font-name-hand), var(--font-sans)" },
+    comic: { fontFamily: "var(--font-name-comic), var(--font-sans)", letterSpacing: "0.01em" },
+    script: { fontFamily: "var(--font-name-script), var(--font-sans)" },
+    block: { fontFamily: "var(--font-name-block), var(--font-sans)" },
+    techno: { fontFamily: "var(--font-name-techno), var(--font-sans)", letterSpacing: "0.02em" },
+    // The one face that is genuinely wider than the rest, so its tracking is
+    // pulled back in and it is set a shade smaller: a pixel face at the size of
+    // the row it is in overruns every column a name sits in.
+    pixel: { fontFamily: "var(--font-name-pixel), var(--font-sans)", fontSize: "0.86em", letterSpacing: "-0.02em" }
 };
+
+/**
+ * The faces that carry their own weight.
+ *
+ * Every display face here is checked in at one weight, and asking a browser for
+ * a bolder one it does not have gets a synthesised bold: the outline smeared
+ * sideways, which on a face that is already heavy is a name that looks blurred.
+ * So the effects that want weight - the ones that need a stem to hang an outline
+ * or a shadow on - only ask for it where a real bold exists.
+ */
+const OWN_WEIGHT: ReadonlySet<NameFont> = new Set<NameFont>([
+    "comic",
+    "script",
+    "block",
+    "pixel"
+]);
+
+/** 700 where there is a 700 to be had, and nothing where there is not. */
+function heavy(font: NameFont): CSSProperties {
+    return OWN_WEIGHT.has(font) ? {} : { fontWeight: 700 };
+}
 
 /** The stops of a gradient, evenly spaced. */
 function ramp(colors: readonly string[]): string {
@@ -104,6 +134,22 @@ function ramp(colors: readonly string[]): string {
     return colors
         .map((color, index, all) => `${color} ${Math.round((index / (all.length - 1)) * 100)}%`)
         .join(", ");
+}
+
+/**
+ * The same stops, closed on the colour they opened with.
+ *
+ * A moving gradient walks exactly one tile per cycle, so the frame it ends on is
+ * the frame it began from - but only if the last stop is the first one again.
+ * Two colours walked as-is meet their own seam every six seconds, which is a
+ * name that flinches, in every list its owner appears in. The catalogue got this
+ * right by writing the first colour twice; a look somebody composed has no way
+ * to, so it is closed here.
+ */
+function loop(colors: readonly string[]): string {
+    const first = colors[0];
+    if (!first) return ramp(colors);
+    return ramp(colors[colors.length - 1] === first ? colors : [...colors, first]);
 }
 
 /** Paint poured through the letters rather than behind them. */
@@ -135,6 +181,13 @@ export function nameLookCss(look: NameLook): CSSProperties {
     const second = look.colors[1] ?? first;
 
     switch (look.effect) {
+        case "plain":
+            // The letterforms and nothing else. Whatever colour the name would
+            // have had where it is drawn, it still has - which is the point:
+            // this is how somebody wears a face in a list without their name
+            // becoming the brightest thing in it.
+            return face;
+
         case "solid":
             return { ...face, color: first };
 
@@ -154,8 +207,8 @@ export function nameLookCss(look: NameLook): CSSProperties {
             // list size is the difference between bold and smudged.
             return {
                 ...face,
+                ...heavy(look.font),
                 color: first,
-                fontWeight: 700,
                 WebkitTextStrokeWidth: "0.06em",
                 WebkitTextStrokeColor: "rgba(0,0,0,0.65)",
                 paintOrder: "stroke fill"
@@ -166,8 +219,8 @@ export function nameLookCss(look: NameLook): CSSProperties {
             // the same picture at twenty pixels and at forty.
             return {
                 ...face,
+                ...heavy(look.font),
                 color: first,
-                fontWeight: 700,
                 textShadow: `0.055em 0.055em 0 rgba(0,0,0,0.55)`
             };
 
@@ -177,7 +230,7 @@ export function nameLookCss(look: NameLook): CSSProperties {
             // rounded, wet-looking thing takes its highlight from.
             return {
                 ...face,
-                fontWeight: 700,
+                ...heavy(look.font),
                 ...throughLetters(`linear-gradient(180deg, ${ramp([first, second])})`, false),
                 filter: `drop-shadow(0 0.04em 0.02em ${second}55)`
             };
@@ -186,7 +239,7 @@ export function nameLookCss(look: NameLook): CSSProperties {
             return {
                 ...face,
                 color: first,
-                ...throughLetters(`linear-gradient(90deg, ${ramp(look.colors)})`, true)
+                ...throughLetters(`linear-gradient(90deg, ${loop(look.colors)})`, true)
             };
 
         case "gradient":

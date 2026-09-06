@@ -825,6 +825,11 @@ export const PROFILE_EFFECTS: readonly ProfileEffect[] = [
  * the person who loses it is whoever is reading.
  */
 export const NAME_EFFECTS = [
+    // No paint at all. Not the absence of a style: it is how somebody wears the
+    // letterforms without the colours, which is a thing people want and which
+    // the effect list has to be able to say, or else choosing a face would
+    // silently paint their name blue as well.
+    "plain",
     "solid",
     "gradient",
     "neon",
@@ -836,16 +841,46 @@ export const NAME_EFFECTS = [
 
 export type NameEffect = (typeof NAME_EFFECTS)[number];
 
+/** Whether an effect puts any colour on the letters at all. */
+export function effectTakesColor(effect: NameEffect): boolean {
+    return effect !== "plain";
+}
+
 /**
  * The letterforms on offer.
  *
- * Stacks the machine already has, not files fetched from anywhere. A display
- * name is drawn in every list in the product, so a face that arrives over the
- * network is a hundred names that reflow a moment after the page settles - and
- * one that fails to arrive is a hundred names in a fallback nobody chose. What
- * is here is what can be promised at any size, offline, on the first paint.
+ * These are real faces, checked into the repository and served from here - not
+ * "whatever the machine has under `ui-rounded`", which is how this started and
+ * which meant that four of the five choices were the same grotesque with a
+ * different fallback and the fifth was small capitals. A picker where the
+ * options are indistinguishable is a picker nobody uses twice.
+ *
+ * Nothing is fetched from a font service. A build has to work with no network,
+ * and a request per visitor to a third party is a record of who uses this
+ * instance kept somewhere the operator does not control - the same rule the
+ * interface face already follows. See `apps/web/src/fonts/NOTICE.md`.
+ *
+ * They cost nothing until they are used. Each is declared but not preloaded, so
+ * the browser fetches a face the first time a name on the screen is actually set
+ * in it: somebody whose colleagues all use the default downloads none of them.
+ *
+ * `sans`, `mono` and `caps` are the three that need no file - the interface face,
+ * its mono companion, and a real typographic variation of the face already
+ * loaded.
  */
-export const NAME_FONTS = ["sans", "serif", "mono", "rounded", "caps"] as const;
+export const NAME_FONTS = [
+    "sans",
+    "caps",
+    "serif",
+    "mono",
+    "rounded",
+    "hand",
+    "comic",
+    "script",
+    "block",
+    "techno",
+    "pixel"
+] as const;
 
 export type NameFont = (typeof NAME_FONTS)[number];
 

@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 import { NAME_STYLES, effectOf, nameStyleOf, decorationOf } from "@polaris/core";
 import {
     nameStyleClass,
+    nameLookCss,
     nameStyleCss,
     ringWidth,
     sheenCss,
@@ -88,6 +89,50 @@ describe("a name in colour", () => {
             expect(image).toContain(`${entry.colors[0]} 0%`);
             expect(image).toContain(`${entry.colors[0]} 100%`);
         }
+    });
+
+    it("closes a composed one too, which cannot write its first colour twice", () => {
+        // The catalogue entries above close themselves by listing the opening
+        // colour again at the end. A look somebody composed is two colours and a
+        // picker, so it has no way to - and walked as-is it meets its own seam
+        // once every cycle, which is a name that flinches in every list its
+        // owner appears in.
+        const image = String(
+            nameLookCss({
+                effect: "prism",
+                font: "sans",
+                colors: ["#5b8def", "#a06bff"],
+                moving: true
+            }).backgroundImage
+        );
+        expect(image).toContain("#5b8def 0%");
+        expect(image).toContain("#5b8def 100%");
+        expect(image).toContain("#a06bff 50%");
+    });
+
+    it("puts a face on a name without putting paint on it", () => {
+        // What `plain` is for: the letterforms alone. Anything that set a colour
+        // here would mean choosing a face repainted somebody's name as well.
+        const css = nameLookCss({
+            effect: "plain",
+            font: "comic",
+            colors: ["#5b8def"],
+            moving: false
+        });
+        expect(css.fontFamily).toContain("var(--font-name-comic)");
+        expect(css.color).toBeUndefined();
+        expect(css.backgroundImage).toBeUndefined();
+        expect(css.WebkitTextFillColor).toBeUndefined();
+    });
+
+    it("only asks for a weight from a face that has one", () => {
+        // Asking a single-weight display face for a bold gets a synthesised one:
+        // the outline smeared sideways, which on a face that is already heavy
+        // reads as a blurred name.
+        const own = nameLookCss({ effect: "pop", font: "comic", colors: ["#5b8def"], moving: false });
+        const not = nameLookCss({ effect: "pop", font: "sans", colors: ["#5b8def"], moving: false });
+        expect(own.fontWeight).toBeUndefined();
+        expect(not.fontWeight).toBe(700);
     });
 
     it("names a colour before it makes the letters transparent", () => {
