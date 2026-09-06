@@ -299,6 +299,9 @@ model User {
     blocking            UserBlock[]          @relation("UserBlockBlocker")
     blockedBy           UserBlock[]          @relation("UserBlockBlocked")
     presenceSchedules   PresenceSchedule[]
+    mailAccounts        MailAccount[]
+    mailLabels          MailLabel[]
+    mailUploads         MailUpload[]
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -2193,7 +2196,8 @@ model UserConnection {
     linkedAt       DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    mailAccounts MailAccount[]
 
     // One outside account cannot be claimed by two Polaris users.
     @@unique([provider, accountId])
@@ -8720,4 +8724,527 @@ model TelemetryDay {
 
     @@unique([issueId, day])
     @@index([projectId, day])
+}
+// ---------------------------------------------------------------------------
+// Mail
+//
+// Somebody else's mailbox, kept here so it can be read at the speed of a local
+// query rather than the speed of an IMAP round trip.
+//
+// Two rules run through every model below and explain most of the columns.
+//
+// **Polaris is a client, not the store.** The mail server is the authority on
+// what exists and what state it is in; these tables are a cache of it, and every
+// one of them can be thrown away and rebuilt from the server. That is why flags
+// are mirrored rather than owned, why `uid` and `uidValidity` are recorded
+// against every message, and why nothing here is the only copy of anything.
+//
+// **What Polaris adds is its own.** Labels, snoozes, rules, pins and collected
+// contacts have no IMAP equivalent on most servers, so they live here and are
+// keyed by the message's own Message-Id as well as its uid - a mailbox that is
+// resynced from scratch must not lose the things its owner did here.
+// ---------------------------------------------------------------------------
+
+// One mailbox somebody linked.
+//
+// The credential is the sensitive part and is envelope-encrypted the same way
+// storage credentials and integration keys are. An account authorized through
+// Google or Microsoft carries none at all: it points at the UserConnection its
+// owner already linked, and a token is minted from that per connection.
+model MailAccount {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    // The mailbox itself, lowercased. One person may link the same address twice
+    // only by unlinking it first.
+    address      String
+    // What the From line says. Blank falls back to the profile name.
+    displayName  String   @default("")
+    // What the rail calls it. Blank is the address.
+    label        String   @default("")
+    // The dot beside it, so three accounts are told apart at a glance. Null is a
+    // color derived from the address, the way an avatar is.
+    color        String?
+    // The service it was recognised as ("gmail", "fastmail", ""), for the
+    // behaviour that differs per service rather than per server.
+    service      String   @default("")
+    // "password" or "oauth".
+    auth         String   @default("password")
+    // The linked outside account authorizing this, for "oauth". Set null rather
+    // than cascading when that link goes: the mailbox stays on screen saying it
+    // needs reconnecting, which is the only way its owner finds out.
+    connectionId String?  @db.Uuid
+    // The login the servers want when it is not the address.
+    username     String   @default("")
+
+    imapHost     String
+    imapPort     Int
+    imapSecurity String   @default("tls")
+    smtpHost     String
+    smtpPort     Int
+    smtpSecurity String   @default("tls")
+
+    // The mailbox password or app password, encrypted. Null for "oauth".
+    encryptedSecret Bytes?
+    secretNonce     Bytes?
+    secretKeyId     String?
+
+    // Whether the last conversation with the server worked, and what to say when
+    // it did not: "ok", "auth" (the credential was refused), "unreachable",
+    // "never" (nothing has tried yet).
+    state        String    @default("never")
+    // The server's own words, where it gave any, for the line under the account.
+    stateDetail  String    @default("")
+    lastSyncAt   DateTime?
+    lastOkAt     DateTime?
+    // How often the server is asked when it will not push. Seconds.
+    pollSeconds  Int       @default(300)
+    notify       Boolean   @default(true)
+    // Whether this account's mail appears in the views that merge every account.
+    unified      Boolean   @default(true)
+    // Whether Polaris files its own copy into Sent. Off for the services that do
+    // it themselves, or everything sent is there twice.
+    appendToSent Boolean   @default(true)
+
+    signature           String  @default("")
+    signatureAboveQuote Boolean @default(true)
+
+    // Privacy, per account rather than per person: a work mailbox and a personal
+    // one are not the same decision.
+    remoteContent  String  @default("trusted")
+    nameTrackers   Boolean @default(true)
+    answerReceipts Boolean @default(false)
+    cleanLinks     Boolean @default(true)
+
+    vacationEnabled    Boolean   @default(false)
+    vacationSubject    String    @default("")
+    vacationBody       String    @default("")
+    vacationStartsAt   DateTime?
+    vacationEndsAt     DateTime?
+    vacationRepeatDays Int       @default(7)
+
+    // Where it sits in the rail.
+    position  Int      @default(0)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    connection  UserConnection?     @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+    folders     MailFolder[]
+    threads     MailThread[]
+    messages    MailMessage[]
+    identities  MailIdentity[]
+    drafts      MailDraft[]
+    rules       MailRule[]
+    contacts    MailContact[]
+    trusted     MailTrustedSender[]
+    autoReplies MailAutoReply[]
+
+    @@unique([userId, address])
+    @@index([userId, position])
+}
+
+// A second address the same mailbox may send from, and the signature that goes
+// with it. An alias, a shared team address, a domain somebody also owns.
+model MailIdentity {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    accountId   String   @db.Uuid
+    address     String
+    displayName String   @default("")
+    replyTo     String   @default("")
+    signature   String   @default("")
+    isDefault   Boolean  @default(false)
+    createdAt   DateTime @default(now())
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    drafts  MailDraft[]
+
+    @@unique([accountId, address])
+}
+
+// One folder on the server, as the server names it.
+//
+// `role` is what the app acts against: every verb in the UI is "put this in
+// whatever this server calls Archive", so a mailbox whose Sent folder is called
+// Gesendete Objekte behaves exactly like one whose is not.
+model MailFolder {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    // The full path, in the server's own hierarchy.
+    path      String
+    // What separates its levels. Servers differ and some answer with none.
+    delimiter String @default("/")
+    // What to draw: the leaf of the path.
+    name      String
+    // "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive" | "all" | "none"
+    role      String @default("none")
+    // Whether the person has this one open in their client. An IMAP account has
+    // dozens of folders nobody looks at, and syncing all of them is why other
+    // clients take an hour to set up.
+    subscribed Boolean @default(false)
+    // Kept out of the rail without unsubscribing it.
+    hidden     Boolean @default(false)
+
+    // What the server said the last time it was asked. A changed uidValidity
+    // means every uid held here is meaningless and the folder is resynced.
+    uidValidity   BigInt?
+    uidNext       BigInt?
+    // The CONDSTORE cursor, so a resync asks only for what changed.
+    highestModseq BigInt?
+    // The server's own counts, for the number beside the folder. Kept rather
+    // than counted here: what Polaris has cached is a window, and a folder with
+    // nine thousand unread would otherwise read as nine hundred.
+    total      Int       @default(0)
+    unread     Int       @default(0)
+    lastSyncAt DateTime?
+
+    account  MailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    messages MailMessage[]
+
+    @@unique([accountId, path])
+    @@index([accountId, role])
+}
+
+// A conversation, as this app groups it.
+//
+// Derived from headers rather than given by the server: IMAP's own THREAD
+// extension is optional, disagrees between servers, and cannot span the two
+// folders a conversation nearly always lives in once somebody has replied to it.
+model MailThread {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    // The normalized subject the conversation is known by, for the subject
+    // fallback. Null when the conversation was matched by ids alone.
+    subjectKey String?
+    // What to draw as the title: the subject of the first message, unstripped.
+    subject    String @default("")
+    // Everybody who has said anything, as a JSON array of {name, address}, in
+    // the order they first appeared. Held rather than joined because the list
+    // view draws it for every row.
+    participants   Json     @default("[]")
+    messageCount   Int      @default(0)
+    unreadCount    Int      @default(0)
+    hasAttachments Boolean  @default(false)
+    starred        Boolean  @default(false)
+    // Kept at the top of the list by its reader.
+    pinned         Boolean  @default(false)
+    // Nothing about this conversation is announced, however much it moves.
+    muted          Boolean  @default(false)
+    lastMessageAt  DateTime @default(now())
+    firstMessageAt DateTime @default(now())
+    // The line under the subject, from the newest message.
+    snippet        String   @default("")
+
+    account  MailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    messages MailMessage[]
+
+    @@index([accountId, lastMessageAt])
+    @@index([accountId, subjectKey])
+}
+
+// One message, cached.
+//
+// The body columns are null until somebody opens it: an envelope is a few
+// hundred bytes and a message with a slide deck in it is forty megabytes, so
+// syncing bodies eagerly would mean downloading a mailbox to show a list.
+model MailMessage {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    folderId  String @db.Uuid
+    threadId  String @db.Uuid
+
+    // The server's id for it inside this folder, and the validity it was read
+    // under. Together they are the only durable way back to it.
+    uid         BigInt
+    uidValidity BigInt?
+    // The Message-Id header, bare. The one id that survives a move, a resync,
+    // and the message being in two folders at once, so everything Polaris adds
+    // is keyed on it too.
+    messageId   String @default("")
+    inReplyTo   String @default("")
+    // The References header, as a JSON array of bare ids.
+    references  Json   @default("[]")
+    // The List-Id header, which is what makes a mailing list a mailing list.
+    listId      String @default("")
+
+    subject     String @default("")
+    // {name, address} arrays, as JSON. Stored rather than normalized into a
+    // people table: they are written once, read whole, and never queried by
+    // anything but a substring search.
+    fromJson    Json   @default("[]")
+    toJson      Json   @default("[]")
+    ccJson      Json   @default("[]")
+    bccJson     Json   @default("[]")
+    replyToJson Json   @default("[]")
+
+    snippet    String   @default("")
+    sentAt     DateTime @default(now())
+    receivedAt DateTime @default(now())
+    size       Int      @default(0)
+
+    // Mirrored from the server, never owned here.
+    seen     Boolean @default(false)
+    flagged  Boolean @default(false)
+    answered Boolean @default(false)
+    draft    Boolean @default(false)
+    deleted  Boolean @default(false)
+
+    hasAttachments Boolean @default(false)
+    // Whether this message asked to be told when it was read. Recorded so the
+    // reader can be shown that it did, which is the only thing Polaris does
+    // about it.
+    wantsReceipt   Boolean @default(false)
+
+    // Fetched on open and kept. Null means nobody has opened it yet.
+    bodyText String?
+    bodyHtml String?
+    // Everything else off the headers worth keeping, as JSON: the authentication
+    // results, the unsubscribe address, the user agent. Small, and the
+    // difference between a message view that can explain itself and one that
+    // cannot.
+    headers  Json?
+
+    // What Polaris adds, none of which the server knows about.
+    snoozedUntil   DateTime?
+    // Where it came back to when the snooze ends.
+    snoozeFolderId String?   @db.Uuid
+    pinned         Boolean   @default(false)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    account     MailAccount        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    folder      MailFolder         @relation(fields: [folderId], references: [id], onDelete: Cascade)
+    thread      MailThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+    attachments MailAttachment[]
+    labels      MailMessageLabel[]
+
+    @@unique([folderId, uid])
+    @@index([accountId, sentAt])
+    @@index([threadId, sentAt])
+    @@index([folderId, sentAt])
+    @@index([accountId, messageId])
+    @@index([accountId, seen])
+    @@index([accountId, snoozedUntil])
+}
+
+// One part of a message that is a file.
+//
+// The row exists from the moment the structure is read; the bytes arrive only
+// when somebody asks for them, which is what `path` being null means.
+model MailAttachment {
+    id          String  @id @default(uuid(7)) @db.Uuid
+    messageId   String  @db.Uuid
+    // Where the part is in the message, as IMAP addresses it ("2", "1.2").
+    part        String
+    name        String
+    contentType String  @default("application/octet-stream")
+    size        BigInt  @default(0)
+    // The Content-Id, for a picture the HTML refers to rather than a file
+    // somebody attached.
+    contentId   String  @default("")
+    inline      Boolean @default(false)
+
+    // Where the bytes were put once they were fetched, and on which storage.
+    // Both null until then.
+    connectionId String?
+    path         String?
+    fetchedAt    DateTime?
+
+    message MailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@unique([messageId, part])
+}
+
+// A label somebody made here.
+//
+// Applied to a message by its Message-Id as well as its row, so relabelling
+// survives the mailbox being resynced from scratch. Where the server accepts
+// keywords they are pushed to it as well, so another client sees them; where it
+// does not, they live here and nowhere else.
+model MailLabel {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    name      String
+    color     String   @default("#6366f1")
+    position  Int      @default(0)
+    createdAt DateTime @default(now())
+
+    user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages MailMessageLabel[]
+
+    @@unique([userId, name])
+}
+
+model MailMessageLabel {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    labelId   String   @db.Uuid
+    messageId String   @db.Uuid
+    // The Message-Id of the message, so the label finds its way back after a
+    // resync has replaced every row.
+    headerId  String   @default("")
+    appliedAt DateTime @default(now())
+
+    label   MailLabel   @relation(fields: [labelId], references: [id], onDelete: Cascade)
+    message MailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@unique([labelId, messageId])
+    @@index([messageId])
+    @@index([labelId, headerId])
+}
+
+// Something being written, or waiting for its hour.
+//
+// The same row covers both, because they are the same thing at different times:
+// a message with a `sendAt` in the future is a draft the scheduler will pick up,
+// and cancelling a scheduled send is clearing one column.
+model MailDraft {
+    id         String  @id @default(uuid(7)) @db.Uuid
+    accountId  String  @db.Uuid
+    identityId String? @db.Uuid
+
+    toJson  Json   @default("[]")
+    ccJson  Json   @default("[]")
+    bccJson Json   @default("[]")
+    subject String @default("")
+    // Markdown, the way everything written in Polaris is.
+    body    String @default("")
+    replyTo String @default("")
+
+    // The message this answers, by its own Message-Id, so the reply still
+    // threads after a resync.
+    inReplyToId     String? @db.Uuid
+    inReplyToHeader String  @default("")
+    references      Json    @default("[]")
+    forward         Boolean @default(false)
+    requestReceipt  Boolean @default(false)
+
+    // When to send it. Null is "not yet said".
+    sendAt   DateTime?
+    // "draft" | "queued" | "sending" | "failed". A sent one is deleted.
+    state    String    @default("draft")
+    // Why the last attempt did not work, in the server's words.
+    failure  String    @default("")
+    attempts Int       @default(0)
+
+    // The uid of the copy on the server's Drafts folder, so editing here
+    // replaces it rather than leaving a trail of half-written messages.
+    serverUid BigInt?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    account     MailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    identity    MailIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+    attachments MailUpload[]
+
+    @@index([accountId, updatedAt])
+    @@index([state, sendAt])
+}
+
+// A file somebody attached in the composer.
+//
+// Owned by the person rather than by the draft, because it is uploaded before
+// there is a draft to hang it on. One with no draft and no recent use is swept.
+model MailUpload {
+    id          String  @id @default(uuid(7)) @db.Uuid
+    userId      String  @db.Uuid
+    draftId     String? @db.Uuid
+    name        String
+    contentType String  @default("application/octet-stream")
+    size        BigInt  @default(0)
+    // The storage it was written to, and where. Null connection is the disk
+    // Polaris runs on.
+    connectionId String?
+    path         String
+    // Sent inline as a picture the body refers to, rather than as a file.
+    inline    Boolean  @default(false)
+    contentId String   @default("")
+    createdAt DateTime @default(now())
+
+    user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    draft MailDraft? @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
+    @@index([draftId])
+}
+
+// A filter, run on arrival and optionally over what is already there.
+model MailRule {
+    id        String  @id @default(uuid(7)) @db.Uuid
+    accountId String  @db.Uuid
+    name      String
+    enabled   Boolean @default(true)
+    // "all" | "any"
+    match      String    @default("all")
+    conditions Json      @default("[]")
+    actions    Json      @default("[]")
+    // Whether a match here ends the walk.
+    stop       Boolean   @default(false)
+    position   Int       @default(0)
+    // What it has done, so a rule that fires on everything is visible as one.
+    matchCount Int       @default(0)
+    lastRunAt  DateTime?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@index([accountId, position])
+}
+
+// Somebody this mailbox has written to or heard from.
+//
+// Collected rather than entered, because a contact list nobody maintains is a
+// contact list that is wrong, and the composer needs to complete an address the
+// first time somebody types three letters of it. Ranked by how often and how
+// recently, so the person written to daily comes first.
+model MailContact {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    address   String
+    name      String @default("")
+    // How many messages have gone to them, which is worth more than how many
+    // arrived: everybody has heard from a newsletter a hundred times.
+    sentCount     Int      @default(0)
+    receivedCount Int      @default(0)
+    lastSeenAt    DateTime @default(now())
+    // Kept out of completion without forgetting it.
+    hidden        Boolean  @default(false)
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, address])
+    @@index([accountId, lastSeenAt])
+}
+
+// A sender whose remote content is allowed through.
+//
+// Per account and per address. The default is that nothing loads, which is what
+// stops a message telling its sender it was opened; this is how somebody says
+// "except the newsletter I actually want to look at".
+model MailTrustedSender {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    accountId String   @db.Uuid
+    address   String
+    addedAt   DateTime @default(now())
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, address])
+}
+
+// Who the out-of-office reply has already answered, and when.
+//
+// Without this an auto-reply answers every message in a thread, which is how a
+// vacation responder ends up arguing with a mailing list.
+model MailAutoReply {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    accountId String   @db.Uuid
+    address   String
+    repliedAt DateTime @default(now())
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, address])
+    @@index([repliedAt])
 }
