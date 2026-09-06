@@ -51,7 +51,8 @@ import { callMuted, setCallMuted } from "./call-muted";
 import { useVoiceGate } from "./voice-gate";
 import { voiceSettings } from "./voice-settings";
 import type { MeetingView } from "@/lib/chat/meetings";
-import { callDevices, openMedia, settle } from "./call-media";
+import { callDevices, openMedia, refused, settle } from "./call-media";
+import { withCameraDevice } from "./camera-device";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
@@ -1418,9 +1419,23 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         [say]
     );
 
+    /** The device swap, reachable from the controls above where it is declared.
+     *  Reopening a track that has ended is the same operation as picking a
+     *  different one, and it is two hundred lines further down. */
+    const reopen = useRef<((kind: "audio" | "video", deviceId: string) => void) | null>(null);
+
     const toggleMic = useCallback(() => {
         const track = mic.current;
         if (!track) return;
+        // The same trap as the camera: a track that has ended - a headset
+        // unplugged, a device another application took - accepts being enabled
+        // and carries nothing, so unmuting would put somebody back in the room
+        // believing they were audible. Reopened from the device instead, which
+        // is the path a swap already goes down.
+        if (track.readyState !== "live") {
+            reopen.current?.("audio", track.getSettings().deviceId ?? "default");
+            return;
+        }
         // Pressing unmute while this device is quiet for a room is somebody
         // saying they want to be heard, which is a decision to stop sharing the
         // room's microphone rather than a mute to be argued with. The effect
@@ -1449,16 +1464,40 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const toggleCamera = useCallback(() => {
         const existing = camera.current;
-        if (existing) {
+        /**
+         * A camera that is still there to turn back on.
+         *
+         * A `MediaStreamTrack` ends without anybody asking: a laptop lid, a USB
+         * camera taken by another application, a device the operating system
+         * reassigned. The track object stays, and it stays useless - `enabled`
+         * accepts being set and nothing flows - so turning the camera off and on
+         * again left the last frame frozen on screen and every further press did
+         * nothing at all, because the branch below kept reusing the dead one.
+         *
+         * So it is checked rather than assumed, and a dead one is let go of and
+         * reopened from the device.
+         */
+        const alive = existing && existing.readyState === "live" ? existing : null;
+        if (existing && !alive) {
+            existing.stop();
+            camera.current = null;
+            setHasCamera(false);
+        }
+
+        if (alive) {
             const next = !cameraOn;
-            existing.enabled = next;
+            alive.enabled = next;
             setCameraOn(next);
-            void publish(CAMERA, next ? existing : null);
+            void publish(CAMERA, next ? alive : null);
             publishLocalPreview();
             return;
         }
         void navigator.mediaDevices
-            .getUserMedia({ video: quality.cameraConstraints(levelNow("camera")) })
+            // The camera this browser was told to prefer, and the size the rung
+            // asks for - the same request `openMedia` makes on the way in. Asking
+            // for the size alone opened whichever camera the browser felt like,
+            // which on a machine with a webcam and a capture card is a coin toss.
+            .getUserMedia({ video: withCameraDevice(quality.cameraConstraints(levelNow("camera"))) })
             .then(async (stream) => {
                 const track = stream.getVideoTracks()[0] ?? null;
                 camera.current = track;
@@ -1470,7 +1509,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 publishLocalPreview();
                 void listDevices();
             })
-            .catch(() => setError("Polaris could not reach your camera."));
+            // What the browser actually said, rather than one sentence for all of
+            // it: a permission that was refused, a camera another application is
+            // holding and a camera that is not there send somebody to three
+            // different places.
+            .catch((caught) => setError(refused(caught, "camera")));
     }, [cameraOn, levelNow, listDevices, publish, publishLocalPreview]);
 
     /**
@@ -1599,6 +1642,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             startFilter
         ]
     );
+
+    useEffect(() => {
+        reopen.current = chooseDevice;
+    }, [chooseDevice]);
 
     const chooseMicrophone = useCallback(
         (deviceId: string) => chooseDevice("audio", deviceId),
