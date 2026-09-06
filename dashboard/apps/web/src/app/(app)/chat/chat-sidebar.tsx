@@ -35,6 +35,7 @@ import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { NotifyOptions } from "./notify-menu";
+import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
@@ -44,6 +45,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import {
+    Ban,
     ChevronDown,
     FolderPlus,
     Hash,
@@ -53,10 +55,12 @@ import {
     Mail,
     MessageSquarePlus,
     Pencil,
+    Phone,
     Pin,
     PinOff,
     Plus,
     Settings2,
+    ShieldOff,
     Star,
     Trash2,
     Video,
@@ -875,7 +879,7 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { refresh } = useChat();
+    const { blocked, refresh } = useChat();
     const [naming, setNaming] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
@@ -949,6 +953,20 @@ function RowMenu({
                         />
                     )}
 
+                    {/* Ring them from the row. The address is the whole
+                        mechanism - arriving with `answer` on it is what starts
+                        the call, which is the same path answering a missed one
+                        takes - so there is no second copy of "start a call"
+                        here to fall out of step with the one in the room. */}
+                    {channel.kind !== "text" && (
+                        <ContextMenuItem
+                            onSelect={() => router.push(`/chat/c/${channel.id}?answer=1`)}
+                        >
+                            <Phone className="size-3.5" />
+                            Start a call
+                        </ContextMenuItem>
+                    )}
+
                     {/* What you call them, offered from the row as well as from
                     the open conversation: it is a note about a person, and the
                     place somebody reaches for it is wherever their name is
@@ -958,6 +976,37 @@ function RowMenu({
                             <Pencil className="size-3.5" />
                             Nickname
                         </ContextMenuItem>
+                    )}
+
+                    {/* The heavy one, and the reason it is here: somebody
+                        deciding they are done with a person decides it looking
+                        at the row with their name on, not after opening the
+                        conversation and finding their way to their profile.
+                        Below the rest and marked, so it is not next to Pin. */}
+                    {person && (
+                        <>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                                variant={blocked.has(person.id) ? undefined : "danger"}
+                                onSelect={async () => {
+                                    const result = await runAction(
+                                        () =>
+                                            blocked.has(person.id)
+                                                ? unblockPersonAction({ userId: person.id })
+                                                : blockPersonAction({ userId: person.id }),
+                                        setError
+                                    );
+                                    if (!result?.error) refresh();
+                                }}
+                            >
+                                {blocked.has(person.id) ? (
+                                    <ShieldOff className="size-3.5" />
+                                ) : (
+                                    <Ban className="size-3.5" />
+                                )}
+                                {blocked.has(person.id) ? "Unblock" : "Block"}
+                            </ContextMenuItem>
+                        </>
                     )}
 
                     {/* The same item the open conversation offers, offered from
