@@ -33,7 +33,7 @@
  */
 
 /** How this browser stands with the call server. */
-export type CallLink = "connecting" | "connected" | "reconnecting" | "lost";
+export type CallLink = "connecting" | "connected" | "reconnecting" | "lost" | "resting";
 
 /**
  * What this browser is doing with its own voice.
@@ -154,6 +154,12 @@ function linkLine(link: CallLink): CallAudioLine {
     if (link === "connected") return { label, value: "Connected", state: "good" };
     if (link === "connecting") return { label, value: "Connecting", state: "idle" };
     if (link === "reconnecting") return { label, value: "Reconnecting", state: "bad" };
+    // Alone in the call, so there is nothing to carry and the room behind it has
+    // been let go of - see `REST_AFTER_MS`. Deliberately not "not connected":
+    // that reads as a fault, and this is a call that is working and waiting.
+    if (link === "resting") {
+        return { label, value: "Waiting for somebody to join", state: "idle" };
+    }
     return { label, value: "Not connected", state: "bad" };
 }
 

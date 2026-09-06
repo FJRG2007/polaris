@@ -192,6 +192,20 @@ const CARRYING_WITHIN_MS = 30_000;
 const SETTLING_MS = 10_000;
 
 /**
+ * How long somebody is alone in a call before the room behind it is let go of.
+ *
+ * Not immediately, and the margin is the whole of the design. Somebody hanging
+ * up and coming straight back, or the first of two people arriving half a minute
+ * early, are the ordinary shapes of a call - and releasing on the second they
+ * are alone would make every one of those a reconnection, paid to save a room
+ * that was about to be used again anyway.
+ *
+ * Forty-five seconds is past both of those and well short of the case this is
+ * for, which is somebody sitting in an empty room while they wait.
+ */
+const REST_AFTER_MS = 45_000;
+
+/**
  * The meeting's own stream, which is about people rather than media.
  *
  * Only the room, never the media: with a server in the middle there is nothing
@@ -309,6 +323,37 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
+    /**
+     * Whether this browser is holding a room nobody else is in.
+     *
+     * A call with one person in it carries nothing: there is no subscriber, so
+     * every packet published is encoded, sent and thrown away, and the room
+     * itself is a session the media server keeps alive for an audience of
+     * nobody. On a small machine running everything else Polaris runs, that is
+     * a cost paid for a person sitting alone waiting.
+     *
+     * So the room is let go of and the seat is not. Who is in the call is
+     * Polaris' own fact - the roster, the presence, the badge on the channel -
+     * and none of it comes from the media server, so everybody else goes on
+     * seeing this person in the call exactly as before. What stops is the
+     * publishing.
+     *
+     * The microphone stays open. Reopening a device is the slow part - a fifth
+     * of a second at best, two seconds at worst, and on some systems a
+     * recording indicator that blinks off and on - so what is released is the
+     * publication, never the capture. Mute, camera and the noise filter are
+     * exactly where they were when somebody arrives.
+     */
+    const [resting, setResting] = useState(false);
+    /** The clock on going to rest, so a room that empties for ten seconds and
+     *  fills again costs nothing at all. */
+    const resign = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** Taking the room again, reachable from outside the effect that builds it -
+     *  which is where the decision to rest is made. */
+    const rejoin = useRef<(() => void) | null>(null);
+    /** Readable from inside the connect closure, which was built before any of
+     *  this was decided. */
+    const restingRef = useRef(false);
 
     /**
      * Whether sound is actually flowing, and what to say when it is not.
@@ -379,6 +424,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  this device is listening through, and whether it is recording. */
     const groupRef = useRef<string | null>(null);
     const recordingRef = useRef(false);
+    /** The same for a shared screen, readable from the timer that decides
+     *  whether the room may be let go of. */
+    const sharingRef = useRef(false);
     const roleRef = useRef<AudioRole | null>(null);
     /** Whether the microphone was on before this device went quiet for a room,
      *  so leaving the group gives back what it took rather than a default. */
@@ -784,6 +832,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // button offering to stop a share nobody was making.
         setLocalScreen(null);
         setSharing(false);
+        sharingRef.current = false;
         // Nothing about the last room is true of this one: the seats it named
         // are gone, and a browser that walked into a new call still pointing at
         // one of them would be silent at both ends for nobody.
@@ -858,6 +907,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             setError((current) => (current === stale ? "" : current));
         }
 
+        rejoin.current = () => void connect();
+
         // This is a different call, so nothing about the last one is true of it.
         // `ended` in particular: it is only ever set, never cleared, so a second
         // call in the same tab opened straight onto "the call has ended" - the
@@ -875,6 +926,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          */
         async function connect(): Promise<void> {
             if (stopped || connecting || room.current) return;
+            // Resting is a deliberate absence, not a connection that failed. A
+            // roster change arriving while alone must not undo it - what ends it
+            // is somebody actually being here, which the effect below decides.
+            if (restingRef.current) return;
             // Claimed here, before the first await, and not after the ticket comes
             // back. Two attempts a moment apart - the roster change that admits
             // somebody, and the one that follows it - both got past this guard while
@@ -1302,6 +1357,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
         return () => {
             stopped = true;
+            rejoin.current = null;
             if (beat) clearInterval(beat);
             source?.close();
             // A scan plays a tone into the room on a timer of its own. Left
@@ -1598,6 +1654,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void publish(SCREEN, null);
             publishLocalPreview();
             setSharing(false);
+            sharingRef.current = false;
             sound("shareOff");
             return;
         }
@@ -1619,12 +1676,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     void publish(SCREEN, null);
                     publishLocalPreview();
                     setSharing(false);
+                    sharingRef.current = false;
                     sound("shareOff");
                 };
                 screen.current = track;
                 await publish(SCREEN, track);
                 publishLocalPreview();
                 setSharing(true);
+                sharingRef.current = true;
                 sound("shareOn");
             })
             .catch(() => {
@@ -1980,6 +2039,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
         /** How this browser stands with the call server. */
         function linkNow(current: Room | null): CallLink {
+            // A room deliberately let go of, because nobody else is here for it
+            // to carry anything to. Asked before "no room yet", since with no
+            // room those two look identical and only one of them is a wait for
+            // something to happen.
+            if (restingRef.current) return "resting";
             // No room yet is a call still being joined rather than a failure:
             // the ticket is asked for first, and somebody in the waiting room
             // has not been given one. What went wrong on that path is already
@@ -2217,6 +2281,88 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         .map((person) => person.id)
         .sort()
         .join(" ");
+
+    /** How many people are admitted to this call, Polaris' own count rather than
+     *  the media server's - which is exactly the distinction that lets the room
+     *  be let go of without anybody disappearing from the call. */
+    const admittedCount = listening === "" ? 0 : listening.split(" ").length;
+
+    /**
+     * Hold the room only while there is somebody to carry sound to.
+     *
+     * Alone means nothing published is ever delivered, so the room is released
+     * after a margin and taken again the moment the roster says somebody else is
+     * here. The trigger is that roster frame rather than the first sound: it
+     * arrives while the person joining is still negotiating their own
+     * connection, so the two happen at once and what they walk into is a call
+     * already carrying.
+     *
+     * Three things hold it open regardless. A recording is being written from
+     * what this browser publishes; a shared screen would have to be picked again
+     * from the operating system's own dialog, which is not something to do to
+     * somebody behind their back; and a call that is still connecting has
+     * nothing to release yet.
+     */
+    useEffect(() => {
+        if (resign.current) {
+            clearTimeout(resign.current);
+            resign.current = null;
+        }
+        if (!meetingId || ended) return;
+
+        const alone = admittedCount <= 1;
+        if (!alone) {
+            // Somebody is here. Whatever was resting comes back, and `connect`
+            // is a no-op for a browser that never left.
+            if (resting) setResting(false);
+            return;
+        }
+        if (recording || sharing || resting) return;
+
+        resign.current = setTimeout(() => {
+            resign.current = null;
+            // Asked again at the moment it fires rather than trusted from when
+            // it was set: forty-five seconds is long enough for all of this to
+            // have changed.
+            if (!room.current || recordingRef.current || sharingRef.current) return;
+            setResting(true);
+        }, REST_AFTER_MS);
+
+        return () => {
+            if (resign.current) clearTimeout(resign.current);
+            resign.current = null;
+        };
+    }, [meetingId, ended, admittedCount, recording, sharing, resting]);
+
+    /**
+     * Let the room go, and take it again.
+     *
+     * The publications come down first and the connection after, so what the
+     * media server sees is a participant leaving rather than one that vanished -
+     * which is what it would otherwise report to everybody as a peer that
+     * dropped.
+     *
+     * Coming back is `connect` again, unchanged: it opens the room, publishes
+     * whatever this browser has open and reapplies mute exactly as it does on
+     * the way in. There is nothing here that a fresh join does not already do,
+     * which is the reason this is safe to do at all.
+     */
+    useEffect(() => {
+        restingRef.current = resting;
+        if (!meetingId || ended) return;
+        if (!resting) {
+            rejoin.current?.();
+            return;
+        }
+        const held = room.current;
+        if (!held) return;
+        void (async () => {
+            await publish(MICROPHONE, null);
+            await publish(CAMERA, null);
+            await held.disconnect().catch(() => undefined);
+            room.current = null;
+        })();
+    }, [resting, meetingId, ended, publish]);
     useEffect(() => {
         seats.current = listening ? listening.split(" ") : [];
         // The room changed, so the sound in it is given a moment to catch up
