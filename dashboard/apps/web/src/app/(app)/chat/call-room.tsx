@@ -47,6 +47,7 @@ import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
+import { useSpeakers } from "./speaker-device";
 import { stagesOf, stagingOf } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
@@ -201,6 +202,10 @@ export function CallRoom({
         };
     };
     const columns = gridColumns((admitted?.length ?? 1) || 1);
+
+    /** Where this browser plays the call. Empty on a browser that cannot be told,
+     *  which is what leaves the picker undrawn rather than drawn and ignored. */
+    const speakers = useSpeakers();
 
     /**
      * The one picture filling the room, when somebody has asked for one.
@@ -606,24 +611,32 @@ export function CallRoom({
                     qualityLabel="Screen quality"
                 />
 
-                <Button
-                    size="icon"
-                    variant={call.deafened ? "danger" : "secondary"}
-                    onClick={call.toggleDeafen}
-                    aria-pressed={call.deafened}
-                    aria-label={call.deafened ? "Undeafen" : "Deafen"}
+                {/* The one device that had no picker. A headset plugged in after
+                    the tab was opened, or a call coming out of a laptop lid in a
+                    room with other people in it, meant leaving the call and
+                    changing it in the operating system. */}
+                <Split
+                    label={call.deafened ? "Undeafen" : "Deafen"}
                     title={
                         call.deafened
                             ? "You cannot hear anybody, and nobody can hear you (F10)"
                             : "Silence everybody, and yourself with them (F10)"
                     }
-                >
-                    {call.deafened ? (
-                        <HeadphoneOff className="size-4" />
-                    ) : (
-                        <Headphones className="size-4" />
-                    )}
-                </Button>
+                    icon={
+                        call.deafened ? (
+                            <HeadphoneOff className="size-4" />
+                        ) : (
+                            <Headphones className="size-4" />
+                        )
+                    }
+                    variant={call.deafened ? "danger" : "secondary"}
+                    pressed={call.deafened}
+                    onClick={call.toggleDeafen}
+                    devices={speakers.devices}
+                    chosenId={speakers.chosenId}
+                    devicesLabel="Output"
+                    onChoose={speakers.choose}
+                />
 
                 <Button
                     size="icon"
@@ -725,9 +738,13 @@ function Split({
     onQuality,
     qualityLabel,
     mirrored,
-    onMirror
+    onMirror,
+    title
 }: {
     label: string;
+    /** What the tooltip says, where it is worth more words than the accessible
+     *  name - deafening is the one that needs explaining. */
+    title?: string;
     icon: React.ReactNode;
     /** How the button reads: off is danger, on-and-sending is primary. */
     variant: "secondary" | "danger" | "primary";
@@ -784,7 +801,7 @@ function Split({
                 onClick={onClick}
                 aria-pressed={pressed}
                 aria-label={label}
-                title={label}
+                title={title ?? label}
                 className={hasMenu ? "rounded-r-none" : undefined}
             >
                 {icon}

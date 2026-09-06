@@ -35,6 +35,7 @@ import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
 import { useVoiceSettings } from "./voice-settings";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
+import { playThroughChosenSpeaker, SPEAKER_CHANGED } from "./speaker-device";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function CallAudio({ call }: { call: CallState }) {
@@ -186,6 +187,10 @@ function RemoteAudio({
         const audio = element.current;
         if (!audio) return;
         resumeBoost();
+        // Wherever this browser was told to play. Asked on every start rather
+        // than once, because an element gets a new source each time somebody
+        // republishes and a device can be chosen mid-call.
+        void playThroughChosenSpeaker(audio);
         // A source that is not there cannot be played, and asking anyway is what
         // records a refusal nothing can clear. An EMPTY stream counts as not
         // there: it is a truthy srcObject with no track in it, play() rejects
@@ -269,6 +274,14 @@ function RemoteAudio({
         },
         []
     );
+
+    // A different output picked mid-call moves everybody who is already playing,
+    // rather than only whoever speaks next.
+    useEffect(() => {
+        const follow = () => void playThroughChosenSpeaker(element.current);
+        window.addEventListener(SPEAKER_CHANGED, follow);
+        return () => window.removeEventListener(SPEAKER_CHANGED, follow);
+    }, []);
 
     useEffect(() => {
         // Never both at once: whichever is not playing is at zero rather than
