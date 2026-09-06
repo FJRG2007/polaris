@@ -28,8 +28,27 @@ const { applyMicCleanup, micCleanup, micConstraints, setMicCleanup } = await imp
     "@/app/(app)/chat/mic-cleanup"
 );
 
-const ALL_ON = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
-const ALL_OFF = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+/**
+ * One channel is asked for whatever the three switches say.
+ *
+ * A voice has nothing in a second channel worth carrying, and what a second
+ * channel does carry is the failure people hit: a headset that presents two and
+ * feeds one, which arrives as somebody audible in the left ear and absent from
+ * the right. `ideal` rather than `exact`, so a device that can only do two is
+ * still usable.
+ */
+const MONO = { channelCount: { ideal: 1 } };
+/** The three switches on their own, which is all that is re-applied to a track
+ *  that is already open: how many channels a device presents is decided when it
+ *  is opened, and re-negotiating that mid-call is not what this is for. */
+const SWITCHES = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+const ALL_ON = { ...SWITCHES, ...MONO };
+const ALL_OFF = {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+    ...MONO
+};
 
 beforeEach(() => {
     store.clear();
@@ -91,7 +110,7 @@ describe("applying it to a microphone already open", () => {
                 applied.push(constraints);
             }
         } as unknown as MediaStreamTrack);
-        expect(applied).toEqual([ALL_ON]);
+        expect(applied).toEqual([SWITCHES]);
     });
 
     it("says nothing when the device cannot do it", async () => {

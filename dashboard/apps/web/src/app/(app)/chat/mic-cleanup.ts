@@ -124,6 +124,20 @@ export function micConstraints(deviceId?: string): MediaTrackConstraints {
               : {}),
         echoCancellation: on,
         noiseSuppression: on,
+        // One channel, asked for rather than assumed.
+        //
+        // A call is a voice, and a voice has nothing in a second channel worth
+        // carrying. What a second channel does carry is the failure people
+        // actually hit: an interface or a headset that presents two channels and
+        // only feeds one of them, which arrives at the other end as a person
+        // audible in the left ear and absent from the right. A mono track has no
+        // such half - every player sends it to both ears, because that is what a
+        // mono track means.
+        //
+        // `ideal`, not `exact`: a device that can only do two channels should
+        // still be usable, and the graph in `mic-filter` holds the rest of the
+        // chain to one channel whatever arrives here.
+        channelCount: { ideal: 1 },
         // Its own answer on top, because it is the one of the three people turn
         // off on its own: a level pumped up and down between sentences is what
         // gain control sounds like when it is wrong, and the echo canceller is

@@ -170,6 +170,21 @@ export async function filterMic(
 
     const source = context.createMediaStreamSource(new MediaStream([track]));
     const sink = context.createMediaStreamDestination();
+    // Mono, said out loud at every node rather than left to the defaults.
+    //
+    // The models process one channel - they are built with `maxChannels: 1` -
+    // but a Web Audio node left on its defaults takes the channel count of
+    // whatever is feeding it, so a stereo microphone made a two-channel graph in
+    // which the model only ever wrote the first. The second stayed silent, and
+    // what came out was a voice in the left ear and nothing in the right. That
+    // is what every report of "the noise suppression only comes out of one side"
+    // was.
+    //
+    // Declared explicitly, the source is downmixed to one channel on the way in
+    // and the track that leaves is genuinely mono - which every player then
+    // sends to both ears, because that is what a mono track means. Voice has
+    // nothing to lose by it: there was never a second channel worth carrying.
+    monoOnly(sink);
 
     // No model when the graph is only here to change the level, and a model that
     // will not start is not a reason to throw the level away with it.
@@ -201,8 +216,10 @@ export async function filterMic(
     // the same knob, and a doubled voice on top of the model's makeup is what
     // the limiter below is for.
     const makeup = context.createGain();
+    monoOnly(makeup);
     makeup.gain.value = (built ? MAKEUP_GAIN : 1) * gain;
     const limiter = context.createDynamicsCompressor();
+    monoOnly(limiter);
     limiter.threshold.value = LIMIT_DBFS;
     limiter.knee.value = 0;
     limiter.ratio.value = 20;
@@ -210,6 +227,7 @@ export async function filterMic(
     limiter.release.value = 0.1;
 
     if (built) {
+        monoOnly(built.node);
         source.connect(built.node);
         built.node.connect(makeup);
     } else {
@@ -244,6 +262,20 @@ export async function filterMic(
             await context.close().catch(() => undefined);
         }
     };
+}
+
+/**
+ * Hold a node to one channel, whatever is feeding it.
+ *
+ * `explicit` is the half that matters: on the default `max` a node simply adopts
+ * its input's channel count, which is how a stereo microphone turned a mono
+ * model into a left-ear-only call. `speakers` is what makes the downmix an
+ * average of the two rather than one of them thrown away.
+ */
+function monoOnly(node: AudioNode): void {
+    node.channelCount = 1;
+    node.channelCountMode = "explicit";
+    node.channelInterpretation = "speakers";
 }
 
 /** What a build attempt came back with: the node, or the reason there is none. */
