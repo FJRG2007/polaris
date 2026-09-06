@@ -31,6 +31,8 @@ import { saveProfileStyleAction } from "./actions";
 import { avatarUrl, bannerUrl } from "@/lib/avatar-url";
 import { ProfileBanner } from "@/components/profile-banner";
 import { PictureEditor, usePicture } from "./avatar-card";
+import { Choice, Tile } from "./appearance-choice";
+import { NameEffectPicker, NameFontPicker } from "./name-style-picker";
 import { BAND_CROP, FACE_CROP } from "@/components/image-cropper";
 import { Camera, Image as ImageIcon, RotateCcw, Sparkles } from "lucide-react";
 import { useProfileStyleRefresh } from "@/components/profile-style-store";
@@ -368,9 +370,28 @@ export function AppearanceCard({
                 <section className="flex flex-col gap-2">
                     <Field
                         label="Display name style"
-                        hint="An effect, letterforms and your own colours. Nothing changes the size, so a name is never taller than the row it is in."
+                        hint="What the paint does, and in which colours. Nothing here changes the size, so a name is never taller than the row it is in."
                     />
-                    <NameStylePicker value={style.nameStyle} onChange={(next) => set({ nameStyle: next })} />
+                    <NameEffectPicker
+                        value={style.nameStyle}
+                        onChange={(next) => set({ nameStyle: next })}
+                    />
+                </section>
+
+                {/* Its own section rather than a row inside the one above,
+                    because it is its own question: wanting a name in that
+                    handwriting is not wanting a name that is a gradient, and
+                    inside the colour controls the face could only be chosen by
+                    first choosing paint. */}
+                <section className="flex flex-col gap-2">
+                    <Field
+                        label="Font"
+                        hint="The letterforms your display name is set in, wherever it appears. Only downloaded when somebody's name on the screen is actually set in one."
+                    />
+                    <NameFontPicker
+                        value={style.nameStyle}
+                        onChange={(next) => set({ nameStyle: next })}
+                    />
                 </section>
 
                 <section className="flex flex-col gap-2">
@@ -459,220 +480,6 @@ function Field({ label, hint }: { label: string; hint: string }) {
                 {label}
             </span>
             <span className="text-xs text-muted-foreground">{hint}</span>
-        </div>
-    );
-}
-
-/** One option. The picture on it is the answer; the word beside it is only there
- *  so the picture can be named out loud. */
-function Choice({
-    chosen,
-    onClick,
-    label,
-    style,
-    labelClass,
-    children
-}: {
-    chosen: boolean;
-    onClick: () => void;
-    label: string;
-    style?: React.CSSProperties;
-    /** For a treatment that needs keyframes as well as properties - the colours
-     *  of a moving name are a class, since a `style` attribute cannot hold one. */
-    labelClass?: string;
-    children?: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-pressed={chosen}
-            className={cn(
-                "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
-                chosen
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"
-            )}
-        >
-            {children}
-            <span className={labelClass} style={style}>
-                {label}
-            </span>
-        </button>
-    );
-}
-
-/**
- * One tile of the gallery: a drawing, its name, and whether it moves.
- *
- * A tile rather than a chip because what is being chosen is a picture. The name
- * under it is what a screen reader announces and what somebody says out loud
- * when they want the one their colleague has; it is not what the choice is made
- * on.
- */
-function Tile({
-    chosen,
-    onClick,
-    label,
-    note,
-    children
-}: {
-    chosen: boolean;
-    onClick: () => void;
-    label: string;
-    note?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-pressed={chosen}
-            title={note ? `${label} - ${note.toLowerCase()}` : label}
-            className={cn(
-                "flex flex-col items-center gap-1 rounded-lg border px-1 py-2 transition-colors",
-                chosen
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"
-            )}
-        >
-            {children}
-            <span className="w-full truncate px-1 text-center text-[0.6875rem] leading-tight">
-                {label}
-            </span>
-            {/* Only on the ones it is true of, so the row of words under the
-                gallery stays quiet. */}
-            {note ? (
-                <span className="text-muted-foreground text-[0.625rem] leading-none">{note}</span>
-            ) : null}
-        </button>
-    );
-}
-
-/** What each effect is called on the button, and what it is for. */
-const EFFECT_LABELS: Record<core.NameEffect, string> = {
-    solid: "Solid",
-    gradient: "Gradient",
-    neon: "Neon",
-    toon: "Toon",
-    pop: "Pop",
-    gummy: "Gummy",
-    prism: "Prism"
-};
-
-const FONT_LABELS: Record<core.NameFont, string> = {
-    sans: "Default",
-    serif: "Serif",
-    mono: "Mono",
-    rounded: "Rounded",
-    caps: "Small caps"
-};
-
-/** Where a name starts when somebody turns one on, so the first thing they see
- *  is a painted name rather than black on black. */
-const FIRST_INK = "#5b8def";
-const SECOND_INK = "#a06bff";
-
-/**
- * Choosing how a name is painted.
- *
- * Three questions, in the order they matter: what it does, what it is set in,
- * and in which colours. Every button is drawn in the thing it selects - the word
- * "Neon" glows, "Serif" is set in a serif - because the alternative is a list of
- * nouns somebody has to try one at a time to find out what they mean.
- *
- * The catalogue that came before this is not offered any more, and does not need
- * to be: everything in it was a gradient between two colours, which is one of
- * the seven with the colour pickers underneath it. What is still read is the
- * stored ids, so nobody's name changes because the screen did.
- */
-function NameStylePicker({
-    value,
-    onChange
-}: {
-    value: string | null;
-    onChange: (next: string | null) => void;
-}) {
-    const look = core.nameLookOf(value);
-    const on = look !== null;
-    const effect = look?.effect ?? "gradient";
-    const font = look?.font ?? "sans";
-    const first = look?.colors[0] ?? FIRST_INK;
-    const second = look?.colors[1] ?? SECOND_INK;
-
-    /** Write the whole look every time. It is one value in one column, so there
-     *  is no half-changed state to be in. */
-    const put = (part: Partial<core.NameLook>) =>
-        onChange(
-            core.writeNameLook({
-                effect: part.effect ?? effect,
-                font: part.font ?? font,
-                colors: part.colors ?? [first, second],
-                moving: false
-            })
-        );
-
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-1.5">
-                <Choice chosen={!on} onClick={() => onChange(null)} label="Plain" />
-                {core.NAME_EFFECTS.map((entry) => (
-                    <Choice
-                        key={entry}
-                        chosen={on && effect === entry}
-                        onClick={() => put({ effect: entry })}
-                        label={EFFECT_LABELS[entry]}
-                        // Painted as the thing it selects, in the colours
-                        // already chosen, so the choice is made by looking.
-                        labelClass={nameStyleClass({ moving: entry === "prism" })}
-                        style={nameLookCss({
-                            effect: entry,
-                            font,
-                            colors: [first, second],
-                            moving: entry === "prism"
-                        })}
-                    />
-                ))}
-            </div>
-
-            {on && (
-                <>
-                    <div className="flex flex-wrap gap-1.5">
-                        {core.NAME_FONTS.map((entry) => (
-                            <Choice
-                                key={entry}
-                                chosen={font === entry}
-                                onClick={() => put({ font: entry })}
-                                label={FONT_LABELS[entry]}
-                                style={nameLookCss({
-                                    effect: "solid",
-                                    font: entry,
-                                    colors: ["currentColor"],
-                                    moving: false
-                                })}
-                            />
-                        ))}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <ColorPicker
-                            label={core.effectTakesTwo(effect) ? "From" : "Colour"}
-                            value={first}
-                            onChange={(next) => put({ colors: [next, second] })}
-                        />
-                        {/* Only for the effects that actually run between two.
-                            A second picker on Solid is a control that changes
-                            nothing, which is worse than one that is missing. */}
-                        {core.effectTakesTwo(effect) && (
-                            <ColorPicker
-                                label="To"
-                                value={second}
-                                onChange={(next) => put({ colors: [first, next] })}
-                            />
-                        )}
-                    </div>
-                </>
-            )}
         </div>
     );
 }
