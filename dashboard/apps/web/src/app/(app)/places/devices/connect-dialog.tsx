@@ -24,11 +24,11 @@ import Link from "next/link";
 import * as actions from "../actions";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { Check, ExternalLink, Loader2 } from "lucide-react";
-import { IntegrationLogo } from "@/components/logos";
 import * as kinds from "@/lib/home/device-kinds";
+import { IntegrationLogo } from "@/components/logos";
 import type { DeviceView } from "@/lib/home/device-kinds";
 import * as registry from "@/lib/home/device-connections";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
 import type { DeviceAccountView } from "@/lib/home/device-accounts";
 import {
     Button,
@@ -48,6 +48,13 @@ import {
 export interface Connected {
     readonly devices: DeviceView[];
     readonly accounts: DeviceAccountView[];
+}
+
+/** What a make brings in, as one line. Written once because the card shows it and
+ *  carries the same words as its own title, and two of those drifting apart is a
+ *  tooltip that says something the row does not. */
+function kindsOf(entry: registry.DeviceBrand): string {
+    return entry.kinds.map((kind) => kinds.DEVICE_KIND_LABELS[kind].toLowerCase()).join(", ");
 }
 
 function Field({
@@ -196,11 +203,17 @@ export function ConnectDialog({
                                             className="size-6 w-8 shrink-0 object-contain"
                                         />
                                         <span className="flex min-w-0 flex-col">
-                                            <span className="truncate text-sm font-medium">{entry.brand}</span>
-                                            <span className="truncate text-[0.6875rem] text-foreground-subtle">
-                                                {entry.kinds
-                                                    .map((kind) => kinds.DEVICE_KIND_LABELS[kind].toLowerCase())
-                                                    .join(", ")}
+                                            <span
+                                                className="truncate text-sm font-medium"
+                                                title={entry.brand}
+                                            >
+                                                {entry.brand}
+                                            </span>
+                                            <span
+                                                className="truncate text-[0.6875rem] text-foreground-subtle"
+                                                title={kindsOf(entry)}
+                                            >
+                                                {kindsOf(entry)}
                                             </span>
                                         </span>
                                     </button>
