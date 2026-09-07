@@ -17,12 +17,26 @@
  * place that puts anybody into a room - it carries the answer in the address and
  * the screen acts on it - because two places that can open a microphone is how
  * one of them ends up with a camera nobody turned on.
+ *
+ * There are three answers to a ringing telephone and not two. Declining says no;
+ * hushing it says "not now, and I have not decided" - which is what somebody in
+ * a meeting does, and what every phone made in the last twenty years has a
+ * button for. So the sound stops, the notice the operating system drew is taken
+ * back, and the card stays exactly where it was.
+ *
+ * And a call nobody picked up leaves something behind. It used to vanish: the
+ * ringing stopped, the card went, and whoever was called found out only if they
+ * happened to open the conversation. Now the card turns into the missed call it
+ * was, with the one thing anybody wants from it - a way to call back - and the
+ * conversation keeps its own line about it. Both are needed: this is what is in
+ * front of somebody who was at their desk, and the line is what is there
+ * tomorrow.
  */
 
 import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
-import { Phone, PhoneOff } from "lucide-react";
+import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { useSessionScope } from "./session-scope";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -38,6 +52,22 @@ import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/
 /** How often a ringing telephone checks whether it was answered somewhere else.
  *  Only ever while one is ringing, so it costs nothing the rest of the time. */
 const SEAT_CHECK_MS = 4_000;
+
+/** A call that rang here and was never answered. Kept until it is dismissed:
+ *  the whole failing this replaces was a notice that took itself away before
+ *  anybody came back to their desk. */
+interface Missed {
+    readonly channelId: string;
+    readonly meetingId: string;
+    readonly name: string;
+    readonly userId: string;
+    /** When it stopped ringing, for the line under the name. */
+    readonly at: number;
+}
+
+/** How many of them are drawn at once. Past a few this stops being a notice and
+ *  becomes a pile; the bell and the conversation both keep the rest. */
+const MOST_MISSED = 3;
 
 interface Ringing {
     readonly channelId: string;
@@ -56,6 +86,11 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     const scope = useSessionScope();
     const held = useHeldCall();
     const [ringing, setRinging] = useState<readonly Ringing[]>([]);
+    const [missed, setMissed] = useState<readonly Missed[]>([]);
+    // Hushed here or in another tab of this browser. Kept apart from the ringing
+    // list because it outlives nothing: a call that is silenced is still a call
+    // being offered, and only the sound has been dealt with.
+    const [silenced, setSilenced] = useState<readonly string[]>([]);
     const inCall = held?.session?.meetingId ?? null;
 
     const drop = useCallback(
@@ -77,7 +112,17 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useEffect(() => {
         const channel = openPeerChannel<CallTabMessage>(CALLS_CHANNEL, scope, (message) => {
             const parsed = callTabMessageSchema.safeParse(message);
-            if (parsed.success) drop(parsed.data.meetingId);
+            if (!parsed.success) return;
+            // Hushed next door is hushed here: one telephone, however many
+            // windows it is drawn in. The card stays in all of them, because
+            // silence is not an answer.
+            if (parsed.data.kind === "silenced") {
+                setSilenced((current) =>
+                    current.includes(parsed.data.meetingId) ? current : [...current, parsed.data.meetingId]
+                );
+                return;
+            }
+            drop(parsed.data.meetingId);
         });
         peers.current = channel;
         return () => {
@@ -85,6 +130,45 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             channel.close();
         };
     }, [drop, scope]);
+
+    /** What is ringing right now, readable from a timer and from a frame handler
+     *  without either of them having to be rebuilt every time the list changes. */
+    const live = useRef<readonly Ringing[]>([]);
+    useEffect(() => {
+        live.current = ringing;
+    }, [ringing]);
+
+    /**
+     * A call that went away without being answered.
+     *
+     * The difference from `settle` is the whole of what a missed call is: settled
+     * means somebody here dealt with it - answered it, declined it, picked it up
+     * on their phone - and this means nobody did and it stopped. Only the second
+     * leaves anything behind.
+     *
+     * Nothing is recorded for a call that was already gone from the list, which
+     * is what the frame announcing the end of an answered call would otherwise
+     * do: it arrives in every tab, including the one that answered.
+     */
+    const missedOut = useCallback(
+        (meetingId: string) => {
+            const entry = live.current.find((one) => one.meetingId === meetingId);
+            drop(meetingId);
+            if (!entry) return;
+            setMissed((current) =>
+                [
+                    { ...entry, at: Date.now() },
+                    ...current.filter((one) => one.meetingId !== meetingId)
+                ].slice(0, MOST_MISSED)
+            );
+        },
+        [drop]
+    );
+
+    const forget = useCallback(
+        (meetingId: string) => setMissed((current) => current.filter((one) => one.meetingId !== meetingId)),
+        []
+    );
 
     /** Put a call down here, and everywhere else this browser is drawing it. */
     const settle = useCallback(
@@ -94,6 +178,19 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         },
         [drop]
     );
+
+    /**
+     * Stop the sound, keep the call.
+     *
+     * The middle answer, and the one a ringing telephone has always had: not
+     * now, and not no. The notice the operating system drew goes with the sound -
+     * it is the same interruption in another form - and the card stays, because
+     * nothing has been decided yet.
+     */
+    const hush = useCallback((meetingId: string) => {
+        setSilenced((current) => (current.includes(meetingId) ? current : [...current, meetingId]));
+        peers.current?.post({ kind: "silenced", meetingId });
+    }, []);
 
     /**
      * Answered, wherever in Polaris that happened.
@@ -180,13 +277,16 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         settle(frame.meetingId);
                         return;
                     case "drop":
-                        drop(frame.meetingId);
+                        // Over, and this browser never picked it up: the caller
+                        // gave up, or the room emptied. That is a missed call,
+                        // and `missedOut` is what tells the two apart.
+                        missedOut(frame.meetingId);
                         return;
                     case "ignore":
                         return;
                 }
             },
-            [drop, settle, viewerId]
+            [missedOut, settle, viewerId]
         )
     );
 
@@ -223,7 +323,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * opened halfway through does not join in, and it is remembered here so that
      * a re-render deciding to ring the same call again asks nobody a second time.
      */
-    const sounding = showing[0]?.meetingId ?? null;
+    const sounding = showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null;
     const mine = useRef(new Map<string, Promise<boolean>>());
     useEffect(() => {
         if (!sounding) return;
@@ -257,6 +357,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useEffect(() => {
         for (const entry of showing) {
             if (notices.current.has(entry.meetingId) || tabIsWatched()) continue;
+            // A hushed call raises nothing outside the window either. The
+            // operating system's notice is the same interruption in another
+            // form, and somebody who has just silenced one has said so.
+            if (silenced.includes(entry.meetingId)) continue;
             // Marked before the claim and the permission prompt resolve, so a
             // second frame does not raise a second notice for the same call.
             notices.current.set(entry.meetingId, { close: () => undefined });
@@ -276,7 +380,9 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             );
         }
 
-        const live = new Set(showing.map((entry) => entry.meetingId));
+        const live = new Set(
+            showing.filter((entry) => !silenced.includes(entry.meetingId)).map((entry) => entry.meetingId)
+        );
         for (const [meetingId, notice] of notices.current) {
             if (live.has(meetingId)) continue;
             notice.close();
@@ -288,7 +394,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         for (const meetingId of mine.current.keys()) {
             if (!live.has(meetingId)) mine.current.delete(meetingId);
         }
-    }, [scope, showing]);
+    }, [scope, showing, silenced]);
 
     // Nothing outlives the screen: a notice left behind by a page that has gone
     // is one nobody can dismiss from inside Polaris.
@@ -301,20 +407,69 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     }, []);
 
     // A call nobody answered stops asking. The same span the sound gives up
-    // after, so the card never sits there silent.
+    // after, so the card never sits there silent - and what it becomes is the
+    // missed call it was, rather than nothing at all.
     useEffect(() => {
         if (ringing.length === 0) return;
         const timer = setInterval(() => {
             const cutoff = Date.now() - RING_FOR_MS;
-            setRinging((current) => current.filter((entry) => entry.at > cutoff));
+            for (const entry of live.current) {
+                if (entry.at <= cutoff) missedOut(entry.meetingId);
+            }
         }, 1000);
         return () => clearInterval(timer);
-    }, [ringing.length]);
+    }, [ringing.length, missedOut]);
 
-    if (showing.length === 0) return null;
+    if (showing.length === 0 && missed.length === 0) return null;
 
     return (
         <div className="flex flex-col gap-2">
+            {missed.map((entry) => (
+                <div
+                    key={entry.meetingId}
+                    role="status"
+                    className="pointer-events-auto flex w-72 flex-col gap-3 rounded-lg border border-border bg-elevated p-3 shadow-modal"
+                >
+                    <span className="flex items-center gap-2.5">
+                        <Avatar size={36} person={{ id: entry.userId, name: entry.name || "Somebody" }} />
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                                {entry.name || "Somebody"}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">Missed call</span>
+                        </span>
+                        <PhoneMissed className="size-4 shrink-0 text-danger" aria-hidden />
+                    </span>
+                    <span className="flex items-center gap-2">
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => forget(entry.meetingId)}
+                        >
+                            {/* The same address answering uses. What it names is
+                                over, and that is fine: the conversation's screen
+                                reads it as "put me in this room's call", which
+                                starts one when there is none - which is exactly
+                                what calling somebody back is. */}
+                            <Link href={`/chat/c/${entry.channelId}?answer=${entry.meetingId}`}>
+                                <Phone className="size-4" />
+                                Call back
+                            </Link>
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Dismiss"
+                            title="Dismiss"
+                            onClick={() => forget(entry.meetingId)}
+                        >
+                            <X className="size-4" />
+                        </Button>
+                    </span>
+                </div>
+            ))}
             {showing.map((entry) => (
                 <div
                     key={entry.meetingId}
@@ -348,6 +503,16 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                                 <Phone className="size-4" />
                                 Answer
                             </Link>
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Silence the ring"
+                            title="Silence the ring"
+                            disabled={silenced.includes(entry.meetingId)}
+                            onClick={() => hush(entry.meetingId)}
+                        >
+                            <BellOff className="size-4" />
                         </Button>
                         <Button
                             size="sm"

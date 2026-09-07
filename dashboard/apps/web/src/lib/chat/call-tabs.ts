@@ -8,10 +8,15 @@
  * answered next door, the tab holding the connection went on ringing, and the
  * notice the operating system had drawn stayed up. All of it until a reload.
  *
- * So the tab that deals with a call says so, and the others put it down. What
- * travels is the meeting it was about and nothing else: what was decided is
- * nobody else's business, because answering and declining leave every other tab
- * with exactly the same thing to do.
+ * So the tab that deals with a call says so, and the others put it down. Two
+ * things can be said about a call, and they are different in exactly one way:
+ *
+ * - **settled** - answered, declined, or gone. Every tab drops it. What was
+ *   decided does not travel, because answering and declining leave every other
+ *   tab with the same thing to do.
+ * - **silenced** - the sound is off and the card stays. Somebody who hushed a
+ *   ringing telephone in one window has hushed it in this browser, and the card
+ *   is still there in all of them because they have not said no yet.
  *
  * Messages arrive unvalidated - a tab still running a previous build of Polaris
  * is on this channel too - so they are parsed before they are believed.
@@ -23,7 +28,7 @@ import { z } from "zod";
 export const CALLS_CHANNEL = "chat.calls";
 
 export const callTabMessageSchema = z.object({
-    kind: z.literal("settled"),
+    kind: z.enum(["settled", "silenced"]),
     meetingId: z.string().min(1).max(100)
 });
 

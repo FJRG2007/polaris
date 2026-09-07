@@ -19,10 +19,19 @@
  */
 
 /** What happened. "added" and "joined" differ by whether somebody else did it,
- *  and that is the whole content of the line; the two below it are moderation,
- *  which is written down for the same reason it is announced - a room where
- *  people quietly disappear is a room nobody trusts. */
-export type ChatNoticeKind = "joined" | "added" | "left" | "removed" | "banned" | "timedOut";
+ *  and that is the whole content of the line; the three after them are
+ *  moderation, which is written down for the same reason it is announced - a
+ *  room where people quietly disappear is a room nobody trusts. The last is a
+ *  call nobody picked up, which is the one line here that is not about who is in
+ *  the room. */
+export type ChatNoticeKind =
+    | "joined"
+    | "added"
+    | "left"
+    | "removed"
+    | "banned"
+    | "timedOut"
+    | "missedCall";
 
 /** Somebody a notice names. */
 export interface NoticePerson {
@@ -85,6 +94,16 @@ export function noticeBody(
             return actor ? `${actor} banned ${who}` : `${who} was banned`;
         case "timedOut":
             return actor ? `${actor} timed ${who} out` : `${who} was timed out`;
+        case "missedCall":
+            // Written from the caller's side rather than the missed person's, so
+            // one line is true for everybody who reads it: "Ana called - no
+            // answer" to the room, "You called - no answer" to Ana. Saying
+            // "missed call from Ana" would read as nonsense to Ana herself.
+            //
+            // It says nothing about whether somebody declined it. A refused call
+            // and an unanswered one look the same from the other end, and that
+            // is deliberate - it is the same silence the card that rang keeps.
+            return `${who} called - no answer`;
     }
 }
 

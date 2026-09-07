@@ -22,6 +22,9 @@ import { randomBytes } from "node:crypto";
 import { prisma, type Prisma } from "@polaris/db";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { blockersOf } from "@/lib/blocks";
+import { notify } from "@/lib/notifications/dispatch";
+import { postNotice } from "./notices";
+import { whoMissedTheCall } from "./missed-call";
 import { discardMeetingChat } from "./meeting-files";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
@@ -1045,7 +1048,85 @@ async function closeMeeting(meetingId: string): Promise<void> {
     // Only for the one caller that actually closed it. Ending is reached from
     // several places - the last person out, a lone call timing out, the host
     // pressing the button - and each would otherwise announce it again.
-    if (stillLive) await announceCall(meetingId, "ended", "");
+    if (stillLive) {
+        await announceCall(meetingId, "ended", "");
+        await noteMissedCall(meetingId);
+    }
+}
+
+/**
+ * A call nobody picked up, said out loud.
+ *
+ * Every messenger does this and Polaris did not: a telephone rang in a tab
+ * somebody was not looking at, gave up after half a minute, and left nothing
+ * behind at all. Whoever was called never found out, and whoever called had no
+ * way to know their call had even been drawn.
+ *
+ * Two records, because they answer two different questions. The line in the
+ * conversation is where it happened, in the order it happened in, and it is the
+ * one both sides read - so a call back a day later has something to refer to.
+ * The alert is the one that reaches somebody who is not looking at Chat, which
+ * is the whole point of a missed call and the only thing in Chat that is allowed
+ * on the bell: a message is not an event and never goes there, and this is.
+ *
+ * Guarded by the same `stillLive` read that guards the announcement, so a call
+ * reaching this from three directions writes one line.
+ *
+ * Best effort throughout. The call is over either way, and a conversation one
+ * line short is a better outcome than an ending that reports itself as failed.
+ */
+async function noteMissedCall(meetingId: string): Promise<void> {
+    try {
+        const meeting = await prisma.meeting.findUnique({
+            where: { id: meetingId },
+            select: {
+                channelId: true,
+                hostId: true,
+                scheduledAt: true,
+                channel: { select: { members: { select: { userId: true } } } }
+            }
+        });
+        // A room somebody put in the diary and sent an address for is not a
+        // telephone call: nobody's phone rang, so nobody missed it.
+        if (!meeting?.channelId || meeting.scheduledAt) return;
+
+        const seats = await prisma.meetingParticipant.findMany({
+            where: { meetingId },
+            select: { userId: true }
+        });
+        const members = (meeting.channel?.members ?? []).map((row) => row.userId);
+        const missed = whoMissedTheCall({
+            hostId: meeting.hostId,
+            members,
+            seated: seats.map((seat) => seat.userId).filter((id): id is string => Boolean(id)),
+            // Somebody who blocked the caller was never rung. Telling them they
+            // missed a call would walk around the one thing blocking does.
+            unreachable: [...(await blockersOf(meeting.hostId, members))],
+            answeredByGuest: seats.some((seat) => !seat.userId)
+        });
+        if (missed.length === 0) return;
+
+        await postNotice(meeting.channelId, "missedCall", { subjectId: meeting.hostId });
+
+        const caller = await prisma.user.findUnique({
+            where: { id: meeting.hostId },
+            select: { name: true }
+        });
+        const channelId = meeting.channelId;
+        await Promise.all(
+            missed.map((userId) =>
+                notify({
+                    userId,
+                    event: "chat.callMissed",
+                    title: `Missed call from ${caller?.name || "somebody"}`,
+                    body: "Nobody picked it up.",
+                    href: `/chat/c/${channelId}`
+                }).catch(() => undefined)
+            )
+        );
+    } catch (error) {
+        console.error("polaris: could not record a missed call:", error);
+    }
 }
 // ---------------------------------------------------------------------------
 // Meetings of their own

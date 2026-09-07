@@ -261,6 +261,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "chat.callMissed",
+        group: "people",
+        label: "Missed calls",
+        description: "Somebody called you and nobody picked it up.",
+        // A missed call is not an error, and it is not nothing either: it is the
+        // one thing in Chat that is worth finding out about after the fact,
+        // which is why it is the only thing in Chat that reaches the bell at all.
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "account.orgInvite",
         group: "people",
         // Both halves again, and for the same reason: whoever sent it wants to
