@@ -110,10 +110,17 @@ function toView(row: DeviceRow): DeviceView {
  * Ordered by where they are and then by name, which is how somebody standing in a
  * building reads a list of its doors: the front ones together, the back ones
  * together.
+ *
+ * A device that has not been put anywhere yet is in every place's list, not none
+ * of them. An account arrives knowing what it holds and not where any of it is,
+ * so everything lands here unplaced - and a list that filtered those out showed
+ * an empty screen telling the reader to open one and say where it was, with
+ * nothing on it to open. They are listed and marked instead, and putting one
+ * somewhere is what takes it off the other places' lists.
  */
 export async function listDevices(installedAppId: string, placeId?: string | null): Promise<DeviceView[]> {
     const rows = await prisma.placeDevice.findMany({
-        where: { installedAppId, ...(placeId ? { placeId } : {}) },
+        where: { installedAppId, ...(placeId ? { OR: [{ placeId }, { placeId: null }] } : {}) },
         orderBy: [{ zone: "asc" }, { name: "asc" }],
         select: DEVICE_FIELDS
     });
@@ -252,7 +259,10 @@ export async function listDeviceEvents(
             device: {
                 installedAppId,
                 ...(query.deviceId ? { id: query.deviceId } : {}),
-                ...(query.placeId ? { placeId: query.placeId } : {})
+                // Unplaced devices belong to this list for the same reason they
+                // belong to the one above: they are on the screen, so what they
+                // did has to be readable from it.
+                ...(query.placeId ? { OR: [{ placeId: query.placeId }, { placeId: null }] } : {})
             }
         },
         orderBy: { at: "desc" },

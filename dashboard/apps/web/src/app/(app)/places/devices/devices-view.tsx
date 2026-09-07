@@ -234,10 +234,17 @@ export function DevicesView({
                 </p>
             )}
 
+            {devices.some((device) => device.placeId === null) && (
+                <p className="text-xs text-muted-foreground">
+                    An account arrives knowing what it holds and not where any of it is, so anything
+                    marked not placed is on every place&apos;s list. Open one to say which it belongs to.
+                </p>
+            )}
+
             {devices.length === 0 ? (
                 <EmptyState
-                    title="The account has no doors at this place."
-                    description="A lock arrives with no place of its own. Open one and say where it is, or check that this account is the one they are on."
+                    title="The account answered with no doors."
+                    description="Check that this is the account the locks are on, and that the token it was connected with may see them."
                 />
             ) : (
                 <ul className="flex flex-col gap-2">
@@ -263,6 +270,11 @@ export function DevicesView({
                                         <Badge className="shrink-0 gap-1 border-danger/30 bg-danger/10 text-danger">
                                             <BatteryLow className="size-3 shrink-0" />
                                             Battery
+                                        </Badge>
+                                    )}
+                                    {device.placeId === null && (
+                                        <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
+                                            Not placed
                                         </Badge>
                                     )}
                                 </span>
