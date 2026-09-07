@@ -31,7 +31,7 @@ import { useCall } from "./use-call";
 import { takeRememberedCall } from "./call-resume";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
-import { AlertTriangle, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
+import { AlertTriangle, Hand, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
 
 // The context and the two hooks that read it live in `call-hold`, which has no
 // runtime dependency of its own - see the note there. Passed on from here so
@@ -197,6 +197,21 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
      * forget by walking to another screen.
      */
     const recorded = call.recording || [...call.states.values()].some((state) => state.recording);
+    /**
+     * Whoever is at the front of the queue of hands, named.
+     *
+     * The bar is where somebody is standing when a hand goes up: the whole point
+     * of keeping the call while you look something up is that you are looking at
+     * something else, and a gesture that only exists on the screen you walked
+     * away from is a gesture nobody answers. The chair hears the chime; this is
+     * what they see when they look up.
+     */
+    const firstHand = call.hands[0];
+    const waiting =
+        firstHand === call.participantId
+            ? "You"
+            : ((call.meeting?.participants ?? []).find((person) => person.id === firstHand)?.name ??
+              "Somebody");
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
@@ -238,6 +253,19 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     >
                         <AlertTriangle className="size-2.5 shrink-0" />
                         No sound
+                    </span>
+                )}
+                {call.hands.length > 0 && (
+                    <span
+                        title={
+                            call.hands.length === 1
+                                ? `${waiting} has a hand up`
+                                : `${call.hands.length} hands are up. ${waiting} is first`
+                        }
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-warning px-1.5 py-0.5 text-[0.625rem] font-semibold text-warning-foreground"
+                    >
+                        <Hand className="size-2.5 shrink-0" />
+                        {call.hands.length}
                     </span>
                 )}
                 {recorded && (
