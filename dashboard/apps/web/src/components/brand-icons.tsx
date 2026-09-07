@@ -89,6 +89,40 @@ export function NukiMark(props: SVGProps<SVGSVGElement>) {
     );
 }
 
+export function VercelMark(props: SVGProps<SVGSVGElement>) {
+    // Vercel's whole mark is one triangle, and their brand guide has it in the
+    // foreground colour on whatever it sits on - so currentColor is the vendor's
+    // own instruction rather than a convenience.
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            {...mark(props)}
+        >
+            <path fill="currentColor" d="m12 1.608 12 20.784H0Z" />
+        </svg>
+    );
+}
+
+export function RailwayMark(props: SVGProps<SVGSVGElement>) {
+    // Railway's own mark, monochrome and left as currentColor: they ship it in
+    // black on light and white on dark, which is what following the surface does.
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            {...mark(props)}
+        >
+            <path
+                fill="currentColor"
+                d="M.113 10.27A13.026 13.026 0 000 11.48h18.23c-.064-.125-.15-.237-.235-.347-3.117-4.027-4.793-3.677-7.19-3.78-.8-.034-1.34-.048-4.524-.048-1.704 0-3.555.005-5.358.01-.234.63-.459 1.24-.567 1.737h9.342v1.216H.113v.002zm18.26 2.426H.009c.02.326.05.645.094.961h16.955c.754 0 1.179-.429 1.315-.961zM1.8 17.792A11.997 11.997 0 0012 24c6.628 0 12-5.373 12-12 0-.535-.04-1.06-.106-1.577-1.913 3.412-4.463 4.66-8.264 4.66H.51c.183.6.417 1.178.695 1.732h11.436v1.216H1.8v-.239zM12 0C7.4 0 3.406 2.588 1.392 6.388h5.077c.44 0 1.658-.005 2.05-.005 4.4 0 5.734.588 7.895 2.85.42.44.79.887 1.11 1.334h6.213C22.276 4.478 17.629 0 12 0z"
+            />
+        </svg>
+    );
+}
+
 export function NgrokMark(props: SVGProps<SVGSVGElement>) {
     // ngrok's official single-path mark (monochrome), left as currentColor so it
     // reads on both light and dark surfaces.

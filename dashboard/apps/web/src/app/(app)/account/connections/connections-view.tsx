@@ -16,7 +16,7 @@ import { IntegrationLogo } from "@/components/logos";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Unlink } from "lucide-react";
-import { connectGithubTokenAction, disconnectAccountAction } from "./actions";
+import { connectTokenAction, disconnectAccountAction } from "./actions";
 import {
     Badge,
     Button,
@@ -378,6 +378,7 @@ function ProviderCard({
 
             {tokenOpen ? (
                 <TokenDialog
+                    provider={provider.slug}
                     providerName={provider.name}
                     label={provider.tokenLabel ?? "Access token"}
                     help={provider.tokenHelp}
@@ -427,6 +428,7 @@ function DisconnectDialog({
 }
 
 function TokenDialog({
+    provider,
     providerName,
     label,
     help,
@@ -434,6 +436,9 @@ function TokenDialog({
     onClose,
     onDone
 }: {
+    /** Which service this token is for. Passed rather than assumed: the form is
+     *  the same for all of them and the call behind it is not. */
+    provider: string;
     providerName: string;
     label: string;
     help?: string;
@@ -449,7 +454,7 @@ function TokenDialog({
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => connectGithubTokenAction(token),
+                () => connectTokenAction(provider, token),
                 (message) => setError(message)
             );
             if (!result) return;

@@ -50,7 +50,9 @@ export type ConnectionProviderSlug =
     | "steam"
     | "epic"
     | "minecraft"
-    | "discord";
+    | "discord"
+    | "vercel"
+    | "railway";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -120,6 +122,42 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         // GitHub only lets an address be published once it has been confirmed, so
         // the one it hands back is one GitHub itself proved.
         emailTrustDefault: true
+    },
+    {
+        slug: "vercel",
+        name: "Vercel",
+        summary: "Run some of your services on Vercel and keep watching them from here.",
+        description:
+            "Polaris lists the projects your token reaches, shows what each one has deployed and can redeploy it. Vercel still does the building and the serving; unlinking stops Polaris seeing any of it.",
+        acceptsToken: true,
+        tokenLabel: "Access token",
+        tokenHelp:
+            "An account token from Vercel's own settings. Give it access to the team the projects are under, or it will only see your personal ones.",
+        tokenUrl: "https://vercel.com/account/tokens",
+        defaultLimit: 2,
+        requires: "nothing",
+        // Never a way in. A deployment token is a credential for machines, and a
+        // service that holds one has no business proving who anybody is.
+        signInDefault: false,
+        signInWarning:
+            "This is a deployment token rather than an account you sign in to, so it cannot prove who you are."
+    },
+    {
+        slug: "railway",
+        name: "Railway",
+        summary: "Run some of your services on Railway and keep watching them from here.",
+        description:
+            "Polaris lists the projects your token reaches, shows what each service has deployed and can redeploy it. Railway still does the building and the serving; unlinking stops Polaris seeing any of it.",
+        acceptsToken: true,
+        tokenLabel: "Account token",
+        tokenHelp:
+            "An account token from Railway's own settings, which reaches every workspace you are in. A project token reaches one project and cannot list the rest.",
+        tokenUrl: "https://railway.com/account/tokens",
+        defaultLimit: 2,
+        requires: "nothing",
+        signInDefault: false,
+        signInWarning:
+            "This is a deployment token rather than an account you sign in to, so it cannot prove who you are."
     },
     {
         slug: "google",
