@@ -26,6 +26,7 @@ import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type V
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
+    listAnalyticsSitesAction,
     rotateTrackerKeyAction,
     setAnalyticsSettingsAction,
     setTrackerEnabledAction,
@@ -57,20 +58,51 @@ export function AnalyticsView({
     scope,
     siteId,
     range,
-    services,
     canOperate
 }: {
     scope: AnalyticsScope;
     siteId: string;
     range: VisitRange;
-    services: SiteOption[];
     canOperate: boolean;
 }) {
+    const router = useRouter();
     const [data, setData] = useState<AnalyticsOverview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
     const [, startLoad] = useTransition();
+    // Null while it is still arriving, which is not the same as an account with
+    // nothing to measure - and the difference is a dropdown that says "no services
+    // yet" to somebody who has forty.
+    const [services, setServices] = useState<SiteOption[] | null>(null);
+
+    // After the screen, never before it: this walks every project the account can
+    // reach, and it only fills the picker in the header.
+    useEffect(() => {
+        let cancelled = false;
+        void listAnalyticsSitesAction()
+            .then((result) => {
+                if (!cancelled) setServices(result.sites);
+            })
+            .catch(() => {
+                if (!cancelled) setServices([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // Landing on Analytics with no service named. The first one is chosen once the
+    // list is known, and written into the address so the page stays linkable.
+    useEffect(() => {
+        if (!scopeNeedsTarget(scope) || siteId || !services || services.length === 0) return;
+        const first = services[0]!.id;
+        router.replace(`/apps/analytics?scope=${scope}&id=${encodeURIComponent(first)}&range=${range}`);
+    }, [scope, siteId, services, range, router]);
 
     const load = useCallback(() => {
+        // Nothing to ask about yet: the address names no service and the list that
+        // would choose one has not arrived. Asking anyway answers "that is not
+        // something Polaris measures", which is a sentence about a URL nobody typed.
+        if (scopeNeedsTarget(scope) && !siteId) return;
         startLoad(async () => {
             const result = await getAnalyticsOverviewAction({ scopeType: scope, scopeId: siteId, range });
             if ("error" in result) {
@@ -107,7 +139,7 @@ export function AnalyticsView({
         [load]
     );
 
-    const nothingToMeasure = scopeNeedsTarget(scope) && services.length === 0;
+    const nothingToMeasure = scopeNeedsTarget(scope) && services !== null && services.length === 0;
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
@@ -161,7 +193,8 @@ function SitePicker({
 }: {
     scope: AnalyticsScope;
     siteId: string;
-    services: SiteOption[];
+    /** Null while the list is still arriving. */
+    services: SiteOption[] | null;
     canOperate: boolean;
 }) {
     const router = useRouter();
@@ -184,12 +217,16 @@ function SitePicker({
             options={scopes.map((entry) => ({ value: entry.value, label: entry.label }))}
             onValueChange={(value) => {
                 const next = value as AnalyticsScope;
-                go(next, next === "application" ? (services[0]?.id ?? "") : "");
+                go(next, next === "application" ? (services?.[0]?.id ?? "") : "");
             }}
         />
     );
 
-    const siteSelect = !scopeNeedsTarget(scope) ? null : services.length > 0 ? (
+    const siteSelect = !scopeNeedsTarget(scope) ? null : services === null ? (
+        // The shape of the control that is coming, rather than a gap the header
+        // closes up and then reopens.
+        <Skeleton className="h-8 min-w-0 flex-1 md:w-60 md:min-w-[15rem] md:flex-none" />
+    ) : services.length > 0 ? (
         <Select
             value={siteId || (services[0]?.id ?? "")}
             aria-label="Service"
@@ -592,7 +629,10 @@ function TrackerPanel({
     // The snippet is pasted into somebody else's site, so it has to name the address
     // Polaris answers on publicly - a LAN hostname would load nothing out there.
     const baseUrl = useAppUrl();
-    const snippet = `<script defer src="${baseUrl}/analytics.js" data-key="${data.site.publicKey}"></script>`;
+    // Deferred and de-prioritised in the snippet itself, so the measurement never
+    // competes with the page it is measuring - a browser that does not know
+    // `fetchpriority` ignores it.
+    const snippet = `<script defer fetchpriority="low" src="${baseUrl}/analytics.js" data-key="${data.site.publicKey}"></script>`;
 
     return (
         <Card>

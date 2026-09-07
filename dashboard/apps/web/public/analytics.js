@@ -13,7 +13,15 @@
  * Deliberately one small file with no build step: it is served to somebody else's
  * page, and the honest size of it is part of the deal.
  *
- *   <script defer src="https://polaris.example/analytics.js" data-key="..."></script>
+ * **It is never allowed to cost the page anything.** It is deferred, so it runs
+ * after the document is parsed; the first beat waits for the browser to be idle,
+ * so it never competes with the page's own first requests; every request is sent
+ * at low priority, so the network puts the page in front of it; and everything it
+ * does is inside a try, so a measurement failing is invisible to the visitor
+ * rather than an error in their console on somebody else's site. Analytics that
+ * slow a page down are analytics that get removed.
+ *
+ *   <script defer fetchpriority="low" src="https://polaris.example/analytics.js" data-key="..."></script>
  *
  * Optional attributes:
  *   data-host         - where to send beats, if not the script's own origin
@@ -37,6 +45,22 @@
 
     const currentUrl = () => location.pathname + location.search;
 
+    /**
+     * Do this when the browser has nothing better to do.
+     *
+     * The first beat of a visit lands in the same moment as the page's own fonts,
+     * images and data, and it is the least urgent thing on the wire. A deadline
+     * rather than a wish: a tab that is never idle still reports, a second late.
+     */
+    function whenIdle(run) {
+        try {
+            if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 1000 });
+            else setTimeout(run, 0);
+        } catch {
+            run();
+        }
+    }
+
     function send(body, viaBeacon) {
         const payload = JSON.stringify(body);
         // A page being closed is exactly when the most interesting beat is sent, and
@@ -57,7 +81,11 @@
                 headers: { "Content-Type": "application/json" },
                 keepalive: true,
                 mode: "cors",
-                credentials: "omit"
+                credentials: "omit",
+                // Behind everything the page itself is fetching. Browsers that do
+                // not know the option ignore it, which is the same behaviour they
+                // had before it was there.
+                priority: "low"
             }).catch(() => {
                 // Analytics must never surface as an error on somebody's site.
             });
@@ -135,5 +163,8 @@
         else if (!enteredAt) enteredAt = Date.now();
     });
 
-    view();
+    // The opening beat, once the browser has drawn what the visitor came for.
+    // Everything after it is a route change or a page being closed, which are
+    // moments the page is not loading anything anyway.
+    whenIdle(() => view());
 })();

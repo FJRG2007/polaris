@@ -12,7 +12,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
-import { visibleApplication } from "@/lib/deploy-service";
+import { listProjectScopes, visibleApplication } from "@/lib/deploy-service";
+import type { SiteOption } from "./site-catalog";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { analyticsSettingsSchema, visitRangeSchema, type VisitRange } from "@polaris/core";
 import {
@@ -76,6 +77,32 @@ export interface AnalyticsOverview {
 }
 
 /** Everything one screen shows, in one round trip. */
+/**
+ * Everything this account can look at, for the picker in the header.
+ *
+ * Asked for after the screen is drawn rather than resolved before it. It walks
+ * every project, environment and service somebody can reach, which on a busy
+ * instance is the slowest thing on the page - and it was being awaited before the
+ * first paint, so the whole of Analytics waited on a list that only fills one
+ * dropdown.
+ */
+export async function listAnalyticsSitesAction(): Promise<{ sites: SiteOption[] }> {
+    const user = await requirePermission("deploy.manage");
+    const projects = await listProjectScopes(user.id);
+    const sites: SiteOption[] = [];
+    for (const project of projects) {
+        for (const environment of project.environments) {
+            for (const application of environment.applications) {
+                sites.push({
+                    id: application.id,
+                    label: `${project.name} / ${environment.name} / ${application.name}`
+                });
+            }
+        }
+    }
+    return { sites };
+}
+
 export async function getAnalyticsOverviewAction(input: {
     scopeType: string;
     scopeId: string;

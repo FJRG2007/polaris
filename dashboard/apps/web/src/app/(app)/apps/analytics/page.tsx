@@ -6,17 +6,17 @@
  * read down. The choice lives in the URL (`?scope=application&id=...`), so a
  * service's own panel can link straight at its numbers.
  *
- * The shell renders immediately and the numbers arrive into it. Everything on this
- * page is a database read over a window the visitor chose, and holding the whole
- * screen back for it would mean a blank page every time somebody changes the range.
+ * The shell renders immediately and everything else arrives into it - the numbers,
+ * and the list of what can be measured. Both are database reads: one over a window
+ * the visitor chose, the other over every project they can reach, and waiting for
+ * either would mean a blank page every time somebody changes the range or opens
+ * this at all. Which is what it did, for the list.
  */
 
-import { notFound } from "next/navigation";
 import { AnalyticsView } from "./analytics-view";
-import { listProjectScopes } from "@/lib/deploy-service";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { visitRangeSchema, type VisitRange } from "@polaris/core";
-import { isAnalyticsScope, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
+import { isAnalyticsScope, type AnalyticsScope } from "./site-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -29,32 +29,17 @@ export default async function AnalyticsPage({
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
 
-    const projects = await listProjectScopes(user.id);
-    const services: SiteOption[] = [];
-    for (const project of projects) {
-        for (const environment of project.environments) {
-            for (const application of environment.applications) {
-                services.push({
-                    id: application.id,
-                    label: `${project.name} / ${environment.name} / ${application.name}`
-                });
-            }
-        }
-    }
-
     // An unknown scope in the URL is a stale link, not a 404. Polaris's own traffic is
     // the natural landing place for an operator and is not offered to anyone else.
     const requested = isAnalyticsScope(scope) ? scope : null;
     let kind: AnalyticsScope = requested ?? (canOperate ? "polaris" : "application");
     if (!canOperate && kind === "polaris") kind = "application";
 
-    const siteId = scopeNeedsTarget(kind) ? (services.find((option) => option.id === id)?.id ?? services[0]?.id ?? "") : "";
-    if (scopeNeedsTarget(kind) && id && !services.some((option) => option.id === id)) {
-        // An id that is not this caller's must not quietly resolve to their first
-        // service - that turns a link to someone else's numbers into a link to their
-        // own, which reads as data appearing where it should not.
-        notFound();
-    }
+    // Taken as written. An id belonging to somebody else is refused by the read
+    // itself - it resolves the service against the person asking - so nothing here
+    // has to hold the page open to find out, and a link to someone else's numbers
+    // still cannot become a link to your own.
+    const siteId = (id ?? "").trim().slice(0, 64);
 
     const parsedRange = visitRangeSchema.safeParse(range);
     const activeRange: VisitRange = parsedRange.success ? parsedRange.data : "24h";
@@ -65,7 +50,6 @@ export default async function AnalyticsPage({
             scope={kind}
             siteId={siteId}
             range={activeRange}
-            services={services}
             canOperate={canOperate}
         />
     );
