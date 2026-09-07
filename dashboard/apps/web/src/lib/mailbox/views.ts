@@ -14,11 +14,12 @@
  * Reaching the end asks for the next page; it never reaches for all of them.
  */
 
+import Fuse from "fuse.js";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { addressesFrom } from "./json";
 import type { Prisma } from "@polaris/db";
 import { unifiedAccountIds } from "./access";
-import { addressesFrom } from "./json";
 
 /** One folder in the rail. */
 export interface MailFolderView {
@@ -174,28 +175,27 @@ export async function listThreads(
                   }
               }
             : {}),
-        ...(query.query
-            ? {
-                  OR: [
-                      { subject: { contains: query.query, mode: "insensitive" } },
-                      { snippet: { contains: query.query, mode: "insensitive" } },
-                      { bodyText: { contains: query.query, mode: "insensitive" } }
-                  ]
-              }
-            : {}),
-        // Matched against the raw JSON, which is what a stored address list is.
-        // Good enough for "from: somebody", which is how people search mail, and
-        // it needs no second table nobody would otherwise keep in step.
+        // The search itself is not here. Who a message is from and to is stored
+        // as JSON, which the database cannot be asked about usefully - which is
+        // why searching for the sender's own address found nothing at all. It is
+        // answered in `matchingThreads` instead, over a bounded window.
         ...(query.from
             ? { fromJson: { string_contains: query.from.trim().toLowerCase() } }
             : {})
     };
+
+    // Which conversations the search admits, decided before the list is drawn so
+    // the page, the cursor and the order below are the ordinary ones.
+    const terms = query.query.trim() ? core.parseMailSearch(query.query) : core.EMPTY_SEARCH;
+    const matched = core.searchIsEmpty(terms) ? null : await matchingThreads(accountIds, query, terms);
+    if (matched && matched.size === 0) return { threads: [], cursor: "" };
 
     const cursorAt = query.cursor ? new Date(query.cursor) : null;
     const threads = await prisma.mailThread.findMany({
         where: {
             accountId: { in: accountIds },
             messages: { some: messageWhere },
+            ...(matched ? { id: { in: [...matched] } } : {}),
             ...(cursorAt ? { lastMessageAt: { lt: cursorAt } } : {})
         },
         select: {
@@ -257,6 +257,117 @@ export async function listThreads(
         ""
     );
     return { threads: rows, cursor: rows.length < query.limit ? "" : oldest };
+}
+
+/**
+ * How much mail one search reads before it answers.
+ *
+ * A ceiling rather than a page: the words and the people are matched here rather
+ * than in the database, so this is the honest cost of a search and it has to be
+ * bounded. High enough that a year of one mailbox is inside it, low enough that
+ * the worst search anybody can type is a few hundred milliseconds.
+ */
+const SEARCH_WINDOW = 2000;
+
+/**
+ * The conversations a search admits.
+ *
+ * Split in two on purpose, along the line of what a database is good at. The
+ * flags, the folder and the dates are columns with indexes on them, so they
+ * narrow the window before anything is read. Who a message is from and to is
+ * JSON in a column - a shape no index helps with, and the reason searching for
+ * the sender's own address used to find nothing - so those, the phrases, the
+ * exclusions and the loose words are answered over what comes back.
+ *
+ * The loose words go through Fuse, which is what makes a search forgiving: a
+ * half-remembered name, a subject typed from memory, an address with one letter
+ * wrong. Everything with an operator on it stays exact, because somebody who
+ * wrote `from:ana` meant Ana.
+ */
+async function matchingThreads(
+    accountIds: string[],
+    query: MailListQuery,
+    terms: core.MailSearchTerms
+): Promise<Set<string>> {
+    const messages = await prisma.mailMessage.findMany({
+        where: {
+            accountId: { in: accountIds },
+            ...(query.folderId ? { folderId: query.folderId } : {}),
+            ...(query.role ? { folder: { role: query.role } } : {}),
+            ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
+            ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
+            ...(terms.unread === null ? {} : { seen: !terms.unread }),
+            ...(terms.starred === null ? {} : { flagged: terms.starred }),
+            ...(terms.after || terms.before
+                ? {
+                      sentAt: {
+                          ...(terms.after ? { gte: new Date(`${terms.after}T00:00:00`) } : {}),
+                          ...(terms.before ? { lte: new Date(`${terms.before}T23:59:59.999`) } : {})
+                      }
+                  }
+                : {})
+        },
+        select: {
+            threadId: true,
+            subject: true,
+            snippet: true,
+            bodyText: true,
+            fromJson: true,
+            toJson: true,
+            ccJson: true,
+            hasAttachments: true,
+            seen: true,
+            flagged: true,
+            sentAt: true
+        },
+        orderBy: { sentAt: "desc" },
+        take: SEARCH_WINDOW
+    });
+
+    const searchable = messages.map((message) => ({
+        threadId: message.threadId,
+        subject: message.subject,
+        snippet: core.snippetFrom(message.snippet),
+        // Only what has been fetched. Most rows have no body until somebody opens
+        // them, which is why the empty state says the search covers what Polaris
+        // holds rather than the whole mailbox.
+        body: message.bodyText ?? "",
+        from: named(message.fromJson),
+        to: named(message.toJson),
+        cc: named(message.ccJson),
+        hasAttachments: message.hasAttachments,
+        seen: message.seen,
+        flagged: message.flagged,
+        sentAt: message.sentAt
+    }));
+
+    const exact = searchable.filter((message) => core.mailSearchAdmits(message, terms));
+    if (!terms.text) return new Set(exact.map((message) => message.threadId));
+
+    const fuse = new Fuse(exact, {
+        includeScore: false,
+        ignoreLocation: true,
+        threshold: 0.35,
+        minMatchCharLength: 2,
+        keys: [
+            { name: "subject", weight: 0.4 },
+            // One field rather than three, so a name in the To line scores the
+            // same as the same name in the From line - which is what somebody
+            // typing a colleague's name into the box means.
+            { name: "people", weight: 0.3, getFn: (message) => [...message.from, ...message.to, ...message.cc] },
+            { name: "snippet", weight: 0.2 },
+            { name: "body", weight: 0.1 }
+        ]
+    });
+    return new Set(fuse.search(terms.text).map((hit) => hit.item.threadId));
+}
+
+/** An address list as words a search can match: the name and the address of each
+ *  person on the message, because people search for both. */
+function named(value: unknown): string[] {
+    return addressesFrom(value).flatMap((entry) =>
+        entry.name.trim() ? [entry.name, entry.address] : [entry.address]
+    );
 }
 
 /** One message in a conversation, as the reading pane lists it. */

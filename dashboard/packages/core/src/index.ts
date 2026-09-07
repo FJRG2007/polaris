@@ -26,6 +26,7 @@ export * from "./contrast.js";
 export * from "./profile-style.js";
 export * from "./connection-providers.js";
 export * from "./mailbox-providers.js";
+export * from "./mailbox-search.js";
 export * from "./mailbox.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
