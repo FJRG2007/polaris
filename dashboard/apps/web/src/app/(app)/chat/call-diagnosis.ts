@@ -224,6 +224,17 @@ function heardLine(others: readonly HeardFrom[]): CallAudioLine {
     if (others.length === 0) return { label, value: "Nobody else is here", state: "idle" };
     const audible = others.filter((person) => !person.muted);
     if (audible.length === 0) return { label, value: "Everybody else is muted", state: "idle" };
+    // Neither of these is a fault in this call, so neither is drawn as one - and
+    // both are read here, in the order `diagnoseCall` reads them, because the
+    // counters below lag: sound that moved half a minute ago still reads as
+    // carrying, and a row saying so under a headline saying they have gone is
+    // the panel arguing with itself about the call it exists for.
+    if (audible.every((person) => !person.reachable)) {
+        return { label, value: "They have stopped answering", state: "idle" };
+    }
+    if (audible.every((person) => !person.sharing)) {
+        return { label, value: "No microphone shared", state: "idle" };
+    }
     const carrying = audible.filter((person) => person.carrying).length;
     if (carrying > 0) {
         return { label, value: `Sound from ${carrying} of ${audible.length}`, state: "good" };
@@ -233,13 +244,6 @@ function heardLine(others: readonly HeardFrom[]): CallAudioLine {
     }
     if (audible.some((person) => person.subscribed)) {
         return { label, value: "Not reaching this device", state: "bad" };
-    }
-    // Neither of these is a fault in this call, so neither is drawn as one.
-    if (audible.every((person) => !person.reachable)) {
-        return { label, value: "They have stopped answering", state: "idle" };
-    }
-    if (audible.every((person) => !person.sharing)) {
-        return { label, value: "No microphone shared", state: "idle" };
     }
     return { label, value: "Nothing is being sent", state: "bad" };
 }
@@ -353,8 +357,7 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
     // Gone, or going. A browser that was closed is still in the room until the
     // server times it out, and for those seconds it looks exactly like a call
     // that has broken - so it is named before anything here is blamed.
-    const away = audible.filter((person) => !person.reachable);
-    if (away.length === audible.length) {
+    if (audible.every((person) => !person.reachable)) {
         return theirs(
             audible.length === 1
                 ? `${audible[0]?.name} has stopped answering. If they closed the tab or lost their connection, they will drop out of the call in a moment.`

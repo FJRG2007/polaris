@@ -250,6 +250,7 @@ const frameSchema = z.discriminatedUnion("kind", [
 function sameReport(left: CallAudioReport, right: CallAudioReport): boolean {
     return (
         left.ok === right.ok &&
+        left.blame === right.blame &&
         left.headline === right.headline &&
         left.fix === right.fix &&
         left.lines.length === right.lines.length &&
@@ -2340,9 +2341,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // drag the module into every bundle. A build that does not report the
             // quality reads as reachable, which is exactly how this behaved
             // before it was asked.
-            const sharing = Boolean(publication);
+            //
+            // Somebody the roster still holds and the room no longer has is
+            // gone, not refusing a microphone: the roster keeps a seat for
+            // `PARTICIPANT_TTL_MS` and the call server drops people on its own,
+            // shorter clock, so this window is every closed tab rather than a
+            // rare one. Nothing is claimed about a microphone that cannot be
+            // looked at.
+            const sharing = !remote || Boolean(publication);
             const quality = (remote as { connectionQuality?: string } | undefined)?.connectionQuality;
-            const reachable = quality !== "lost";
+            const reachable = Boolean(remote) && quality !== "lost";
             // Structurally, as the sender statistics are read: naming the media
             // client's own class here would drag the module into every bundle -
             // see `livekit` at the top of this file.

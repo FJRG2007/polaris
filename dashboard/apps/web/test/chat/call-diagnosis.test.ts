@@ -329,6 +329,52 @@ describe("what is happening at the other end", () => {
         expect(row(silent, "What you are being sent")).toBe("No microphone shared");
     });
 
+    it("does not report sound as arriving from somebody who has stopped answering", () => {
+        // The counters lag by design - sound that moved half a minute ago still
+        // reads as carrying - so a tab closed a second ago has a live-looking
+        // row underneath a headline saying they have gone. The two halves of one
+        // panel disagreeing is the panel failing at the moment it exists for.
+        const gone = working({ others: [heard({ reachable: false })] });
+        const report = diagnoseCall(gone);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("Ana has stopped answering");
+        const sent = report.lines.find((line) => line.label === "What you are being sent");
+        expect(sent?.value).toBe("They have stopped answering");
+        expect(sent?.state).toBe("idle");
+    });
+
+    it("does not report sound as arriving from somebody sharing no microphone", () => {
+        const silent = working({ others: [heard({ sharing: false })] });
+        const report = diagnoseCall(silent);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("has not shared a microphone");
+        const sent = report.lines.find((line) => line.label === "What you are being sent");
+        expect(sent?.value).toBe("No microphone shared");
+        expect(sent?.state).toBe("idle");
+    });
+
+    it("keeps blaming the call while one of several is still here", () => {
+        // Both verdicts are about everybody, so one person leaving a call of
+        // three is not an answer for the other two.
+        const mixed = working({
+            others: [
+                heard({
+                    id: "p2",
+                    name: "Ana",
+                    reachable: false,
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                }),
+                heard({ id: "p3", name: "Bea", subscribed: false, arriving: false, carrying: false })
+            ]
+        });
+        const report = diagnoseCall(mixed);
+        expect(report.blame).toBe("fault");
+        expect(report.fix).not.toBe("");
+        expect(row(mixed, "What you are being sent")).toBe("Nothing is being sent");
+    });
+
     it("still blames the call when they are here and sharing", () => {
         // The case this must not swallow: somebody present, publishing, and none
         // of it arriving is a fault worth the yellow.
