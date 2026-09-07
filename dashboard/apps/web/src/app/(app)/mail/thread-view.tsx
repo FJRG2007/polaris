@@ -25,6 +25,7 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
+import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
 import {
     Button,
     DropdownMenu,
@@ -443,6 +444,7 @@ function MessageCard({
 }) {
     const format = useDisplayFormat();
     const { refresh } = useMail();
+    const [viewing, setViewing] = useState<ViewerTarget | null>(null);
     const [readable, setReadable] = useState<ReadableMessage | null>(null);
     const [failed, setFailed] = useState("");
 
@@ -573,17 +575,55 @@ function MessageCard({
                                     {message.attachments
                                         .filter((file) => !file.inline)
                                         .map((file) => (
-                                            <li key={file.id}>
+                                            <li
+                                                key={file.id}
+                                                className="flex items-center gap-1 rounded-md border border-border pr-1 text-[12px]"
+                                            >
+                                                {/* Openable ones open. A receipt,
+                                                    a spreadsheet, a scan - the
+                                                    reason to attach one is for
+                                                    somebody to look at it, and
+                                                    making them save it to a
+                                                    Downloads folder first is a
+                                                    step nobody wanted. */}
+                                                {isViewable(file.name) ? (
+                                                    <button
+                                                        type="button"
+                                                        className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
+                                                        onClick={() =>
+                                                            setViewing({
+                                                                path: file.id,
+                                                                name: file.name,
+                                                                size: String(file.size)
+                                                            })
+                                                        }
+                                                    >
+                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                            {file.name}
+                                                        </span>
+                                                        <span className="shrink-0 text-foreground-subtle">
+                                                            {readableSize(file.size)}
+                                                        </span>
+                                                    </button>
+                                                ) : (
+                                                    <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
+                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                            {file.name}
+                                                        </span>
+                                                        <span className="shrink-0 text-foreground-subtle">
+                                                            {readableSize(file.size)}
+                                                        </span>
+                                                    </span>
+                                                )}
                                                 <a
                                                     href={`/api/mail/attachments/${file.id}`}
-                                                    className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+                                                    className="shrink-0 rounded p-1 text-foreground-subtle hover:text-foreground"
+                                                    aria-label={`Save ${file.name}`}
+                                                    title={`Save ${file.name}`}
                                                     download
                                                 >
-                                                    <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                                    <span className="max-w-[16rem] truncate" title={file.name}>{file.name}</span>
-                                                    <span className="shrink-0 text-foreground-subtle">
-                                                        {readableSize(file.size)}
-                                                    </span>
                                                     <Download className="size-3.5 shrink-0" aria-hidden />
                                                 </a>
                                             </li>
@@ -609,6 +649,19 @@ function MessageCard({
                     )}
                 </div>
             ) : null}
+
+            {/* The same viewer Drive opens a file in - PDFs, spreadsheets,
+                documents, pictures, code. Written once there and pointed at a
+                different source here rather than reimplemented, which is the
+                whole reason it takes a `urlFor`. */}
+            <FileViewer
+                target={viewing}
+                readOnly
+                urlFor={(target, inline) =>
+                    `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
+                }
+                onOpenChange={(open) => (open ? undefined : setViewing(null))}
+            />
         </li>
     );
 }

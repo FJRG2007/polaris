@@ -23,6 +23,9 @@
 
 import * as core from "@polaris/core";
 import { EmojiPicker } from "./emoji-picker";
+import { asFiles } from "@/components/file-picker/as-files";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ClipDialog } from "./clip-dialog";
 import { MicSettings } from "./mic-settings";
 import { VideoPreview } from "@/components/video-preview";
@@ -240,6 +243,7 @@ export function Composer({
      *  object and not somewhere to write a decision. */
     const [covered, setCovered] = useState<ReadonlySet<number>>(() => new Set());
     const [refused, setRefused] = useState("");
+    const [picking, setPicking] = useState(false);
     /** Whether the "when" dialog is open, and what the server said about the
      *  last moment offered to it. */
     const [scheduling, setScheduling] = useState(false);
@@ -537,6 +541,20 @@ export function Composer({
      * refused - no permission to send files, or a message already holding as many
      * as it may - or the paste is eaten and nothing at all appears.
      */
+    /**
+     * Files chosen from somewhere other than this machine.
+     *
+     * The same dialog Mail uses, so "attach a file" means the same thing
+     * wherever somebody is in Polaris. What it hands back is where a file is;
+     * Polaris fetches it and hands it over as an ordinary file, which is what
+     * this composer already knows how to stage.
+     */
+    const takePicked = async (picked: readonly PickedFile[]): Promise<void> => {
+        const { files: got, failed } = await asFiles(picked);
+        if (failed.length > 0) setRefused(failed[0] ?? "");
+        if (got.length > 0) stage(got);
+    };
+
     const stage = (picked: ArrayLike<File> | null): number => {
         if (!picked || picked.length === 0) return 0;
         // Said rather than ignored: a file dropped onto a box that quietly does
@@ -836,7 +854,7 @@ export function Composer({
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
-                                    onClick={() => picker.current?.click()}
+                                    onClick={() => setPicking(true)}
                                     aria-label="Attach a file"
                                     title="Attach a file"
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
@@ -1053,6 +1071,14 @@ export function Composer({
                     // text, with other files, or at nine tomorrow morning -
                     // none of which is a special case.
                     onReady={(clip) => stage([clip])}
+                />
+            )}
+
+            {picking && (
+                <FilePickerDialog
+                    title="Attach to this message"
+                    onClose={() => setPicking(false)}
+                    onPick={(picked) => void takePicked(picked)}
                 />
             )}
 

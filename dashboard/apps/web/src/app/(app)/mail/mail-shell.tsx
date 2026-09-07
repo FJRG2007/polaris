@@ -169,7 +169,18 @@ export function MailShell({
 
     return (
         <MailContext.Provider value={value}>
-            <div className={cn(PAGE_BLEED, "flex h-full min-h-0 overflow-hidden")}>
+            {/* No `h-full` here, and that is the whole of why this app has one
+                scrollbar rather than two. PAGE_BLEED already fixes the height to
+                what is left of the window; `h-full` is `height: 100%` of a
+                parent that has no height of its own, which resolves to auto - so
+                the app grew to the height of its own content and the PAGE
+                scrolled behind the list that was supposed to be doing it.
+
+                Two Tailwind classes for one property do not resolve by the order
+                they are written in the attribute, which is what makes this
+                invisible in review: `cn` merges them and the later definition
+                wins whatever the author meant. */}
+            <div className={cn(PAGE_BLEED, "flex min-h-0 overflow-hidden")}>
                 <aside
                     className={cn(
                         "w-60 shrink-0 flex-col border-r border-border bg-surface",

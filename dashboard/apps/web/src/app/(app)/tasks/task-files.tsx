@@ -19,6 +19,9 @@ import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Input, cn } from "@polaris/ui";
 import { CopyButton } from "@/components/copy-button";
+import { asFiles } from "@/components/file-picker/as-files";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { CommitLink } from "@/lib/tasks/commit-service";
 import type { AttachmentView } from "@/lib/tasks/attachment-service";
@@ -60,9 +63,24 @@ export function AttachmentSection({
 }) {
     const input = useRef<HTMLInputElement | null>(null);
     const [busy, setBusy] = useState(false);
+    const [picking, setPicking] = useState(false);
     const [dragging, setDragging] = useState(false);
 
-    const upload = async (fileList: FileList | null) => {
+    /**
+     * Files chosen from somewhere other than this machine.
+     *
+     * The same dialog Mail and Chat use. Polaris fetches what was chosen and
+     * hands it over as an ordinary file, which is what the upload below already
+     * takes - so a file already sitting in somebody's Drive is attached without
+     * their having to download it first.
+     */
+    const takePicked = async (picked: readonly PickedFile[]) => {
+        const { files, failed } = await asFiles(picked);
+        if (failed.length > 0) onError(failed[0] ?? "");
+        if (files.length > 0) await upload(files);
+    };
+
+    const upload = async (fileList: FileList | null | readonly File[]) => {
         if (!fileList || fileList.length === 0) return;
         setBusy(true);
         onError("");
@@ -97,7 +115,7 @@ export function AttachmentSection({
             <header className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">Files</h3>
                 {canEdit && (
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => input.current?.click()}>
+                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPicking(true)}>
                         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
                         Attach
                     </Button>
@@ -112,6 +130,14 @@ export function AttachmentSection({
                 aria-hidden
                 onChange={(event) => void upload(event.target.files)}
             />
+
+            {picking && (
+                <FilePickerDialog
+                    title="Attach to this task"
+                    onClose={() => setPicking(false)}
+                    onPick={(picked) => void takePicked(picked)}
+                />
+            )}
 
             {canEdit && (
                 <div
