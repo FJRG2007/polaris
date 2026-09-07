@@ -25,7 +25,9 @@ import {
     type StrayContainer
 } from "@/lib/deploy/host-containers";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
-import { createHost, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import { createHost, listHosts, renameHost, setHostEnvironment, setHostWildcardDomain } from "@/lib/host-service";
+import { getOrCreateHostTarget } from "@/lib/deploy-target-service";
+import { prepareServerEdge, readServerEdge, type ServerEdgeState } from "@/lib/deploy/server-edge";
 import { findLocalPath, useLocalPath, type LocalPath } from "@/lib/server-local-path";
 import {
     createEnrollmentSchema,
@@ -574,4 +576,53 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
     });
     revalidatePath(SERVERS_PATH);
     return {};
+}
+
+/* -------------------------------------------------------------------------- */
+/* The server's own edge                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Whether this server can serve the domains pointed at it.
+ *
+ * A read, and a slow one - it opens a connection to the machine - so it is asked
+ * by the panel that draws the answer rather than by the page, and the screen is
+ * complete before it comes back.
+ */
+export async function serverEdgeAction(hostId: string): Promise<ServerEdgeState> {
+    const user = await requirePermission("system.manage");
+    return readServerEdge(hostId, user.id);
+}
+
+/**
+ * Install, or repair, that edge.
+ *
+ * It replaces the Traefik container, which is a second or two of not serving on a
+ * server that already is - so it is a deliberate press with that said next to it,
+ * never something a page does on its own.
+ */
+export async function prepareServerEdgeAction(hostId: string): Promise<{ error?: string; log?: string }> {
+    const user = await requirePermission("system.manage");
+    const host = (await listHosts(user.id)).find((entry) => entry.id === hostId);
+    if (!host) return { error: "That server is not one of yours" };
+    try {
+        // The same target the deploy pipeline uses, so the proxy network the edge
+        // joins is the one deployed containers are already on. Two networks is an
+        // edge that cannot reach a single thing it is meant to be routing.
+        const target = await getOrCreateHostTarget(host.id, user.id, host.name);
+        let log = "";
+        await prepareServerEdge(host.id, user.id, target.proxyNetwork, (chunk) => {
+            log += chunk;
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "server.edge.prepare",
+            targetType: "host",
+            targetId: host.id
+        });
+        revalidatePath(`/apps/servers/${host.id}`);
+        return { log: log.slice(-4000) };
+    } catch (error) {
+        return { error: error instanceof Error ? error.message : "That server refused to set itself up" };
+    }
 }

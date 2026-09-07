@@ -9050,6 +9050,11 @@ model MailAccount {
 
     signature           String  @default("")
     signatureAboveQuote Boolean @default(true)
+    // When the signature is put in without being asked for: "never", "new" (a
+    // message somebody starts), or "always" (replies and forwards too). A
+    // signature nobody ever sees because it has to be inserted by hand is not a
+    // signature, which is what this was.
+    signatureAuto       String  @default("new")
 
     // Privacy, per account rather than per person: a work mailbox and a personal
     // one are not the same decision.

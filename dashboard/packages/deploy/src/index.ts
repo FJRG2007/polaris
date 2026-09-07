@@ -77,7 +77,7 @@ export { mountFailureReason } from "./mount-failure.js";
 export { deployFailureReason, isOutOfSpace, parseReclaimedBytes } from "./deploy-failure.js";
 export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
-export { onboardingScript, type OnboardingOptions } from "./onboarding.js";
+export { onboardingScript, DYNAMIC_DIR, type OnboardingOptions } from "./onboarding.js";
 export { parseHttpLogs, bucketHttpMetrics, type HttpLogEntry, type HttpMetricPoint } from "./http-logs.js";
 export { detectBuild, type DetectedBuild, type PackageManifest, type RepoSnapshot } from "./detect.js";
 export { nixpacksConfig, type NixpacksConfig } from "./nixpacks.js";

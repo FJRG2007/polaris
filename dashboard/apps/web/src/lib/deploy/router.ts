@@ -178,6 +178,19 @@ export interface RenderOptions {
     /** Whether the guard serves that page. False writes none of it, so a stale sidecar
      *  keeps today's behaviour rather than being pointed at a path it does not have. */
     readonly vacantAvailable?: boolean;
+    /**
+     * An explicit rank for every app router, or nothing to leave Traefik ranking
+     * them by the length of their rule.
+     *
+     * Set on a remote server's edge and nowhere else. There, a deployed container
+     * already declares the same hostname through its own labels - that is what
+     * routes a service the moment it starts, with nothing to push - and two
+     * routers holding the same rule at the same rank is a tie Traefik resolves by
+     * complaining in its log and picking one of them. The pushed route is the one
+     * Polaris keeps current, so it says out loud that it wins; the label route
+     * stays as what serves the site when nothing has been pushed at all.
+     */
+    readonly routePriority?: number;
 }
 
 /**
@@ -403,9 +416,11 @@ export function renderDynamicConfig(
             ...routeMiddlewares(route, name, defs, options)
         ];
         const appMwLine = appMw.length > 0 ? `\n      middlewares: [${appMw.join(", ")}]` : "";
+        const rank =
+            options.routePriority === undefined ? "" : `\n      priority: ${options.routePriority}`;
         if (route.certResolver === "none") {
             routers.push(
-                `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}${appMwLine}`
+                `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]${rank}\n      service: ${name}${appMwLine}`
             );
         } else {
             const tls =
@@ -413,7 +428,7 @@ export function renderDynamicConfig(
                     ? "\n      tls:\n        certResolver: letsencrypt"
                     : "\n      tls: {}";
             routers.push(
-                `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [websecure]\n      service: ${name}${appMwLine}${tls}`
+                `    ${name}:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [websecure]${rank}\n      service: ${name}${appMwLine}${tls}`
             );
             // The http router redirects to https; the allowlist still applies here, but
             // the guard runs only on the canonical https URL (redirect goes first).
@@ -425,7 +440,7 @@ export function renderDynamicConfig(
                 "polaris-redirect-https"
             ];
             routers.push(
-                `    ${name}-http:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]\n      service: ${name}\n      middlewares: [${httpMw.join(", ")}]`
+                `    ${name}-http:\n      rule: "Host(\`${route.hostname}\`)"\n      entryPoints: [web]${rank}\n      service: ${name}\n      middlewares: [${httpMw.join(", ")}]`
             );
         }
         // A proxied route dials the guard instead of the app; the app's own address

@@ -15,6 +15,33 @@ import { onboardingScript } from "../src/onboarding.js";
 
 const script = onboardingScript({ proxyNetwork: "polaris-net", acmeEmail: "ops@example.com" });
 
+describe("the edge it leaves running", () => {
+    it("belongs to the server, so an app keeps answering without Polaris", () => {
+        // The whole design: the domain resolves to this machine and this machine's
+        // Traefik serves it. A control plane at the end of somebody's home
+        // broadband must not be in the request path of a data-centre app.
+        expect(script).toContain("docker run -d --name polaris-traefik");
+        expect(script).toContain("-p 80:80 -p 443:443");
+    });
+
+    it("reads the labels a deployed container carries", () => {
+        // What makes a service routed and firewalled the moment it starts, with
+        // nothing for anybody to push.
+        expect(script).toContain("--providers.docker=true");
+    });
+
+    it("also reads a directory Polaris can write into", () => {
+        // For everything a label cannot express - a route that dials somewhere
+        // other than the container it describes, which is what response rewriting
+        // needs. Watched, or picking up a change would mean restarting the edge.
+        expect(script).toContain("--providers.file.directory=/dynamic");
+        expect(script).toContain("--providers.file.watch=true");
+        expect(script).toContain("-v /var/lib/polaris/traefik/dynamic:/dynamic");
+        expect(script).toContain("mkdir -p");
+        expect(script).toContain("/var/lib/polaris/traefik/dynamic");
+    });
+});
+
 describe("the build toolchain", () => {
     it("installs nixpacks, not only docker", () => {
         expect(script).toContain("nixpacks");

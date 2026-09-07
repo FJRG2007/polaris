@@ -28,6 +28,7 @@ import { useLiveResource } from "@/components/use-live-resource";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import type { ServerRow, ServerStatus, ServerStatusPayload } from "../types";
 import { Connect, LocalNote, LocalPathPanel, Reachability, RenameForm } from "../server-panels";
+import { EdgePanel } from "../edge-panel";
 import { EnvironmentDialog, type EnvironmentTarget } from "../environment-dialog";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { ArrowLeft, Boxes, FolderOpen, MapPin, SquareTerminal, Trash2 } from "lucide-react";
@@ -209,6 +210,16 @@ export function ServerDetail({
                     {/* Only where there is a machine to ask. The box Polaris runs
                         on is already as near as anything gets. */}
                     {server.kind === "local" ? null : <LocalPathPanel server={server} />}
+
+                    {/* Whether a domain pointed at this machine is served by this
+                        machine - which is the difference between an app that keeps
+                        answering while Polaris is off and one that does not. Only
+                        for a server that is not the box Polaris is running on:
+                        that one's edge is the one this page is being served
+                        through. */}
+                    {server.kind !== "local" && server.hostId ? (
+                        <EdgePanel hostId={server.hostId} />
+                    ) : null}
 
                     {/* The whole machine, including everything that is not a
                         container. It needs a login on the box, so it is offered

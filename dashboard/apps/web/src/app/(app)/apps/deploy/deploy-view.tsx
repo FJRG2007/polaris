@@ -134,6 +134,9 @@ export interface ProjectSummary {
                 /** Whether the operator supplied a certificate for this name. Never the
                  *  certificate itself - the panel only says which one is in use. */
                 hasCertificate?: boolean;
+                /** Who answers it: "server" - the machine the service runs on - or
+                 *  "polaris" - this instance, dialling that machine. */
+                servedBy?: string;
             }[];
             volumes: {
                 id: string;

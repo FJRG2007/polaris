@@ -1231,6 +1231,39 @@ export async function setDomainEnabledAction(
     }
 }
 
+/**
+ * Choose who answers this service's addresses.
+ *
+ * Set for every domain of the service at once, because it is one decision about
+ * one service: its addresses all resolve to the same place or they are a puzzle.
+ * The reverse is possible in the database and deliberately not offered here.
+ *
+ * The same capability as enabling a domain - it is the same kind of change, made
+ * from the same panel, and it decides where traffic for that name lands.
+ */
+export async function setServedByAction(
+    applicationId: string,
+    servedBy: "server" | "polaris"
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    if (servedBy !== "server" && servedBy !== "polaris") return { error: "Unknown choice" };
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "domains.manage");
+        await deployService.setApplicationServedBy(applicationId, access.ownerId, servedBy);
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.domain.servedBy",
+            targetType: "application",
+            targetId: applicationId,
+            metadata: { servedBy }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : "Could not update the domain" };
+    }
+}
+
 /** Current public URL / state of an app's Cloudflare Quick Tunnel (no account). */
 export async function quickTunnelStatusAction(applicationId: string): Promise<QuickTunnelStatus> {
     const user = await requirePermission("deploy.manage");

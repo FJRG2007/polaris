@@ -4,6 +4,19 @@
  * missing, create the shared proxy network, prepare the deploy/volume roots, and
  * start a Traefik proxy with Let's Encrypt. Pure - it only builds the script text;
  * the caller runs it and streams the output. Written to be safe to re-run.
+ *
+ * **The edge it starts belongs to the server, not to Polaris.** That is the whole
+ * design: a domain on a remote server resolves to that server and is served by
+ * that server's Traefik, so an app deployed there keeps answering when the control
+ * plane is switched off, unreachable, or at the end of somebody's home broadband.
+ * Polaris pushes configuration to it and is never in the request path.
+ *
+ * Two providers, because they answer different halves of that. The **docker**
+ * provider reads the labels a deployed container carries, which is what makes a
+ * service routed and firewalled the moment it starts, with nothing to push. The
+ * **file** provider reads a directory Polaris writes into over SSH, which is where
+ * anything a label cannot express goes - a route that has to dial somewhere other
+ * than the container it describes, which is what response rewriting needs.
  */
 
 import { quoteArg } from "./shell.js";
@@ -25,6 +38,14 @@ export interface OnboardingOptions {
     /** Polaris base URL the guard redirects to for require-login sign-in. */
     readonly publicUrl?: string;
 }
+
+/**
+ * Where this server's edge reads the routes Polaris pushes it.
+ *
+ * Exported because the thing that writes into it over SSH has to name the same
+ * directory, and two spellings of a path is how a route silently lands nowhere.
+ */
+export const DYNAMIC_DIR = "/var/lib/polaris/traefik/dynamic";
 
 const DEFAULT_DEPLOY_ROOT = "/var/lib/polaris/deploy";
 const DEFAULT_VOLUME_ROOT = "/var/lib/polaris/volumes";
@@ -96,7 +117,7 @@ export function onboardingScript(options: OnboardingOptions): string {
         "  NIXPACKS_VERSION=\"$NIXPACKS_WANT\" bash -c \"$(curl -fsSL https://nixpacks.com/install.sh)\";",
         "fi",
         "nixpacks --version",
-        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik`,
+        `mkdir -p ${deployRoot} ${volumeRoot} /var/lib/polaris/traefik ${DYNAMIC_DIR}`,
         `docker network inspect ${net} >/dev/null 2>&1 || docker network create ${net}`,
         'echo "== starting Traefik =="',
         "docker rm -f polaris-traefik >/dev/null 2>&1 || true",
@@ -106,10 +127,16 @@ export function onboardingScript(options: OnboardingOptions): string {
             "-p 80:80 -p 443:443",
             "-v /var/run/docker.sock:/var/run/docker.sock:ro",
             "-v /var/lib/polaris/traefik:/traefik",
+            `-v ${DYNAMIC_DIR}:/dynamic`,
             image,
             "--providers.docker=true",
             "--providers.docker.exposedbydefault=false",
             `--providers.docker.network=${net}`,
+            // Watched rather than read once: Polaris writes into this directory
+            // over SSH long after the container started, and a restart to pick up
+            // a routing change would be an outage per change.
+            "--providers.file.directory=/dynamic",
+            "--providers.file.watch=true",
             "--entrypoints.web.address=:80",
             "--entrypoints.websecure.address=:443",
             "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",

@@ -2944,6 +2944,8 @@ function SettingsTab({
                             whichever method fits your setup.
                         </p>
                     </div>
+                    <ServedByChoice app={app} onChanged={onChanged} />
+
                     <ul className="flex flex-col gap-1">
                         {app.domains.map((rendered) => {
                             const domain = { ...rendered, ...(health.get(rendered.id) ?? {}) };
@@ -3415,6 +3417,63 @@ function SettingsTab({
             {can("service.delete") && (
                 <DangerSection app={app} staged={staged} onChanged={onChanged} />
             )}
+        </div>
+    );
+}
+
+/**
+ * Who answers this service's addresses.
+ *
+ * Only ever asked about a service on another machine, because on the box Polaris
+ * runs on the two answers are the same edge. There it is the question that decides
+ * what happens on a bad night: an address served by the machine the service runs
+ * on keeps working while Polaris is off, being updated, or at the wrong end of a
+ * home connection that has dropped - and one served by Polaris does not.
+ *
+ * The default is the server's own edge, and the other option exists for the case
+ * that genuinely needs it: a machine that cannot hold a public address of its own,
+ * behind a router with nothing forwarded to it. The trade is stated rather than
+ * implied, because it is not obvious from the words and it is the entire content
+ * of the choice.
+ */
+function ServedByChoice({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
+    const can = useProjectCan();
+    const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+    // Set for the whole service, so whatever its first domain says is what it is.
+    const current = app.domains.find((domain) => domain.servedBy)?.servedBy ?? "server";
+
+    if (app.serverId === "local" || !can("domains.manage") || app.domains.length === 0) return null;
+
+    return (
+        <div className="flex flex-col gap-1.5">
+            <SegmentedControl
+                size="sm"
+                aria-label="Who answers these addresses"
+                value={current === "polaris" ? "polaris" : "server"}
+                options={[
+                    { value: "server", label: app.serverName || "Its own server" },
+                    { value: "polaris", label: "Through Polaris" }
+                ]}
+                onValueChange={(next) =>
+                    startTransition(async () => {
+                        setError(null);
+                        const result = await deployActions.setServedByAction(
+                            app.id,
+                            next === "polaris" ? "polaris" : "server"
+                        );
+                        if (result.error) setError(result.error);
+                        onChanged();
+                    })
+                }
+            />
+            <p className="text-xs text-muted-foreground">
+                {current === "polaris"
+                    ? `Point the DNS at Polaris. It forwards each request to ${app.serverName || "that server"}, so while Polaris is down or unreachable these addresses stop answering. Worth it for a server that cannot hold a public address of its own.`
+                    : `Point the DNS at ${app.serverName || "that server"}. It serves these addresses itself, so they keep working while Polaris is switched off, updating, or unreachable.`}
+                {pending ? " Saving..." : ""}
+            </p>
+            {error && <p className="text-xs text-danger">{error}</p>}
         </div>
     );
 }

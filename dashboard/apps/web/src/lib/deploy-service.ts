@@ -76,6 +76,7 @@ import {
     parseWatchPaths,
     releaseDomain,
     resolveDockerfilePath,
+    serviceName,
     shortHash,
     shouldDeployForPaths,
     slugify,
@@ -926,6 +927,31 @@ function dialTarget(
     );
 }
 
+/**
+ * Choose who answers a service's addresses, and re-route the edges at once.
+ *
+ * Set on every domain of the service together: they all point at one service on
+ * one machine, and a service half-served here and half-served there is a puzzle
+ * rather than a configuration.
+ *
+ * The sync afterwards is the whole of the change taking effect - one edge stops
+ * holding the hostname and the other starts - so it runs here rather than being
+ * left to the next deploy.
+ */
+export async function setApplicationServedBy(
+    applicationId: string,
+    ownerId: string,
+    servedBy: "server" | "polaris"
+): Promise<void> {
+    const app = await prisma.application.findFirst({
+        where: { id: applicationId, environment: { project: { ownerId } } },
+        select: { id: true }
+    });
+    if (!app) throw new Error("Application not found");
+    await prisma.domain.updateMany({ where: { applicationId: app.id }, data: { servedBy } });
+    await syncAppRoutes();
+}
+
 export async function syncAppRoutes(): Promise<void> {
     const domains = await prisma.domain.findMany({
         where: { enabled: true },
@@ -933,10 +959,20 @@ export async function syncAppRoutes(): Promise<void> {
             id: true,
             hostname: true,
             certResolver: true,
+            targetPort: true,
+            servedBy: true,
             applicationId: true,
             deploymentId: true,
             application: {
-                select: { target: { select: { kind: true } }, currentDeploymentId: true }
+                select: {
+                    slug: true,
+                    keepReleases: true,
+                    currentDeploymentId: true,
+                    target: { select: { kind: true, hostId: true } },
+                    environment: {
+                        select: { project: { select: { slug: true, ownerId: true } } }
+                    }
+                }
             }
         }
     });
@@ -958,11 +994,43 @@ export async function syncAppRoutes(): Promise<void> {
         ).map((deployment) => deployment.id)
     );
     const localIp = await localDialHost();
-    const localDomains = domains.filter((domain) => domain.application.target.kind === "local");
-    // Served by the remote server's own edge (per-server edge, phase 2).
-    const remotePending = domains
-        .filter((domain) => domain.application.target.kind !== "local")
-        .map((domain) => domain.hostname);
+    // Everything this machine's own edge answers for: the apps that run here, plus
+    // any remote app whose domain was deliberately pointed at Polaris instead of at
+    // its own server - which is what somebody chooses for a machine that cannot
+    // hold a public address of its own.
+    const localDomains = domains.filter(
+        (domain) => domain.application.target.kind === "local" || domain.servedBy === "polaris"
+    );
+    // Served by the server the app runs on, by that server's own edge. Polaris
+    // pushes the configuration and is not in the request path, which is the whole
+    // reason a remote app keeps answering while the control plane is off.
+    const remoteDomains = domains.filter(
+        (domain) =>
+            domain.application.target.kind !== "local" &&
+            domain.application.target.hostId &&
+            domain.servedBy !== "polaris"
+    );
+    // Where this edge dials for a remote app it was asked to front. Read once for
+    // the whole sync rather than per domain.
+    const throughPolaris = localDomains.filter((domain) => domain.application.target.hostId);
+    const serverAddress = new Map<string, string>();
+    if (throughPolaris.length > 0) {
+        const hosts = await prisma.host.findMany({
+            where: {
+                id: {
+                    in: [
+                        ...new Set(
+                            throughPolaris
+                                .map((domain) => domain.application.target.hostId)
+                                .filter((id): id is string => Boolean(id))
+                        )
+                    ]
+                }
+            },
+            select: { id: true, address: true }
+        });
+        for (const host of hosts) serverAddress.set(host.id, host.address);
+    }
     const localRoutes: AppRoute[] = [];
     if (localIp) {
         // Quick-tunnel traffic must traverse the edge too, or its requests never reach
@@ -1003,11 +1071,18 @@ export async function syncAppRoutes(): Promise<void> {
         const loginUrl = await appBaseUrl();
         for (const domain of localDomains) {
             const rule = waf.get(domain.applicationId) ?? emptyWaf;
+            // A remote app fronted by this edge is dialled on its own machine's
+            // address and the port that machine publishes it on. Skipped when the
+            // address is not known rather than dialled on this box, which would
+            // route somebody's domain at whatever happens to be listening here.
+            const remoteHostId = domain.application.target.hostId;
+            const dialHost = remoteHostId ? (serverAddress.get(remoteHostId) ?? "") : localIp;
+            if (!dialHost) continue;
             localRoutes.push({
                 id: domain.id,
                 hostname: domain.hostname,
                 certResolver: domain.certResolver,
-                dialHost: localIp,
+                dialHost,
                 dialPort: hostPortForApp(dialTarget(domain, isolated)),
                 allowLists: rule.allowLists,
                 deny: rule.deny,
@@ -1047,11 +1122,129 @@ export async function syncAppRoutes(): Promise<void> {
         }
     }
     await new LocalRouter(await deployZoneHosts()).sync(localRoutes);
-    if (remotePending.length > 0) {
-        console.warn(
-            `polaris: ${remotePending.length} remote-server domain(s) await a per-server edge and are not routed by the local edge: ${remotePending.join(", ")}`
-        );
+    // After the local edge, and never able to take it down with them: a server that
+    // is asleep, moved or refusing a connection is a server whose own edge goes on
+    // serving whatever it was already serving, and no reason for the routes on this
+    // machine to be left unwritten.
+    await pushRemoteRoutes(remoteDomains);
+}
+
+/** One row of the query above, narrowed to what a remote push reads. */
+type RoutableDomain = {
+    id: string;
+    hostname: string;
+    certResolver: string;
+    targetPort: number;
+    servedBy: string;
+    applicationId: string;
+    deploymentId: string | null;
+    application: {
+        slug: string;
+        keepReleases: boolean;
+        currentDeploymentId: string | null;
+        target: { kind: string; hostId: string | null };
+        environment: { project: { slug: string; ownerId: string } };
+    };
+};
+
+/**
+ * Give every connected server the routes for the apps it runs.
+ *
+ * The container already carries all of this as Traefik labels, so a service is
+ * routed and firewalled by its own server the moment it starts, with nothing
+ * pushed and no control plane involved. What this adds is currency: labels are
+ * written at deploy time, so until now a domain added afterwards was not served
+ * until the next build, and a firewall rule edited on a screen here did not reach
+ * that server until somebody happened to redeploy. Pushed configuration is read by
+ * the same edge within seconds and ranks above the labels, so both take effect at
+ * once - and if this never runs, the labels are still there and still enforcing.
+ *
+ * Left to the labels on purpose: a hostname pinned to one release, and a service
+ * keeping its releases side by side. Both are served by a container this cannot
+ * name without guessing, and a guessed upstream is a 502 in place of a working
+ * site.
+ */
+async function pushRemoteRoutes(domains: readonly RoutableDomain[]): Promise<void> {
+    const pushable = domains.filter(
+        (domain) => !domain.deploymentId && !domain.application.keepReleases
+    );
+    if (pushable.length === 0) return;
+
+    const byHost = new Map<string, RoutableDomain[]>();
+    for (const domain of pushable) {
+        const hostId = domain.application.target.hostId;
+        if (!hostId) continue;
+        const held = byHost.get(hostId);
+        if (held) held.push(domain);
+        else byHost.set(hostId, [domain]);
     }
+    if (byHost.size === 0) return;
+
+    const [{ RemoteRouter }, { getHostConnection }] = await Promise.all([
+        import("@/lib/deploy/router-remote"),
+        import("@/lib/host-service")
+    ]);
+    const waf = await resolveWafBatch(pushable.map((domain) => domain.applicationId));
+    const loginUrl = await appBaseUrl();
+
+    await Promise.all(
+        [...byHost.entries()].map(async ([hostId, held]) => {
+            const owner = held[0]!.application.environment.project.ownerId;
+            try {
+                const connection = await getHostConnection(hostId, owner);
+                const routes: AppRoute[] = held.map((domain) => {
+                    const rule = waf.get(domain.applicationId);
+                    return {
+                        id: domain.id,
+                        hostname: domain.hostname,
+                        certResolver: domain.certResolver,
+                        // The container itself, by name, on the proxy network both
+                        // it and that server's edge are on - which is what the
+                        // labels resolve to as well. Never a published host port:
+                        // the edge is a container, and the host is not a name it
+                        // can be relied on to have.
+                        dialHost: serviceName(
+                            domain.application.environment.project.slug,
+                            domain.application.slug,
+                            domain.applicationId
+                        ),
+                        dialPort: domain.targetPort,
+                        allowLists: rule?.allowLists ?? [],
+                        deny: rule?.deny ?? [],
+                        presets: rule?.presets ?? [],
+                        rules: rule?.rules ?? [],
+                        requireLogin: rule?.requireLogin ?? false,
+                        loginUrl,
+                        loginAllowLists: rule?.loginAllowLists ?? [],
+                        loginDeny: rule?.loginDeny ?? [],
+                        browserIntegrity: rule?.browserIntegrity ?? false,
+                        sqlInjectionProtection: rule?.sqlInjectionProtection ?? true,
+                        xssProtection: rule?.xssProtection ?? true,
+                        // Never on a pushed remote route: rewriting a response means
+                        // dialling that server's guard instead of the container, and
+                        // Polaris cannot see whether it is listening. See
+                        // `router-remote`.
+                        emailObfuscation: false
+                    } satisfies AppRoute;
+                });
+                await new RemoteRouter({
+                    address: connection.address,
+                    port: connection.port,
+                    username: connection.username,
+                    auth: connection.auth,
+                    hostKey: connection.hostKey
+                }).sync(routes);
+            } catch (error) {
+                // Said once, plainly, and never thrown: the apps on that server are
+                // still routed and still firewalled by the labels they were deployed
+                // with. What is stale is anything changed since.
+                console.warn(
+                    `polaris: could not hand ${held.length} route(s) to the edge on server ${hostId}; it keeps serving what it already had:`,
+                    error instanceof Error ? error.message : error
+                );
+            }
+        })
+    );
 }
 
 /**
