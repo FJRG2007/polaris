@@ -18,13 +18,16 @@
  * because it could not announce itself would be a worse product than one that
  * never announced anything.
  *
- * Who it is announced as follows the same rule the rest of Deploy runs by
- * (`githubTokenForOwner`): the project owner's own linked account, and the App
- * installed on this Polaris behind it. Nobody is asked for a new credential.
+ * It is announced as Polaris, not as whoever pressed deploy. Every other part of
+ * Deploy prefers the project owner's own linked account, and this is the one
+ * place that does the opposite: a deployment and a check belong to the thing that
+ * built the release, which is why Vercel's box carries Vercel's name and mark
+ * rather than the avatar of whoever pushed. The person's own credential is still
+ * there behind it, for a repository the App was never installed on.
  */
 
 import { prisma } from "@polaris/db";
-import { appBaseUrl } from "@/lib/domain-service";
+import { publicAppUrl } from "@/lib/domain-service";
 import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
@@ -44,11 +47,20 @@ interface Announceable {
     /** The service, for the one line GitHub shows beside the state. */
     label: string;
     production: boolean;
-    /** Whose linked account this was announced as, so a refusal reaches them. */
+    /** Whose linked account stands behind this, so a refusal reaches them. */
     ownerId: string;
-    /** Reassigned when the personal link is refused and the App is not: the
-     *  states that follow have to be posted with whatever actually minted it. */
+    /**
+     * What to announce with: the App installed on the repository where there is
+     * one, so the commit carries Polaris rather than a person.
+     */
     token: string;
+    /**
+     * The other credential, tried when the first is refused. Null when there was
+     * only ever one. Whichever of them mints the deployment is the one that has
+     * to move it afterwards, so `token` is reassigned rather than both being
+     * tried again at every state.
+     */
+    fallback: string | null;
 }
 
 /**
@@ -112,7 +124,17 @@ async function announceable(deploymentId: string): Promise<AnnounceTarget> {
         };
     }
 
-    const token = await githubTokenForOwner(app.environment.project.ownerId, parsed.owner).catch(() => null);
+    // Both, and the App first. A deployment written with somebody's own token is
+    // a deployment GitHub attributes to them - their face on the commit for a
+    // release they may not have pushed - and a check run is the App's to write in
+    // the first place. The personal link stays as the fallback, because a
+    // repository the App was never installed on can still be announced by
+    // somebody who can reach it.
+    const [installed, personal] = await Promise.all([
+        githubAppInstallationToken(parsed.owner).catch(() => null),
+        githubTokenForOwner(app.environment.project.ownerId, parsed.owner).catch(() => null)
+    ]);
+    const token = installed ?? personal;
     if (!token) {
         return {
             ok: false,
@@ -134,7 +156,8 @@ async function announceable(deploymentId: string): Promise<AnnounceTarget> {
             label: `${app.environment.project.name} / ${app.name}`,
             production: environmentName.toLowerCase() === "production",
             ownerId: app.environment.project.ownerId,
-            token
+            token,
+            fallback: token === installed ? personal : null
         }
     };
 }
@@ -187,10 +210,11 @@ async function reachableUrl(deploymentId: string, applicationId: string): Promis
 
 /** The service's own panel, where GitHub sends whoever asks what happened - the
  *  build log is the first thing on it. Null when this Polaris has no address that
- *  would work from outside it either, which is most of them. */
+ *  would work from outside it either, which is most of them: `publicAppUrl` is
+ *  the same test every other callback handed to an outside service is held to. */
 async function logUrl(applicationId: string): Promise<string | null> {
-    const base = (await appBaseUrl().catch(() => null))?.replace(/\/+$/, "") ?? null;
-    if (!isPublicUrl(base)) return null;
+    const base = await publicAppUrl().catch(() => null);
+    if (!base) return null;
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
         select: { environment: { select: { projectId: true } } }
@@ -258,19 +282,15 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
             });
 
         let minted = await mint(info.token);
-        // The personal link is preferred everywhere in Deploy, and for writing a
-        // deployment it is the weaker of the two: a user-to-server token carries
-        // what the person may do, and the App installed on the repository carries
-        // deployments outright. Vercel and Railway appear on a commit because they
-        // post as their App, and this is Polaris doing the same rather than
-        // reporting that somebody's own account was not enough.
-        if (!minted.id && (minted.status === 403 || minted.status === 404)) {
-            const installed = await githubAppInstallationToken(info.owner).catch(() => null);
-            if (installed && installed !== info.token) {
-                const retried = await mint(installed);
-                if (retried.id) info.token = installed;
-                minted = retried.id ? retried : minted;
-            }
+        // The App is tried first and the person second, which is the opposite of
+        // everywhere else in Deploy and is deliberate - see the note at the top of
+        // this file. Whichever of them mints it is the one the states that follow
+        // are posted with, because a deployment can only be moved by the
+        // credential that opened it.
+        if (!minted.id && info.fallback && (minted.status === 403 || minted.status === 404)) {
+            const retried = await mint(info.fallback);
+            if (retried.id) info.token = info.fallback;
+            minted = retried.id ? retried : minted;
         }
         if (!minted.id) {
             await noteOnDeploy(deploymentId, announceRefusal(minted.status, info.owner, info.repo));
@@ -328,6 +348,12 @@ async function announceCheck(
 ): Promise<void> {
     try {
         const where = await logUrl(info.applicationId);
+        // Details belongs to the thing that did the work: Vercel's goes to Vercel,
+        // and this one goes to the service's panel in Polaris, where the build log
+        // is. The released address is not it - that is what the deployment's own
+        // "View deployment" button carries - and it is only used here when this
+        // Polaris has no address anybody outside could open, where a link to the
+        // running site is better than none at all.
         const live =
             status === "completed" && conclusion === "success"
                 ? await reachableUrl(deploymentId, info.applicationId)
@@ -342,9 +368,7 @@ async function announceCheck(
             status,
             conclusion,
             summary,
-            // Where it came up, when it did; the build log otherwise. A check
-            // whose Details goes nowhere is worse than one with no link.
-            detailsUrl: live ?? where,
+            detailsUrl: where ?? live,
             token: info.token
         });
         // Only an App may write one, and only where it is installed. The
@@ -409,14 +433,10 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
         });
         if (!deployment) return;
 
-        const app = await prisma.application.findUnique({
-            where: { id: deployment.deployableId },
-            select: { environment: { select: { project: { select: { ownerId: true } } } } }
-        });
-        const token = await githubTokenForOwner(app?.environment.project.ownerId ?? null, target.owner).catch(
-            () => null
-        );
-        if (!token) return;
+        // The same resolution the mint used, App first, rather than a second one
+        // that could pick a different credential and be refused for it.
+        const info = await announceableOf(deploymentId);
+        if (!info) return;
 
         // Resolved once rather than per attempt: neither depends on the credential,
         // and the retry below would otherwise pay for both a second time.
@@ -438,13 +458,12 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
                 token: as
             });
 
-        let posted = await post(token);
+        let posted = await post(info.token);
         // The same fallback the minting used, for the same reason: whichever
         // credential was allowed to open the deployment is the one allowed to
         // move it, and a box left reading "queued" forever is worse than none.
-        if (posted.status === 403 || posted.status === 404) {
-            const installed = await githubAppInstallationToken(target.owner).catch(() => null);
-            if (installed && installed !== token) posted = await post(installed);
+        if (info.fallback && (posted.status === 403 || posted.status === 404)) {
+            posted = await post(info.fallback);
         }
         // Said once, when the deploy ends. A "queued" or "in progress" that GitHub
         // turned down is the same refusal as the verdict that follows it, and three
@@ -455,16 +474,13 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
 
         // And the row on the commit, which moves with it.
         const said = CHECK_WORDS[state];
-        const announceable = await announceableOf(deploymentId);
-        if (announceable) {
-            await announceCheck(
-                announceable,
-                said.status,
-                state === "failure" && deployment.error ? deployment.error : said.summary,
-                deploymentId,
-                said.conclusion
-            );
-        }
+        await announceCheck(
+            info,
+            said.status,
+            state === "failure" && deployment.error ? deployment.error : said.summary,
+            deploymentId,
+            said.conclusion
+        );
     } catch (error) {
         console.error("polaris: could not update this deploy on GitHub:", error);
     }

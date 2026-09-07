@@ -57,9 +57,10 @@ vi.mock("@/lib/connections/health", () => ({
     noteDeploymentsRefused: mocks.noteDeploymentsRefused
 }));
 
-// The deploy's own panel link. Absent here, which is what a Polaris nobody can
-// reach from outside answers anyway.
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => null }));
+// The deploy's own panel link. Absent unless a case sets it, which is what a
+// Polaris nobody can reach from outside answers anyway.
+const mockPublicUrl = vi.hoisted(() => ({ value: null as string | null }));
+vi.mock("@/lib/domain-service", () => ({ publicAppUrl: async () => mockPublicUrl.value }));
 
 import { createDeployment, setDeploymentState } from "@/lib/github-service";
 import { announceDeployQueued, announceRefusal } from "@/lib/deploy/github-deployment";
@@ -67,19 +68,43 @@ import { announceDeployQueued, announceRefusal } from "@/lib/deploy/github-deplo
 const SHA = "9f2c1b0a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90";
 const CALL = { owner: "acme", repo: "widgets", token: "gho_test" };
 
-/** The bodies GitHub was sent, in order, parsed. */
-let sent: Array<{ url: string; body: Record<string, unknown> }> = [];
+/** What GitHub was sent, in order: where, what, and as whom. */
+let sent: Array<{ url: string; body: Record<string, unknown>; as: string }> = [];
+
+/** Whichever credential a request carried, or "" for one that carried none. */
+function credentialOf(init: { headers?: Record<string, string> }): string {
+    return (init.headers?.Authorization ?? "").replace(/^Bearer /, "");
+}
 
 /** GitHub answering with `status` and `payload` to whatever it is asked. */
 function githubAnswers(status: number, payload: unknown): void {
-    vi.stubGlobal("fetch", async (url: string, init: { body?: string }) => {
-        sent.push({ url, body: JSON.parse(init.body ?? "{}") as Record<string, unknown> });
-        return { status, ok: status < 300, json: async () => payload } as unknown as Response;
-    });
+    vi.stubGlobal(
+        "fetch",
+        async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+            sent.push({
+                url,
+                body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                as: credentialOf(init)
+            });
+            return { status, ok: status < 300, json: async () => payload } as unknown as Response;
+        }
+    );
+}
+
+/** The first request that went to a path, whoever it was sent as. */
+function requestTo(fragment: string): (typeof sent)[number] | undefined {
+    return sent.find((request) => request.url.includes(fragment));
+}
+
+/** The one that WRITES the check row, rather than the read that looks for an
+ *  existing one - both are under /check-runs, and only one carries a body. */
+function checkWritten(): (typeof sent)[number] | undefined {
+    return sent.find((request) => request.url.includes("check-runs") && request.body.head_sha !== undefined);
 }
 
 beforeEach(() => {
     sent = [];
+    mockPublicUrl.value = null;
 });
 
 describe("minting the deployment", () => {
@@ -254,7 +279,11 @@ describe("why a deploy was not announced at all", () => {
             name: "api",
             slug: "api",
             sourceConfig: JSON.stringify(options.repoUrl ? { repoUrl: options.repoUrl } : { imageRef: "nginx" }),
-            environment: { name: "production", project: { name: "Acme", ownerId: "owner-1" } }
+            environment: {
+                name: "production",
+                projectId: "project-1",
+                project: { name: "Acme", ownerId: "owner-1" }
+            }
         });
     }
 
@@ -302,22 +331,49 @@ describe("why a deploy was not announced at all", () => {
     });
 
     /**
-     * The personal link is preferred everywhere in Deploy, and for writing a
-     * deployment it is the weaker credential: a user-to-server token carries what
-     * the person may do, while the App installed on the repository carries
-     * deployments outright. Vercel and Railway appear on a commit because they
-     * post as their App - so when somebody's own account is refused, this posts as
-     * the App rather than reporting that their account was not enough.
+     * Who a deploy is announced as.
+     *
+     * Everywhere else in Deploy the project owner's own linked account comes
+     * first; here it comes second, and that is the whole of what makes the commit
+     * read "Polaris" instead of carrying the face of whoever pushed. Vercel's box
+     * says Vercel because Vercel posts as its App, and a deployment written with
+     * somebody's user token is a deployment GitHub attributes to them.
      */
-    it("posts as the App when the person's own account is refused", async () => {
+    it("announces as the App rather than as whoever pressed deploy", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        githubAnswers(201, { id: 4212 });
+
+        await announceDeployQueued("dep-1");
+
+        expect(requestTo("/deployments")?.as).toBe("ghs_installed");
+        expect(sent.every((request) => request.as === "ghs_installed")).toBe(true);
+    });
+
+    it("uses the person's account where the App was never installed", async () => {
+        // A repository somebody can reach and the App cannot is still worth
+        // announcing: their name on it is better than an empty commit.
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue(null);
+        githubAnswers(201, { id: 4212 });
+
+        await announceDeployQueued("dep-1");
+
+        expect(requestTo("/deployments")?.as).toBe("gho_test");
+    });
+
+    it("tries the other credential when the first one is refused", async () => {
         deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
         mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
         let attempt = 0;
         vi.stubGlobal("fetch", async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
-            sent.push({ url, body: JSON.parse(init.body ?? "{}") as Record<string, unknown> });
+            sent.push({
+                url,
+                body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                as: credentialOf(init)
+            });
             attempt += 1;
-            // The first POST is the deployment, with the person's token; the App's
-            // retry is the second, and the third is the "queued" state on it.
+            // The App is asked first and refused; the person's account mints it.
             const refused = attempt === 1;
             return {
                 status: refused ? 403 : 201,
@@ -328,6 +384,8 @@ describe("why a deploy was not announced at all", () => {
 
         await announceDeployQueued("dep-1");
 
+        expect(sent[0]?.as).toBe("ghs_installed");
+        expect(sent[1]?.as).toBe("gho_test");
         expect(mocks.deploymentUpdate).toHaveBeenCalledWith(
             expect.objectContaining({
                 data: { githubRepo: "acme/widgets", githubDeploymentId: "4212" }
@@ -336,6 +394,39 @@ describe("why a deploy was not announced at all", () => {
         // Nothing to warn about and nobody to tell: it did appear on the commit.
         expect(mocks.noteOnDeploy).not.toHaveBeenCalled();
         expect(mocks.noteDeploymentsRefused).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Where Details goes.
+     *
+     * To Polaris, the way Vercel's goes to Vercel: the row on a commit is a link
+     * to the thing that did the work, and the build log is the first thing on
+     * that page. The released address is not it - that is what the deployment's
+     * own "View deployment" button carries.
+     */
+    it("points the check at Polaris rather than at GitHub", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        githubAnswers(201, { id: 4212 });
+
+        await announceDeployQueued("dep-1");
+
+        const check = checkWritten();
+        expect(String(check?.body.details_url)).toBe(
+            "https://polaris.example.com/apps/deploy/project-1?service=app-1"
+        );
+    });
+
+    it("leaves Details off rather than pointing it at a name nobody can open", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        githubAnswers(201, { id: 4212 });
+
+        await announceDeployQueued("dep-1");
+
+        expect(checkWritten()).toBeDefined();
+        expect(checkWritten()?.body.details_url).toBeUndefined();
     });
 
     // The one case the log line could never fix: the person who can grant the
