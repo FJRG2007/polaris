@@ -26,6 +26,7 @@ import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
 import * as views from "@/lib/mailbox/views";
 import * as reading from "@/lib/mailbox/reading";
+import * as attachFrom from "@/lib/mailbox/attach-from";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
 import * as accounts from "@/lib/mailbox/accounts";
@@ -517,5 +518,39 @@ export async function moreThreadsAction(input: unknown) {
         });
     } catch (caught) {
         return failure(caught, "That page could not be loaded.");
+    }
+}
+
+/**
+ * Attach a file that is already on a storage Polaris can reach.
+ *
+ * The bytes never leave the server: the alternative is somebody downloading
+ * their own file out of their own Drive so they can upload it again.
+ */
+export async function attachFromDriveAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailAttachFromDriveSchema.safeParse(input);
+    if (!parsed.success) return { error: "That file could not be attached." };
+    try {
+        const upload = await attachFrom.attachFromDrive(userId, parsed.data.connectionId, parsed.data.path);
+        return { upload };
+    } catch (caught) {
+        if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
+        return failure(caught, "That file could not be attached.");
+    }
+}
+
+/** Attach a file at an address somebody pasted. Fetched by Polaris, through the
+ *  same guard every person-supplied address goes through. */
+export async function attachFromAddressAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailAttachFromAddressSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not an address Polaris can fetch." };
+    try {
+        const upload = await attachFrom.attachFromAddress(userId, parsed.data.url);
+        return { upload };
+    } catch (caught) {
+        if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
+        return failure(caught, "That file could not be attached.");
     }
 }

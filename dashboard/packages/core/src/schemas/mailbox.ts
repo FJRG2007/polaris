@@ -448,3 +448,16 @@ export const mailPageSchema = z.object({
 });
 
 export type MailPage = z.infer<typeof mailPageSchema>;
+
+/** Attaching a file that is already on one of this reader's storages. The path
+ *  is checked again on the server by the same guard the Drive screen uses. */
+export const mailAttachFromDriveSchema = z.object({
+    connectionId: z.string().trim().min(1).max(128),
+    path: z.string().trim().max(4096)
+});
+
+/** Attaching a file at an address. Only the shape is checked here; whether it is
+ *  an address this server may reach at all is decided by the fetch guard. */
+export const mailAttachFromAddressSchema = z.object({
+    url: z.string().trim().url().max(2048)
+});

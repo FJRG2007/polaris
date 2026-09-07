@@ -31,9 +31,17 @@ import { refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
 import { RecipientField } from "./recipient-field";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
-import { saveDraftAction, sendAction, undoSendAction } from "./actions";
+import {
+    attachFromAddressAction,
+    attachFromDriveAction,
+    saveDraftAction,
+    sendAction,
+    undoSendAction
+} from "./actions";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     ChevronDown,
     Clock,
@@ -96,8 +104,8 @@ export function Composer() {
     const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
+    const [picking, setPicking] = useState(false);
     const [insert, setInsert] = useState<{ token: number; text: string } | null>(null);
-    const picker = useRef<HTMLInputElement | null>(null);
 
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
     // whenever something asks for a new one, so pressing Reply on two different
@@ -168,6 +176,40 @@ export function Composer() {
             }
         },
         [toast]
+    );
+
+    /**
+     * Files chosen anywhere but this machine.
+     *
+     * A file already on a storage Polaris can reach never travels: the server
+     * copies it. So does one at an address somebody pasted, through the same
+     * guard every outside address goes through - the browser is not asked to
+     * fetch a stranger's URL on the reader's behalf.
+     */
+    const attachPicked = useCallback(
+        async (picked: readonly PickedFile[]) => {
+            const fromComputer = picked.filter((one) => one.kind === "upload");
+            if (fromComputer.length > 0) {
+                await attach(fromComputer.map((one) => (one as { file: File }).file));
+            }
+            for (const one of picked) {
+                if (one.kind === "upload") continue;
+                const answer =
+                    one.kind === "drive"
+                        ? await attachFromDriveAction({ connectionId: one.connectionId, path: one.path })
+                        : await attachFromAddressAction({ url: one.url });
+                const said = refusalOf(answer);
+                if (said) {
+                    toast.show({ title: said });
+                    continue;
+                }
+                if ("upload" in answer && answer.upload) {
+                    const stored = answer.upload as Attached;
+                    setFiles((held) => [...held, stored]);
+                }
+            }
+        },
+        [attach, toast]
     );
 
     const remove = useCallback(async (uploadId: string) => {
@@ -440,22 +482,12 @@ export function Composer() {
                             />
                         </div>
 
-                        <input
-                            ref={picker}
-                            type="file"
-                            multiple
-                            className="hidden"
-                            onChange={(event) => {
-                                void attach([...(event.target.files ?? [])]);
-                                event.target.value = "";
-                            }}
-                        />
                         <Button
                             variant="ghost"
                             size="icon"
                             aria-label="Attach a file"
                             title="Attach a file"
-                            onClick={() => picker.current?.click()}
+                            onClick={() => setPicking(true)}
                         >
                             <Paperclip className="size-4 shrink-0" aria-hidden />
                         </Button>
@@ -484,6 +516,14 @@ export function Composer() {
                     </footer>
                 </>
             )}
+
+            {picking ? (
+                <FilePickerDialog
+                    title="Attach to this message"
+                    onClose={() => setPicking(false)}
+                    onPick={(picked) => void attachPicked(picked)}
+                />
+            ) : null}
         </div>
     );
 }
