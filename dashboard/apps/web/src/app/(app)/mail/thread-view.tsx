@@ -151,7 +151,7 @@ export function ThreadView({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <header className="flex items-start gap-2 border-b border-border px-4 py-3">
+            <header className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-3">
                 {onBack ? (
                     <Button
                         variant="ghost"

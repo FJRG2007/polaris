@@ -241,7 +241,12 @@ export function MailView({
         <div className="flex h-full min-h-0">
             <section
                 className={cn(
-                    "flex min-w-0 flex-col",
+                    // `min-h-0` is what keeps the two panes scrolling apart.
+                    // A flex item's floor is its content, so without it the
+                    // `overflow-y-auto` inside never gets shorter than the list
+                    // and the scroll escapes to whatever contains both - which
+                    // is one scrollbar moving the message and the list together.
+                    "flex min-h-0 min-w-0 flex-col",
                     // Two shapes, and which one is a decision its reader makes.
                     //
                     // `split` keeps a narrow list beside the conversation, which
@@ -258,7 +263,7 @@ export function MailView({
                 )}
                 aria-label={context.title}
             >
-                <header className="flex flex-col gap-2 border-b border-border px-3 py-2">
+                <header className="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2">
                     <div className="flex items-center gap-2">
                         <Checkbox
                             checked={allPicked}
@@ -457,7 +462,9 @@ export function MailView({
 
             <section
                 className={cn(
-                    "min-w-0 flex-1",
+                    // Same reason as the list beside it: this pane owns its own
+                    // scrollbar, and it only can while its own height is bounded.
+                    "min-h-0 min-w-0 flex-1",
                     openThread ? "flex" : layout === "split" ? "hidden lg:flex" : "hidden"
                 )}
                 aria-label="Conversation"
