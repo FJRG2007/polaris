@@ -535,6 +535,46 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, []);
 
     /**
+     * Say everything this browser is, in one breath.
+     *
+     * Each of these was announced where it was changed, which is right, and each
+     * was announced separately on the way in, which was not. Arriving said only
+     * whether the microphone was on; the rest was sent only where it happened to
+     * be true, so a browser that walked in deafened said so and one that walked
+     * in recording said so, and nothing at all said "and everything else about me
+     * is the ordinary way round".
+     *
+     * That is fine when nobody is listening yet and wrong the moment somebody is,
+     * because a state nobody has been told is a state every other browser is left
+     * to infer - and what it infers from is the publication, which was settled
+     * before any of this was true. Answering a call and being drawn muted while
+     * talking is that: the person is heard, the icon says otherwise, and the only
+     * way out was to press mute twice so that something was finally said.
+     *
+     * So it is said in full, from the values that are actually true at the
+     * moment of saying, whenever this browser arrives and whenever anybody else
+     * does. An empty value is how an attribute is taken back, which is what makes
+     * this able to say a thing is *not* so - the half that was missing.
+     */
+    const announce = useCallback(() => {
+        const participant = room.current?.localParticipant;
+        if (!participant) return;
+        void participant
+            .setAttributes({
+                // No microphone at all is quiet, and has to read as quiet. It is
+                // the state a browser that could not open one is in, and drawing
+                // it as live is the same lie in the other direction.
+                [MUTED]: mic.current?.enabled ? "0" : "1",
+                [DEAFENED]: deafenedRef.current ? "1" : "",
+                [RECORDING]: recordingRef.current ? "1" : "",
+                [AUDIO_GROUP]: groupRef.current ?? "",
+                [HAND]: handUpAt.current ? "1" : "",
+                [HAND_AT]: handUpAt.current ? String(handUpAt.current) : ""
+            })
+            .catch(() => undefined);
+    }, []);
+
+    /**
      * What this browser is putting out, in the two shapes the room draws.
      *
      * Two, not one, and that split is a bug fix. A screen used to be folded into
@@ -804,6 +844,25 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [say]);
 
     /**
+     * Make the room's idea of this microphone match the person's, and say so.
+     *
+     * Called after every publication of it, which is more often than it sounds: a
+     * different microphone was picked, the cleanup was changed, a publication
+     * that failed was repaired. Each of those hands the room a track it has never
+     * seen, and a new publication is live by definition - so somebody who muted
+     * themselves and then changed device was published unmuted, with nothing
+     * anywhere saying otherwise.
+     *
+     * Both halves, because they travel differently: the publication's own flag
+     * reaches whoever is in the room now, and the attribute reaches whoever
+     * arrives later.
+     */
+    const settleMic = useCallback(() => {
+        setVoiceEnabled(mic.current?.enabled === true);
+        announce();
+    }, [announce, setVoiceEnabled]);
+
+    /**
      * Push to talk, or voice activity, when this browser has asked for one.
      *
      * It only ever opens and closes the track - the same thing the mute button
@@ -877,10 +936,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (micRepairs.current >= MIC_REPAIR_TRIES) return;
         micRepairs.current += 1;
 
-        if (await publish(MICROPHONE, outgoingMic())) return;
+        if (await publish(MICROPHONE, outgoingMic())) {
+            settleMic();
+            return;
+        }
         // Only worth a second attempt when there was something between the
         // device and the call to leave out.
-        if (filtered.current && (await publish(MICROPHONE, device))) return;
+        if (filtered.current && (await publish(MICROPHONE, device))) {
+            settleMic();
+            return;
+        }
         if (micRepairs.current >= MIC_REPAIR_TRIES) {
             setError(
                 "This device could not put its microphone on the call, so nobody else can hear it. Leaving the call and joining again usually clears it."
@@ -1158,7 +1223,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // one wrong state nobody thinks to question. It is a few
                     // bytes per person joining, and it makes arriving order stop
                     // mattering.
-                    say({ [MUTED]: mic.current?.enabled ? "0" : "1" });
+                    //
+                    // All of it rather than the microphone alone: a hand that is
+                    // up, a browser that is recording and one that is deafened
+                    // are in exactly the same race, and losing it is quieter but
+                    // no less wrong.
+                    announce();
                 })
                 .on(RoomEvent.ParticipantDisconnected, () => {
                     resort();
@@ -1253,29 +1323,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // the one the publication was made with. Rather than reason about
             // which of those happened, the state is asserted here, in full, in
             // both directions.
-            setVoiceEnabled(mic.current ? mic.current.enabled : false);
+            settleMic();
             await publish(CAMERA, camera.current);
             if (screen.current) await publish(SCREEN, screen.current);
-            if (deafenedRef.current) {
-                await joined.localParticipant
-                    .setAttributes({ [DEAFENED]: "1" })
-                    .catch(() => undefined);
-            }
-            // The two facts a reconnection would otherwise drop. A device that
-            // came back without saying it is quiet for a room reappears as a
-            // second live microphone in that room; one that came back without
-            // saying it is recording is recording a call that thinks it is not
-            // being recorded, which is the worse of the two.
-            if (groupRef.current) {
-                await joined.localParticipant
-                    .setAttributes({ [AUDIO_GROUP]: groupRef.current })
-                    .catch(() => undefined);
-            }
-            if (recordingRef.current) {
-                await joined.localParticipant
-                    .setAttributes({ [RECORDING]: "1" })
-                    .catch(() => undefined);
-            }
+            // Everything else about this browser, including the facts a
+            // reconnection would otherwise drop. A device that came back without
+            // saying it is quiet for a room reappears as a second live microphone
+            // in that room; one that came back without saying it is recording is
+            // recording a call that thinks it is not being recorded, which is the
+            // worse of the two.
+            announce();
             publishLocalPreview();
             resort();
             resortStates();
@@ -1923,6 +1980,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         // reading from the track just stopped.
                         await startFilter();
                         await publish(MICROPHONE, outgoingMic());
+                        settleMic();
                     } else {
                         track.enabled = cameraOn;
                         camera.current = track;
@@ -1976,6 +2034,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void (async () => {
                 await startFilter();
                 await publish(MICROPHONE, outgoingMic());
+                settleMic();
                 publishLocalPreview();
             })();
         },
