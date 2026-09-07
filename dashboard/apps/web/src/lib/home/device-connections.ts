@@ -24,6 +24,7 @@
  * Pure and client-safe: the picker and the server read the same list.
  */
 
+import { TUYA_REGIONS } from "@/lib/integrations/tuya-api";
 import type { DeviceKind } from "@/lib/home/device-kinds";
 
 /** One thing a connection has to be told. */
@@ -88,6 +89,7 @@ export interface DeviceConnection {
 }
 
 const NUKI_TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
+const TUYA_CONSOLE = "https://iot.tuya.com/";
 
 /**
  * Every way in, best first within each brand.
@@ -123,6 +125,57 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         ],
         kinds: ["lock", "opener"],
         search: ["smart lock", "opener", "smart door", "web api"]
+    },
+    {
+        id: "tuya-cloud",
+        brand: "Tuya",
+        label: "Tuya cloud project",
+        reach: "anywhere",
+        summary:
+            "Everything on the Smart Life or Tuya app account, whatever brand is printed on it: switches, sockets and lights.",
+        note: "Tuya is what is inside a few thousand makes, so a plug with somebody else's name on the box is usually this. The keys come from their developer console, which is free, and the app account has to be linked to the project there - keys that work while the account is not linked are the one way this goes wrong quietly, so Polaris says so rather than showing an empty list.",
+        steps: [
+            "Open the Tuya IoT console and create a cloud project, choosing the data centre your app account is in.",
+            "On the project's Devices tab, link the Smart Life or Tuya app account your devices are on.",
+            "Copy the Access ID and Access Secret from the project overview."
+        ],
+        link: { label: "the Tuya IoT console", href: TUYA_CONSOLE },
+        fields: [
+            {
+                key: "accessId",
+                label: "Access ID",
+                placeholder: "From the project overview",
+                minLength: 8,
+                maxLength: 128
+            },
+            {
+                key: "accessSecret",
+                label: "Access Secret",
+                placeholder: "Shown next to the Access ID",
+                secret: true,
+                minLength: 8,
+                maxLength: 256
+            },
+            {
+                key: "region",
+                label: "Data centre",
+                hint: "The one the project was created in. Devices exist in that one only, so anywhere else answers as though the account were empty.",
+                defaultValue: "eu",
+                choices: TUYA_REGIONS.map((region) => ({ value: region.value, label: region.label }))
+            }
+        ],
+        kinds: ["switch", "outlet", "light"],
+        search: [
+            "smart life",
+            "switch",
+            "socket",
+            "plug",
+            "light",
+            "bulb",
+            "led",
+            "smart plug",
+            "wall switch"
+        ]
     }
 ];
 

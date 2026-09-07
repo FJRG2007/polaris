@@ -21,6 +21,7 @@ import { HomeError } from "@/lib/home/home-error";
 import * as registry from "@/lib/home/device-connections";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { NUKI_WEB, nukiWebDriver } from "@/lib/home/drivers/nuki-web";
+import { TUYA_CLOUD, tuyaCloudDriver } from "@/lib/home/drivers/tuya-cloud";
 import { DriverError, type Credentials, type DeviceDriver } from "@/lib/home/drivers/contract";
 
 /**
@@ -30,7 +31,8 @@ import { DriverError, type Credentials, type DeviceDriver } from "@/lib/home/dri
  * the app names one, which is the whole point of the shape.
  */
 const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
-    [NUKI_WEB]: nukiWebDriver
+    [NUKI_WEB]: nukiWebDriver,
+    [TUYA_CLOUD]: tuyaCloudDriver
 };
 
 export function driverFor(connection: string): DeviceDriver {

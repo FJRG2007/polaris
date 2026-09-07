@@ -1145,7 +1145,9 @@ export async function operateDeviceAction(
     action: DeviceAction
 ): Promise<{ device?: DeviceView; error?: string; }> {
     const { user, install } = await requireHome("home.control");
-    const result = await guard(() => devices.actOnDevice(install.id, String(deviceId), action));
+    const result = await guard(() =>
+        devices.actOnDevice(install.id, String(deviceId), action, user.name)
+    );
     if (result.error) {
         // Recorded refused as well as done. An attempt that was turned down is
         // the half of this log that says somebody tried.

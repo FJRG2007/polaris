@@ -185,7 +185,8 @@ export async function updateDevice(
 export async function actOnDevice(
     installedAppId: string,
     id: string,
-    action: kinds.DeviceAction
+    action: kinds.DeviceAction,
+    actor: string = ""
 ): Promise<kinds.DeviceView> {
     const device = await requireDevice(installedAppId, id);
     if (!kinds.actionsFor(device.kind).includes(action)) {
@@ -197,10 +198,9 @@ export async function actOnDevice(
     if (!device.online) throw new HomeError(`${device.name} was not answering when it was last checked`);
 
     const { view, credentials } = await accounts.accountWithCredentials(installedAppId, device.accountId);
+    const driver = accounts.driverFor(view.connection);
     try {
-        await accounts
-            .driverFor(view.connection)
-            .act(credentials, { externalId: device.externalId, kind: device.kind }, action);
+        await driver.act(credentials, { externalId: device.externalId, kind: device.kind }, action);
     } catch (caught) {
         // Written down even though it never happened. A door that refused to move
         // is exactly what somebody comes to this history for, and the account's
@@ -216,6 +216,24 @@ export async function actOnDevice(
             }
         });
         throw caught instanceof DriverError ? new HomeError(caught.message) : caught;
+    }
+
+    // Where the make keeps a log of its own, the entry comes from there on the
+    // next sync - which is better, because it says what the device did rather
+    // than what it was told. Where it does not, this is the only record there
+    // will ever be, and a history that only ever showed the presses that failed
+    // would be a history nobody could read.
+    if (!driver.history) {
+        await prisma.placeDeviceEvent.create({
+            data: {
+                deviceId: device.id,
+                action,
+                actor: actor.trim() || null,
+                via: "polaris",
+                outcome: "ok",
+                at: new Date()
+            }
+        });
     }
 
     const row = await prisma.placeDevice.update({
