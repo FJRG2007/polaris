@@ -27,16 +27,13 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 import { badgeLabel } from "@/lib/notification-badge";
-import { useChatUnread } from "@/components/chat-unread";
-import { useMailUnread } from "@/components/mail-unread";
+import { anythingWaiting, useAppUnread } from "@/components/app-unread";
 
 export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAppIds?: string[] }) {
     const pathname = usePathname();
     const allowed = new Set(appIds);
     const asGuest = new Set(guestAppIds);
-    const waiting = useChatUnread();
-    const unread = badgeLabel(waiting.messages);
-    const mail = badgeLabel(useMailUnread().messages);
+    const waiting = useAppUnread();
     const [places, setPlaces] = useState<Record<string, string>>({});
 
     // Re-read on every navigation: leaving Tasks is the moment the entry that
@@ -58,9 +55,10 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
                 // the app, so their entry leads to that subject and never to a
                 // remembered screen behind it.
                 : { ...app, href: places[app.id] ?? app.href };
-        if (app.id === "chat" && unread) return { ...entry, badge: unread };
-        if (app.id === "mail" && mail) return { ...entry, badge: mail };
-        return entry;
+        // Whatever that app has waiting, whichever app it is. Naming them
+        // here is what left Mail with a number and no dot beside it.
+        const badge = badgeLabel(waiting[app.id] ?? 0);
+        return badge ? { ...entry, badge } : entry;
     });
     const current = resolveActiveApp(pathname);
     return (
@@ -72,7 +70,11 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
             // whole dashboard, which among other things hung up on whoever was
             // on the other end of a call.
             linkAs={Link}
-            alert={Boolean(unread)}
+            // The dot on the switcher itself, which is all somebody sees
+            // while the list is closed. Derived from what is actually waiting
+            // rather than from a list of apps, so the next app to start counting
+            // raises it without anybody remembering to.
+            alert={anythingWaiting(waiting)}
         />
     );
 }

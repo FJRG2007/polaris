@@ -27,8 +27,7 @@ import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
 import { badgeLabel } from "@/lib/notification-badge";
-import { useChatUnread } from "@/components/chat-unread";
-import { useMailUnread } from "@/components/mail-unread";
+import { useAppUnread } from "@/components/app-unread";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useInstalledNav } from "@/components/use-installed-nav";
 
@@ -125,8 +124,12 @@ function appRail(appIds: readonly string[]): nav.AppSection[] {
 
 /** The Chat entry, by the one thing a rail entry is keyed on. Read off the
  *  app list rather than written again, so a move takes the badge with it. */
-const CHAT_HREF = nav.POLARIS_APPS.find((app) => app.id === "chat")?.href ?? "/chat";
-const MAIL_HREF = nav.POLARIS_APPS.find((app) => app.id === "mail")?.href ?? "/mail";
+/** Which app a rail entry belongs to, by the address it points at. Built from
+ *  the catalogue rather than written out, so an app that starts counting needs
+ *  nothing here. */
+const APP_BY_HREF: Readonly<Record<string, string>> = Object.fromEntries(
+    nav.POLARIS_APPS.map((app) => [app.href, app.id])
+);
 
 function RailLink({
     item,
@@ -139,14 +142,11 @@ function RailLink({
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
-    const waiting = useChatUnread();
-    const mail = useMailUnread();
-    // Only on the two apps somebody is waited on in, and only when there is
-    // something. A count beside every entry would be a rail of numbers; what
-    // this answers is "is anybody waiting for me", which is a question about
-    // those two and no others.
-    const unread =
-        item.href === CHAT_HREF ? waiting.messages : item.href === MAIL_HREF ? mail.messages : 0;
+    const waiting = useAppUnread();
+    // Only where there is something, and only on an entry that IS an app rather
+    // than a screen inside one. A count beside every entry would be a rail of
+    // numbers; what this answers is "is anybody waiting for me".
+    const unread = waiting[APP_BY_HREF[item.href] ?? ""] ?? 0;
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
