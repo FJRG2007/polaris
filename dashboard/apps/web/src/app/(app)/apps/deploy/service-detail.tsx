@@ -37,24 +37,25 @@ import {
     type MetricSpec
 } from "@/components/metrics-history";
 import {
-    cn,
-    Input,
     Button,
-    Dialog,
-    Select,
-    Switch,
     Checkbox,
-    Textarea,
-    EmptyState,
+    cn,
+    ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
     DialogTitle,
     DropdownMenu,
-    DialogContent,
-    DropdownMenuItem,
-    SegmentedControl,
-    ConfirmDeleteDialog,
     DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
-    DropdownMenuSeparator
+    EmptyState,
+    Input,
+    ScrollRow,
+    SegmentedControl,
+    Select,
+    Switch,
+    Textarea
 } from "@polaris/ui";
 import {
     ArrowUpRight,
@@ -203,7 +204,7 @@ export function ServiceDetail({
                     </div>
                 </div>
 
-                <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 px-5 text-sm">
+                <ScrollRow className="no-scrollbar flex items-center gap-1 border-b border-border/60 px-5 text-sm">
                     {tabs.map((name) => (
                         <button
                             key={name}
@@ -237,7 +238,7 @@ export function ServiceDetail({
                             </Link>
                         );
                     })}
-                </div>
+                </ScrollRow>
 
                 <div className="flex-1 overflow-y-auto px-5 py-3">
                     {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
@@ -961,7 +962,7 @@ function DeploymentLogsView({
                 )}
             </div>
 
-            <div className="no-scrollbar flex items-center gap-3 overflow-x-auto border-b border-border/60 text-sm">
+            <ScrollRow className="no-scrollbar flex items-center gap-3 border-b border-border/60 text-sm">
                 {CATS.map((name) => (
                     <button
                         key={name}
@@ -976,7 +977,7 @@ function DeploymentLogsView({
                         {name}
                     </button>
                 ))}
-            </div>
+            </ScrollRow>
 
             {cat === "Details" ? (
                 <DetailsPanel app={app} deployment={deployment} />

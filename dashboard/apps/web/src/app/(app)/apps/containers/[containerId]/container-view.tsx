@@ -34,9 +34,10 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
+    ScrollRow,
     Skeleton,
     TimeSeriesChart,
-    cn,
     type TimePoint
 } from "@polaris/ui";
 import type {
@@ -398,10 +399,7 @@ export function ContainerView({
             </div>
 
             <Card>
-                <div
-                    className="flex gap-1 overflow-x-auto border-b border-border px-2 py-2"
-                    role="tablist"
-                >
+                <ScrollRow className="flex gap-1 border-b border-border px-2 py-2" role="tablist">
                     {TABS.map((entry) => (
                         <button
                             key={entry.id}
@@ -418,7 +416,7 @@ export function ContainerView({
                             {entry.label}
                         </button>
                     ))}
-                </div>
+                </ScrollRow>
                 <CardBody className="min-h-[24rem]">
                     {tab === "details" ? <DetailsTab detail={detail} /> : null}
                     {tab === "logs" ? <LogsTab query={query} /> : null}

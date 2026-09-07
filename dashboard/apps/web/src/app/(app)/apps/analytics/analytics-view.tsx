@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { ANALYTICS_SCOPES, scopeNeedsTarget, type AnalyticsScope, type SiteOption } from "./site-catalog";
 import { Activity, Check, Copy, Globe, MonitorSmartphone, RefreshCw, ShieldCheck, TrendingUp } from "lucide-react";
 import { countryFlag, countryName, VISIT_RANGE_SPEC, type VisitDimension, type VisitRange, type VisitRow } from "@polaris/core";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Skeleton, Switch, TimeSeriesChart, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle, cn, Input, ScrollRow, Select, Skeleton, Switch, TimeSeriesChart } from "@polaris/ui";
 import {
     getAnalyticsOverviewAction,
     rotateTrackerKeyAction,
@@ -222,7 +222,7 @@ function SitePicker({
 function RangeTabs({ range }: { range: VisitRange }) {
     const params = useSearchParams();
     return (
-        <div className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
+        <ScrollRow className="no-scrollbar -mx-1 flex gap-1 px-1">
             {RANGES.map((value) => {
                 const next = new URLSearchParams(params.toString());
                 next.set("range", value);
@@ -244,7 +244,7 @@ function RangeTabs({ range }: { range: VisitRange }) {
                     </Link>
                 );
             })}
-        </div>
+        </ScrollRow>
     );
 }
 
@@ -363,7 +363,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
     return (
         <Card>
             <CardHeader className="pb-2">
-                <div className="no-scrollbar -mx-1 flex items-center gap-1 overflow-x-auto px-1">
+                <ScrollRow className="no-scrollbar -mx-1 flex items-center gap-1 px-1">
                     {Icon ? <Icon className="mr-1 size-4 shrink-0 text-muted-foreground" /> : null}
                     {panels.map((entry, index) => (
                         <button
@@ -381,7 +381,7 @@ function BreakdownCard({ icon: Icon, panels }: { icon?: typeof Globe; panels: Pa
                             {entry.label}
                         </button>
                     ))}
-                </div>
+                </ScrollRow>
             </CardHeader>
             <CardBody className="pt-0">
                 {rows === null ? (

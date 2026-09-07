@@ -8,7 +8,7 @@
  */
 
 import { Loading, ViewerError } from "./status";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, ScrollRow } from "@polaris/ui";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { PptxDeck, PptxParagraph, PptxRun, PptxShape } from "./pptx-parse";
@@ -233,7 +233,7 @@ export function PptxView({ src }: { src: string }) {
                 >
                     <ChevronLeft className="size-4" />
                 </Button>
-                <div className="flex max-w-full items-center gap-1 overflow-x-auto px-1">
+                <ScrollRow className="flex max-w-full items-center gap-1 px-1">
                     {deck.slides.map((_, slideIndex) => (
                         <button
                             key={slideIndex}
@@ -250,7 +250,7 @@ export function PptxView({ src }: { src: string }) {
                             {slideIndex + 1}
                         </button>
                     ))}
-                </div>
+                </ScrollRow>
                 <Button
                     size="sm"
                     variant="ghost"

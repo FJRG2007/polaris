@@ -23,7 +23,7 @@ import type { StagedChangeView } from "@/lib/deploy-staged-changes";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { StagedChangesBanner, StagedChangesProvider } from "./staged-changes";
 import { NEW_ENVIRONMENT, NewEnvironmentDialog, newEnvironmentOption } from "./new-environment-dialog";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, cn } from "@polaris/ui";
+import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle, Input, ScrollRow, Select } from "@polaris/ui";
 
 /** Picking this opens the create dialog instead of switching to it. */
 const NEW_PROJECT = "__new_project__";
@@ -183,7 +183,7 @@ function ProjectNav({
 
     return (
         <nav className="lg:w-52 lg:shrink-0">
-            <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
+            <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
                 {SECTIONS.map((section) => {
                     const active = isActive(section.path);
                     const Icon = section.icon;
@@ -204,7 +204,7 @@ function ProjectNav({
                         </li>
                     );
                 })}
-            </ul>
+            </ScrollRow>
         </nav>
     );
 }

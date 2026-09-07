@@ -7,7 +7,7 @@
  */
 
 import { useState } from "react";
-import { cn } from "@polaris/ui";
+import { cn, ScrollRow } from "@polaris/ui";
 import { ProjectWebhooks } from "@/components/project-webhooks";
 
 export function WatchWebhooks({ projects }: { projects: { id: string; name: string; count: number }[] }) {
@@ -19,7 +19,7 @@ export function WatchWebhooks({ projects }: { projects: { id: string; name: stri
     return (
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
             <nav className="md:w-52 md:shrink-0">
-                <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+                <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
                     {projects.map((project) => (
                         <li key={project.id} className="shrink-0 md:shrink">
                             <button
@@ -42,7 +42,7 @@ export function WatchWebhooks({ projects }: { projects: { id: string; name: stri
                             </button>
                         </li>
                     ))}
-                </ul>
+                </ScrollRow>
             </nav>
 
             <div className="min-w-0 flex-1">

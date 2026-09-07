@@ -35,11 +35,12 @@ import {
     Trash2
 } from "lucide-react";
 import {
-    cn,
     Button,
+    cn,
     ConfirmDeleteDialog,
     EmptyState,
     Input,
+    ScrollRow,
     SegmentedControl,
     Skeleton
 } from "@polaris/ui";
@@ -295,7 +296,7 @@ export function TelemetryView({
 function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => void }) {
     return (
         <nav className="lg:w-48 lg:shrink-0">
-            <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
+            <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
                 {SECTIONS.map((section) => {
                     const active = section.key === open;
                     const Icon = section.icon;
@@ -319,7 +320,7 @@ function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => v
                         </li>
                     );
                 })}
-            </ul>
+            </ScrollRow>
         </nav>
     );
 }

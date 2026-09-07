@@ -9,7 +9,7 @@
  */
 
 import Link from "next/link";
-import { cn, PageHeader } from "@polaris/ui";
+import { cn, PageHeader, ScrollRow } from "@polaris/ui";
 import { SETTINGS_SECTIONS } from "./settings/sections";
 import { UsageSection } from "./settings/usage-section";
 import { TokensSection } from "./settings/tokens-section";
@@ -45,7 +45,7 @@ export function ProjectSettings({
 
             <div className="flex flex-col gap-5 md:flex-row md:gap-6">
                 <nav className="md:w-48 md:shrink-0">
-                    <ul className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+                    <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
                         {SETTINGS_SECTIONS.map((entry) => {
                             const href = entry.slug === "general" ? base : `${base}/${entry.slug}`;
                             const active = entry.slug === current.slug;
@@ -70,7 +70,7 @@ export function ProjectSettings({
                                 </li>
                             );
                         })}
-                    </ul>
+                    </ScrollRow>
                 </nav>
 
                 <div className="min-w-0 flex-1">

@@ -24,7 +24,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { updateServerSettingsAction } from "./minecraft-actions";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, Input, Select, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
 import {
     ArrowUpCircle,
     Download,
@@ -298,7 +298,7 @@ export function MinecraftMods({
                     {/* Shelves rather than a blank search box. Somebody who knows
                         what they want types it; everybody else is here to find out
                         what there is. */}
-                    <div className="no-scrollbar flex items-center gap-1 overflow-x-auto">
+                    <ScrollRow className="no-scrollbar flex items-center gap-1">
                         {categories.map((entry) => (
                             <button
                                 key={entry.value || "all"}
@@ -314,7 +314,7 @@ export function MinecraftMods({
                                 {entry.label}
                             </button>
                         ))}
-                    </div>
+                    </ScrollRow>
 
                     <p className="text-xs text-muted-foreground">
                         {version

@@ -320,6 +320,46 @@ thead th {
     display: none;
 }
 
+/* The ends of a strip that scrolls sideways, faded while there is more past
+   them. Drawn as a mask on the strip itself rather than as an overlay, because
+   these replace elements that already had a border, a negative margin or a flex
+   rule on them, and a wrapper would have changed every one of those layouts.
+   The attributes are set by ScrollRow; a strip that fits gets neither, and is
+   left exactly as it was. */
+[data-scroll-row][data-more-start="true"][data-more-end="false"] {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 1.5rem);
+    mask-image: linear-gradient(to right, transparent 0, #000 1.5rem);
+}
+
+[data-scroll-row][data-more-start="false"][data-more-end="true"] {
+    -webkit-mask-image: linear-gradient(to left, transparent 0, #000 1.5rem);
+    mask-image: linear-gradient(to left, transparent 0, #000 1.5rem);
+}
+
+[data-scroll-row][data-more-start="true"][data-more-end="true"] {
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 1.5rem,
+        #000 calc(100% - 1.5rem),
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 1.5rem,
+        #000 calc(100% - 1.5rem),
+        transparent 100%
+    );
+}
+
+/* A sideways strip never takes the browser's back gesture with it: the wheel is
+   turned into horizontal movement here, and a trackpad swipe that runs off the
+   end of a tab bar must not navigate away from the page. */
+[data-scroll-row] {
+    overscroll-behavior-x: contain;
+}
+
 /* One focus ring for the whole application, on the token that names it, drawn
    outside the element so it never changes the layout of the row it is in.
    Keyboard only: a mouse press already tells the user what it hit. */

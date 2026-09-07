@@ -45,7 +45,7 @@ import type { PlayerSeen } from "@/lib/apps/games-activity";
 import type { PlayerSessionEvent } from "@/lib/apps/minecraft/sessions";
 import type { GameReachAdvice } from "@/lib/apps/minecraft/reach-advice";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, cn, ScrollRow, Skeleton } from "@polaris/ui";
 import type { PlayerAccessView } from "@/lib/apps/minecraft/player-access";
 import { findBlueprint, hasCrossplay } from "@/lib/apps/minecraft/blueprints";
 import { resetServerConfigAction, saveWorldAction } from "./minecraft-actions";
@@ -328,7 +328,7 @@ export function MinecraftPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 text-sm">
+            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
                 {tabs.map((entry) => (
                     // A real href, so a screen can be middle-clicked, opened in a
                     // new tab and copied; the plain click is taken over to keep the
@@ -352,7 +352,7 @@ export function MinecraftPanel({
                         {entry.label}
                     </a>
                 ))}
-            </nav>
+            </ScrollRow>
 
             {tab === "" && (
                 <OverviewTab

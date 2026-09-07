@@ -72,6 +72,7 @@ import {
     Button,
     Card,
     CardBody,
+    cn,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -79,9 +80,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
+    ScrollRow,
     Skeleton,
-    Switch,
-    cn
+    Switch
 } from "@polaris/ui";
 import {
     Ban,
@@ -335,7 +336,7 @@ export function ArkPanel({
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <nav className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-border/60 text-sm">
+            <ScrollRow as="nav" className="no-scrollbar flex items-center gap-1 border-b border-border/60 text-sm">
                 {tabs.map((entry) => (
                     <a
                         key={entry.slug}
@@ -356,7 +357,7 @@ export function ArkPanel({
                         {entry.label}
                     </a>
                 ))}
-            </nav>
+            </ScrollRow>
 
             {tab === "" && <OverviewTab status={status} settings={settings} />}
             {tab === "console" && (

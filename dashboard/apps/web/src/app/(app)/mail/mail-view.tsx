@@ -57,6 +57,7 @@ import {
 import {
     Button,
     Checkbox,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -69,7 +70,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     EmptyState,
-    cn,
+    ScrollRow,
     useToast
 } from "@polaris/ui";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
@@ -1101,7 +1102,7 @@ function CategoryTabs({ current }: { current: string }) {
     }
 
     return (
-        <div className="-mb-2 flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="Sort the inbox">
+        <ScrollRow className="-mb-2 flex items-center gap-1" role="tablist" aria-label="Sort the inbox">
             <TabButton label="All" active={!current} onClick={() => go("")} />
             {core.MAIL_CATEGORIES.map((one) => (
                 <TabButton
@@ -1112,7 +1113,7 @@ function CategoryTabs({ current }: { current: string }) {
                     onClick={() => go(one)}
                 />
             ))}
-        </div>
+        </ScrollRow>
     );
 }
 

@@ -29,12 +29,13 @@ import { tabSubtitle, tabTitle } from "./workbench-tabs";
 import { Activity, Plus, SquareTerminal, Table2, X } from "lucide-react";
 import {
     Button,
+    cn,
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
     ContextMenuSeparator,
     ContextMenuTrigger,
-    cn
+    ScrollRow
 } from "@polaris/ui";
 
 export function TabStrip({
@@ -62,7 +63,7 @@ export function TabStrip({
 }) {
     return (
         <div className="flex items-end gap-1 border-b border-border">
-            <div className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto pb-px">
+            <ScrollRow className="flex min-w-0 flex-1 items-end gap-0.5 pb-px">
                 {tabs.map((tab) => {
                     const active = tab.id === activeId;
                     const title = tabTitle(tab, shape);
@@ -126,7 +127,7 @@ export function TabStrip({
                         </ContextMenu>
                     );
                 })}
-            </div>
+            </ScrollRow>
 
             {/* Kept out of the scrolling half: these two are how anything gets
                 opened that is not a table, and a control that scrolls out of
