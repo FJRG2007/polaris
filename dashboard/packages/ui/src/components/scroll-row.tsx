@@ -99,17 +99,21 @@ export function ScrollRow({
         // inside screens that re-render on every keystroke, and re-attaching a
         // listener and an observer each time would be the strip's cost paid over
         // and over for nothing.
-        const resize = new ResizeObserver(measure);
-        resize.observe(node);
-        const changes = new MutationObserver(measure);
-        changes.observe(node, { childList: true, subtree: true, characterData: true });
+        //
+        // Asked for rather than assumed: a test renderer has neither observer,
+        // and a strip that threw while mounting would take the whole screen down
+        // for want of a fade.
+        const resize = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+        resize?.observe(node);
+        const changes = typeof MutationObserver === "function" ? new MutationObserver(measure) : null;
+        changes?.observe(node, { childList: true, subtree: true, characterData: true });
         measure();
 
         return () => {
             node.removeEventListener("wheel", onWheel);
             node.removeEventListener("scroll", measure);
-            resize.disconnect();
-            changes.disconnect();
+            resize?.disconnect();
+            changes?.disconnect();
         };
     }, [measure]);
 
