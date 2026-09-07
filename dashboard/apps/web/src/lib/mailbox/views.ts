@@ -226,7 +226,12 @@ export async function listThreads(
         id: thread.id,
         accountId: thread.accountId,
         subject: thread.subject,
-        snippet: thread.snippet,
+        // Tidied on the way out, not only on the way in. A mailbox synced before
+        // the preview function existed holds rows that read `Mar=C3=ADa` and
+        // carry a stylesheet in them, and nobody is going to be told to resync a
+        // mailbox to stop looking at that. Running it again over a line that is
+        // already clean changes nothing.
+        snippet: core.snippetFrom(thread.snippet),
         participants: addressesFrom(thread.participants),
         messageCount: thread.messageCount,
         unreadCount: thread.unreadCount,
@@ -328,7 +333,7 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         to: addressesFrom(message.toJson),
         cc: addressesFrom(message.ccJson),
         replyTo: addressesFrom(message.replyToJson),
-        snippet: message.snippet,
+        snippet: core.snippetFrom(message.snippet),
         sentAt: message.sentAt.toISOString(),
         seen: message.seen,
         flagged: message.flagged,

@@ -353,7 +353,12 @@ async function storeMessages(
                 seen: message.flags.has("\\Seen"),
                 flagged: message.flags.has("\\Flagged"),
                 answered: message.flags.has("\\Answered"),
-                deleted: message.flags.has("\\Deleted")
+                deleted: message.flags.has("\\Deleted"),
+                // Rewritten, not left as it was found. A row stored before the
+                // decoder existed holds an escape sequence everywhere somebody
+                // put an accent, and a resync is the one moment the good line
+                // can replace it for good.
+                snippet
             },
             create: {
                 accountId: account.id,
@@ -453,7 +458,10 @@ async function fetchSnippets(
                     encoding: coding?.encoding,
                     charset: coding?.charset
                 });
-                out.set(message.uid, html ? stripTags(text) : text);
+                // Handed over as it arrived, markup and all: the preview
+                // function undoes the encoding, the tags and the padding in one
+                // place, so the list and a repaired old row read alike.
+                out.set(message.uid, text);
             }
         } catch {
             // A snippet is a nicety. A server that will not answer for one part
@@ -461,18 +469,6 @@ async function fetchSnippets(
         }
     }
     return out;
-}
-
-/** Enough tag stripping for a preview line. Never used to render anything: what
- *  is shown as HTML goes through the sanitizer. */
-function stripTags(html: string): string {
-    return html
-        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">");
 }
 
 /* -------------------------------------------------------------------------- */
