@@ -230,13 +230,36 @@ function undoTransferEncoding(text: string): string {
  * line of it is what the list showed for every message from one bank. Undone
  * only when the whole thing is one run of base64 and what comes out reads as
  * text, because those two together are not something prose does by accident.
+ *
+ * A preview is a slice of a part rather than the whole of one - a few thousand
+ * bytes off the front, which is all a line under a subject can ever need - and a
+ * slice of base64 almost never ends on a group boundary. Requiring one meant the
+ * commonest case of all was refused: every message from the senders who encode
+ * their text part kept its `ICAgICAgICAg` in the list, which is what a bank's
+ * payment reminder looked like. The tail that does not make a whole group is
+ * dropped, which costs at most two characters of the preview, and `readsAsText`
+ * is still what decides whether the guess was right at all.
  */
 function undoBase64(text: string): string {
-    const packed = text.replace(/\s+/g, "");
-    if (packed.length < 40 || packed.length % 4 !== 0) return text;
+    // Whitespace in a base64 part is the line wrapping and nothing else, so
+    // every run between two breaks is a long one. Prose is the opposite - it is
+    // mostly short words - and that is the difference this leans on, because
+    // removing the whitespace first makes a sentence look exactly like one long
+    // run of base64 characters. Only the last chunk may be short: a preview is a
+    // slice, and the slice ends where it ends.
+    const chunks = text.trim().split(/\s+/);
+    const wrapped = chunks.every(
+        (chunk, index) => chunk.length >= (index === chunks.length - 1 ? 4 : 16)
+    );
+    if (!wrapped) return text;
+
+    const packed = chunks.join("");
+    if (packed.length < 40) return text;
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(packed)) return text;
+    const whole = packed.slice(0, packed.length - (packed.length % 4));
+    if (whole.length < 40) return text;
     try {
-        const bytes = Uint8Array.from(atob(packed), (char) => char.charCodeAt(0));
+        const bytes = Uint8Array.from(atob(whole), (char) => char.charCodeAt(0));
         const out = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
         return readsAsText(out) ? out : text;
     } catch {

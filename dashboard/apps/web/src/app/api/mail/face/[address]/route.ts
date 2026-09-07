@@ -24,6 +24,7 @@
 import { prisma } from "@polaris/db";
 import { apiPermission } from "@/lib/api-session";
 import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { markDomains } from "@/lib/mailbox/sender-domain";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,19 +89,31 @@ export async function GET(
     return found ? picture(found.bytes, found.type) : gone();
 }
 
-/** The site's own mark, at the two addresses every site puts one. Nothing
- *  clever: a site that hides its mark behind a parsed page is a site whose
- *  senders get initials, which is a fine outcome. */
+/**
+ * The site's own mark, at the two addresses every site puts one.
+ *
+ * Asked of the sending host first and then of the domain it belongs to, because
+ * almost nobody sends from the site their logo is on: Apple's receipts come from
+ * `email.apple.com`, which serves nothing at all, and asking only that is why a
+ * mailbox full of household names showed initials. Which domain a host belongs
+ * to is `markDomains`, along with the reason it never walks further than one
+ * step.
+ *
+ * Nothing clever beyond that: a site that hides its mark behind a parsed page is
+ * a site whose senders get initials, which is a fine outcome.
+ */
 async function fetchMark(domain: string): Promise<{ bytes: Uint8Array; type: string } | null> {
-    for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
-        const target = safeUrl(`https://${domain}${path}`);
-        if (!target) continue;
-        const response = await follow(target, "image/*").catch(() => null);
-        if (!response || response.status !== 200) continue;
-        const type = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-        if (!IMAGE_TYPES.test(type)) continue;
-        const bytes = await readCapped(response, MAX_BYTES);
-        if (bytes && bytes.length > 0) return { bytes, type };
+    for (const host of markDomains(domain)) {
+        for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
+            const target = safeUrl(`https://${host}${path}`);
+            if (!target) continue;
+            const response = await follow(target, "image/*").catch(() => null);
+            if (!response || response.status !== 200) continue;
+            const type = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
+            if (!IMAGE_TYPES.test(type)) continue;
+            const bytes = await readCapped(response, MAX_BYTES);
+            if (bytes && bytes.length > 0) return { bytes, type };
+        }
     }
     return null;
 }

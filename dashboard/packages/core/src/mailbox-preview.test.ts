@@ -25,6 +25,35 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom(encoded)).toBe("JAVIER, recuerda las fechas de los proximos pagos.");
     });
 
+    it("reads a run of base64 the preview cut mid-group", () => {
+        // A preview is a slice of a part - a few thousand bytes off the front -
+        // and a slice of base64 almost never ends where a group does. Requiring
+        // one meant every sender who encodes their text part kept its
+        // `ICAgICAg` in the list, which is what a bank's payment reminders
+        // looked like.
+        const whole = Buffer.from(
+            "Recuerda las fechas de los proximos pagos de tu compra. Consulta el calendario en tu cuenta.",
+            "utf8"
+        ).toString("base64");
+        const cut = whole.slice(0, whole.length - 3);
+        expect(snippetFrom(cut)).toContain("Recuerda las fechas de los proximos pagos");
+    });
+
+    it("says nothing for a part that was only ever indentation", () => {
+        // The other half of the same message: a plain part carrying spaces and
+        // nothing else. Blank is the honest answer, and the list falls back to
+        // the message's other half for something to show.
+        const spaces = Buffer.from(" ".repeat(120), "utf8").toString("base64");
+        expect(snippetFrom(spaces)).toBe("");
+    });
+
+    it("leaves a word alone that happens to look like base64", () => {
+        // The guard that stops this being a decoder pointed at prose.
+        expect(snippetFrom("Confirmacion de tu pedido en la tienda de electronica")).toBe(
+            "Confirmacion de tu pedido en la tienda de electronica"
+        );
+    });
+
     it("undoes escapes that stand for a space or an equals sign", () => {
         // The two commonest escapes there are, and both stand for a perfectly
         // printable byte - so a decoder looking only for accents left these.

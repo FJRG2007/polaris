@@ -17,7 +17,8 @@
  * told to make one rather than silently doing nothing.
  */
 
-import { withImap } from "./imap";
+import { after } from "next/server";
+import { withImap, type MailConnectionSource } from "./imap";
 import { prisma } from "@polaris/db";
 import { addressesFrom } from "./json";
 import { publishMail } from "./live";
@@ -211,19 +212,62 @@ export async function actOnMessages(
                 if (target) landed.add(target);
             }
 
-            // On the same connection, before it is handed back. A message that
-            // has been archived has to be in Archive by the time the screen
-            // redraws, not at the next scheduled pass: the row is deleted the
-            // moment it moves, so until its new home is read the message is
-            // nowhere, and that reads as having lost it rather than as a wait.
-            for (const folderId of landed) {
-                await catchUpFolder(client, account.id, folderId).catch(() => undefined);
-            }
         });
         publishMail({ accountId, kind: "messages", actorId: userId });
+        // Where they landed, read after the answer rather than before it.
+        //
+        // A message that has been archived has to be in Archive by the time
+        // anybody looks there, and that means reading the destination - which is
+        // a second mailbox, a second lock and a second pass over its uids. Doing
+        // it before answering held the whole click: a server action is what the
+        // router waits on, so for as long as this ran the screen ignored the next
+        // conversation somebody clicked. That is the "it goes dead for a moment
+        // after deleting" this exists to end.
+        //
+        // It is not skipped, only moved: the stream frame that follows is what
+        // redraws the screen once the new home is readable, and until then the
+        // list somebody is looking at is already right.
+        settle(account, [...landed], userId);
     }
     await refreshThreadsFor(messages.map((message) => message.accountId));
     return done;
+}
+
+/**
+ * Read the folders an action moved messages into, once the answer has gone.
+ *
+ * `after` is what makes this genuinely off the critical path: the work runs when
+ * the response has been flushed, so nothing anybody clicks is queued behind it.
+ * Outside a request - a rule firing on a sync, a sweep - there is no response to
+ * be after, so it is simply awaited there instead, which is what that path always
+ * did.
+ *
+ * A connection of its own, because the one the move was made on has been handed
+ * back by the time this runs. That is a second login to somebody's mail server,
+ * and it buys a mailbox that answers a click while it happens.
+ */
+function settle(
+    account: MailConnectionSource & { id: string },
+    folderIds: readonly string[],
+    userId: string
+): void {
+    if (folderIds.length === 0) return;
+    const read = async (): Promise<void> => {
+        await withImap(account, async (client) => {
+            for (const folderId of folderIds) {
+                await catchUpFolder(client, account.id, folderId).catch(() => undefined);
+            }
+        }).catch(() => undefined);
+        await refreshThreadsFor([account.id]).catch(() => undefined);
+        publishMail({ accountId: account.id, kind: "messages", actorId: userId });
+    };
+    try {
+        after(read);
+    } catch {
+        // No request to be after: whatever called this is a background pass, and
+        // there is nothing waiting on it to be kind to.
+        void read();
+    }
 }
 
 /** What one folder's worth of an action did: how many messages it touched, and

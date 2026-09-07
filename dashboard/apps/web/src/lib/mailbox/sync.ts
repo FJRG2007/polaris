@@ -484,16 +484,44 @@ async function fetchSnippets(
     client: ImapFlow,
     fetched: readonly Fetched[]
 ): Promise<Map<number, string>> {
+    const out = new Map<number, string>();
+    await readParts(client, fetched, out, "text");
+    // A plain part with nothing in it is not a message with nothing in it.
+    //
+    // Plenty of senders put their words in the HTML half and leave the plain one
+    // as indentation - a run of spaces, base64-encoded, which is exactly what one
+    // bank's payment reminders carry. Reading only the plain part left those rows
+    // blank while every other client showed a line, because every other client
+    // falls back the same way.
+    const silent = fetched.filter(
+        (message) => !core.snippetFrom(out.get(message.uid) ?? "") && message.structure.htmlPart
+    );
+    if (silent.length > 0) await readParts(client, silent, out, "html");
+    return out;
+}
+
+/**
+ * One pass over whichever half of a message is being read.
+ *
+ * Grouped by part key rather than asked for one message at a time: a mailbox
+ * fetches in pages of dozens, and they nearly all keep their text in the same
+ * place, so this is two or three commands instead of fifty.
+ */
+async function readParts(
+    client: ImapFlow,
+    fetched: readonly Fetched[],
+    out: Map<number, string>,
+    half: "text" | "html"
+): Promise<void> {
     const byPart = new Map<string, number[]>();
     for (const message of fetched) {
-        const key = message.structure.textPart || message.structure.htmlPart;
+        const key = half === "text" ? message.structure.textPart || message.structure.htmlPart : message.structure.htmlPart;
         if (!key) continue;
         const held = byPart.get(key);
         if (held) held.push(message.uid);
         else byPart.set(key, [message.uid]);
     }
 
-    const out = new Map<number, string>();
     for (const [key, uids] of byPart) {
         try {
             for await (const message of client.fetch(
@@ -524,7 +552,6 @@ async function fetchSnippets(
             // must not cost the page it belongs to.
         }
     }
-    return out;
 }
 
 /* -------------------------------------------------------------------------- */
