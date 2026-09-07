@@ -74,7 +74,12 @@ export const vercelDriver: ProviderDriver = {
                     // Named by scope where there is more than one, so two projects
                     // called "web" are tellable apart before either is chosen.
                     name: scopes.length > 1 ? `${scope.name} / ${project.name}` : project.name,
-                    children: scope.id ? [{ id: scope.id, name: scope.name }] : []
+                    // A Vercel project is a whole service on its own. The team is
+                    // not a second choice, it is the scope the project already
+                    // lives in, so it travels in the reference rather than being
+                    // asked about.
+                    externalId: project.id,
+                    ref: scope.id ? { team: scope.id } : {}
                 });
             }
         }

@@ -14,6 +14,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
+import { awsIdentity } from "@/lib/integrations/aws-api";
 import { vercelUser } from "@/lib/integrations/vercel-api";
 import { railwayAccount } from "@/lib/integrations/railway-api";
 import { ConnectionClaimedError, ConnectionLimitError, deleteConnection, saveConnection } from "@/lib/connections/store";
@@ -99,6 +100,65 @@ export async function connectTokenAction(
         });
         revalidatePath(CONNECTIONS_PATH);
         return { login: account.label };
+    } catch (caught) {
+        if (caught instanceof ConnectionClaimedError || caught instanceof ConnectionLimitError) {
+            return { error: caught.message };
+        }
+        return { error: caught instanceof Error ? caught.message : "Could not connect the account" };
+    }
+}
+
+/** An AWS key pair and the region it was linked for. The region is asked for
+ *  because a key is not regional and everything it reaches is. */
+const awsSchema = z.object({
+    accessKeyId: z.string().trim().min(16, "That does not look like an access key").max(128),
+    secretAccessKey: z.string().trim().min(16, "That does not look like a secret key").max(256),
+    region: z
+        .string()
+        .trim()
+        .min(1, "Name the region your services are in")
+        .max(32)
+        .regex(/^[a-z0-9-]+$/, "A region looks like eu-west-1")
+});
+
+/**
+ * Link an AWS account with an access key.
+ *
+ * Its own action rather than the token form, because AWS issues no token: a
+ * request is signed with the secret, so what is stored is the key pair itself and
+ * the region it was given for.
+ *
+ * Proved before it is stored, the same way every other link is. `GetCallerIdentity`
+ * is the right check because AWS grants it to everybody - it needs no policy at
+ * all - so it answers "is this key live" without depending on what the key is
+ * allowed to do, which is a separate question the board asks later and answers in
+ * that provider's own words.
+ */
+export async function connectAwsAction(input: unknown): Promise<{ error?: string; login?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return { error: blocked };
+
+    const parsed = awsSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+
+    try {
+        const identity = await awsIdentity(parsed.data);
+        await saveConnection(user.id, {
+            provider: "aws",
+            // Their account number, which is what an AWS account is called and what
+            // makes two links to the same one recognisably the same.
+            accountId: identity.account,
+            label: `${identity.arn.split("/").at(-1) || identity.account} (${parsed.data.region})`,
+            method: "token",
+            credential: {
+                accessKeyId: parsed.data.accessKeyId,
+                secretAccessKey: parsed.data.secretAccessKey,
+                region: parsed.data.region
+            }
+        });
+        revalidatePath(CONNECTIONS_PATH);
+        return { login: identity.account };
     } catch (caught) {
         if (caught instanceof ConnectionClaimedError || caught instanceof ConnectionLimitError) {
             return { error: caught.message };

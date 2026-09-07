@@ -139,8 +139,13 @@ describe("a service on Railway", () => {
 
         const choices = await railwayDriver.choices("token");
         expect(choices[0]?.children?.[0]?.id).toBe("s1");
-        // Production where there is one, whatever order they came in.
-        expect(choices[0]?.children?.[0]?.children?.[0]?.id).toBe("e-prod");
+        // The service is what can be pointed at, and it says so itself now: what
+        // gets stored is the project id and the pair Railway addresses a
+        // deployment by. Production where there is one, whatever order they came
+        // in.
+        expect(choices[0]?.externalId).toBeUndefined();
+        expect(choices[0]?.children?.[0]?.externalId).toBe("p1");
+        expect(choices[0]?.children?.[0]?.ref).toEqual({ service: "s1", environment: "e-prod" });
     });
 
     it("reads their words for a build that failed", async () => {

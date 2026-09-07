@@ -92,12 +92,14 @@ export const railwayDriver: ProviderDriver = {
             found.push({
                 id: project.id,
                 name: full.name || project.name,
+                // The project is a heading here and not a thing to point at: a
+                // Railway deployment is addressed by a service and an environment,
+                // so only the level that has both can be chosen.
                 children: full.services.map((service) => ({
                     id: service.id,
                     name: service.name,
-                    // The environment travels with the service, because it is the
-                    // other half of what a deployment is addressed by.
-                    children: [{ id: environment.id, name: environment.name }]
+                    externalId: project.id,
+                    ref: { service: service.id, environment: environment.id }
                 }))
             });
         }

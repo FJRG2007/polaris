@@ -68,6 +68,19 @@ export interface ConnectionCredential {
     readonly expiresAt?: number;
     /** A personal access token, for the "token" method. */
     readonly token?: string;
+    /**
+     * An AWS key pair and the region it was linked for.
+     *
+     * AWS is the one service here that does not issue a token: every call is
+     * signed with the secret, so the secret itself is what has to be kept. The
+     * region is part of the credential rather than of the thing being reached,
+     * because a key is not regional and everything it reaches is - the same key
+     * lists nothing at all in the wrong region, with no error to say why.
+     */
+    readonly accessKeyId?: string;
+    readonly secretAccessKey?: string;
+    readonly sessionToken?: string;
+    readonly region?: string;
 }
 
 /** Raised when somebody has as many accounts of a provider as they are allowed. */

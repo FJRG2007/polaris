@@ -423,10 +423,12 @@ function AddDialog({
 
     const project = choices?.find((entry) => entry.id === chosen) ?? null;
     const children = project?.children ?? [];
-    // Vercel hands back the team as the one child, which is not a choice anybody
-    // makes: it is the scope the project already lives in. Railway hands back the
-    // services, which is.
-    const asksForChild = accounts.find((entry) => entry.id === account)?.provider === "railway";
+    // Whether this one has a level below it, which the driver answers by handing
+    // back children. It used to be "is this Railway", which is a sentence about
+    // one provider living in a dialog - and the provider after it needed a second
+    // one. What to store is on the choice itself now.
+    const asksForChild = children.length > 0;
+    const picked = asksForChild ? children.find((entry) => entry.id === child) : project;
     const ready = Boolean(account && environment && chosen && (!asksForChild || child) && name.trim());
 
     const submit = async () => {
@@ -434,14 +436,10 @@ function AddDialog({
         setSaving(true);
         setError("");
 
-        const picked = children.find((entry) => entry.id === child);
-        const ref: Record<string, string> = {};
-        if (asksForChild && picked) {
-            ref.service = picked.id;
-            const environmentOf = picked.children?.[0];
-            if (environmentOf) ref.environment = environmentOf.id;
-        } else if (children[0]) {
-            ref.team = children[0].id;
+        if (!picked?.externalId) {
+            setSaving(false);
+            setError("Pick the service itself, not the project it is in.");
+            return;
         }
 
         const result = await runAction(
@@ -450,8 +448,10 @@ function AddDialog({
                     environmentId: environment,
                     connectionId: account,
                     name: name.trim(),
-                    externalId: chosen,
-                    ref
+                    // What the driver said names this one. Nothing here knows the
+                    // shape of it, which is the point.
+                    externalId: picked.externalId,
+                    ref: picked.ref ?? {}
                 }),
             setError
         );

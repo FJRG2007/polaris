@@ -52,7 +52,8 @@ export type ConnectionProviderSlug =
     | "minecraft"
     | "discord"
     | "vercel"
-    | "railway";
+    | "railway"
+    | "aws";
 
 export interface ConnectionProvider {
     slug: ConnectionProviderSlug;
@@ -158,6 +159,25 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         signInDefault: false,
         signInWarning:
             "This is a deployment token rather than an account you sign in to, so it cannot prove who you are."
+    },
+    {
+        slug: "aws",
+        name: "AWS",
+        summary: "Watch what you run on ECS or Amplify, and release it again from here.",
+        description:
+            "Polaris lists the ECS services and Amplify branches your key can see in one region, shows what each last released and can ask for another. AWS still does the building and the serving; unlinking stops Polaris seeing any of it. App Runner is not offered - AWS closed it to new customers in March 2026.",
+        acceptsToken: true,
+        tokenLabel: "Access key",
+        tokenHelp:
+            "An access key from IAM, its secret, and the region your services are in. A key is not regional and everything it reaches is, so the wrong region lists nothing and says nothing about why. Read-only is enough to watch; releasing again needs ecs:UpdateService or amplify:StartJob.",
+        tokenUrl: "https://console.aws.amazon.com/iam/home#/security_credentials",
+        defaultLimit: 2,
+        requires: "nothing",
+        // Never a way in, and more so than the others: this is a key that signs
+        // requests to somebody's whole account, not a token scoped to deployments.
+        signInDefault: false,
+        signInWarning:
+            "This is an access key for machines rather than an account you sign in to, so it cannot prove who you are."
     },
     {
         slug: "google",

@@ -16,7 +16,7 @@ import { IntegrationLogo } from "@/components/logos";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, KeyRound, Loader2, Plus, RefreshCw, Unlink } from "lucide-react";
-import { connectTokenAction, disconnectAccountAction } from "./actions";
+import { connectAwsAction, connectTokenAction, disconnectAccountAction } from "./actions";
 import {
     Badge,
     Button,
@@ -376,7 +376,19 @@ function ProviderCard({
                 />
             ) : null}
 
-            {tokenOpen ? (
+            {/* AWS asks for three things rather than one, because it issues no
+                token at all - a request is signed with the secret. */}
+            {tokenOpen && provider.slug === "aws" ? (
+                <AwsDialog
+                    onClose={() => setTokenOpen(false)}
+                    onDone={() => {
+                        setTokenOpen(false);
+                        router.refresh();
+                    }}
+                />
+            ) : null}
+
+            {tokenOpen && provider.slug !== "aws" ? (
                 <TokenDialog
                     provider={provider.slug}
                     providerName={provider.name}
@@ -422,6 +434,104 @@ function DisconnectDialog({
                     </Button>
                     <Button onClick={onConfirm}>Disconnect</Button>
                 </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * AWS, which has no token to paste.
+ *
+ * Every other service here issues one string; AWS issues a key and a secret, and
+ * signs each request with them. The region is asked for at the same time because
+ * a key is not regional and everything it reaches is - the same key lists nothing
+ * at all in the wrong region, with no error to say why, which is the one failure
+ * somebody would spend an afternoon on.
+ */
+function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+    const [accessKeyId, setAccessKeyId] = useState("");
+    const [secretAccessKey, setSecretAccessKey] = useState("");
+    const [region, setRegion] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+
+    const ready = accessKeyId.trim() && secretAccessKey.trim() && region.trim();
+
+    function submit() {
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () =>
+                    connectAwsAction({
+                        accessKeyId: accessKeyId.trim(),
+                        secretAccessKey: secretAccessKey.trim(),
+                        region: region.trim()
+                    }),
+                (message) => setError(message)
+            );
+            if (!result) return;
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            onDone();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Connect AWS with an access key</DialogTitle>
+                    <DialogDescription>
+                        Polaris asks AWS who the key belongs to and connects that account. It reads
+                        your ECS services and Amplify branches in this region, and can ask for
+                        another release.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">Access key ID</span>
+                        <Input
+                            autoComplete="off"
+                            value={accessKeyId}
+                            placeholder="AKIA..."
+                            onChange={(event) => setAccessKeyId(event.target.value)}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">Secret access key</span>
+                        <Input
+                            type="password"
+                            autoComplete="off"
+                            value={secretAccessKey}
+                            onChange={(event) => setSecretAccessKey(event.target.value)}
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-sm font-medium">Region</span>
+                        <Input
+                            autoComplete="off"
+                            value={region}
+                            placeholder="eu-west-1"
+                            onChange={(event) => setRegion(event.target.value)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            The one your services are in. A key reaches every region; what it can
+                            see is decided here, and the wrong one simply lists nothing.
+                        </span>
+                    </label>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose} disabled={pending}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={pending || !ready}>
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                        Connect
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

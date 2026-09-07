@@ -28,8 +28,17 @@
 /** How a release is going, in the words Polaris uses for every provider. */
 export type ExternalStatus = "queued" | "building" | "live" | "failed" | "cancelled" | "unknown";
 
-/** Something that could be pointed at: a project, and whatever else that provider
- *  needs to name one thing inside it. */
+/**
+ * Something that could be pointed at: a project, and whatever else that provider
+ * needs to name one thing inside it.
+ *
+ * A choice that can be added says so itself, in `externalId` and `ref` - the two
+ * values the row is stored with. That is deliberate and it replaced a screen that
+ * knew each provider's shape: it had a branch reading "if this is Railway, the
+ * second level is the service and the environment travels with it", which is a
+ * sentence about Railway living in a dialog, and the next provider added a second
+ * one. A driver knows what names one of its services; nothing else should have to.
+ */
 export interface ProviderChoice {
     /** Their id for it, kept on the row. */
     readonly id: string;
@@ -37,6 +46,12 @@ export interface ProviderChoice {
     /** What else has to be chosen before this is a single deployable thing, where
      *  the provider has such a level. Empty when the project is enough. */
     readonly children?: readonly ProviderChoice[];
+    /** What to store as the row's id when this is the thing chosen. Absent on a
+     *  choice that is only a heading - a Railway project, an ECS cluster - which
+     *  is also what says it cannot be picked on its own. */
+    readonly externalId?: string;
+    /** Everything else that names it there, stored beside the id. */
+    readonly ref?: ProviderRef;
 }
 
 /** The last release, as a screen shows it. */

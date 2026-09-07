@@ -17,6 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { readCredential } from "@/lib/connections/store";
+import { AWS, awsDriver } from "@/lib/deploy/providers/aws";
 import { VERCEL, vercelDriver } from "@/lib/deploy/providers/vercel";
 import { RAILWAY, railwayDriver } from "@/lib/deploy/providers/railway";
 import {
@@ -31,7 +32,8 @@ import {
  *  driver; nothing else in the app names a provider. */
 const DRIVERS: Readonly<Record<string, ProviderDriver>> = {
     [VERCEL]: vercelDriver,
-    [RAILWAY]: railwayDriver
+    [RAILWAY]: railwayDriver,
+    [AWS]: awsDriver
 };
 
 export function providerDriver(provider: string): ProviderDriver | null {
@@ -175,9 +177,24 @@ async function requireService(projectId: string, id: string): Promise<Row> {
     return row;
 }
 
-/** The token behind a row, or the sentence that says why there is none. */
-async function tokenFor(row: Row): Promise<string> {
+/**
+ * The credential behind a row, as the string a driver takes.
+ *
+ * A string, because every other provider here issues one and the seam is the
+ * poorer for pretending otherwise. AWS issues none - a request is signed with the
+ * secret rather than carrying a token - so its key pair travels as the JSON its
+ * own driver reads back, and nothing between here and there has to know that.
+ */
+async function tokenFor(row: { connectionId: string; provider: string }): Promise<string> {
     const credential = await readCredential(row.connectionId);
+    if (row.provider === AWS && credential?.accessKeyId && credential.secretAccessKey) {
+        return JSON.stringify({
+            accessKeyId: credential.accessKeyId,
+            secretAccessKey: credential.secretAccessKey,
+            region: credential.region ?? "",
+            ...(credential.sessionToken ? { sessionToken: credential.sessionToken } : {})
+        });
+    }
     const token = credential?.token ?? credential?.accessToken;
     if (!token) {
         throw new ProviderError(
@@ -262,9 +279,9 @@ export async function providerChoices(
         select: { id: true, provider: true, label: true }
     });
     if (!link) throw new ProviderError("That account is not connected to your profile", "refused");
-    const credential = await readCredential(link.id);
-    const token = credential?.token ?? credential?.accessToken;
-    if (!token) throw new ProviderError(`${link.label} has to be connected again`, "unauthorized");
+    // The same reading the rows use, so a provider whose credential is not a token
+    // works here too rather than only once it is on the board.
+    const token = await tokenFor({ connectionId: link.id, provider: link.provider });
     return driverFor(link.provider).choices(token);
 }
 
