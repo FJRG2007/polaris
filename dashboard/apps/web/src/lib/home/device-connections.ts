@@ -192,6 +192,55 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         search: ["mqtt", "local", "broker", "smart lock pro", "ultra", "go", "offline", "lan"]
     },
     {
+        id: "mqtt-discovery",
+        brand: "Anything on MQTT",
+        logo: "",
+        label: "A broker on your own network",
+        reach: "same-network",
+        summary:
+            "Every switch, plug and light that announces itself on your broker, whatever made it - one connection instead of one per brand.",
+        note: "Zigbee2MQTT, Tasmota, ESPHome, Shelly and anything written against them publish a description of each device alongside its state, and this reads those. Nothing here talks to Home Assistant or needs it installed; the convention is what is being read, and a broker that has one on it is simply a broker with these topics on it. Things that are on or off and things that lock arrive; sensors, blinds and thermostats announce themselves the same way and are left out until Polaris can draw them honestly.",
+        steps: [
+            "You need an MQTT broker on the same network, which anything publishing devices this way already has.",
+            "Switch discovery on in whatever publishes them. It is on by default in Zigbee2MQTT and Tasmota.",
+            "Put the broker's address and credentials here."
+        ],
+        fields: [
+            {
+                key: "host",
+                label: "Broker address",
+                hint: "A name or address Polaris can reach on this network.",
+                placeholder: "192.168.1.20",
+                maxLength: 200
+            },
+            { key: "port", label: "Port", defaultValue: "1883", optional: true, maxLength: 5 },
+            { key: "username", label: "Username", optional: true, maxLength: 120 },
+            { key: "password", label: "Password", secret: true, optional: true, maxLength: 200 },
+            {
+                key: "prefix",
+                label: "Discovery prefix",
+                hint: "What the descriptions are published under. The convention's own default, unless you changed it.",
+                defaultValue: "homeassistant",
+                optional: true,
+                maxLength: 60
+            }
+        ],
+        kinds: ["switch", "light", "lock"],
+        search: [
+            "mqtt",
+            "zigbee",
+            "zigbee2mqtt",
+            "tasmota",
+            "esphome",
+            "shelly",
+            "sonoff",
+            "home assistant",
+            "broker",
+            "discovery",
+            "local"
+        ]
+    },
+    {
         id: "tuya-cloud",
         brand: "Tuya",
         logo: "tuya",

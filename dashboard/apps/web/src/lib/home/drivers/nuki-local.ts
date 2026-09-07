@@ -30,7 +30,7 @@ export const NUKI_LOCAL = "nuki-local";
  *  as a field anyway: a broker behind a forwarder is somebody's real setup. */
 export const DEFAULT_BROKER_PORT = 1883;
 
-function brokerOf(credentials: Credentials): mqtt.BrokerAddress {
+function brokerOf(credentials: Credentials): mqtt.NukiBroker {
     const host = credentials.host?.trim();
     if (!host) throw new HomeError("That connection is missing the broker's address");
     const port = Number(credentials.port || DEFAULT_BROKER_PORT);
