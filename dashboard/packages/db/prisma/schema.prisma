@@ -4109,6 +4109,17 @@ model Domain {
     certPem       String?
     certKey       String?
     pathPrefix    String?
+    // Who answers this hostname: "server" - the machine the service runs on, by
+    // its own edge - or "polaris" - this instance's edge, dialling that machine.
+    //
+    // It matters on a remote server and only there. "server" means DNS points at
+    // that machine and it serves the site whether or not Polaris is running, which
+    // is the whole reason each server has an edge of its own; a control plane on
+    // somebody's home connection must not be what a data-centre app depends on.
+    // "polaris" is for the server that cannot hold a public address itself - one
+    // behind a router with nothing forwarded - and it makes this instance part of
+    // the request path, so an outage here is an outage there.
+    servedBy      String   @default("server")
     createdAt     DateTime @default(now())
     // Reachability, set by the health probe: up | down | unknown. So a free
     // subdomain that resolves but does not actually serve is flagged, not shown
@@ -9050,11 +9061,6 @@ model MailAccount {
 
     signature           String  @default("")
     signatureAboveQuote Boolean @default(true)
-    // When the signature is put in without being asked for: "never", "new" (a
-    // message somebody starts), or "always" (replies and forwards too). A
-    // signature nobody ever sees because it has to be inserted by hand is not a
-    // signature, which is what this was.
-    signatureAuto       String  @default("new")
 
     // Privacy, per account rather than per person: a work mailbox and a personal
     // one are not the same decision.
