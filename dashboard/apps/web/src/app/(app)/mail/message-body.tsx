@@ -99,6 +99,59 @@ export function MessageBody({
     );
 }
 
+
+/**
+ * Addresses a sender typed but did not link.
+ *
+ * Plenty of mail carries an address as words - a tracking page, a meeting, an
+ * unsubscribe line - and leaving it as words means the reader has to select and
+ * copy it. Every other client makes them links, and a message with a dead
+ * address in it reads as broken rather than as faithful.
+ *
+ * Done on the parsed document rather than with an expression over the markup,
+ * which is the only safe way: a pattern loose enough to find an address in a
+ * sentence is also loose enough to find one inside an `href`, a `style` or a
+ * `srcset` and rewrite the tag around it. Text nodes are the only thing touched,
+ * and never one already inside a link.
+ *
+ * Runs after the sanitizer, so what it reads has already been through it - and
+ * what it writes is an anchor with a scheme it checked itself.
+ */
+export function linkifyBareAddresses(html: string): string {
+    if (!/(?:https?:\/\/|www\.)/i.test(html)) return html;
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const found: Text[] = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = node as Text;
+        if (!text.data || !/(?:https?:\/\/|www\.)\S/i.test(text.data)) continue;
+        if (text.parentElement?.closest("a, style, script, textarea")) continue;
+        found.push(text);
+    }
+    if (found.length === 0) return html;
+
+    for (const text of found) {
+        const pieces = doc.createDocumentFragment();
+        let at = 0;
+        for (const match of text.data.matchAll(/(?:https?:\/\/|www\.)[^\s<>"')\]]+/gi)) {
+            const start = match.index ?? 0;
+            // A full stop or a bracket at the end of a sentence is not part of
+            // the address, which is the commonest way an autolinker gets it
+            // wrong.
+            const raw = match[0].replace(/[.,;:!?)\]}'"]+$/, "");
+            if (start > at) pieces.append(text.data.slice(at, start));
+            const anchor = doc.createElement("a");
+            anchor.href = /^www\./i.test(raw) ? `https://${raw}` : raw;
+            anchor.textContent = raw;
+            pieces.append(anchor);
+            at = start + raw.length;
+        }
+        if (at < text.data.length) pieces.append(text.data.slice(at));
+        text.replaceWith(pieces);
+    }
+    return doc.body.innerHTML;
+}
+
 /**
  * The line above a message that carried trackers.
  *
@@ -194,15 +247,38 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
   .quoted{opacity:.65;}
   a{color:${linkColor};}
 </style>
-</head><body>${body}
+</head><body><div id="polaris-body">${body}</div>
+<style>
+  /* Last in the cascade on purpose, so it beats the message's own sheet.
+     Newsletters set html,body height 100% all the time, which makes the
+     document exactly as tall as the frame however long the message is - so the
+     frame stayed at its opening height and scrolled inside itself, next to the
+     pane already scrolling outside it. */
+  html,body{height:auto!important;min-height:0!important;overflow:visible!important;}
+</style>
 <script>
   // The one thing the frame is allowed to do: say how tall it is, so the page
   // can size it. It cannot reach the page - the sandbox withheld same-origin -
   // and the page treats what arrives as a number and nothing else.
   (function () {
-    function tell() { parent.postMessage({ polarisMailHeight: document.documentElement.scrollHeight }, "*"); }
+    var root = document.getElementById("polaris-body");
+    // The wrapper rather than the document: a message that sets its own height
+    // to 100% makes the document lie, and the wrapper cannot.
+    function measure() {
+      return Math.max(
+        root ? root.scrollHeight : 0,
+        root ? Math.ceil(root.getBoundingClientRect().height) : 0,
+        document.body ? document.body.scrollHeight : 0
+      );
+    }
+    function tell() { parent.postMessage({ polarisMailHeight: measure() }, "*"); }
     window.addEventListener("load", tell);
-    new ResizeObserver(tell).observe(document.documentElement);
+    if (root) new ResizeObserver(tell).observe(root);
+    // A picture that arrives after the layout settled changes the height, and a
+    // message is mostly pictures.
+    window.addEventListener("resize", tell);
+    setTimeout(tell, 300);
+    setTimeout(tell, 1500);
     tell();
   })();
 </script>
@@ -273,7 +349,11 @@ function SandboxedHtml({
      */
     const body = useMemo(() => {
         if (clean === null) return "";
-        return clean.replace(/(["'])\/api\/mail\/image\//g, (_match, quote: string) => `${quote}${origin}/api/mail/image/`);
+        const linked = linkifyBareAddresses(clean);
+        return linked.replace(
+            /(["'])\/api\/mail\/image\//g,
+            (_match, quote: string) => `${quote}${origin}/api/mail/image/`
+        );
     }, [clean, origin]);
 
     useEffect(() => {
