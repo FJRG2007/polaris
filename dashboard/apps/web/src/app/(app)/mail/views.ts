@@ -13,6 +13,7 @@ import type { ListRoute } from "./list-page";
 export const MAIL_VIEWS: Readonly<Record<string, ListRoute>> = {
     inbox: {
         narrow: { role: "inbox" },
+        categorised: true,
         context: {
             title: "Inbox",
             emptyTitle: "Nothing waiting",

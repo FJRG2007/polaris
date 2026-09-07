@@ -63,6 +63,7 @@ export const ACCOUNT_COLUMNS = {
     nameTrackers: true,
     answerReceipts: true,
     cleanLinks: true,
+    securityKeepMinutes: true,
     vacationEnabled: true,
     vacationSubject: true,
     vacationBody: true,

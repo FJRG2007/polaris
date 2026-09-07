@@ -20,9 +20,23 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { Button, Switch, useToast } from "@polaris/ui";
+import { Button, Select, Switch, useToast } from "@polaris/ui";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { setPrivacyAction, trustSenderAction } from "@/app/(app)/mail/actions";
+
+/** What switching it on means, before anybody chooses otherwise. Long enough
+ *  that a code is dead several times over, short enough to be worth having. */
+const DEFAULT_KEEP_MINUTES = 60;
+
+/** The waits worth offering. Anything finer is somebody counting minutes at a
+ *  mailbox, which is not a thing people do. */
+const KEEP_CHOICES: readonly { minutes: number; label: string }[] = [
+    { minutes: 15, label: "After 15 minutes" },
+    { minutes: 60, label: "After an hour" },
+    { minutes: 60 * 6, label: "After six hours" },
+    { minutes: 60 * 24, label: "After a day" },
+    { minutes: 60 * 24 * 7, label: "After a week" }
+];
 
 const MODES = [
     {
@@ -59,6 +73,7 @@ export function PrivacyView({
     const [nameTrackers, setNameTrackers] = useState(account.nameTrackers);
     const [answerReceipts, setAnswerReceipts] = useState(account.answerReceipts);
     const [cleanLinks, setCleanLinks] = useState(account.cleanLinks);
+    const [keepCodes, setKeepCodes] = useState(account.securityKeepMinutes);
 
     function pick(next: string): void {
         const chosen = accounts.find((one) => one.id === next);
@@ -68,13 +83,15 @@ export function PrivacyView({
         setNameTrackers(chosen.nameTrackers);
         setAnswerReceipts(chosen.answerReceipts);
         setCleanLinks(chosen.cleanLinks);
+        setKeepCodes(chosen.securityKeepMinutes);
     }
 
     const dirty =
         remoteContent !== account.remoteContent ||
         nameTrackers !== account.nameTrackers ||
         answerReceipts !== account.answerReceipts ||
-        cleanLinks !== account.cleanLinks;
+        cleanLinks !== account.cleanLinks ||
+        keepCodes !== account.securityKeepMinutes;
 
     return (
         <div>
@@ -145,6 +162,39 @@ export function PrivacyView({
                     </span>
                 </label>
 
+                <label className="flex items-start gap-2">
+                    <Switch
+                        checked={keepCodes > 0}
+                        onChange={(on) => setKeepCodes(on ? DEFAULT_KEEP_MINUTES : 0)}
+                        aria-label="Throw away codes once they have expired"
+                    />
+                    <span className="min-w-0">
+                        <span className="block text-[13px]">Throw away codes once they have expired</span>
+                        <span className="block text-[12px] text-muted-foreground">
+                            A verification code stops working in a few minutes and then sits in your mailbox
+                            for years. Off by default: this deletes mail, so it is something to switch on
+                            rather than something to switch off.
+                        </span>
+                        {keepCodes > 0 ? (
+                            <span className="mt-1.5 flex items-center gap-2">
+                                <Select
+                                    value={String(keepCodes)}
+                                    onValueChange={(next) => setKeepCodes(Number(next))}
+                                    aria-label="How long a code is kept"
+                                    className="h-7 w-44 text-[12px]"
+                                    options={KEEP_CHOICES.map((one) => ({
+                                        value: String(one.minutes),
+                                        label: one.label
+                                    }))}
+                                />
+                                <span className="text-[12px] text-foreground-subtle">
+                                    then to the trash, where you can still get it back.
+                                </span>
+                            </span>
+                        ) : null}
+                    </span>
+                </label>
+
                 <Button
                     disabled={!dirty || saving}
                     onClick={() =>
@@ -153,7 +203,8 @@ export function PrivacyView({
                                 remoteContent,
                                 nameTrackers,
                                 answerReceipts,
-                                cleanLinks
+                                cleanLinks,
+                                securityKeepMinutes: keepCodes
                             });
                             const said = refusalOf(answer);
                             if (said) {

@@ -12,6 +12,7 @@
  * the next page, and which conversation is open beside it.
  */
 
+import * as core from "@polaris/core";
 import { MailOnboarding } from "./onboarding";
 import { requirePermission } from "@/lib/session";
 import { ownedAccountIds } from "@/lib/mailbox/access";
@@ -23,13 +24,22 @@ import { EMPTY_QUERY, listThreads, readThread, type MailListQuery, type MailThre
 export interface ListRoute {
     readonly narrow: Partial<MailListQuery>;
     readonly context: MailViewContext;
+    /** Whether this list is worth sorting into tabs. An inbox is; Sent is not. */
+    readonly categorised?: boolean;
 }
 
 export type MailSearchParams = Promise<{
     q?: string;
     open?: string;
     before?: string;
+    tab?: string;
 }>;
+
+/** Whether what the address says is one of the tabs. Anything else is somebody
+ *  editing a URL, and the answer to that is the whole list. */
+function isCategory(value: string | undefined): value is core.MailCategory {
+    return Boolean(value) && (core.MAIL_CATEGORIES as readonly string[]).includes(value ?? "");
+}
 
 export async function MailListPage({
     route,
@@ -62,6 +72,9 @@ export async function MailListPage({
         ...EMPTY_QUERY,
         ...route.narrow,
         query: params.q?.trim() ?? "",
+        // Only where the route offers tabs at all, which is the inbox. Sent,
+        // Drafts and the trash are not a mixture of things to sort.
+        category: route.categorised && isCategory(params.tab) ? params.tab : "",
         cursor: params.before ?? ""
     };
 
@@ -123,10 +136,13 @@ export async function MailListPage({
                 starredOnly: query.starredOnly,
                 snoozedOnly: query.snoozedOnly,
                 withAttachments: query.withAttachments,
+                category: query.category,
                 query: query.query
             }}
             openThread={openThread}
             openMessages={openMessages}
+            categorised={Boolean(route.categorised) && !searched}
+            category={query.category}
             context={
                 searched
                     ? {

@@ -29,6 +29,7 @@ import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
+import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { sweepCameraReachability } from "@/lib/home/reachability";
@@ -303,6 +304,19 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // per account, which is how a client gets rate limited by Gmail.
         leaseMs: 10 * MINUTE,
         run: syncMailboxes
+    },
+    {
+        key: "mail-categories",
+        // Every minute while there is a backlog, and free once there is not:
+        // the pass looks for messages with no category and stops finding any.
+        everyMs: MINUTE,
+        // Leased, because two passes would decide the same batch twice.
+        leaseMs: 5 * MINUTE,
+        run: async () => {
+            const sorted = await backfillCategories();
+            const cleared = await sweepExpiredCodes();
+            return { sorted, cleared };
+        }
     },
     {
         key: "mail-send",

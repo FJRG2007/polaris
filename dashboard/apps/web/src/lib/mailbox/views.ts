@@ -114,6 +114,8 @@ export interface MailListQuery {
      *  the one screen that exists to show it. */
     readonly snoozedOnly: boolean;
     readonly withAttachments: boolean;
+    /** One of the tabs above the list, or "" for all of them. */
+    readonly category: string;
     readonly query: string;
     readonly from: string;
     readonly since: Date | null;
@@ -132,6 +134,7 @@ export const EMPTY_QUERY: MailListQuery = {
     starredOnly: false,
     snoozedOnly: false,
     withAttachments: false,
+    category: "",
     query: "",
     from: "",
     since: null,
@@ -171,6 +174,7 @@ export async function listThreads(
         ...(query.unreadOnly ? { seen: false } : {}),
         ...(query.starredOnly ? { flagged: true } : {}),
         ...(query.withAttachments ? { hasAttachments: true } : {}),
+        ...(query.category ? { category: query.category } : {}),
         ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
         ...(query.since || query.before
             ? {
@@ -304,6 +308,7 @@ async function matchingThreads(
             ...(query.folderId ? { folderId: query.folderId } : {}),
             ...(query.role ? { folder: { role: query.role } } : {}),
             ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
+            ...(query.category ? { category: query.category } : {}),
             ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),

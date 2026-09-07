@@ -30,7 +30,8 @@ import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
 import { MailSearch } from "./mail-search";
-import { useRouter } from "next/navigation";
+import * as core from "@polaris/core";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
@@ -90,6 +91,7 @@ export interface MailPageNarrow {
     readonly starredOnly: boolean;
     readonly snoozedOnly: boolean;
     readonly withAttachments: boolean;
+    readonly category: string;
     readonly query: string;
 }
 
@@ -112,7 +114,9 @@ export function MailView({
     openThread,
     openMessages,
     cursor: firstCursor,
-    page
+    page,
+    categorised,
+    category
 }: {
     threads: MailThreadView[];
     context: MailViewContext;
@@ -121,6 +125,11 @@ export function MailView({
     cursor: string;
     /** What this list is, so the scroll can ask for more of the same one. */
     page: MailPageNarrow;
+    /** Whether this list is worth sorting into tabs. An inbox is; Sent is not,
+     *  and neither is a search - a search is already a narrowing. */
+    categorised: boolean;
+    /** Which tab is showing, or "" for all of them. */
+    category: string;
 }) {
     const router = useRouter();
     const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } = useMail();
@@ -681,6 +690,7 @@ export function MailView({
                         )}
                     </div>
                     <MailSearch />
+                    {categorised ? <CategoryTabs current={category} /> : null}
                 </header>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
@@ -823,6 +833,82 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
                 {busy ? "Loading older conversations" : ""}
             </span>
         </div>
+    );
+}
+
+
+/**
+ * The tabs above the inbox.
+ *
+ * Not filing: a message stays in exactly the folder it was in, with the same
+ * flags, and every one of them is still in the list with no tab chosen. This is
+ * a way of looking at the same inbox, which is why it lives in the address as a
+ * parameter rather than anywhere that would outlive the visit.
+ *
+ * The one Polaris has that others do not is the codes: they are the most
+ * time-sensitive mail anybody gets and the least worth keeping, and gathering
+ * them is what makes it possible to offer to clear them up.
+ */
+function CategoryTabs({ current }: { current: string }) {
+    const router = useRouter();
+    const search = useSearchParams();
+    const pathname = usePathname();
+
+    function go(next: string): void {
+        const url = new URLSearchParams(search.toString());
+        if (next) url.set("tab", next);
+        else url.delete("tab");
+        // A different tab is a different list: the cursor and whatever was open
+        // belong to the one being left.
+        url.delete("before");
+        url.delete("open");
+        const query = url.toString();
+        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+
+    return (
+        <div className="-mb-2 flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="Sort the inbox">
+            <TabButton label="All" active={!current} onClick={() => go("")} />
+            {core.MAIL_CATEGORIES.map((one) => (
+                <TabButton
+                    key={one}
+                    label={core.MAIL_CATEGORY_LABELS[one]}
+                    title={core.MAIL_CATEGORY_NOTES[one]}
+                    active={current === one}
+                    onClick={() => go(one)}
+                />
+            ))}
+        </div>
+    );
+}
+
+function TabButton({
+    label,
+    title,
+    active,
+    onClick
+}: {
+    label: string;
+    title?: string;
+    active: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            role="tab"
+            aria-selected={active}
+            title={title}
+            className={cn(
+                "shrink-0 border-b-2 px-2 pb-1.5 pt-0.5 text-[12px]",
+                active
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+            onClick={onClick}
+        >
+            {label}
+        </button>
     );
 }
 

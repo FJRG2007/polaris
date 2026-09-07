@@ -389,6 +389,17 @@ async function storeMessages(
 
         const threadId = await threadFor(account.id, shape);
         const snippet = core.snippetFrom(snippets.get(message.uid) ?? "");
+        // Which tab it sits under. Decided from what is already on the row - no
+        // body is fetched for it - and written on every pass, so a mailbox that
+        // resyncs gets the current reading rather than the one that was current
+        // when it first arrived.
+        const category = core.categoriseMail({
+            subject: shape.subject,
+            snippet,
+            fromAddress: from[0]?.address ?? "",
+            fromName: from[0]?.name ?? "",
+            headers: message.headers
+        });
 
         const row = await prisma.mailMessage.upsert({
             where: { folderId_uid: { folderId: folder.id, uid: BigInt(message.uid) } },
@@ -401,7 +412,8 @@ async function storeMessages(
                 // decoder existed holds an escape sequence everywhere somebody
                 // put an accent, and a resync is the one moment the good line
                 // can replace it for good.
-                snippet
+                snippet,
+                category
             },
             create: {
                 accountId: account.id,
@@ -418,6 +430,7 @@ async function storeMessages(
                 ccJson: asJson(cc),
                 replyToJson: asJson(addresses(envelope?.replyTo)),
                 snippet,
+                category,
                 sentAt,
                 receivedAt: message.internalDate ?? sentAt,
                 size: message.size,

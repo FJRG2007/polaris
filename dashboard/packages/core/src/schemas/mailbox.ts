@@ -419,7 +419,12 @@ export const mailPrivacySchema = z.object({
      *  client that has told the sender their address is live. */
     answerReceipts: z.boolean().default(false),
     /** Whether links are stripped of the parameters that identify the reader. */
-    cleanLinks: z.boolean().default(true)
+    cleanLinks: z.boolean().default(true),
+    /** How long a verification code or a sign-in link is kept before Polaris
+     *  throws it away, in minutes. Zero is off, and off is the default. Capped
+     *  at a week: past that it is not a code being cleared up, it is a rule
+     *  somebody should have written. */
+    securityKeepMinutes: z.coerce.number().int().min(0).max(10080).default(0)
 });
 
 export type MailPrivacy = z.infer<typeof mailPrivacySchema>;
@@ -442,6 +447,7 @@ export const mailPageSchema = z.object({
     starredOnly: z.boolean().default(false),
     snoozedOnly: z.boolean().default(false),
     withAttachments: z.boolean().default(false),
+    category: z.string().trim().max(32).default(""),
     query: z.string().trim().max(500).default(""),
     /** The moment the last row already on screen is at. */
     cursor: z.string().trim().max(64).default("")

@@ -8931,6 +8931,11 @@ model MailAccount {
     answerReceipts Boolean @default(false)
     cleanLinks     Boolean @default(true)
 
+    // How long a verification code or a sign-in link is kept before Polaris
+    // throws it away, in minutes. Zero is off, and off is the default: deleting
+    // somebody's mail without being asked is not a thing to opt out of.
+    securityKeepMinutes Int @default(0)
+
     vacationEnabled    Boolean   @default(false)
     vacationSubject    String    @default("")
     vacationBody       String    @default("")
@@ -9124,6 +9129,12 @@ model MailMessage {
     headers  Json?
 
     // What Polaris adds, none of which the server knows about.
+    //
+    // Which of the tabs above the list this message sits under: primary, social,
+    // promotions, updates or security. Empty means nothing has decided yet,
+    // which is what every row written before this existed holds until the
+    // backfill reaches it - so the column is also the backfill's own queue.
+    category       String    @default("")
     snoozedUntil   DateTime?
     // Where it came back to when the snooze ends.
     snoozeFolderId String?   @db.Uuid
@@ -9143,6 +9154,7 @@ model MailMessage {
     @@index([threadId, sentAt])
     @@index([folderId, sentAt])
     @@index([accountId, messageId])
+    @@index([accountId, category, sentAt])
     @@index([accountId, seen])
     @@index([accountId, snoozedUntil])
 }

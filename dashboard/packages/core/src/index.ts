@@ -25,6 +25,7 @@ export * from "./colors.js";
 export * from "./contrast.js";
 export * from "./profile-style.js";
 export * from "./connection-providers.js";
+export * from "./mailbox-category.js";
 export * from "./mailbox-providers.js";
 export * from "./mailbox-search.js";
 export * from "./mailbox-unsubscribe.js";
