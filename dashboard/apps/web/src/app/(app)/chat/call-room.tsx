@@ -45,6 +45,13 @@ import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
 import { NOISE_LEVELS } from "./mic-cleanup";
 import type { FilteredMic, MicFilter } from "./mic-filter";
+import {
+    REACTIONS,
+    REACTION_GLYPHS,
+    REACTION_LABELS,
+    type Reaction,
+    type ShownReaction
+} from "./call-signals";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { useSpeakers } from "./speaker-device";
@@ -65,6 +72,7 @@ import {
     ChevronUp,
     Circle,
     Expand,
+    Hand,
     Headphones,
     HeadphoneOff,
     Link2,
@@ -74,6 +82,7 @@ import {
     MicOff,
     Minimize2,
     MonitorUp,
+    Smile,
     MonitorX,
     PhoneOff,
     Shrink,
@@ -202,6 +211,12 @@ export function CallRoom({
             combineAsked: call.combineAsked === personId
         };
     };
+    /** What this person has reacted with in the last few seconds. Grouped here
+     *  rather than filtered in each tile so the list is walked once for a room
+     *  rather than once per face in it. */
+    const reactionsFor = (personId: string | null): ShownReaction[] =>
+        personId ? call.reactions.filter((shown) => shown.from === personId) : [];
+
     const columns = gridColumns((admitted?.length ?? 1) || 1);
 
     /** Where this browser plays the call. Empty on a browser that cannot be told,
@@ -460,6 +475,8 @@ export function CallRoom({
                                     deafened={call.states.get(personId)?.deafened}
                                     speaking={call.speaking.has(personId)}
                                     recording={call.states.get(personId)?.recording}
+                                    hand={call.states.get(personId)?.hand}
+                                    reactions={reactionsFor(personId)}
                                     volumeKey={person?.userId ?? personId}
                                     {...combining(personId)}
                                 />
@@ -509,6 +526,8 @@ export function CallRoom({
                         muted={!call.micOn}
                         deafened={call.deafened}
                         recording={call.recording}
+                        hand={call.handRaised}
+                        reactions={reactionsFor(call.participantId)}
                         sameRoom={call.audioRole !== null}
                         focused={live === `camera:${call.participantId}`}
                         onFocus={
@@ -530,6 +549,8 @@ export function CallRoom({
                                 muted={call.states.get(person.id)?.muted}
                                 deafened={call.states.get(person.id)?.deafened}
                                 recording={call.states.get(person.id)?.recording}
+                                hand={call.states.get(person.id)?.hand}
+                                reactions={reactionsFor(person.id)}
                                 focused={live === `camera:${person.id}`}
                                 onFocus={() => focus(`camera:${person.id}`)}
                                 {...combining(person.id)}
@@ -641,6 +662,23 @@ export function CallRoom({
                     devicesLabel="Output"
                     onChoose={speakers.choose}
                 />
+
+                {/* Two ways to say something without interrupting. A hand stays
+                    up until it is put down and everybody who joins later sees
+                    it; a reaction is over in three seconds. See
+                    `call-signals`. */}
+                <Button
+                    size="icon"
+                    variant={call.handRaised ? "primary" : "secondary"}
+                    aria-pressed={call.handRaised}
+                    aria-label={call.handRaised ? "Lower your hand" : "Raise your hand"}
+                    title={call.handRaised ? "Lower your hand" : "Raise your hand"}
+                    onClick={() => call.setHandRaised(!call.handRaised)}
+                >
+                    <Hand className="size-4" />
+                </Button>
+
+                <ReactionMenu onReact={call.react} />
 
                 <Button
                     size="icon"
@@ -994,6 +1032,8 @@ function Tile({
     deafened = false,
     sameRoom = false,
     recording = false,
+    hand = false,
+    reactions = [],
     focused = false,
     onFocus,
     onCombine,
@@ -1034,6 +1074,12 @@ function Tile({
     sameRoom?: boolean;
     /** Whether this person is writing the call to a file. */
     recording?: boolean;
+    /** Whether their hand is up. Drawn on the picture rather than only in a
+     *  list, because the point of raising one is to be seen. */
+    hand?: boolean;
+    /** What they have reacted with in the last few seconds. Over the picture and
+     *  gone again - see `call-signals`. */
+    reactions?: readonly ShownReaction[];
     /** Whether this tile is the one filling the room right now. */
     focused?: boolean;
     /** Make this the big one, or put it back. Absent where there is nothing to
@@ -1245,6 +1291,22 @@ function Tile({
                     />
                 </span>
             )}
+            {reactions.length > 0 && (
+                // Over the face rather than beside the name, because it is a
+                // gesture about that person and it has three seconds to be seen.
+                // `pointer-events-none` so it never eats the press that makes a
+                // tile the big one.
+                <span
+                    className="pointer-events-none absolute inset-x-0 bottom-8 flex justify-center gap-1 text-2xl"
+                    aria-live="polite"
+                >
+                    {reactions.map((shown) => (
+                        <span key={shown.id} aria-label={REACTION_LABELS[shown.reaction]}>
+                            {REACTION_GLYPHS[shown.reaction]}
+                        </span>
+                    ))}
+                </span>
+            )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
@@ -1266,6 +1328,9 @@ function Tile({
                         className="size-3 text-primary"
                         aria-label="Sharing a room's microphone"
                     />
+                )}
+                {hand && (
+                    <Hand className="size-3 text-primary" aria-label="Hand up" />
                 )}
                 {recording && (
                     <Circle
@@ -1589,4 +1654,38 @@ function gridColumns(people: number): string {
     if (people <= 4) return "grid-cols-2";
     if (people <= 6) return "grid-cols-2 sm:grid-cols-3";
     return "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4";
+}
+
+/**
+ * The reactions, behind one button.
+ *
+ * A menu rather than a row of six on the control bar: the bar already wraps to a
+ * second line on a laptop, and six more buttons on it would push the one people
+ * need most - leaving - off the end of it. A closed list rather than an emoji
+ * picker, for the reason in `call-signals`: what is chosen here appears over
+ * everybody else's picture.
+ */
+function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="secondary" aria-label="React" title="React">
+                    <Smile className="size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" side="top" className="flex w-auto gap-1 p-1">
+                {REACTIONS.map((reaction) => (
+                    <DropdownMenuItem
+                        key={reaction}
+                        onSelect={() => onReact(reaction)}
+                        aria-label={REACTION_LABELS[reaction]}
+                        title={REACTION_LABELS[reaction]}
+                        className="justify-center px-2 text-lg"
+                    >
+                        {REACTION_GLYPHS[reaction]}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
 }

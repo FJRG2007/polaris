@@ -19,12 +19,18 @@
  * the task to exist first - its thread, its files, its time - is not offered
  * here and is one click away the moment it is created.
  *
- * Pressing outside a dialog closes it, and until now that threw away everything
- * typed into it. A name, a description, three tags and a date is several minutes
- * of somebody's attention to lose to a stray click, so a dialog with something in
- * it asks first: keep writing, save the draft, or throw it away. A saved draft is
- * this browser's - see `task-draft-store` - and it is offered back the next time
- * the dialog opens on that list.
+ * Pressing outside a dialog closes it, and that once threw away everything typed
+ * into it. A name, a description, three tags and a date is several minutes of
+ * somebody's attention to lose to a stray click, so a dialog with something in it
+ * asks first: keep writing, save the draft, or throw it away.
+ *
+ * The question is a courtesy, not the safety net. A dismissed dialog is only one
+ * of the ways this work goes missing - the tab is closed, the browser falls over,
+ * the screen underneath re-renders and takes the dialog with it - and none of
+ * those stop to ask anything. So the draft is written down as it is typed, in
+ * this browser and nowhere else (see `task-draft-store`), and offered back the
+ * next time the dialog opens on that list. Only creating the task, or saying to
+ * discard it, takes it away.
  */
 
 import * as actions from "./actions";
@@ -46,8 +52,10 @@ import type { StatusView, TagView } from "@/lib/tasks/space-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import type { PersonRef, SpaceContext, TaskRow } from "@/lib/tasks/facts";
 import {
+    createdTag,
     isProvisionalTagId,
     settleTagIds,
+    storableTagId,
     tagCreationLives,
     useTagCreation,
     withCreatedTags
@@ -122,7 +130,10 @@ function toDraft(row: TaskRow): Omit<TaskDraft, "at"> {
         dueDate: row.dueDate,
         startDate: row.startDate,
         assigneeIds: row.assignees.map((person) => person.id),
-        tagIds: row.tags.map((tag) => tag.id),
+        // Under the server's own ids wherever they have arrived: a tag made in
+        // the picker a moment ago is carrying one this browser invented, and
+        // that means nothing to the browser reading the draft back.
+        tagIds: row.tags.map((tag) => storableTagId(tag.id)),
         points: row.points
     };
 }
@@ -154,9 +165,16 @@ function fromDraft(
         startDate: draft.startDate,
         points: draft.points,
         assignees: book.people.filter((person) => draft.assigneeIds.includes(person.id)),
-        tags: book.tags.filter((tag) => draft.tagIds.includes(tag.id))
+        tags: draft.tagIds
+            .map((id) => book.tags.find((tag) => tag.id === id) ?? createdTag(id))
+            .filter((tag): tag is TagView => tag !== null)
     };
 }
+
+/** How long typing has to stop before the draft is written down. Long enough
+ *  that a sentence is one write rather than forty, short enough that nothing is
+ *  lost worth noticing. */
+const SAVE_AFTER_MS = 500;
 
 export function TaskCreateDialog({
     open,
@@ -203,6 +221,10 @@ export function TaskCreateDialog({
     /** Said once, when a draft was picked up rather than started fresh. */
     const [restored, setRestored] = useState(false);
 
+    // A tag created here is on the task before the server has answered, so it has
+    // to be among the tags this dialog draws against - see `useTagCreation`.
+    const tagBook = useTagCreation(spaceId, tags);
+
     // A dialog that reopens holding the last task's details is a dialog that
     // creates the same task twice - so it starts blank, unless a draft was
     // deliberately kept for this list, which is the one thing worth carrying
@@ -211,17 +233,15 @@ export function TaskCreateDialog({
         if (!open) return;
         const fresh = blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate });
         const kept = readTaskDraft(defaultListId);
-        setDraft(kept ? fromDraft(kept, fresh, { statuses, tags, people }) : fresh);
+        // Against the picker's list rather than the server's, so a tag made
+        // seconds ago is still a tag when the draft comes back.
+        setDraft(kept ? fromDraft(kept, fresh, { statuses, tags: tagBook.tags, people }) : fresh);
         setRestored(kept !== null);
         setAsking(false);
         setError("");
         // The status object is rebuilt on every render; its id is what changes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, defaultListId, firstStatusId, defaultName, defaultDueDate]);
-
-    // A tag created here is on the task before the server has answered, so it has
-    // to be among the tags this dialog draws against - see `useTagCreation`.
-    const tagBook = useTagCreation(spaceId, tags);
 
     /** What the property rows are drawn against. The space's own fields and the
      *  sibling tasks are left out: neither can be set before the task exists. */
@@ -269,7 +289,27 @@ export function TaskCreateDialog({
      * pressing outside it again - which is most of the times it is dismissed -
      * puts no question in the way.
      */
-    const worthKeeping = draftHasContent(toDraft(draft), defaultName);
+    const worthKeeping = draftHasContent(toDraft(shown), defaultName);
+
+    /**
+     * Written down as it is typed, so nothing here depends on being asked first.
+     *
+     * The question on the way out covers a dismissed dialog and nothing else; a
+     * closed tab, a browser that falls over and a screen that re-renders under
+     * the dialog all take the same work away without a word.
+     *
+     * Only writes. Emptying the dialog back out is not the same statement as
+     * discarding it, and the first pass of this cleared on its way to restoring
+     * a draft - the effect ran once holding the blank row the restore had not
+     * been drawn from yet, and deleted the very thing it was about to put on
+     * screen. Taking a draft away is `dismiss` and the Discard button, both of
+     * which are somebody saying so.
+     */
+    useEffect(() => {
+        if (!open || !worthKeeping) return;
+        const timer = setTimeout(() => writeTaskDraft({ ...toDraft(shown), at: Date.now() }), SAVE_AFTER_MS);
+        return () => clearTimeout(timer);
+    }, [open, shown, worthKeeping]);
 
     /** Pressing outside, pressing Escape, or Cancel. All the same question. */
     const dismiss = () => {
@@ -282,7 +322,7 @@ export function TaskCreateDialog({
     };
 
     const keepDraft = () => {
-        writeTaskDraft({ ...toDraft(draft), at: Date.now() });
+        writeTaskDraft({ ...toDraft(shown), at: Date.now() });
         setAsking(false);
         onClose();
     };
@@ -344,7 +384,13 @@ export function TaskCreateDialog({
                     <span className="text-xs text-muted-foreground">in</span>
                     <Select
                         value={draft.listId}
-                        onValueChange={(listId) => setDraft((current) => ({ ...current, listId }))}
+                        // The draft is filed under the list it is going into, so
+                        // moving it leaves nothing behind to be offered back in
+                        // the list it came from.
+                        onValueChange={(listId) => {
+                            clearTaskDraft(draft.listId);
+                            setDraft((current) => ({ ...current, listId }));
+                        }}
                         options={lists.map((list) => ({ value: list.id, label: list.name }))}
                         aria-label="List"
                         className="h-7 w-48 text-xs"

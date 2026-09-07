@@ -8,10 +8,11 @@
  * to most people; "a message can tell its sender you opened it, and this stops
  * it" means something to everybody.
  *
- * The default is the middle one - nothing loads until you say a particular
- * sender is fine - because it is the only setting that survives contact with a
- * real inbox. Blocking everything for ever makes half of somebody's mail
- * unreadable, and allowing everything is the thing this app exists not to do.
+ * Pictures are shown by default, and that is not a retreat. Every outside
+ * address in a message is fetched by Polaris and served from here, so a sender
+ * learns that a server asked and nothing about the reader - which means the
+ * click that used to stand between somebody and their own mail was buying
+ * nothing. The stricter settings stay for anybody who wants no fetch at all.
  */
 
 import { X } from "lucide-react";
@@ -32,12 +33,12 @@ const MODES = [
     {
         value: "trusted",
         title: "Only from senders I have allowed",
-        body: "Nothing loads until you say a particular sender is fine, one message at a time."
+        body: "Stricter than it needs to be now that pictures come through Polaris, and slower to read: nothing is drawn until you allow that sender."
     },
     {
         value: "always",
-        title: "Always load pictures",
-        body: "Convenient, and it tells every sender when you open their message."
+        title: "Show pictures",
+        body: "The usual choice. Polaris fetches them on your behalf, so the sender never learns your address, your browser, or when you opened it."
     }
 ] as const;
 
@@ -83,7 +84,8 @@ export function PrivacyView({
                 <h2 className="text-[13px] font-medium">Pictures and anything else a message loads</h2>
                 <p className="text-[12px] text-muted-foreground">
                     A message can carry an invisible picture that tells its sender the moment you opened it, from
-                    where, and on what. Polaris does not fetch any of it until you say so.
+                    where, and on what. Polaris fetches every one of them for you, so what they get is a request
+                    from this server rather than anything about you.
                 </p>
                 <ul className="space-y-1.5">
                     {MODES.map((mode) => (

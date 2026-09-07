@@ -22,7 +22,8 @@ import { DocView } from "./viewer/doc-view";
 import { PdfView } from "./viewer/pdf-view";
 import { CodeView } from "./viewer/code-view";
 import { PptxView } from "./viewer/pptx-view";
-import { Download, Share2 } from "lucide-react";
+import { Download, Loader2, Share2 } from "lucide-react";
+import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { extensionOf } from "./file-categories";
 import { MediaView } from "./viewer/media-view";
 import { SheetEditor } from "./viewer/sheet-editor";
@@ -114,6 +115,9 @@ export function FileViewer({
 }) {
     const format = useDisplayFormat();
     const byteUrl = urlFor ?? driveByteUrl;
+    // Whether the server has answered the last request for bytes yet, so a file
+    // on a slow share says it is coming - see `drive/downloads`.
+    const preparing = useDownloadsPending();
     const extension = target ? extensionOf(target.name) : "";
 
     return (
@@ -129,11 +133,18 @@ export function FileViewer({
                                     Share
                                 </Button>
                             ) : null}
-                            <Button asChild size="sm" variant="secondary">
-                                <a href={byteUrl(target, false)} download={target.name}>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={preparing > 0}
+                                onClick={() => startDownload(byteUrl(target, false), target.name)}
+                            >
+                                {preparing > 0 ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
                                     <Download className="size-4" />
-                                    Download
-                                </a>
+                                )}
+                                {preparing > 0 ? "Fetching" : "Download"}
                             </Button>
                         </div>
                     ) : null}

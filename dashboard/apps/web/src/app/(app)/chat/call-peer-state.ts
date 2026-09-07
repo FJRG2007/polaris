@@ -28,6 +28,7 @@
 
 import type { PeerState } from "./call-state";
 import { AUDIO_GROUP } from "./call-combine";
+import { handRaised, handRaisedAt } from "./call-signals";
 
 /** The keys a browser writes about itself. */
 export const MUTED = "muted";
@@ -80,6 +81,11 @@ export function peerState(participant: PeerFacts): PeerState {
         muted: mic === "muted",
         deafened: participant.attributes?.[DEAFENED] === "1",
         recording: participant.attributes?.[RECORDING] === "1",
+        // A hand stays up until it is put down, so it has to reach somebody who
+        // joins afterwards - which is what an attribute does and a message does
+        // not. See `call-signals`.
+        hand: handRaised(participant.attributes),
+        handAt: handRaisedAt(participant.attributes),
         // An empty attribute is how a browser takes back something it said, so
         // it means "listening through nobody" rather than "through the seat
         // called nothing".

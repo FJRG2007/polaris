@@ -29,6 +29,7 @@ import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
+import { decodePart } from "./decode";
 import { addressesFrom, asJson } from "./json";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
@@ -441,10 +442,18 @@ async function fetchSnippets(
             )) {
                 const bytes = message.bodyParts?.get(key.toLowerCase()) ?? message.bodyParts?.get(key);
                 if (!bytes) continue;
-                const text = bytes.toString("utf8");
-                out.set(message.uid, key === (fetched.find((one) => one.uid === message.uid)?.structure.htmlPart ?? "")
-                    ? stripTags(text)
-                    : text);
+                const shape = fetched.find((one) => one.uid === message.uid)?.structure;
+                const html = shape?.htmlPart === key;
+                // Decoded, not read as bytes. A part is wrapped in
+                // quoted-printable or base64 for the journey and carries its own
+                // character set, and skipping either is what put `Mar=C3=ADa`
+                // and `=20` in every preview line in the list.
+                const coding = html ? shape?.htmlCoding : shape?.textCoding;
+                const text = decodePart(bytes, {
+                    encoding: coding?.encoding,
+                    charset: coding?.charset
+                });
+                out.set(message.uid, html ? stripTags(text) : text);
             }
         } catch {
             // A snippet is a nicety. A server that will not answer for one part

@@ -11,6 +11,7 @@ import { pipeThenDispose } from "@/lib/drive-stream";
 import { sessionCan } from "@/lib/session";
 import { baseName, normalizeRelPath } from "@polaris/core";
 import { requireDriveDriver, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
+import { downloadTicketCookie, validDownloadTicket } from "@/lib/drive/download-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,12 @@ export async function GET(request: Request): Promise<Response> {
             "accept-ranges": "bytes",
             "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(baseName(path))}`
         });
+        // The page asked to be told when this began. A file on a share behind a
+        // fresh connection can be many seconds before its first byte, and until
+        // now the button that asked for it said nothing at all - see
+        // `download-ticket`.
+        const ticket = url.searchParams.get("dl");
+        if (validDownloadTicket(ticket)) headers.append("set-cookie", downloadTicketCookie(ticket));
 
         const rangeHeader = request.headers.get("range");
         const match = rangeHeader ? RANGE.exec(rangeHeader) : null;

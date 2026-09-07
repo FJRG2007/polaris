@@ -12,6 +12,7 @@ import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import type { CallLevel, CallQuality } from "./call-quality";
 import type { AudioRole, CombineRequest } from "./call-combine";
+import type { Reaction, ShownReaction } from "./call-signals";
 
 /** What somebody else's controls are set to, as far as they have said. */
 export interface PeerState {
@@ -38,6 +39,11 @@ export interface PeerState {
     readonly deafened: boolean;
     /** Whether they are writing this call to a file. */
     readonly recording: boolean;
+    /** Whether their hand is up. A state rather than an event, which is why it
+     *  reaches somebody who joined after it went up - see `call-signals`. */
+    readonly hand: boolean;
+    /** When it went up, so a room draws one queue rather than one order each. */
+    readonly handAt: number;
     /** The seat they are listening through, for people sitting in one room
      *  sharing one microphone between their devices - see `call-combine`. Null
      *  for an ordinary device, which is almost everybody. */
@@ -163,6 +169,19 @@ export interface CallState {
      *  half everybody else in the call can see. */
     readonly recording: boolean;
     setRecording: (on: boolean) => void;
+
+    /** Whether this browser's own hand is up, and the control that changes it.
+     *  Everybody else's is in their `PeerState`. */
+    readonly handRaised: boolean;
+    setHandRaised: (up: boolean) => void;
+    /** Who has a hand up, oldest first - a hand is a queue, and knowing who to
+     *  go to next is the reason anybody puts one up. */
+    readonly hands: readonly string[];
+
+    /** Reactions on screen right now, each for a few seconds. Ephemeral by
+     *  design: see `call-signals`. */
+    readonly reactions: readonly ShownReaction[];
+    react: (reaction: Reaction) => void;
 
     /**
      * Whether sound is actually flowing, and what to say when it is not.

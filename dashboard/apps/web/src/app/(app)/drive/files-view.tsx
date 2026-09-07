@@ -30,6 +30,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
 import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
 import { activityKey, prefetchListing } from "./listing-cache";
+import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { useDisplayFormat } from "@/components/display-format";
 import { matchesStructured, parseSearch } from "./search-query";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
@@ -93,6 +94,7 @@ import {
     ClipboardPaste,
     Copy,
     Download,
+    Loader2,
     Eraser,
     Eye,
     EyeOff,
@@ -255,14 +257,10 @@ function downloadUrl(connectionId: string, path: string): string {
     return `/api/drive/download?c=${connectionId}&p=${encodeURIComponent(path)}`;
 }
 
-/** Trigger a browser download for a file entry without leaving the page. */
+/** Trigger a browser download for a file entry without leaving the page. It is
+ *  counted while the server is still answering - see `drive/downloads`. */
 function triggerDownload(connectionId: string, entry: DriveEntry) {
-    const anchor = document.createElement("a");
-    anchor.href = downloadUrl(connectionId, entry.path);
-    anchor.download = entry.name;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    startDownload(downloadUrl(connectionId, entry.path), entry.name);
 }
 
 /** URL of the ZIP endpoint bundling several paths (files and/or folders). */
@@ -283,14 +281,12 @@ function downloadSelection(connectionId: string, entries: DriveEntry[]) {
         triggerDownload(connectionId, entries[0]);
         return;
     }
-    const anchor = document.createElement("a");
-    anchor.href = zipUrl(
-        connectionId,
-        entries.map((entry) => entry.path)
+    startDownload(
+        zipUrl(
+            connectionId,
+            entries.map((entry) => entry.path)
+        )
     );
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
 }
 
 /**
@@ -994,6 +990,10 @@ export function FilesView({
     const selectable = visible.filter((entry) => !leaving.has(entry.path));
     const selectedEntries = selectable.filter((entry) => selected.has(entry.path));
     const allSelected = selectable.length > 0 && selectedEntries.length === selectable.length;
+    // How many downloads the server has not answered yet, so the button that
+    // asked for one says it is working instead of looking like it missed the
+    // press - see `drive/downloads`.
+    const preparing = useDownloadsPending();
     // Anything but a single file comes down as an archive, and the button says so.
     const zipLabel =
         selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
@@ -1720,14 +1720,23 @@ export function FilesView({
                                     Get a link
                                 </Button>
                             ) : null}
-                            <Button asChild size="sm" variant="secondary">
-                                <a
-                                    href={downloadUrl(connectionId, viewerTarget.path)}
-                                    download={viewerTarget.name}
-                                >
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={preparing > 0}
+                                onClick={() =>
+                                    startDownload(
+                                        downloadUrl(connectionId, viewerTarget.path),
+                                        viewerTarget.name
+                                    )
+                                }
+                            >
+                                {preparing > 0 ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
                                     <Download className="size-4" />
-                                    Download
-                                </a>
+                                )}
+                                {preparing > 0 ? "Fetching" : "Download"}
                             </Button>
                         </div>
                     </div>
@@ -2162,11 +2171,17 @@ export function FilesView({
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => downloadSelection(connectionId, selectedEntries)}
-                                    title={zipLabel}
-                                    aria-label={zipLabel}
+                                    title={preparing > 0 ? "Fetching" : zipLabel}
+                                    aria-label={preparing > 0 ? "Fetching" : zipLabel}
                                 >
-                                    <Download className="size-4" />
-                                    <span className="hidden sm:inline">{zipLabel}</span>
+                                    {preparing > 0 ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Download className="size-4" />
+                                    )}
+                                    <span className="hidden sm:inline">
+                                        {preparing > 0 ? "Fetching" : zipLabel}
+                                    </span>
                                 </Button>
                                 <SelectionZipMenu
                                     connectionId={connectionId}

@@ -36,7 +36,9 @@ export interface ReadableMessage {
     /** The markup, with remote addresses parked unless they are allowed. */
     readonly html: string;
     readonly text: string;
-    /** Whether the frame may put the pictures back without being asked. */
+    /** Whether the pictures are drawn at all. True for every mailbox that has
+     *  not been set to block them, because what is drawn goes through Polaris
+     *  rather than out of the reader's browser. */
     readonly remoteAllowed: boolean;
     /** How many outside addresses this message carries. */
     readonly remoteCount: number;
@@ -121,6 +123,9 @@ function cleanLinks(html: string): string {
  */
 export async function readableMessage(
     accountId: string,
+    /** The message's own id, because the pictures are served back through an
+     *  address that names it. */
+    messageId: string,
     policy: ReadingPolicy,
     message: {
         readonly bodyHtml: string | null;
@@ -139,7 +144,16 @@ export async function readableMessage(
 
     let html = original;
     if (policy.cleanLinks) html = cleanLinks(html);
-    if (!allowed) html = core.holdRemoteContent(html);
+    // Every outside address is pointed at this server rather than at the
+    // sender's. The browser fetches from Polaris, Polaris fetches from them, and
+    // what a tracking pixel learns is that a server asked - not who read it,
+    // from where, on what, or when they opened it.
+    //
+    // A mailbox set to block still blocks: the addresses are held on
+    // `data-remote-*` and nothing is fetched at all.
+    html = allowed
+        ? core.proxyRemoteContent(html, (index) => `/api/mail/image/${messageId}/${index}`)
+        : core.holdRemoteContent(html);
 
     return {
         html,

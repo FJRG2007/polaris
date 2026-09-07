@@ -36,6 +36,9 @@ interface Made {
     readonly tag: TagView;
     /** The id the server gave it, or null if it refused - see `settleTagIds`. */
     readonly done: Promise<string | null>;
+    /** The same answer, readable without awaiting, once it has arrived. Null
+     *  while the creation is still in flight - see `storableTagId`. */
+    real: string | null;
 }
 
 const made = new Map<string, Made>();
@@ -123,6 +126,35 @@ export function withCreatedTags<Space extends Tagged>(space: Space): Space {
 }
 
 /**
+ * The id to write down for a tag, where waiting for one is not an option.
+ *
+ * `settleTagIds` is the right answer wherever a write can wait, and everything
+ * going to the server uses it. Storage cannot: a draft is put down between two
+ * keystrokes, and an id this browser invented means nothing to the browser that
+ * reads it back - the store that gave it out is gone with the page. So the
+ * server's own id is used as soon as it has arrived, which is well before
+ * anybody has finished typing.
+ */
+export function storableTagId(id: string): string {
+    return made.get(id)?.real ?? id;
+}
+
+/**
+ * A tag this browser made, found by either of the ids it can be named by.
+ *
+ * A draft read back out of storage names the server's id where it had arrived
+ * and this browser's where it had not, and until the screen has been refetched
+ * neither of them is in the list of tags it was given. This is where the tag
+ * still is, so a rescued draft comes back with it on.
+ */
+export function createdTag(id: string): TagView | null {
+    for (const entry of made.values()) {
+        if (entry.tag.id === id || entry.real === id) return entry.tag;
+    }
+    return null;
+}
+
+/**
  * Real ids for a list that may name tags this browser has only just invented.
  * Waits for any creation still in flight, and drops the ones that were refused -
  * a write must never carry an id that will never exist.
@@ -153,7 +185,7 @@ export function useTagCreation(spaceId: string, tags: readonly TagView[]): TagCr
             const done = new Promise<string | null>((resolve) => {
                 answer = resolve;
             });
-            made.set(id, { spaceId, tag: { id, name, color }, done });
+            made.set(id, { spaceId, tag: { id, name, color }, done, real: null });
             publish();
 
             /** Take it back off, and say so - the picker it was typed into is
@@ -170,7 +202,11 @@ export function useTagCreation(spaceId: string, tags: readonly TagView[]): TagCr
                 // A rejected call has already been refused by the handler above.
                 if (!result) return;
                 if (!result.tag) refuse(result.error ?? "The tag was not added.");
-                else answer(result.tag.id);
+                else {
+                    const entry = made.get(id);
+                    if (entry) entry.real = result.tag.id;
+                    answer(result.tag.id);
+                }
             })();
 
             return id;

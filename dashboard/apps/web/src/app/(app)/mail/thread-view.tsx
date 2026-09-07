@@ -36,9 +36,9 @@ import type { MailViewContext } from "./mail-view";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import { actOnAction, applyLabelAction, openMessageAction, trustSenderAction } from "./actions";
+import { actOnAction, applyLabelAction, openMessageAction } from "./actions";
 import {
     ArrowLeft,
     Archive,
@@ -48,6 +48,7 @@ import {
     Download,
     Forward,
     Mail,
+    MoreHorizontal,
     Paperclip,
     Star,
     Tag,
@@ -78,12 +79,36 @@ export function ThreadView({
     const [answering, startAnswering] = useTransition();
     const newest = messages.at(-1);
     const [open, setOpen] = useState<string[]>(newest ? [newest.id] : []);
+    const [expandAll, setExpandAll] = useState(false);
 
     // The conversation changed under the pane - a different row was clicked, or
     // a reply arrived. Whatever was open belonged to the old one.
     useEffect(() => {
         setOpen(messages.at(-1) ? [messages[messages.length - 1]!.id] : []);
+        setExpandAll(false);
     }, [thread.id, messages.length]);
+
+    /**
+     * What the pane actually lists.
+     *
+     * A conversation of thirty was thirty preview lines stacked on top of each
+     * other, which is a wall rather than a thread - the shape of it was
+     * unreadable. So the middle is folded away behind one line saying how many
+     * are in there, and what stays is the beginning and the end, which is what
+     * anybody opening a long thread is looking for.
+     */
+    const shown = useMemo<Shown[]>(() => {
+        if (expandAll || messages.length <= KEPT_OPEN + KEPT_FIRST + 1) {
+            return messages.map((message) => ({ kind: "message" as const, message }));
+        }
+        const first = messages.slice(0, KEPT_FIRST);
+        const last = messages.slice(-KEPT_OPEN);
+        return [
+            ...first.map((message) => ({ kind: "message" as const, message })),
+            { kind: "gap" as const, count: messages.length - first.length - last.length },
+            ...last.map((message) => ({ kind: "message" as const, message }))
+        ];
+    }, [messages, expandAll]);
 
     const act = useCallback(
         (action: MailAction) => {
@@ -271,22 +296,35 @@ export function ThreadView({
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-                <ul className="space-y-2">
-                    {messages.map((message) => (
-                        <MessageCard
-                            key={message.id}
-                            message={message}
-                            onRead={onRead}
-                            open={open.includes(message.id)}
-                            onToggle={() =>
-                                setOpen((held) =>
-                                    held.includes(message.id)
-                                        ? held.filter((id) => id !== message.id)
-                                        : [...held, message.id]
-                                )
-                            }
-                        />
-                    ))}
+                <ul className="space-y-1.5">
+                    {shown.map((entry) =>
+                        entry.kind === "gap" ? (
+                            <li key="gap">
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+                                    onClick={() => setExpandAll(true)}
+                                >
+                                    <MoreHorizontal className="size-3.5 shrink-0" aria-hidden />
+                                    {entry.count} earlier {entry.count === 1 ? "message" : "messages"}
+                                </button>
+                            </li>
+                        ) : (
+                            <MessageCard
+                                key={entry.message.id}
+                                message={entry.message}
+                                onRead={onRead}
+                                open={open.includes(entry.message.id)}
+                                onToggle={() =>
+                                    setOpen((held) =>
+                                        held.includes(entry.message.id)
+                                            ? held.filter((id) => id !== entry.message.id)
+                                            : [...held, entry.message.id]
+                                    )
+                                }
+                            />
+                        )
+                    )}
                 </ul>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -364,6 +402,18 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
         </DropdownMenu>
     );
 }
+
+/** How many of the newest messages stay on screen when a long conversation is
+ *  folded, and how many of the oldest. The last few are what somebody came for;
+ *  the first is where the thread started, which is the other thing people look
+ *  for. Everything between them is one line. */
+const KEPT_OPEN = 3;
+const KEPT_FIRST = 1;
+
+/** A row in the pane: a message, or the fold standing in for the ones between. */
+type Shown =
+    | { readonly kind: "message"; readonly message: MailMessageView }
+    | { readonly kind: "gap"; readonly count: number };
 
 /**
  * What a reply starts with.
@@ -455,7 +505,6 @@ function MessageCard({
 }) {
     const format = useDisplayFormat();
     const { refresh } = useMail();
-    const toast = useToast();
     const [readable, setReadable] = useState<ReadableMessage | null>(null);
     const [failed, setFailed] = useState("");
 
@@ -509,37 +558,56 @@ function MessageCard({
 
     return (
         <li className="rounded-md border border-border bg-card">
+            {/* Collapsed, a message is ONE line - who, a glimpse, when - because
+                a conversation is read by scanning down it. It was three lines
+                with the whole preview in the middle, so ten messages filled the
+                screen and the shape of the thread disappeared. */}
             <button
                 type="button"
-                className="flex w-full items-start gap-2 px-3 py-2 text-left"
+                className={cn(
+                    "flex w-full items-baseline gap-2 px-3 text-left",
+                    open ? "items-start py-2" : "py-1.5"
+                )}
                 aria-expanded={open}
                 onClick={onToggle}
             >
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                        <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
-                            {sender ? core.addressLabel(sender) : "(nobody)"}
-                        </span>
-                        <span className="min-w-0 truncate text-[12px] text-foreground-subtle">
-                            {sender?.address}
-                        </span>
-                        <span className="ml-auto shrink-0 text-[11px] text-foreground-subtle">
-                            {format.dateTime(new Date(message.sentAt))}
-                        </span>
-                    </div>
-                    {open ? (
+                {open ? (
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2">
+                            <span className="truncate text-[13px] font-medium text-foreground">
+                                {sender ? core.addressLabel(sender) : "(nobody)"}
+                            </span>
+                            <span className="min-w-0 truncate text-[12px] text-foreground-subtle">
+                                {sender?.address}
+                            </span>
+                        </div>
                         <p className="mt-0.5 truncate text-[12px] text-foreground-subtle">
                             to {message.to.map((entry) => core.addressLabel(entry)).join(", ") || "nobody"}
                             {message.cc.length > 0
                                 ? `, copy to ${message.cc.map((entry) => core.addressLabel(entry)).join(", ")}`
                                 : ""}
                         </p>
-                    ) : (
-                        <p className="truncate text-[12px] text-muted-foreground" title={message.snippet}>{message.snippet}</p>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <>
+                        <span
+                            className={cn(
+                                "w-40 shrink-0 truncate text-[13px]",
+                                message.seen ? "text-muted-foreground" : "font-semibold text-foreground"
+                            )}
+                        >
+                            {sender ? core.addressLabel(sender) : "(nobody)"}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
+                            {message.snippet}
+                        </span>
+                    </>
+                )}
+                <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
+                    {open ? format.dateTime(new Date(message.sentAt)) : shortWhen(message.sentAt, format)}
+                </span>
                 <ChevronDown
-                    className={cn("mt-0.5 size-4 shrink-0 text-foreground-subtle", open && "rotate-180")}
+                    className={cn("size-4 shrink-0 text-foreground-subtle", open && "rotate-180")}
                     aria-hidden
                 />
             </button>
@@ -560,26 +628,7 @@ function MessageCard({
                                 html={readable.html}
                                 text={readable.text}
                                 remoteAllowed={readable.remoteAllowed}
-                                remoteCount={readable.remoteCount}
                                 trackerVendors={readable.trackerVendors}
-                                onAlwaysAllow={
-                                    sender
-                                        ? () =>
-                                              void (async () => {
-                                                  const outcome = await trustSenderAction(message.accountId, {
-                                                      address: sender.address,
-                                                      trusted: true
-                                                  });
-                                                  const said = refusalOf(outcome);
-                                                  if (said) {
-                                                      toast.show({ title: said });
-                                                      return;
-                                                  }
-                                                  toast.show({ title: `Pictures from ${sender.address} will load from now on.` });
-                                                  refresh();
-                                              })()
-                                        : undefined
-                                }
                             />
                             {message.attachments.filter((file) => !file.inline).length > 0 ? (
                                 <ul className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
@@ -624,6 +673,13 @@ function MessageCard({
             ) : null}
         </li>
     );
+}
+
+/** The date beside a collapsed message: the time if it arrived today, the date
+ *  otherwise. Short, because it sits at the end of a one-line row. */
+function shortWhen(iso: string, format: ReturnType<typeof useDisplayFormat>): string {
+    const when = new Date(iso);
+    return when.toDateString() === new Date().toDateString() ? format.time(when) : format.date(when);
 }
 
 /** A file size somebody can read. Not a locale format: the units are the same

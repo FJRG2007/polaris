@@ -46,6 +46,15 @@ import { NEARBY_SLOTS, nearbyEnabled, scanNearby } from "./call-nearby";
 // What somebody says about their own controls, and why muting has to be said
 // out loud at all rather than read off the publication.
 import { DEAFENED, MUTED, RECORDING, peerState } from "./call-peer-state";
+import {
+    HAND,
+    HAND_AT,
+    REACTION_FOR_MS,
+    callSignalSchema,
+    handQueue,
+    type Reaction,
+    type ShownReaction
+} from "./call-signals";
 import { playCallSound } from "@/lib/call-sounds";
 import { callMuted, setCallMuted } from "./call-muted";
 import { useVoiceGate } from "./voice-gate";
@@ -54,7 +63,7 @@ import type { MeetingView } from "@/lib/chat/meetings";
 import { callDevices, openMedia, refused, settle } from "./call-media";
 import { withCameraDevice } from "./camera-device";
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
 import type {
@@ -191,6 +200,13 @@ const CARRYING_WITHIN_MS = 30_000;
  */
 const SETTLING_MS = 10_000;
 
+/** How many times a microphone that will not go on the call is put back before
+ *  Polaris stops trying and says so. Three, because the two causes worth
+ *  retrying - a graph that had not started and a publication lost to a
+ *  reconnection - are both fixed by the first or second attempt, and a fourth is
+ *  a browser that is not going to do it. */
+const MIC_REPAIR_TRIES = 3;
+
 /**
  * How long somebody is alone in a call before the room behind it is let go of.
  *
@@ -323,6 +339,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Whether this browser is telling the room it is recording. What is being
      *  written lives in `call-recorder`; this is the half everybody can see. */
     const [recording, setRecordingSaid] = useState(false);
+    /** This browser's own hand. Said out loud as an attribute as well, which is
+     *  what carries it to somebody who joins after it went up. */
+    const [handRaised, setHandUp] = useState(false);
+    /** When this browser's own hand went up, so its place in the queue is the
+     *  same one everybody else computes for it. */
+    const handUpAt = useRef(0);
+    /** Reactions on screen, each swept a few seconds after it arrived. */
+    const [reactions, setReactions] = useState<readonly ShownReaction[]>([]);
     /**
      * Whether this browser is holding a room nobody else is in.
      *
@@ -463,6 +487,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  is what tells "the sound stopped" from "the sound never had a way in" -
      *  see `everHeard` in `call-diagnosis`. */
     const everHeard = useRef(false);
+    /** How many times this call has put the microphone back up. Reset per call:
+     *  it is a budget for one room, not for the session. */
+    const micRepairs = useRef(0);
+    /** The repair, as the sampler reaches it. Assigned on every render. */
+    const repair = useRef<() => Promise<void>>(async () => undefined);
 
     /** What the sampler needs about the room and cannot read off the connection:
      *  who is admitted, what they have said about themselves, and what this
@@ -672,9 +701,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             source: Track.Source,
             track: MediaStreamTrack | null,
             options?: { again?: boolean }
-        ) => {
+        ): Promise<boolean> => {
             const current = room.current;
-            if (!current || current.state !== CONNECTED) return;
+            if (!current || current.state !== CONNECTED) return false;
             const local = current.localParticipant;
             const existing = local.getTrackPublication(source);
 
@@ -682,22 +711,23 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (existing?.track) {
                     await local.unpublishTrack(existing.track, false).catch(() => undefined);
                 }
-                return;
+                // Nothing to send is not a failure to send it.
+                return true;
             }
             if (existing?.track && !options?.again) {
                 // `true` is "this track is the caller's": the old one is left
                 // alone rather than stopped, which is what makes a microphone
                 // swap reversible.
                 await existing.track.replaceTrack(track, true).catch(() => undefined);
-                return;
+                return true;
             }
             if (existing?.track) {
                 await local.unpublishTrack(existing.track, false).catch(() => undefined);
             }
             const screening = source === SCREEN;
             const level = levelNow(screening ? "screen" : "camera");
-            await local
-                .publishTrack(track, {
+            try {
+                await local.publishTrack(track, {
                     source,
                     // What the encoder is allowed to spend, sized to the picture
                     // it is being given. Left out, the client sizes it from the
@@ -733,8 +763,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                             ? "maintain-framerate"
                             : "maintain-resolution"
                         : "balanced"
-                })
-                .catch(() => undefined);
+                });
+                return true;
+            } catch (caught) {
+                // Swallowed until now, and that was the whole of a reported
+                // outage: a microphone that would not go up left a call
+                // connected, both names on screen, sound in one direction only,
+                // and nothing anywhere saying so - least of all to the person it
+                // happened to, since what is missing is their own voice.
+                //
+                // Nothing is shown from here. A camera that will not publish is
+                // worth far less noise than a voice is, so the caller decides;
+                // what this does is stop pretending it worked.
+                console.error("call: a track could not be published", caught);
+                return false;
+            }
         },
         [levelNow]
     );
@@ -808,6 +851,44 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, []);
 
     /**
+     * Put the microphone back on the call when it is not on it.
+     *
+     * This is the one fault on a call that the person it happens to cannot hear,
+     * because what is missing is their own voice: the room is connected, both
+     * names are on screen, sound arrives, and nothing they send goes anywhere. It
+     * reached us as "calls work in one direction" and as a panel reading `Your
+     * microphone: Open, not being sent`, which named it exactly and could do
+     * nothing about it.
+     *
+     * Two attempts, and the order matters. The cleaned-up track first, because
+     * that is what the call should be carrying; then the bare device, because the
+     * filter is the half that fails on its own - a graph built on an audio
+     * context the browser declined to start hands back a track that nothing will
+     * accept, and a raw microphone is worth immeasurably more than a filtered
+     * silence. A few goes, then it is said out loud rather than retried for the
+     * length of the call.
+     */
+    const repairMic = useCallback(async (): Promise<void> => {
+        const current = room.current;
+        const device = mic.current;
+        if (!current || current.state !== CONNECTED) return;
+        if (!device || device.readyState !== "live") return;
+        if (current.localParticipant.getTrackPublication(MICROPHONE)?.track) return;
+        if (micRepairs.current >= MIC_REPAIR_TRIES) return;
+        micRepairs.current += 1;
+
+        if (await publish(MICROPHONE, outgoingMic())) return;
+        // Only worth a second attempt when there was something between the
+        // device and the call to leave out.
+        if (filtered.current && (await publish(MICROPHONE, device))) return;
+        if (micRepairs.current >= MIC_REPAIR_TRIES) {
+            setError(
+                "This device could not put its microphone on the call, so nobody else can hear it. Leaving the call and joining again usually clears it."
+            );
+        }
+    }, [outgoingMic, publish]);
+
+    /**
      * Everything that was true of the last call and is not true of this one.
      *
      * A hook outlives the calls it carries - the provider holding it is above
@@ -845,6 +926,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         setAudioMembers([]);
         setCombineAsked(null);
         setCombineRequest(null);
+        // A hand left up would be raised in the next call, at nobody.
+        setHandUp(false);
+        handUpAt.current = 0;
+        setReactions([]);
         setNearby(new Set());
     }, []);
 
@@ -854,6 +939,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         const inCall = meetingId;
         let stopped = false;
         let source: EventSource | null = null;
+        // A budget for this room rather than for the session.
+        micRepairs.current = 0;
         let beat: ReturnType<typeof setInterval> | null = null;
         /**
          * Whether the connection has been made, so the waiting room does not
@@ -1143,7 +1230,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // Everything this browser already had open goes up now. Nothing was
             // published before the connection existed, so this is the one place
             // the first publication happens.
-            await publish(MICROPHONE, outgoingMic());
+            // Checked rather than fired and forgotten. A publication that never
+            // went up is a call this browser is silent on, and it used to be
+            // invisible from both ends - see `repairMic`.
+            if (!(await publish(MICROPHONE, outgoingMic()))) await repairMic();
             // Both halves of the truth, whichever it is - and the second half
             // used to be missing on the way in.
             //
@@ -1206,6 +1296,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             try {
                 raw = JSON.parse(new TextDecoder().decode(payload));
             } catch {
+                return;
+            }
+            // A reaction, which is the other thing that travels this way. Checked
+            // as strictly as a request body: it comes from somebody else's
+            // browser, and sharing a call with us makes it no more trustworthy.
+            const signal = callSignalSchema.safeParse(raw);
+            if (signal.success) {
+                show({
+                    id: `${participant.identity}:${Date.now()}:${Math.random()}`,
+                    from: participant.identity,
+                    reaction: signal.data.reaction,
+                    at: Date.now()
+                });
                 return;
             }
             const message = combineMessageSchema.safeParse(raw);
@@ -1394,6 +1497,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         publish,
         publishLocalPreview,
         refresh,
+        repairMic,
         resort,
         resortStates,
         say,
@@ -1529,6 +1633,20 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             });
     }, []);
 
+    /**
+     * Put one reaction on screen and take it off again.
+     *
+     * Swept by its own timer rather than by a tick over the list: a room of ten
+     * agreeing at once is ten timers that each cost nothing, against a re-render
+     * every fraction of a second for as long as anybody is in a call.
+     */
+    const show = useCallback((shown: ShownReaction) => {
+        setReactions((current) => [...current, shown]);
+        setTimeout(() => {
+            setReactions((current) => current.filter((entry) => entry.id !== shown.id));
+        }, REACTION_FOR_MS);
+    }, []);
+
     /** Tell the room this browser is recording it, or that it has stopped. */
     const setRecording = useCallback(
         (on: boolean) => {
@@ -1537,6 +1655,67 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             say({ [RECORDING]: on ? "1" : "" });
         },
         [say]
+    );
+
+    /**
+     * Put a hand up, or take it down.
+     *
+     * Two keys rather than one: the hand, and the moment it went up. A hand is a
+     * queue - the reason to raise one in a call of twenty is so whoever is
+     * chairing knows who is next - and the moment is what lets every browser sort
+     * the same list from what the server already hands it, with nothing to agree
+     * on and no message to miss.
+     */
+    const setHandRaised = useCallback(
+        (up: boolean) => {
+            handUpAt.current = up ? Date.now() : 0;
+            setHandUp(up);
+            say({ [HAND]: up ? "1" : "", [HAND_AT]: up ? String(handUpAt.current) : "" });
+        },
+        [say]
+    );
+
+    /**
+     * Say something without saying it.
+     *
+     * Sent to the room and drawn here too, from the same path: a reaction that
+     * only appeared on everybody else's screen would leave the person who sent it
+     * unsure whether it went. Unreliable on purpose - it is worth nothing a
+     * second later, so it is not worth the retransmissions that would guarantee
+     * it and would arrive after the moment had passed.
+     */
+    const react = useCallback(
+        (reaction: Reaction) => {
+            const seat = me.current;
+            if (!seat) return;
+            show({ id: `${seat}:${Date.now()}`, from: seat, reaction, at: Date.now() });
+            const body = new TextEncoder().encode(JSON.stringify({ kind: "reaction", reaction }));
+            void room.current?.localParticipant
+                .publishData(body, { reliable: false })
+                .catch(() => undefined);
+        },
+        [show]
+    );
+
+    /**
+     * Who has a hand up, oldest first, this browser included.
+     *
+     * Its own seat is folded in from local state rather than read back off the
+     * attributes: the server echoes what this browser said a moment later, and a
+     * hand that appears in the queue half a second after it was raised reads as
+     * the button not having worked.
+     */
+    const hands = useMemo(
+        () =>
+            handQueue([
+                ...(participantId && handRaised
+                    ? [{ id: participantId, hand: true, handAt: handUpAt.current }]
+                    : []),
+                ...[...states.entries()]
+                    .filter(([id]) => id !== participantId)
+                    .map(([id, state]) => ({ id, hand: state.hand, handAt: state.handAt }))
+            ]),
+        [handRaised, participantId, states]
     );
 
     /** The device swap, reachable from the controls above where it is declared.
@@ -2000,6 +2179,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * per call instead of being torn down and rebuilt every time somebody mutes
      * themselves or joins.
      */
+    // Read by the sampler, which is started once per call and must not be torn
+    // down every time this identity changes.
+    repair.current = repairMic;
+
     watching.current = {
         others: (meeting?.participants ?? [])
             .filter((person) => person.admission === "admitted" && person.id !== participantId)
@@ -2174,6 +2357,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // while the room is still settling, because a person who has just
             // been admitted has not connected yet and reads exactly like one
             // whose audio never arrived.
+            // The one row here that can be repaired rather than only reported.
+            // Asked every tick and guarded by its own budget, so a publication
+            // lost to a reconnection comes back without anybody pressing
+            // anything.
+            if (link === "connected" && facts.mic === "unpublished") void repair.current();
             const judged = diagnoseCall(facts);
             const report =
                 at - settledAt.current < SETTLING_MS
@@ -2454,6 +2642,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         leaveCombine,
         recording,
         setRecording,
+        handRaised,
+        setHandRaised,
+        hands,
+        reactions,
+        react,
         audio,
         outgoing: filteredTrack ?? micTrack
     };

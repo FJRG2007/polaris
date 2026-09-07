@@ -17,6 +17,7 @@ import { listLocks } from "@/lib/access-lock-service";
 import { recordAudit } from "@/lib/audit-service";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { baseNameOf, zipSourcesFor } from "@/lib/drive-archive";
+import { downloadTicketCookie, validDownloadTicket } from "@/lib/drive/download-ticket";
 import type { StorageDriver } from "@polaris/storage";
 
 export const runtime = "nodejs";
@@ -88,12 +89,15 @@ export async function GET(request: Request): Promise<Response> {
     });
 
     const archiveName = paths.length === 1 && paths[0] ? `${baseNameOf(paths[0])}.zip` : "polaris-files.zip";
-    return new Response(createZipStream(sources()), {
-        status: 200,
-        headers: {
-            "content-type": "application/zip",
-            "content-disposition": `attachment; filename="${asciiFallback(archiveName)}"; filename*=UTF-8''${encodeURIComponent(archiveName)}`,
-            "cache-control": "no-store"
-        }
+    const headers = new Headers({
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename="${asciiFallback(archiveName)}"; filename*=UTF-8''${encodeURIComponent(archiveName)}`,
+        "cache-control": "no-store"
     });
+    // The page asked to be told when this began. Building an archive of a folder
+    // is the slowest thing Drive hands anybody, and a button with no answer for
+    // twenty seconds is a button people press four times - see `download-ticket`.
+    const ticket = url.searchParams.get("dl");
+    if (validDownloadTicket(ticket)) headers.append("set-cookie", downloadTicketCookie(ticket));
+    return new Response(createZipStream(sources()), { status: 200, headers });
 }

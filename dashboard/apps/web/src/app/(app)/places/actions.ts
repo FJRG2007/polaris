@@ -25,6 +25,7 @@ import { revalidatePath } from "next/cache";
 import * as events from "@/lib/home/events";
 import * as alerts from "@/lib/home/alerts";
 import * as places from "@/lib/home/places";
+import * as devices from "@/lib/home/devices";
 import * as people from "@/lib/home/people";
 import * as cameras from "@/lib/home/cameras";
 import * as cameraZones from "@/lib/home/camera-zones";
@@ -41,13 +42,19 @@ import * as defaults from "@/lib/home/detection-defaults";
 import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
 import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/detection";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
+import { recordAudit } from "@/lib/audit-service";
+import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
+import { connectNuki, disconnectNuki, nukiConnection, type NukiConnection } from "@/lib/home/nuki-devices";
 import {
     alertRuleInputSchema,
     cameraInputSchema,
     cameraProbeInputSchema,
     cameraZoneInputSchema,
+    deviceAccountSchema,
+    deviceEditSchema,
     discoveryInputSchema,
     normalizeCameraInput,
+    normalizeDeviceInput,
     normalizeZoneInput
 } from "@/lib/home/schemas";
 import {
@@ -1063,4 +1070,177 @@ export async function liveCamerasAction(): Promise<{ live?: string[]; error?: st
             .map((camera) => camera.id);
     });
     return result.error ? { error: result.error } : { live: result.value };
+}
+// ---------------------------------------------------------------------------
+// Devices
+// ---------------------------------------------------------------------------
+//
+// The same three gates as the cameras, applied to the one difference between a
+// camera and a door: this half of the app does things rather than watches them.
+// Reading a lock's state is `home.read`, operating it is `home.control`, and
+// connecting the account it is on - or taking a door off the controls entirely -
+// is `home.manage`. Every operation is written to the audit log as well as to the
+// door's own history, because "who opened the office at 03:00" has to be
+// answerable from Polaris' own side too, and the door's history is the vendor's.
+
+/** The doors at this place, and how the account they are on is doing. */
+export async function listDevicesAction(): Promise<{
+    devices?: DeviceView[];
+    account?: NukiConnection;
+    error?: string;
+}> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        const [list, account] = await Promise.all([
+            devices.listDevices(install.id, current.id),
+            nukiConnection()
+        ]);
+        return { list, account };
+    });
+    if (result.error) return { error: result.error };
+    return { devices: result.value?.list, account: result.value?.account };
+}
+
+/**
+ * Go and ask the account what it has, now.
+ *
+ * A read rather than a control: it changes nothing at the door, and somebody
+ * looking at a screen of locks has to be able to find out whether it is current.
+ */
+export async function syncDevicesAction(): Promise<{ devices?: DeviceView[]; error?: string; }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const outcome = await devices.syncDevices(install.id);
+        const { current } = await currentPlace(install.id);
+        return { outcome, list: await devices.listDevices(install.id, current.id) };
+    });
+    if (result.error) return { error: result.error };
+    // A sync that reached one account and not another has both an answer and a
+    // complaint, so the screen gets the doors it did read alongside the line
+    // about the ones it did not.
+    return { devices: result.value?.list, error: result.value?.outcome.error ?? undefined };
+}
+
+/** Lock, unlock or open one door. */
+export async function operateDeviceAction(
+    deviceId: string,
+    action: DeviceAction
+): Promise<{ device?: DeviceView; error?: string; }> {
+    const { user, install } = await requireHome("home.control");
+    const result = await guard(() => devices.actOnDevice(install.id, String(deviceId), action));
+    if (result.error) {
+        // Recorded refused as well as done. An attempt that was turned down is
+        // the half of this log that says somebody tried.
+        await recordAudit({
+            actorId: user.id,
+            action: `places.device.${action}.refused`,
+            targetType: "placeDevice",
+            targetId: String(deviceId)
+        });
+        return { error: result.error };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: `places.device.${action}`,
+        targetType: "placeDevice",
+        targetId: String(deviceId),
+        metadata: { name: result.value?.name }
+    });
+    return { device: result.value };
+}
+
+/** What a door is called, where it is, and whether Polaris may operate it. */
+export async function saveDeviceAction(
+    deviceId: string,
+    input: unknown
+): Promise<{ device?: DeviceView; error?: string; }> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = deviceEditSchema.safeParse(normalizeDeviceInput((input ?? {}) as Record<string, unknown>));
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const result = await guard(() => devices.updateDevice(install.id, String(deviceId), parsed.data));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.device.update",
+        targetType: "placeDevice",
+        targetId: String(deviceId)
+    });
+    return { device: result.value };
+}
+
+/** What has happened at a door, or at every door of this place. */
+export async function deviceHistoryAction(
+    deviceId: string | null,
+    limit = 100
+): Promise<{ events?: DeviceEventView[]; error?: string; }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(async () => {
+        const { current } = await currentPlace(install.id);
+        return devices.listDeviceEvents(install.id, {
+            deviceId: deviceId ? String(deviceId) : null,
+            placeId: deviceId ? null : current.id,
+            limit
+        });
+    });
+    return result.error ? { error: result.error } : { events: result.value };
+}
+
+/** When a door was used, for the chart. Bare times: the day one falls in is the
+ *  reader's own, and only their browser knows which zone that is. */
+export async function deviceUsageAction(deviceId: string): Promise<{ used?: number[]; error?: string; }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => devices.deviceUsage(install.id, String(deviceId)));
+    return result.error ? { error: result.error } : { used: result.value };
+}
+
+/**
+ * Connect the account the locks are on.
+ *
+ * Administrative, as adding a camera is, and for a stronger reason: this is the
+ * credential to somebody's front door, and the account behind it can open every
+ * lock on it.
+ */
+export async function connectDeviceAccountAction(
+    input: unknown
+): Promise<{ devices?: DeviceView[]; account?: NukiConnection; error?: string; }> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the token and try again" };
+    const result = await guard(async () => {
+        await connectNuki(parsed.data.token, parsed.data.label);
+        await devices.syncDevices(install.id);
+        const { current } = await currentPlace(install.id);
+        return {
+            list: await devices.listDevices(install.id, current.id),
+            account: await nukiConnection()
+        };
+    });
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.deviceAccount.connect",
+        targetType: "installedApp",
+        targetId: install.id,
+        metadata: { vendor: "nuki" }
+    });
+    return { devices: result.value?.list, account: result.value?.account };
+}
+
+/** Take the account away, and the doors and their history with it. */
+export async function disconnectDeviceAccountAction(): Promise<{ account?: NukiConnection; error?: string; }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(async () => {
+        await disconnectNuki(install.id);
+        return nukiConnection();
+    });
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.deviceAccount.disconnect",
+        targetType: "installedApp",
+        targetId: install.id,
+        metadata: { vendor: "nuki" }
+    });
+    return { account: result.value };
 }

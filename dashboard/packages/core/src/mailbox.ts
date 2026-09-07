@@ -897,3 +897,41 @@ export function textToHtml(text: string): string {
     );
     return `<div class="plain">${lines.join("\n")}</div>`;
 }
+
+/**
+ * The same markup with every outside address pointed at Polaris instead.
+ *
+ * This is what lets a message show its pictures without telling the sender
+ * anything. The browser never fetches from the sender's server: it asks this
+ * Polaris, which fetches on its behalf, so what reaches a tracking pixel is the
+ * server's own request - not the reader's address, not their browser, not the
+ * moment they opened it beyond the moment Polaris asked.
+ *
+ * `toProxy` is given the index of the address in the same order
+ * `remoteResourcesIn` reports them, and nothing else: the URL is never handed
+ * back to the browser and never travels in a link, so this cannot be turned into
+ * an open proxy by anybody typing one.
+ */
+export function proxyRemoteContent(html: string, toProxy: (index: number) => string): string {
+    let index = -1;
+    const next = () => {
+        index += 1;
+        return toProxy(index);
+    };
+    return (
+        html
+            .replace(
+                /\b(src|background|poster)\s*=\s*(["'])(https?:\/\/[^"']*)\2/gi,
+                (_match, name: string, quote: string) => `${name}=${quote}${next()}${quote}`
+            )
+            // A srcset names several addresses and the browser picks one. Only
+            // the first is kept: the rest are the same picture at other sizes,
+            // and a proxy that had to serve every candidate would fetch four
+            // pictures to draw one.
+            .replace(
+                /\bsrcset\s*=\s*(["'])[^"']*\1/gi,
+                (_match, quote: string) => `srcset=${quote}${next()}${quote}`
+            )
+            .replace(/url\(\s*(["']?)https?:\/\/[^"')]+\1\s*\)/gi, () => `url(${next()})`)
+    );
+}

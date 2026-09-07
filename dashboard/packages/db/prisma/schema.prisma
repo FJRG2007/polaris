@@ -8926,7 +8926,7 @@ model MailAccount {
 
     // Privacy, per account rather than per person: a work mailbox and a personal
     // one are not the same decision.
-    remoteContent  String  @default("trusted")
+    remoteContent  String  @default("always")
     nameTrackers   Boolean @default(true)
     answerReceipts Boolean @default(false)
     cleanLinks     Boolean @default(true)

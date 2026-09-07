@@ -37,12 +37,25 @@ export interface MessagePart {
     readonly inline: boolean;
 }
 
+/** How a part was wrapped for the journey, and what its bytes mean. Carried
+ *  because a part read without them is the mojibake that made a Spanish thread
+ *  read as `Mar=C3=ADa` in every preview line. */
+export interface PartCoding {
+    readonly encoding: string;
+    readonly charset: string;
+    /** Whether a plain-text part is soft-wrapped, so the paragraphs can be put
+     *  back together instead of arriving in 72-character pieces. */
+    readonly flowed: boolean;
+}
+
 /** What one message is made of. */
 export interface MessageShape {
     /** The part holding the plain text, or "" when there is none. */
     readonly textPart: string;
     /** The part holding the HTML, or "" when there is none. */
     readonly htmlPart: string;
+    readonly textCoding: PartCoding;
+    readonly htmlCoding: PartCoding;
     readonly attachments: readonly MessagePart[];
     /** Whether the paperclip is drawn: a file somebody attached, not a picture
      *  the message draws itself with. */
@@ -52,13 +65,32 @@ export interface MessageShape {
 /** IMAP's name for the body of a message that has no parts. */
 export const WHOLE_BODY = "TEXT";
 
-const EMPTY: MessageShape = { textPart: "", htmlPart: "", attachments: [], hasAttachments: false };
+const NO_CODING: PartCoding = { encoding: "", charset: "", flowed: false };
+
+const EMPTY: MessageShape = {
+    textPart: "",
+    htmlPart: "",
+    textCoding: NO_CODING,
+    htmlCoding: NO_CODING,
+    attachments: [],
+    hasAttachments: false
+};
+
+function codingOf(node: MessageStructureObject): PartCoding {
+    return {
+        encoding: node.encoding ?? "",
+        charset: node.parameters?.charset ?? "",
+        flowed: (node.parameters?.format ?? "").toLowerCase() === "flowed"
+    };
+}
 
 export function readShape(structure: MessageStructureObject | undefined): MessageShape {
     if (!structure) return EMPTY;
     const attachments: MessagePart[] = [];
     let textPart = "";
     let htmlPart = "";
+    let textCoding = NO_CODING;
+    let htmlCoding = NO_CODING;
 
     const walk = (node: MessageStructureObject, depth: number): void => {
         // A message inside a message is a forward. Its parts are addressable and
@@ -85,10 +117,12 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
 
         if (!isFile && type === "text/plain" && !textPart) {
             textPart = part || WHOLE_BODY;
+            textCoding = codingOf(node);
             return;
         }
         if (!isFile && type === "text/html" && !htmlPart) {
             htmlPart = part || WHOLE_BODY;
+            htmlCoding = codingOf(node);
             return;
         }
         if (!part) return;
@@ -111,12 +145,19 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
     // A message with no multipart structure at all: one node, no part number.
     if (!textPart && !htmlPart && !structure.childNodes) {
         const type = (structure.type ?? "").toLowerCase();
-        if (type === "text/html") htmlPart = WHOLE_BODY;
-        else textPart = WHOLE_BODY;
+        if (type === "text/html") {
+            htmlPart = WHOLE_BODY;
+            htmlCoding = codingOf(structure);
+        } else {
+            textPart = WHOLE_BODY;
+            textCoding = codingOf(structure);
+        }
     }
     return {
         textPart,
         htmlPart,
+        textCoding,
+        htmlCoding,
         attachments,
         hasAttachments: attachments.some((entry) => !entry.inline)
     };

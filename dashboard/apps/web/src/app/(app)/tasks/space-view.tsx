@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import * as actions from "./actions";
+import { useRouter } from "next/navigation";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
 import { ProgressBar, StatusDot } from "./pickers";
@@ -654,6 +655,11 @@ function TagsTab({
     const [draft, setDraft] = useState<{ name: string; color: string } | null>(null);
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState<TagView | null>(null);
+    // Adding one is the single write here the action does not re-render for: it
+    // is the same call the task pickers make, and there it must leave the task
+    // being written alone. This screen is the one place a new tag has to appear
+    // in a list that came from the server, so it asks for the list itself.
+    const router = useRouter();
 
     const save = async () => {
         if (!editing || !draft || !draft.name.trim()) return;
@@ -770,7 +776,10 @@ function TagsTab({
                                 onError
                             );
                             if (result?.error) onError(result.error);
-                            else setName("");
+                            else if (result) {
+                                setName("");
+                                router.refresh();
+                            }
                         }}
                     >
                         <Plus className="size-3.5" /> Add

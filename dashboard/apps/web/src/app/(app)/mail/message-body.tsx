@@ -29,8 +29,8 @@
  * load, once, when its reader decided.
  */
 
-import { Button, cn } from "@polaris/ui";
-import { Eye, ShieldCheck } from "lucide-react";
+import { cn } from "@polaris/ui";
+import { ShieldCheck } from "lucide-react";
 import * as core from "@polaris/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -38,24 +38,15 @@ export function MessageBody({
     html,
     text,
     remoteAllowed,
-    remoteCount,
-    trackerVendors,
-    onAlwaysAllow
+    trackerVendors
 }: {
     html: string;
     text: string;
+    /** Whether this mailbox draws pictures at all. They are served through
+     *  Polaris either way, so this is a preference rather than a defence. */
     remoteAllowed: boolean;
-    remoteCount: number;
     trackerVendors: readonly string[];
-    /** Trust this sender from now on. Absent when there is nobody to trust -
-     *  a message with no remote content at all. */
-    onAlwaysAllow?: () => void;
 }) {
-    // Once for this message, without changing the setting. The ordinary case:
-    // somebody wants to see this newsletter and has no opinion about the next
-    // one from the same address.
-    const [showOnce, setShowOnce] = useState(false);
-    const showing = remoteAllowed || showOnce;
 
     /**
      * What is actually drawn.
@@ -81,29 +72,16 @@ export function MessageBody({
 
     return (
         <div className="min-w-0">
-            {!remoteAllowed && remoteCount > 0 ? (
-                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                    <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
-                    <p className="min-w-0 flex-1 text-[12px] text-muted-foreground">
-                        {blockedSentence(remoteCount, trackerVendors)}
-                    </p>
-                    {!showOnce ? (
-                        <Button variant="secondary" size="sm" onClick={() => setShowOnce(true)}>
-                            <Eye className="size-3.5 shrink-0" aria-hidden />
-                            Show pictures
-                        </Button>
-                    ) : null}
-                    {onAlwaysAllow ? (
-                        <Button variant="ghost" size="sm" onClick={onAlwaysAllow}>
-                            Always from this sender
-                        </Button>
-                    ) : null}
-                </div>
+            {trackerVendors.length > 0 ? (
+                <p className="mb-2 flex items-center gap-1.5 text-[12px] text-foreground-subtle">
+                    <ShieldCheck className="size-3.5 shrink-0 text-success" aria-hidden />
+                    {trackerSentence(trackerVendors)}
+                </p>
             ) : null}
 
             {drawn.trim() ? (
                 <>
-                    <SandboxedHtml html={drawn} showRemote={showing} paper={inForce} />
+                    <SandboxedHtml html={drawn} showRemote={remoteAllowed} paper={inForce} />
                     <button
                         type="button"
                         className="mt-2 text-[12px] text-foreground-subtle underline hover:text-foreground"
@@ -121,14 +99,18 @@ export function MessageBody({
     );
 }
 
-/** What the bar above a message says. Naming the companies is the whole reason
- *  this setting survives contact with a real person: "4 blocked, from Mailchimp"
- *  is information, and "some images were blocked" is an annoyance. */
-function blockedSentence(remoteCount: number, vendors: readonly string[]): string {
-    const pictures = `${remoteCount} thing${remoteCount === 1 ? "" : "s"} this message wanted to load from elsewhere`;
-    if (vendors.length === 0) return `Blocked ${pictures}.`;
+/**
+ * The line above a message that carried trackers.
+ *
+ * A statement, not a gate. The pictures are already on screen - they came
+ * through Polaris, so the sender learned nothing - and this says who was trying
+ * to watch. A button that made somebody click before seeing their own mail was
+ * the wrong trade: neither Gmail nor Proton asks that, and it turned every
+ * newsletter into a chore.
+ */
+function trackerSentence(vendors: readonly string[]): string {
     const named = vendors.length === 1 ? vendors[0] : `${vendors.slice(0, -1).join(", ")} and ${vendors.at(-1)}`;
-    return `Blocked ${pictures}, including trackers from ${named}.`;
+    return `Trackers from ${named} were served through Polaris, so they learned nothing about you.`;
 }
 
 /**
@@ -182,8 +164,11 @@ function readerColors(): { foreground: string; link: string; dark: boolean } {
 
 /** The wrapper the message is drawn inside. Nothing here is the message's: the
  *  policy, the base target, the colours and the height reporter are all ours. */
-function frameDocument(body: string, showRemote: boolean, paper: MessagePaper): string {
-    const images = showRemote ? "img-src https: data: cid:;" : "img-src data:;";
+function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, origin: string): string {
+    // Only this origin, and only when the mailbox draws pictures at all. Not
+    // `https:` - that would let a message fetch straight from its sender and
+    // undo the whole point of serving them through here.
+    const images = showRemote ? `img-src ${origin} data: cid:;` : "img-src data:;";
     const colors = readerColors();
     // `color-scheme` is what stops a browser inverting form controls and
     // scrollbars inside the frame against the page it is actually drawn on.
@@ -238,6 +223,14 @@ function SandboxedHtml({
     showRemote: boolean;
     paper: MessagePaper;
 }) {
+    // What this Polaris is called from where the reader is sitting. Read once,
+    // and never during render: the server has no window, and a value that
+    // differed between its HTML and the browser's first paint is a hydration
+    // mismatch on the most security-sensitive component in the app.
+    const [origin, setOrigin] = useState("");
+    useEffect(() => {
+        setOrigin(window.location.origin);
+    }, []);
     const frame = useRef<HTMLIFrameElement | null>(null);
     const [height, setHeight] = useState(240);
     const [clean, setClean] = useState<string | null>(null);
@@ -271,16 +264,17 @@ function SandboxedHtml({
         };
     }, [html]);
 
-    // "Show pictures" is the held addresses being put back, in the browser, with
-    // nothing asked of the server. Done on the sanitized markup so the frame is
-    // rebuilt from something that has already been through the sanitizer.
+    /**
+     * The frame has an opaque origin - the sandbox withheld same-origin - so a
+     * relative address in it resolves against nothing. The proxy paths the
+     * server wrote are made absolute here, in the browser that knows what this
+     * Polaris is called, which is also what the frame's own policy then names as
+     * the only place a picture may come from.
+     */
     const body = useMemo(() => {
         if (clean === null) return "";
-        if (!showRemote) return clean;
-        return clean
-            .replace(/data-remote-(src|srcset|background|poster)=/gi, (_match, name: string) => `${name}=`)
-            .replace(/url\((['"]?)about:blank\1\)/gi, "url()");
-    }, [clean, showRemote]);
+        return clean.replace(/(["'])\/api\/mail\/image\//g, (_match, quote: string) => `${quote}${origin}/api/mail/image/`);
+    }, [clean, origin]);
 
     useEffect(() => {
         function onMessage(event: MessageEvent) {
@@ -295,7 +289,7 @@ function SandboxedHtml({
         return () => window.removeEventListener("message", onMessage);
     }, []);
 
-    if (clean === null) {
+    if (clean === null || !origin) {
         return <div className="h-24 animate-pulse rounded-md bg-card" aria-label="Opening the message" />;
     }
 
@@ -307,7 +301,7 @@ function SandboxedHtml({
             // granted only so the frame can report its own height; with an
             // opaque origin they reach nothing of this page's.
             sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-            srcDoc={frameDocument(body, showRemote, paper)}
+            srcDoc={frameDocument(body, showRemote, paper, origin)}
             className={cn(
                 "w-full border-0",
                 // A message on its own page gets a card to sit on, so it reads as

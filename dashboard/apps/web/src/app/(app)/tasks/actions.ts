@@ -58,30 +58,49 @@ function failure(caught: unknown, fallback: string): { error: string } {
 }
 
 /**
- * Refresh the screens a change can be visible on, for the person who made it and
- * for everyone else looking at the same work.
- *
- * The first half is this tab: revalidating the subtree beats trying to guess
- * which page the user is on, and the app is small enough for that to be cheap.
- * The second half is the team's tabs, which are holding /api/tasks/stream open
- * and are told the space moved - so a task assigned in one browser lands in the
- * assignee's without them reloading.
+ * Tell the team's tabs that a space moved. They are holding /api/tasks/stream
+ * open, so a task assigned in one browser lands in the assignee's without them
+ * reloading.
  *
  * `where` names the space or spaces the write touched, and it is what keeps a
  * change in one team's space from re-rendering another team's screen. A write
  * with no space is a write nothing else can see - a goal or a page somebody
  * keeps to themselves, a timer that was not running - so it announces nothing
  * rather than waking the whole instance to look at something private.
+ *
+ * The person who made the change is not among them: the stream drops a signal
+ * for its own actor, because their tab either revalidated with the call or drew
+ * the result before it went out.
+ */
+function announce(
+    caller: access.TaskActor,
+    where?: string | readonly (string | null)[] | null
+): void {
+    const named = typeof where === "string" ? [where] : (where ?? []);
+    for (const spaceId of new Set(named.filter((id): id is string => Boolean(id)))) {
+        publishTaskChange({ spaceId, actorId: caller.id });
+    }
+}
+
+/**
+ * Refresh the screens a change can be visible on, for the person who made it and
+ * for everyone else looking at the same work.
+ *
+ * Revalidating the subtree beats trying to guess which page the user is on, and
+ * the app is small enough for that to be cheap.
+ *
+ * Not for a write made from inside something half filled in. Revalidating a
+ * layout re-suspends the boundary these screens are drawn under, and everything
+ * below it is torn down and built again - so an open dialog comes back empty,
+ * taking whatever had been typed into it. A write like that announces itself and
+ * leaves the screen alone; `createTagAction` is the one that happens mid-form.
  */
 function refresh(
     caller: access.TaskActor,
     where?: string | readonly (string | null)[] | null
 ): void {
     revalidatePath(TASKS_PATH, "layout");
-    const named = typeof where === "string" ? [where] : (where ?? []);
-    for (const spaceId of new Set(named.filter((id): id is string => Boolean(id)))) {
-        publishTaskChange({ spaceId, actorId: caller.id });
-    }
+    announce(caller, where);
 }
 
 // ---------------------------------------------------------------------------
@@ -805,7 +824,12 @@ export async function createTagAction(
     try {
         await access.requireSpace(caller, spaceId, "member");
         const tag = await spaces.createTag(spaceId, parsed.data.name, parsed.data.color);
-        refresh(caller, spaceId);
+        // Announced rather than revalidated. Most tags are born in a picker
+        // inside a task somebody is still writing, and re-rendering the screen
+        // under them takes the task with it. The picker has already drawn the
+        // tag; the space's settings screen, where the other few are made, asks
+        // for the new list itself.
+        announce(caller, spaceId);
         return { tag };
     } catch (caught) {
         return failure(caught, "Could not add the tag");

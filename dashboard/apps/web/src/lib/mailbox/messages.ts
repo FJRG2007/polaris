@@ -22,6 +22,7 @@ import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
+import { decodePart, unflow } from "./decode";
 import { refreshThreads } from "./sync";
 import type { ImapFlow } from "imapflow";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
@@ -409,14 +410,28 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
     return body;
 }
 
-/** One part, decoded. imapflow answers with a stream so the whole message is
- *  never held twice. */
+/**
+ * One part, as text.
+ *
+ * imapflow undoes the transfer encoding on the way out of `download`, and stops
+ * there: the bytes are still in whatever character set the part declared, and
+ * reading them as UTF-8 is what turns a Latin-1 footer into mojibake. So the
+ * charset is applied here, from what the server said about the part.
+ *
+ * A stream rather than a buffer from the socket, so a forty-megabyte message is
+ * never held twice.
+ */
 async function downloadPart(client: ImapFlow, uid: number, part: string): Promise<string> {
     const download = await client.download(String(uid), part, { uid: true });
     if (!download?.content) return "";
     const chunks: Buffer[] = [];
     for await (const chunk of download.content) chunks.push(chunk as Buffer);
-    return Buffer.concat(chunks).toString("utf8");
+    const bytes = Buffer.concat(chunks);
+    const text = decodePart(bytes, { charset: download.meta?.charset });
+    // A plain part sent `format=flowed` arrives cut into 72-character pieces,
+    // and joining them back is the difference between a paragraph and a wall of
+    // ragged lines.
+    return download.meta?.flowed ? unflow(text, download.meta.delSp) : text;
 }
 
 /**

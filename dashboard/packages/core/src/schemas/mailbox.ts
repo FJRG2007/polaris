@@ -411,7 +411,7 @@ export const mailTrustSenderSchema = z.object({
 export const mailRemoteContentMode = z.enum(["block", "trusted", "always"]);
 
 export const mailPrivacySchema = z.object({
-    remoteContent: mailRemoteContentMode.default("trusted"),
+    remoteContent: mailRemoteContentMode.default("always"),
     /** Whether a message's trackers are named above it rather than only counted. */
     nameTrackers: z.boolean().default(true),
     /** Whether a read receipt anybody asks for is ever answered. Off, and there
