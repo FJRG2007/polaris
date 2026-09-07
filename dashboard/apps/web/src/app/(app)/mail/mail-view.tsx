@@ -316,8 +316,17 @@ export function MailView({
                 // Done from the list, but it may have been aimed at whatever is
                 // open beside it - the conversation's own row, or the whole
                 // selection with it in.
+                //
+                // One of the two, never both. Closing the pane is a navigation,
+                // and these routes are dynamic, so arriving is already a fresh
+                // read of the list; asking the router to refresh in the same
+                // breath is a second fetch racing the first, and the one that
+                // loses is the navigation - which left the address still naming a
+                // conversation that had been deleted, and the next click on
+                // another one apparently doing nothing at all.
                 if (leavesTheView(action) && openThread && aimed.includes(openThread.id)) {
                     closeOpen();
+                    return;
                 }
                 refresh();
             });

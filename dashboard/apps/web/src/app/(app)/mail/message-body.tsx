@@ -89,7 +89,7 @@ export function MessageBody({
                     >
                         {inForce === "own"
                             ? "Show this in the Polaris theme"
-                            : "Show this the way the sender designed it"}
+                            : "Show this on its own white page"}
                     </button>
                 </>
             ) : (
@@ -182,11 +182,24 @@ function trackerSentence(vendors: readonly string[]): string {
  */
 export type MessagePaper = "own" | "reader";
 
-/** Whether the message dresses itself. A colour anywhere in it - a style, a
- *  bgcolor attribute, a font tag - means it was designed against a page of its
- *  own choosing. */
+/**
+ * Whether the message brought a page of its own.
+ *
+ * A background is the test, and a text colour is not. A newsletter that set a
+ * background was designed against it, and taking that away is what leaves black
+ * text on black. The much commoner thing - an automated message that sets a
+ * colour on a heading or a signature and nothing else - was designed against
+ * whatever page it happened to land on, which for most of its life was white
+ * because that is what its author's client used. Treating those as designed put
+ * a bright white card in the middle of a dark screen for every receipt and
+ * password reset anybody gets, and there was nothing in them that needed it.
+ *
+ * They take the reader's page instead, with their own colours neutralised so
+ * nothing arrives unreadable - see `frameDocument`. What is lost is a coloured
+ * heading; what is gained is a mailbox that looks like one screen.
+ */
 export function dressesItself(html: string): boolean {
-    return /(?:background(?:-color)?\s*:|(?:\bbgcolor|\bcolor)\s*[:=])/i.test(html);
+    return /(?:\bbackground(?:-color)?\s*:|\bbgcolor\s*=)/i.test(html);
 }
 
 /**
@@ -230,6 +243,23 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
             ? "color-scheme:light;background:#ffffff;color:#111111;"
             : `color-scheme:${colors.dark ? "dark" : "light"};background:transparent;color:${colors.foreground};`;
     const linkColor = paper === "own" ? "#1a56db" : colors.link;
+    // A page of its own is a sheet of paper, and text has never been printed
+    // flush to the edge of one. A designed newsletter brings its own outer
+    // table and does not need this; the plain white rectangle a simple message
+    // gets is exactly what looked wrong without it.
+    const inset = paper === "own" ? "padding:16px;" : "";
+    // Their colours, on our page, made readable.
+    //
+    // Only ever on the reader's page, and only ever colours: a message that got
+    // here set no background of its own, so its author had no idea what would be
+    // behind their dark grey heading - and on a dark page it is not there at all.
+    // Anything the message drew rather than wrote is untouched, which is why this
+    // leaves images, borders and layout exactly as they are.
+    const adapt =
+        paper === "reader"
+            ? `#polaris-body,#polaris-body *:not(a){color:inherit!important;background-color:transparent!important;}
+  #polaris-body a{color:${linkColor}!important;}`
+            : "";
     return `<!doctype html><html><head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${images} style-src 'unsafe-inline'; font-src data:; script-src 'unsafe-inline'; form-action 'none'; base-uri 'none';">
@@ -237,6 +267,7 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
 <style>
   html{${page}}
   html,body{margin:0;padding:0;}
+  body{${inset}}
   body{font:13px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;word-break:break-word;overflow-wrap:anywhere;}
   img,video,table{max-width:100%;height:auto;}
   table{border-collapse:collapse;}
@@ -246,6 +277,7 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper, o
   .plain{white-space:pre-wrap;word-break:break-word;}
   .quoted{opacity:.65;}
   a{color:${linkColor};}
+  ${adapt}
 </style>
 </head><body><div id="polaris-body">${body}</div>
 <style>

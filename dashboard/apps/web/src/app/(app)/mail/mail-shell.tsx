@@ -28,7 +28,7 @@ import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useRef, useMemo, useState, useEffect, useContext, useCallback, createContext, type ReactNode } from "react";
 
 export interface MailContextValue {
     readonly accounts: readonly MailAccountView[];
@@ -104,6 +104,11 @@ function colorFor(seed: string): string {
     return ACCOUNT_COLORS[Math.abs(hash) % ACCOUNT_COLORS.length] ?? ACCOUNT_COLORS[0]!;
 }
 
+/** How long the live channel is allowed to settle before the screen is asked
+ *  for again. One action lands as several frames, and each of them used to be a
+ *  fetch of the whole page. */
+const STREAM_SETTLE_MS = 400;
+
 export function MailShell({
     accounts,
     folders,
@@ -129,7 +134,33 @@ export function MailShell({
     const [asking, setAsking] = useState<{ missing: MissingFolderRole; retry: () => void } | null>(null);
 
     const refresh = useCallback(() => router.refresh(), [router]);
-    useMailStream(refresh);
+
+    /**
+     * The live channel's own refreshes, coalesced.
+     *
+     * One delete is not one frame. Moving a message changes a mailbox, the sync
+     * that follows changes it again, and the server says so each time - so a
+     * single action arrives here as a burst, and each of those was asking the
+     * router to fetch the whole screen again. A router that is fetching is a
+     * router that defers what somebody clicks next, which is what made a mailbox
+     * feel dead until it was reloaded.
+     *
+     * A short pause after the last frame is enough: nothing here is watching a
+     * clock, and a screen that redraws a beat after the mail moved is what a
+     * mailbox has always looked like.
+     */
+    const settling = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const onFrame = useCallback(() => {
+        if (settling.current) clearTimeout(settling.current);
+        settling.current = setTimeout(() => {
+            settling.current = null;
+            refresh();
+        }, STREAM_SETTLE_MS);
+    }, [refresh]);
+    useEffect(() => () => {
+        if (settling.current) clearTimeout(settling.current);
+    }, []);
+    useMailStream(onFrame);
 
     const accountColor = useCallback(
         (accountId: string) => {

@@ -133,9 +133,16 @@ export function ThreadView({
                     return;
                 }
                 // Archived, trashed or deleted: this pane is now looking at
-                // messages the server has moved out from under it. Close before
-                // the refresh, or the next render asks for them again.
-                if (leavesTheView(action)) onGone?.();
+                // messages the server has moved out from under it. Closing it is
+                // a navigation and these routes are dynamic, so it comes back
+                // with a fresh list on its own - refreshing as well would be a
+                // second fetch racing the navigation, and the navigation is the
+                // one that loses. That race is why deleting from inside a
+                // conversation left the reader inside it.
+                if (leavesTheView(action)) {
+                    onGone?.();
+                    return;
+                }
                 refresh();
             });
         },

@@ -76,9 +76,27 @@ describe("the address stops naming what was moved", () => {
 
     it("closes the pane from the conversation's own header", async () => {
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
-        expect(thread).toContain("if (leavesTheView(action)) onGone?.();");
+        expect(thread).toContain("if (leavesTheView(action)) {");
+        expect(thread).toContain("onGone?.();");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // And the list is what it is told to do, or the pane calls into nothing.
         expect(view).toContain("onGone={closeOpen}");
+    });
+
+    /**
+     * Closing the pane is a navigation, and asking the router to refresh in the
+     * same breath is a second fetch racing it - the navigation is the one that
+     * loses. That is what left the address still naming a deleted conversation,
+     * with the next click on another one apparently doing nothing until the page
+     * was reloaded.
+     */
+    it("does not refresh over the navigation that closes it", async () => {
+        for (const screen of ["thread-view.tsx", "mail-view.tsx"]) {
+            const source = await readFile(`${SCREENS}${screen}`, "utf8");
+            const closing = source.slice(source.indexOf("leavesTheView(action)"));
+            const stop = closing.indexOf("return;");
+            expect(stop, `${screen} carries on past closing the pane`).toBeGreaterThan(0);
+            expect(closing.slice(0, stop)).not.toContain("refresh()");
+        }
     });
 });
