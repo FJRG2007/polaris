@@ -347,18 +347,24 @@ export type DiscoveryInput = z.infer<typeof discoveryInputSchema>;
 // ---------------------------------------------------------------------------
 
 /**
- * Connecting the account a place's locks are on.
+ * Connecting an account, hub or box a place's devices are reached through.
  *
- * The token is the credential and is never shown again, so the only thing to
- * check is that something was pasted and that it is not obviously a whole line of
- * something else. Whether it works is not a rule a schema can hold - that is the
+ * The fields are not listed here, and that is the point: which ones a connection
+ * needs is the connection's own business, and a schema that named them would have
+ * to be edited every time a make was added. So this checks the envelope - which
+ * connection, what to call it, and a flat set of strings - and the registry checks
+ * the contents against the fields that connection actually declared.
+ *
+ * Whether the credential works is not a rule a schema can hold: that is the
  * account answering, and the call that connects is what asks.
  */
 export const deviceAccountSchema = z.object({
-    /** What to call the account in the list, since a company may have more than
-     *  one and "Nuki" alone stops telling them apart. */
+    /** Which way in - see DEVICE_CONNECTIONS. */
+    connection: z.string().trim().min(1, "Pick how to connect it").max(64),
+    /** What to call it in the list, since a company may have more than one and
+     *  the make alone stops telling them apart. */
     label: z.string().trim().max(60).default(""),
-    token: z.string().trim().min(20, "That does not look like an API token").max(500)
+    fields: z.record(z.string().max(64), z.string().max(500)).default({})
 });
 
 export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;

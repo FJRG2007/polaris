@@ -1,41 +1,31 @@
 /**
  * The devices at a place: reading them, acting on them, and what they have done.
  *
- * A camera is looked at; a door is used. That is the whole difference, and it is
- * why this is not part of `cameras`: what matters about a lock is its state, the
- * two buttons that change it, and the record of every time it changed - none of
- * which a camera has.
+ * A camera is looked at; a device is used. That is the whole difference, and it
+ * is why this is not part of `cameras`: what matters about a lock or a socket is
+ * its state, the buttons that change it, and the record of every time it changed
+ * - none of which a camera has.
  *
- * Vendor-agnostic on purpose. `vendor` on the row picks the driver, and the
- * driver is the only thing that knows a make's numbering (see `nuki-devices`).
- * Adding a second make is a driver and a case in `driverFor`; no screen, no
- * action and no table changes.
+ * Make-agnostic on purpose, and account-driven. A device belongs to a connected
+ * account, the account names a connection, and the connection names the driver
+ * that is the only thing in the app knowing one make's numbering. Adding a make -
+ * or a second way in to a make already here - is a driver and a registry entry:
+ * no screen, no action and no table changes.
  *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
-import { HomeError } from "@/lib/home/home-error";
-import { NUKI_VENDOR, actOnNuki, nukiConnection, syncNuki } from "@/lib/home/nuki-devices";
 import * as kinds from "@/lib/home/device-kinds";
-
-/** The makes Polaris can talk to. One entry, and the shape is the point: it is
- *  what keeps every caller below from naming one. */
-const DRIVERS = {
-    [NUKI_VENDOR]: { act: actOnNuki, sync: syncNuki }
-} as const;
+import { HomeError } from "@/lib/home/home-error";
+import * as accounts from "@/lib/home/device-accounts";
+import { DriverError, type DeviceHistoryEntry } from "@/lib/home/drivers/contract";
 
 /** What a sync was asked for. `probe` is somebody pressing the button rather than
  *  a timer coming round, and a driver may spend something on it - waking a lock
  *  over its radio, say - that a background read must never spend. */
 export interface SyncOptions {
     readonly probe?: boolean;
-}
-
-function driverFor(vendor: string): (typeof DRIVERS)[keyof typeof DRIVERS] {
-    const driver = DRIVERS[vendor as keyof typeof DRIVERS];
-    if (!driver) throw new HomeError("That device is connected through something Polaris no longer supports");
-    return driver;
 }
 
 /** Which of the actions count as somebody using the thing, for the chart. A door
@@ -47,8 +37,14 @@ const USED_ACTIONS = ["lock", "unlock", "unlatch", "lock-and-go", "turn-on", "tu
  *  way. */
 const USAGE_CEILING = 5000;
 
+/** How much of an account's own log one sync reads. The entries already written
+ *  are skipped rather than duplicated, so re-reading the overlap costs nothing
+ *  and is what makes a missed sync heal itself. */
+const HISTORY_PAGE = 200;
+
 const DEVICE_FIELDS = {
     id: true,
+    accountId: true,
     vendor: true,
     kind: true,
     name: true,
@@ -67,6 +63,7 @@ const DEVICE_FIELDS = {
 
 type DeviceRow = {
     id: string;
+    accountId: string | null;
     vendor: string;
     kind: string;
     name: string;
@@ -171,17 +168,19 @@ export async function updateDevice(
 /**
  * Do something to a device.
  *
- * Three refusals before anything leaves the building, and each of them is a
+ * Four refusals before anything leaves the building, and each of them is a
  * different mistake: an action this kind of device does not have, a device
- * somebody has deliberately taken off the controls, and a device that was not
- * answering when it was last asked. The last one is a refusal rather than an
- * attempt because a command sent into silence looks exactly like one that
- * worked, and the door being open is the wrong thing to be unsure about.
+ * somebody has deliberately taken off the controls, a device whose account is no
+ * longer here, and a device that was not answering when it was last asked. The
+ * last one is a refusal rather than an attempt because a command sent into
+ * silence looks exactly like one that worked, and the door being open is the
+ * wrong thing to be unsure about.
  *
- * The state is set to moving rather than to what was asked for. A lock told to
- * lock is a lock that is turning; whether it got there comes back from the
- * account, in the log, which is also where the history entry comes from - so the
- * record says what the door did rather than what Polaris wanted.
+ * A lock told to lock is set to moving rather than to locked: it is a lock that
+ * is turning, and whether it got there comes back from the account, in the log,
+ * which is also where the history entry comes from - so the record says what the
+ * door did rather than what Polaris wanted. A socket has no such gap, so it is
+ * written as what it was told to be.
  */
 export async function actOnDevice(
     installedAppId: string,
@@ -194,10 +193,14 @@ export async function actOnDevice(
         throw new HomeError(`A ${what} cannot be told to ${kinds.DEVICE_ACTION_VERBS[action]}`);
     }
     if (!device.controllable) throw new HomeError(`${device.name} is set to be watched, not operated`);
+    if (!device.accountId) throw new HomeError(`${device.name} is not connected to anything`);
     if (!device.online) throw new HomeError(`${device.name} was not answering when it was last checked`);
 
+    const { view, credentials } = await accounts.accountWithCredentials(installedAppId, device.accountId);
     try {
-        await driverFor(device.vendor).act(device.externalId, action);
+        await accounts
+            .driverFor(view.connection)
+            .act(credentials, { externalId: device.externalId, kind: device.kind }, action);
     } catch (caught) {
         // Written down even though it never happened. A door that refused to move
         // is exactly what somebody comes to this history for, and the account's
@@ -212,7 +215,7 @@ export async function actOnDevice(
                 at: new Date()
             }
         });
-        throw caught;
+        throw caught instanceof DriverError ? new HomeError(caught.message) : caught;
     }
 
     const row = await prisma.placeDevice.update({
@@ -224,27 +227,142 @@ export async function actOnDevice(
 }
 
 /**
- * Go and ask the accounts what they have.
+ * Go and ask every connected account what it has.
  *
- * Every connected make, one after the other, and one of them failing does not
- * stop the rest: a Nuki account that is refusing its token must not leave a
- * second make's doors unread.
+ * One after the other, and one of them failing does not stop the rest: an account
+ * that is refusing its token must not leave a second make's devices unread. What
+ * went wrong is remembered on the account it went wrong on, so a screen can say
+ * which of them is the problem rather than putting one line above everything.
  */
 export async function syncDevices(
     installedAppId: string,
     options: SyncOptions = {}
 ): Promise<{ devices: number; error: string | null }> {
+    const connected = await accounts.listAccounts(installedAppId);
     let devices = 0;
     let error: string | null = null;
-    for (const [vendor, driver] of Object.entries(DRIVERS)) {
-        if (vendor === NUKI_VENDOR && !(await nukiConnection()).connected) continue;
+    for (const account of connected) {
+        if (!accounts.isConnectable(account.connection)) continue;
         try {
-            devices += (await driver.sync(installedAppId, options)).devices;
+            devices += await syncAccount(installedAppId, account.id, options);
         } catch (caught) {
-            error = caught instanceof Error ? caught.message : "That account could not be reached";
+            error = caught instanceof Error ? caught.message : `${account.label} could not be reached`;
         }
     }
     return { devices, error };
+}
+
+/** One account: what it holds now, and what has happened on it. */
+async function syncAccount(
+    installedAppId: string,
+    accountId: string,
+    options: SyncOptions
+): Promise<number> {
+    const { view, credentials } = await accounts.accountWithCredentials(installedAppId, accountId);
+    const driver = accounts.driverFor(view.connection);
+    try {
+        if (options.probe === true && driver.probe) {
+            const known = await prisma.placeDevice.findMany({
+                where: { accountId },
+                select: { externalId: true }
+            });
+            await driver.probe(
+                credentials,
+                known.map((device) => device.externalId)
+            );
+        }
+
+        const snapshots = await driver.list(credentials);
+        const vendor = view.brand.toLowerCase();
+        for (const snapshot of snapshots) {
+            const reading = {
+                kind: snapshot.kind,
+                model: snapshot.model,
+                firmware: snapshot.firmware,
+                state: snapshot.state,
+                doorState: snapshot.doorState,
+                batteryPercent: snapshot.batteryPercent,
+                batteryCritical: snapshot.batteryCritical,
+                online: snapshot.online,
+                stateAt: new Date()
+            };
+            await prisma.placeDevice.upsert({
+                where: { accountId_externalId: { accountId, externalId: snapshot.externalId } },
+                // The name, the place and the zone are not overwritten on the way
+                // in: a door renamed here is renamed for a reason, and a sync that
+                // put "Smart Lock 4" back over "Warehouse side door" every minute
+                // would make the field pointless.
+                update: reading,
+                create: {
+                    ...reading,
+                    installedAppId,
+                    accountId,
+                    vendor,
+                    externalId: snapshot.externalId,
+                    name: snapshot.name
+                }
+            });
+        }
+
+        // Anything on our side the account no longer has. A device somebody sold
+        // is not a device this house has, and leaving the row would leave a button
+        // that answers with an error nobody can act on.
+        await prisma.placeDevice.deleteMany({
+            where: {
+                accountId,
+                externalId: { notIn: snapshots.map((snapshot) => snapshot.externalId) }
+            }
+        });
+
+        if (driver.history) await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
+        await accounts.markSynced(accountId);
+        return snapshots.length;
+    } catch (caught) {
+        if (caught instanceof DriverError) {
+            await accounts.markAccount(
+                accountId,
+                caught.kind === "unauthorized" ? "unauthorized" : "unreachable",
+                caught.message
+            );
+            throw new HomeError(caught.message);
+        }
+        throw caught;
+    }
+}
+
+/**
+ * An account's own log, written down as ours.
+ *
+ * `createMany` with `skipDuplicates` rather than a read-then-write: the unique key
+ * on (device, their id) is what decides, so two syncs racing each other write the
+ * same history once and neither has to hold a lock to be sure.
+ */
+async function ingestHistory(accountId: string, entries: readonly DeviceHistoryEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const devices = await prisma.placeDevice.findMany({
+        where: { accountId },
+        select: { id: true, externalId: true }
+    });
+    const byExternal = new Map(devices.map((device) => [device.externalId, device.id]));
+
+    const rows = entries.flatMap((entry) => {
+        const deviceId = byExternal.get(entry.deviceExternalId);
+        if (!deviceId) return [];
+        return [
+            {
+                deviceId,
+                externalId: entry.externalId,
+                action: entry.action,
+                actor: entry.actor,
+                via: entry.via,
+                outcome: entry.outcome,
+                note: entry.note,
+                at: entry.at
+            }
+        ];
+    });
+    if (rows.length === 0) return;
+    await prisma.placeDeviceEvent.createMany({ data: rows, skipDuplicates: true });
 }
 
 /**
@@ -305,7 +423,11 @@ export async function listDeviceEvents(
  * office door is a few hundred entries - so sending the times costs less than
  * plumbing a timezone down to a query.
  */
-export async function deviceUsage(installedAppId: string, deviceId: string, days = kinds.USAGE_DAYS): Promise<number[]> {
+export async function deviceUsage(
+    installedAppId: string,
+    deviceId: string,
+    days = kinds.USAGE_DAYS
+): Promise<number[]> {
     await requireDevice(installedAppId, deviceId);
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const rows = await prisma.placeDeviceEvent.findMany({

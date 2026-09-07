@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { translateLog } from "@/lib/home/nuki-devices";
+import { translateLog } from "@/lib/home/drivers/nuki-web";
 import { actionsFor, bucketUsage, describeEvent, settledState, USAGE_DAYS } from "@/lib/home/device-kinds";
 
 /** One entry as Nuki hands it over. */

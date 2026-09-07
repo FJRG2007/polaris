@@ -8363,6 +8363,9 @@ model PlaceDevice {
     /// Which place it is at. Null until somebody says, which is what a device
     /// that arrived from an account covering several addresses starts as.
     placeId        String? @db.Uuid
+    /// Which connected account it came from. Null only on a row that predates
+    /// accounts having their own table, and only until the first read adopts it.
+    accountId      String? @db.Uuid
     /// nuki - whose account this is reached through.
     vendor         String
     /// lock | opener - what it does, which is what decides the buttons. Kept
@@ -8399,14 +8402,68 @@ model PlaceDevice {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    place  Place?             @relation(fields: [placeId], references: [id], onDelete: SetNull)
-    events PlaceDeviceEvent[]
+    place   Place?              @relation(fields: [placeId], references: [id], onDelete: SetNull)
+    account PlaceDeviceAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    events  PlaceDeviceEvent[]
 
-    // One device per id per vendor. A sync runs on a schedule and on demand, and
-    // the two overlapping must not leave a house with the same door twice.
-    @@unique([vendor, externalId])
+    // One device per id per account. A sync runs on a schedule and on demand, and
+    // the two overlapping must not leave a house with the same door twice. Per
+    // account rather than per make: the same lock can be on two logins, and a
+    // house that connected both should see it under each rather than have the
+    // second one silently overwrite the first.
+    @@unique([accountId, externalId])
     @@index([installedAppId])
     @@index([placeId])
+    @@index([accountId])
+}
+
+// An account, hub or box a place's devices are reached through.
+//
+// One row is one way in to one make: a Nuki web login, a bridge on the LAN, a
+// Tuya cloud project. Several at once is the normal case rather than the
+// exception - two makes in one house, or one make reached two ways so it still
+// answers when either is out - which is why this is a table and not a handful of
+// settings.
+//
+// What it is reached with lives in `secret`, envelope-encrypted, and never comes
+// back to a screen. Which fields it holds is the connection's own business: the
+// registry in `device-connections` names them, the driver is handed them by name,
+// and nothing in between has to know whether a make wants a token or an address
+// and a password.
+model PlaceDeviceAccount {
+    id             String @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String @db.Uuid
+
+    /// Who makes the devices, as their owner would say it ("Nuki").
+    brand      String
+    /// Which of that make's ways in this is - see DEVICE_CONNECTIONS.
+    connection String
+    /// What to call it on screen, since a company can have two of the same make
+    /// and the brand alone stops telling them apart.
+    label      String
+
+    /// Every field the connection asked for, as one envelope-encrypted blob.
+    /// Addresses are in here with the credentials, and only the ones the registry
+    /// marks as not secret are ever shown again.
+    secret String
+
+    /// ok | unauthorized | unreachable - how the last call went. A refused
+    /// credential is still stored: taking it away on one bad answer would
+    /// silently disconnect a house over a network blip, and this way the screen
+    /// can say so and offer the one button that fixes it.
+    status       String    @default("ok")
+    /// Their own words for why, where there were any worth showing.
+    statusNote   String?
+    lastSyncedAt DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    devices PlaceDevice[]
+
+    @@index([installedAppId])
 }
 
 // One thing that happened to a device: it was locked, it was opened, the door

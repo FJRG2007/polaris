@@ -1,27 +1,35 @@
 "use client";
 
 /**
- * Every door at this place, with its controls on the row.
+ * Every device at this place, with its controls on the row.
  *
  * The frequent task here is one press long - lock the front door on the way out,
- * let somebody in - so it does not cost a dialog. The row carries the state, the
- * battery and the buttons; the panel behind it is for the two slower questions,
- * how often it is used and what it has done.
+ * let somebody in, switch off the thing that was left on - so it does not cost a
+ * dialog. The row carries the state, the battery and the buttons; the panel
+ * behind it is for the two slower questions, how often it is used and what it has
+ * done.
  *
- * The list refreshes itself while somebody is looking at it, because a lock's
+ * More than one thing can be connected, and they are shown as what they are:
+ * several makes in one house, or one make reached two ways. Each says when it was
+ * last heard from and each fails on its own, because "the switches are out" and
+ * "the locks are out" are different sentences and a screen that merged them would
+ * tell somebody neither.
+ *
+ * The list refreshes itself while somebody is looking at it, because a device's
  * state is the one thing on this screen that changes without them: a door opened
- * by a keypad downstairs has to appear here. It refreshes on a minute and only
- * while the tab is in front, since every refresh is a call to somebody else's
- * account and a screen nobody is watching does not need one.
+ * by a keypad downstairs has to appear here. It refreshes on the half minute,
+ * only while the tab is in front, and again the moment it comes back to the
+ * front - every refresh is a call to somebody else's account, and a screen nobody
+ * is watching does not need one.
  */
 
 import * as actions from "../actions";
 import { runAction } from "@/lib/run-action";
 import { DeviceDialog } from "./device-dialog";
-import { ConnectDialog } from "./connect-dialog";
+import { ConnectDialog, type Connected } from "./connect-dialog";
 import * as kinds from "@/lib/home/device-kinds";
 import type { PlaceView } from "@/lib/home/place-kinds";
-import type { NukiConnection } from "@/lib/home/nuki-devices";
+import type { DeviceAccountView } from "@/lib/home/device-accounts";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BatteryLow, Plug, RefreshCw, Unplug } from "lucide-react";
@@ -74,11 +82,14 @@ export function DevicesView({
 }) {
     const format = useDisplayFormat();
     const [devices, setDevices] = useState<DeviceView[] | null>(null);
-    const [account, setAccount] = useState<NukiConnection | null>(null);
+    const [accounts, setAccounts] = useState<DeviceAccountView[]>([]);
     const [connecting, setConnecting] = useState(false);
+    /** The account being given a new credential, where that is what the dialog is
+     *  open for. Null is connecting something new. */
+    const [reconnecting, setReconnecting] = useState<DeviceAccountView | null>(null);
     const [editing, setEditing] = useState<DeviceView | null>(null);
     const [opened, setOpened] = useState<DeviceView | null>(null);
-    const [disconnecting, setDisconnecting] = useState(false);
+    const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [busy, setBusy] = useState<{ id: string; action: DeviceAction } | null>(null);
     const [error, setError] = useState("");
@@ -91,7 +102,7 @@ export function DevicesView({
             if (cancelled) return;
             if (result.error) setError(result.error);
             setDevices(result.devices ?? []);
-            setAccount(result.account ?? null);
+            setAccounts(result.accounts ?? []);
         })();
         return () => {
             cancelled = true;
@@ -118,12 +129,14 @@ export function DevicesView({
         const result = await actions.syncDevicesAction({ probe: !quiet });
         if (!quiet) setRefreshing(false);
         if (result.devices) setDevices(result.devices);
-        if (result.account) setAccount(result.account);
+        if (result.accounts) setAccounts(result.accounts);
         if (!quiet) setError(result.error ?? "");
     }, []);
 
+    const connected = accounts.length > 0;
+
     useEffect(() => {
-        if (!account?.connected) return;
+        if (!connected) return;
         const timer = setInterval(() => {
             if (document.visibilityState === "visible") void sync(true);
         }, REFRESH_MS);
@@ -139,7 +152,7 @@ export function DevicesView({
             clearInterval(timer);
             document.removeEventListener("visibilitychange", wake);
         };
-    }, [account?.connected, sync]);
+    }, [connected, sync]);
 
     /** Put a device back into both lists it can be in, so the row and the open
      *  panel never disagree about what a door is doing. */
@@ -166,14 +179,31 @@ export function DevicesView({
     };
 
     const disconnect = async () => {
-        const result = await runAction(() => actions.disconnectDeviceAccountAction(), setError);
-        setDisconnecting(false);
+        if (!disconnecting) return;
+        const result = await runAction(
+            () => actions.disconnectDeviceAccountAction(disconnecting.id),
+            setError
+        );
+        setDisconnecting(null);
         if (!result || result.error) {
             if (result?.error) setError(result.error);
             return;
         }
-        setAccount(result.account ?? null);
-        setDevices([]);
+        setAccounts(result.accounts ?? []);
+        setDevices(result.devices ?? []);
+    };
+
+    /** One dialog, two jobs, and the difference is which account it was opened
+     *  on. Closing it has to forget that either way. */
+    const settleConnection = (result: Connected) => {
+        setDevices(result.devices);
+        setAccounts(result.accounts);
+        setConnecting(false);
+        setReconnecting(null);
+    };
+    const closeConnect = () => {
+        setConnecting(false);
+        setReconnecting(null);
     };
 
     if (devices === null) {
@@ -186,34 +216,30 @@ export function DevicesView({
         );
     }
 
-    if (!account?.connected) {
+    if (!connected) {
         return (
             <>
                 <EmptyState
-                    title="No locks yet."
+                    title="Nothing connected yet."
                     description={
                         canManage
-                            ? "Connect the account your locks are on and they appear here, with their state, their controls and everything they have done."
-                            : "Somebody who administers Places can connect the account the locks are on."
+                            ? "Connect what your locks, switches and lights are on and they appear here, with their state, their controls and everything they have done."
+                            : "Somebody who administers Places can connect what the devices are on."
                     }
                     action={
                         canManage ? (
                             <Button size="sm" onClick={() => setConnecting(true)}>
                                 <Plug className="size-4" />
-                                Connect Nuki
+                                Connect devices
                             </Button>
                         ) : undefined
                     }
                 />
                 <ConnectDialog
                     open={connecting}
-                    connected={false}
-                    onClose={() => setConnecting(false)}
-                    onConnected={(result) => {
-                        setDevices(result.devices);
-                        setAccount(result.account);
-                        setConnecting(false);
-                    }}
+                    reconnect={null}
+                    onClose={closeConnect}
+                    onConnected={settleConnection}
                 />
             </>
         );
@@ -222,15 +248,47 @@ export function DevicesView({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <Badge className="gap-1.5 border-border bg-muted text-muted-foreground">
-                    {account.label || "Nuki"}
-                </Badge>
-                <span className="text-xs text-foreground-subtle">
-                    {account.lastSyncedAt
-                        ? `Checked at ${format.time(account.lastSyncedAt)}`
-                        : "Not checked yet"}
-                </span>
+                {accounts.map((account) => (
+                    <span
+                        key={account.id}
+                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 pl-2.5 pr-1"
+                    >
+                        <span className="text-xs font-medium">{account.label}</span>
+                        <span className="text-[0.6875rem] text-foreground-subtle">
+                            {account.status === "ok"
+                                ? account.lastSyncedAt
+                                    ? format.time(account.lastSyncedAt)
+                                    : "not checked yet"
+                                : account.status === "unauthorized"
+                                  ? "refusing what it was given"
+                                  : "not answering"}
+                        </span>
+                        {canManage && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-6 p-0"
+                                aria-label={`Disconnect ${account.label}`}
+                                title={`Disconnect ${account.label}`}
+                                onClick={() => setDisconnecting(account)}
+                            >
+                                <Unplug className="size-3.5" />
+                            </Button>
+                        )}
+                    </span>
+                ))}
                 <span className="flex-1" />
+                {canManage && (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Connect something else"
+                        title="Connect something else"
+                        onClick={() => setConnecting(true)}
+                    >
+                        <Plug className="size-4" />
+                    </Button>
+                )}
                 <Button
                     size="sm"
                     variant="ghost"
@@ -241,32 +299,28 @@ export function DevicesView({
                 >
                     <RefreshCw className={cn("size-4", refreshing && "animate-spin")} />
                 </Button>
-                {canManage && (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Disconnect the account"
-                        title="Disconnect the account"
-                        onClick={() => setDisconnecting(true)}
-                    >
-                        <Unplug className="size-4" />
-                    </Button>
-                )}
             </div>
 
-            {account.status === "unauthorized" && (
-                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2">
-                    <p className="flex-1 text-sm text-danger">
-                        The account is refusing the token, so the doors are not being read. It was
-                        probably revoked.
-                    </p>
-                    {canManage && (
-                        <Button size="sm" onClick={() => setConnecting(true)}>
-                            Reconnect
-                        </Button>
-                    )}
-                </div>
-            )}
+            {accounts
+                .filter((account) => account.status !== "ok")
+                .map((account) => (
+                    <div
+                        key={account.id}
+                        className="flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2"
+                    >
+                        <p className="flex-1 text-sm text-danger">
+                            {account.status === "unauthorized"
+                                ? `${account.label} is refusing what Polaris opens it with, so its devices are not being read. It was probably revoked.`
+                                : `${account.label} could not be reached, so its devices are as they were when it last answered.`}
+                            {account.statusNote ? ` ${account.statusNote}` : ""}
+                        </p>
+                        {canManage && account.status === "unauthorized" && (
+                            <Button size="sm" onClick={() => setReconnecting(account)}>
+                                Reconnect
+                            </Button>
+                        )}
+                    </div>
+                ))}
 
             {error && (
                 <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -385,23 +439,19 @@ export function DevicesView({
             />
 
             <ConnectDialog
-                open={connecting}
-                connected
-                onClose={() => setConnecting(false)}
-                onConnected={(result) => {
-                    setDevices(result.devices);
-                    setAccount(result.account);
-                    setConnecting(false);
-                }}
+                open={connecting || reconnecting !== null}
+                reconnect={reconnecting}
+                onClose={closeConnect}
+                onConnected={settleConnection}
             />
 
             <ConfirmDeleteDialog
-                open={disconnecting}
-                onOpenChange={(open) => (open ? undefined : setDisconnecting(false))}
-                name={account.label || "Nuki"}
-                kind="account"
+                open={disconnecting !== null}
+                onOpenChange={(open) => (open ? undefined : setDisconnecting(null))}
+                name={disconnecting?.label ?? ""}
+                kind="connection"
                 requireTyping={false}
-                description="The doors go with it, and so does everything they have done. Polaris keeps no copy of a building it has been told it has no business with."
+                description="Its devices go with it, and so does everything they have done. Polaris keeps no copy of a building it has been told it has no business with."
                 confirmLabel="Disconnect"
                 onConfirm={disconnect}
             />

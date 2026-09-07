@@ -1,27 +1,33 @@
 "use client";
 
 /**
- * Connecting the account a place's locks are on.
+ * Connecting something the devices at a place are reached through.
  *
- * One field that matters, and a paragraph explaining where to get what goes in
- * it, because that part genuinely is not Polaris' to do: the token is made in the
- * lock maker's own web console, and no amount of screen here can produce one.
- * Everything after it is - the doors arrive, get their names, and answer.
+ * The make and the way in are two questions, not one, and both are the reader's
+ * to answer. A lock maker is a web account reachable from anywhere and a box on
+ * the same network answering in milliseconds; a switch maker is a cloud project
+ * and a key on the device itself. Which of those somebody has - and which they
+ * are willing to depend on - is not something a form can work out for them, so it
+ * is asked, with what each one costs written next to it.
  *
- * The token is written once and never shown again. There is no "reveal" and no
+ * Everything below those two questions is drawn from the registry: the fields, the
+ * hints, what is a secret and what is an address, and the steps for the part that
+ * genuinely is not Polaris' to do. Adding a make adds no markup here.
+ *
+ * A credential is written once and never shown again. There is no reveal and no
  * masked copy of it in a field on the next visit: it is a key to somebody's front
  * door, and a screen that can print it back is a screen somebody can be walked
  * into opening.
  */
 
 import Link from "next/link";
-import { useState } from "react";
 import * as actions from "../actions";
+import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { deviceAccountSchema } from "@/lib/home/schemas";
 import type { DeviceView } from "@/lib/home/device-kinds";
-import type { NukiConnection } from "@/lib/home/nuki-devices";
+import * as registry from "@/lib/home/device-connections";
+import type { DeviceAccountView } from "@/lib/home/device-accounts";
 import {
     Button,
     Dialog,
@@ -30,42 +36,106 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Select
 } from "@polaris/ui";
 
-/** Where the token is made. Named exactly, and linked, because "create an API
- *  token" is three screens deep and everybody looks for it in the phone app. */
-const TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
+/** What comes back once something is connected: everything the screen behind this
+ *  has to redraw, so it never has to go and ask again. */
+export interface Connected {
+    readonly devices: DeviceView[];
+    readonly accounts: DeviceAccountView[];
+}
+
+function Field({
+    field,
+    value,
+    onChange
+}: {
+    field: registry.ConnectionField;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const issue = registry.fieldIssue(field, value);
+    return (
+        <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-muted-foreground">
+                {field.label}
+                {field.optional === true ? (
+                    <span className="text-foreground-subtle"> optional</span>
+                ) : (
+                    <span className="text-danger"> *</span>
+                )}
+            </span>
+            {field.choices ? (
+                <Select
+                    value={value || field.defaultValue || ""}
+                    onValueChange={onChange}
+                    options={field.choices.map((choice) => ({ value: choice.value, label: choice.label }))}
+                    aria-label={field.label}
+                />
+            ) : (
+                <Input
+                    type={field.secret === true ? "password" : "text"}
+                    value={value}
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder={field.placeholder}
+                    onChange={(event) => onChange(event.target.value)}
+                    aria-label={field.label}
+                />
+            )}
+            {field.hint && <span className="text-xs text-foreground-subtle">{field.hint}</span>}
+            {issue && <span className="text-xs text-danger">{issue}</span>}
+        </label>
+    );
+}
 
 export function ConnectDialog({
     open,
-    connected,
+    reconnect,
     onClose,
     onConnected
 }: {
     open: boolean;
-    /** Reconnecting rather than connecting, which is what a refused token needs
-     *  and is worth saying out loud - the old one is replaced, not added to. */
-    connected: boolean;
+    /** The account being given a new credential, where that is what this is. Its
+     *  connection cannot change: a token is replaced, a way in is not. */
+    reconnect: DeviceAccountView | null;
     onClose: () => void;
-    onConnected: (result: { devices: DeviceView[]; account: NukiConnection }) => void;
+    onConnected: (result: Connected) => void;
 }) {
+    const brands = useMemo(() => registry.deviceBrands(), []);
+    const [brand, setBrand] = useState(brands[0]?.brand ?? "");
+    const [chosen, setChosen] = useState(registry.connectionsOfBrand(brands[0]?.brand ?? "")[0]?.id ?? "");
     const [label, setLabel] = useState("");
-    const [token, setToken] = useState("");
+    const [fields, setFields] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
-    const issue = token.trim()
-        ? (deviceAccountSchema.shape.token.safeParse(token).error?.issues[0]?.message ?? null)
-        : null;
-    const canSubmit = token.trim().length > 0 && !issue && !saving;
+    const connectionId = reconnect ? reconnect.connection : chosen;
+    const connection = registry.deviceConnection(connectionId);
+    const ofBrand = useMemo(() => registry.connectionsOfBrand(brand), [brand]);
+    const complete = connection ? registry.fieldsComplete(connection, fields) : false;
+
+    /** A make with one way in is not a question. The picker stays visible so it is
+     *  obvious there was a choice made, and there is nothing to weigh up. */
+    const pickBrand = (next: string) => {
+        setBrand(next);
+        setChosen(registry.connectionsOfBrand(next)[0]?.id ?? "");
+        setFields({});
+        setError("");
+    };
 
     const submit = async () => {
-        if (!canSubmit) return;
+        if (!connection || !complete || saving) return;
         setSaving(true);
         setError("");
+        const payload = { connection: connection.id, label, fields };
         const result = await runAction(
-            () => actions.connectDeviceAccountAction({ label, token }),
+            () =>
+                reconnect
+                    ? actions.reconnectDeviceAccountAction(reconnect.id, payload)
+                    : actions.connectDeviceAccountAction(payload),
             setError
         );
         setSaving(false);
@@ -74,65 +144,119 @@ export function ConnectDialog({
             setError(result.error);
             return;
         }
-        setToken("");
+        setFields({});
         setLabel("");
-        onConnected({ devices: result.devices ?? [], account: result.account as NukiConnection });
+        onConnected({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
     };
 
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{connected ? "Reconnect Nuki" : "Connect Nuki"}</DialogTitle>
+                    <DialogTitle>
+                        {reconnect ? `Reconnect ${reconnect.label}` : "Connect devices"}
+                    </DialogTitle>
                     <DialogDescription>
-                        Polaris reaches the locks through your Nuki account, so they answer from
-                        anywhere rather than only on their own network.
+                        {reconnect
+                            ? "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes."
+                            : "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place."}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
-                        <li>
-                            Open{" "}
-                            <Link
-                                href={TOKEN_PAGE}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-foreground underline"
-                            >
-                                Nuki Web <ExternalLink className="size-3" />
-                            </Link>{" "}
-                            and sign in with the account the locks are on.
-                        </li>
-                        <li>Under API, create a token that may see and operate your Smart Locks.</li>
-                        <li>Paste it here. Nuki shows it once.</li>
-                    </ol>
+                    {!reconnect && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-xs text-muted-foreground">Make</span>
+                                <Select
+                                    value={brand}
+                                    onValueChange={pickBrand}
+                                    options={brands.map((entry) => ({
+                                        value: entry.brand,
+                                        label: entry.brand
+                                    }))}
+                                    aria-label="Make"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1.5">
+                                <span className="text-xs text-muted-foreground">How to reach it</span>
+                                <Select
+                                    value={chosen}
+                                    onValueChange={(next) => {
+                                        setChosen(next);
+                                        setFields({});
+                                        setError("");
+                                    }}
+                                    options={ofBrand.map((entry, index) => ({
+                                        value: entry.id,
+                                        label: index === 0 ? `${entry.label} - recommended` : entry.label
+                                    }))}
+                                    aria-label="How to reach it"
+                                />
+                            </label>
+                        </div>
+                    )}
 
-                    <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">API token</span>
-                        <Input
-                            autoFocus
-                            type="password"
-                            value={token}
-                            spellCheck={false}
-                            autoComplete="off"
-                            placeholder="Paste the token"
-                            onChange={(event) => setToken(event.target.value)}
-                            aria-label="API token"
+                    {connection && (
+                        <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                            <span className="text-xs font-medium">
+                                {registry.REACH_LABELS[connection.reach]}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{connection.summary}</span>
+                            {connection.note && (
+                                <span className="text-xs text-foreground-subtle">{connection.note}</span>
+                            )}
+                        </div>
+                    )}
+
+                    {connection?.steps && (
+                        <ol className="flex list-decimal flex-col gap-1 pl-4 text-xs text-muted-foreground">
+                            {connection.steps.map((step, index) => (
+                                <li key={step}>
+                                    {index === 0 && connection.link ? (
+                                        <>
+                                            {step.split(connection.link.label)[0]}
+                                            <Link
+                                                href={connection.link.href}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-foreground underline"
+                                            >
+                                                {connection.link.label}
+                                                <ExternalLink className="size-3" />
+                                            </Link>
+                                            {step.split(connection.link.label)[1]}
+                                        </>
+                                    ) : (
+                                        step
+                                    )}
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+
+                    {connection?.fields.map((field) => (
+                        <Field
+                            key={field.key}
+                            field={field}
+                            value={fields[field.key] ?? ""}
+                            onChange={(value) =>
+                                setFields((current) => ({ ...current, [field.key]: value }))
+                            }
                         />
-                        {issue && <span className="text-xs text-danger">{issue}</span>}
-                    </label>
+                    ))}
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            Name for this account <span className="text-foreground-subtle">optional</span>
+                            Name for this connection{" "}
+                            <span className="text-foreground-subtle">optional</span>
                         </span>
                         <Input
                             value={label}
                             maxLength={60}
-                            placeholder="Nuki"
+                            placeholder={reconnect?.label ?? connection?.brand ?? ""}
                             onChange={(event) => setLabel(event.target.value)}
-                            aria-label="Name for this account"
+                            aria-label="Name for this connection"
                         />
                     </label>
 
@@ -147,7 +271,11 @@ export function ConnectDialog({
                     <Button variant="ghost" onClick={onClose} disabled={saving}>
                         Cancel
                     </Button>
-                    <Button onClick={() => void submit()} disabled={!canSubmit}>
+                    <Button
+                        onClick={() => void submit()}
+                        disabled={!complete || saving}
+                        aria-disabled={!complete || saving}
+                    >
                         {saving && <Loader2 className="size-4 animate-spin" />}
                         {saving ? "Checking" : "Connect"}
                     </Button>

@@ -44,7 +44,8 @@ import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/de
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import { recordAudit } from "@/lib/audit-service";
 import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
-import { connectNuki, disconnectNuki, nukiConnection, type NukiConnection } from "@/lib/home/nuki-devices";
+import * as deviceAccounts from "@/lib/home/device-accounts";
+import * as deviceConnections from "@/lib/home/device-connections";
 import {
     alertRuleInputSchema,
     cameraInputSchema,
@@ -1083,23 +1084,23 @@ export async function liveCamerasAction(): Promise<{ live?: string[]; error?: st
 // door's own history, because "who opened the office at 03:00" has to be
 // answerable from Polaris' own side too, and the door's history is the vendor's.
 
-/** The doors at this place, and how the account they are on is doing. */
+/** The devices at this place, and how the accounts they are on are doing. */
 export async function listDevicesAction(): Promise<{
     devices?: DeviceView[];
-    account?: NukiConnection;
+    accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
 }> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
-        const [list, account] = await Promise.all([
-            devices.listDevices(install.id, current.id),
-            nukiConnection()
-        ]);
-        return { list, account };
+        // The accounts are read first: that read is what adopts a connection made
+        // before they had a table of their own, and the devices it points at have
+        // to be listed under it rather than under nothing.
+        const connected = await deviceAccounts.listAccounts(install.id);
+        return { list: await devices.listDevices(install.id, current.id), connected };
     });
     if (result.error) return { error: result.error };
-    return { devices: result.value?.list, account: result.value?.account };
+    return { devices: result.value?.list, accounts: result.value?.connected };
 }
 
 /**
@@ -1110,7 +1111,11 @@ export async function listDevicesAction(): Promise<{
  */
 export async function syncDevicesAction(
     options: { probe?: boolean } = {}
-): Promise<{ devices?: DeviceView[]; account?: NukiConnection; error?: string; }> {
+): Promise<{
+    devices?: DeviceView[];
+    accounts?: deviceAccounts.DeviceAccountView[];
+    error?: string;
+}> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         const outcome = await devices.syncDevices(install.id, { probe: options.probe === true });
@@ -1118,7 +1123,7 @@ export async function syncDevicesAction(
         return {
             outcome,
             list: await devices.listDevices(install.id, current.id),
-            account: await nukiConnection()
+            connected: await deviceAccounts.listAccounts(install.id)
         };
     });
     if (result.error) return { error: result.error };
@@ -1129,7 +1134,7 @@ export async function syncDevicesAction(
     // of the rest is current.
     return {
         devices: result.value?.list,
-        account: result.value?.account,
+        accounts: result.value?.connected,
         error: result.value?.outcome.error ?? undefined
     };
 }
@@ -1207,25 +1212,44 @@ export async function deviceUsageAction(deviceId: string): Promise<{ used?: numb
 }
 
 /**
- * Connect the account the locks are on.
+ * Connect an account, hub or box the devices are on.
  *
  * Administrative, as adding a camera is, and for a stronger reason: this is the
  * credential to somebody's front door, and the account behind it can open every
  * lock on it.
+ *
+ * What the fields are is the connection's own business. They are checked against
+ * the ones it actually declared, and anything else in the object is dropped
+ * rather than stored - what arrives here is somebody else's shape.
  */
 export async function connectDeviceAccountAction(
     input: unknown
-): Promise<{ devices?: DeviceView[]; account?: NukiConnection; error?: string; }> {
+): Promise<{
+    devices?: DeviceView[];
+    accounts?: deviceAccounts.DeviceAccountView[];
+    error?: string;
+}> {
     const { user, install } = await requireHome("home.manage");
     const parsed = deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the token and try again" };
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const connection = deviceConnections.deviceConnection(parsed.data.connection);
+    if (!connection) return { error: "Polaris cannot connect that yet" };
+    const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
+    if (!deviceConnections.fieldsComplete(connection, fields)) {
+        return { error: `Fill in what ${connection.label} needs and try again` };
+    }
+
     const result = await guard(async () => {
-        await connectNuki(parsed.data.token, parsed.data.label);
+        await deviceAccounts.connectAccount(install.id, {
+            connection: connection.id,
+            label: parsed.data.label,
+            fields
+        });
         await devices.syncDevices(install.id);
         const { current } = await currentPlace(install.id);
         return {
             list: await devices.listDevices(install.id, current.id),
-            account: await nukiConnection()
+            connected: await deviceAccounts.listAccounts(install.id)
         };
     });
     if (result.error) return { error: result.error };
@@ -1234,25 +1258,79 @@ export async function connectDeviceAccountAction(
         action: "places.deviceAccount.connect",
         targetType: "installedApp",
         targetId: install.id,
-        metadata: { vendor: "nuki" }
+        metadata: { connection: connection.id }
     });
-    return { devices: result.value?.list, account: result.value?.account };
+    return { devices: result.value?.list, accounts: result.value?.connected };
 }
 
-/** Take the account away, and the doors and their history with it. */
-export async function disconnectDeviceAccountAction(): Promise<{ account?: NukiConnection; error?: string; }> {
+/**
+ * Put a new credential on a connection that already exists.
+ *
+ * A replacement rather than an addition, which is what a revoked token needs. The
+ * devices keep their names, their places and their history: it is the same house.
+ */
+export async function reconnectDeviceAccountAction(
+    accountId: string,
+    input: unknown
+): Promise<{
+    devices?: DeviceView[];
+    accounts?: deviceAccounts.DeviceAccountView[];
+    error?: string;
+}> {
+    const { user, install } = await requireHome("home.manage");
+    const parsed = deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const connection = deviceConnections.deviceConnection(parsed.data.connection);
+    if (!connection) return { error: "Polaris cannot connect that yet" };
+    const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
+    if (!deviceConnections.fieldsComplete(connection, fields)) {
+        return { error: `Fill in what ${connection.label} needs and try again` };
+    }
+
+    const result = await guard(async () => {
+        await deviceAccounts.reconnectAccount(install.id, String(accountId), {
+            label: parsed.data.label,
+            fields
+        });
+        await devices.syncDevices(install.id);
+        const { current } = await currentPlace(install.id);
+        return {
+            list: await devices.listDevices(install.id, current.id),
+            connected: await deviceAccounts.listAccounts(install.id)
+        };
+    });
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.deviceAccount.reconnect",
+        targetType: "installedApp",
+        targetId: install.id,
+        metadata: { connection: connection.id }
+    });
+    return { devices: result.value?.list, accounts: result.value?.connected };
+}
+
+/** Take one connection away, and the devices and their history with it. */
+export async function disconnectDeviceAccountAction(accountId: string): Promise<{
+    devices?: DeviceView[];
+    accounts?: deviceAccounts.DeviceAccountView[];
+    error?: string;
+}> {
     const { user, install } = await requireHome("home.manage");
     const result = await guard(async () => {
-        await disconnectNuki(install.id);
-        return nukiConnection();
+        await deviceAccounts.disconnectAccount(install.id, String(accountId));
+        const { current } = await currentPlace(install.id);
+        return {
+            list: await devices.listDevices(install.id, current.id),
+            connected: await deviceAccounts.listAccounts(install.id)
+        };
     });
     if (result.error) return { error: result.error };
     await recordAudit({
         actorId: user.id,
         action: "places.deviceAccount.disconnect",
         targetType: "installedApp",
-        targetId: install.id,
-        metadata: { vendor: "nuki" }
+        targetId: install.id
     });
-    return { account: result.value };
+    return { devices: result.value?.list, accounts: result.value?.connected };
 }
