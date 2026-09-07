@@ -78,6 +78,7 @@ import {
 } from "./call-combine";
 import {
     diagnoseCall,
+    settlingFor,
     UNKNOWN_AUDIO,
     type CallAudioFacts,
     type CallAudioReport,
@@ -183,16 +184,14 @@ const AUDIO_CHECK_MS = 3_000;
 const ARRIVING_WITHIN_MS = 8_000;
 const CARRYING_WITHIN_MS = 30_000;
 
-/**
- * How long the room is left alone after it changes before anything is judged.
- *
- * Somebody admitted to a call is on the roster before their browser has asked
- * for a ticket, connected, opened a microphone and published it. Every one of
- * those seconds looks exactly like a person whose audio never arrived, and a
- * panel that says so the moment they appear is a panel that is wrong on every
- * single join.
+/*
+ * How long the room is left alone after it changes before anything is judged -
+ * and it is longer for a call that has never carried a byte. Somebody admitted
+ * to a call is on the roster before their browser has asked for a ticket,
+ * connected, opened a microphone and published it; every one of those seconds
+ * looks exactly like a person whose audio never arrived. The rule is
+ * `settlingFor` in `call-diagnosis`, where it can be checked without a browser.
  */
-const SETTLING_MS = 10_000;
 
 /** How many times a microphone that will not go on the call is put back before
  *  Polaris stops trying and says so. Three, because the two causes worth
@@ -476,8 +475,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     );
 
     /** When the room last changed under this browser. Nothing is judged for a
-     *  moment afterwards - see `SETTLING_MS`. */
+     *  moment afterwards - see `settlingFor`. */
     const settledAt = useRef(0);
+    /** What the link was at the last look, so coming back from a reconnection
+     *  can be told from having been connected all along. */
+    const wasLinked = useRef<CallLink>("connecting");
     /** Whether a single audio packet has arrived from anybody on this call. It
      *  is what tells "the sound stopped" from "the sound never had a way in" -
      *  see `everHeard` in `call-diagnosis`. */
@@ -2412,6 +2414,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const current = room.current;
             const at = Date.now();
             const link = linkNow(current);
+            // Back from a reconnection - which is what a Polaris update looks
+            // like from inside a call, the server restarting under it. The room
+            // is as new as it was on the first join, so it is given the same
+            // moment rather than being judged on the second it returns.
+            if (link === "connected" && wasLinked.current !== "connected") {
+                settledAt.current = at;
+            }
+            wasLinked.current = link;
             const others =
                 current && link === "connected"
                     ? await Promise.all(
@@ -2442,8 +2452,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // anything.
             if (link === "connected" && facts.mic === "unpublished") void repair.current();
             const judged = diagnoseCall(facts);
+            // A call that has just connected, or just come back, is given time
+            // before it is accused of anything - and a call that has never heard
+            // a byte is given more of it. Both hand the rows back, so the panel
+            // can be opened and read while it settles.
+            const waiting = settlingFor(everHeard.current);
             const report =
-                at - settledAt.current < SETTLING_MS
+                at - settledAt.current < waiting
                     ? { ...UNKNOWN_AUDIO, lines: judged.lines }
                     : judged;
             // Compared before it is set, because this runs on a timer and a new
@@ -2633,7 +2648,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     useEffect(() => {
         seats.current = listening ? listening.split(" ") : [];
         // The room changed, so the sound in it is given a moment to catch up
-        // before anything is said about it - see `SETTLING_MS`.
+        // before anything is said about it - see `settlingFor`.
         settledAt.current = Date.now();
         if (!meetingId || !nearbyEnabled()) return;
         if (seats.current.length < 2) {

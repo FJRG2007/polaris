@@ -11,7 +11,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { diagnoseCall, type CallAudioFacts, type HeardFrom } from "@/app/(app)/chat/call-diagnosis";
+import {
+    diagnoseCall,
+    settlingFor,
+    type CallAudioFacts,
+    type HeardFrom
+} from "@/app/(app)/chat/call-diagnosis";
 
 /** A call in which everything works, as the starting point for changing exactly
  *  one thing about it. */
@@ -389,5 +394,21 @@ describe("what is happening at the other end", () => {
         const report = diagnoseCall(broken);
         expect(report.blame).toBe("fault");
         expect(report.fix).not.toBe("");
+    });
+});
+
+describe("how long a call is left alone", () => {
+    it("gives a call that has never carried a byte much longer", () => {
+        // The reported case: a Polaris update restarts the call server, this page
+        // reloads and rejoins, and for as long as that takes there is a call that
+        // has honestly never heard anything and is honestly fine. Ten seconds of
+        // patience turned that into an instruction to go and ask an administrator
+        // about ports.
+        expect(settlingFor(false)).toBeGreaterThan(settlingFor(true) * 3);
+    });
+
+    it("still judges a call that had sound and lost it, quickly", () => {
+        // That one has something to diagnose, and waiting is the wrong answer.
+        expect(settlingFor(true)).toBeLessThanOrEqual(10_000);
     });
 });

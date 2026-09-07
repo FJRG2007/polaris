@@ -156,6 +156,24 @@ export interface CallAudioReport {
     readonly lines: readonly CallAudioLine[];
 }
 
+/**
+ * How long a call is left alone before anything is said about it.
+ *
+ * Two windows, because the two silences are not equally worth accusing. A call
+ * that has carried sound and gone quiet has something to diagnose, and ten
+ * seconds is long enough to be sure. A call that has never carried a byte is
+ * usually one that is still starting - and during a Polaris update it is a call
+ * whose server is restarting under it, this page reloading and rejoining - and
+ * the verdict waiting for it sends somebody to an administrator about ports on a
+ * machine where the ports are fine.
+ *
+ * So the second one waits, and it waits much longer. Patience costs nothing while
+ * there is nothing to say; the rows underneath still show every check.
+ */
+export function settlingFor(everHeard: boolean): number {
+    return everHeard ? 10_000 : 45_000;
+}
+
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
 export const UNKNOWN_AUDIO: CallAudioReport = {
