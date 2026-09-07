@@ -341,3 +341,47 @@ export const discoveryInputSchema = z.object({
 });
 
 export type DiscoveryInput = z.infer<typeof discoveryInputSchema>;
+
+// ---------------------------------------------------------------------------
+// Devices
+// ---------------------------------------------------------------------------
+
+/**
+ * Connecting the account a place's locks are on.
+ *
+ * The token is the credential and is never shown again, so the only thing to
+ * check is that something was pasted and that it is not obviously a whole line of
+ * something else. Whether it works is not a rule a schema can hold - that is the
+ * account answering, and the call that connects is what asks.
+ */
+export const deviceAccountSchema = z.object({
+    /** What to call the account in the list, since a company may have more than
+     *  one and "Nuki" alone stops telling them apart. */
+    label: z.string().trim().max(60).default(""),
+    token: z.string().trim().min(20, "That does not look like an API token").max(500)
+});
+
+export type DeviceAccountInput = z.infer<typeof deviceAccountSchema>;
+
+/** What somebody can change about a device here. The rest belongs to the account
+ *  it came from and is read back by every sync. */
+export const deviceEditSchema = z.object({
+    name: z.string().trim().min(1, "Give it a name").max(80),
+    /** Where at the place it is ("Front door"), matching a camera's zone so the
+     *  two group together on any screen that shows both. */
+    zone: z.string().trim().max(60).default(""),
+    placeId: z.string().trim().max(64).nullable().default(null),
+    /** Off is a device somebody wants on the screen and off the controls - a lock
+     *  on a door that is not theirs to open. */
+    controllable: z.boolean().default(true)
+});
+
+export type DeviceEditInput = z.infer<typeof deviceEditSchema>;
+
+/** Every string a device edit carries, trimmed on both sides of the wire. */
+export function normalizeDeviceInput<T extends Record<string, unknown>>(input: T): T {
+    const value = { ...input } as Record<string, unknown>;
+    if (typeof value.name === "string") value.name = value.name.trim();
+    if (typeof value.zone === "string") value.zone = value.zone.trim();
+    return value as T;
+}

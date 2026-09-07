@@ -26,6 +26,7 @@ import {
     Contact,
     Container,
     Database,
+    DoorClosed,
     EyeOff,
     FileText,
     FolderGit2,
@@ -191,7 +192,7 @@ export const POLARIS_APPS: AppEntry[] = [
          */
         id: "home",
         label: "Places",
-        description: "Your places and the cameras in them, what they saw, and what to do about it",
+        description: "Your places, the cameras in them and the doors of them - what they saw, and what to do about it",
         icon: House,
         // Never "/home": that path belongs to Overview and spent a release
         // redirecting permanently to Drive, so browsers that followed it once
@@ -321,6 +322,7 @@ export interface AppSection {
  * rearranging a rail people have learned is a worse cost than one heading now.
  */
 const CAMERAS_GROUP = "Cameras";
+const DOORS_GROUP = "Doors";
 
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
@@ -669,6 +671,23 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/places/people",
             icon: ScanFace,
             keywords: ["faces", "known", "recognition", "family", "strangers"]
+        },
+        {
+            label: "Doors",
+            group: DOORS_GROUP,
+            href: "/places/devices",
+            icon: DoorClosed,
+            keywords: [
+                "locks",
+                "lock",
+                "unlock",
+                "nuki",
+                "smart lock",
+                "door",
+                "open the door",
+                "who opened",
+                "access"
+            ]
         },
         {
             label: "Settings",
