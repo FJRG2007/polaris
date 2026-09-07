@@ -12,12 +12,11 @@
  * the next page, and which conversation is open beside it.
  */
 
-import { notFound } from "next/navigation";
-import { requirePermission } from "@/lib/session";
 import { MailOnboarding } from "./onboarding";
+import { requirePermission } from "@/lib/session";
 import { ownedAccountIds } from "@/lib/mailbox/access";
-import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { MailView, type MailViewContext } from "./mail-view";
+import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { EMPTY_QUERY, listThreads, readThread, type MailListQuery, type MailThreadView } from "@/lib/mailbox/views";
 
 /** What a route knows about itself, beyond the query it narrows to. */
@@ -70,14 +69,21 @@ export async function MailListPage({
     // a link to one is a link somebody was sent, and it has to open even when
     // the list under it has moved on. It is looked up in the page first because
     // that is nearly always where it is.
+    //
+    // A name that resolves to nothing is a list with nothing open beside it, and
+    // never a 404. Archiving or trashing the conversation being read is the
+    // ordinary way to arrive here - every move drops the rows and the address is
+    // still naming what was moved - and answering that with the not-found page
+    // took the whole screen away instead of the one message somebody asked to be
+    // rid of. It is also what a link to a conversation that has since been filed
+    // deserves: the mailbox it was in, rather than a dead end.
     const wanted = params.open ?? "";
     let openThread: MailThreadView | null = threads.find((thread) => thread.id === wanted) ?? null;
-    let openMessages = wanted ? await readThread(user.id, wanted) : [];
-    if (wanted && !openThread) {
+    const openMessages = wanted ? await readThread(user.id, wanted) : [];
+    if (wanted && !openThread && openMessages.length > 0) {
         // Not on this page. It still opens, drawn from its own messages, so long
         // as it is on one of this person's mailboxes - `readThread` narrows by
         // the reader, so an empty answer is both "not there" and "not yours".
-        if (openMessages.length === 0) notFound();
         const first = openMessages[0]!;
         openThread = {
             id: wanted,

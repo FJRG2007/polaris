@@ -20,6 +20,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
+import { leavesTheView } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
@@ -61,7 +62,8 @@ export function ThreadView({
     messages,
     context,
     onBack,
-    onRead
+    onRead,
+    onGone
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
@@ -72,6 +74,9 @@ export function ThreadView({
     /** Told the moment a message here is marked read, so the row in the list
      *  stops being bold now rather than after the round trip. */
     onRead?: () => void;
+    /** Told when this conversation has been filed or thrown away from here, so
+     *  the address stops naming something the server no longer has. */
+    onGone?: () => void;
 }) {
     const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
@@ -125,10 +130,14 @@ export function ThreadView({
                     toast.show({ title: said });
                     return;
                 }
+                // Archived, trashed or deleted: this pane is now looking at
+                // messages the server has moved out from under it. Close before
+                // the refresh, or the next render asks for them again.
+                if (leavesTheView(action)) onGone?.();
                 refresh();
             });
         },
-        [askFolderRole, messages, refresh, toast]
+        [askFolderRole, messages, onGone, refresh, toast]
     );
 
     /**

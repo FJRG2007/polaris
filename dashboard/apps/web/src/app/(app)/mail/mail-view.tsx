@@ -21,6 +21,7 @@
  */
 
 import Link from "next/link";
+import { leavesTheView } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { useMailLayout } from "./use-mail-layout";
 import { ThreadContextMenu } from "./thread-menu";
@@ -135,6 +136,28 @@ export function MailView({
         [patched]
     );
 
+    /**
+     * Stop the address naming a conversation.
+     *
+     * Archiving, trashing or deleting drops the rows the reading pane was drawn
+     * from - a move is re-fetched under the destination's own uids rather than
+     * guessed at - so a moment after the action the pane is asking the server for
+     * something that is not there. Left alone that took the whole screen away
+     * rather than the one message; leaving it open would be a pane that says the
+     * conversation is gone next to a list it is no longer in.
+     *
+     * `/mail/t/<id>` names the conversation in the path instead of the query and
+     * has nothing to strip, so the way out of it is the list itself. Replaced
+     * rather than pushed: a Back into a conversation that has been filed is a
+     * step nobody wants offered.
+     */
+    const closeOpen = useCallback(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("open");
+        const path = url.pathname.startsWith("/mail/t/") ? "/mail" : url.pathname;
+        router.replace(`${path}${url.search}`, { scroll: false });
+    }, [router]);
+
     /** The conversations an action was aimed at, from the messages it named. */
     const threadsOf = useCallback(
         (messageIds: readonly string[]) =>
@@ -185,10 +208,16 @@ export function MailView({
                 }
                 setSelected([]);
                 toast.show({ title: announce });
+                // Done from the list, but it may have been aimed at whatever is
+                // open beside it - the conversation's own row, or the whole
+                // selection with it in.
+                if (leavesTheView(action) && openThread && aimed.includes(openThread.id)) {
+                    closeOpen();
+                }
                 refresh();
             });
         },
-        [askFolderRole, patch, refresh, threadsOf, toast]
+        [askFolderRole, closeOpen, openThread, patch, refresh, threadsOf, toast]
     );
 
     const snooze = useCallback(
@@ -530,6 +559,9 @@ export function MailView({
                         // Opening a message marks it read on the server, which
                         // takes a round trip. The row stops being bold now.
                         onRead={() => patch([openThread.id], { unreadCount: 0 })}
+                        // Filed or thrown away from its own header. Same reason
+                        // as above, from the other side of the screen.
+                        onGone={closeOpen}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         onBack={
