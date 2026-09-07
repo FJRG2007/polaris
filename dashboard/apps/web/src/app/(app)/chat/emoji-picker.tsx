@@ -178,10 +178,10 @@ export function EmojiPicker({
     media?: boolean;
     onEmoji: (char: string) => void;
     /** A chosen GIF or sticker, by address. The caller sends it. */
-    onMedia: (address: string) => void;
+    onMedia?: (address: string) => void;
     /** One the reader kept, by its id. Sent through its own path, since a stored
      *  one is copied rather than fetched back off this Polaris. */
-    onSaved: (savedId: string) => void;
+    onSaved?: (savedId: string) => void;
 }) {
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState<Tab>("emoji");
@@ -541,7 +541,7 @@ export function EmojiPicker({
                                             description={entry.name}
                                             kept={kept.has(entry.source)}
                                             onPick={() => {
-                                                onSaved(entry.id);
+                                                onSaved?.(entry.id);
                                                 setOpen(false);
                                             }}
                                             onKeep={(keep) =>
@@ -559,7 +559,7 @@ export function EmojiPicker({
                                 </p>
                                 <ByLink
                                     onSend={(address) => {
-                                        onMedia(address);
+                                        onMedia?.(address);
                                         setOpen(false);
                                     }}
                                 />
@@ -583,7 +583,7 @@ export function EmojiPicker({
                                     onKeep={toggleKeep}
                                     onPick={(media) => {
                                         rememberMedia(media);
-                                        onMedia(media.full);
+                                        onMedia?.(media.full);
                                         setOpen(false);
                                     }}
                                 />
@@ -602,7 +602,7 @@ export function EmojiPicker({
                                     onKeep={toggleKeep}
                                     onPick={(media) => {
                                         rememberMedia(media);
-                                        onMedia(media.full);
+                                        onMedia?.(media.full);
                                         setOpen(false);
                                     }}
                                 />
@@ -622,7 +622,7 @@ export function EmojiPicker({
                                 onKeep={toggleKeep}
                                 onPick={(media) => {
                                     rememberMedia(media);
-                                    onMedia(media.full);
+                                    onMedia?.(media.full);
                                     setOpen(false);
                                 }}
                             />

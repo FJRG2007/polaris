@@ -24,7 +24,7 @@ import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
 import { Menu, PenLine } from "lucide-react";
 import { Button, PAGE_BLEED } from "@polaris/ui";
 import { useMailStream } from "./use-mail-stream";
-import type { MailLabelView } from "@/lib/mailbox/labels";
+import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -34,6 +34,8 @@ export interface MailContextValue {
     readonly accounts: readonly MailAccountView[];
     readonly folders: readonly MailFolderView[];
     readonly labels: readonly MailLabelView[];
+    /** The addresses each mailbox may send as, keyed by mailbox. */
+    readonly identities: Readonly<Record<string, readonly MailIdentityView[]>>;
     readonly unread: { total: number; byAccount: Record<string, number> };
     readonly viewerName: string;
     /** Pull everything the server drew again. The answer to every live frame:
@@ -106,6 +108,7 @@ export function MailShell({
     accounts,
     folders,
     labels,
+    identities,
     unread,
     viewerName,
     children
@@ -113,6 +116,7 @@ export function MailShell({
     accounts: MailAccountView[];
     folders: MailFolderView[];
     labels: MailLabelView[];
+    identities: Record<string, MailIdentityView[]>;
     unread: { total: number; byAccount: Record<string, number> };
     viewerName: string;
     children: ReactNode;
@@ -145,6 +149,7 @@ export function MailShell({
             accounts,
             folders,
             labels,
+            identities,
             unread,
             viewerName,
             refresh,
@@ -153,7 +158,7 @@ export function MailShell({
             openComposer: setComposing,
             askFolderRole
         }),
-        [accounts, folders, labels, unread, viewerName, refresh, accountColor, composing, askFolderRole]
+        [accounts, folders, labels, identities, unread, viewerName, refresh, accountColor, composing, askFolderRole]
     );
 
     // Inside a conversation on a phone the list steps aside, which is why this

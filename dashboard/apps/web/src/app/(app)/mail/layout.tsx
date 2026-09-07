@@ -17,7 +17,7 @@
 
 import { MailShell } from "./mail-shell";
 import { requirePermission } from "@/lib/session";
-import { listLabels } from "@/lib/mailbox/labels";
+import { listIdentities, listLabels } from "@/lib/mailbox/labels";
 import { listAccountViews } from "@/lib/mailbox/accounts";
 import { listFolders, unreadCounts } from "@/lib/mailbox/views";
 
@@ -32,11 +32,21 @@ export default async function MailLayout({ children }: { children: React.ReactNo
         unreadCounts(user.id)
     ]);
 
+    // The addresses each mailbox may send as, so the composer can offer them
+    // without a round trip when somebody presses Write. Small, and read here
+    // because the composer is mounted by the shell rather than by a screen.
+    const identities = Object.fromEntries(
+        await Promise.all(
+            accounts.map(async (account) => [account.id, await listIdentities(user.id, account.id)] as const)
+        )
+    );
+
     return (
         <MailShell
             accounts={accounts}
             folders={folders}
             labels={labels}
+            identities={identities}
             unread={unread}
             viewerName={user.name}
         >

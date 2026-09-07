@@ -3,35 +3,73 @@
 /**
  * Writing a message.
  *
- * Three decisions shape it.
+ * Four decisions shape it.
  *
- * **The mailbox it goes from is a field, not a mode.** Somebody with four
+ * **The address it goes from is a field, not a mode.** Somebody with four
  * mailboxes writes from whichever one the conversation belongs to, and a reply
  * starts on the mailbox the message arrived in. Getting that wrong sends a work
- * message from a personal address, which cannot be taken back, so the address is
- * on screen the whole time rather than in a menu.
+ * message from a personal address, which cannot be taken back, so it is on
+ * screen the whole time rather than in a menu - and the addresses a mailbox may
+ * send AS sit in the same control, because to the writer they are one question.
+ *
+ * **It is the editor the rest of Polaris writes in.** The same surface as a note
+ * and a chat message: real formatting, links, lists, code, emoji and paste. What
+ * it produces is Markdown, which is what the mail pipeline already turns into
+ * both halves of a message - so writing something formatted and sending
+ * something that renders in every client are the same act.
  *
  * **Nothing is lost.** What is typed is saved as a draft a few seconds after
- * typing stops, so a closed tab, a reload or a crash costs the last few seconds
- * and nothing more.
+ * typing stops, so a closed tab, a reload or a crash costs the last few seconds.
  *
  * **Send is not final for ten seconds.** Pressing it queues the message and
- * starts a countdown; Undo puts it back in the composer. That window is what
- * catches the wrong recipient and the missing attachment, which are the two
- * mistakes everybody makes and the only two that matter.
+ * starts a countdown; Undo puts it back. That window catches the wrong recipient
+ * and the missing attachment, which are the two mistakes everybody makes.
  */
 
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
-import { RecipientField } from "./recipient-field";
 import { useMail } from "./mail-shell";
-import { Loader2, Paperclip, Send, X } from "lucide-react";
-import { Button, Input, Select, useToast } from "@polaris/ui";
+import { RecipientField } from "./recipient-field";
+import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import { saveDraftAction, sendAction, undoSendAction } from "./actions";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+    ChevronDown,
+    Clock,
+    Loader2,
+    Maximize2,
+    Minimize2,
+    Minus,
+    Paperclip,
+    PenLine,
+    Send,
+    X
+} from "lucide-react";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    Input,
+    Select,
+    cn,
+    useToast
+} from "@polaris/ui";
 
 /** How long typing settles before a draft is written. */
 const AUTOSAVE_MS = 3000;
+
+/** How the composer is sitting. `docked` is the corner panel, `full` takes the
+ *  screen for a long message, `minimized` is a bar that keeps the draft alive
+ *  while somebody goes and looks something up in the conversation behind it. */
+type Posture = "docked" | "full" | "minimized";
 
 interface Attached {
     readonly id: string;
@@ -40,11 +78,13 @@ interface Attached {
 }
 
 export function Composer() {
-    const { accounts, composing, openComposer, refresh, viewerName } = useMail();
+    const { accounts, identities, composing, openComposer, refresh, viewerName } = useMail();
     const toast = useToast();
     const [sending, startSending] = useTransition();
 
+    const [posture, setPosture] = useState<Posture>("docked");
     const [accountId, setAccountId] = useState("");
+    const [identityId, setIdentityId] = useState("");
     const [to, setTo] = useState<core.MailAddress[]>([]);
     const [cc, setCc] = useState<core.MailAddress[]>([]);
     const [bcc, setBcc] = useState<core.MailAddress[]>([]);
@@ -53,16 +93,20 @@ export function Composer() {
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<Attached[]>([]);
     const [draftId, setDraftId] = useState<string | null>(null);
+    const [sendAt, setSendAt] = useState<Date | null>(null);
     const [queued, setQueued] = useState<{ draftId: string; until: number } | null>(null);
     const [problem, setProblem] = useState("");
+    const [insert, setInsert] = useState<{ token: number; text: string } | null>(null);
     const picker = useRef<HTMLInputElement | null>(null);
 
     // Opening the composer seeds it. Keyed on the seed object, which is replaced
-    // whenever something asks for a new one, so pressing Reply twice on two
-    // different conversations does not keep the first one's recipients.
+    // whenever something asks for a new one, so pressing Reply on two different
+    // conversations does not keep the first one's recipients.
     useEffect(() => {
         if (!composing) return;
-        setAccountId(composing.accountId ?? accounts[0]?.id ?? "");
+        const account = composing.accountId ?? accounts[0]?.id ?? "";
+        setAccountId(account);
+        setIdentityId((identities[account] ?? []).find((one) => one.isDefault)?.id ?? "");
         setTo([...(composing.to ?? [])]);
         setCc([...(composing.cc ?? [])]);
         setBcc([]);
@@ -71,15 +115,16 @@ export function Composer() {
         setBody(composing.body ?? "");
         setFiles([]);
         setDraftId(composing.draftId ?? null);
+        setSendAt(null);
         setQueued(null);
         setProblem("");
-    }, [composing, accounts]);
+        setPosture("docked");
+    }, [composing, accounts, identities]);
 
     const dirty = to.length > 0 || subject.trim() !== "" || body.trim() !== "" || files.length > 0;
 
-    // The draft, written a few seconds after typing stops. Skipped while nothing
-    // has been typed - an opened-and-closed composer should not leave an empty
-    // draft in somebody's Drafts.
+    // The draft, a few seconds after typing stops. Skipped while nothing has been
+    // typed - an opened-and-closed composer should not leave an empty draft.
     useEffect(() => {
         if (!composing || !accountId || !dirty || queued) return;
         const timer = setTimeout(() => {
@@ -87,6 +132,7 @@ export function Composer() {
                 const outcome = await saveDraftAction({
                     id: draftId,
                     accountId,
+                    identityId: identityId || null,
                     to,
                     cc,
                     bcc,
@@ -98,12 +144,11 @@ export function Composer() {
             })();
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [composing, accountId, to, cc, bcc, subject, body, files, draftId, dirty, queued]);
+    }, [composing, accountId, identityId, to, cc, bcc, subject, body, files, draftId, dirty, queued]);
 
     const attach = useCallback(
-        async (chosen: FileList | null) => {
-            if (!chosen) return;
-            for (const file of Array.from(chosen)) {
+        async (chosen: readonly File[]) => {
+            for (const file of chosen) {
                 if (file.size > core.MAIL_MAX_ATTACHMENT_BYTES) {
                     toast.show({ title: `${file.name} is bigger than most mail servers will accept.` });
                     continue;
@@ -118,7 +163,8 @@ export function Composer() {
                     toast.show({ title: answer?.error ?? "That file could not be attached." });
                     continue;
                 }
-                setFiles((held) => [...held, answer.upload!]);
+                const stored = answer.upload;
+                setFiles((held) => [...held, stored]);
             }
         },
         [toast]
@@ -129,46 +175,99 @@ export function Composer() {
         await fetch(`/api/mail/uploads?id=${encodeURIComponent(uploadId)}`, { method: "DELETE" });
     }, []);
 
-    const send = useCallback(() => {
-        setProblem("");
-        startSending(async () => {
-            const outcome = await sendAction({
-                accountId,
-                to,
-                cc,
-                bcc,
-                subject,
-                body,
-                attachmentIds: files.map((file) => file.id),
-                inReplyToId: composing?.inReplyToId ?? null,
-                forward: composing?.forward ?? false,
-                draftId
+    const send = useCallback(
+        (when: Date | null) => {
+            setProblem("");
+            startSending(async () => {
+                const outcome = await sendAction({
+                    accountId,
+                    identityId: identityId || null,
+                    to,
+                    cc,
+                    bcc,
+                    subject,
+                    body,
+                    attachmentIds: files.map((file) => file.id),
+                    inReplyToId: composing?.inReplyToId ?? null,
+                    forward: composing?.forward ?? false,
+                    sendAt: when,
+                    draftId
+                });
+                const said = refusalOf(outcome);
+                if (said) {
+                    setProblem(said);
+                    return;
+                }
+                if ("draftId" in outcome && outcome.draftId && "sendAt" in outcome && outcome.sendAt) {
+                    setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
+                }
+                refresh();
             });
-            const said = refusalOf(outcome);
-            if (said) {
-                setProblem(said);
-                return;
-            }
-            if ("draftId" in outcome && outcome.draftId && "sendAt" in outcome && outcome.sendAt) {
-                setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
-            }
-            refresh();
-        });
-    }, [accountId, to, cc, bcc, subject, body, files, composing, draftId, refresh]);
+        },
+        [accountId, identityId, to, cc, bcc, subject, body, files, composing, draftId, refresh]
+    );
+
+    const account = accounts.find((one) => one.id === accountId);
+    const own = useMemo(() => identities[accountId] ?? [], [identities, accountId]);
+    const identity = own.find((one) => one.id === identityId);
+    /** What this message would sign with, for the Insert button. */
+    const signature = (identity?.signature || account?.signature || "").trim();
 
     if (!composing) return null;
 
-    const account = accounts.find((one) => one.id === accountId);
     const from = account
-        ? core.formatAddress({ name: account.displayName || viewerName, address: account.address })
+        ? core.formatAddress({
+              name: identity?.displayName || account.displayName || viewerName,
+              address: identity?.address || account.address
+          })
         : "";
 
+    const shell =
+        posture === "full"
+            ? "inset-4 md:inset-10 rounded-lg border-b"
+            : posture === "minimized"
+              ? "bottom-0 right-6 w-[22rem]"
+              : "inset-x-0 bottom-0 mx-auto w-full max-w-3xl max-h-[85vh] md:inset-x-auto md:right-6 md:mx-0 md:w-[36rem]";
+
     return (
-        <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-h-[85vh] w-full max-w-3xl flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal md:right-6 md:left-auto md:mx-0 md:w-[36rem]">
-            <header className="flex items-center gap-2 border-b border-border px-3 py-2">
-                <h2 className="min-w-0 flex-1 truncate text-[13px] font-medium">
+        <div
+            className={cn(
+                "fixed z-40 flex flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal",
+                shell
+            )}
+            role="dialog"
+            aria-label="New message"
+        >
+            <header className="flex items-center gap-1 border-b border-border px-3 py-2">
+                <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left text-[13px] font-medium"
+                    onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
+                >
                     {subject.trim() || "New message"}
-                </h2>
+                </button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
+                    title={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
+                    onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
+                >
+                    <Minus className="size-4 shrink-0" aria-hidden />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={posture === "full" ? "Shrink the composer" : "Expand the composer"}
+                    title={posture === "full" ? "Shrink the composer" : "Expand the composer"}
+                    onClick={() => setPosture(posture === "full" ? "docked" : "full")}
+                >
+                    {posture === "full" ? (
+                        <Minimize2 className="size-4 shrink-0" aria-hidden />
+                    ) : (
+                        <Maximize2 className="size-4 shrink-0" aria-hidden />
+                    )}
+                </Button>
                 <Button
                     variant="ghost"
                     size="icon"
@@ -180,7 +279,7 @@ export function Composer() {
                 </Button>
             </header>
 
-            {queued ? (
+            {posture === "minimized" ? null : queued ? (
                 <QueuedNotice
                     until={queued.until}
                     onUndo={() =>
@@ -200,131 +299,306 @@ export function Composer() {
                     onDone={() => openComposer(null)}
                 />
             ) : (
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                    <div className="space-y-2 px-3 py-2">
-                        {accounts.length > 1 ? (
+                <>
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        <div className="space-y-2 px-3 py-2">
                             <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                                 <span className="w-10 shrink-0">From</span>
-                                <Select
-                                    value={accountId}
-                                    onValueChange={setAccountId}
-                                    options={accounts.map((one) => ({
-                                        value: one.id,
-                                        label: one.label ? `${one.label} - ${one.address}` : one.address
-                                    }))}
-                                    aria-label="The mailbox this is sent from"
-                                    className="min-w-0 flex-1"
+                                {accounts.length > 1 || own.length > 0 ? (
+                                    <Select
+                                        value={identityId ? `identity:${identityId}` : `account:${accountId}`}
+                                        onValueChange={(next) => {
+                                            const [kind, id] = next.split(":");
+                                            if (kind === "identity") {
+                                                setIdentityId(id ?? "");
+                                                return;
+                                            }
+                                            setAccountId(id ?? "");
+                                            setIdentityId("");
+                                        }}
+                                        aria-label="The address this is sent from"
+                                        className="min-w-0 flex-1"
+                                        options={accounts.flatMap((one) => [
+                                            {
+                                                value: `account:${one.id}`,
+                                                label: one.label ? `${one.label} - ${one.address}` : one.address
+                                            },
+                                            ...(identities[one.id] ?? []).map((alias) => ({
+                                                value: `identity:${alias.id}`,
+                                                label: `${alias.address} (via ${one.address})`
+                                            }))
+                                        ])}
+                                    />
+                                ) : (
+                                    <span className="min-w-0 truncate text-foreground" title={from}>{from}</span>
+                                )}
+                            </label>
+
+                            <RecipientField label="To" value={to} onChange={setTo} autoFocus />
+                            {showCopies ? (
+                                <>
+                                    <RecipientField label="Cc" value={cc} onChange={setCc} />
+                                    <RecipientField label="Bcc" value={bcc} onChange={setBcc} />
+                                </>
+                            ) : (
+                                <button
+                                    type="button"
+                                    className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
+                                    onClick={() => setShowCopies(true)}
+                                >
+                                    Add a copy or a blind copy
+                                </button>
+                            )}
+
+                            <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                                <span className="w-10 shrink-0">Subject</span>
+                                <Input
+                                    value={subject}
+                                    onChange={(event) => setSubject(event.target.value)}
+                                    aria-label="Subject"
+                                    className="h-8 min-w-0 flex-1 text-[13px]"
                                 />
                             </label>
-                        ) : (
-                            <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                <span className="w-10 shrink-0">From</span>
-                                <span className="min-w-0 truncate text-foreground" title={from}>{from}</span>
-                            </p>
-                        )}
+                        </div>
 
-                        <RecipientField label="To" value={to} onChange={setTo} autoFocus />
-                        {showCopies ? (
-                            <>
-                                <RecipientField label="Cc" value={cc} onChange={setCc} />
-                                <RecipientField label="Bcc" value={bcc} onChange={setBcc} />
-                            </>
-                        ) : (
-                            <button
-                                type="button"
-                                className="pl-12 text-[12px] text-muted-foreground hover:text-foreground"
-                                onClick={() => setShowCopies(true)}
-                            >
-                                Add a copy or a blind copy
-                            </button>
-                        )}
-
-                        <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                            <span className="w-10 shrink-0">Subject</span>
-                            <Input
-                                value={subject}
-                                onChange={(event) => setSubject(event.target.value)}
-                                aria-label="Subject"
-                                className="h-8 min-w-0 flex-1 text-[13px]"
+                        <div className="px-1 pb-2">
+                            <RichTextEditor
+                                value={body}
+                                onChange={setBody}
+                                insert={insert}
+                                placeholder="Write your message."
+                                // A screenshot pasted in is an attachment rather
+                                // than a picture pasted into the text: a data URI
+                                // that size is refused by mail servers and shows
+                                // up as a broken image at the other end.
+                                onPasteFiles={(dropped) => {
+                                    void attach([...dropped]);
+                                    return true;
+                                }}
                             />
-                        </label>
+                        </div>
+
+                        {composing.forward ? (
+                            <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
+                                Files on the message you are forwarding are not carried with it yet. Attach them
+                                again if they matter.
+                            </p>
+                        ) : null}
+
+                        {files.length > 0 ? (
+                            <ul className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
+                                {files.map((file) => (
+                                    <li
+                                        key={file.id}
+                                        className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
+                                    >
+                                        <Paperclip className="size-3.5 shrink-0 text-foreground-subtle" aria-hidden />
+                                        <span className="max-w-[14rem] truncate" title={file.name}>{file.name}</span>
+                                        <button
+                                            type="button"
+                                            aria-label={`Remove ${file.name}`}
+                                            title={`Remove ${file.name}`}
+                                            className="text-foreground-subtle hover:text-foreground"
+                                            onClick={() => void remove(file.id)}
+                                        >
+                                            <X className="size-3.5 shrink-0" aria-hidden />
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
                     </div>
 
-                    <textarea
-                        value={body}
-                        onChange={(event) => setBody(event.target.value)}
-                        aria-label="Message"
-                        placeholder="Write your message. Markdown works."
-                        className="min-h-[14rem] w-full resize-none border-0 bg-transparent px-3 py-2 text-[13px] leading-relaxed outline-none"
-                    />
+                    <footer className="flex flex-wrap items-center gap-1 border-t border-border px-3 py-2">
+                        <div className="flex items-stretch">
+                            <Button
+                                className="rounded-r-none"
+                                onClick={() => send(sendAt)}
+                                disabled={sending || to.length === 0 || !accountId}
+                            >
+                                {sending ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                ) : (
+                                    <Send className="size-4 shrink-0" aria-hidden />
+                                )}
+                                {sendAt ? "Schedule" : "Send"}
+                            </Button>
+                            <SendLaterMenu
+                                disabled={sending || to.length === 0 || !accountId}
+                                chosen={sendAt}
+                                onChoose={(when) => {
+                                    setSendAt(when);
+                                    if (when) send(when);
+                                }}
+                            />
+                        </div>
 
-                    {files.length > 0 ? (
-                        <ul className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
-                            {files.map((file) => (
-                                <li
-                                    key={file.id}
-                                    className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
-                                >
-                                    <Paperclip className="size-3.5 shrink-0 text-foreground-subtle" aria-hidden />
-                                    <span className="max-w-[14rem] truncate" title={file.name}>{file.name}</span>
-                                    <button
-                                        type="button"
-                                        aria-label={`Remove ${file.name}`}
-                                        title={`Remove ${file.name}`}
-                                        className="text-foreground-subtle hover:text-foreground"
-                                        onClick={() => void remove(file.id)}
-                                    >
-                                        <X className="size-3.5 shrink-0" aria-hidden />
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : null}
-                </div>
+                        <input
+                            ref={picker}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            onChange={(event) => {
+                                void attach([...(event.target.files ?? [])]);
+                                event.target.value = "";
+                            }}
+                        />
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Attach a file"
+                            title="Attach a file"
+                            onClick={() => picker.current?.click()}
+                        >
+                            <Paperclip className="size-4 shrink-0" aria-hidden />
+                        </Button>
+
+                        <EmojiPicker
+                            disabled={false}
+                            media={false}
+                            onEmoji={(emoji) => setInsert({ token: Date.now(), text: emoji })}
+                        />
+
+                        {signature ? (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Insert your signature"
+                                title="Insert your signature"
+                                onClick={() => setInsert({ token: Date.now(), text: `\n\n-- \n${signature}` })}
+                            >
+                                <PenLine className="size-4 shrink-0" aria-hidden />
+                            </Button>
+                        ) : null}
+
+                        {problem ? (
+                            <p className="min-w-0 flex-1 basis-full text-[12px] text-danger">{problem}</p>
+                        ) : null}
+                    </footer>
+                </>
             )}
-
-            {!queued ? (
-                <footer className="flex items-center gap-2 border-t border-border px-3 py-2">
-                    <Button onClick={send} disabled={sending || to.length === 0 || !accountId}>
-                        {sending ? (
-                            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
-                        ) : (
-                            <Send className="size-4 shrink-0" aria-hidden />
-                        )}
-                        Send
-                    </Button>
-                    <input
-                        ref={picker}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(event) => {
-                            void attach(event.target.files);
-                            event.target.value = "";
-                        }}
-                    />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Attach a file"
-                        title="Attach a file"
-                        onClick={() => picker.current?.click()}
-                    >
-                        <Paperclip className="size-4 shrink-0" aria-hidden />
-                    </Button>
-                    {problem ? <p className="min-w-0 flex-1 truncate text-[12px] text-danger" title={problem}>{problem}</p> : null}
-                </footer>
-            ) : null}
         </div>
     );
 }
+
+/**
+ * Send later.
+ *
+ * A handful of times somebody would actually pick, and a specific one for
+ * everything else. Nothing new underneath it: the queue already holds a message
+ * with an hour on it, so this only decides which hour.
+ */
+function SendLaterMenu({
+    disabled,
+    chosen,
+    onChoose
+}: {
+    disabled: boolean;
+    chosen: Date | null;
+    onChoose: (when: Date | null) => void;
+}) {
+    const [custom, setCustom] = useState("");
+    const [asking, setAsking] = useState(false);
+
+    return (
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        size="icon"
+                        className="rounded-l-none border-l border-black/20"
+                        disabled={disabled}
+                        aria-label="Send later"
+                        title="Send later"
+                    >
+                        <ChevronDown className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    {SEND_TIMES.map((entry) => (
+                        <DropdownMenuItem key={entry.label} onSelect={() => onChoose(entry.when())}>
+                            <Clock className="size-3.5 shrink-0" aria-hidden />
+                            {entry.label}
+                        </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setAsking(true)}>Pick a time...</DropdownMenuItem>
+                    {chosen ? (
+                        <DropdownMenuItem onSelect={() => onChoose(null)}>Send it now instead</DropdownMenuItem>
+                    ) : null}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            {asking ? (
+                <Dialog open onOpenChange={(next) => (next ? undefined : setAsking(false))}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Send this when?</DialogTitle>
+                        </DialogHeader>
+                        <Input
+                            type="datetime-local"
+                            value={custom}
+                            aria-label="The time to send it"
+                            onChange={(event) => setCustom(event.target.value)}
+                        />
+                        <div className="mt-3 flex gap-2">
+                            <Button
+                                disabled={!custom || new Date(custom).getTime() <= Date.now()}
+                                onClick={() => {
+                                    onChoose(new Date(custom));
+                                    setAsking(false);
+                                }}
+                            >
+                                Schedule it
+                            </Button>
+                            <Button variant="ghost" onClick={() => setAsking(false)}>
+                                Cancel
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+        </>
+    );
+}
+
+/** The times worth having on a menu. Anything else is the picker. */
+const SEND_TIMES: readonly { label: string; when: () => Date }[] = [
+    {
+        label: "Later today",
+        when: () => {
+            const when = new Date();
+            when.setHours(when.getHours() + 3, 0, 0, 0);
+            return when;
+        }
+    },
+    {
+        label: "Tomorrow morning",
+        when: () => {
+            const when = new Date();
+            when.setDate(when.getDate() + 1);
+            when.setHours(8, 0, 0, 0);
+            return when;
+        }
+    },
+    {
+        label: "Monday morning",
+        when: () => {
+            const when = new Date();
+            when.setDate(when.getDate() + ((8 - when.getDay()) % 7 || 7));
+            when.setHours(8, 0, 0, 0);
+            return when;
+        }
+    }
+];
 
 /**
  * The countdown after Send.
  *
  * It closes itself when it reaches zero rather than sitting there saying "sent",
  * because a composer that stays open after a message has gone is one somebody
- * sends twice.
+ * sends twice. A message scheduled for next week says so instead of counting
+ * down to it.
  */
 function QueuedNotice({
     until,
@@ -336,24 +610,33 @@ function QueuedNotice({
     onDone: () => void;
 }) {
     const [left, setLeft] = useState(() => Math.max(0, Math.ceil((until - Date.now()) / 1000)));
+    // Anything further out than a minute is a scheduled message rather than a
+    // send in progress, and counting down to Thursday would be absurd.
+    const scheduled = until - Date.now() > 60_000;
 
     useEffect(() => {
+        if (scheduled) return;
         const timer = setInterval(() => {
             const remaining = Math.max(0, Math.ceil((until - Date.now()) / 1000));
             setLeft(remaining);
             if (remaining === 0) onDone();
         }, 250);
         return () => clearInterval(timer);
-    }, [until, onDone]);
+    }, [until, onDone, scheduled]);
 
     return (
         <div className="flex items-center gap-3 px-4 py-6">
             <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
-                {left > 0 ? `Sending in ${left}s.` : "Sending."}
+                {scheduled ? "Waiting until it is due." : left > 0 ? `Sending in ${left}s.` : "Sending."}
             </p>
-            {left > 0 ? (
+            {scheduled || left > 0 ? (
                 <Button variant="secondary" onClick={onUndo}>
-                    Undo
+                    {scheduled ? "Bring it back" : "Undo"}
+                </Button>
+            ) : null}
+            {scheduled ? (
+                <Button variant="ghost" onClick={onDone}>
+                    Done
                 </Button>
             ) : null}
         </div>
