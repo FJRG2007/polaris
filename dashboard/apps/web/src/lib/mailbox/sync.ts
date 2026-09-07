@@ -33,6 +33,7 @@ import { decodePart } from "./decode";
 import { addressesFrom, asJson } from "./json";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
+import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import { replyIfAway } from "./vacation";
 import { applyRulesToMessage } from "./rules";
 import { MailAuthError } from "./credentials";
@@ -59,6 +60,30 @@ function worthSyncing(folder: { role: string; subscribed: boolean; hidden: boole
  * every other account on the instance.
  */
 export async function syncAccount(accountId: string): Promise<void> {
+    // One pass per mailbox at a time, whoever asked. The scheduled sweep, the
+    // Check for new mail button and the fast pass a watching tab drives all
+    // reach here, and two at once is two IMAP sessions on the same account -
+    // which is how a client gets rate limited by Gmail. The second caller joins
+    // the first rather than being turned away, so a button press during a
+    // scheduled pass still finishes before the screen redraws.
+    const running = passes().get(accountId);
+    if (running) return running;
+    const pass = onePass(accountId).finally(() => passes().delete(accountId));
+    passes().set(accountId, pass);
+    return pass;
+}
+
+/** In flight, by mailbox. On `globalThis` for the same reason the live bus is:
+ *  a dev server re-evaluates the module and a fresh map would lose the guard. */
+const PASSES = Symbol.for("polaris.mail.passes");
+
+function passes(): Map<string, Promise<void>> {
+    const held = globalThis as { [PASSES]?: Map<string, Promise<void>> };
+    held[PASSES] ??= new Map();
+    return held[PASSES];
+}
+
+async function onePass(accountId: string): Promise<void> {
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
         select: ACCOUNT_COLUMNS
@@ -681,15 +706,24 @@ async function reconcileDeletions(client: ImapFlow, folder: FolderRow): Promise<
 export async function accountsToSync(): Promise<string[]> {
     const accounts = await prisma.mailAccount.findMany({
         where: { state: { not: "auth" } },
-        select: { id: true, pollSeconds: true, lastSyncAt: true },
+        select: { id: true, userId: true, pollSeconds: true, lastSyncAt: true },
         orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } },
         take: 200
     });
     const now = Date.now();
+    const watching = watchedReaders();
     return accounts
-        .filter(
-            (account) =>
-                !account.lastSyncAt || now - account.lastSyncAt.getTime() >= account.pollSeconds * 1000
-        )
+        .filter((account) => {
+            if (!account.lastSyncAt) return true;
+            // A mailbox somebody is looking at right now is asked far more often
+            // than its own interval, which is set for a mailbox nobody has open.
+            // Mail read in another client - a phone, Thunderbird, the provider's
+            // own web page - showed up here five minutes later, which is not what
+            // anybody means by their mail being in one place.
+            const seconds = watching.has(account.userId)
+                ? Math.min(account.pollSeconds, WATCHED_POLL_SECONDS)
+                : account.pollSeconds;
+            return now - account.lastSyncAt.getTime() >= seconds * 1000;
+        })
         .map((account) => account.id);
 }

@@ -20,6 +20,7 @@
  */
 
 import { subscribeMail } from "@/lib/mailbox/live";
+import { watchMailboxes } from "@/lib/mailbox/watch";
 import { ownedAccountIds } from "@/lib/mailbox/access";
 import { resolveSession, sessionCan } from "@/lib/session";
 
@@ -53,6 +54,8 @@ export async function GET(request: Request): Promise<Response> {
     const readerId = session.id;
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
+    /** Stops this tab counting as somebody watching. */
+    let unwatch: (() => void) | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let pending: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
@@ -90,6 +93,8 @@ export async function GET(request: Request): Promise<Response> {
         pending = null;
         unsubscribe?.();
         unsubscribe = null;
+        unwatch?.();
+        unwatch = null;
     }
 
     const stream = new ReadableStream<Uint8Array>({
@@ -119,6 +124,11 @@ export async function GET(request: Request): Promise<Response> {
             }
 
             await refreshMine();
+
+            // Somebody is looking at their mail. That is what makes their
+            // mailboxes worth asking every twenty seconds instead of every five
+            // minutes, and it lasts exactly as long as this stream does.
+            unwatch = watchMailboxes(readerId);
 
             unsubscribe = subscribeMail((change) => {
                 if (closed) return;

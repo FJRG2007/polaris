@@ -36,7 +36,10 @@ vi.mock("@polaris/auth", () => ({ signInWithConnection: async () => ({ challenge
 // The real one is covered in domains/browser-origin; here it only has to answer
 // where the browser is, which is what decides whether the trip has to move.
 vi.mock("@/lib/domain-service", () => ({
-    requestOrigin: (request: Request) => `https://${request.headers.get("host") ?? "0.0.0.0:3000"}`
+    requestOrigin: (request: Request) => `https://${request.headers.get("host") ?? "0.0.0.0:3000"}`,
+    // A link is only started when a provider has somewhere to return somebody
+    // to, so this has to answer for the trips below to happen at all.
+    publicAppUrl: async () => REGISTERED
 }));
 
 vi.mock("@/lib/connections/store", () => ({
