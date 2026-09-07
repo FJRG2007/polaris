@@ -18,17 +18,17 @@
  *     them - a link that can be forwarded is a link that will be.
  */
 
-import { randomBytes } from "node:crypto";
-import { prisma, type Prisma } from "@polaris/db";
-import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
-import { blockersOf } from "@/lib/blocks";
-import { notify } from "@/lib/notifications/dispatch";
 import { postNotice } from "./notices";
+import { randomBytes } from "node:crypto";
+import { blockersOf } from "@/lib/blocks";
 import { whoMissedTheCall } from "./missed-call";
+import { prisma, type Prisma } from "@polaris/db";
 import { discardMeetingChat } from "./meeting-files";
+import { notify } from "@/lib/notifications/dispatch";
 import { publishMeetingEvent } from "./meeting-events";
 import { publishChatChange, type CallState } from "./live";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
+import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 
 /** How many browsers one call holds.
@@ -1054,6 +1054,11 @@ async function closeMeeting(meetingId: string): Promise<void> {
     }
 }
 
+/** How many people one unanswered call raises an alert for. Past this it has
+ *  stopped being a telephone call and become a channel that rang, and the line in
+ *  the conversation is the record that suits it. */
+const MOST_MISSED_ALERTS = 25;
+
 /**
  * A call nobody picked up, said out loud.
  *
@@ -1107,6 +1112,14 @@ async function noteMissedCall(meetingId: string): Promise<void> {
         if (missed.length === 0) return;
 
         await postNotice(meeting.channelId, "missedCall", { subjectId: meeting.hostId });
+
+        // The bell only while this is still a telephone call. Somebody ringing a
+        // space channel of two hundred people is one line in the conversation and
+        // not two hundred preference lookups and two hundred alerts written in a
+        // single breath when the room closes - and nobody in a channel that size
+        // reads "you missed a call" as being about them anyway. The line is there
+        // for all of them either way, which is the record that lasts.
+        if (missed.length > MOST_MISSED_ALERTS) return;
 
         const caller = await prisma.user.findUnique({
             where: { id: meeting.hostId },

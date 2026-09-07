@@ -13,13 +13,19 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import * as migrate from "@/lib/deploy/migrate";
 import { requirePermission } from "@/lib/session";
+import { recordAudit } from "@/lib/audit-service";
+import type { ProjectCapability } from "@polaris/core";
 import { listConnections } from "@/lib/connections/store";
 import * as external from "@/lib/deploy/external-services";
-import * as migrate from "@/lib/deploy/migrate";
 import { listDeployTargets } from "@/lib/deploy-target-service";
-import { requireProjectAccess } from "@/lib/deploy-project-access";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
+import {
+    accessCan,
+    requireEnvironmentAccess,
+    requireProjectAccess
+} from "@/lib/deploy-project-access";
 
 const idSchema = z.string().uuid();
 
@@ -177,18 +183,42 @@ const moveHomeSchema = z.object({
     deployNow: z.boolean().default(true)
 });
 
+/**
+ * Whether the variables may travel with the move, in each direction.
+ *
+ * Not covered by the capabilities that create and configure a service, and
+ * deliberately not: a set assembled to withhold the variables withholds their
+ * names as well as their values, and a move that copies them into somebody's own
+ * Vercel project is the widest read of them there is. So the plans below hand
+ * over how many there are and nothing more, and the move itself refuses to carry
+ * them.
+ *
+ * Coming the other way it is a write rather than a read - a provider's values
+ * land in this project's own variables - so it is the writing capability.
+ */
+const COPY_OUT: ProjectCapability = "variables.read";
+const COPY_HOME: ProjectCapability = "variables.write";
+
 /** What a service here would take with it. A read of the project, which is what
  *  it is: nothing has been asked to move yet. */
 export async function moveOutPlanAction(
     projectId: string,
     applicationId: string
-): Promise<{ plan?: migrate.MoveOutPlan; error?: string }> {
+): Promise<{ plan?: migrate.MoveOutPlan; canCopyVariables?: boolean; error?: string }> {
     const user = await requirePermission("deploy.read");
     const parsed = idSchema.safeParse(applicationId);
     if (!parsed.success) return { error: "Unknown service" };
     try {
-        await requireProjectAccess(projectId, user.id, "project.read");
-        return { plan: await migrate.moveOutPlan(projectId, parsed.data) };
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
+        const canCopyVariables = accessCan(access, COPY_OUT);
+        const plan = await migrate.moveOutPlan(projectId, parsed.data);
+        // The count travels either way; the names only to somebody who may read
+        // them. "There are none" and "they are not yours to see" are different
+        // sentences and the screen has to be able to say the second one.
+        return {
+            plan: canCopyVariables ? plan : { ...plan, variableKeys: [] },
+            canCopyVariables
+        };
     } catch (caught) {
         return { error: refusal(caught) };
     }
@@ -200,7 +230,8 @@ export async function moveOutPlanAction(
  * Creating a service and stopping one, so it asks for both capabilities rather
  * than the weaker of them: this is the button that takes production off a
  * Polaris server, and somebody who may only start builds is not the person who
- * decides that.
+ * decides that. Carrying the variables asks for a third, because that half of it
+ * is a read of every secret the service holds.
  */
 export async function moveOutAction(
     projectId: string,
@@ -213,9 +244,37 @@ export async function moveOutAction(
     const parsed = moveOutSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await requireProjectAccess(projectId, user.id, "service.create");
-        await requireProjectAccess(projectId, user.id, "service.configure");
+        // Reached through the environment the row lands in rather than through
+        // the project, so an access limited to development cannot put one in
+        // production - and checked against this project, because the id came off
+        // a form and a form is a claim.
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "service.create"
+        );
+        if (access.projectId !== projectId) return { error: "Project not found" };
+        if (!accessCan(access, "service.configure")) return { error: "Project not found" };
+        if (parsed.data.copyVariables && !accessCan(access, COPY_OUT)) {
+            return {
+                error: "Copying the variables needs access to them. Move it without them, or ask for that access."
+            };
+        }
         const result = await migrate.moveOut(user.id, projectId, service.data, parsed.data);
+        // The one action here worth a trail: it decrypts every secret the service
+        // runs with and hands them to a third party.
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.app.moveOut",
+            targetType: "application",
+            targetId: service.data,
+            metadata: {
+                projectId,
+                provider: result.service.provider,
+                copied: result.copied,
+                stopped: result.stopped
+            }
+        });
         revalidatePath(`/apps/deploy/${projectId}`);
         revalidatePath(`/apps/deploy/${projectId}/elsewhere`);
         return { result };
@@ -232,6 +291,7 @@ export async function moveHomePlanAction(
 ): Promise<{
     plan?: migrate.MoveHomePlan;
     targets?: { id: string; name: string }[];
+    canCopyVariables?: boolean;
     error?: string;
 }> {
     const user = await requirePermission("deploy.read");
@@ -244,7 +304,8 @@ export async function moveHomePlanAction(
             listDeployTargets(access.ownerId)
         ]);
         return {
-            plan,
+            plan: accessCan(access, COPY_OUT) ? plan : { ...plan, variableKeys: [] },
+            canCopyVariables: accessCan(access, COPY_HOME),
             targets: targets.map((target) => ({ id: target.id, name: target.name }))
         };
     } catch (caught) {
@@ -265,8 +326,31 @@ export async function moveHomeAction(
     const parsed = moveHomeSchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     try {
-        await requireProjectAccess(projectId, user.id, "service.create");
+        // The environment is where the new service is created, and it arrives on
+        // a form. Authorized through itself rather than through the project:
+        // `createApplication` only checks that the environment belongs to the
+        // same owner, so an id from a sibling project would otherwise be enough
+        // to plant a running service - and its variables - somewhere this person
+        // has no access at all.
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "service.create"
+        );
+        if (access.projectId !== projectId) return { error: "Project not found" };
+        if (parsed.data.copyVariables && !accessCan(access, COPY_HOME)) {
+            return {
+                error: "Copying the variables needs access to them. Bring it over without them, or ask for that access."
+            };
+        }
         const result = await migrate.moveHome(user.id, projectId, service.data, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.app.moveHome",
+            targetType: "application",
+            targetId: result.applicationId,
+            metadata: { projectId, externalServiceId: service.data, copied: result.copied }
+        });
         revalidatePath(`/apps/deploy/${projectId}`);
         return { result };
     } catch (caught) {

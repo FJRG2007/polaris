@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ringDecision } from "@/lib/chat/ring-decision";
+import { ringDecision, roomAfter } from "@/lib/chat/ring-decision";
 
 const ME = "user-me";
 const THEM = "user-them";
@@ -53,5 +53,56 @@ describe("what a call frame means to a browser that is not in the call", () => {
         // to "" would have every one of those silence their telephone.
         expect(ringDecision({ state: "moved", userId: "", count: 2 }, "")).toBe("ignore");
         expect(ringDecision({ state: "moved", userId: "", count: 2 }, ME)).toBe("ignore");
+    });
+});
+
+/**
+ * And what became of the room, which is the other half of the same reading.
+ *
+ * A card that turns into "Missed call" because the ringing ran out disagrees
+ * with the server, which writes nothing at all once anybody but the caller has
+ * sat in the room. So a group call one person answered used to leave everybody
+ * else with a persistent card and a Call back button for a conversation that was
+ * answered and might still be running.
+ */
+describe("what became of the room", () => {
+    const RANG = { state: "ringing", userId: THEM, count: 1 } as const;
+
+    it("starts from the ringing frame, with the caller alone in it", () => {
+        expect(roomAfter(undefined, RANG)).toEqual({ ringing: 1, answered: false });
+    });
+
+    it("says nothing about a call this browser never heard ring", () => {
+        expect(roomAfter(undefined, { state: "moved", userId: THEM, count: 2 })).toBeUndefined();
+        expect(roomAfter(undefined, { state: "ended", userId: "", count: 0 })).toBeUndefined();
+    });
+
+    it("is answered once somebody walks in", () => {
+        const rang = roomAfter(undefined, RANG);
+        expect(roomAfter(rang, { state: "moved", userId: THEM, count: 2 })?.answered).toBe(true);
+    });
+
+    it("stays answered after they leave again, and after the room closes", () => {
+        const joined = roomAfter(roomAfter(undefined, RANG), {
+            state: "moved",
+            userId: THEM,
+            count: 2
+        });
+        const left = roomAfter(joined, { state: "moved", userId: "", count: 1 });
+        expect(left?.answered).toBe(true);
+        expect(roomAfter(left, { state: "ended", userId: "", count: 0 })?.answered).toBe(true);
+    });
+
+    it("is not answered by a call that only ever held the person who rang", () => {
+        // The missed call itself. Nobody joined, it timed out, the room closed.
+        const rang = roomAfter(undefined, RANG);
+        const ended = roomAfter(rang, { state: "ended", userId: "", count: 0 });
+        expect(ended?.answered).toBe(false);
+    });
+
+    it("is not answered by a second ringing frame", () => {
+        // Inviting somebody into a group rings them with a frame of its own.
+        const rang = roomAfter(undefined, RANG);
+        expect(roomAfter(rang, { state: "ringing", userId: THEM, count: 1 })?.answered).toBe(false);
     });
 });

@@ -111,6 +111,26 @@ function Tick({
     );
 }
 
+/**
+ * What the dialog says about the variables, in the three cases there are.
+ *
+ * The names come back empty for somebody whose access does not include the
+ * variables, and empty is not the same as none - so the count is what this reads
+ * and the names only decorate it. Saying "there are no variables" to somebody who
+ * simply may not see them would be the screen lying about the project.
+ */
+function variableNote(
+    plan: { variableCount: number; variableKeys: readonly string[] },
+    canCopy: boolean
+): string {
+    const many = `${plan.variableCount} variable${plan.variableCount === 1 ? "" : "s"}`;
+    if (plan.variableCount === 0) return "There are no variables to carry across.";
+    if (!canCopy) return `${many} stay where they are: copying them is not part of your access here.`;
+    if (plan.variableKeys.length === 0) return `${many} can travel.`;
+    const listed = plan.variableKeys.slice(0, 6).join(", ");
+    return `${many} can travel: ${listed}${plan.variableKeys.length > 6 ? ", and more" : ""}.`;
+}
+
 function Problem({ text }: { text: string }) {
     return (
         <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -142,6 +162,11 @@ export function MoveOutDialog({
     const [child, setChild] = useState("");
     const [name, setName] = useState(application.name);
     const [copyVariables, setCopyVariables] = useState(true);
+    // Whether the variables are this person's to send at all. Decided on the
+    // server and only mirrored here: withholding them is the point of a
+    // capability set built without them, so the tick is not offered and the
+    // names are not in the plan either.
+    const [canCopy, setCanCopy] = useState(true);
     const [releaseThere, setReleaseThere] = useState(true);
     const [stopHere, setStopHere] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -158,6 +183,10 @@ export function MoveOutDialog({
             if (cancelled) return;
             if (planned.error) setError(planned.error);
             if (planned.plan) setPlan(planned.plan);
+            if (planned.canCopyVariables === false) {
+                setCanCopy(false);
+                setCopyVariables(false);
+            }
             const found = linked.accounts ?? [];
             setAccounts(found);
             setAccount(found[0]?.id ?? "");
@@ -280,11 +309,7 @@ export function MoveOutDialog({
                                         ? `Built from ${plan.repoUrl}${plan.branch ? ` on ${plan.branch}` : ""}. The provider builds it from the same repository, so connect it there first if you have not.`
                                         : "This service is not built from a repository, so there is nothing for a provider to build. Point the provider's project at the code first."}
                                 </Note>
-                                <Note>
-                                    {plan.variableKeys.length > 0
-                                        ? `${plan.variableKeys.length} variable${plan.variableKeys.length === 1 ? "" : "s"} can travel: ${plan.variableKeys.slice(0, 6).join(", ")}${plan.variableKeys.length > 6 ? ", and more" : ""}.`
-                                        : "There are no variables to carry across."}
-                                </Note>
+                                <Note>{variableNote(plan, canCopy)}</Note>
                                 {plan.volumes.length > 0 && (
                                     <Note>
                                         Its volumes stay here and are not copied: {plan.volumes.join(", ")}.
@@ -377,12 +402,14 @@ export function MoveOutDialog({
                                 </Field>
 
                                 <div className="flex flex-col gap-2">
-                                    <Tick
-                                        label="Copy the variables across"
-                                        hint="Anything of the same name there is replaced. Nothing else it has is touched."
-                                        checked={copyVariables}
-                                        onChange={setCopyVariables}
-                                    />
+                                    {canCopy && (
+                                        <Tick
+                                            label="Copy the variables across"
+                                            hint="Anything of the same name there is replaced. Nothing else it has is touched."
+                                            checked={copyVariables}
+                                            onChange={setCopyVariables}
+                                        />
+                                    )}
                                     <Tick
                                         label="Ask them to build it now"
                                         hint="A project that has never built there has nothing to repeat yet; push to it instead."
@@ -452,6 +479,9 @@ export function MoveHomeDialog({
     const [repoUrl, setRepoUrl] = useState("");
     const [branch, setBranch] = useState("");
     const [copyVariables, setCopyVariables] = useState(true);
+    // The same rule as the other direction, on the other capability: writing a
+    // provider's values into this project's variables is a write of them.
+    const [canCopy, setCanCopy] = useState(true);
     const [deployNow, setDeployNow] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -463,6 +493,10 @@ export function MoveHomeDialog({
             const result = await actions.moveHomePlanAction(projectId, service.id);
             if (cancelled) return;
             if (result.error) setError(result.error);
+            if (result.canCopyVariables === false) {
+                setCanCopy(false);
+                setCopyVariables(false);
+            }
             if (result.plan) {
                 setPlan(result.plan);
                 // Prefilled where the provider will say, asked for where it will
@@ -558,11 +592,7 @@ export function MoveHomeDialog({
                                         : `${service.provider} does not say which repository it builds, so Polaris needs the address below.`}
                                 </Note>
                                 <Note>
-                                    {plan.variablesError
-                                        ? plan.variablesError
-                                        : plan.variableKeys.length > 0
-                                          ? `${plan.variableKeys.length} variable${plan.variableKeys.length === 1 ? "" : "s"} can travel: ${plan.variableKeys.slice(0, 6).join(", ")}${plan.variableKeys.length > 6 ? ", and more" : ""}.`
-                                          : "There are no variables to bring across."}
+                                    {plan.variablesError ?? variableNote(plan, canCopy)}
                                 </Note>
                                 <Note>
                                     Whatever domain it answers on there keeps answering there.
@@ -634,12 +664,14 @@ export function MoveHomeDialog({
                         </div>
 
                         <div className="flex flex-col gap-2">
-                            <Tick
-                                label="Bring the variables with it"
-                                hint="Stored as secrets here, except the prefixes that mean a value is compiled into the browser bundle."
-                                checked={copyVariables}
-                                onChange={setCopyVariables}
-                            />
+                            {canCopy && (
+                                <Tick
+                                    label="Bring the variables with it"
+                                    hint="Stored as secrets here, except the prefixes that mean a value is compiled into the browser bundle."
+                                    checked={copyVariables}
+                                    onChange={setCopyVariables}
+                                />
+                            )}
                             <Tick
                                 label="Build it now"
                                 hint="Otherwise it is created and waits for you to press Deploy."

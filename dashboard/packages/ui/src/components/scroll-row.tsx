@@ -38,6 +38,29 @@ import { useCallback, useEffect, useRef, type ElementType, type ReactNode } from
  *  sideways is nothing at all - this is roughly one item per notch. */
 const STEP = 3;
 
+/** What a browser reporting a wheel in lines means by one.
+ *
+ *  `deltaY` is not pixels unless the browser says it is. Firefox reports a mouse
+ *  wheel in lines - `deltaMode: 1`, `deltaY: 3` for one notch - so read as a
+ *  distance that is three pixels, and a notch moved this strip nine of them
+ *  while the same notch moved it three hundred in Chrome. Which is the whole
+ *  component not working, on one of the two browsers, in the exact way it was
+ *  written to fix. */
+const LINE_PX = 16;
+
+/**
+ * How far one wheel gesture moves the row, in pixels.
+ *
+ * Three units are possible and a browser may use any of them. Pixels and lines
+ * are both amplified, because a notch is a line of text and sideways that is
+ * nothing; a page already is a distance, and multiplying it would send the strip
+ * to its end from anywhere.
+ */
+function wheelPixels(event: WheelEvent, page: number): number {
+    if (event.deltaMode === 2) return event.deltaY * page;
+    return (event.deltaMode === 1 ? event.deltaY * LINE_PX : event.deltaY) * STEP;
+}
+
 export function ScrollRow({
     as: Tag = "div",
     className,
@@ -82,10 +105,12 @@ export function ScrollRow({
             if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
             const room = row.scrollWidth - row.clientWidth;
             if (room <= 1) return;
-            const forward = event.deltaY > 0;
+            const moved = wheelPixels(event, row.clientWidth);
+            if (moved === 0) return;
+            const forward = moved > 0;
             if (forward ? row.scrollLeft >= room - 1 : row.scrollLeft <= 1) return;
             event.preventDefault();
-            row.scrollLeft += event.deltaY * STEP;
+            row.scrollLeft += moved;
         }
 
         // Not React's own handler: it attaches wheel passively, and a passive
@@ -100,12 +125,14 @@ export function ScrollRow({
         // listener and an observer each time would be the strip's cost paid over
         // and over for nothing.
         //
-        // Asked for rather than assumed: a test renderer has neither observer,
-        // and a strip that threw while mounting would take the whole screen down
-        // for want of a fade.
-        const resize = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+        // Neither is assumed to exist. This replaced the plain element in a
+        // dozen layouts, so constructing an observer that is not there does not
+        // lose a fade - it throws while mounting and takes the whole screen down
+        // with it, which is what happened the moment one of these was rendered
+        // anywhere but a browser. The fades are a hint; the row is the component.
+        const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
         resize?.observe(node);
-        const changes = typeof MutationObserver === "function" ? new MutationObserver(measure) : null;
+        const changes = typeof MutationObserver === "undefined" ? null : new MutationObserver(measure);
         changes?.observe(node, { childList: true, subtree: true, characterData: true });
         measure();
 

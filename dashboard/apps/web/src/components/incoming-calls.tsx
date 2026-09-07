@@ -36,15 +36,15 @@
 import Link from "next/link";
 import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
-import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { useSessionScope } from "./session-scope";
+import { claimForDevice } from "@/lib/device-once";
+import { ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { claimForDevice } from "@/lib/device-once";
-import { ringDecision } from "@/lib/chat/ring-decision";
-import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
+import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
+import { BellOff, Phone, PhoneMissed, PhoneOff, X } from "lucide-react";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
 import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
@@ -93,11 +93,27 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     const [silenced, setSilenced] = useState<readonly string[]>([]);
     const inCall = held?.session?.meetingId ?? null;
 
-    const drop = useCallback(
-        (meetingId: string) =>
-            setRinging((current) => current.filter((entry) => entry.meetingId !== meetingId)),
-        []
-    );
+    /**
+     * How full each ringing room was, and whether anybody walked into it.
+     *
+     * The one fact this card cannot work out for itself. "It left my list and I
+     * did not answer it" is not what a missed call is - the server's rule is
+     * that somebody other than the caller sat in it, and by that rule a group
+     * call Bob picked up is a call, not three missed ones. Without this, every
+     * other person rung was left with a persistent card and a Call back button
+     * for a conversation that was answered and may still be running.
+     *
+     * Read off the frames, which carry the seat count. The caller is already
+     * seated when it starts ringing, so the count at that moment is the room
+     * with nobody having answered yet, and anything above it afterwards is
+     * somebody who did.
+     */
+    const seats = useRef(new Map<string, RingRoom>());
+
+    const drop = useCallback((meetingId: string) => {
+        seats.current.delete(meetingId);
+        setRinging((current) => current.filter((entry) => entry.meetingId !== meetingId));
+    }, []);
 
     /**
      * The other tabs of this browser, told when a call has been dealt with here.
@@ -149,12 +165,19 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * Nothing is recorded for a call that was already gone from the list, which
      * is what the frame announcing the end of an answered call would otherwise
      * do: it arrives in every tab, including the one that answered.
+     *
+     * And nothing is recorded for a call somebody else answered. Not answering a
+     * call three people were rung about and one of them took is not missing it,
+     * which is the rule the server writes the conversation's line by - so a card
+     * saying otherwise would be this browser contradicting the only record of it
+     * that lasts.
      */
     const missedOut = useCallback(
         (meetingId: string) => {
             const entry = live.current.find((one) => one.meetingId === meetingId);
+            const answered = seats.current.get(meetingId)?.answered ?? false;
             drop(meetingId);
-            if (!entry) return;
+            if (!entry || answered) return;
             setMissed((current) =>
                 [
                     { ...entry, at: Date.now() },
@@ -247,6 +270,11 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         useCallback(
             (frame) => {
                 if (frame.kind !== "call") return;
+                // Who is in the room, before anything is decided about it: the
+                // decision below cannot see this, and it is what tells a call
+                // nobody answered from one somebody else did.
+                const room = roomAfter(seats.current.get(frame.meetingId), frame);
+                if (room) seats.current.set(frame.meetingId, room);
                 // What the frame means is decided in one pure place, because
                 // "should this still be ringing" is the question and none of
                 // what is needed to draw a ringing card can be asked it. See

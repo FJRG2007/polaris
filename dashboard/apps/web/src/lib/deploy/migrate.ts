@@ -62,8 +62,12 @@ export interface MoveOutPlan {
     readonly repoUrl: string;
     readonly branch: string;
     /** The names of what would be copied. Never the values: this answers a
-     *  screen, and a screen is not where thirty secrets belong. */
+     *  screen, and a screen is not where thirty secrets belong. Empty for a
+     *  reader who may not see the variables at all, which is not the same as
+     *  there being none - `variableCount` is the part everybody may be told. */
     readonly variableKeys: readonly string[];
+    /** How many would travel. */
+    readonly variableCount: number;
     /** The hostnames pointing at this half, which will go on pointing at it. */
     readonly domains: readonly string[];
     /** Whether it has volumes, which are the thing that cannot follow it. */
@@ -142,6 +146,7 @@ export async function moveOutPlan(projectId: string, applicationId: string): Pro
         repoUrl: source.repoUrl,
         branch: source.branch,
         variableKeys: Object.keys(variables).sort(),
+        variableCount: Object.keys(variables).length,
         domains: app.domains.map((domain) => domain.hostname),
         volumes: app.volumes.map((volume) => volume.mountPath || volume.name),
         running: app.desiredState === "running"
@@ -267,7 +272,10 @@ export interface MoveHomePlan {
      *  and not a failure - Railway does not publish it - and then the repository
      *  is asked for instead. */
     readonly source: ServiceSource | null;
+    /** The same rule as the other direction: empty where the names are not this
+     *  reader's to see, and the count beside it either way. */
     readonly variableKeys: readonly string[];
+    readonly variableCount: number;
     /** Why the variables could not be read, where they could not. The provider's
      *  own words: a token that has expired has to say so. */
     readonly variablesError: string | null;
@@ -350,6 +358,7 @@ export async function moveHomePlan(projectId: string, serviceId: string): Promis
         provider: row.provider,
         source,
         variableKeys: Object.keys(variables.values).sort(),
+        variableCount: Object.keys(variables.values).length,
         variablesError: variables.error
     };
 }

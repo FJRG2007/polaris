@@ -184,7 +184,6 @@ export async function listThreads(
         ...(query.folderId ? { folderId: query.folderId } : {}),
         ...(query.role ? { folder: { role: query.role } } : {}),
         ...(query.unreadOnly ? { seen: false } : {}),
-        ...(query.readOnly ? { seen: true } : {}),
         ...(query.starredOnly ? { flagged: true } : {}),
         ...(query.withAttachments ? { hasAttachments: true } : {}),
         ...(query.category ? { category: query.category } : {}),
@@ -216,6 +215,13 @@ export async function listThreads(
         where: {
             accountId: { in: accountIds },
             messages: { some: messageWhere },
+            // Read is a fact about the conversation and not about a message in
+            // it. Asked the other way round - "has a message that was read" - it
+            // matches the moment somebody opens the first of five, so the same
+            // conversation sits in both the Unread list and the Read one and the
+            // Read one is very nearly the whole mailbox. The count is already
+            // held on the row, so the question has an exact answer.
+            ...(query.readOnly ? { unreadCount: 0 } : {}),
             ...(matched ? { id: { in: [...matched] } } : {}),
             ...mailCursorWhere(query.sort, query.cursor)
         },
@@ -320,7 +326,6 @@ async function matchingThreads(
             ...(query.category ? { category: query.category } : {}),
             ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
             ...(query.unreadOnly ? { seen: false } : {}),
-            ...(query.readOnly ? { seen: true } : {}),
             ...(query.starredOnly ? { flagged: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),

@@ -17,11 +17,17 @@
  *   conversations of the same few kilobytes, and a cursor of size alone would
  *   hand back the same page for ever.
  *
- * The edge is the smallest row of the page under the order being read, not the
- * last one drawn: pinned conversations sort to the top whatever the order says,
- * so the last row and the smallest row are different rows the moment anything is
- * pinned. Anchoring on the smallest is what stops the page after it skipping
- * everything between the two.
+ * Both of them carry one thing more: whether the edge was pinned. Pinned
+ * conversations sort to the top whatever the order says, so a list is really two
+ * lists end to end - the pinned ones in that order, then the rest in the same
+ * order - and a cursor naming only a size or a moment cannot say which of the
+ * two it stopped in. That is not a detail. A single pinned conversation of a
+ * kilobyte, in a folder read largest first, is the smallest row on the first
+ * page: anchoring the next page on it asks for everything below a kilobyte and
+ * silently drops every conversation between there and the page just drawn.
+ *
+ * So the edge is the furthest row of the half the page ended in, and the
+ * narrowing below says which half to carry on from.
  */
 
 import type { MailSort } from "@polaris/core";
@@ -29,12 +35,14 @@ import type { MailSort } from "@polaris/core";
 /** One `orderBy` entry, as Prisma takes them. */
 export type MailOrderBy = Readonly<Record<string, "asc" | "desc">>;
 
-/** What the cursor is measured against: the two columns the orders read, and the
- *  id that breaks a tie between two of the same size. */
+/** What the cursor is measured against: the two columns the orders read, the id
+ *  that breaks a tie between two of the same size, and the flag that decides
+ *  which half of the list a row is in. */
 export interface MailOrderRow {
     readonly id: string;
     readonly lastMessageAt: string;
     readonly size: number;
+    readonly pinned: boolean;
 }
 
 /**
@@ -67,15 +75,24 @@ function bySize(sort: MailSort): boolean {
  *
  * Empty when there is no next page, which is what a page shorter than it asked
  * for means, and what the list uses to stop asking.
+ *
+ * The edge is read out of the unpinned half wherever the page reached it, since
+ * that is the half the next page continues in. A page that is all pins - more of
+ * them than fit on one page - hands over a pinned edge instead, and the
+ * narrowing below carries on through the rest of them before it reaches
+ * anything else.
  */
 export function mailCursorOf(sort: MailSort, rows: readonly MailOrderRow[], limit: number): string {
     if (rows.length === 0 || rows.length < limit) return "";
-    const edge = rows.reduce((held, row) => (further(sort, row, held) ? row : held));
-    return bySize(sort) ? `${edge.size}:${edge.id}` : edge.lastMessageAt;
+    const open = rows.filter((row) => !row.pinned);
+    const half = open.length > 0 ? open : rows;
+    const edge = half.reduce((held, row) => (further(sort, row, held) ? row : held));
+    const at = bySize(sort) ? `${edge.size}:${edge.id}` : edge.lastMessageAt;
+    return `${edge.pinned ? "1" : "0"}|${at}`;
 }
 
 /** Whether `row` is further along the order than `held` - the row a page would
- *  end on if nothing were pinned. */
+ *  end on, within the half of the list it is in. */
 function further(sort: MailSort, row: MailOrderRow, held: MailOrderRow): boolean {
     if (sort === "newest") return row.lastMessageAt < held.lastMessageAt;
     if (sort === "oldest") return row.lastMessageAt > held.lastMessageAt;
@@ -95,19 +112,34 @@ function further(sort: MailSort, row: MailOrderRow, held: MailOrderRow): boolean
  * nonsense page; an empty list is not.
  */
 export function mailCursorWhere(sort: MailSort, cursor: string): Record<string, unknown> {
-    if (!cursor.trim()) return {};
+    const trimmed = cursor.trim();
+    if (!trimmed) return {};
+    if (trimmed[1] !== "|" || (trimmed[0] !== "0" && trimmed[0] !== "1")) return {};
 
+    const past = pastEdge(sort, trimmed.slice(2));
+    if (!past) return {};
+    // An unpinned edge is the simple half: the pins are all above it and were all
+    // drawn. A pinned one still has the rest of the pins to go, and then the
+    // whole of the unpinned list after them.
+    return trimmed[0] === "1"
+        ? { OR: [{ pinned: true, ...past }, { pinned: false }] }
+        : { pinned: false, ...past };
+}
+
+/** Everything past one edge, in whatever shape the order reads. Null for an edge
+ *  this order cannot make sense of. */
+function pastEdge(sort: MailSort, edge: string): Record<string, unknown> | null {
     if (!bySize(sort)) {
-        const at = new Date(cursor);
-        if (Number.isNaN(at.getTime())) return {};
+        const at = new Date(edge);
+        if (Number.isNaN(at.getTime())) return null;
         return { lastMessageAt: sort === "oldest" ? { gt: at } : { lt: at } };
     }
 
-    const split = cursor.indexOf(":");
-    if (split <= 0) return {};
-    const size = Number(cursor.slice(0, split));
-    const id = cursor.slice(split + 1);
-    if (!Number.isFinite(size) || !id) return {};
+    const split = edge.indexOf(":");
+    if (split <= 0) return null;
+    const size = Number(edge.slice(0, split));
+    const id = edge.slice(split + 1);
+    if (!Number.isFinite(size) || !id) return null;
     // Read as one two-part number: past this size, or the same size and past this
     // row. Written out because a database has no way to compare a pair.
     return sort === "largest"

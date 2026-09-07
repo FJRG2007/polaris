@@ -42,6 +42,40 @@ export interface CallFrameFacts {
     readonly count?: number;
 }
 
+/**
+ * What has become of one room somebody was rung about.
+ *
+ * The decision above cannot answer this and is not meant to: it says whether to
+ * go on ringing, and this says what the ringing turned out to be. They are read
+ * together because a call that stops ringing is either a missed call or one
+ * somebody else answered, and only the second is not owed a card.
+ */
+export interface RingRoom {
+    /** How many were seated when it started ringing. The caller is already in
+     *  the room by then, so this is the room with nobody having answered. */
+    readonly ringing: number;
+    /** Whether anybody walked in afterwards. */
+    readonly answered: boolean;
+}
+
+/**
+ * The room, after one frame.
+ *
+ * Undefined for a call this browser never heard ring - a frame about somebody
+ * else's conversation, or one that arrived after the ringing was settled - which
+ * is a call there is nothing to decide about.
+ *
+ * "Answered" is somebody other than the caller taking a seat, which is exactly
+ * the rule the server writes the conversation's line by (`whoMissedTheCall`).
+ * Read off the count rather than the actor, because the actor of a frame is
+ * whoever moved and an empty one is the server saying "this happened".
+ */
+export function roomAfter(held: RingRoom | undefined, frame: CallFrameFacts): RingRoom | undefined {
+    if (frame.state === "ringing") return held ?? { ringing: frame.count ?? 0, answered: false };
+    if (!held || held.answered) return held;
+    return (frame.count ?? 0) > held.ringing ? { ...held, answered: true } : held;
+}
+
 export function ringDecision(frame: CallFrameFacts, viewerId: string): RingDecision {
     if (frame.state === "ringing") {
         // Your own call. The frame is addressed to the conversation, and the
