@@ -205,7 +205,7 @@ export function sameAddress(left: string, right: string): boolean {
  * `=C3=ADa`.
  */
 export function snippetFrom(text: string, limit = 200): string {
-    const decoded = undoQuotedPrintable(text);
+    const decoded = undoTransferEncoding(text);
     const words = looksLikeMarkup(decoded) ? stripMarkup(decoded) : decoded;
     const collapsed = words
         .split(/\r?\n/)
@@ -217,26 +217,73 @@ export function snippetFrom(text: string, limit = 200): string {
     return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
 }
 
-/** Padding a preheader is stuffed with so that nothing but the sender's opening
- *  line reaches the list. Invisible on screen and hundreds long. */
-const INVISIBLE = /[\u00ad\u034f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\ufeff]/g;
+/** Whatever a part was wrapped in for the journey, undone. Base64 first, because
+ *  a base64 part is one unbroken run with no `=XX` in it to mistake. */
+function undoTransferEncoding(text: string): string {
+    return undoQuotedPrintable(undoBase64(text));
+}
+
+/**
+ * A part that is base64 from end to end, read back.
+ *
+ * Whole messages arrive this way - `PGh0bWw+PGhlYWQ+` is `<html><head>`, and a
+ * line of it is what the list showed for every message from one bank. Undone
+ * only when the whole thing is one run of base64 and what comes out reads as
+ * text, because those two together are not something prose does by accident.
+ */
+function undoBase64(text: string): string {
+    const packed = text.replace(/\s+/g, "");
+    if (packed.length < 40 || packed.length % 4 !== 0) return text;
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(packed)) return text;
+    try {
+        const bytes = Uint8Array.from(atob(packed), (char) => char.charCodeAt(0));
+        const out = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+        return readsAsText(out) ? out : text;
+    } catch {
+        return text;
+    }
+}
+
+/** Whether what came out of a decode is something a person could read. Guards
+ *  every decode here: a wrong guess must leave the line as it found it rather
+ *  than replace it with worse. */
+function readsAsText(value: string): boolean {
+    if (!value) return false;
+    let readable = 0;
+    for (const char of value) {
+        const code = char.codePointAt(0) ?? 0;
+        if (code === 9 || code === 10 || code === 13 || code >= 32) readable += 1;
+    }
+    return readable / [...value].length > 0.9;
+}
 
 /**
  * Quoted-printable, undone - but only where there is evidence of it.
  *
  * `width=50cm` is a sentence, not an escape, and decoding it would put a `P` in
- * somebody's mail. So this asks for proof: a soft line break, which is only ever
- * an encoding artefact, or an escape that stands for a byte no keyboard types -
- * a control character or anything above ASCII. Both are what real
- * quoted-printable is full of and neither appears in prose.
+ * somebody's mail. So this asks for proof, and the proof is any of three things:
+ * a soft line break, which is only ever an encoding artefact; an escape standing
+ * for a byte no keyboard types; or simply more than one escape, because prose
+ * with two `=` followed by hex digits in it is vanishingly rare and mail encoded
+ * this way is full of them.
+ *
+ * That last one is not a nicety. The commonest escapes of all are `=20` for a
+ * space and `=3D` for an equals sign, and both stand for perfectly printable
+ * bytes - so a rule that only looked for accents left whole previews reading
+ * `=20 =20 =20` and `ref_=3Dfed_yo_default`.
  */
 function undoQuotedPrintable(text: string): string {
+    const escapes = text.match(/=[0-9A-Fa-f]{2}/g) ?? [];
     const soft = /=\r?\n/.test(text);
-    const telling = (text.match(/=[0-9A-Fa-f]{2}/g) ?? []).some((escape) => {
+    const telling = escapes.some((escape) => {
+        // `=3D` is the escape for an equals sign, and it is the one that can
+        // only ever be an artefact: were it literal text, the `=` in front of it
+        // would itself have been encoded. One of them is proof on its own.
+        if (escape.toUpperCase() === "=3D") return true;
         const byte = Number.parseInt(escape.slice(1), 16);
         return byte < 0x20 || byte >= 0x80;
     });
-    if (!soft && !telling) return text;
+    if (!soft && !telling && escapes.length < 2) return text;
 
     // Walked as bytes rather than characters, because a part is often half
     // decoded already - a subject line put back by the header decoder beside a
@@ -258,14 +305,30 @@ function undoQuotedPrintable(text: string): string {
         // one is not an option.
         out.push(0x3d);
     }
-    return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(out));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(out));
+    return readsAsText(decoded) ? decoded : text;
 }
 
-/** Whether this is a message's HTML half rather than its text. Deliberately
- *  loose: a false positive costs a stripped angle bracket, a false negative
- *  costs a preview line made of tags. */
+/** Padding a preheader is stuffed with so that nothing but the sender's opening
+ *  line reaches the list. Invisible on screen and hundreds long. */
+const INVISIBLE = /[\u00ad\u034f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\ufeff]/g;
+
+/**
+ * Whether this is a message's HTML half rather than its text.
+ *
+ * Deliberately loose, and looser than "does it contain a complete tag". A
+ * preview is the first few kilobytes of a part, so it is a fragment: it ends
+ * mid-tag, and it very often begins inside the stylesheet a mailing tool puts at
+ * the top of every message. Both of those are markup with not one closed tag in
+ * them, and both were being shown to people as the preview of their mail.
+ */
 function looksLikeMarkup(text: string): boolean {
-    return /<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/i.test(text);
+    return (
+        /<\/?[a-z!][a-z0-9-]*(?:[\s>/]|$)/i.test(text) ||
+        /@(?:media|import|font-face)\b/i.test(text) ||
+        /\/\*[\s\S]*?\*\//.test(text) ||
+        /[.#][\w-]+\s*\{[^}]*\}/.test(text)
+    );
 }
 
 const NAMED_ENTITIES: Readonly<Record<string, string>> = {
@@ -287,21 +350,80 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
     shy: ""
 };
 
-/** Enough tag handling for a preview line, and never for anything drawn: what
- *  is shown as HTML goes through the sanitizer and a sandboxed frame. */
+/**
+ * Enough tag handling for a preview line, and never for anything drawn: what is
+ * shown as HTML goes through the sanitizer and a sandboxed frame.
+ *
+ * Written to survive a fragment, because that is all a preview ever is. A
+ * `<style>` that never closes, a tag cut in half at the end, a stylesheet with
+ * no markup around it at all - each of those was a preview line somebody read.
+ */
 function stripMarkup(html: string): string {
-    return html
-        .replace(/<!--[\s\S]*?-->/g, " ")
-        // Whole elements whose contents are not the message: a stylesheet in the
-        // body is words, and they used to be the preview.
-        .replace(/<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
-        // Anything that ends a line becomes one, so two sentences do not run
-        // together into one word.
-        .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6]|\/table)\b[^>]*>/gi, " ")
-        .replace(/<[^>]*>/g, "")
-        .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => codePoint(Number.parseInt(hex, 16)))
-        .replace(/&#(\d+);/g, (_match, digits: string) => codePoint(Number.parseInt(digits, 10)))
-        .replace(/&([a-z]+);/gi, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
+    return (
+        html
+            .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
+            // Whole elements whose contents are not the message. The closing tag
+            // is optional in these: a preview is cut off after four kilobytes and
+            // a stylesheet is easily longer than that, so demanding `</style>`
+            // meant the stylesheet WAS the preview.
+            .replace(/<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+            // Anything that ends a line becomes one, so two sentences do not run
+            // together into one word.
+            .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6]|\/table)\b[^>]*>/gi, " ")
+            .replace(/<[^>]*>/g, "")
+            // A tag the truncation cut in half, at either end.
+            .replace(/<[^>]*$/, "")
+            .replace(/^[^<>]*>/, (found) => (found.includes("=") ? " " : found))
+            // A stylesheet with nothing around it, which is what a mailing tool
+            // puts at the top of the part this was taken from.
+            .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, " ")
+            // Scanned rather than matched. A stylesheet nests - `@media` holds
+            // rules and rules hold declarations - and an expression that tried
+            // to reach the closing brace either stopped at the first one or ran
+            // past the last and swallowed the sentence after it, which is how
+            // one message's preview came out empty.
+            .replace(/[\s\S]*/, (found) => stripCssBlocks(found))
+            .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => codePoint(Number.parseInt(hex, 16)))
+            .replace(/&#(\d+);/g, (_match, digits: string) => codePoint(Number.parseInt(digits, 10)))
+            .replace(/&([a-z]+);/gi, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match)
+    );
+}
+
+/**
+ * Everything inside braces, gone - and the selector that introduced it with it.
+ *
+ * A brace counter rather than an expression, because a stylesheet nests and the
+ * text after the last closing brace is the part somebody wanted to read. The
+ * selector is cut back to the nearest boundary a sentence cannot cross, which
+ * keeps the words in front of it and loses the `@media only screen and (...)`.
+ */
+function stripCssBlocks(text: string): string {
+    if (!text.includes("{")) return text;
+    let held = "";
+    let depth = 0;
+    for (const char of text) {
+        if (char === "{") {
+            if (depth === 0) held = held.slice(0, cutBack(held));
+            depth += 1;
+            continue;
+        }
+        if (char === "}") {
+            depth = Math.max(0, depth - 1);
+            continue;
+        }
+        if (depth === 0) held += char;
+    }
+    return held;
+}
+
+/** Where a selector starts: after the last thing prose ends with. */
+function cutBack(held: string): number {
+    let at = 0;
+    for (const mark of ["}", ";", ">", "*/", "\n", ". ", "! ", "? "]) {
+        const found = held.lastIndexOf(mark);
+        if (found >= 0) at = Math.max(at, found + mark.length);
+    }
+    return at;
 }
 
 /** One character from its number, or nothing when a message names one that does

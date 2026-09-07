@@ -224,7 +224,12 @@ export function RichTextEditor({
             attributes: {
                 class: cn(
                     RICH_TEXT_PROSE,
-                    "min-h-[3rem] outline-none",
+                    // `h-full` so the writing area is the whole box a caller
+                    // made room for. Without it the box can be fourteen rems
+                    // tall and the place you may actually type three, and the
+                    // rest is a dead zone that swallows the click somebody
+                    // aimed at their own message.
+                    "h-full min-h-[3rem] outline-none",
                     // The placeholder is drawn by the Placeholder extension as a
                     // pseudo-element on the first empty block.
                     "[&_p.is-editor-empty:first-child::before]:pointer-events-none",
@@ -374,7 +379,29 @@ export function RichTextEditor({
     }
 
     return (
-        <div className={cn(surfaceClass(bordered, disabled), className)}>
+        <div
+            className={cn(surfaceClass(bordered, disabled), className)}
+            /**
+             * Anywhere in the box starts writing.
+             *
+             * A caller can make this box much taller than the paragraph inside
+             * it - a mail composer does - and clicking the space under the text
+             * did nothing at all, so somebody had to find the one line the
+             * placeholder was on. Every editor anybody has used puts the caret
+             * in when you click the page.
+             *
+             * On mousedown rather than click, so the caret lands before the
+             * browser decides the press was a selection starting on nothing.
+             * Anything that is already something to press - the toolbar, a link,
+             * the text itself - is left alone.
+             */
+            onMouseDown={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest(".ProseMirror, button, a, input, textarea, [role='button']")) return;
+                event.preventDefault();
+                editor.commands.focus("end");
+            }}
+        >
             <SelectionToolbar editor={editor} />
             <EditorMenu
                 editor={editor}

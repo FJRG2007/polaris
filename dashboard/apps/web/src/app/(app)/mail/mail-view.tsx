@@ -684,7 +684,7 @@ export function MailView({
                 </header>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    {threads.length === 0 ? (
+                    {threads.every((thread) => patched[thread.id]?.gone) ? (
                         <div className="p-6">
                             <EmptyState
                                 icon={<Inbox className="size-5 shrink-0" aria-hidden />}
@@ -694,7 +694,9 @@ export function MailView({
                         </div>
                     ) : (
                         <ul>
-                            {threads.map((thread) => (
+                            {threads
+                                .filter((thread) => !patched[thread.id]?.gone)
+                                .map((thread) => (
                                 <ThreadContextMenu
                                     key={thread.id}
                                     thread={shown(thread)}
@@ -732,7 +734,7 @@ export function MailView({
                                         }
                                     />
                                 </ThreadContextMenu>
-                            ))}
+                                ))}
                         </ul>
                     )}
 
@@ -859,15 +861,20 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
 interface ThreadPatch {
     unreadCount?: number;
     starred?: boolean;
+    /** Taken out of this list. Drawn as gone at once and put back if the server
+     *  refuses, rather than left sitting there while a mail server is asked. */
+    gone?: boolean;
 }
 
 /**
  * How a row should look the instant an action is asked for.
  *
- * Only the actions that leave the conversation where it is. Archiving, trashing
- * and reporting spam take it out of this list entirely, and guessing that
- * locally would mean a row vanishing and reappearing if the server refused -
- * which is worse than the wait. Those keep the refresh.
+ * Every action, including the ones that take the conversation out of the list.
+ * That was held back at first on the grounds that a row vanishing and
+ * reappearing after a refusal is worse than the wait - but the wait is a round
+ * trip to somebody's mail server, and pressing Archive and watching the row sit
+ * there reads as the button not having worked. A refusal is rare, it says why,
+ * and the row comes back.
  */
 function optimistically(action: MailAction): ThreadPatch | null {
     switch (action) {
@@ -880,7 +887,7 @@ function optimistically(action: MailAction): ThreadPatch | null {
         case "unstar":
             return { starred: false };
         default:
-            return null;
+            return leavesTheView(action) ? { gone: true } : null;
     }
 }
 

@@ -24,7 +24,7 @@ import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
 import { decodePart, unflow } from "./decode";
-import { refreshThreads } from "./sync";
+import { catchUpFolder, refreshThreads } from "./sync";
 import type { ImapFlow } from "imapflow";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 
@@ -188,6 +188,9 @@ export async function actOnMessages(
     let done = 0;
     for (const [accountId, mine] of groupByAccount(messages)) {
         const account = await ownedAccount(userId, accountId);
+        /** Where the messages went, so it can be read again before anybody looks
+         *  for them there. */
+        const landed = new Set<string>();
         await withImap(account, async (client) => {
             for (const [folderId, rows] of byFolder(mine)) {
                 const folder = await prisma.mailFolder.findUnique({
@@ -197,17 +200,37 @@ export async function actOnMessages(
                 if (!folder) continue;
                 const uids = rows.map((row) => Number(row.uid));
                 const lock = await client.getMailboxLock(folder.path);
+                let target = "";
                 try {
-                    done += await applyOne(client, account.id, folderId, uids, rows, action);
+                    const outcome = await applyOne(client, account.id, folderId, uids, rows, action);
+                    done += outcome.done;
+                    target = outcome.movedTo;
                 } finally {
                     lock.release();
                 }
+                if (target) landed.add(target);
+            }
+
+            // On the same connection, before it is handed back. A message that
+            // has been archived has to be in Archive by the time the screen
+            // redraws, not at the next scheduled pass: the row is deleted the
+            // moment it moves, so until its new home is read the message is
+            // nowhere, and that reads as having lost it rather than as a wait.
+            for (const folderId of landed) {
+                await catchUpFolder(client, account.id, folderId).catch(() => undefined);
             }
         });
         publishMail({ accountId, kind: "messages", actorId: userId });
     }
     await refreshThreadsFor(messages.map((message) => message.accountId));
     return done;
+}
+
+/** What one folder's worth of an action did: how many messages it touched, and
+ *  where they went if they went anywhere. */
+interface Applied {
+    readonly done: number;
+    readonly movedTo: string;
 }
 
 async function applyOne(
@@ -217,42 +240,42 @@ async function applyOne(
     uids: number[],
     rows: readonly { id: string }[],
     action: MailAction
-): Promise<number> {
+): Promise<Applied> {
     const flag = FLAG_ACTIONS[action];
     if (flag) {
         const changed = flag.add
             ? await client.messageFlagsAdd(uids, [flag.flag], { uid: true })
             : await client.messageFlagsRemove(uids, [flag.flag], { uid: true });
-        if (!changed) return 0;
+        if (!changed) return { done: 0, movedTo: "" };
         await prisma.mailMessage.updateMany({
             where: { id: { in: rows.map((row) => row.id) } },
             data: { [flag.column]: flag.add }
         });
-        return rows.length;
+        return { done: rows.length, movedTo: "" };
     }
 
     if (action === "delete") {
         // Deleting outright, not into Trash. Only ever reached from the Trash
         // folder's own Delete button and from Empty trash, both of which say so.
         const removed = await client.messageDelete(uids, { uid: true });
-        if (!removed) return 0;
+        if (!removed) return { done: 0, movedTo: "" };
         await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
-        return rows.length;
+        return { done: rows.length, movedTo: "" };
     }
 
     const role = MOVE_ACTIONS[action];
-    if (!role) return 0;
+    if (!role) return { done: 0, movedTo: "" };
     const target = await folderForRole(accountId, role);
-    if (target.id === folderId) return 0;
+    if (target.id === folderId) return { done: 0, movedTo: "" };
     const moved = await client.messageMove(uids, target.path, { uid: true });
-    if (!moved) return 0;
+    if (!moved) return { done: 0, movedTo: "" };
     // The uids the messages now have are the destination's, and the server may
     // not have said what they are. The rows are dropped rather than guessed at:
     // the next pass over the destination folder picks them up with the uids the
     // server actually gave them, and a guessed uid is a row that points at
     // somebody else's message.
     await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
-    return rows.length;
+    return { done: rows.length, movedTo: target.id };
 }
 
 function groupByAccount<T extends { accountId: string }>(rows: readonly T[]): Map<string, T[]> {

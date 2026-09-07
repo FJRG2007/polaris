@@ -193,6 +193,24 @@ type FolderRow = {
     highestModseq: bigint | null;
 };
 
+/**
+ * Bring one folder up to date on a connection somebody else already has open.
+ *
+ * For the moment a message lands in it. A move deletes the local row - the
+ * destination decides the uid and guessing it would point at somebody else's
+ * message - so until the destination is read again the message is nowhere at
+ * all. Archiving something and not finding it in Archive is not a delay anybody
+ * reads as a delay: it reads as the message having been lost.
+ */
+export async function catchUpFolder(client: ImapFlow, accountId: string, folderId: string): Promise<void> {
+    const [account, folder] = await Promise.all([
+        prisma.mailAccount.findUnique({ where: { id: accountId }, select: ACCOUNT_COLUMNS }),
+        prisma.mailFolder.findUnique({ where: { id: folderId } })
+    ]);
+    if (!account || !folder || folder.accountId !== accountId) return;
+    await syncFolder(client, account, folder);
+}
+
 async function syncFolder(client: ImapFlow, account: AccountRow, folder: FolderRow): Promise<void> {
     const lock = await client.getMailboxLock(folder.path, { readOnly: true });
     try {
