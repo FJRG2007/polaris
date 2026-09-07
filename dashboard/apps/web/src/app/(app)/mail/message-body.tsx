@@ -31,6 +31,7 @@
 
 import { Button, cn } from "@polaris/ui";
 import { Eye, ShieldCheck } from "lucide-react";
+import * as core from "@polaris/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export function MessageBody({
@@ -56,9 +57,25 @@ export function MessageBody({
     const [showOnce, setShowOnce] = useState(false);
     const showing = remoteAllowed || showOnce;
 
+    /**
+     * What is actually drawn.
+     *
+     * A message with no HTML half is turned into some: plenty of mail is plain
+     * text - anything sent by a script, a digest, a colleague on a terminal
+     * client - and drawing it as preformatted text left every address in it
+     * dead. People send links expecting them to be links.
+     *
+     * It goes through the same sanitizer and the same sandboxed frame as any
+     * other message, so this changes what a plain message looks like and nothing
+     * about what it is allowed to do.
+     */
+    const drawn = useMemo(() => (html.trim() ? html : core.textToHtml(text)), [html, text]);
+
     // Which page this message is drawn on. Guessed from whether it dresses
-    // itself, and overridable per message because the guess is a heuristic.
-    const guessed: MessagePaper = useMemo(() => (dressesItself(html) ? "own" : "reader"), [html]);
+    // itself, and overridable per message because the guess is a heuristic. A
+    // message Polaris made the markup for never dresses itself, so it always
+    // takes the reader's theme, which is what it should do.
+    const guessed: MessagePaper = useMemo(() => (dressesItself(drawn) ? "own" : "reader"), [drawn]);
     const [paper, setPaper] = useState<MessagePaper | null>(null);
     const inForce = paper ?? guessed;
 
@@ -84,9 +101,9 @@ export function MessageBody({
                 </div>
             ) : null}
 
-            {html.trim() ? (
+            {drawn.trim() ? (
                 <>
-                    <SandboxedHtml html={html} showRemote={showing} paper={inForce} />
+                    <SandboxedHtml html={drawn} showRemote={showing} paper={inForce} />
                     <button
                         type="button"
                         className="mt-2 text-[12px] text-foreground-subtle underline hover:text-foreground"
@@ -98,9 +115,7 @@ export function MessageBody({
                     </button>
                 </>
             ) : (
-                <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-relaxed text-foreground">
-                    {text}
-                </pre>
+                <p className="text-[13px] text-foreground-subtle">This message has nothing in it.</p>
             )}
         </div>
     );
@@ -188,6 +203,10 @@ function frameDocument(body: string, showRemote: boolean, paper: MessagePaper): 
   img,video,table{max-width:100%;height:auto;}
   table{border-collapse:collapse;}
   blockquote{margin:0 0 0 .75rem;padding-left:.75rem;border-left:2px solid rgba(127,127,127,.4);}
+  /* What a plain-text message is wrapped in: its own line breaks are the
+     layout, and a long address must wrap rather than widen the frame. */
+  .plain{white-space:pre-wrap;word-break:break-word;}
+  .quoted{opacity:.65;}
   a{color:${linkColor};}
 </style>
 </head><body>${body}

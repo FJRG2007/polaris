@@ -99,6 +99,49 @@ export function MailView({
     const [helpOpen, setHelpOpen] = useState(false);
     const [layout, setLayout] = useMailLayout();
 
+    /**
+     * What the reader has just done, before the server has said so.
+     *
+     * Every action here is a round trip to somebody's mail server - a socket, a
+     * command, a wait - and waiting for it before the row changes is what made
+     * marking a message read feel broken. So the row moves now and the truth
+     * arrives after: a refusal puts it back and says why, and a success is
+     * simply the server agreeing with a screen that already showed it.
+     *
+     * Cleared whenever the server's own answer arrives, which is what
+     * `threads` becoming a new array means. Keeping a patch past that would
+     * mean the screen quietly disagreeing with the server for ever.
+     */
+    const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
+    useEffect(() => {
+        setPatched({});
+    }, [threads]);
+
+    const patch = useCallback((ids: readonly string[], change: ThreadPatch) => {
+        setPatched((held) => {
+            const next = { ...held };
+            for (const id of ids) next[id] = { ...next[id], ...change };
+            return next;
+        });
+    }, []);
+
+    /** The row as the reader should see it: what the server sent, with anything
+     *  they have just done laid over it. */
+    const shown = useCallback(
+        (thread: MailThreadView): MailThreadView => {
+            const over = patched[thread.id];
+            return over ? { ...thread, ...over } : thread;
+        },
+        [patched]
+    );
+
+    /** The conversations an action was aimed at, from the messages it named. */
+    const threadsOf = useCallback(
+        (messageIds: readonly string[]) =>
+            threads.filter((thread) => messageIds.includes(thread.leadMessageId)).map((thread) => thread.id),
+        [threads]
+    );
+
     // The lead message of each selected conversation. Every action here is
     // against messages rather than conversations, because a conversation lives
     // in two folders at once and archiving "the conversation" would be a promise
@@ -115,6 +158,12 @@ export function MailView({
     const act = useCallback(
         (action: MailAction, messageIds: readonly string[], announce: string) => {
             if (messageIds.length === 0) return;
+            const aimed = threadsOf(messageIds);
+            const ahead = optimistically(action);
+            // The row moves now. A mail server is slow enough that waiting for it
+            // reads as the screen having ignored the click.
+            if (ahead) patch(aimed, ahead);
+
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds: [...messageIds], action });
                 // This mailbox has no folder for what was asked. Ask which one it
@@ -122,11 +171,15 @@ export function MailView({
                 // costs one question rather than the action being lost.
                 const missing = missingFolderRole(outcome);
                 if (missing) {
+                    setPatched({});
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
+                    // Put it back. A screen that kept showing the change after
+                    // the server refused it would be lying about somebody's mail.
+                    setPatched({});
                     toast.show({ title: said });
                     return;
                 }
@@ -135,7 +188,7 @@ export function MailView({
                 refresh();
             });
         },
-        [askFolderRole, refresh, toast]
+        [askFolderRole, patch, refresh, threadsOf, toast]
     );
 
     const snooze = useCallback(
@@ -407,7 +460,7 @@ export function MailView({
                             {threads.map((thread) => (
                                 <ThreadContextMenu
                                     key={thread.id}
-                                    thread={thread}
+                                    thread={shown(thread)}
                                     canArchive={context.canArchive}
                                     permanentDelete={context.permanentDelete}
                                     onAct={act}
@@ -415,7 +468,7 @@ export function MailView({
                                     onLabel={label}
                                 >
                                     <ThreadRow
-                                        thread={thread}
+                                        thread={shown(thread)}
                                         onCursor={onRow?.id === thread.id}
                                         open={openThread?.id === thread.id}
                                         picked={selected.includes(thread.id)}
@@ -429,9 +482,9 @@ export function MailView({
                                         }
                                         onStar={() =>
                                             act(
-                                                thread.starred ? "unstar" : "star",
+                                                shown(thread).starred ? "unstar" : "star",
                                                 [thread.leadMessageId],
-                                                thread.starred ? "Unstarred." : "Starred."
+                                                shown(thread).starred ? "Unstarred." : "Starred."
                                             )
                                         }
                                     />
@@ -471,9 +524,12 @@ export function MailView({
             >
                 {openThread ? (
                     <ThreadView
-                        thread={openThread}
+                        thread={shown(openThread)}
                         messages={openMessages}
                         context={context}
+                        // Opening a message marks it read on the server, which
+                        // takes a round trip. The row stops being bold now.
+                        onRead={() => patch([openThread.id], { unreadCount: 0 })}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         onBack={
@@ -520,6 +576,36 @@ function ShortcutSheet({ onClose }: { onClose: () => void }) {
             </DialogContent>
         </Dialog>
     );
+}
+
+/** What an action changes about a row before the server has confirmed it. Only
+ *  the two things a list actually draws differently. */
+interface ThreadPatch {
+    unreadCount?: number;
+    starred?: boolean;
+}
+
+/**
+ * How a row should look the instant an action is asked for.
+ *
+ * Only the actions that leave the conversation where it is. Archiving, trashing
+ * and reporting spam take it out of this list entirely, and guessing that
+ * locally would mean a row vanishing and reappearing if the server refused -
+ * which is worse than the wait. Those keep the refresh.
+ */
+function optimistically(action: MailAction): ThreadPatch | null {
+    switch (action) {
+        case "read":
+            return { unreadCount: 0 };
+        case "unread":
+            return { unreadCount: 1 };
+        case "star":
+            return { starred: true };
+        case "unstar":
+            return { starred: false };
+        default:
+            return null;
+    }
 }
 
 /** Eight tomorrow morning, in the reader's own clock. The one snooze everybody

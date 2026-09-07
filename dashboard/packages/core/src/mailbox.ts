@@ -850,3 +850,50 @@ export function holdRemoteContent(html: string): string {
             .replace(/url\(\s*(["']?)(https?:\/\/[^"')]+)\1\s*\)/gi, "url($1about:blank$1)")
     );
 }
+
+/**
+ * A plain-text message, as markup.
+ *
+ * Plenty of mail has no HTML half at all - anything sent by a script, a mailing
+ * list in digest mode, a colleague on a terminal client - and drawing it as
+ * preformatted text leaves every address in it dead. People send links expecting
+ * them to be links.
+ *
+ * Everything is escaped first and the linking happens on the escaped text, which
+ * is the order that matters: doing it the other way round would let a message
+ * containing `<a href=...>` write its own anchor. What comes out still goes
+ * through the sanitizer and into the sandboxed frame like any other message, so
+ * this is a convenience rather than a trust boundary.
+ */
+export function textToHtml(text: string): string {
+    const escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+
+    const linked = escaped
+        // A bare http(s) address. The trailing character class is what stops a
+        // sentence's full stop, comma or closing bracket being swallowed into
+        // the link - the single most common way an autolinker gets it wrong.
+        .replace(/\bhttps?:\/\/[^\s<>"]+/g, (found) => {
+            const trimmed = found.replace(/[.,;:!?)\]}'"]+$/, "");
+            const tail = found.slice(trimmed.length);
+            return `<a href="${trimmed}">${trimmed}</a>${tail}`;
+        })
+        // A bare `www.` address, which is what people actually type.
+        .replace(/(^|[\s(])(www\.[^\s<>"]+)/g, (_match, before: string, found: string) => {
+            const trimmed = found.replace(/[.,;:!?)\]}'"]+$/, "");
+            const tail = found.slice(trimmed.length);
+            return `${before}<a href="https://${trimmed}">${trimmed}</a>${tail}`;
+        })
+        // An address somebody can write to.
+        .replace(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g, (found) => `<a href="mailto:${found}">${found}</a>`);
+
+    // Quoted history is dimmed rather than dropped: it is what a reply is
+    // answering, and hiding it entirely is how people lose the thread.
+    const lines = linked.split(/\r?\n/).map((line) =>
+        line.startsWith("&gt;") ? `<span class="quoted">${line}</span>` : line
+    );
+    return `<div class="plain">${lines.join("\n")}</div>`;
+}

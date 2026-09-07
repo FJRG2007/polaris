@@ -59,7 +59,8 @@ export function ThreadView({
     thread,
     messages,
     context,
-    onBack
+    onBack,
+    onRead
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
@@ -67,6 +68,9 @@ export function ThreadView({
     /** Given when the list is not on screen beside this - reading one message at
      *  a time, or on a phone - because then this is the only way back to it. */
     onBack?: () => void;
+    /** Told the moment a message here is marked read, so the row in the list
+     *  stops being bold now rather than after the round trip. */
+    onRead?: () => void;
 }) {
     const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
@@ -181,6 +185,45 @@ export function ThreadView({
                     ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                    {/* Answering is offered at the top as well as the bottom.
+                        A company's newsletter is a screen and a half of HTML
+                        with a footer under it, and having to scroll all of it
+                        to find Reply is the thing that makes people answer in
+                        another client. Same three actions, same handler; icons
+                        here because the words are already at the bottom. */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Reply"
+                        title="Reply"
+                        disabled={answering}
+                        onClick={() => answer("reply")}
+                    >
+                        <CornerUpLeft className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    {newest.to.length + newest.cc.length > 1 ? (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Reply to everybody"
+                            title="Reply to everybody"
+                            disabled={answering}
+                            onClick={() => answer("reply-all")}
+                        >
+                            <CornerUpRight className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                    ) : null}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Forward"
+                        title="Forward"
+                        disabled={answering}
+                        onClick={() => answer("forward")}
+                    >
+                        <Forward className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
                     <Button
                         variant="ghost"
                         size="icon"
@@ -233,6 +276,7 @@ export function ThreadView({
                         <MessageCard
                             key={message.id}
                             message={message}
+                            onRead={onRead}
                             open={open.includes(message.id)}
                             onToggle={() =>
                                 setOpen((held) =>
@@ -401,11 +445,13 @@ function forwardOf(message: MailMessageView, quoted: string) {
 function MessageCard({
     message,
     open,
-    onToggle
+    onToggle,
+    onRead
 }: {
     message: MailMessageView;
     open: boolean;
     onToggle: () => void;
+    onRead?: () => void;
 }) {
     const format = useDisplayFormat();
     const { refresh } = useMail();
@@ -447,13 +493,17 @@ function MessageCard({
     useEffect(() => {
         if (!open || message.seen || marked.current) return;
         marked.current = true;
+        // The list stops being bold now. The server is told in the same breath,
+        // and the round trip is no longer something anybody watches.
+        onRead?.();
         void (async () => {
             const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
             // A server that refused leaves it unread, which is the truth. Nothing
-            // is said about it: nobody asked for this, so a failure is not news.
+            // is said about it: nobody asked for this, so a failure is not news -
+            // and the next refresh brings the bold row back on its own.
             if (!refusalOf(outcome)) refresh();
         })();
-    }, [open, message.id, message.seen, refresh]);
+    }, [open, message.id, message.seen, onRead, refresh]);
 
     const sender = message.from[0];
 

@@ -317,3 +317,35 @@ describe("working out where a domain's mail lives", () => {
         expect(providers.serviceForAddress("someone@tpeoficial.com")).toBeNull();
     });
 });
+
+describe("a plain-text message, drawn", () => {
+    it("makes a bare address a link, without swallowing the punctuation after it", () => {
+        const out = mailbox.textToHtml("See https://example.com/a, then www.example.org.");
+        expect(out).toContain('<a href="https://example.com/a">https://example.com/a</a>,');
+        expect(out).toContain('<a href="https://www.example.org">www.example.org</a>.');
+    });
+
+    it("links an address somebody can write to", () => {
+        expect(mailbox.textToHtml("ask ada@example.com")).toContain(
+            '<a href="mailto:ada@example.com">ada@example.com</a>'
+        );
+    });
+
+    it("escapes before it links, so a message cannot write its own anchor", () => {
+        const out = mailbox.textToHtml('<a href="https://evil.example">click</a>');
+        expect(out).not.toContain("<a href=\"https://evil.example\">click</a>");
+        expect(out).toContain("&lt;a href=");
+    });
+
+    it("escapes the characters that would end the document", () => {
+        const out = mailbox.textToHtml('<script>alert(1)</script> & "quoted"');
+        expect(out).not.toContain("<script>");
+        expect(out).toContain("&lt;script&gt;");
+        expect(out).toContain("&amp;");
+        expect(out).toContain("&quot;");
+    });
+
+    it("keeps the quoted history, dimmed rather than dropped", () => {
+        expect(mailbox.textToHtml("Thanks.\n> the old message")).toContain('<span class="quoted">');
+    });
+});
