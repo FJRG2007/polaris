@@ -25,32 +25,7 @@
 
 import { z } from "zod";
 import { createHash, createHmac, randomUUID } from "node:crypto";
-
-/**
- * Where an account's devices live.
- *
- * Not a preference: a project is created in one data centre and its devices exist
- * in that one only, so asking anywhere else answers as though the account were
- * empty. It is on the developer console's own front page, which is why the field
- * asks for it in those words.
- */
-export const TUYA_REGIONS = [
-    { value: "eu", label: "Central Europe", host: "https://openapi.tuyaeu.com" },
-    { value: "weu", label: "Western Europe", host: "https://openapi-weaz.tuyaeu.com" },
-    { value: "us", label: "Western America", host: "https://openapi.tuyaus.com" },
-    { value: "eus", label: "Eastern America", host: "https://openapi-ueaz.tuyaus.com" },
-    { value: "cn", label: "China", host: "https://openapi.tuyacn.com" },
-    { value: "in", label: "India", host: "https://openapi.tuyain.com" }
-] as const;
-
-export type TuyaRegion = (typeof TUYA_REGIONS)[number]["value"];
-
-export function tuyaHost(region: string): string {
-    return (
-        TUYA_REGIONS.find((entry) => entry.value === region)?.host ??
-        TUYA_REGIONS[0].host
-    );
-}
+import { tuyaHost } from "@/lib/integrations/tuya-regions";
 
 /** Long enough for a plug on the far side of a cloud round trip, short enough
  *  that a screen waiting on it is not left there. */

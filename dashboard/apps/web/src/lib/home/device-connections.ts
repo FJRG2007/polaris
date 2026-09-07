@@ -21,10 +21,14 @@
  * the normal case rather than the exception - a lock on the web account and on
  * its own bridge is a lock that still answers when either is out.
  *
- * Pure and client-safe: the picker and the server read the same list.
+ * Pure and client-safe: the picker and the server read the same list. That is a
+ * rule with teeth rather than a note - every import here has to be pure too. This
+ * file reached a provider's region list through its API client once, and the
+ * client imports node's crypto to sign with: the browser bundle pulled that in
+ * and the build failed with a webpack error naming neither file.
  */
 
-import { TUYA_REGIONS } from "@/lib/integrations/tuya-api";
+import { TUYA_REGIONS } from "@/lib/integrations/tuya-regions";
 import type { DeviceKind } from "@/lib/home/device-kinds";
 
 /** One thing a connection has to be told. */
