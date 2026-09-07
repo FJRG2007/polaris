@@ -242,6 +242,31 @@ export async function openMessageAction(messageId: string) {
     }
 }
 
+/**
+ * Fetch a message's body and keep it, without reading it.
+ *
+ * Opening a message that has never been opened is a round trip to somebody
+ * else's IMAP server: a connection, a mailbox lock, the body structure, then the
+ * parts. That is why Polaris felt slower to open mail than a webmail that holds
+ * everything itself - and it is all avoidable, because by the time somebody
+ * clicks a row they have usually been pointing at it for a moment first.
+ *
+ * So the pointer resting on a conversation is enough to go and get it. Nothing
+ * comes back: the body lands in the row it belongs to, and the open that follows
+ * finds it already there. Cheap to call on a message that is already held - it is
+ * one indexed read and returns - and silent when it fails, because a prefetch
+ * that raised an error would be an error about something nobody asked for.
+ */
+export async function warmMessageAction(messageId: string): Promise<void> {
+    try {
+        const userId = await actorId();
+        await messages.loadBody(userId, messageId);
+    } catch {
+        // Never surfaced. Whatever went wrong will go wrong again, visibly, if
+        // they actually open it.
+    }
+}
+
 /** Let one sender's pictures through from now on, or take that back. */
 export async function trustSenderAction(accountId: string, input: unknown) {
     const userId = await actorId();

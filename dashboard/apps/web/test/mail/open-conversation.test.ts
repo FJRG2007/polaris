@@ -71,16 +71,38 @@ describe("the address stops naming what was moved", () => {
         // A link straight to a conversation names it in the path instead, where
         // there is nothing to strip - the way out is the list.
         expect(view).toContain('url.pathname.startsWith("/mail/t/")');
-        expect(view).toContain("leavesTheView(action) && openThread && aimed.includes(openThread.id)");
+        expect(view).toContain(
+            "leavesTheView(action) && openThread !== null && aimed.includes(openThread.id)"
+        );
     });
 
     it("closes the pane from the conversation's own header", async () => {
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
-        expect(thread).toContain("if (leavesTheView(action)) {");
+        expect(thread).toContain("const leaving = leavesTheView(action);");
         expect(thread).toContain("onGone?.();");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // And the list is what it is told to do, or the pane calls into nothing.
         expect(view).toContain("onGone={closeOpen}");
+    });
+
+    it("closes it before the mail server answers, and puts it back if it refuses", async () => {
+        // Filing a message is a round trip to somebody else's IMAP server. Waiting
+        // for it read as a button that had not been pressed: the reader sat inside
+        // a message they had just deleted, in a list whose row had already gone,
+        // watching nothing happen.
+        const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
+        const act = thread.slice(thread.indexOf("const act = useCallback"));
+        const leaves = act.indexOf("if (leaving) onGone?.();");
+        const asks = act.indexOf("startBusy(");
+        expect(leaves, "the pane closes inside the action").toBeGreaterThan(0);
+        expect(leaves, "the pane closes before the server is asked").toBeLessThan(asks);
+        // And the other half, without which leaving early is a lie: a refusal puts
+        // the reader back where they were.
+        expect(act).toContain("if (leaving) onStayed?.();");
+
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain("onStayed={() => openAgain(openThread.id)}");
+        expect(view).toContain('url.searchParams.set("open", threadId)');
     });
 
     /**
@@ -93,7 +115,10 @@ describe("the address stops naming what was moved", () => {
     it("does not refresh over the navigation that closes it", async () => {
         for (const screen of ["thread-view.tsx", "mail-view.tsx"]) {
             const source = await readFile(`${SCREENS}${screen}`, "utf8");
-            const closing = source.slice(source.indexOf("leavesTheView(action)"));
+            // The success path, which is the one that must not fetch again: the
+            // pane has already navigated, and a refresh in the same breath is a
+            // second read racing it - the navigation is the one that loses.
+            const closing = source.slice(source.indexOf("if (leaving) return;"));
             const stop = closing.indexOf("return;");
             expect(stop, `${screen} carries on past closing the pane`).toBeGreaterThan(0);
             expect(closing.slice(0, stop)).not.toContain("refresh()");

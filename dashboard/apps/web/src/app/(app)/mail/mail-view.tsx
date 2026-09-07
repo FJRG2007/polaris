@@ -42,6 +42,7 @@ import {
     blockSenderAction,
     moreThreadsAction,
     openMessageAction,
+    warmMessageAction,
     snoozeAction,
     syncAllAction
 } from "./actions";
@@ -91,6 +92,15 @@ import {
     Star,
     Trash2
 } from "lucide-react";
+
+/**
+ * How long the pointer rests on a conversation before its body is fetched.
+ *
+ * Long enough that running down a list of fifty asks for nothing, short enough
+ * that it is already on its way by the time somebody has decided to click. A
+ * quarter of a second is roughly how long a person takes to stop moving.
+ */
+const WARM_AFTER_MS = 250;
 
 /** What list this is, as the scroll asks the server for more of it. The shape
  *  the page schema validates on the way in. */
@@ -284,6 +294,57 @@ export function MailView({
         router.replace(`${path}${url.search}`, { scroll: false });
     }, [router]);
 
+    /**
+     * Go and get a conversation's body before anybody asks for it.
+     *
+     * Opening a message that has never been opened is a round trip to somebody
+     * else's IMAP server, and that is the whole of why Polaris felt slower to
+     * open mail than a webmail holding everything itself. It is also avoidable:
+     * by the time somebody clicks a row they have been pointing at it for a
+     * moment, and that moment is enough.
+     *
+     * Once per message and never again - the answer is kept on the row, so a
+     * second ask would be a database read for nothing. Fired on a rest rather
+     * than on every crossing, so running the pointer down a list of fifty does
+     * not ask for fifty bodies.
+     */
+    const warmed = useRef(new Set<string>());
+    const warming = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const warm = useCallback((messageId: string) => {
+        if (!messageId || warmed.current.has(messageId)) return;
+        if (warming.current) clearTimeout(warming.current);
+        warming.current = setTimeout(() => {
+            if (warmed.current.has(messageId)) return;
+            warmed.current.add(messageId);
+            void warmMessageAction(messageId);
+        }, WARM_AFTER_MS);
+    }, []);
+
+    // Nothing outlives the screen: a timer that fires after this list is gone
+    // asks for a body nobody is waiting for.
+    useEffect(
+        () => () => {
+            if (warming.current) clearTimeout(warming.current);
+        },
+        []
+    );
+
+    /**
+     * Put the conversation back on screen after the server refused to move it.
+     *
+     * The other half of leaving before the answer arrives. Replaced rather than
+     * pushed, like the close it undoes: a Back that walks through a conversation
+     * closing and reopening is a Back nobody meant.
+     */
+    const openAgain = useCallback(
+        (threadId: string) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("open", threadId);
+            router.replace(`${url.pathname}${url.search}`, { scroll: false });
+        },
+        [router]
+    );
+
     /** The conversations an action was aimed at, from the messages it named. */
     const threadsOf = useCallback(
         (messageIds: readonly string[]) =>
@@ -312,6 +373,15 @@ export function MailView({
             // The row moves now. A mail server is slow enough that waiting for it
             // reads as the screen having ignored the click.
             if (ahead) patch(aimed, ahead);
+            // And the conversation being read closes now, for the same reason and
+            // more so: the row it came from is already gone from the list behind
+            // it, so waiting left somebody looking at a message that had been
+            // filed, in a list that no longer had it, for as long as their mail
+            // server took to answer.
+            const leaving =
+                leavesTheView(action) && openThread !== null && aimed.includes(openThread.id);
+            const reopen = leaving ? openThread.id : "";
+            if (leaving) closeOpen();
 
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds: [...messageIds], action });
@@ -321,14 +391,18 @@ export function MailView({
                 const missing = missingFolderRole(outcome);
                 if (missing) {
                     setPatched({});
+                    if (reopen) openAgain(reopen);
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
-                    // Put it back. A screen that kept showing the change after
-                    // the server refused it would be lying about somebody's mail.
+                    // Put it back, both halves of it. A screen that kept showing
+                    // the change after the server refused it would be lying about
+                    // somebody's mail - and a reader taken out of a conversation
+                    // that was never filed has to be put back in it.
                     setPatched({});
+                    if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
                 }
@@ -345,14 +419,11 @@ export function MailView({
                 // loses is the navigation - which left the address still naming a
                 // conversation that had been deleted, and the next click on
                 // another one apparently doing nothing at all.
-                if (leavesTheView(action) && openThread && aimed.includes(openThread.id)) {
-                    closeOpen();
-                    return;
-                }
+                if (leaving) return;
                 refresh();
             });
         },
-        [askFolderRole, closeOpen, openThread, patch, refresh, threadsOf, toast]
+        [askFolderRole, closeOpen, openAgain, openThread, patch, refresh, threadsOf, toast]
     );
 
     const snooze = useCallback(
@@ -372,6 +443,13 @@ export function MailView({
     );
 
     const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
+
+    // The keyboard's own pointer. Somebody arrowing down a list is deciding what
+    // to open exactly as somebody hovering is, and the wait afterwards is the
+    // same wait.
+    useEffect(() => {
+        if (onRow?.leadMessageId) warm(onRow.leadMessageId);
+    }, [onRow?.leadMessageId, warm]);
     const rowMessageIds = onRow ? [onRow.leadMessageId].filter(Boolean) : [];
 
     /**
@@ -788,6 +866,7 @@ export function MailView({
                                     <ThreadRow
                                         thread={shown(thread)}
                                         onCursor={onRow?.id === thread.id}
+                                        onPeek={() => warm(thread.leadMessageId)}
                                         open={openThread?.id === thread.id}
                                         picked={selected.includes(thread.id)}
                                         color={accountColor(thread.accountId)}
@@ -878,6 +957,7 @@ export function MailView({
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
                         onGone={closeOpen}
+                        onStayed={() => openAgain(openThread.id)}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         onBack={
@@ -1234,6 +1314,7 @@ function tomorrowMorning(): Date {
 function ThreadRow({
     thread,
     onCursor,
+    onPeek,
     open,
     picked,
     color,
@@ -1254,6 +1335,9 @@ function ThreadRow({
     /** Whether the keyboard is on this row. Drawn as an edge rather than a fill,
      *  so it stays legible over the fill an open or picked row already has. */
     onCursor: boolean;
+    /** Somebody is looking at this row. Fetching its body now is what makes
+     *  opening it feel instant - see `WARM_AFTER_MS`. */
+    onPeek: () => void;
     open: boolean;
     picked: boolean;
     color: string;
@@ -1290,6 +1374,21 @@ function ThreadRow({
     return (
         <li
             {...rest}
+            // A pointer resting here, or focus landing on it, is enough to go
+            // and fetch what is in it - so opening it is a screen drawing rather
+            // than a wait on somebody else's mail server.
+            //
+            // Both call on through: this row is a context-menu trigger and it is
+            // handed handlers by it, so replacing one rather than adding to it
+            // would cost the right-click menu to save a fetch.
+            onPointerEnter={(event) => {
+                rest.onPointerEnter?.(event);
+                onPeek();
+            }}
+            onFocus={(event) => {
+                rest.onFocus?.(event);
+                onPeek();
+            }}
             // Dragged onto a folder in the rail to file it there. The payload is
             // ids and nothing else: what is dropped is looked up and authorized
             // on the server, so a drag cannot become a way of naming somebody

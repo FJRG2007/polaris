@@ -25,7 +25,26 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
-import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
+import dynamic from "next/dynamic";
+import { isViewable } from "@/app/(app)/drive/viewer/kind";
+import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
+
+/**
+ * The viewer, fetched when a file is actually opened.
+ *
+ * Never statically, and this is not a nicety: it carries a PDF engine, a
+ * spreadsheet parser, a document converter and a slide renderer, and importing
+ * it from a screen means all of that is in the bundle for every reader who never
+ * opens an attachment. It also reaches `node:crypto` somewhere down that chain,
+ * which a client bundle cannot resolve at all - so a static import does not make
+ * the page heavy, it makes the build fail. The chat message list learned this
+ * first; `viewer/kind` exists so that asking whether a file is openable costs
+ * nothing.
+ */
+const FileViewer = dynamic(
+    () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
+    { ssr: false }
+);
 import {
     Button,
     DropdownMenu,
@@ -65,7 +84,8 @@ export function ThreadView({
     context,
     onBack,
     onRead,
-    onGone
+    onGone,
+    onStayed
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
@@ -79,6 +99,9 @@ export function ThreadView({
     /** Told when this conversation has been filed or thrown away from here, so
      *  the address stops naming something the server no longer has. */
     onGone?: () => void;
+    /** Put the reader back, for a filing the server refused after this pane had
+     *  already stepped out of the way. */
+    onStayed?: () => void;
 }) {
     const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
@@ -120,33 +143,43 @@ export function ThreadView({
     const act = useCallback(
         (action: MailAction) => {
             const messageIds = messages.map((message) => message.id);
+            // Out of the conversation now, before the mail server is asked.
+            // Filing a message is a round trip to somebody else's IMAP server,
+            // and waiting for it read as a button that had not been pressed -
+            // the reader sat inside a message they had just deleted, watching
+            // nothing happen. If it is refused, they are put back and told.
+            const leaving = leavesTheView(action);
+            if (leaving) onGone?.();
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds, action });
                 const missing = missingFolderRole(outcome);
                 if (missing) {
+                    // Back where they were, so the question is answered with the
+                    // conversation in front of them rather than about a message
+                    // they can no longer see.
+                    if (leaving) onStayed?.();
                     askFolderRole(missing, () => act(action));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
+                    if (leaving) onStayed?.();
                     toast.show({ title: said });
                     return;
                 }
-                // Archived, trashed or deleted: this pane is now looking at
-                // messages the server has moved out from under it. Closing it is
-                // a navigation and these routes are dynamic, so it comes back
-                // with a fresh list on its own - refreshing as well would be a
-                // second fetch racing the navigation, and the navigation is the
-                // one that loses. That race is why deleting from inside a
-                // conversation left the reader inside it.
-                if (leavesTheView(action)) {
-                    onGone?.();
-                    return;
-                }
+                // Archived, trashed or deleted: this pane was looking at messages
+                // the server has now moved out from under it, and it closed
+                // before the round trip. Closing is a navigation and these routes
+                // are dynamic, so it comes back with a fresh list on its own -
+                // refreshing as well would be a second fetch racing the
+                // navigation, and the navigation is the one that loses. That race
+                // is why deleting from inside a conversation left the reader
+                // inside it.
+                if (leaving) return;
                 refresh();
             });
         },
-        [askFolderRole, messages, onGone, refresh, toast]
+        [askFolderRole, messages, onGone, onStayed, refresh, toast]
     );
 
     /**
