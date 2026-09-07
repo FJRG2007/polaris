@@ -16,7 +16,7 @@
 import { wallClock, zonedInstant } from "@polaris/core";
 
 /** What a device does, which is what decides the buttons it gets. */
-export const DEVICE_KINDS = ["lock", "opener", "switch", "outlet", "light"] as const;
+export const DEVICE_KINDS = ["lock", "opener", "switch", "outlet", "light", "sensor"] as const;
 
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
 
@@ -25,7 +25,8 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     opener: "Door opener",
     switch: "Switch",
     outlet: "Socket",
-    light: "Light"
+    light: "Light",
+    sensor: "Sensor"
 };
 
 /** Devices of the same sort, listed together. A place has a handful of doors and
@@ -35,7 +36,8 @@ export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     opener: "Doors",
     switch: "Switches and sockets",
     outlet: "Switches and sockets",
-    light: "Lights"
+    light: "Lights",
+    sensor: "Sensors"
 };
 
 /** Whether a word off a device row is a kind this build knows. A device synced by
@@ -94,6 +96,24 @@ const KIND_STATE_LABELS: Readonly<Partial<Record<DeviceKind, Partial<Record<Devi
 
 export function stateLabel(kind: string, state: DeviceState): string {
     return KIND_STATE_LABELS[deviceKind(kind)]?.[state] ?? DEVICE_STATE_LABELS[state];
+}
+
+/** What a device that measures rather than does last read. Text and a unit as
+ *  its own maker wrote them: a contact says open or closed, and a temperature
+ *  that lost its decimal on the way in is worse than the string it sent. */
+export interface DeviceReading {
+    readonly value: string;
+    readonly unit: string;
+}
+
+/** The reading as one line, or an empty string for a device that has none. The
+ *  space before a unit is dropped for the ones that are written closed up, which
+ *  is every symbol and no word. */
+export function readingLine(reading: DeviceReading | null): string {
+    if (!reading || !reading.value) return "";
+    if (!reading.unit) return reading.value;
+    const closed = /^[%\u00b0]/.test(reading.unit);
+    return closed ? `${reading.value}${reading.unit}` : `${reading.value} ${reading.unit}`;
 }
 
 export type DeviceTone = "success" | "active" | "warning" | "danger" | "muted";
@@ -173,7 +193,10 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     opener: ["unlatch"],
     switch: ["turn-on", "turn-off"],
     outlet: ["turn-on", "turn-off"],
-    light: ["turn-on", "turn-off"]
+    light: ["turn-on", "turn-off"],
+    // A sensor is not done, it is read. Nothing to press, and a row that offered
+    // something would be offering to change the weather.
+    sensor: []
 };
 
 export function actionsFor(kind: string): readonly DeviceAction[] {
@@ -215,6 +238,9 @@ export interface DeviceView {
     readonly batteryCritical: boolean;
     readonly online: boolean;
     readonly controllable: boolean;
+    /** What it last read, for a device that measures rather than does. Null for
+     *  everything that has a state instead. */
+    readonly reading: DeviceReading | null;
     /** When the state was last read, so a screen can say how old it is rather
      *  than presenting a stale reading as the present. */
     readonly stateAt: string | null;

@@ -8448,8 +8448,17 @@ model PlaceDevice {
 
     // The last reading. Kept on the row rather than derived from the events so a
     // list of twenty doors is one query, and refreshed by every sync.
-    /// locked | unlocked | unlatched | jammed | uncalibrated | unknown.
+    /// locked | unlocked | unlatched | jammed | uncalibrated | on | off |
+    /// unknown. A device that only measures something is `unknown` here and
+    /// carries its reading below instead.
     state          String    @default("unknown")
+    /// What a device that measures rather than does last read, as the text to
+    /// draw. Text rather than a number because half of them are not numbers: a
+    /// contact says open or closed, and a number that lost its "22.5" to
+    /// rounding is worse than the string the device sent.
+    value          String?
+    /// What that reading is in, as its own maker wrote it - "C", "%", "lx".
+    unit           String?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")

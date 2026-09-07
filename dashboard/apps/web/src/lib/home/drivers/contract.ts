@@ -51,6 +51,12 @@ export interface DeviceSnapshot {
     /** Whether the account could reach it when asked. A device nobody can reach
      *  still draws, saying so, rather than disappearing off a screen. */
     readonly online: boolean;
+    /** What it last read, for a device that measures rather than does - a
+     *  contact, a temperature, a movement detector. Null for everything that has
+     *  a state instead, which is most of them. */
+    readonly value?: string | null;
+    /** What that reading is in, as its own maker wrote it. */
+    readonly unit?: string | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */

@@ -58,6 +58,8 @@ const DEVICE_FIELDS = {
     batteryCritical: true,
     online: true,
     controllable: true,
+    value: true,
+    unit: true,
     stateAt: true
 } as const;
 
@@ -77,6 +79,8 @@ type DeviceRow = {
     batteryCritical: boolean;
     online: boolean;
     controllable: boolean;
+    value: string | null;
+    unit: string | null;
     stateAt: Date | null;
 };
 
@@ -96,6 +100,9 @@ function toView(row: DeviceRow): kinds.DeviceView {
         batteryCritical: row.batteryCritical,
         online: row.online,
         controllable: row.controllable,
+        // Both or neither: a unit with nothing to put it after is not a reading,
+        // and a screen that drew one would print a bare "C".
+        reading: row.value ? { value: row.value, unit: row.unit ?? "" } : null,
         stateAt: row.stateAt?.toISOString() ?? null
     };
 }
@@ -302,6 +309,8 @@ async function syncAccount(
                 batteryPercent: snapshot.batteryPercent,
                 batteryCritical: snapshot.batteryCritical,
                 online: snapshot.online,
+                value: snapshot.value ?? null,
+                unit: snapshot.unit ?? null,
                 stateAt: new Date()
             };
             await prisma.placeDevice.upsert({

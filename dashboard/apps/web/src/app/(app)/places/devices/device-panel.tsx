@@ -38,6 +38,7 @@ import {
     BatteryLow,
     DoorClosed,
     DoorOpen,
+    Gauge,
     Lightbulb,
     Loader2,
     Lock,
@@ -67,7 +68,8 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     opener: DoorOpen,
     switch: ToggleRight,
     outlet: Plug,
-    light: Lightbulb
+    light: Lightbulb,
+    sensor: Gauge
 };
 
 /** The one button of a pair that gets the weight. Locking up and switching a
@@ -100,10 +102,18 @@ export function stateClass(device: DeviceView): string {
 /** How the state reads on the badge. Deliberately not a colour on its own: a
  *  colour is the glance and the word is the answer. */
 function StatePill({ device }: { device: DeviceView }) {
+    // A sensor has no state to be in - it has a reading, and that is what the
+    // badge is for on one. A sensor whose reading has not arrived says so rather
+    // than borrowing the word a lock uses for the same silence.
+    const reading = kinds.readingLine(device.reading);
     return (
         <Badge className={cn("gap-1.5", stateClass(device))}>
             {device.state === "moving" && <Loader2 className="size-3 animate-spin" />}
-            {device.online ? kinds.stateLabel(device.kind, device.state) : "Not answering"}
+            {!device.online
+                ? "Not answering"
+                : kinds.deviceKind(device.kind) === "sensor"
+                  ? reading || "Nothing read yet"
+                  : kinds.stateLabel(device.kind, device.state)}
         </Badge>
     );
 }
@@ -123,6 +133,10 @@ export function DeviceControls({
     className?: string;
 }) {
     if (!canControl) return null;
+    // Nothing to press on something that only measures. Left silent rather than
+    // explained: a row of buttons that is not there needs no note, and a sentence
+    // under every sensor in a house would be thirty sentences.
+    if (kinds.actionsFor(device.kind).length === 0) return null;
     // A door taken off the controls says so where the buttons would be, rather
     // than showing nothing and leaving somebody looking for them.
     if (!device.controllable) {

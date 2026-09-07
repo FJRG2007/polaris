@@ -90,15 +90,9 @@ describe("what a broker is announcing", () => {
     });
 
     it("leaves out what it could only pretend to control", async () => {
-        // A temperature and a blind announce themselves exactly like a switch.
-        // Drawing either as one would be a row with an On that means something
-        // else entirely.
+        // A blind announces itself exactly like a switch. Drawing it as one would
+        // be a row with an On that means something else entirely.
         broker({
-            "homeassistant/sensor/temp/config": {
-                name: "Temperature",
-                state_topic: "z/t",
-                command_topic: "z/t/set"
-            },
             "homeassistant/cover/blind/config": {
                 name: "Blind",
                 state_topic: "z/b",
@@ -115,11 +109,72 @@ describe("what a broker is announcing", () => {
         expect(found.map((device) => device.name)).toEqual(["Plug"]);
     });
 
-    it("leaves out a description with no way to read it or work it", async () => {
+    it("leaves out a switch with no way to work it", async () => {
+        // Something that is only read needs a state topic; something that is
+        // worked needs both, and half of one is a button that goes nowhere.
         broker({
             "homeassistant/switch/half/config": { name: "Half", state_topic: "z/h" }
         });
         expect(await mqttDiscoveryDriver.list(BROKER)).toHaveLength(0);
+    });
+
+    it("takes a sensor, which needs no way to be worked", async () => {
+        broker(
+            {
+                "homeassistant/sensor/temp/config": {
+                    name: "Temperature",
+                    unique_id: "t1",
+                    state_topic: "z/t",
+                    unit_of_measurement: "°C",
+                    device_class: "temperature",
+                    value_template: "{{ value_json.temperature }}"
+                }
+            },
+            { "z/t": JSON.stringify({ temperature: 21.5, humidity: 48 }) }
+        );
+
+        const found = await mqttDiscoveryDriver.list(BROKER);
+        expect(found[0]?.kind).toBe("sensor");
+        expect(found[0]?.value).toBe("21.5");
+        expect(found[0]?.unit).toBe("°C");
+        // It reads rather than is: borrowing a lock's word here would put "Not
+        // answering" beside a perfectly good temperature.
+        expect(found[0]?.state).toBe("unknown");
+    });
+
+    it("says what a contact means rather than what it published", async () => {
+        // "on" is what the device says and "Open" is what somebody needs to read.
+        broker(
+            {
+                "homeassistant/binary_sensor/front/config": {
+                    name: "Front door",
+                    unique_id: "c1",
+                    state_topic: "z/c",
+                    device_class: "door",
+                    payload_on: "true",
+                    payload_off: "false"
+                }
+            },
+            { "z/c": "true" }
+        );
+
+        const found = await mqttDiscoveryDriver.list(BROKER);
+        expect(found[0]?.value).toBe("Open");
+        expect(found[0]?.unit).toBe("");
+    });
+
+    it("falls back to on and off for a contact whose class it does not know", async () => {
+        broker(
+            {
+                "homeassistant/binary_sensor/thing/config": {
+                    name: "Thing",
+                    unique_id: "c2",
+                    state_topic: "z/x"
+                }
+            },
+            { "z/x": "ON" }
+        );
+        expect((await mqttDiscoveryDriver.list(BROKER))[0]?.value).toBe("On");
     });
 
     it("says nothing about the state of something the bridge cannot reach", async () => {

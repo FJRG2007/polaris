@@ -368,9 +368,12 @@ export function DevicesView({
                                                     {device.name}
                                                 </span>
                                                 <Badge className={cn("shrink-0", stateClass(device))}>
-                                                    {device.online
-                                                        ? kinds.stateLabel(device.kind, device.state)
-                                                        : "Not answering"}
+                                                    {!device.online
+                                                        ? "Not answering"
+                                                        : kinds.deviceKind(device.kind) === "sensor"
+                                                          ? kinds.readingLine(device.reading) ||
+                                                            "Nothing read yet"
+                                                          : kinds.stateLabel(device.kind, device.state)}
                                                 </Badge>
                                                 {device.batteryCritical && (
                                                     <Badge className="shrink-0 gap-1 border-danger/30 bg-danger/10 text-danger">

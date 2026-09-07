@@ -14,10 +14,10 @@
  * it installed, and a broker that has one on it is simply a broker with these
  * topics on it.
  *
- * Only what Polaris can honestly draw is taken: things that are on or off, and
- * things that lock. A thermostat and a blind announce themselves the same way and
- * are skipped rather than listed with controls that would mean something else -
- * they are the next kinds to grow, not something to fake now.
+ * Only what Polaris can honestly draw is taken: things that are on or off, things
+ * that lock, and things that read. A thermostat and a blind announce themselves
+ * the same way and are skipped rather than listed with controls that would mean
+ * something else - they are the next kinds to grow, not something to fake now.
  *
  * Server-only.
  */
@@ -44,15 +44,43 @@ export const DEFAULT_BROKER_PORT = 1883;
 /**
  * The components worth taking, as kinds.
  *
- * A switch is a switch and a light is a light. `binary_sensor` and `sensor` are
- * announced by everything and mean anything from a temperature to a door contact;
- * they are read-only and have no home in this app's vocabulary yet, so they are
- * left rather than drawn as something they are not.
+ * A switch is a switch and a light is a light. The two sensor components are
+ * everything else a house is full of - a temperature, a door contact, a movement
+ * detector - and they arrive as one kind here because what Polaris does with all
+ * of them is the same: read them and draw what they said.
  */
 const COMPONENT_KINDS: Readonly<Record<string, DeviceKind>> = {
     switch: "switch",
     light: "light",
-    lock: "lock"
+    lock: "lock",
+    sensor: "sensor",
+    binary_sensor: "sensor"
+};
+
+/**
+ * What a thing that is either true or false should say it is.
+ *
+ * The convention has a device class for this and it is the only reason the answer
+ * is readable: "on" is what a contact publishes and "Open" is what its owner
+ * needs to see. Anything unlisted falls back to on and off, which is honest
+ * rather than wrong.
+ */
+const BINARY_WORDS: Readonly<Record<string, { on: string; off: string }>> = {
+    door: { on: "Open", off: "Closed" },
+    window: { on: "Open", off: "Closed" },
+    garage_door: { on: "Open", off: "Closed" },
+    opening: { on: "Open", off: "Closed" },
+    lock: { on: "Unlocked", off: "Locked" },
+    motion: { on: "Movement", off: "Still" },
+    occupancy: { on: "Somebody there", off: "Empty" },
+    presence: { on: "Home", off: "Away" },
+    moisture: { on: "Wet", off: "Dry" },
+    smoke: { on: "Smoke", off: "Clear" },
+    gas: { on: "Gas", off: "Clear" },
+    problem: { on: "Problem", off: "Fine" },
+    battery: { on: "Low", off: "Fine" },
+    connectivity: { on: "Connected", off: "Disconnected" },
+    tamper: { on: "Tampered", off: "Fine" }
 };
 
 /**
@@ -86,6 +114,10 @@ const configSchema = z
         payload_unlock: z.string().optional(),
         state_locked: z.string().optional(),
         state_unlocked: z.string().optional(),
+        unit_of_measurement: z.string().optional(),
+        unit_of_meas: z.string().optional(),
+        device_class: z.string().optional(),
+        dev_cla: z.string().optional(),
         availability_topic: z.string().optional(),
         avty_t: z.string().optional(),
         payload_available: z.string().optional(),
@@ -109,6 +141,9 @@ type Config = z.infer<typeof configSchema>;
 interface Announced {
     readonly id: string;
     readonly kind: DeviceKind;
+    /** The convention's own word for it. Two of them are one kind here and are
+     *  not read the same way, which is the only reason this is kept. */
+    readonly component: string;
     readonly config: Config;
 }
 
@@ -215,6 +250,45 @@ function stateOf(config: Config, raw: string | undefined, kind: DeviceKind): Dev
     return "unknown";
 }
 
+/**
+ * What a sensor last read, as the line to draw.
+ *
+ * The same two shapes as a state - a bare payload, or JSON with the value under
+ * the key a template names - because a bridge publishes both for the same device.
+ * A binary one is turned into words by its device class: "on" is what a contact
+ * publishes and "Open" is what somebody needs to read.
+ */
+function readingOf(
+    config: Config,
+    component: string,
+    raw: string | undefined
+): { value: string; unit: string } | null {
+    if (raw === undefined) return null;
+    const text = raw.trim();
+    let value = text;
+    if (text.startsWith("{")) {
+        try {
+            const parsed = JSON.parse(text) as Record<string, unknown>;
+            const template = pick(config, "value_template", "val_tpl") ?? "";
+            const named = /value_json\.([A-Za-z0-9_]+)/.exec(template)?.[1];
+            const held = named ? parsed[named] : (parsed.value ?? parsed.state);
+            if (held === undefined || held === null) return null;
+            value = typeof held === "string" ? held : String(held);
+        } catch {
+            return null;
+        }
+    }
+    if (!value) return null;
+
+    if (component === "binary_sensor") {
+        const on = payload(config.payload_on ?? config.pl_on, "ON");
+        const words = BINARY_WORDS[pick(config, "device_class", "dev_cla") ?? ""];
+        if (!words) return { value: value === on ? "On" : "Off", unit: "" };
+        return { value: value === on ? words.on : words.off, unit: "" };
+    }
+    return { value, unit: pick(config, "unit_of_measurement", "unit_of_meas") ?? "" };
+}
+
 /** Whether the bridge says this one is reachable. No availability topic means
  *  nothing was claimed, which is not the same as being offline. */
 function onlineOf(config: Config, held: Map<string, string>): boolean {
@@ -262,9 +336,12 @@ async function readAll(
         if (!config.success) continue;
         const state = pick(config.data, "state_topic", "stat_t");
         const command = pick(config.data, "command_topic", "cmd_t");
-        // No way to read it or no way to work it is not a device on this screen.
-        if (!state || !command) continue;
-        found.push({ id: idOf(config.data, topic), kind, config: config.data });
+        // Something that is worked needs both; something that is only read needs
+        // one. A description with no state topic is a device nothing can say
+        // anything about either way.
+        if (!state) continue;
+        if (kind !== "sensor" && !command) continue;
+        found.push({ id: idOf(config.data, topic), kind, component, config: config.data });
         topics.add(state);
         const availability = pick(config.data, "availability_topic", "avty_t");
         if (availability) topics.add(availability);
@@ -277,6 +354,11 @@ async function readAll(
 function toSnapshot(entry: Announced, held: Map<string, string>): DeviceSnapshot {
     const state = pick(entry.config, "state_topic", "stat_t");
     const online = onlineOf(entry.config, held);
+    const raw = state ? held.get(state) : undefined;
+    // A sensor whose bridge cannot reach it keeps its last reading rather than
+    // losing it: what a thermometer said an hour ago is still what it said, and
+    // the row already says the bridge has lost it.
+    const reading = entry.kind === "sensor" ? readingOf(entry.config, entry.component, raw) : null;
     return {
         externalId: entry.id,
         kind: entry.kind,
@@ -289,11 +371,21 @@ function toSnapshot(entry: Announced, held: Map<string, string>): DeviceSnapshot
         firmware: entry.config.device?.sw_version?.trim() || null,
         // A device the bridge says it cannot reach has no state worth drawing:
         // what it was doing when it last answered is not what it is doing.
-        state: online ? stateOf(entry.config, state ? held.get(state) : undefined, entry.kind) : "unknown",
+        // A sensor has no state to be in. Its reading is what it has, and
+        // borrowing the word a lock uses would put "Not answering" beside a
+        // perfectly good temperature.
+        state:
+            entry.kind === "sensor"
+                ? "unknown"
+                : online
+                  ? stateOf(entry.config, raw, entry.kind)
+                  : "unknown",
         doorState: "none",
         batteryPercent: null,
         batteryCritical: false,
-        online
+        online,
+        value: reading?.value ?? null,
+        unit: reading?.unit ?? null
     };
 }
 
