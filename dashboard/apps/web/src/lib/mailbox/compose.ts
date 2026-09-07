@@ -389,3 +389,56 @@ export async function sweepDueSends(): Promise<number> {
     }
     return sent;
 }
+
+/** One message somebody started and has not sent. */
+export interface MailDraftView {
+    readonly id: string;
+    readonly accountId: string;
+    readonly identityId: string | null;
+    readonly to: readonly core.MailAddress[];
+    readonly cc: readonly core.MailAddress[];
+    readonly bcc: readonly core.MailAddress[];
+    readonly subject: string;
+    readonly body: string;
+    readonly inReplyToId: string | null;
+    readonly forward: boolean;
+    /** Set only while it is waiting to go, which is what the Outbox shows. */
+    readonly sendAt: string | null;
+    readonly updatedAt: string;
+}
+
+/**
+ * Everything this person has started and not sent.
+ *
+ * Polaris' own drafts rather than the Drafts folder on the mail server. They are
+ * not the same thing and conflating them is what left this screen permanently
+ * empty: the composer saves here as somebody types, and nothing has ever been
+ * appended to the server's folder - so a draft was saved, was real, and could
+ * not be reached from anywhere.
+ */
+export async function listDrafts(userId: string): Promise<MailDraftView[]> {
+    const rows = await prisma.mailDraft.findMany({
+        where: { account: { userId } },
+        orderBy: { updatedAt: "desc" },
+        take: 200
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        accountId: row.accountId,
+        identityId: row.identityId,
+        to: addressesFrom(row.toJson),
+        cc: addressesFrom(row.ccJson),
+        bcc: addressesFrom(row.bccJson),
+        subject: row.subject,
+        body: row.body,
+        inReplyToId: row.inReplyToId,
+        forward: row.forward,
+        sendAt: row.sendAt?.toISOString() ?? null,
+        updatedAt: row.updatedAt.toISOString()
+    }));
+}
+
+/** Throw one away. Nothing was ever sent, so there is nothing to take back. */
+export async function discardDraft(userId: string, draftId: string): Promise<void> {
+    await prisma.mailDraft.deleteMany({ where: { id: draftId, account: { userId } } });
+}

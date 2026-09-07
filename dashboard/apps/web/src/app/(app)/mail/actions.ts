@@ -591,3 +591,16 @@ export async function unblockSenderAction(accountId: string, ruleId: string) {
         return failure(caught, "That block could not be removed.");
     }
 }
+
+/** Throw a half-written message away. Nothing was sent, so there is nothing to
+ *  take back. */
+export async function discardDraftAction(draftId: string) {
+    const userId = await actorId();
+    try {
+        await compose.discardDraft(userId, draftId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That draft could not be removed.");
+    }
+}
