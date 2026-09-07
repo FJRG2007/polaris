@@ -23,6 +23,8 @@ import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { isLocalDomain, primaryDomain } from "./domain-rank";
 import { useProjectCan } from "./access-context";
+import { useParams, useRouter } from "next/navigation";
+import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { stageServiceDeleteAction } from "./project-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { isTunnelHostname, type DisplayFormat, type ProjectCapability } from "@polaris/core";
@@ -3408,10 +3410,60 @@ function SettingsTab({
                 </div>
             )}
 
+            {can("service.create") && can("service.configure") && <MoveOutSection app={app} />}
+
             {can("service.delete") && (
                 <DangerSection app={app} staged={staged} onChanged={onChanged} />
             )}
         </div>
+    );
+}
+
+/**
+ * Sending the service to somebody else's build farm.
+ *
+ * Here rather than on the Elsewhere board because this is where somebody is
+ * standing when they decide it: they are looking at the service that is going to
+ * move, not at a list of the ones that already have. The board is where it ends
+ * up, and its own rows offer the journey back.
+ *
+ * Hidden entirely outside a project - the Containers app draws this same panel
+ * for something it reached another way, and there is no project for a move to
+ * land in.
+ */
+function MoveOutSection({ app }: { app: ProjectApp }) {
+    const params = useParams<{ projectId?: string }>();
+    const projectId = params?.projectId ?? "";
+    const [moving, setMoving] = useState(false);
+    const router = useRouter();
+    if (!projectId) return null;
+
+    return (
+        <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Somewhere else</h3>
+            <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                <span className="min-w-0">
+                    <span className="font-medium">Move it to Vercel or Railway</span>
+                    <span className="block text-xs text-muted-foreground">
+                        They build and serve it from the same repository; the variables go with it,
+                        and it stays on this project&apos;s board. Nothing here is deleted - it is
+                        stopped, and one button starts it again.
+                    </span>
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setMoving(true)}>
+                    <ArrowUpRight className="size-4 shrink-0" />
+                    Move it
+                </Button>
+            </div>
+            {moving && (
+                <MoveOutDialog
+                    projectId={projectId}
+                    application={{ id: app.id, name: app.name, environmentId: app.environmentId }}
+                    onClose={() => setMoving(false)}
+                    onMoved={() => router.refresh()}
+                />
+            )}
+        </section>
     );
 }
 

@@ -1,12 +1,19 @@
 /**
  * What a place that runs somebody else's services has to be able to answer.
  *
- * Four questions, and they are the only four every provider can answer about a
- * service it builds and serves: what have you got, which of it am I looking at,
- * what state is it in, and do it again. Anything past that is one vendor's idea -
- * Vercel has previews and instant rollback, Railway has replicas and volumes -
- * and a control plane that modelled those would be a worse copy of each of their
- * dashboards.
+ * Four questions to watch one, and they are the only four every provider can
+ * answer about a service it builds and serves: what have you got, which of it am
+ * I looking at, what state is it in, and do it again. Anything past that is one
+ * vendor's idea - Vercel has previews and instant rollback, Railway has replicas
+ * and volumes - and a control plane that modelled those would be a worse copy of
+ * each of their dashboards.
+ *
+ * Three more to move one, and they are there because a service moving between a
+ * Polaris server and a provider is exactly three things: a repository, a set of
+ * variables, and a domain. The repository and the variables are what a driver can
+ * answer; the domain is DNS and belongs to whoever owns the name. Without these a
+ * move is somebody copying thirty secrets between two dashboards by hand, which
+ * is the part of moving a service that actually goes wrong.
  *
  * The deliberate omission is the build. Polaris does not build, upload or
  * configure anything here: what goes into a release is the provider's, decided
@@ -76,4 +83,50 @@ export interface ProviderDriver {
     state(token: string, externalId: string, ref: ProviderRef): Promise<ExternalState>;
     /** Build and release it again, with whatever the provider already has. */
     deploy(token: string, externalId: string, ref: ProviderRef): Promise<void>;
+
+    /**
+     * The repository the provider builds, for a service being brought home.
+     *
+     * Null where the provider will not say - which is a real answer and not a
+     * failure: a project deployed straight from somebody's command line has no
+     * repository behind it, and Railway's public API does not expose the one a
+     * service is connected to at all. The move then asks for it, which is one
+     * field somebody can read off their own dashboard.
+     */
+    source(token: string, externalId: string, ref: ProviderRef): Promise<ServiceSource | null>;
+
+    /**
+     * What it is built and run with, for a service being brought home.
+     *
+     * Only what is worth carrying: a provider's own variables and any reference
+     * that means nothing outside their project are left where they are. Values
+     * the provider will not decrypt are absent rather than empty - a secret that
+     * silently became "" is worse than one that is missing and said so.
+     */
+    variables(token: string, externalId: string, ref: ProviderRef): Promise<Record<string, string>>;
+
+    /**
+     * Put these on it, replacing any of the same name and leaving the rest.
+     *
+     * Never a replacement of the whole set. This is reached by a move carrying
+     * variables from somewhere else, and a move that also deleted whatever was
+     * already there would be one nobody could undo.
+     */
+    putVariables(
+        token: string,
+        externalId: string,
+        ref: ProviderRef,
+        values: Readonly<Record<string, string>>
+    ): Promise<void>;
+}
+
+/** Where a service is built from. */
+export interface ServiceSource {
+    /** `owner/name`, as every git host writes it. */
+    readonly repo: string;
+    /** The branch they build, or "" where the provider does not say. */
+    readonly branch: string;
+    /** The whole address, where one can be built. Empty for a host Polaris
+     *  cannot assume - which is anything but GitHub. */
+    readonly url: string;
 }

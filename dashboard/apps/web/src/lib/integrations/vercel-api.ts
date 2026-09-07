@@ -7,6 +7,11 @@
  * covers, what each one has deployed, and the one action worth having on a screen
  * you are already looking at, which is deploying it again.
  *
+ * The variables at the bottom are the exception, and they are here for one job:
+ * moving a service between a Polaris server and Vercel. That move is a repository,
+ * a set of variables and a domain, and the variables are the half nobody can do by
+ * hand without getting one of thirty of them wrong.
+ *
  * Every response is parsed against a schema before anything reads it: this is
  * somebody else's server, and a shape that changed under us has to fail here,
  * saying so, rather than three layers further in as an undefined.
@@ -199,6 +204,124 @@ export async function vercelDeployments(
         .safeParse(await call(token, `/v7/deployments?${query.toString()}`));
     if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.deployments;
+}
+
+const linkSchema = z.object({
+    type: z.string().default(""),
+    org: z.string().default(""),
+    repo: z.string().default(""),
+    productionBranch: z.string().nullable().default(null)
+});
+
+const oneProjectSchema = projectSchema.extend({
+    /** The repository they build, where one is connected. Absent for a project
+     *  deployed from the command line, which is a project Polaris cannot bring
+     *  home without being told the repository. */
+    link: linkSchema.nullable().default(null)
+});
+
+export type VercelOneProject = z.infer<typeof oneProjectSchema>;
+
+/** One project, whole - the repository behind it being the part nothing else
+ *  here asks for. */
+export async function vercelProject(
+    token: string,
+    project: string,
+    team?: string | null
+): Promise<VercelOneProject> {
+    const query = team ? `?teamId=${encodeURIComponent(team)}` : "";
+    const parsed = oneProjectSchema.safeParse(
+        await call(token, `/v9/projects/${encodeURIComponent(project)}${query}`)
+    );
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    return parsed.data;
+}
+
+const envSchema = z.object({
+    key: z.string().default(""),
+    value: z.string().nullable().default(null),
+    /** encrypted | plain | sensitive | secret | system. */
+    type: z.string().default(""),
+    /** Whether the value beside it is the real one. Absent on a plain variable,
+     *  and false on one they would not decrypt for this token - where `value` is
+     *  ciphertext rather than nothing, which is the one shape that would
+     *  otherwise be copied somewhere else as if it were a password. */
+    decrypted: z.boolean().nullable().default(null),
+    target: z.union([z.array(z.string()), z.string()]).nullable().default(null)
+});
+
+/**
+ * The variables a project builds and runs with.
+ *
+ * Asked for decrypted, which their API does for a token that is allowed to -
+ * and quietly does not for the ones marked sensitive, which come back with no
+ * value at all. Those are left out rather than carried across as an empty
+ * string: a variable that silently became "" is worse than one that is missing
+ * and said so.
+ *
+ * `system` is theirs - VERCEL_URL and the rest - and is never anybody's to copy.
+ */
+export async function vercelProjectEnv(
+    token: string,
+    project: string,
+    input: { team?: string | null; target?: string } = {}
+): Promise<Record<string, string>> {
+    const query = new URLSearchParams({ decrypt: "true" });
+    if (input.team) query.set("teamId", input.team);
+    const parsed = z
+        .object({ envs: z.array(envSchema).default([]) })
+        .safeParse(await call(token, `/v10/projects/${encodeURIComponent(project)}/env?${query.toString()}`));
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+
+    const want = input.target ?? "production";
+    const found: Record<string, string> = {};
+    for (const row of parsed.data.envs) {
+        if (!row.key || row.type === "system") continue;
+        if (typeof row.value !== "string" || row.value === "") continue;
+        // Their ciphertext, which is what an encrypted row carries when the token
+        // was not allowed to decrypt it. Copying that anywhere would be writing a
+        // password that is not the password.
+        if (row.decrypted === false) continue;
+        const targets = Array.isArray(row.target) ? row.target : row.target ? [row.target] : [];
+        // A variable with no target named at all applies everywhere, which is
+        // what their older rows look like.
+        if (targets.length > 0 && !targets.includes(want)) continue;
+        found[row.key] = row.value;
+    }
+    return found;
+}
+
+/**
+ * Put variables on a project, replacing any of the same name.
+ *
+ * Sent as one request with `upsert`, which is the difference between moving a
+ * service and moving a service twice: without it their API refuses every key
+ * that already exists, and half a copied set is worse than none.
+ *
+ * Encrypted, because that is what a variable being moved from somewhere else
+ * deserves by default, and because it is what their dashboard writes.
+ */
+export async function vercelSetEnv(
+    token: string,
+    project: string,
+    values: Readonly<Record<string, string>>,
+    input: { team?: string | null; target?: string } = {}
+): Promise<void> {
+    const entries = Object.entries(values);
+    if (entries.length === 0) return;
+    const query = new URLSearchParams({ upsert: "true" });
+    if (input.team) query.set("teamId", input.team);
+    await call(token, `/v10/projects/${encodeURIComponent(project)}/env?${query.toString()}`, {
+        method: "POST",
+        body: JSON.stringify(
+            entries.map(([key, value]) => ({
+                key,
+                value,
+                type: "encrypted",
+                target: [input.target ?? "production"]
+            }))
+        )
+    });
 }
 
 /**

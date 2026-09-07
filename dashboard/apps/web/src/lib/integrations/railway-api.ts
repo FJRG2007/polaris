@@ -221,6 +221,86 @@ export async function railwayDeployments(
 }
 
 /**
+ * The variables one service runs with.
+ *
+ * Their `variables` query answers with a plain object of name to value rather
+ * than a list of rows, which is why nothing here has a schema of its own: what
+ * comes back is checked to be an object of strings and taken as it is.
+ *
+ * Only what is worth carrying somewhere else. Railway's own - the ones it sets
+ * for a service, and the `${{...}}` references that only mean something inside
+ * their project - are left where they are: a reference copied out of Railway is
+ * a literal string of punctuation anywhere else.
+ */
+export async function railwayVariables(
+    token: string,
+    input: { project: string; service: string; environment: string }
+): Promise<Record<string, string>> {
+    const answer = await query(
+        token,
+        `query variables($projectId: String!, $environmentId: String!, $serviceId: String!) {
+            variables(projectId: $projectId, environmentId: $environmentId, serviceId: $serviceId)
+        }`,
+        {
+            projectId: input.project,
+            environmentId: input.environment,
+            serviceId: input.service
+        }
+    );
+    const parsed = z
+        .object({ variables: z.record(z.string(), z.string()).default({}) })
+        .safeParse(answer);
+    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+
+    const found: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed.data.variables)) {
+        if (key.startsWith("RAILWAY_")) continue;
+        if (value.includes("${{")) continue;
+        found[key] = value;
+    }
+    return found;
+}
+
+/**
+ * Put variables on one service, replacing any of the same name.
+ *
+ * Never `replace`, which would delete everything not named here: this is asked
+ * for by a move that brings a set of variables from somewhere else, and a move
+ * that also quietly removed whatever Railway had would be a move nobody could
+ * undo.
+ *
+ * A deploy is skipped, because the caller does that itself once everything is in
+ * place - otherwise a service with thirty variables would build thirty times.
+ */
+export async function railwaySetVariables(
+    token: string,
+    input: {
+        project: string;
+        service: string;
+        environment: string;
+        variables: Readonly<Record<string, string>>;
+    }
+): Promise<void> {
+    if (Object.keys(input.variables).length === 0) return;
+    await query(
+        token,
+        `mutation variableCollectionUpsert($input: VariableCollectionUpsertInput!) {
+            variableCollectionUpsert(input: $input)
+        }`,
+        {
+            input: {
+                projectId: input.project,
+                environmentId: input.environment,
+                serviceId: input.service,
+                variables: input.variables,
+                replace: false,
+                skipDeploys: true
+            }
+        }
+    );
+}
+
+/**
  * Build and release one service again.
  *
  * Their own words for it: a service instance in an environment is deployed. What

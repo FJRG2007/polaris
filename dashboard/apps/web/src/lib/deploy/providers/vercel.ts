@@ -14,7 +14,8 @@ import {
     type ExternalState,
     type ExternalStatus,
     type ProviderChoice,
-    type ProviderDriver
+    type ProviderDriver,
+    type ServiceSource
 } from "@/lib/deploy/providers/contract";
 
 export const VERCEL = "vercel";
@@ -119,6 +120,47 @@ export const vercelDriver: ProviderDriver = {
                 metaOf(last.meta, "bitbucketCommitMessage"),
             error: last.errorMessage
         } satisfies ExternalState;
+    },
+
+    /**
+     * The repository behind the project.
+     *
+     * Read from the project itself rather than from its last deployment: a
+     * project that has never built still has a repository connected to it, and
+     * that is exactly the project somebody is most likely to be moving.
+     *
+     * Only a git host Polaris can build an address for gets one. Their `link`
+     * says which it is, and inventing `https://<something>/<org>/<repo>` for a
+     * host nobody named would be a clone command that fails at the far end.
+     */
+    async source(token, externalId, ref) {
+        const project = await speaking(() => vercel.vercelProject(token, externalId, ref.team ?? null));
+        const link = project.link;
+        if (!link?.org || !link.repo) return null;
+        const repo = `${link.org}/${link.repo}`;
+        const hosts: Readonly<Record<string, string>> = {
+            github: "https://github.com",
+            gitlab: "https://gitlab.com",
+            bitbucket: "https://bitbucket.org"
+        };
+        const host = hosts[link.type] ?? "";
+        return {
+            repo,
+            branch: link.productionBranch ?? "",
+            url: host ? `${host}/${repo}.git` : ""
+        } satisfies ServiceSource;
+    },
+
+    async variables(token, externalId, ref) {
+        return speaking(() =>
+            vercel.vercelProjectEnv(token, externalId, { team: ref.team ?? null, target: "production" })
+        );
+    },
+
+    async putVariables(token, externalId, ref, values) {
+        await speaking(() =>
+            vercel.vercelSetEnv(token, externalId, values, { team: ref.team ?? null, target: "production" })
+        );
     },
 
     /**

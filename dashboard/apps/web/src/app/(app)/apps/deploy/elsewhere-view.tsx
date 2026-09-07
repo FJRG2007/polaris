@@ -28,7 +28,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import type { ExternalServiceView } from "@/lib/deploy/external-services";
-import { ExternalLink, Loader2, Plus, RefreshCw, RotateCw, Trash2 } from "lucide-react";
+import { ExternalLink, HardDriveDownload, Loader2, Plus, RefreshCw, RotateCw, Trash2 } from "lucide-react";
+import { MoveHomeDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import {
     Badge,
     Button,
@@ -103,6 +104,7 @@ export function ElsewhereView({
     const [services, setServices] = useState(initial);
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<ExternalServiceView | null>(null);
+    const [bringing, setBringing] = useState<ExternalServiceView | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState("");
 
@@ -169,7 +171,9 @@ export function ElsewhereView({
                     <h1 className="text-[1.0625rem] font-semibold tracking-tight">Elsewhere</h1>
                     <p className="text-sm text-muted-foreground">
                         Services in this project that Vercel or Railway builds and serves. Polaris
-                        watches them and can release them again.
+                        watches them and can release them again - and a service can be moved either
+                        way: one of these onto a Polaris server, or one of your own services out to
+                        a provider, from its own Settings.
                     </p>
                 </div>
                 {canAdd && accounts.length > 0 && (
@@ -304,6 +308,17 @@ export function ElsewhereView({
                                         Deploy
                                     </Button>
                                 )}
+                                {canAdd && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`Run ${service.name} on a Polaris server instead`}
+                                        title="Run it on a Polaris server"
+                                        onClick={() => setBringing(service)}
+                                    >
+                                        <HardDriveDownload className="size-4 shrink-0" />
+                                    </Button>
+                                )}
                                 {canRemove && (
                                     <Button
                                         size="sm"
@@ -332,6 +347,16 @@ export function ElsewhereView({
                         setAdding(false);
                         router.refresh();
                     }}
+                />
+            )}
+
+            {bringing && (
+                <MoveHomeDialog
+                    projectId={projectId}
+                    service={bringing}
+                    environments={environments}
+                    onClose={() => setBringing(null)}
+                    onMoved={() => router.refresh()}
                 />
             )}
 

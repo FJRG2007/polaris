@@ -140,6 +140,39 @@ export const railwayDriver: ProviderDriver = {
         } satisfies ExternalState;
     },
 
+    /**
+     * Nothing, always.
+     *
+     * Railway's public API has a mutation for connecting a service to a
+     * repository and no documented way to read back the one it is already
+     * connected to. Guessing at an undocumented field would be worse than this:
+     * the move asks for the repository instead, which is one line somebody can
+     * read off their own dashboard, and a wrong guess would be a service built
+     * from the wrong code.
+     */
+    async source() {
+        return null;
+    },
+
+    async variables(token, externalId, ref) {
+        const { service, environment } = addressOf(ref);
+        return speaking(() =>
+            railway.railwayVariables(token, { project: externalId, service, environment })
+        );
+    },
+
+    async putVariables(token, externalId, ref, values) {
+        const { service, environment } = addressOf(ref);
+        await speaking(() =>
+            railway.railwaySetVariables(token, {
+                project: externalId,
+                service,
+                environment,
+                variables: values
+            })
+        );
+    },
+
     async deploy(token, _externalId, ref) {
         const address = addressOf(ref);
         await speaking(() => railway.railwayDeploy(token, address));
