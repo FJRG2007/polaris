@@ -57,6 +57,14 @@ vi.mock("@/lib/call-sounds", () => ({
     startRinging: () => () => undefined
 }));
 
+/** Where this account's seat is, as the server would answer. Null is the usual
+ *  case - nobody has picked the call up anywhere. */
+let seatElsewhere: { meetingId: string } | null = null;
+
+vi.mock("@/app/(app)/chat/meeting-actions", () => ({
+    callElsewhereAction: async () => seatElsewhere
+}));
+
 /** A call coming in, as the stream announces one. */
 const ring = (meetingId: string) => ({
     kind: "call",
@@ -73,6 +81,7 @@ beforeEach(() => {
     onPeer = null;
     posted = [];
     session = null;
+    seatElsewhere = null;
 });
 
 afterEach(() => {
@@ -115,6 +124,22 @@ describe("a call ringing in several tabs", () => {
 
         expect(posted).toEqual([{ kind: "settled", meetingId: "m1" }]);
         await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull());
+    });
+
+    it("stops when the account has already answered on another device", async () => {
+        // The frame that says so is announced and usually arrives. What it does
+        // not survive is not arriving - a phone with its screen off has a stream
+        // the operating system suspended, and it wakes up ringing about a call
+        // answered on the desk five minutes ago. So it is asked as well.
+        render(<IncomingCalls viewerId="ada" />);
+        onFrame?.(ring("m1"), { owner: true });
+        expect(await screen.findByText("Grace is calling")).toBeTruthy();
+
+        seatElsewhere = { meetingId: "m1" };
+
+        await vi.waitFor(() => expect(screen.queryByText("Grace is calling")).toBeNull(), {
+            timeout: 8_000
+        });
     });
 
     it("tells the others when the call was answered anywhere in Polaris", async () => {

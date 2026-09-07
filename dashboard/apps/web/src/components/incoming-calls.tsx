@@ -29,10 +29,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import { claimForDevice } from "@/lib/device-once";
 import { ringDecision } from "@/lib/chat/ring-decision";
+import { callElsewhereAction } from "@/app/(app)/chat/meeting-actions";
 import { notifyDesktop, tabIsWatched } from "@/lib/desktop-notify";
 import { openPeerChannel, type PeerChannel } from "@/lib/shared-stream";
 import { RING_FOR_MS, playCallSound, startRinging } from "@/lib/call-sounds";
 import { CALLS_CHANNEL, callTabMessageSchema, type CallTabMessage } from "@/lib/chat/call-tabs";
+
+/** How often a ringing telephone checks whether it was answered somewhere else.
+ *  Only ever while one is ringing, so it costs nothing the rest of the time. */
+const SEAT_CHECK_MS = 4_000;
 
 interface Ringing {
     readonly channelId: string;
@@ -101,6 +106,45 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useEffect(() => {
         if (inCall) settle(inCall);
     }, [inCall, settle]);
+
+    /**
+     * Answered on another device, asked rather than waited for.
+     *
+     * There is a frame that says so - joining announces itself, carrying who
+     * joined - and while everything is well it arrives and this costs nothing.
+     * What it does not survive is not arriving: a phone with its screen off has
+     * a stream the operating system has suspended, and it wakes up ringing about
+     * a call that was answered on the desk five minutes ago. That is the thing
+     * everybody notices about a house with more than one telephone, and it is
+     * not something to leave to a message.
+     *
+     * So while anything is ringing, and only then, the account is asked where
+     * its seat is. On a timer and again the moment the tab comes back, which is
+     * exactly when somebody is looking at the phone that should have stopped.
+     */
+    useEffect(() => {
+        if (ringing.length === 0) return;
+        let stopped = false;
+
+        async function ask(): Promise<void> {
+            const elsewhere = await callElsewhereAction().catch(() => null);
+            if (stopped || !elsewhere) return;
+            settle(elsewhere.meetingId);
+        }
+
+        function onVisible(): void {
+            if (document.visibilityState === "visible") void ask();
+        }
+
+        void ask();
+        const timer = setInterval(() => void ask(), SEAT_CHECK_MS);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, [ringing.length, settle]);
 
     useChatStream(
         useCallback(
