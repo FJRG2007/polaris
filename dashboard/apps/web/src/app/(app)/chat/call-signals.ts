@@ -17,7 +17,14 @@
  * rest of the call, and would make two of the same in a row indistinguishable
  * from one.
  *
- * Pure, so both rules can be checked without a call server.
+ * **Lowering somebody else's hand is neither.** It cannot be a state, because a
+ * browser may only write its own attributes, and it is not an event about the
+ * person sending it - so it is the one thing here that is a request: the chair
+ * asks, and the browser holding the hand does the writing. Which makes who asked
+ * the whole of the safety, checked where it arrives rather than where it is
+ * offered - see `use-sfu-call`.
+ *
+ * Pure, so all three rules can be checked without a call server.
  */
 
 import { z } from "zod";
@@ -69,10 +76,28 @@ export const REACTION_FOR_MS = 3_000;
  * else's browser, and the fact that they are in the same call as us makes it no
  * more trustworthy than a form post.
  */
-export const callSignalSchema = z.object({
-    kind: z.literal("reaction"),
-    reaction: z.enum(REACTIONS)
-});
+export const callSignalSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("reaction"),
+        reaction: z.enum(REACTIONS)
+    }),
+    /**
+     * Put that hand down.
+     *
+     * The one thing here that is asked of somebody else's browser rather than
+     * said about this one, and the reason it can be: a hand rides in an
+     * attribute, and a browser may only write its own. So the chair cannot lower
+     * anybody's hand directly - they ask, and the browser holding the hand does
+     * the writing.
+     *
+     * Which makes who is asking the whole of the safety, and it is checked on
+     * arrival: honoured from the seat the meeting says is its host and dropped
+     * from everybody else. Sharing a call with somebody is not permission to
+     * reach into their controls, and without that check a call of twenty is
+     * twenty people who can each silence a raised hand.
+     */
+    z.object({ kind: z.literal("lower-hand") })
+]);
 
 export type CallSignal = z.infer<typeof callSignalSchema>;
 
@@ -123,4 +148,47 @@ export function handQueue(people: readonly HandFacts[]): string[] {
         .filter((person) => person.hand)
         .sort((left, right) => left.handAt - right.handAt || left.id.localeCompare(right.id))
         .map((person) => person.id);
+}
+
+/**
+ * Where each raised hand stands, counting from one.
+ *
+ * The queue was worked out and then never shown, which is most of why raising a
+ * hand did not work here: the order existed, the number nobody could see did
+ * not, and a hand drawn as a twelve-pixel icon beside five other twelve-pixel
+ * icons is a hand nobody notices at all - let alone knows they are third in.
+ *
+ * A map rather than a search per face: a grid of twenty tiles asking a list of
+ * twenty for its own position is four hundred comparisons a render, on the one
+ * screen in the product that is already redrawing every time somebody speaks.
+ */
+export function handPlaces(queue: readonly string[]): ReadonlyMap<string, number> {
+    return new Map(queue.map((id, index) => [id, index + 1]));
+}
+
+/** One person in the queue, as the strip needs them. */
+export interface HandInQueue {
+    readonly id: string;
+    readonly name: string;
+    /** Whether this is the reader's own hand, which is said as "yours" rather
+     *  than by name - nobody reads their own name in a list of three and
+     *  recognises it faster than the word. */
+    readonly own: boolean;
+}
+
+/**
+ * What the strip says above the faces.
+ *
+ * One hand is a sentence about a person, because that is what it is: somebody
+ * wants to speak and the only thing worth saying is who. Several is a count and
+ * then the queue itself, drawn beside this, because at three the question stops
+ * being "who" and becomes "who is next".
+ */
+export function handsSummary(hands: readonly HandInQueue[]): string {
+    if (hands.length === 0) return "";
+    if (hands.length === 1) {
+        const only = hands[0];
+        return only?.own ? "Your hand is up" : `${only?.name} has their hand up`;
+    }
+    return `${hands.length} hands are up`;
 }

@@ -33,7 +33,16 @@ const preset: Omit<Config, "content"> = {
                 primary: { DEFAULT: withAlpha("primary"), foreground: withAlpha("primary-foreground") },
                 accent: { DEFAULT: withAlpha("accent"), foreground: withAlpha("accent-foreground") },
                 success: withAlpha("success"),
-                warning: withAlpha("warning"),
+                warning: {
+                    DEFAULT: withAlpha("warning"),
+                    // Amber is a light colour in every theme here, so what is
+                    // written on it is dark in every theme here. It had no ink of
+                    // its own until something was actually filled with it: a
+                    // raised hand, which is a warning colour used as a surface
+                    // rather than as a line, and `text-background` on it is white
+                    // on amber the moment the reader is not in the dark theme.
+                    foreground: withAlpha("warning-foreground")
+                },
                 danger: { DEFAULT: withAlpha("danger"), foreground: withAlpha("danger-foreground") }
             },
             // 4/6/8/12px. Anything rounder starts to read as a toy rather than an

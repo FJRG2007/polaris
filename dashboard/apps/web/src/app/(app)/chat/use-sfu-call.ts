@@ -52,6 +52,7 @@ import {
     REACTION_FOR_MS,
     callSignalSchema,
     handQueue,
+    type CallSignal,
     type Reaction,
     type ShownReaction
 } from "./call-signals";
@@ -339,8 +340,54 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** When this browser's own hand went up, so its place in the queue is the
      *  same one everybody else computes for it. */
     const handUpAt = useRef(0);
+    /**
+     * The seat the host is sitting in, which is not the same thing as their
+     * account.
+     *
+     * A call is addressed by seat: the media server knows identities it handed
+     * out for this meeting and nothing about who owns them. The meeting knows the
+     * other half, so the two are joined once here - and this is what a request
+     * arriving over the wire is checked against, in a ref rather than in the
+     * dependencies of the room's listeners, which are set up once and must not be
+     * rebuilt every time somebody's name changes.
+     */
+    const hostSeat = useRef<string | null>(null);
+    /**
+     * Lower this browser's own hand, reachable from the data handler that is set
+     * up long before the control which does it exists.
+     *
+     * The same shape as `reopen` further down, and for the same reason: the
+     * room's listeners are attached once, and reaching forwards through a ref is
+     * what keeps them from being torn down and rebuilt every time a hand moves.
+     */
+    const putHandDown = useRef<(() => void) | null>(null);
     /** Reactions on screen, each swept a few seconds after it arrived. */
     const [reactions, setReactions] = useState<readonly ShownReaction[]>([]);
+    useEffect(() => {
+        hostSeat.current =
+            meeting?.participants.find(
+                (person) => person.userId !== null && person.userId === meeting.hostId
+            )?.id ?? null;
+    }, [meeting]);
+    /**
+     * Whether the reader is the one chairing this call, which is what a queue of
+     * hands is actually for.
+     *
+     * Read from the meeting rather than from the ref above, though they say the
+     * same thing: a ref changing schedules no render, so a screen drawn from one
+     * would keep whatever it was told first. The ref is for the listeners, which
+     * are not redrawn; this is for the screen, which is.
+     */
+    const hosting = Boolean(
+        participantId &&
+            meeting &&
+            meeting.participants.some(
+                (person) =>
+                    person.id === participantId &&
+                    person.userId !== null &&
+                    person.userId === meeting.hostId
+            )
+    );
     /**
      * Whether this browser is holding a room nobody else is in.
      *
@@ -1360,6 +1407,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // browser, and sharing a call with us makes it no more trustworthy.
             const signal = callSignalSchema.safeParse(raw);
             if (signal.success) {
+                // The chair asking for a hand to come down. A hand rides in an
+                // attribute and a browser may only write its own, so this is a
+                // request rather than an instruction - and who is making it is
+                // the whole of the safety, which is why it is honoured from the
+                // host's seat and dropped from every other one.
+                if (signal.data.kind === "lower-hand") {
+                    if (participant.identity === hostSeat.current) putHandDown.current?.();
+                    return;
+                }
                 show({
                     id: `${participant.identity}:${Date.now()}:${Math.random()}`,
                     from: participant.identity,
@@ -1576,9 +1632,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         playCallSound(name);
     }, []);
 
-    /** Say something to one person in the call and to nobody else. Only ever the
-     *  two things that cannot be read off an attribute - see `call-combine`. */
-    const tell = useCallback((participantId: string, message: CombineMessage) => {
+    /** Say something to one person in the call and to nobody else: the two things
+     *  that cannot be read off an attribute - see `call-combine` - and the one
+     *  thing that can only be asked of the browser holding it. */
+    const tell = useCallback((participantId: string, message: CombineMessage | CallSignal) => {
         const local = room.current?.localParticipant;
         if (!local) return;
         void local
@@ -1732,6 +1789,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         [say]
     );
 
+    useEffect(() => {
+        putHandDown.current = () => setHandRaised(false);
+    }, [setHandRaised]);
+
+    /**
+     * Ask for a hand to come down.
+     *
+     * Your own is simply lowered - it is this browser's attribute and nobody
+     * else's business. Somebody else's is asked for, because it is theirs to
+     * write and the call server would refuse anything else: their browser hears
+     * the request, checks it came from the chair, and lowers it. Offered only to
+     * the host on screen, and checked again on arrival - an offer withheld is a
+     * courtesy, not a permission.
+     */
+    const lowerHand = useCallback(
+        (seat: string) => {
+            if (seat === me.current) {
+                setHandRaised(false);
+                return;
+            }
+            tell(seat, { kind: "lower-hand" });
+        },
+        [setHandRaised, tell]
+    );
+
     /**
      * Say something without saying it.
      *
@@ -1774,6 +1856,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             ]),
         [handRaised, participantId, states]
     );
+
+    /**
+     * A chime when somebody puts a hand up, for the person chairing.
+     *
+     * Only for them, and that is the whole design: a hand is raised at the chair,
+     * and a room of twenty that all chimed at each other would be twenty people
+     * learning to ignore the sound by the third one. It is the same reason the
+     * host is who gets the button to lower one.
+     *
+     * Sounded from the queue rather than from an arriving attribute, so a hand
+     * that was already up when this browser walked in is not announced as if it
+     * had just gone up - the seats already seen are remembered, and only a seat
+     * that was not there before is new.
+     */
+    const handsHeard = useRef<ReadonlySet<string> | null>(null);
+    useEffect(() => {
+        const now = new Set(hands);
+        const before = handsHeard.current;
+        handsHeard.current = now;
+        // Nothing on the first pass: everything is new to a browser that has just
+        // arrived, and none of it happened while it was watching.
+        if (before === null) return;
+        if (!hosting) return;
+        if (hands.some((seat) => seat !== me.current && !before.has(seat))) sound("handUp");
+    }, [hands, hosting, sound]);
 
     /** The device swap, reachable from the controls above where it is declared.
      *  Reopening a track that has ended is the same operation as picking a
@@ -2739,6 +2846,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         handRaised,
         setHandRaised,
         hands,
+        lowerHand,
+        hosting,
         reactions,
         react,
         audio,

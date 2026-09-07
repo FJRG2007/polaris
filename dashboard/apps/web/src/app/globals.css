@@ -530,10 +530,64 @@ dialog.pdfSlick-dialog .dialogButton {
     color: var(--plate-ink-soft);
 }
 
+/*
+ * A hand going up in a call.
+ *
+ * The one animation here that is not decoration. A raised hand is somebody
+ * asking to speak, and it appears on a screen whose whole job is faces moving -
+ * a badge that simply materialised among them is a badge the eye never catches.
+ * The movement is what makes it a gesture rather than another status light.
+ *
+ * One pass and done, unlike the ornaments above: it plays when the badge mounts,
+ * which is the moment the hand went up, and a hand that kept waving for the four
+ * minutes it stays up would be unreadable next to the person's face. Rises,
+ * overshoots once, waves twice and settles level - so the frame it stops on is
+ * the frame it holds for the rest of the call.
+ *
+ * Every keyframe writes the same three functions in the same order. A transform
+ * list that changes shape between frames is interpolated as a whole rather than
+ * per function, which is a visible jump in the middle of a 700ms animation.
+ */
+@keyframes polaris-hand-up {
+    0% {
+        transform: translateY(0.4rem) scale(0.8) rotate(0deg);
+        opacity: 0;
+    }
+    40% {
+        transform: translateY(0) scale(1.08) rotate(0deg);
+        opacity: 1;
+    }
+    60% {
+        transform: translateY(0) scale(1) rotate(-14deg);
+        opacity: 1;
+    }
+    80% {
+        transform: translateY(0) scale(1) rotate(10deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(0) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+.call-hand-up {
+    animation: polaris-hand-up 700ms ease-out;
+    /* Pivoting at the wrist rather than at the middle of the badge, which is
+       what makes the wave read as a hand and not as a wobbling label. */
+    transform-origin: 30% 80%;
+}
+
 /* Nothing moves for somebody who asked their machine for less of it. The plate
-   still appears - it is information, not decoration - it simply arrives. */
+   still appears - it is information, not decoration - it simply arrives. The
+   hand is the same: it is somebody asking to speak, so it is still drawn, still
+   in its own colour, still numbered. It just does not wave. */
 @media (prefers-reduced-motion: reduce) {
     .plate-on-active {
         transition: none;
+    }
+
+    .call-hand-up {
+        animation: none;
     }
 }

@@ -15,9 +15,11 @@ import {
     HAND,
     HAND_AT,
     callSignalSchema,
+    handPlaces,
     handQueue,
     handRaised,
-    handRaisedAt
+    handRaisedAt,
+    handsSummary
 } from "@/app/(app)/chat/call-signals";
 
 describe("a raised hand", () => {
@@ -66,6 +68,54 @@ describe("the queue of hands", () => {
             { id: "zoe", hand: true, handAt: 100 }
         ]);
         expect(one).toEqual(two);
+    });
+});
+
+describe("what the queue is drawn as", () => {
+    it("numbers every hand from one, in the order they went up", () => {
+        const places = handPlaces(["ada", "bo", "cy"]);
+        expect(places.get("ada")).toBe(1);
+        expect(places.get("bo")).toBe(2);
+        expect(places.get("cy")).toBe(3);
+    });
+
+    it("knows nothing about a hand that is down", () => {
+        expect(handPlaces(["ada"]).get("bo")).toBeUndefined();
+    });
+
+    it("says who, while who is still the question", () => {
+        // One hand is a person asking to speak, and the only thing worth saying
+        // about it is their name.
+        expect(handsSummary([{ id: "a", name: "Ada", own: false }])).toBe("Ada has their hand up");
+        expect(handsSummary([{ id: "a", name: "Ada", own: true }])).toBe("Your hand is up");
+    });
+
+    it("counts once who stops being the question and next starts", () => {
+        expect(
+            handsSummary([
+                { id: "a", name: "Ada", own: false },
+                { id: "b", name: "Bo", own: true }
+            ])
+        ).toBe("2 hands are up");
+    });
+
+    it("says nothing at all when nobody has asked", () => {
+        expect(handsSummary([])).toBe("");
+    });
+});
+
+describe("being asked to lower a hand", () => {
+    it("is a message, because a browser may only write its own attributes", () => {
+        expect(callSignalSchema.safeParse({ kind: "lower-hand" }).success).toBe(true);
+    });
+
+    it("carries nothing, so there is nothing to aim it with", () => {
+        // Who it is about is who received it, and who may ask is who sent it -
+        // both read off the connection rather than off the body, where somebody
+        // else's browser could write them. See `use-sfu-call`, which drops one
+        // that did not come from the host's seat.
+        const parsed = callSignalSchema.safeParse({ kind: "lower-hand", participantId: "someone" });
+        expect(parsed.success && parsed.data).toEqual({ kind: "lower-hand" });
     });
 });
 

@@ -49,6 +49,7 @@ import {
     REACTIONS,
     REACTION_GLYPHS,
     REACTION_LABELS,
+    handPlaces,
     type Reaction,
     type ShownReaction
 } from "./call-signals";
@@ -58,6 +59,7 @@ import { useSpeakers } from "./speaker-device";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { stagesOf, stagingOf } from "./call-media";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
+import { HandStrip } from "./call-hands-panel";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     CAMERA_LADDER,
@@ -218,6 +220,14 @@ export function CallRoom({
         personId ? call.reactions.filter((shown) => shown.from === personId) : [];
 
     const columns = gridColumns((admitted?.length ?? 1) || 1);
+    /** Where each raised hand stands in the queue, so a tile can carry its own
+     *  number. Built once for the room: twenty faces each searching a list of
+     *  twenty is four hundred comparisons on the screen that redraws whenever
+     *  somebody draws breath. */
+    const places = handPlaces(call.hands);
+    /** Whether a number is worth drawing at all. A lone "1" beside a hand says
+     *  nothing that the hand did not already say. */
+    const queued = call.hands.length > 1;
 
     /** Where this browser plays the call. Empty on a browser that cannot be told,
      *  which is what leaves the picker undrawn rather than drawn and ignored. */
@@ -379,6 +389,11 @@ export function CallRoom({
 
             <CombineStrip call={call} />
 
+            {/* Who has asked to speak, and in what order. Here rather than only
+                on the faces because a hand raised in a grid of eight thumbnails
+                is a hand nobody sees - see `call-hands-panel`. */}
+            <HandStrip call={call} />
+
             {waiting && waiting.length > 0 && (
                 <ul className="flex flex-col gap-1">
                     {waiting.map((person) => (
@@ -458,6 +473,12 @@ export function CallRoom({
                             cameraOff={!call.cameraOn}
                             muted={!call.micOn}
                             deafened={call.deafened}
+                            hand={call.handRaised}
+                            handPlace={
+                                queued && call.participantId
+                                    ? (places.get(call.participantId) ?? null)
+                                    : null
+                            }
                         />
                     ) : (
                         (() => {
@@ -476,6 +497,7 @@ export function CallRoom({
                                     speaking={call.speaking.has(personId)}
                                     recording={call.states.get(personId)?.recording}
                                     hand={call.states.get(personId)?.hand}
+                                    handPlace={queued ? (places.get(personId) ?? null) : null}
                                     reactions={reactionsFor(personId)}
                                     volumeKey={person?.userId ?? personId}
                                     {...combining(personId)}
@@ -527,6 +549,11 @@ export function CallRoom({
                         deafened={call.deafened}
                         recording={call.recording}
                         hand={call.handRaised}
+                        handPlace={
+                            queued && call.participantId
+                                ? (places.get(call.participantId) ?? null)
+                                : null
+                        }
                         reactions={reactionsFor(call.participantId)}
                         sameRoom={call.audioRole !== null}
                         focused={live === `camera:${call.participantId}`}
@@ -550,6 +577,7 @@ export function CallRoom({
                                 deafened={call.states.get(person.id)?.deafened}
                                 recording={call.states.get(person.id)?.recording}
                                 hand={call.states.get(person.id)?.hand}
+                                handPlace={queued ? (places.get(person.id) ?? null) : null}
                                 reactions={reactionsFor(person.id)}
                                 focused={live === `camera:${person.id}`}
                                 onFocus={() => focus(`camera:${person.id}`)}
@@ -672,10 +700,27 @@ export function CallRoom({
                     variant={call.handRaised ? "primary" : "secondary"}
                     aria-pressed={call.handRaised}
                     aria-label={call.handRaised ? "Lower your hand" : "Raise your hand"}
-                    title={call.handRaised ? "Lower your hand" : "Raise your hand"}
+                    title={
+                        call.hands.length > 0
+                            ? `${call.hands.length} ${call.hands.length === 1 ? "hand is" : "hands are"} up. ${call.handRaised ? "Lower yours" : "Raise yours"}`
+                            : "Raise your hand"
+                    }
                     onClick={() => call.setHandRaised(!call.handRaised)}
+                    className="relative"
                 >
                     <Hand className="size-4" />
+                    {/* How many are up, on the button that is about hands. The
+                        strip above says who; this says there is something up
+                        there to read, from the bar somebody's eyes are already
+                        on. */}
+                    {call.hands.length > 0 && (
+                        <span
+                            aria-hidden
+                            className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-warning text-[0.625rem] font-semibold text-warning-foreground"
+                        >
+                            {call.hands.length}
+                        </span>
+                    )}
                 </Button>
 
                 <ReactionMenu onReact={call.react} />
@@ -1033,6 +1078,7 @@ function Tile({
     sameRoom = false,
     recording = false,
     hand = false,
+    handPlace = null,
     reactions = [],
     focused = false,
     onFocus,
@@ -1077,6 +1123,9 @@ function Tile({
     /** Whether their hand is up. Drawn on the picture rather than only in a
      *  list, because the point of raising one is to be seen. */
     hand?: boolean;
+    /** Where they stand in the queue of raised hands, counting from one, or null
+     *  when there is only one hand up and a number would say nothing. */
+    handPlace?: number | null;
     /** What they have reacted with in the last few seconds. Over the picture and
      *  gone again - see `call-signals`. */
     reactions?: readonly ShownReaction[];
@@ -1229,7 +1278,16 @@ function Tile({
                 // Two rings rather than a thicker one: a border that appears and
                 // disappears would move everything inside the tile by two pixels
                 // every time somebody drew breath.
-                speaking ? "ring-2 ring-success" : "ring-border",
+                // Talking wins the ring, because it is about this second and a
+                // hand is about the next minute - and the badge below says the
+                // hand loudly enough on its own. Otherwise a raised hand takes
+                // it: across a grid of eight faces the ring is what the eye
+                // actually finds.
+                speaking
+                    ? "ring-2 ring-success"
+                    : hand
+                      ? "ring-2 ring-warning"
+                      : "ring-border",
                 zoomable && look.zoomed && "cursor-grab active:cursor-grabbing"
             )}
         >
@@ -1307,6 +1365,26 @@ function Tile({
                     ))}
                 </span>
             )}
+            {hand && (
+                // A badge on the picture rather than a twelve-pixel icon in the
+                // name plate, which is where this was and where nobody saw it:
+                // beside up to five other icons of the same size and colour, at
+                // a ninth of a window, a raised hand read as another status
+                // light. It is the one thing on a tile that is a person asking
+                // for something, so it is the one thing drawn away from the rest
+                // - top left, in the colour nothing else here uses, carrying its
+                // place in the queue when there is a queue to be in.
+                //
+                // `pointer-events-none` so it never eats the press that makes a
+                // tile the big one.
+                <span
+                    className="call-hand-up pointer-events-none absolute left-1 top-1 flex items-center gap-1 rounded-full bg-warning py-0.5 pl-1 pr-1.5 text-[0.6875rem] font-semibold text-warning-foreground shadow-sm"
+                    aria-label={handPlace ? `Hand up, ${handPlace} in the queue` : "Hand up"}
+                >
+                    <Hand className="size-3.5 shrink-0" />
+                    {handPlace !== null && <span>{handPlace}</span>}
+                </span>
+            )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {name}
                 {guest && <span className="text-muted-foreground">guest</span>}
@@ -1328,9 +1406,6 @@ function Tile({
                         className="size-3 text-primary"
                         aria-label="Sharing a room's microphone"
                     />
-                )}
-                {hand && (
-                    <Hand className="size-3 text-primary" aria-label="Hand up" />
                 )}
                 {recording && (
                     <Circle

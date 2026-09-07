@@ -67,6 +67,7 @@
     /* Status. */
     --success: 152 52% 44%;
     --warning: 38 88% 54%;
+    --warning-foreground: 36 60% 10%;
     --danger: 356 68% 57%;
     --danger-foreground: 0 0% 100%;
 
@@ -118,6 +119,7 @@
 
     --success: 152 50% 34%;
     --warning: 34 88% 44%;
+    --warning-foreground: 36 60% 10%;
     --danger: 356 64% 48%;
     --danger-foreground: 0 0% 100%;
 
@@ -161,6 +163,7 @@
 
         --success: 152 50% 34%;
         --warning: 34 88% 44%;
+        --warning-foreground: 36 60% 10%;
         --danger: 356 64% 48%;
         --danger-foreground: 0 0% 100%;
 
