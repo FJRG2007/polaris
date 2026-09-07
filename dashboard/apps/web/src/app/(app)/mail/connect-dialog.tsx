@@ -21,6 +21,7 @@
  * filling the form in with the wrong servers.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { refusalOf } from "@/app/(app)/mail/refusal";
@@ -65,11 +66,18 @@ export function isMailAddress(value: string): boolean {
 export function ConnectMailboxDialog({
     links,
     googleReady,
+    publicAddress,
+    canSetDomain,
     microsoftReady,
     onClose
 }: {
     links: readonly LinkedAccount[];
     googleReady: boolean;
+    /** Whether this dashboard has an address a provider could return somebody
+     *  to. Without one the authorize button is a dead end, so it is not drawn. */
+    publicAddress: boolean;
+    /** Whether the person looking can go and set that address themself. */
+    canSetDomain: boolean;
     microsoftReady: boolean;
     onClose: () => void;
 }) {
@@ -274,6 +282,25 @@ export function ConnectMailboxDialog({
                                 </div>
                             ) : (
                                 <label className="block">
+                                    {/* Why the one-click option is not here. Without
+                                        this the screen simply asks for a password and
+                                        somebody spends an afternoon working out that
+                                        Polaris cannot be returned to. */}
+                                    {discovery.oauth && !publicAddress ? (
+                                        <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
+                                            {discovery.serviceName} could connect this without a password, but
+                                            it has nowhere to send you back to: Polaris is only reachable on
+                                            this network, and an address like that is one they refuse.{" "}
+                                            {canSetDomain ? (
+                                                <Link href="/admin/domains" className="underline">
+                                                    Give Polaris a public address
+                                                </Link>
+                                            ) : (
+                                                "Ask an administrator to give Polaris a public address."
+                                            )}{" "}
+                                            Until then this mailbox takes a password.
+                                        </span>
+                                    ) : null}
                                     <span className="mb-1 block text-[12px] text-muted-foreground">
                                         Password <span aria-hidden>*</span>
                                     </span>

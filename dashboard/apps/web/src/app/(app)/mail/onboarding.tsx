@@ -28,7 +28,7 @@ const PROMISES = [
     {
         icon: ShieldCheck,
         title: "Nothing loads until you say so",
-        body: "Pictures and trackers stay blocked, and a message tells you how many it carried and who they belong to. A sender is never told you opened it."
+        body: "Polaris fetches every picture for you, so a sender learns that a server asked and nothing about you - not your address, not your browser, not when you opened it."
     },
     {
         icon: Eye,
@@ -40,11 +40,15 @@ const PROMISES = [
 export function MailOnboarding({
     links,
     googleReady,
-    microsoftReady
+    microsoftReady,
+    publicAddress,
+    canSetDomain
 }: {
     links: LinkedAccount[];
     googleReady: boolean;
     microsoftReady: boolean;
+    publicAddress: boolean;
+    canSetDomain: boolean;
 }) {
     const [connecting, setConnecting] = useState(false);
 
@@ -85,6 +89,8 @@ export function MailOnboarding({
                         links={links}
                         googleReady={googleReady}
                         microsoftReady={microsoftReady}
+                        publicAddress={publicAddress}
+                        canSetDomain={canSetDomain}
                         onClose={() => setConnecting(false)}
                     />
                 ) : null}

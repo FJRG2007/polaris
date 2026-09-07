@@ -32,6 +32,8 @@ export default async function MailAccountsPage({
             links={options.links}
             googleReady={options.googleReady}
             microsoftReady={options.microsoftReady}
+            publicAddress={options.publicAddress}
+            canSetDomain={user.isAdmin}
             outcome={params.connection ?? ""}
             outcomeProvider={params.provider ?? ""}
         />

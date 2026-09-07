@@ -32,7 +32,7 @@ import { requireUser } from "@/lib/session";
 import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { requestOrigin } from "@/lib/domain-service";
+import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
 import { findConnectionProvider } from "@polaris/core";
 import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
@@ -77,7 +77,16 @@ const SIGN_IN_WINDOW_MS = 10 * 60 * 1000;
 type ConnectionMode = "link" | "signin" | "storage" | "mail";
 
 /** What the round trip came back with, as the screen reads it. */
-export type LinkOutcome = "linked" | "cancelled" | "state_error" | "taken" | "limit" | "unavailable" | "error";
+export type LinkOutcome =
+    | "linked"
+    | "cancelled"
+    | "state_error"
+    | "taken"
+    | "limit"
+    | "unavailable"
+    /** This dashboard has no address the provider could send anybody back to. */
+    | "not_public"
+    | "error";
 
 /**
  * What a sign-in came back with.
@@ -148,6 +157,23 @@ async function begin(
         return mode === "signin"
             ? endSignIn(origin, provider, "unavailable")
             : endLink(origin, provider, "unavailable");
+    }
+
+    /**
+     * The trip has to be able to end.
+     *
+     * A provider returns somebody to the address this deployment hands it, and
+     * on a LAN-only install that address is a name only this network knows -
+     * `http://polaris.local`, say. Google will not take it, and what a person
+     * gets instead is a consent screen that authorizes nothing and a browser
+     * left on an address that does not resolve. It looked like the mail app
+     * being broken; it was the dashboard having no public name.
+     *
+     * Refused here rather than at the provider, so the answer is a Polaris
+     * screen that says what is missing and where to set it.
+     */
+    if (mode !== "signin" && !(await publicAppUrl())) {
+        return endLink(origin, provider, "not_public", mode === "mail" ? MAIL_SCREEN : undefined);
     }
 
     const state = randomBytes(16).toString("hex");

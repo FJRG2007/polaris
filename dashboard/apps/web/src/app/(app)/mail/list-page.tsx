@@ -52,6 +52,8 @@ export async function MailListPage({
                 links={options.links}
                 googleReady={options.googleReady}
                 microsoftReady={options.microsoftReady}
+                publicAddress={options.publicAddress}
+                canSetDomain={user.isAdmin}
             />
         );
     }

@@ -24,6 +24,7 @@
  * never syncs.
  */
 
+import Link from "next/link";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { useRouter } from "next/navigation";
@@ -37,6 +38,8 @@ export function AccountsView({
     accounts,
     links,
     googleReady,
+    publicAddress,
+    canSetDomain,
     microsoftReady,
     outcome,
     outcomeProvider
@@ -44,6 +47,8 @@ export function AccountsView({
     accounts: MailAccountView[];
     links: LinkedAccount[];
     googleReady: boolean;
+    publicAddress: boolean;
+    canSetDomain: boolean;
     microsoftReady: boolean;
     outcome: string;
     outcomeProvider: string;
@@ -58,7 +63,20 @@ export function AccountsView({
                     mailbox below and it will be offered without a password.
                 </p>
             ) : null}
-            {outcome && outcome !== "linked" ? (
+            {outcome === "not_public" ? (
+                <p className="rounded-md border border-danger/40 bg-card px-3 py-2 text-[13px] text-danger">
+                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} had nowhere to send you back
+                    to. Polaris is only reachable on this network, and an address like that is one they
+                    refuse.{" "}
+                    {canSetDomain ? (
+                        <Link href="/admin/domains" className="underline">
+                            Give Polaris a public address
+                        </Link>
+                    ) : (
+                        "Ask an administrator to give Polaris a public address."
+                    )}
+                </p>
+            ) : outcome && outcome !== "linked" ? (
                 <p className="rounded-md border border-danger/40 bg-card px-3 py-2 text-[13px] text-danger">
                     That authorization did not finish. Nothing was changed.
                 </p>
@@ -98,6 +116,8 @@ export function AccountsView({
                     links={links}
                     googleReady={googleReady}
                     microsoftReady={microsoftReady}
+                    publicAddress={publicAddress}
+                    canSetDomain={canSetDomain}
                     onClose={() => setAdding(false)}
                 />
             ) : null}
