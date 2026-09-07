@@ -31,6 +31,7 @@ import {
     Mail,
     MailOpen,
     Search,
+    ShieldOff,
     Star,
     Tag,
     Trash2
@@ -56,6 +57,7 @@ export function ThreadContextMenu({
     onSnooze,
     onLabel,
     onAnswer,
+    onBlock,
     children
 }: {
     thread: MailThreadView;
@@ -68,6 +70,8 @@ export function ThreadContextMenu({
      *  reading pane offers, because the point of a right-click is doing
      *  something to a row without opening it first. */
     onAnswer: (kind: "reply" | "reply-all" | "forward", messageId: string) => void;
+    /** Refuse this sender from now on, and clear out what they have sent. */
+    onBlock: (accountId: string, address: string) => void;
     children: ReactNode;
 }) {
     const { labels } = useMail();
@@ -223,6 +227,17 @@ export function ThreadContextMenu({
                     <Search className="size-3.5 shrink-0" aria-hidden />
                     Find everything from {sender || "this sender"}
                 </ContextMenuItem>
+
+                <ContextMenuItem
+                    variant="danger"
+                    onSelect={() => onBlock(thread.accountId, sender)}
+                    disabled={!sender}
+                >
+                    <ShieldOff className="size-3.5 shrink-0" aria-hidden />
+                    Block {sender || "this sender"}
+                </ContextMenuItem>
+
+                <ContextMenuSeparator />
 
                 <ContextMenuItem
                     onSelect={() => void copy(sender, "Address copied.")}

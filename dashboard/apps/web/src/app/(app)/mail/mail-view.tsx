@@ -38,6 +38,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import {
     actOnAction,
     applyLabelAction,
+    blockSenderAction,
     moreThreadsAction,
     openMessageAction,
     snoozeAction,
@@ -55,6 +56,7 @@ import {
 import {
     Button,
     Checkbox,
+    ConfirmDeleteDialog,
     Dialog,
     DialogContent,
     DialogHeader,
@@ -151,6 +153,7 @@ export function MailView({
      */
     const [anchor, setAnchor] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
+    const [blocking, setBlocking] = useState<{ accountId: string; address: string } | null>(null);
     const [layout, setLayout] = useMailLayout();
 
     /**
@@ -524,6 +527,21 @@ export function MailView({
         [accounts, openComposer, toast]
     );
 
+    /**
+     * Refuse a sender.
+     *
+     * Confirmed first, because it is the one action here that acts on every
+     * message somebody will ever get from an address rather than on the one in
+     * front of them - and because what it does is throw mail away.
+     */
+    const block = useCallback(
+        (accountId: string, address: string) => {
+            if (!address) return;
+            setBlocking({ accountId, address });
+        },
+        []
+    );
+
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
     return (
@@ -716,6 +734,7 @@ export function MailView({
                                     onSnooze={snooze}
                                     onLabel={label}
                                     onAnswer={answer}
+                                    onBlock={block}
                                 >
                                     <ThreadRow
                                         thread={shown(thread)}
@@ -753,6 +772,40 @@ export function MailView({
             </section>
 
             {helpOpen ? <ShortcutSheet onClose={() => setHelpOpen(false)} /> : null}
+
+            {blocking ? (
+                <ConfirmDeleteDialog
+                    open
+                    name={blocking.address}
+                    kind="sender"
+                    // A plain confirmation rather than typing the address out:
+                    // it is one sender of many and it can be undone from the
+                    // Blocked screen in one press.
+                    requireTyping={false}
+                    title={`Block ${blocking.address}?`}
+                    question={`Send everything from ${blocking.address} to the trash?`}
+                    description="What they have already sent goes to the trash too. Mail cannot be refused before it arrives - only your provider can do that - so it will still reach your mailbox; you simply will not see it."
+                    confirmLabel="Block"
+                    pending={busy}
+                    onOpenChange={(next) => (next ? undefined : setBlocking(null))}
+                    onConfirm={() =>
+                        startBusy(async () => {
+                            const outcome = await blockSenderAction(blocking.accountId, {
+                                address: blocking.address,
+                                as: "trash"
+                            });
+                            setBlocking(null);
+                            const said = refusalOf(outcome);
+                            if (said) {
+                                toast.show({ title: said });
+                                return;
+                            }
+                            toast.show({ title: `${blocking.address} is blocked.` });
+                            refresh();
+                        })
+                    }
+                />
+            ) : null}
 
             <section
                 className={cn(

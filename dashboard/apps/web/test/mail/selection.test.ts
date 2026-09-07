@@ -85,9 +85,9 @@ describe("what the right-click menu offers", () => {
     it("draws the two that take mail away as what they are", async () => {
         const menu = await readFile(`${SCREENS}thread-menu.tsx`, "utf8");
         const danger = menu.split('variant="danger"').length - 1;
-        // Report as spam and Move to trash. Archive is not one of these: it is
-        // where mail goes to be kept.
-        expect(danger).toBe(2);
+        // Report as spam, Move to trash, and blocking the sender. Archive is not
+        // one of these: it is where mail goes to be kept.
+        expect(danger).toBe(3);
     });
 
     it("can answer a conversation without opening it", async () => {
