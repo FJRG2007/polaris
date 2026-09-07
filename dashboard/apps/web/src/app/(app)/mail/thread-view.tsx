@@ -40,6 +40,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { actOnAction, applyLabelAction, openMessageAction, trustSenderAction } from "./actions";
 import {
+    ArrowLeft,
     Archive,
     ChevronDown,
     CornerUpLeft,
@@ -57,15 +58,20 @@ import {
 export function ThreadView({
     thread,
     messages,
-    context
+    context,
+    onBack
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
     context: MailViewContext;
+    /** Given when the list is not on screen beside this - reading one message at
+     *  a time, or on a phone - because then this is the only way back to it. */
+    onBack?: () => void;
 }) {
     const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
+    const [answering, startAnswering] = useTransition();
     const newest = messages.at(-1);
     const [open, setOpen] = useState<string[]>(newest ? [newest.id] : []);
 
@@ -96,6 +102,43 @@ export function ThreadView({
         [askFolderRole, messages, refresh, toast]
     );
 
+    /**
+     * Open the composer with the message quoted in it.
+     *
+     * The quoting happens here rather than at send time, because the point of a
+     * quote is that its author can see it, trim it, and write above it - which is
+     * what everybody does with a long thread. It needs the plain text, and a
+     * collapsed message has none loaded, so it goes through the same action the
+     * reading pane uses rather than growing a second path to a body.
+     */
+    const answer = useCallback(
+        (kind: "reply" | "reply-all" | "forward") => {
+            // Guarded here as well as by the early return below: this closure
+            // outlives the render that made it, and a conversation whose last
+            // message was just moved has none.
+            if (!newest) return;
+            startAnswering(async () => {
+                const outcome = await openMessageAction(newest.id);
+                const said = refusalOf(outcome);
+                if (said) {
+                    toast.show({ title: said });
+                    return;
+                }
+                const readable = "readable" in outcome ? outcome.readable : null;
+                // The plain text, never the HTML: quoting markup into a reply is
+                // how a thread turns into unreadable nested tables. A message with
+                // no text part quotes nothing, which is honest.
+                const body = readable?.text ?? "";
+                openComposer(
+                    kind === "forward"
+                        ? forwardOf(newest, body)
+                        : replyTo(newest, accounts, kind === "reply-all", body)
+                );
+            });
+        },
+        [accounts, newest, openComposer, toast]
+    );
+
     if (!newest) {
         return (
             <div className="flex flex-1 items-center justify-center p-8">
@@ -109,6 +152,17 @@ export function ThreadView({
     return (
         <div className="flex min-h-0 flex-1 flex-col">
             <header className="flex items-start gap-2 border-b border-border px-4 py-3">
+                {onBack ? (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Back to the list"
+                        title="Back to the list"
+                        onClick={onBack}
+                    >
+                        <ArrowLeft className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                ) : null}
                 <div className="min-w-0 flex-1">
                     <h2 className="truncate text-[17px] font-semibold tracking-tight">
                         {thread.subject || "(no subject)"}
@@ -192,17 +246,17 @@ export function ThreadView({
                 </ul>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => openComposer(replyTo(newest, accounts, false))}>
+                    <Button variant="secondary" disabled={answering} onClick={() => answer("reply")}>
                         <CornerUpLeft className="size-4 shrink-0" aria-hidden />
                         Reply
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
-                        <Button variant="secondary" onClick={() => openComposer(replyTo(newest, accounts, true))}>
+                        <Button variant="secondary" disabled={answering} onClick={() => answer("reply-all")}>
                             <CornerUpRight className="size-4 shrink-0" aria-hidden />
                             Reply to all
                         </Button>
                     ) : null}
-                    <Button variant="ghost" onClick={() => openComposer(forwardOf(newest))}>
+                    <Button variant="ghost" disabled={answering} onClick={() => answer("forward")}>
                         <Forward className="size-4 shrink-0" aria-hidden />
                         Forward
                     </Button>
@@ -267,12 +321,19 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
     );
 }
 
-/** What a reply starts with. The recipients come out of the shared rule, so a
- *  reply from here and a reply from anywhere else address the same people. */
+/**
+ * What a reply starts with.
+ *
+ * The recipients come out of the shared rule, so a reply from here and a reply
+ * from anywhere else address the same people. The body is two blank lines and
+ * then the message being answered, attributed the way every other client
+ * attributes it - so the result reads the same in theirs.
+ */
 function replyTo(
     message: MailMessageView,
     accounts: ReturnType<typeof useMail>["accounts"],
-    all: boolean
+    all: boolean,
+    quoted: string
 ) {
     const self = accounts.map((account) => account.address);
     const { to, cc } = core.replyRecipients(
@@ -291,21 +352,47 @@ function replyTo(
         self,
         all
     );
+    const sender = message.from[0] ?? { name: "", address: "" };
     return {
         accountId: message.accountId,
         to: [...to],
         cc: [...cc],
         subject: core.replySubject(message.subject),
+        body: quoted.trim()
+            ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}`
+            : "",
         inReplyToId: message.id,
         forward: false
     };
 }
 
-function forwardOf(message: MailMessageView) {
+/**
+ * What a forward starts with.
+ *
+ * The block above the original is the one every client writes and every reader
+ * recognises, which matters more here than anywhere else: a forward with no
+ * header is a message whose recipient cannot tell who originally sent it.
+ *
+ * The original's attachments do not come with it. That is a real gap and it is
+ * said on the composer rather than left for somebody to discover after sending -
+ * carrying them needs the parts fetched and re-uploaded, which is a server path
+ * that does not exist yet.
+ */
+function forwardOf(message: MailMessageView, quoted: string) {
+    const sender = message.from[0];
+    const header = [
+        "---------- Forwarded message ----------",
+        `From: ${sender ? core.formatAddress(sender) : "unknown"}`,
+        `Date: ${new Date(message.sentAt).toISOString().slice(0, 16).replace("T", " ")} UTC`,
+        `Subject: ${message.subject}`,
+        `To: ${core.formatAddressList(message.to)}`,
+        ...(message.cc.length > 0 ? [`Cc: ${core.formatAddressList(message.cc)}`] : [])
+    ].join("\n");
     return {
         accountId: message.accountId,
         to: [],
         subject: core.forwardSubject(message.subject),
+        body: `\n\n${header}\n\n${quoted}`,
         inReplyToId: message.id,
         forward: true
     };

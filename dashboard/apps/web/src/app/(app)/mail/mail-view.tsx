@@ -22,6 +22,8 @@
 
 import Link from "next/link";
 import { missingFolderRole, refusalOf } from "./refusal";
+import { useMailLayout } from "./use-mail-layout";
+import { ThreadContextMenu } from "./thread-menu";
 import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
@@ -30,7 +32,7 @@ import { useRouter } from "next/navigation";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
-import { actOnAction, snoozeAction, syncAllAction } from "./actions";
+import { actOnAction, applyLabelAction, snoozeAction, syncAllAction } from "./actions";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Button,
@@ -48,11 +50,13 @@ import {
     Archive,
     Bug,
     Clock,
+    Columns2,
     Inbox,
     Mail,
     MailOpen,
     Paperclip,
     RefreshCw,
+    Rows3,
     Star,
     Trash2
 } from "lucide-react";
@@ -93,6 +97,7 @@ export function MailView({
     // walk that ticked every checkbox on the way past would be unusable.
     const [onIndex, setOnIndex] = useState(0);
     const [helpOpen, setHelpOpen] = useState(false);
+    const [layout, setLayout] = useMailLayout();
 
     // The lead message of each selected conversation. Every action here is
     // against messages rather than conversations, because a conversation lives
@@ -211,16 +216,45 @@ export function MailView({
         return () => window.removeEventListener("keydown", onKey);
     }, []);
 
+    const label = useCallback(
+        (labelId: string, messageIds: readonly string[]) => {
+            startBusy(async () => {
+                const outcome = await applyLabelAction({
+                    labelId,
+                    messageIds: [...messageIds],
+                    applied: true
+                });
+                const said = refusalOf(outcome);
+                if (said) {
+                    toast.show({ title: said });
+                    return;
+                }
+                refresh();
+            });
+        },
+        [refresh, toast]
+    );
+
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
     return (
         <div className="flex h-full min-h-0">
             <section
                 className={cn(
-                    "flex min-w-0 flex-col border-r border-border",
-                    // The list keeps its width beside an open conversation and
-                    // takes the whole column when nothing is open.
-                    openThread ? "hidden w-[22rem] shrink-0 lg:flex" : "flex flex-1"
+                    "flex min-w-0 flex-col",
+                    // Two shapes, and which one is a decision its reader makes.
+                    //
+                    // `split` keeps a narrow list beside the conversation, which
+                    // is what somebody triaging a hundred messages wants. `full`
+                    // gives the list the whole width and hands the whole width to
+                    // the message once one is open, which is what somebody who
+                    // reads one message at a time wants. Neither is right for
+                    // both, which is why this is not a constant.
+                    openThread
+                        ? layout === "split"
+                            ? "hidden w-80 shrink-0 border-r border-border lg:flex"
+                            : "hidden"
+                        : "flex flex-1"
                 )}
                 aria-label={context.title}
             >
@@ -238,6 +272,27 @@ export function MailView({
                                 <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">
                                     {context.title}
                                 </h1>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={
+                                        layout === "split"
+                                            ? "Show one message at a time"
+                                            : "Show the list beside the message"
+                                    }
+                                    title={
+                                        layout === "split"
+                                            ? "Show one message at a time"
+                                            : "Show the list beside the message"
+                                    }
+                                    onClick={() => setLayout(layout === "split" ? "full" : "split")}
+                                >
+                                    {layout === "split" ? (
+                                        <Rows3 className="size-4 shrink-0" aria-hidden />
+                                    ) : (
+                                        <Columns2 className="size-4 shrink-0" aria-hidden />
+                                    )}
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -345,27 +400,37 @@ export function MailView({
                     ) : (
                         <ul>
                             {threads.map((thread) => (
-                                <ThreadRow
+                                <ThreadContextMenu
                                     key={thread.id}
                                     thread={thread}
-                                    onCursor={onRow?.id === thread.id}
-                                    open={openThread?.id === thread.id}
-                                    picked={selected.includes(thread.id)}
-                                    color={accountColor(thread.accountId)}
-                                    showColor={accounts.length > 1}
-                                    onPick={(next) =>
-                                        setSelected((held) =>
-                                            next ? [...held, thread.id] : held.filter((id) => id !== thread.id)
-                                        )
-                                    }
-                                    onStar={() =>
-                                        act(
-                                            thread.starred ? "unstar" : "star",
-                                            [thread.leadMessageId],
-                                            thread.starred ? "Unstarred." : "Starred."
-                                        )
-                                    }
-                                />
+                                    canArchive={context.canArchive}
+                                    permanentDelete={context.permanentDelete}
+                                    onAct={act}
+                                    onSnooze={snooze}
+                                    onLabel={label}
+                                >
+                                    <ThreadRow
+                                        thread={thread}
+                                        onCursor={onRow?.id === thread.id}
+                                        open={openThread?.id === thread.id}
+                                        picked={selected.includes(thread.id)}
+                                        color={accountColor(thread.accountId)}
+                                        showColor={accounts.length > 1}
+                                        wide={layout === "full" && !openThread}
+                                        onPick={(next) =>
+                                            setSelected((held) =>
+                                                next ? [...held, thread.id] : held.filter((id) => id !== thread.id)
+                                            )
+                                        }
+                                        onStar={() =>
+                                            act(
+                                                thread.starred ? "unstar" : "star",
+                                                [thread.leadMessageId],
+                                                thread.starred ? "Unstarred." : "Starred."
+                                            )
+                                        }
+                                    />
+                                </ThreadContextMenu>
                             ))}
                         </ul>
                     )}
@@ -390,9 +455,26 @@ export function MailView({
 
             {helpOpen ? <ShortcutSheet onClose={() => setHelpOpen(false)} /> : null}
 
-            <section className={cn("min-w-0 flex-1", openThread ? "flex" : "hidden lg:flex")} aria-label="Conversation">
+            <section
+                className={cn(
+                    "min-w-0 flex-1",
+                    openThread ? "flex" : layout === "split" ? "hidden lg:flex" : "hidden"
+                )}
+                aria-label="Conversation"
+            >
                 {openThread ? (
-                    <ThreadView thread={openThread} messages={openMessages} context={context} />
+                    <ThreadView
+                        thread={openThread}
+                        messages={openMessages}
+                        context={context}
+                        // Reading one message at a time needs a way back, because
+                        // the list it came from is not on screen.
+                        onBack={
+                            layout === "full"
+                                ? () => router.push(window.location.pathname, { scroll: false })
+                                : undefined
+                        }
+                    />
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
                         <p className="text-[13px] text-foreground-subtle">Pick a conversation to read it.</p>
@@ -449,6 +531,7 @@ function ThreadRow({
     picked,
     color,
     showColor,
+    wide,
     onPick,
     onStar
 }: {
@@ -460,6 +543,10 @@ function ThreadRow({
     picked: boolean;
     color: string;
     showColor: boolean;
+    /** Whether the list has the whole width. Then a row is one line - sender,
+     *  subject, snippet, date - the way a full-width list is read; narrow, it
+     *  stacks, because three columns in twenty rems is unreadable. */
+    wide: boolean;
     onPick: (next: boolean) => void;
     onStar: () => void;
 }) {
@@ -503,10 +590,10 @@ function ThreadRow({
                 <Link
                     href={`?open=${thread.id}`}
                     scroll={false}
-                    className="min-w-0 flex-1"
+                    className={cn("min-w-0 flex-1", wide && "flex items-baseline gap-3")}
                     aria-current={open ? "true" : undefined}
                 >
-                    <div className="flex items-baseline gap-2">
+                    <div className={cn("flex items-baseline gap-2", wide && "w-56 shrink-0")}>
                         <span
                             className={cn(
                                 "min-w-0 flex-1 truncate text-[13px]",
@@ -520,27 +607,40 @@ function ThreadRow({
                                 {thread.messageCount}
                             </span>
                         ) : null}
+                        {wide ? null : (
+                            <span className="shrink-0 text-[11px] text-foreground-subtle">
+                                {shortDate(thread.lastMessageAt, format)}
+                            </span>
+                        )}
+                    </div>
+                    <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>
+                        <p
+                            className={cn(
+                                "truncate text-[13px]",
+                                wide && "shrink-0 max-w-[50%]",
+                                unread ? "font-medium text-foreground" : "text-muted-foreground"
+                            )}
+                        >
+                            {thread.subject || "(no subject)"}
+                        </p>
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            {thread.hasAttachments ? (
+                                <Paperclip
+                                    className="size-3 shrink-0 text-foreground-subtle"
+                                    aria-label="Has attachments"
+                                />
+                            ) : null}
+                            <p className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
+                                {thread.snippet}
+                            </p>
+                        </div>
+                    </div>
+                    {wide ? (
                         <span className="shrink-0 text-[11px] text-foreground-subtle">
                             {shortDate(thread.lastMessageAt, format)}
                         </span>
-                    </div>
-                    <p
-                        className={cn(
-                            "truncate text-[13px]",
-                            unread ? "font-medium text-foreground" : "text-muted-foreground"
-                        )}
-                    >
-                        {thread.subject || "(no subject)"}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                        {thread.hasAttachments ? (
-                            <Paperclip className="size-3 shrink-0 text-foreground-subtle" aria-label="Has attachments" />
-                        ) : null}
-                        <p className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
-                            {thread.snippet}
-                        </p>
-                    </div>
-                    {thread.labels.length > 0 ? (
+                    ) : null}
+                    {thread.labels.length > 0 && !wide ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                             {thread.labels.map((label) => (
                                 <span
