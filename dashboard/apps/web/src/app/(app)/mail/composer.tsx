@@ -227,7 +227,10 @@ export function Composer() {
             ? "inset-4 md:inset-10 rounded-lg border-b"
             : posture === "minimized"
               ? "bottom-0 right-6 w-[22rem]"
-              : "inset-x-0 bottom-0 mx-auto w-full max-w-3xl max-h-[85vh] md:inset-x-auto md:right-6 md:mx-0 md:w-[36rem]";
+              // Taller and wider than it was. A composer whose body is three
+              // lines is one people write three lines in, and the message
+              // being written is the whole point of the screen it covers.
+              : "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:right-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
         <div
@@ -300,10 +303,10 @@ export function Composer() {
                 />
             ) : (
                 <>
-                    <div className="min-h-0 flex-1 overflow-y-auto">
-                        <div className="space-y-2 px-3 py-2">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                        <div className="space-y-1.5 border-b border-border px-4 py-3">
                             <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                <span className="w-10 shrink-0">From</span>
+                                <span className="w-12 shrink-0">From</span>
                                 {accounts.length > 1 || own.length > 0 ? (
                                     <Select
                                         value={identityId ? `identity:${identityId}` : `account:${accountId}`}
@@ -351,7 +354,7 @@ export function Composer() {
                             )}
 
                             <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                <span className="w-10 shrink-0">Subject</span>
+                                <span className="w-12 shrink-0">Subject</span>
                                 <Input
                                     value={subject}
                                     onChange={(event) => setSubject(event.target.value)}
@@ -361,12 +364,16 @@ export function Composer() {
                             </label>
                         </div>
 
-                        <div className="px-1 pb-2">
+                        {/* The body takes whatever is left, so the message is
+                            the biggest thing in the composer rather than a strip
+                            under the headers. */}
+                        <div className="flex min-h-0 flex-1 flex-col px-2 py-2">
                             <RichTextEditor
                                 value={body}
                                 onChange={setBody}
                                 insert={insert}
-                                placeholder="Write your message."
+                                placeholder="Write your message"
+                                className="flex min-h-[14rem] flex-1 flex-col"
                                 // A screenshot pasted in is an attachment rather
                                 // than a picture pasted into the text: a data URI
                                 // that size is refused by mail servers and shows

@@ -74,7 +74,7 @@ export function RecipientField({
 
     return (
         <div className="relative flex items-start gap-2 text-[12px] text-muted-foreground">
-            <span className="w-10 shrink-0 pt-1.5">{label}</span>
+            <span className="w-12 shrink-0 pt-1.5">{label}</span>
             <div className="min-w-0 flex-1">
                 <div
                     className={cn(
@@ -143,7 +143,14 @@ export function RecipientField({
                                 if (looksLikeAddress(typed)) {
                                     event.preventDefault();
                                     commit({ address: typed, name: "" });
+                                    return;
                                 }
+                                // Enter in this box is never anything else's.
+                                // Left to travel it reached the list behind the
+                                // composer, which opened whichever conversation
+                                // its cursor happened to be on - in the middle of
+                                // somebody typing an address.
+                                if (event.key === "Enter") event.preventDefault();
                                 return;
                             }
                             if (event.key === "Backspace" && typed === "" && value.length > 0) {
@@ -157,7 +164,7 @@ export function RecipientField({
                 ) : null}
 
                 {suggestions.length > 0 ? (
-                    <ul className="absolute left-12 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-elevated py-1 shadow-popover">
+                    <ul className="absolute left-14 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-elevated py-1 shadow-popover">
                         {suggestions.map((entry, index) => (
                             <li key={entry.address}>
                                 <button

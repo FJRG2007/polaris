@@ -123,7 +123,7 @@ export function MailView({
     page: MailPageNarrow;
 }) {
     const router = useRouter();
-    const { accounts, accountColor, askFolderRole, identities, openComposer, refresh } = useMail();
+    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } = useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -331,7 +331,16 @@ export function MailView({
     const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
     const rowMessageIds = onRow ? [onRow.leadMessageId].filter(Boolean) : [];
 
-    useMailKeys({
+    /**
+     * The list's keys stand down entirely while the composer is open.
+     *
+     * Guarding on "is something being typed into" is not enough: the composer is
+     * a surface of its own, and a key pressed anywhere in it - a button, the
+     * toolbar, the gap between fields - belongs to it. Enter reaching the list
+     * from the recipient box opened whichever conversation the list's cursor
+     * happened to be on, in the middle of somebody typing an address.
+     */
+    useMailKeys(composing ? {} : {
         compose: () => openComposer({}),
         next: () => setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
         previous: () => setOnIndex((held) => Math.max(0, held - 1)),
