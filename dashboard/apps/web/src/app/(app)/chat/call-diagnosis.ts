@@ -20,6 +20,11 @@
  * - **these speakers** - deafened, turned down to nothing, or deliberately quiet
  *   because the laptop next to this one is carrying the room.
  *
+ * Not all of those are Polaris's to answer for. Somebody who closed their tab or
+ * whose browser never let them share a microphone shows up under "what is
+ * arriving", and is the other end's doing rather than a fault in this call - see
+ * `CallAudioBlame`, and the calmer tone `call-diagnosis-panel` gives it.
+ *
  * Two of those are on the far side of the room and cannot be guessed at from a
  * track existing. A subscribed track is not a track carrying sound: the browser
  * hands one over when the connection is described, long before a single packet
