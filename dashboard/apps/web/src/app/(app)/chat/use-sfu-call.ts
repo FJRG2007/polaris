@@ -66,13 +66,7 @@ import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
-import type {
-    LocalVideoTrack,
-    Participant,
-    Room,
-    Track,
-    TrackPublication
-} from "livekit-client";
+import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 import {
     AUDIO_GROUP,
@@ -831,18 +825,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * quiet is what stops the packets. The publication is muted as well as the
      * track - which is what tells everybody else, without a message of our own.
      */
-    const setVoiceEnabled = useCallback((on: boolean) => {
-        if (mic.current) mic.current.enabled = on;
-        if (filtered.current) filtered.current.track.enabled = on;
-        // Said out loud as well as done, so it reaches whoever joins next. The
-        // publication's own flag only travels to the browsers that were in the
-        // room when it changed.
-        say({ [MUTED]: on ? "0" : "1" });
-        const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
-        if (!publication?.track) return;
-        if (on) void publication.track.unmute().catch(() => undefined);
-        else void publication.track.mute().catch(() => undefined);
-    }, [say]);
+    const setVoiceEnabled = useCallback(
+        (on: boolean) => {
+            if (mic.current) mic.current.enabled = on;
+            if (filtered.current) filtered.current.track.enabled = on;
+            // Said out loud as well as done, so it reaches whoever joins next. The
+            // publication's own flag only travels to the browsers that were in the
+            // room when it changed.
+            say({ [MUTED]: on ? "0" : "1" });
+            const publication = room.current?.localParticipant.getTrackPublication(MICROPHONE);
+            if (!publication?.track) return;
+            if (on) void publication.track.unmute().catch(() => undefined);
+            else void publication.track.mute().catch(() => undefined);
+        },
+        [say]
+    );
 
     /**
      * Make the room's idea of this microphone match the person's, and say so.
@@ -1858,7 +1855,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // asks for - the same request `openMedia` makes on the way in. Asking
             // for the size alone opened whichever camera the browser felt like,
             // which on a machine with a webcam and a capture card is a coin toss.
-            .getUserMedia({ video: withCameraDevice(quality.cameraConstraints(levelNow("camera"))) })
+            .getUserMedia({
+                video: withCameraDevice(quality.cameraConstraints(levelNow("camera")))
+            })
             .then(async (stream) => {
                 const track = stream.getVideoTracks()[0] ?? null;
                 camera.current = track;
@@ -2349,7 +2348,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // rare one. Nothing is claimed about a microphone that cannot be
             // looked at.
             const sharing = !remote || Boolean(publication);
-            const quality = (remote as { connectionQuality?: string } | undefined)?.connectionQuality;
+            const quality = (remote as { connectionQuality?: string } | undefined)
+                ?.connectionQuality;
             const reachable = Boolean(remote) && quality !== "lost";
             // Structurally, as the sender statistics are read: naming the media
             // client's own class here would drag the module into every bundle -

@@ -158,7 +158,13 @@ export interface CallAudioReport {
 
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
-export const UNKNOWN_AUDIO: CallAudioReport = { ok: true, blame: "fault", headline: "", fix: "", lines: [] };
+export const UNKNOWN_AUDIO: CallAudioReport = {
+    ok: true,
+    blame: "fault",
+    headline: "",
+    fix: "",
+    lines: []
+};
 
 /** What a screen says when the call server is the thing to look at. Repeated in
  *  two headlines, and it is the same sentence both times. */

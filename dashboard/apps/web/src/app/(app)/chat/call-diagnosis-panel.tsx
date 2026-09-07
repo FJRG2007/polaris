@@ -47,13 +47,20 @@ export function CallDiagnosisPanel({ audio }: { audio: CallAudioReport }) {
     return (
         <section
             role="status"
-            aria-label={theirs ? "What is happening at the other end" : "Why this call has no sound"}
+            aria-label={
+                theirs ? "What is happening at the other end" : "Why this call has no sound"
+            }
             className={cn(
                 "flex flex-col gap-2 rounded-md border px-3 py-2 text-xs",
                 theirs ? "border-border bg-muted/40" : "border-warning/40 bg-warning/10"
             )}
         >
-            <p className={cn("flex items-start gap-2", theirs ? "text-foreground" : "text-warning")}>
+            <p
+                className={cn(
+                    "flex items-start gap-2",
+                    theirs ? "text-foreground" : "text-warning"
+                )}
+            >
                 <Icon className="mt-0.5 size-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 font-medium">{audio.headline}</span>
             </p>

@@ -11,11 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    diagnoseCall,
-    type CallAudioFacts,
-    type HeardFrom
-} from "@/app/(app)/chat/call-diagnosis";
+import { diagnoseCall, type CallAudioFacts, type HeardFrom } from "@/app/(app)/chat/call-diagnosis";
 
 /** A call in which everything works, as the starting point for changing exactly
  *  one thing about it. */
@@ -76,9 +72,7 @@ describe("the ordinary reasons a call is quiet", () => {
     it("does not treat being alone as a fault", () => {
         const report = diagnoseCall(working({ others: [] }));
         expect(report.ok).toBe(true);
-        expect(row(working({ others: [] }), "What you are being sent")).toBe(
-            "Nobody else is here"
-        );
+        expect(row(working({ others: [] }), "What you are being sent")).toBe("Nobody else is here");
     });
 
     it("does not treat everybody else being muted as a fault", () => {
@@ -228,10 +222,7 @@ describe("what is arriving", () => {
 
     it("is satisfied by one person being audible in a room of several", () => {
         const mixed = working({
-            others: [
-                heard(),
-                heard({ id: "p3", name: "Bo", arriving: false, carrying: false })
-            ]
+            others: [heard(), heard({ id: "p3", name: "Bo", arriving: false, carrying: false })]
         });
         expect(diagnoseCall(mixed).ok).toBe(true);
         expect(row(mixed, "What you are being sent")).toBe("Sound from 1 of 2");
@@ -270,7 +261,9 @@ describe("a call that has never had a byte of sound", () => {
     });
 
     it("says the same when something subscribed but nothing ever arrived", () => {
-        const report = diagnoseCall(working({ everHeard: false, others: [heard({ arriving: false })] }));
+        const report = diagnoseCall(
+            working({ everHeard: false, others: [heard({ arriving: false })] })
+        );
 
         expect(report.fix).toContain("Call ports");
     });
@@ -278,7 +271,9 @@ describe("a call that has never had a byte of sound", () => {
     it("still says rejoin for a call that had sound and lost it", () => {
         // A different fault with a different answer, and the reason the fact is
         // "ever" rather than "now".
-        const report = diagnoseCall(working({ everHeard: true, others: [heard({ arriving: false })] }));
+        const report = diagnoseCall(
+            working({ everHeard: true, others: [heard({ arriving: false })] })
+        );
 
         expect(report.fix).toContain("between here and the call server");
         expect(report.fix).not.toContain("Call ports");
@@ -293,7 +288,9 @@ describe("what is happening at the other end", () => {
         // yellow, telling somebody to leave and rejoin over a tab somebody else
         // shut.
         const gone = working({
-            others: [heard({ reachable: false, subscribed: false, arriving: false, carrying: false })]
+            others: [
+                heard({ reachable: false, subscribed: false, arriving: false, carrying: false })
+            ]
         });
         const report = diagnoseCall(gone);
         expect(report.ok).toBe(false);
@@ -320,7 +317,9 @@ describe("what is happening at the other end", () => {
 
     it("draws neither of them as a failed check", () => {
         const gone = working({
-            others: [heard({ reachable: false, subscribed: false, arriving: false, carrying: false })]
+            others: [
+                heard({ reachable: false, subscribed: false, arriving: false, carrying: false })
+            ]
         });
         expect(row(gone, "What you are being sent")).toBe("They have stopped answering");
         const silent = working({
@@ -366,7 +365,13 @@ describe("what is happening at the other end", () => {
                     arriving: false,
                     carrying: false
                 }),
-                heard({ id: "p3", name: "Bea", subscribed: false, arriving: false, carrying: false })
+                heard({
+                    id: "p3",
+                    name: "Bea",
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                })
             ]
         });
         const report = diagnoseCall(mixed);

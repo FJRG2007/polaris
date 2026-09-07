@@ -196,8 +196,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
      * call being recorded is exactly the thing somebody must not be able to
      * forget by walking to another screen.
      */
-    const recorded =
-        call.recording || [...call.states.values()].some((state) => state.recording);
+    const recorded = call.recording || [...call.states.values()].some((state) => state.recording);
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
