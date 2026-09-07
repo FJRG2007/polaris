@@ -170,7 +170,7 @@ export async function listSmartlocks(token: string): Promise<NukiSmartlock[]> {
 /**
  * Do something to a lock.
  *
- * `action` is Nuki's own numbering - see `NUKI_ACTIONS` - and the call answers as
+ * `action` is Nuki's own numbering - see `nuki-vocabulary` - and the call answers as
  * soon as they have accepted it, not when the door has moved. The state that
  * follows comes from the next read, which is why nothing here returns one.
  */
@@ -212,9 +212,6 @@ export async function listLogs(token: string, limit: number): Promise<NukiLog[]>
     if (!parsed.success) throw new NukiError("Nuki answered with something unexpected.", "refused");
     return parsed.data;
 }
-
-/** Nuki's action numbers for a lock, door or Smart Door - their types 0, 3 and 4. */
-export const NUKI_ACTIONS = { unlock: 1, lock: 2, unlatch: 3, lockAndGo: 4 } as const;
 
 /** The firmware as it is written in Nuki's own release notes. Their integer packs
  *  the parts a byte at a time under the major, so 132884 is 2.7.20. */

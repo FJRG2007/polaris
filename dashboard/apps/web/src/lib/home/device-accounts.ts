@@ -21,6 +21,7 @@ import { HomeError } from "@/lib/home/home-error";
 import * as registry from "@/lib/home/device-connections";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { NUKI_WEB, nukiWebDriver } from "@/lib/home/drivers/nuki-web";
+import { NUKI_LOCAL, nukiLocalDriver } from "@/lib/home/drivers/nuki-local";
 import { TUYA_CLOUD, tuyaCloudDriver } from "@/lib/home/drivers/tuya-cloud";
 import { DriverError, type Credentials, type DeviceDriver } from "@/lib/home/drivers/contract";
 
@@ -32,6 +33,7 @@ import { DriverError, type Credentials, type DeviceDriver } from "@/lib/home/dri
  */
 const DRIVERS: Readonly<Record<string, DeviceDriver>> = {
     [NUKI_WEB]: nukiWebDriver,
+    [NUKI_LOCAL]: nukiLocalDriver,
     [TUYA_CLOUD]: tuyaCloudDriver
 };
 

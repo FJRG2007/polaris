@@ -67,6 +67,7 @@
         "mammoth": "1.12.0",
         "marked": "12.0.2",
         "mongodb": "6.12.0",
+        "mqtt": "5.15.2",
         "mysql2": "3.11.5",
         "next": "15.5.20",
         "node-stream-zip": "1.15.0",

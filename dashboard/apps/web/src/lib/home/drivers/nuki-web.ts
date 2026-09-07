@@ -1,10 +1,11 @@
 /**
  * Nuki over their web account, translated into the words Places uses.
  *
- * This is the whole of what Polaris knows about Nuki's numbering: their device
- * types, their lock states, their door states, their log actions, their triggers
- * and their failure codes. Everything above it speaks `device-kinds` and would
- * not have to change for a second make of lock.
+ * What is here is the account: the calls, their log, their triggers and their
+ * failure codes. Their device types and states are in `nuki-vocabulary`, shared
+ * with the local transport, because it is the same firmware answering either way
+ * and two copies of an enumeration is a lock that reads differently depending on
+ * how it was reached.
  *
  * One account is how Nuki is actually used: ten doors across three offices are
  * ten devices on one login. Somebody with two accounts connects two, and the
@@ -16,6 +17,7 @@
 
 import { HomeError } from "@/lib/home/home-error";
 import * as nuki from "@/lib/integrations/nuki-api";
+import * as vocabulary from "@/lib/home/drivers/nuki-vocabulary";
 import type { DeviceAction } from "@/lib/home/device-kinds";
 import {
     DriverError,
@@ -68,98 +70,6 @@ function token(credentials: Credentials): string {
 // ---------------------------------------------------------------------------
 // Their numbers, in our words
 // ---------------------------------------------------------------------------
-
-/** Nuki's device types: 0 Smart Lock 1/2, 2 Opener, 3 Smart Door, 4 Smart Lock
- *  3/4, 5 Smart Lock 5. Type 1 is the Box, which is not a door. */
-function kindOf(type: number): "lock" | "opener" | null {
-    if (type === 2) return "opener";
-    if (type === 0 || type === 3 || type === 4 || type === 5) return "lock";
-    return null;
-}
-
-const MODEL_NAMES: Readonly<Record<number, string>> = {
-    0: "Smart Lock 2.0",
-    2: "Opener",
-    3: "Smart Door",
-    4: "Smart Lock 4.0",
-    5: "Smart Lock Ultra"
-};
-
-/** Smart Lock 5 ships as three products and the config says which. */
-const VARIANT_NAMES: Readonly<Record<number, string>> = {
-    1: "Smart Lock Go",
-    2: "Smart Lock Pro",
-    3: "Smart Lock Ultra"
-};
-
-function modelOf(lock: nuki.NukiSmartlock): string {
-    if (lock.type === 5) {
-        const variant = lock.config?.productVariant;
-        if (variant !== undefined && VARIANT_NAMES[variant]) return VARIANT_NAMES[variant];
-    }
-    return MODEL_NAMES[lock.type] ?? "Nuki device";
-}
-
-/** Their lock state, for their types 0, 3, 4 and 5. */
-function stateOfLock(state: number | undefined): DeviceSnapshot["state"] {
-    switch (state) {
-        case 0:
-            return "uncalibrated";
-        case 1:
-            return "locked";
-        case 2:
-        case 4:
-        case 7:
-            return "moving";
-        case 3:
-        case 6:
-            return "unlocked";
-        case 5:
-            return "unlatched";
-        case 254:
-            return "jammed";
-        default:
-            return "unknown";
-    }
-}
-
-/** Their opener state, which is a different enum on the same field: 0 untrained,
- *  1 online, 3 ring to open active, 5 open, 7 opening, 253 boot run. An opener at
- *  rest has no bolt to have thrown, so it reads as `locked` here and as "Idle" on
- *  a screen - see the kind-aware labels in `device-kinds`. */
-function stateOfOpener(state: number | undefined): DeviceSnapshot["state"] {
-    switch (state) {
-        case 0:
-            return "uncalibrated";
-        case 1:
-        case 3:
-            return "locked";
-        case 5:
-            return "unlatched";
-        case 7:
-            return "moving";
-        default:
-            return "unknown";
-    }
-}
-
-/** Their door sensor: 0 not paired, 1 deactivated, 2 closed, 3 opened, 4 unknown,
- *  5 calibrating, 16 uncalibrated, 240 removed, 255 unknown. */
-function doorOf(state: number | undefined): DeviceSnapshot["doorState"] {
-    switch (state) {
-        case 2:
-            return "closed";
-        case 3:
-            return "open";
-        case undefined:
-        case 0:
-        case 1:
-        case 240:
-            return "none";
-        default:
-            return "unknown";
-    }
-}
 
 /** Their log actions. Anything not named here is real but not worth a sentence of
  *  its own - a firmware update, the log being switched on - and lands as `other`
@@ -235,14 +145,12 @@ export function translateLog(entry: nuki.NukiLog): DeviceHistoryEntry {
 // The driver
 // ---------------------------------------------------------------------------
 
-/** Nuki's action numbers, and only the actions a Nuki has. The buttons a kind of
- *  device gets are decided once in `actionsFor`; this is the same rule said again
- *  at the edge, because what is on the other side of it is somebody's front door
- *  and a number sent in error is not a mistake worth being relaxed about. */
+/** Only the actions a Nuki has, by the numbers in `nuki-vocabulary` - the same
+ *  ones the local transport sends, because it is the same firmware answering. */
 const ACTION_CODES: Readonly<Partial<Record<DeviceAction, number>>> = {
-    lock: nuki.NUKI_ACTIONS.lock,
-    unlock: nuki.NUKI_ACTIONS.unlock,
-    unlatch: nuki.NUKI_ACTIONS.unlatch
+    lock: vocabulary.NUKI_ACTION_CODES.lock,
+    unlock: vocabulary.NUKI_ACTION_CODES.unlock,
+    unlatch: vocabulary.NUKI_ACTION_CODES.unlatch
 };
 
 /** How long a lock is given to answer after being asked to report, before it is
@@ -268,7 +176,7 @@ export const nukiWebDriver: DeviceDriver = {
         const locks = await speaking(() => nuki.listSmartlocks(token(credentials)));
         const snapshots: DeviceSnapshot[] = [];
         for (const lock of locks) {
-            const kind = kindOf(lock.type);
+            const kind = vocabulary.nukiKind(lock.type);
             // A Box is on the account and is not a door. Skipped rather than
             // listed as a device that can do nothing.
             if (!kind) continue;
@@ -276,10 +184,13 @@ export const nukiWebDriver: DeviceDriver = {
                 externalId: String(lock.smartlockId),
                 kind,
                 name: lock.name.trim() || "Nuki device",
-                model: modelOf(lock),
+                model: vocabulary.nukiModel(lock.type, lock.config?.productVariant),
                 firmware: nuki.nukiFirmware(lock.firmwareVersion),
-                state: kind === "opener" ? stateOfOpener(lock.state?.state) : stateOfLock(lock.state?.state),
-                doorState: doorOf(lock.state?.doorState),
+                state:
+                    kind === "opener"
+                        ? vocabulary.nukiOpenerState(lock.state?.state)
+                        : vocabulary.nukiLockState(lock.state?.state),
+                doorState: vocabulary.nukiDoorState(lock.state?.doorState),
                 batteryPercent: lock.state?.batteryCharge ?? null,
                 batteryCritical: lock.state?.batteryCritical ?? false,
                 // Their `serverState` 4 is a device they cannot reach either.

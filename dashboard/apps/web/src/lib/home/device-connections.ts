@@ -138,6 +138,60 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         search: ["smart lock", "opener", "smart door", "web api"]
     },
     {
+        id: "nuki-local",
+        brand: "Nuki",
+        logo: "nuki",
+        label: "Nuki on your own network",
+        reach: "same-network",
+        summary:
+            "The locks talk to a broker in the building, so they answer in milliseconds and keep working when nobody's servers do.",
+        note: "This is the way in the newer locks actually have: a Smart Lock Pro, Ultra or Go has wifi of its own and no local web address at all, but it will publish itself to an MQTT broker on its own network. It costs the lock nothing to be read, so the state here is always current. What it cannot do is reach a lock from anywhere else, and it does not carry the account's record of who opened the door - the web account does both, and the two are worth having together. Nuki's firmware has no room for encryption, so this only ever runs unencrypted on a network you control, which is their rule rather than ours.",
+        steps: [
+            "You need an MQTT broker running on the same network as the locks. Anything already running one - a smart-home hub, a Zigbee bridge - is the same broker.",
+            "In the Nuki app, open Device Administration then MQTT, switch it on and enter that broker's address and credentials.",
+            "Put the same address and credentials here."
+        ],
+        fields: [
+            {
+                key: "host",
+                label: "Broker address",
+                hint: "A name or address on the same network as the locks. Nuki's firmware will not connect to anything outside it.",
+                placeholder: "192.168.1.20",
+                maxLength: 200
+            },
+            {
+                key: "port",
+                label: "Port",
+                defaultValue: "1883",
+                optional: true,
+                maxLength: 5
+            },
+            {
+                key: "username",
+                label: "Username",
+                optional: true,
+                maxLength: 32
+            },
+            {
+                key: "password",
+                label: "Password",
+                secret: true,
+                optional: true,
+                maxLength: 32
+            },
+            {
+                key: "prefix",
+                label: "Topic prefix",
+                hint: "What the locks publish under. Nuki's own default, unless you changed it.",
+                defaultValue: "nuki",
+                optional: true,
+                maxLength: 60
+            }
+        ],
+        kinds: ["lock", "opener"],
+        search: ["mqtt", "local", "broker", "smart lock pro", "ultra", "go", "offline", "lan"]
+    },
+    {
         id: "tuya-cloud",
         brand: "Tuya",
         logo: "tuya",
