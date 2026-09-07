@@ -63,9 +63,12 @@ describe("codes and sign-ins", () => {
                 })
             )
         ).toBe("updates");
+        // An invoice is a bill rather than a record of one, so it sits with the
+        // rest of what is about to be taken - but it is still not a code, which
+        // is what this is checking.
         expect(
             categoriseMail(message({ subject: "Invoice 4471 is ready", fromAddress: "billing@shop.example" }))
-        ).toBe("updates");
+        ).toBe("billing");
     });
 
     it("does not take a person mentioning a password for a code", () => {
@@ -139,6 +142,91 @@ describe("the other three", () => {
                 })
             )
         ).toBe("updates");
+    });
+});
+
+describe("money that is about to move", () => {
+    it("catches the reminder a payment plan sends before it takes anything", () => {
+        // The one that started this: a card sends the dates of the next
+        // instalments, days before the first of them leaves the account.
+        expect(
+            categoriseMail(
+                message({
+                    subject: "JAVIER, recuerda las fechas de los próximos pagos de tu compra",
+                    snippet: "08/26/2026 · 08/27/2026 · 09/03/2026",
+                    fromAddress: "noreply@pagos.example"
+                })
+            )
+        ).toBe("billing");
+    });
+
+    it("catches a subscription renewing, in the languages a mailbox arrives in", () => {
+        const subjects = [
+            "Your subscription renews on 3 October",
+            "Tu suscripción se renovará automáticamente",
+            "Votre abonnement sera renouvelé",
+            "Il tuo abbonamento si rinnova",
+            "A sua assinatura será renovada"
+        ];
+        for (const subject of subjects) {
+            expect(categoriseMail(message({ subject, fromAddress: "billing@example.com" }))).toBe(
+                "billing"
+            );
+        }
+    });
+
+    it("catches a card that is about to fail, which is the one nobody wants to miss", () => {
+        expect(
+            categoriseMail(message({ subject: "Your card is expiring", fromAddress: "no-reply@example.com" }))
+        ).toBe("billing");
+        expect(
+            categoriseMail(message({ subject: "Payment failed for your plan", fromAddress: "no-reply@example.com" }))
+        ).toBe("billing");
+        expect(
+            categoriseMail(message({ subject: "Tu prueba gratuita termina mañana", fromAddress: "hi@example.com" }))
+        ).toBe("billing");
+    });
+
+    it("takes an invoice, and leaves a receipt where it was", () => {
+        // A demand and a record are not the same mail: one is worth reading
+        // before the money moves and the other after.
+        expect(categoriseMail(message({ subject: "Invoice 2026-114 is due", fromAddress: "a@b.example" }))).toBe(
+            "billing"
+        );
+        expect(categoriseMail(message({ subject: "Factura de septiembre", fromAddress: "a@b.example" }))).toBe(
+            "billing"
+        );
+        expect(
+            categoriseMail(message({ subject: "Your order has shipped", fromAddress: "shop@example.com" }))
+        ).toBe("updates");
+        expect(categoriseMail(message({ subject: "Tu pedido va en reparto", fromAddress: "shop@example.com" }))).toBe(
+            "updates"
+        );
+    });
+
+    it("wins over the offer wrapped around it", () => {
+        // Half of these arrive dressed as a sale - "your plan renews, and here
+        // is 20% off the annual one" - and the half that matters is the renewal.
+        expect(
+            categoriseMail(
+                message({
+                    subject: "Your plan renews soon - save 20% on annual",
+                    fromAddress: "news@example.com",
+                    headers: { "list-unsubscribe": "<mailto:no@example.com>" }
+                })
+            )
+        ).toBe("billing");
+    });
+
+    it("still leaves a code alone, which expires sooner than any bill", () => {
+        expect(
+            categoriseMail(
+                message({
+                    subject: "Your verification code for your subscription",
+                    fromAddress: "no-reply@example.com"
+                })
+            )
+        ).toBe("security");
     });
 });
 

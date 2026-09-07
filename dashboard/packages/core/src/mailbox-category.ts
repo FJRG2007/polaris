@@ -7,7 +7,7 @@
  * message stays exactly where it is, in the same folder, with the same flags -
  * it is only a way of looking at the same inbox.
  *
- * Five kinds, and the fifth is the one no other client has:
+ * Six kinds, and two of them are ones no other client has:
  *
  * - **security** is a code, a link, or a notice about signing in. It is the most
  *   time-sensitive mail anybody gets and the least worth keeping: the code in it
@@ -16,6 +16,12 @@
  *   own.
  * - **social** is somebody's account on a service telling them about people.
  * - **promotions** is somebody selling something.
+ * - **billing** is money about to move: a subscription renewing, a card being
+ *   charged, an invoice falling due, a trial ending. It is separated from the
+ *   rest of the transactional pile because it is the only mail that is worth
+ *   reading BEFORE it happens - a receipt tells you what you spent, and one of
+ *   these tells you what you are about to spend, which is the one somebody would
+ *   have wanted to see.
  * - **updates** is a receipt, an order, a statement, a delivery - transactional
  *   mail nobody replies to but everybody needs to find later.
  * - **primary** is what is left, which is what somebody actually wants to read.
@@ -30,7 +36,7 @@
  * feature doing harm.
  */
 
-export const MAIL_CATEGORIES = ["primary", "social", "promotions", "updates", "security"] as const;
+export const MAIL_CATEGORIES = ["primary", "social", "promotions", "billing", "updates", "security"] as const;
 
 export type MailCategory = (typeof MAIL_CATEGORIES)[number];
 
@@ -38,6 +44,7 @@ export const MAIL_CATEGORY_LABELS: Readonly<Record<MailCategory, string>> = {
     primary: "Primary",
     social: "Social",
     promotions: "Promotions",
+    billing: "Subscriptions and bills",
     updates: "Updates",
     security: "Codes and sign-ins"
 };
@@ -46,6 +53,7 @@ export const MAIL_CATEGORY_NOTES: Readonly<Record<MailCategory, string>> = {
     primary: "People writing to you, and anything Polaris could not place.",
     social: "What the services you use say about other people.",
     promotions: "Offers, newsletters, and anything else selling something.",
+    billing: "Renewals, charges and invoices - what is about to be taken, while there is still time to do something about it.",
     updates: "Receipts, orders, deliveries and statements.",
     security: "Verification codes, sign-in links and password notices. They stop working long before they stop taking up room."
 };
@@ -207,10 +215,104 @@ const PROMOTION_WORDS: readonly string[] = [
     "offerta"
 ];
 
+/**
+ * Words that mean money is about to move, or has moved on a schedule.
+ *
+ * The distinction from an update is tense and repetition rather than subject:
+ * "your order has shipped" is something that happened once and is over, and
+ * "your plan renews on the 3rd" is something that will happen again next month
+ * whether or not anybody reads it. That second kind is the only mail in an inbox
+ * with a deadline attached, which is the whole reason it gets a tab.
+ *
+ * An invoice is here rather than under updates for the same reason: it is a
+ * demand, not a record.
+ */
+const BILLING_WORDS: readonly string[] = [
+    // English
+    "subscription",
+    "subscriptions",
+    "renew",
+    "renews",
+    "renewal",
+    "auto-renew",
+    "automatically renew",
+    "will be charged",
+    "we will charge",
+    "upcoming payment",
+    "next payment",
+    "payment due",
+    "amount due",
+    "due on",
+    "past due",
+    "payment failed",
+    "card declined",
+    "card expiring",
+    "card is expiring",
+    "card expires",
+    "card will expire",
+    "billing",
+    "invoice",
+    "your plan",
+    "plan renews",
+    "membership",
+    "trial ends",
+    "trial is ending",
+    "free trial ends",
+    "direct debit",
+    "instalment",
+    "installment",
+    // Spanish
+    "suscripcion",
+    "suscripciones",
+    "renovacion",
+    "se renueva",
+    "se renovara",
+    "renovacion automatica",
+    "proximo pago",
+    "proximos pagos",
+    "proximo cobro",
+    "se te cobrara",
+    "cargo en tu",
+    "cuota",
+    "cuotas",
+    "factura",
+    "facturacion",
+    "importe pendiente",
+    "pago pendiente",
+    "pago fallido",
+    "domiciliacion",
+    "tarjeta caduca",
+    "tu plan",
+    "prueba gratuita termina",
+    "periodo de prueba",
+    // Portuguese
+    "assinatura",
+    "renovacao",
+    "proxima cobranca",
+    "fatura",
+    "mensalidade",
+    // French
+    "abonnement",
+    "renouvellement",
+    "prochain paiement",
+    "prelevement",
+    "facture",
+    // German
+    "abonnement",
+    "verlangerung",
+    "nachste zahlung",
+    "rechnung faellig",
+    "lastschrift",
+    // Italian
+    "abbonamento",
+    "rinnovo",
+    "prossimo pagamento",
+    "fattura"
+];
+
 /** Words that mean a transaction happened. */
 const UPDATE_WORDS: readonly string[] = [
     "receipt",
-    "invoice",
     "your order",
     "order confirmation",
     "order #",
@@ -220,12 +322,10 @@ const UPDATE_WORDS: readonly string[] = [
     "tracking",
     "payment",
     "statement",
-    "subscription renew",
     "your booking",
     "itinerary",
     "ticket",
     "refund",
-    "factura",
     "recibo",
     "tu pedido",
     "pedido",
@@ -234,7 +334,6 @@ const UPDATE_WORDS: readonly string[] = [
     "entregado",
     "seguimiento",
     "pago",
-    "cuota",
     "reembolso",
     "tu reserva",
     "en aduanas",
@@ -244,10 +343,8 @@ const UPDATE_WORDS: readonly string[] = [
     "livraison",
     "bestellung",
     "lieferung",
-    "rechnung",
     "ordine",
-    "spedizione",
-    "fattura"
+    "spedizione"
 ];
 
 /**
@@ -256,8 +353,9 @@ const UPDATE_WORDS: readonly string[] = [
  * The order of the questions is the whole of the logic. Security first, because
  * a code from a shop is still a code and burying it under Promotions is what
  * makes somebody go looking for their mail in another client. Social next,
- * because those senders are unambiguous. Then the two that both look like bulk
- * mail, told apart by what they say. Everything else is somebody writing.
+ * because those senders are unambiguous. Then money about to move, which is the
+ * only mail with a deadline on it. Then the two that both look like bulk mail,
+ * told apart by what they say. Everything else is somebody writing.
  */
 export function categoriseMail(message: CategorisableMessage): MailCategory {
     const subject = flatten(message.subject);
@@ -285,7 +383,13 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
 
     const promotional = PROMOTION_WORDS.some((word) => words.includes(word));
     const transactional = UPDATE_WORDS.some((word) => words.includes(word));
+    const billed = BILLING_WORDS.some((word) => words.includes(word));
 
+    // Money about to move comes before everything except a code, and before the
+    // word that is selling something: half of these arrive dressed as an offer -
+    // "your plan renews, and here is 20% off the annual one" - and the half a
+    // reader needs is the renewal.
+    if (billed) return "billing";
     if (transactional && !promotional) return "updates";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
