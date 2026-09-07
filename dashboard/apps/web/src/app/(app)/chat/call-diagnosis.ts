@@ -56,6 +56,26 @@ export interface HeardFrom {
     readonly muted: boolean;
     /** An audio track of theirs is subscribed to here. */
     readonly subscribed: boolean;
+    /**
+     * They have a microphone on the call at all.
+     *
+     * The difference between somebody whose sound is not getting here and
+     * somebody who never shared a microphone in the first place - which is what
+     * a browser that refused the permission looks like from the other side. Read
+     * as one silence, both were reported as a fault in the call, and the advice
+     * was to leave and rejoin: a sentence that blames Polaris for a permission
+     * dialog somebody dismissed on their own machine.
+     */
+    readonly sharing: boolean;
+    /**
+     * The call server still hears from them.
+     *
+     * A closed tab is not a disconnection the instant it happens: the server
+     * waits out its own timeout before it drops somebody, and for those seconds
+     * they are still in the room with nothing arriving. That is a person who has
+     * gone, not a call that is broken, and it is what this tells apart.
+     */
+    readonly reachable: boolean;
     /** Packets from them have arrived recently. */
     readonly arriving: boolean;
     /** Those packets carried sound rather than silence, recently. */
@@ -103,10 +123,25 @@ export interface CallAudioLine {
     readonly state: "good" | "bad" | "idle";
 }
 
+/**
+ * Whose problem it is.
+ *
+ * `fault` is something wrong here, in this call, that this reader can usually do
+ * something about. `theirs` is the other half and it is the reason this exists:
+ * a person who closed their tab, or whose browser never let them share a
+ * microphone, is not a failing call - and saying so in the same yellow warning,
+ * with the same "leave and rejoin", tells somebody Polaris broke when Polaris did
+ * nothing at all. It is still worth saying; it is not worth alarming anybody
+ * about.
+ */
+export type CallAudioBlame = "fault" | "theirs";
+
 /** What the call says about its own sound. */
 export interface CallAudioReport {
     /** Whether sound should be working. False is what draws the panel at all. */
     readonly ok: boolean;
+    /** Whether what is being reported is this call's problem or the other end's. */
+    readonly blame: CallAudioBlame;
     /** The first thing that is wrong, in the reader's own terms. Empty while
      *  nothing is. */
     readonly headline: string;
@@ -118,7 +153,7 @@ export interface CallAudioReport {
 
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
-export const UNKNOWN_AUDIO: CallAudioReport = { ok: true, headline: "", fix: "", lines: [] };
+export const UNKNOWN_AUDIO: CallAudioReport = { ok: true, blame: "fault", headline: "", fix: "", lines: [] };
 
 /** What a screen says when the call server is the thing to look at. Repeated in
  *  two headlines, and it is the same sentence both times. */
@@ -199,6 +234,13 @@ function heardLine(others: readonly HeardFrom[]): CallAudioLine {
     if (audible.some((person) => person.subscribed)) {
         return { label, value: "Not reaching this device", state: "bad" };
     }
+    // Neither of these is a fault in this call, so neither is drawn as one.
+    if (audible.every((person) => !person.reachable)) {
+        return { label, value: "They have stopped answering", state: "idle" };
+    }
+    if (audible.every((person) => !person.sharing)) {
+        return { label, value: "No microphone shared", state: "idle" };
+    }
     return { label, value: "Nothing is being sent", state: "bad" };
 }
 
@@ -237,6 +279,16 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
     ];
     const said = (headline: string, fix: string): CallAudioReport => ({
         ok: false,
+        blame: "fault",
+        headline,
+        fix,
+        lines
+    });
+    /** The same, for something that is happening at the other end. Nothing here
+     *  is wrong, so it is drawn as a note rather than as an alarm. */
+    const theirs = (headline: string, fix: string): CallAudioReport => ({
+        ok: false,
+        blame: "theirs",
         headline,
         fix,
         lines
@@ -298,6 +350,31 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
     // Nobody to hear. A call where everybody else is muted is a working call.
     if (audible.length === 0) return { ...UNKNOWN_AUDIO, lines };
 
+    // Gone, or going. A browser that was closed is still in the room until the
+    // server times it out, and for those seconds it looks exactly like a call
+    // that has broken - so it is named before anything here is blamed.
+    const away = audible.filter((person) => !person.reachable);
+    if (away.length === audible.length) {
+        return theirs(
+            audible.length === 1
+                ? `${audible[0]?.name} has stopped answering. If they closed the tab or lost their connection, they will drop out of the call in a moment.`
+                : "Nobody else is answering. If they closed their tabs or lost their connection, they will drop out of the call in a moment.",
+            ""
+        );
+    }
+
+    // Never shared one. What a refused permission looks like from this side, and
+    // there is nothing here to repair: the answer is on their machine, in their
+    // own browser, and it is theirs to give.
+    if (audible.every((person) => !person.sharing)) {
+        return theirs(
+            audible.length === 1
+                ? `${audible[0]?.name} has not shared a microphone with this call.`
+                : "Nobody else has shared a microphone with this call.",
+            "Their browser has to allow it, beside their own address bar. Nothing here needs changing."
+        );
+    }
+
     if (audible.every((person) => !person.subscribed)) {
         return said(
             audible.length === 1
@@ -332,5 +409,5 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         );
     }
 
-    return { ok: true, headline: "", fix: "", lines };
+    return { ok: true, blame: "fault", headline: "", fix: "", lines };
 }

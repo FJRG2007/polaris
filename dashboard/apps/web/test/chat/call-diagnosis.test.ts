@@ -39,6 +39,8 @@ function heard(over: Partial<HeardFrom> = {}): HeardFrom {
         name: "Ana",
         muted: false,
         subscribed: true,
+        sharing: true,
+        reachable: true,
         arriving: true,
         carrying: true,
         turnedDown: false,
@@ -280,5 +282,61 @@ describe("a call that has never had a byte of sound", () => {
 
         expect(report.fix).toContain("between here and the call server");
         expect(report.fix).not.toContain("Call ports");
+    });
+});
+
+describe("what is happening at the other end", () => {
+    it("says somebody has stopped answering rather than blaming the call", () => {
+        // A closed tab is not a disconnection the instant it happens: the server
+        // waits out its own timeout, and for those seconds they are still in the
+        // room with nothing arriving. That used to read as a broken call, in
+        // yellow, telling somebody to leave and rejoin over a tab somebody else
+        // shut.
+        const gone = working({
+            others: [heard({ reachable: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        const report = diagnoseCall(gone);
+        expect(report.ok).toBe(false);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("Ana has stopped answering");
+        // Nothing to do, so nothing is suggested. An instruction here would be
+        // an instruction to fix somebody else's browser from this one.
+        expect(report.fix).toBe("");
+        expect(report.headline).not.toMatch(/Polaris/);
+    });
+
+    it("says a microphone was never shared rather than that sound is not arriving", () => {
+        // What a refused permission looks like from the other side. The advice is
+        // theirs to act on and it says so.
+        const silent = working({
+            others: [heard({ sharing: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        const report = diagnoseCall(silent);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("has not shared a microphone");
+        expect(report.fix).toContain("their own address bar");
+        expect(report.fix).not.toMatch(/leave the call/i);
+    });
+
+    it("draws neither of them as a failed check", () => {
+        const gone = working({
+            others: [heard({ reachable: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        expect(row(gone, "What you are being sent")).toBe("They have stopped answering");
+        const silent = working({
+            others: [heard({ sharing: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        expect(row(silent, "What you are being sent")).toBe("No microphone shared");
+    });
+
+    it("still blames the call when they are here and sharing", () => {
+        // The case this must not swallow: somebody present, publishing, and none
+        // of it arriving is a fault worth the yellow.
+        const broken = working({
+            others: [heard({ subscribed: false, arriving: false, carrying: false })]
+        });
+        const report = diagnoseCall(broken);
+        expect(report.blame).toBe("fault");
+        expect(report.fix).not.toBe("");
     });
 });

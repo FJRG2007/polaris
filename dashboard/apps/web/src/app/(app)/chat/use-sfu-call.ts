@@ -2331,10 +2331,18 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         ): Promise<HeardFrom> {
             const muted = watching.current.states.get(person.id)?.muted ?? false;
             const turnedDown = volumeFor(person.volumeKey) === 0;
-            const publication = current.remoteParticipants
-                .get(person.id)
-                ?.getTrackPublication(MICROPHONE);
+            const remote = current.remoteParticipants.get(person.id);
+            const publication = remote?.getTrackPublication(MICROPHONE);
             const live = publication?.track?.mediaStreamTrack.readyState === "live";
+            // Whether they have a microphone on the call at all, and whether the
+            // server still hears from them. Both read structurally, like the
+            // statistics below: naming the media client's own enum here would
+            // drag the module into every bundle. A build that does not report the
+            // quality reads as reachable, which is exactly how this behaved
+            // before it was asked.
+            const sharing = Boolean(publication);
+            const quality = (remote as { connectionQuality?: string } | undefined)?.connectionQuality;
+            const reachable = quality !== "lost";
             // Structurally, as the sender statistics are read: naming the media
             // client's own class here would drag the module into every bundle -
             // see `livekit` at the top of this file.
@@ -2352,6 +2360,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     name: person.name,
                     muted,
                     subscribed: false,
+                    sharing,
+                    reachable,
                     arriving: false,
                     carrying: false,
                     turnedDown
@@ -2382,6 +2392,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 name: person.name,
                 muted,
                 subscribed: true,
+                sharing,
+                reachable,
                 arriving: at - moved.bytesAt < ARRIVING_WITHIN_MS,
                 carrying: at - moved.energyAt < CARRYING_WITHIN_MS,
                 turnedDown
