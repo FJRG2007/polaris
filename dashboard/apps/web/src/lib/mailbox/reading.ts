@@ -26,6 +26,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { imageUrl } from "./image-token";
 import { addressesFrom } from "./json";
 
 /** How remote content is treated. Read off the account. */
@@ -126,6 +127,9 @@ export async function readableMessage(
     /** The message's own id, because the pictures are served back through an
      *  address that names it. */
     messageId: string,
+    /** Who is reading, because that address carries a pass and the pass says who
+     *  it was made for - the frame it is fetched from has no session to speak of. */
+    userId: string,
     policy: ReadingPolicy,
     message: {
         readonly bodyHtml: string | null;
@@ -142,18 +146,22 @@ export async function readableMessage(
     const trackers = core.trackersIn(resources);
     const allowed = await remoteAllowedFor(accountId, policy.remoteContent, from);
 
-    let html = original;
-    if (policy.cleanLinks) html = cleanLinks(html);
     // Every outside address is pointed at this server rather than at the
     // sender's. The browser fetches from Polaris, Polaris fetches from them, and
     // what a tracking pixel learns is that a server asked - not who read it,
     // from where, on what, or when they opened it.
     //
+    // Done to the markup exactly as it is stored, BEFORE anything else touches
+    // it. What serves those pictures back has to run the same numbering over the
+    // same input to know which address a number meant, and it holds only what is
+    // stored - so anything done first here would be a difference it cannot see.
+    //
     // A mailbox set to block still blocks: the addresses are held on
     // `data-remote-*` and nothing is fetched at all.
-    html = allowed
-        ? core.proxyRemoteContent(html, (index) => `/api/mail/image/${messageId}/${index}`)
-        : core.holdRemoteContent(html);
+    let html = allowed
+        ? core.proxyRemoteContent(original, (index) => imageUrl({ messageId, index, userId }))
+        : core.holdRemoteContent(original);
+    if (policy.cleanLinks) html = cleanLinks(html);
 
     return {
         html,

@@ -14,8 +14,8 @@
  * looks at image tags.
  */
 
-import { describe, expect, it } from "vitest";
 import * as mailbox from "./mailbox.js";
+import { describe, expect, it } from "vitest";
 import * as providers from "./mailbox-providers.js";
 import type { MailEnvelope, MailRule, MailRuleSubject } from "./mailbox.js";
 
@@ -162,6 +162,52 @@ describe("what the list shows", () => {
     it("cuts a long one rather than returning a paragraph", () => {
         expect(mailbox.snippetFrom("x".repeat(400)).length).toBeLessThanOrEqual(200);
     });
+
+    it("undoes the encoding a message travelled in", () => {
+        // Straight out of a real thread. Every one of these was on screen.
+        expect(mailbox.snippetFrom("Hola Mar=C3=ADa, =C2=BFqu=C3=A9 tal?")).toBe("Hola María, ¿qué tal?");
+        expect(mailbox.snippetFrom("primera=0Asegunda")).toBe("primera segunda");
+    });
+
+    it("puts a soft-wrapped paragraph back together", () => {
+        // The break is the encoder's, not the author's, so the halves join
+        // exactly as they were - the space before it is the author's and stays.
+        expect(mailbox.snippetFrom("una linea que sigue =\r\nen la siguiente")).toBe(
+            "una linea que sigue en la siguiente"
+        );
+        // Wrapped mid-word, the word comes back whole rather than split in two.
+        expect(mailbox.snippetFrom("inque=\r\nbrantable")).toBe("inquebrantable");
+    });
+
+    it("leaves prose that merely contains an equals sign alone", () => {
+        // `=50` is the byte for `P`. Decoding this would put "P" in the middle of
+        // somebody's sentence, so nothing is decoded without evidence.
+        expect(mailbox.snippetFrom("la mesa mide width=50cm de ancho")).toBe(
+            "la mesa mide width=50cm de ancho"
+        );
+    });
+
+    it("reads a message that has no plain half", () => {
+        const html = `
+            <html><head><style>.a{color:red}</style><title>Ignore me</title></head>
+            <body><!-- hidden --><p>Hola&nbsp;Jos&#233;</p><p>Nos vemos &amp; gracias</p>
+            <script>alert(1)</script></body></html>
+        `;
+        expect(mailbox.snippetFrom(html)).toBe("Hola José Nos vemos & gracias");
+    });
+
+    it("strips the padding a preheader is stuffed with", () => {
+        // Hundreds of these follow the opening line of most marketing mail, for
+        // no reason other than to be what a mail client shows instead.
+        const padded = `Your order has shipped${"\u200b\u00ad\u200c".repeat(40)}Track it now`;
+        expect(mailbox.snippetFrom(padded)).toBe("Your order has shippedTrack it now");
+    });
+
+    it("is safe to run twice, which is what repairs an old one", () => {
+        const once = mailbox.snippetFrom("Hola Mar=C3=ADa &amp; <b>Jos=C3=A9</b>");
+        expect(mailbox.snippetFrom(once)).toBe(once);
+        expect(once).toBe("Hola María & José");
+    });
 });
 
 describe("folders", () => {
@@ -273,6 +319,91 @@ describe("privacy", () => {
         expect(held).not.toContain(' src="https://');
         expect(held).toContain('data-remote-src="https://x.example/a.png"');
         expect(held).toContain('data-remote-srcset="https://x.example/b.png 2x"');
+    });
+
+    /**
+     * The numbering is a promise to whatever serves the pictures back.
+     *
+     * That side turns a number into an address by running this same function
+     * over the same markup and taking what it hands out, so these tests are the
+     * contract between the two. They are written from the three shapes that
+     * broke it when a second function walked the markup on its own: an address
+     * the sender used twice, a `srcset`, and a background beside an image.
+     */
+    function proxied(html: string): { html: string; urls: string[] } {
+        const urls: string[] = [];
+        const out = mailbox.proxyRemoteContent(html, (index, url) => {
+            urls[index] = url;
+            return `#${index}`;
+        });
+        return { html: out, urls };
+    }
+
+    it("gives an address the sender used twice its own number each time", () => {
+        const { html, urls } = proxied(
+            '<img src="https://a.ex/logo.png"><img src="https://b.ex/pixel.gif"><img src="https://a.ex/logo.png">'
+        );
+        // Three pictures, three numbers. Collapsing the repeat is what made every
+        // number after it point one address too early, and the last point at
+        // nothing at all.
+        expect(html).toBe('<img src="#0"><img src="#1"><img src="#2">');
+        expect(urls).toEqual([
+            "https://a.ex/logo.png",
+            "https://b.ex/pixel.gif",
+            "https://a.ex/logo.png"
+        ]);
+    });
+
+    it("numbers a srcset, and hands over the candidate it kept", () => {
+        const { html, urls } = proxied('<img src="https://a.ex/1.png" srcset="https://a.ex/2.png 2x, https://a.ex/3.png 3x">');
+        expect(html).toBe('<img src="#0" srcset="#1">');
+        expect(urls).toEqual(["https://a.ex/1.png", "https://a.ex/2.png"]);
+    });
+
+    it("leaves a srcset with nothing outside in it unnumbered", () => {
+        // Numbering it would move every address after it by one.
+        const { html, urls } = proxied('<img srcset="cid:logo 2x"><img src="https://a.ex/1.png">');
+        expect(html).toBe('<img srcset="cid:logo 2x"><img src="#0">');
+        expect(urls).toEqual(["https://a.ex/1.png"]);
+    });
+
+    it("reads a background attribute where it actually sits", () => {
+        const { html, urls } = proxied('<td background="https://bg.ex/b.png"><img src="https://a.ex/1.png"></td>');
+        expect(html).toBe('<td background="#0"><img src="#1"></td>');
+        expect(urls).toEqual(["https://bg.ex/b.png", "https://a.ex/1.png"]);
+    });
+
+    it("catches an address nobody put quotes around", () => {
+        const { html, urls } = proxied("<img src=https://a.ex/1.png width=10>");
+        expect(html).toBe('<img src="#0" width=10>');
+        expect(urls).toEqual(["https://a.ex/1.png"]);
+    });
+
+    it("resolves a number back to the address it stood for", () => {
+        // Exactly what the route does: rewrite once to draw the message, walk
+        // again to answer one picture. The two must agree on every index.
+        const html = `
+            <img src="https://a.ex/logo.png">
+            <td background="https://bg.ex/b.png" style="background:url('https://a.ex/tile.png')"></td>
+            <img src="https://a.ex/logo.png" srcset="https://a.ex/logo@2x.png 2x">
+            <video poster="https://a.ex/still.jpg"></video>
+        `;
+        const { urls } = proxied(html);
+        expect(urls.length).toBeGreaterThan(4);
+        for (const [index, url] of urls.entries()) {
+            let found = "";
+            mailbox.proxyRemoteContent(html, (position, at) => {
+                if (position === index) found = at;
+                return "";
+            });
+            expect(found, `index ${index}`).toBe(url);
+        }
+    });
+
+    it("leaves a message with nothing to fetch untouched", () => {
+        const { html, urls } = proxied('<img src="cid:logo"><a href="https://a.ex/page">read</a>');
+        expect(html).toBe('<img src="cid:logo"><a href="https://a.ex/page">read</a>');
+        expect(urls).toEqual([]);
     });
 
     it("leaves an inline picture alone, which is part of the message rather than a fetch", () => {

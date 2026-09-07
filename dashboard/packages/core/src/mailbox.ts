@@ -182,18 +182,137 @@ export function sameAddress(left: string, right: string): boolean {
 /**
  * The line under the subject in the list.
  *
- * Built from the plain-text body wherever there is one, because the alternative
- * is stripping tags out of marketing HTML and showing somebody the words "view
- * this email in your browser" four hundred times. Quoted history is dropped:
- * the interesting part of a reply is what was added, not what was replied to.
+ * Everything a mail server hands over arrives dressed for the journey rather
+ * than for a person, and a preview that shows it undressed is the difference
+ * between a mail client and a dump. Four things are undone here, and every one
+ * of them was visible in the list before it was:
+ *
+ * - **The transfer encoding.** `=0A`, `=20`, `Mar=C3=ADa`. A part is wrapped in
+ *   quoted-printable so it can cross SMTP, and text read without undoing it has
+ *   an escape sequence everywhere a person put an accent or a line break.
+ * - **The markup.** A message with no plain half leaves tags, `&nbsp;` and
+ *   `&#39;` in the line. Entities are resolved rather than deleted, or a
+ *   sender's own ampersand disappears out of their sentence.
+ * - **The padding.** A marketing preheader is followed by hundreds of invisible
+ *   characters - zero-width spaces, joiners, soft hyphens - put there for
+ *   exactly one reason: to push everything else out of the preview line every
+ *   mail client shows. They come out.
+ * - **The quoted history.** The interesting part of a reply is what was added.
+ *
+ * Safe to run on a line that is already clean, which is what makes it the repair
+ * as well as the rule: a preview stored before any of this existed is tidied on
+ * its way to the screen, so nobody has to resync a mailbox to stop looking at
+ * `=C3=ADa`.
  */
 export function snippetFrom(text: string, limit = 200): string {
-    const withoutQuotes = text
+    const decoded = undoQuotedPrintable(text);
+    const words = looksLikeMarkup(decoded) ? stripMarkup(decoded) : decoded;
+    const collapsed = words
         .split(/\r?\n/)
-        .filter((line) => !line.startsWith(">"))
-        .join(" ");
-    const collapsed = withoutQuotes.replace(/\s+/g, " ").trim();
+        .filter((line) => !line.trimStart().startsWith(">"))
+        .join(" ")
+        .replace(INVISIBLE, "")
+        .replace(/\s+/g, " ")
+        .trim();
     return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
+}
+
+/** Padding a preheader is stuffed with so that nothing but the sender's opening
+ *  line reaches the list. Invisible on screen and hundreds long. */
+const INVISIBLE = /[\u00ad\u034f\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2064\ufeff]/g;
+
+/**
+ * Quoted-printable, undone - but only where there is evidence of it.
+ *
+ * `width=50cm` is a sentence, not an escape, and decoding it would put a `P` in
+ * somebody's mail. So this asks for proof: a soft line break, which is only ever
+ * an encoding artefact, or an escape that stands for a byte no keyboard types -
+ * a control character or anything above ASCII. Both are what real
+ * quoted-printable is full of and neither appears in prose.
+ */
+function undoQuotedPrintable(text: string): string {
+    const soft = /=\r?\n/.test(text);
+    const telling = (text.match(/=[0-9A-Fa-f]{2}/g) ?? []).some((escape) => {
+        const byte = Number.parseInt(escape.slice(1), 16);
+        return byte < 0x20 || byte >= 0x80;
+    });
+    if (!soft && !telling) return text;
+
+    // Walked as bytes rather than characters, because a part is often half
+    // decoded already - a subject line put back by the header decoder beside a
+    // body that was never touched - and the two have to survive together.
+    const source = new TextEncoder().encode(text.replace(/=\r?\n/g, ""));
+    const out: number[] = [];
+    for (let at = 0; at < source.length; at += 1) {
+        if (source[at] !== 0x3d) {
+            out.push(source[at]!);
+            continue;
+        }
+        const hex = String.fromCharCode(source[at + 1] ?? 0, source[at + 2] ?? 0);
+        if (/^[0-9a-f]{2}$/i.test(hex)) {
+            out.push(Number.parseInt(hex, 16));
+            at += 2;
+            continue;
+        }
+        // A lone `=`. Senders write them and dropping the rest of the line over
+        // one is not an option.
+        out.push(0x3d);
+    }
+    return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(out));
+}
+
+/** Whether this is a message's HTML half rather than its text. Deliberately
+ *  loose: a false positive costs a stripped angle bracket, a false negative
+ *  costs a preview line made of tags. */
+function looksLikeMarkup(text: string): boolean {
+    return /<\/?[a-z][a-z0-9]*(?:\s[^<>]*)?>/i.test(text);
+}
+
+const NAMED_ENTITIES: Readonly<Record<string, string>> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    nbsp: " ",
+    ndash: "-",
+    mdash: "-",
+    hellip: "…",
+    rsquo: "'",
+    lsquo: "'",
+    ldquo: '"',
+    rdquo: '"',
+    zwnj: "",
+    zwj: "",
+    shy: ""
+};
+
+/** Enough tag handling for a preview line, and never for anything drawn: what
+ *  is shown as HTML goes through the sanitizer and a sandboxed frame. */
+function stripMarkup(html: string): string {
+    return html
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        // Whole elements whose contents are not the message: a stylesheet in the
+        // body is words, and they used to be the preview.
+        .replace(/<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, " ")
+        // Anything that ends a line becomes one, so two sentences do not run
+        // together into one word.
+        .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6]|\/table)\b[^>]*>/gi, " ")
+        .replace(/<[^>]*>/g, "")
+        .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => codePoint(Number.parseInt(hex, 16)))
+        .replace(/&#(\d+);/g, (_match, digits: string) => codePoint(Number.parseInt(digits, 10)))
+        .replace(/&([a-z]+);/gi, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match);
+}
+
+/** One character from its number, or nothing when a message names one that does
+ *  not exist. */
+function codePoint(value: number): string {
+    if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return "";
+    try {
+        return String.fromCodePoint(value);
+    } catch {
+        return "";
+    }
 }
 
 /** The history a plain-text reply carries above it, attributed the way every
@@ -907,31 +1026,71 @@ export function textToHtml(text: string): string {
  * server's own request - not the reader's address, not their browser, not the
  * moment they opened it beyond the moment Polaris asked.
  *
- * `toProxy` is given the index of the address in the same order
- * `remoteResourcesIn` reports them, and nothing else: the URL is never handed
- * back to the browser and never travels in a link, so this cannot be turned into
- * an open proxy by anybody typing one.
+ * **`toProxy` is given the address as well as its number, and that is the whole
+ * trick.** Whatever serves those pictures back has to turn a number into the
+ * address it stood for, and the only way to be sure it lands on the same one is
+ * to run this same function over the same markup and collect what it hands out.
+ * A second function that walked the markup separately is what this used to rely
+ * on, and it disagreed three ways: it skipped a repeat of an address the sender
+ * used twice, it never looked at `srcset` or `poster`, and it read the
+ * backgrounds in a different order. Any message with its logo in the header and
+ * the footer drew the wrong picture from that point on, and the last few
+ * numbers pointed at nothing at all.
+ *
+ * The address itself is never handed back to the browser and never travels in a
+ * link, so this still cannot be turned into an open proxy by anybody typing one.
  */
-export function proxyRemoteContent(html: string, toProxy: (index: number) => string): string {
+export function proxyRemoteContent(
+    html: string,
+    toProxy: (index: number, url: string) => string
+): string {
     let index = -1;
-    const next = () => {
-        index += 1;
-        return toProxy(index);
-    };
+    const next = (url: string) => toProxy((index += 1), url.trim());
     return (
         html
+            // Quoted or bare. A mail server hands over what the sender's client
+            // wrote, and plenty of it predates anybody minding: an unquoted
+            // address that slipped through here would be the one picture in the
+            // message still fetched straight from its sender.
             .replace(
-                /\b(src|background|poster)\s*=\s*(["'])(https?:\/\/[^"']*)\2/gi,
-                (_match, name: string, quote: string) => `${name}=${quote}${next()}${quote}`
+                /\b(src|background|poster)\s*=\s*(?:(["'])(https?:\/\/[^"']*)\2|(https?:\/\/[^\s>"'`]+))/gi,
+                (
+                    _match,
+                    name: string,
+                    quote: string | undefined,
+                    quoted: string | undefined,
+                    bare: string | undefined
+                ) => {
+                    const wrap = quote ?? '"';
+                    return `${name}=${wrap}${next(quoted ?? bare ?? "")}${wrap}`;
+                }
             )
             // A srcset names several addresses and the browser picks one. Only
             // the first is kept: the rest are the same picture at other sizes,
             // and a proxy that had to serve every candidate would fetch four
-            // pictures to draw one.
+            // pictures to draw one. One with nothing outside in it is left alone
+            // rather than numbered, or the count would move for a rewrite that
+            // never happened.
             .replace(
-                /\bsrcset\s*=\s*(["'])[^"']*\1/gi,
-                (_match, quote: string) => `srcset=${quote}${next()}${quote}`
+                /\bsrcset\s*=\s*(["'])([^"']*)\1/gi,
+                (match, quote: string, list: string) => {
+                    const first = firstRemoteCandidate(list);
+                    return first ? `srcset=${quote}${next(first)}${quote}` : match;
+                }
             )
-            .replace(/url\(\s*(["']?)https?:\/\/[^"')]+\1\s*\)/gi, () => `url(${next()})`)
+            .replace(
+                /url\(\s*(["']?)(https?:\/\/[^"')]+)\1\s*\)/gi,
+                (_match, _quote: string, url: string) => `url(${next(url)})`
+            )
     );
+}
+
+/** The first address in a srcset worth fetching. A list can hold a `cid:` or a
+ *  data URI, and neither is something to proxy. */
+function firstRemoteCandidate(srcset: string): string {
+    for (const candidate of srcset.split(",")) {
+        const url = candidate.trim().split(/\s+/)[0] ?? "";
+        if (/^https?:\/\//i.test(url)) return url;
+    }
+    return "";
 }

@@ -10,9 +10,16 @@
  * **It is not an open proxy, and that is the point of the address.** No URL is
  * accepted from anybody. The route names a message and a position, both of which
  * are meaningless without the message; the server looks up what that position
- * actually is in markup it already holds, for a message it has already proved
- * belongs to the caller. Somebody who guesses an address can, at most, make
+ * actually is in markup it already holds, for a message that belongs to whoever
+ * the address was signed for. Somebody who guesses an address can, at most, make
  * Polaris fetch a picture out of their own mail.
+ *
+ * **The caller is the signature, not the cookie.** A message is drawn in a
+ * sandboxed frame with no same-origin privileges, and such a frame is a
+ * different site as far as cookies go - Polaris' session cookie is not sent with
+ * anything it asks for. Guarding this on the session meant every picture in
+ * every message answered 401, which is what "the images do not load" was. The
+ * pass in the address carries who it was for instead.
  *
  * The fetch itself goes through the same guard every person-supplied address in
  * Polaris goes through: public addresses only, redirects followed by hand and
@@ -21,8 +28,8 @@
 
 import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
-import { apiPermission } from "@/lib/api-session";
 import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
+import { IMAGE_CACHE_SECONDS, readImagePass } from "@/lib/mailbox/image-token";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,29 +45,36 @@ const IMAGE_TYPES = /^image\/(?:png|jpeg|gif|webp|avif|bmp|x-icon|vnd\.microsoft
 
 export async function GET(
     _request: Request,
-    { params }: { params: Promise<{ messageId: string; index: string }> }
+    { params }: { params: Promise<{ messageId: string; index: string; token: string }> }
 ): Promise<Response> {
-    const user = await apiPermission("mail.use");
-    if (user instanceof Response) return user;
-    const { messageId, index } = await params;
+    const { messageId, index, token } = await params;
 
     const at = Number.parseInt(index, 10);
     if (!Number.isInteger(at) || at < 0) return new Response("Not found", { status: 404 });
 
-    // Narrowed by the caller inside the query. The same answer for "not there"
-    // and "not yours", so an id cannot be probed.
+    const pass = readImagePass(token, messageId, at);
+    if (!pass) return new Response("Not found", { status: 404 });
+
+    // Narrowed by the reader the pass was signed for, inside the query. The same
+    // answer for "not there" and "not yours", so an id cannot be probed.
     const message = await prisma.mailMessage.findFirst({
-        where: { id: messageId, account: { userId: user.id } },
+        where: { id: messageId, account: { userId: pass.userId } },
         select: { bodyHtml: true }
     });
     if (!message?.bodyHtml) return new Response("Not found", { status: 404 });
 
-    // The addresses in the order `proxyRemoteContent` numbered them, off markup
-    // this server already holds. Nothing here came from the request.
-    const wanted = core.remoteResourcesIn(message.bodyHtml)[at];
+    // The address this number stood for, found by running the very function that
+    // numbered it over the very markup it numbered. Deriving it any other way is
+    // what put the wrong picture in messages that used one twice: two walks over
+    // the same HTML agreed until they did not, and nothing said so.
+    let wanted = "";
+    core.proxyRemoteContent(message.bodyHtml, (position, url) => {
+        if (position === at) wanted = url;
+        return "";
+    });
     if (!wanted) return new Response("Not found", { status: 404 });
 
-    const target = safeUrl(wanted.url);
+    const target = safeUrl(wanted);
     if (!target) return new Response("Not found", { status: 404 });
 
     const response = await follow(target, "image/*");
@@ -82,8 +96,9 @@ export async function GET(
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; sandbox",
             // A message's pictures do not change. Private, because whose mail it
-            // came out of is not a proxy's business.
-            "cache-control": "private, max-age=86400"
+            // came out of is not a proxy's business, and never longer than the
+            // pass that fetched it is good for.
+            "cache-control": `private, max-age=${IMAGE_CACHE_SECONDS}`
         }
     });
 }

@@ -228,7 +228,7 @@ export async function openMessageAction(messageId: string) {
         const body = await messages.loadBody(userId, messageId);
         const message = await messages.messageForReading(userId, messageId);
         if (!message) return { error: "That message is no longer here." };
-        const readable = await reading.readableMessage(message.accountId, messageId, message.policy, {
+        const readable = await reading.readableMessage(message.accountId, messageId, userId, message.policy, {
             ...message.row,
             bodyHtml: body.html || message.row.bodyHtml,
             bodyText: body.text || message.row.bodyText
