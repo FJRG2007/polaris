@@ -94,19 +94,24 @@ export function ScrollRow({
         node.addEventListener("scroll", measure, { passive: true });
 
         // The row changes width when the window does, and its contents change
-        // when a rail gains an entry, so both are watched rather than measured
-        // once on mount.
+        // when a rail gains an entry or a label is renamed - so both are watched.
+        // Watched rather than taken as a dependency on the children: this sits
+        // inside screens that re-render on every keystroke, and re-attaching a
+        // listener and an observer each time would be the strip's cost paid over
+        // and over for nothing.
         const resize = new ResizeObserver(measure);
         resize.observe(node);
-        for (const child of Array.from(node.children)) resize.observe(child);
+        const changes = new MutationObserver(measure);
+        changes.observe(node, { childList: true, subtree: true, characterData: true });
         measure();
 
         return () => {
             node.removeEventListener("wheel", onWheel);
             node.removeEventListener("scroll", measure);
             resize.disconnect();
+            changes.disconnect();
         };
-    }, [measure, children]);
+    }, [measure]);
 
     return (
         <Tag ref={held} data-scroll-row="" className={cn("overflow-x-auto", className)} {...rest}>
