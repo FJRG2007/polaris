@@ -423,3 +423,28 @@ export const mailPrivacySchema = z.object({
 });
 
 export type MailPrivacy = z.infer<typeof mailPrivacySchema>;
+
+/**
+ * The next page of a list, as the scroll asks for it.
+ *
+ * The narrowing comes from the screen rather than being reconstructed from a
+ * path: there are seven lists and each is a different question. Validated here
+ * all the same, because it arrives over the wire like anything else - and
+ * whatever it says, the list resolves the mailboxes from the reader, so the
+ * worst a rewritten one can ask for is a different folder of their own.
+ */
+export const mailPageSchema = z.object({
+    accountId: z.string().trim().max(64).nullable().default(null),
+    folderId: z.string().trim().max(64).nullable().default(null),
+    role: z.enum(["inbox", "archive", "sent", "drafts", "trash", "junk", "none"]).nullable().default(null),
+    labelId: z.string().trim().max(64).nullable().default(null),
+    unreadOnly: z.boolean().default(false),
+    starredOnly: z.boolean().default(false),
+    snoozedOnly: z.boolean().default(false),
+    withAttachments: z.boolean().default(false),
+    query: z.string().trim().max(500).default(""),
+    /** The moment the last row already on screen is at. */
+    cursor: z.string().trim().max(64).default("")
+});
+
+export type MailPage = z.infer<typeof mailPageSchema>;

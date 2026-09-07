@@ -89,6 +89,11 @@ export interface MailThreadView {
     readonly muted: boolean;
     readonly hasAttachments: boolean;
     readonly lastMessageAt: string;
+    /** Where this list lets somebody off it, or "". Read from the newest
+     *  message's headers, which are already stored - the body is not, until
+     *  somebody opens it, so the reading pane finds the ones that only say it in
+     *  their footer. */
+    readonly unsubscribe: string;
     readonly labels: readonly { id: string; name: string; color: string }[];
     /** The message to open when the row is clicked: the newest one in the
      *  folder being looked at, so opening a conversation from Sent lands on
@@ -213,7 +218,7 @@ export async function listThreads(
             lastMessageAt: true,
             messages: {
                 where: messageWhere,
-                select: { id: true, labels: { select: { label: true } } },
+                select: { id: true, headers: true, labels: { select: { label: true } } },
                 orderBy: { sentAt: "desc" },
                 take: 1
             }
@@ -240,6 +245,10 @@ export async function listThreads(
         muted: thread.muted,
         hasAttachments: thread.hasAttachments,
         lastMessageAt: thread.lastMessageAt.toISOString(),
+        unsubscribe:
+            core.unsubscribeFromHeaders(
+                (thread.messages[0]?.headers as Record<string, string> | null) ?? null
+            )?.url ?? "",
         labels: (thread.messages[0]?.labels ?? []).map((applied) => ({
             id: applied.label.id,
             name: applied.label.name,

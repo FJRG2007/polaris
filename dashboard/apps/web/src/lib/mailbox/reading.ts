@@ -86,27 +86,6 @@ export async function remoteAllowedFor(
     return Boolean(trusted);
 }
 
-/**
- * The unsubscribe address a sender published, if it is one worth offering.
- *
- * `List-Unsubscribe` carries one or two: a mailto and an https link. The https
- * one is preferred where the sender also published `List-Unsubscribe-Post`,
- * which is them saying a single POST is enough - that is the one-click
- * unsubscribe, and it is the only version worth putting a button on. Otherwise
- * the mailto is offered, because it works without the reader opening a browser
- * on a page that asks them to sign in.
- */
-export function unsubscribeAddress(headers: Record<string, string> | null): string {
-    const header = headers?.["list-unsubscribe"];
-    if (!header) return "";
-    const links = [...header.matchAll(/<([^>]+)>/g)].map((match) => match[1] ?? "");
-    const oneClick = Boolean(headers?.["list-unsubscribe-post"]);
-    const https = links.find((link) => /^https:\/\//i.test(link)) ?? "";
-    const mailto = links.find((link) => /^mailto:/i.test(link)) ?? "";
-    if (oneClick && https) return https;
-    return mailto || https;
-}
-
 /** Every link in the markup, with what identifies the reader taken off. */
 function cleanLinks(html: string): string {
     return html.replace(
@@ -171,7 +150,11 @@ export async function readableMessage(
         trackers: policy.nameTrackers ? trackers : [],
         trackerVendors: policy.nameTrackers ? core.trackerVendors(trackers) : [],
         wantsReceipt: message.wantsReceipt,
-        unsubscribe: unsubscribeAddress(headers)
+        // Headers first, then the message's own footer. Plenty of mail that is
+        // unmistakably a mailing list publishes no header at all, and its only
+        // way out is a link in a sentence - often one that does not contain the
+        // word, in a language nobody wrote a matcher for.
+        unsubscribe: core.unsubscribeOffer(headers, original, message.bodyText ?? "")?.url ?? ""
     };
 }
 

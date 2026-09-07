@@ -34,8 +34,23 @@ import { useRouter } from "next/navigation";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
-import { actOnAction, applyLabelAction, openMessageAction, snoozeAction, syncAllAction } from "./actions";
-import { useCallback, useEffect, useMemo, useState, useTransition, type ComponentPropsWithRef } from "react";
+import {
+    actOnAction,
+    applyLabelAction,
+    moreThreadsAction,
+    openMessageAction,
+    snoozeAction,
+    syncAllAction
+} from "./actions";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ComponentPropsWithRef
+} from "react";
 import {
     Button,
     Checkbox,
@@ -50,6 +65,7 @@ import {
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import {
     Archive,
+    BellOff,
     Bug,
     Clock,
     Columns2,
@@ -62,6 +78,20 @@ import {
     Star,
     Trash2
 } from "lucide-react";
+
+/** What list this is, as the scroll asks the server for more of it. The shape
+ *  the page schema validates on the way in. */
+export interface MailPageNarrow {
+    readonly accountId: string | null;
+    readonly folderId: string | null;
+    readonly role: string | null;
+    readonly labelId: string | null;
+    readonly unreadOnly: boolean;
+    readonly starredOnly: boolean;
+    readonly snoozedOnly: boolean;
+    readonly withAttachments: boolean;
+    readonly query: string;
+}
 
 /** What the list is showing, so the empty state and the toolbar can say the
  *  right thing: "no mail" in an inbox and "nothing in the trash" are different
@@ -77,17 +107,20 @@ export interface MailViewContext {
 }
 
 export function MailView({
-    threads,
+    threads: firstPage,
     context,
     openThread,
     openMessages,
-    cursor
+    cursor: firstCursor,
+    page
 }: {
     threads: MailThreadView[];
     context: MailViewContext;
     openThread: MailThreadView | null;
     openMessages: MailMessageView[];
     cursor: string;
+    /** What this list is, so the scroll can ask for more of the same one. */
+    page: MailPageNarrow;
 }) {
     const router = useRouter();
     const { accounts, accountColor, askFolderRole, identities, openComposer, refresh } = useMail();
@@ -124,10 +157,58 @@ export function MailView({
      * `threads` becoming a new array means. Keeping a patch past that would
      * mean the screen quietly disagreeing with the server for ever.
      */
+    /**
+     * The pages fetched below the first one.
+     *
+     * The first page is the server's, and it is re-rendered whenever anything
+     * changes - a sync, an action, a refresh. Everything under it was asked for
+     * by scrolling, so it is thrown away the moment the first page is redrawn:
+     * keeping it would mean a list whose top is current and whose bottom is a
+     * snapshot of some earlier minute, with the same conversation in both.
+     */
+    const [older, setOlder] = useState<MailThreadView[]>([]);
+    const [cursor, setCursor] = useState(firstCursor);
+    const [loadingMore, setLoadingMore] = useState(false);
+    useEffect(() => {
+        setOlder([]);
+        setCursor(firstCursor);
+    }, [firstPage, firstCursor]);
+
+    const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
+
     const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
     useEffect(() => {
         setPatched({});
     }, [threads]);
+
+    /**
+     * Ask for the next page.
+     *
+     * Guarded on its own flag rather than on a transition, because the observer
+     * below fires again while the request is in the air - a list that is still
+     * short after appending is a list whose bottom is still on screen - and
+     * without the guard that is the same page asked for four times.
+     */
+    const loadMore = useCallback(() => {
+        if (!cursor || loadingMore) return;
+        setLoadingMore(true);
+        void (async () => {
+            try {
+                const outcome = await moreThreadsAction({ ...page, cursor });
+                if (refusalOf(outcome) || !("threads" in outcome)) return;
+                // Anything already on screen is dropped rather than repeated: a
+                // message arriving between two pages shifts everything down by
+                // one, and the row on the seam would otherwise appear twice.
+                setOlder((held) => {
+                    const known = new Set([...firstPage, ...held].map((thread) => thread.id));
+                    return [...held, ...outcome.threads.filter((thread) => !known.has(thread.id))];
+                });
+                setCursor(outcome.cursor);
+            } finally {
+                setLoadingMore(false);
+            }
+        })();
+    }, [cursor, firstPage, loadingMore, page]);
 
     const patch = useCallback((ids: readonly string[], change: ThreadPatch) => {
         setPatched((held) => {
@@ -625,6 +706,14 @@ export function MailView({
                                         wide={layout === "full" && !openThread}
                                         mine={mine}
                                         onPick={(next, run) => pick(thread.id, next, run)}
+                                        canArchive={context.canArchive}
+                                        permanentDelete={context.permanentDelete}
+                                        onAct={(action, announce) =>
+                                            act(action, [thread.leadMessageId], announce)
+                                        }
+                                        onSnooze={() =>
+                                            snooze([thread.leadMessageId], tomorrowMorning())
+                                        }
                                         onStar={() =>
                                             act(
                                                 shown(thread).starred ? "unstar" : "star",
@@ -638,21 +727,7 @@ export function MailView({
                         </ul>
                     )}
 
-                    {cursor ? (
-                        <div className="p-3">
-                            <Button
-                                variant="secondary"
-                                className="w-full"
-                                onClick={() => {
-                                    const url = new URL(window.location.href);
-                                    url.searchParams.set("before", cursor);
-                                    router.push(`${url.pathname}${url.search}`);
-                                }}
-                            >
-                                Older conversations
-                            </Button>
-                        </div>
-                    ) : null}
+                    {cursor ? <MoreRows onReach={loadMore} busy={loadingMore} /> : null}
                 </div>
             </section>
 
@@ -692,6 +767,50 @@ export function MailView({
                     </div>
                 )}
             </section>
+        </div>
+    );
+}
+
+/**
+ * The bottom of the list, which asks for more of it when it comes into view.
+ *
+ * Watched rather than clicked: a mail list is scrolled, and a button at the
+ * bottom of one is a thing somebody has to notice and aim at every fifty rows.
+ * The margin is what makes it feel like there is no bottom at all - the next
+ * page is asked for while the last one is still a screen away, so it has
+ * usually arrived by the time anybody reaches it.
+ */
+function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
+    const mark = useRef<HTMLDivElement | null>(null);
+    // Held in a ref so the observer is not torn down and rebuilt every time the
+    // list grows, which is every time it fires.
+    const reach = useRef(onReach);
+    reach.current = onReach;
+
+    useEffect(() => {
+        const node = mark.current;
+        if (!node) return;
+        const watcher = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) reach.current();
+            },
+            { rootMargin: "600px" }
+        );
+        watcher.observe(node);
+        return () => watcher.disconnect();
+    }, []);
+
+    return (
+        <div ref={mark} className="p-3">
+            {/* Shaped like the rows it is about to become, so the list does not
+                jump when they land. */}
+            <div className="space-y-2" aria-hidden={!busy}>
+                <div className="h-3 w-1/3 animate-pulse rounded bg-card" />
+                <div className="h-3 w-2/3 animate-pulse rounded bg-card" />
+            </div>
+            <span className="sr-only" role="status">
+                {busy ? "Loading older conversations" : ""}
+            </span>
         </div>
     );
 }
@@ -785,6 +904,10 @@ function ThreadRow({
     wide,
     mine,
     onPick,
+    canArchive,
+    permanentDelete,
+    onAct,
+    onSnooze,
     onStar,
     ...rest
 }: ComponentPropsWithRef<"li"> & {
@@ -806,6 +929,10 @@ function ThreadRow({
     /** `run` is Shift being held: take everything between the last row picked
      *  on its own and this one. */
     onPick: (next: boolean, run: boolean) => void;
+    canArchive: boolean;
+    permanentDelete: boolean;
+    onAct: (action: MailAction, announce: string) => void;
+    onSnooze: () => void;
     onStar: () => void;
 }) {
     const format = useDisplayFormat();
@@ -814,7 +941,7 @@ function ThreadRow({
         <li
             {...rest}
             className={cn(
-                "relative border-b border-border/60",
+                "group relative border-b border-border/60",
                 open ? "bg-card" : "hover:bg-card/60",
                 picked && "bg-card",
                 onCursor && "ring-1 ring-inset ring-border-strong",
@@ -924,8 +1051,114 @@ function ThreadRow({
                         </div>
                     ) : null}
                 </Link>
+                {/* What somebody triaging a list reaches for, on the row rather
+                    than after selecting it. Shown on hover and on keyboard
+                    focus, never on a touch screen where there is no hover and
+                    the menu is a long press away - `hidden sm:flex`.
+
+                    They sit ON TOP of the row rather than in its flow, so a row
+                    does not change width when the pointer crosses it, which is
+                    a list that shivers as you read down it. */}
+                <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center pr-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+                    <div className="pointer-events-auto flex items-center gap-0.5 rounded-md border border-border bg-surface px-0.5 py-0.5 shadow-sm">
+                        {thread.unsubscribe ? (
+                            <RowAction
+                                icon={BellOff}
+                                label={`Stop these emails from ${people(thread, mine)}`}
+                                href={thread.unsubscribe}
+                            />
+                        ) : null}
+                        {canArchive ? (
+                            <RowAction
+                                icon={Archive}
+                                label="Archive"
+                                onClick={() => onAct("archive", "Archived.")}
+                            />
+                        ) : null}
+                        <RowAction
+                            icon={unread ? MailOpen : Mail}
+                            label={unread ? "Mark as read" : "Mark as unread"}
+                            onClick={() =>
+                                onAct(
+                                    unread ? "read" : "unread",
+                                    unread ? "Marked as read." : "Marked as unread."
+                                )
+                            }
+                        />
+                        <RowAction icon={Clock} label="Snooze until tomorrow morning" onClick={onSnooze} />
+                        <RowAction
+                            icon={Trash2}
+                            danger
+                            label={permanentDelete ? "Delete for ever" : "Move to trash"}
+                            onClick={() =>
+                                onAct(
+                                    permanentDelete ? "delete" : "trash",
+                                    permanentDelete ? "Deleted." : "Moved to the trash."
+                                )
+                            }
+                        />
+                    </div>
+                </div>
             </div>
         </li>
+    );
+}
+
+/**
+ * One of the buttons that appear on a row under the pointer.
+ *
+ * A link when it goes somewhere and a button when it does something, rather than
+ * one element pretending to be both: the unsubscribe is an address on somebody
+ * else's server and has to open in its own tab, with the referrer withheld -
+ * a mailing list does not get told which message the click came from.
+ */
+function RowAction({
+    icon: Icon,
+    label,
+    href,
+    danger,
+    onClick
+}: {
+    icon: typeof Archive;
+    label: string;
+    href?: string;
+    danger?: boolean;
+    onClick?: () => void;
+}) {
+    const look = cn(
+        "flex size-6 items-center justify-center rounded text-foreground-subtle hover:bg-card hover:text-foreground",
+        danger && "hover:text-danger"
+    );
+    if (href) {
+        return (
+            <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                aria-label={label}
+                title={label}
+                className={look}
+                // The row underneath is a link to the conversation.
+                onClick={(event) => event.stopPropagation()}
+            >
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+            </a>
+        );
+    }
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            title={label}
+            className={look}
+            onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onClick?.();
+            }}
+        >
+            <Icon className="size-3.5 shrink-0" aria-hidden />
+        </button>
     );
 }
 

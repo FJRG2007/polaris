@@ -100,6 +100,7 @@ export async function MailListPage({
             muted: false,
             hasAttachments: openMessages.some((message) => message.attachments.length > 0),
             lastMessageAt: openMessages.at(-1)!.sentAt,
+            unsubscribe: "",
             labels: [],
             leadMessageId: openMessages.at(-1)!.id
         };
@@ -110,6 +111,20 @@ export async function MailListPage({
         <MailView
             threads={threads}
             cursor={cursor}
+            // What this list IS, so the scroll can ask for the next page of the
+            // same one. Seven routes end up here and a path is a poor thing to
+            // reconstruct which from.
+            page={{
+                accountId: query.accountId,
+                folderId: query.folderId,
+                role: query.role,
+                labelId: query.labelId,
+                unreadOnly: query.unreadOnly,
+                starredOnly: query.starredOnly,
+                snoozedOnly: query.snoozedOnly,
+                withAttachments: query.withAttachments,
+                query: query.query
+            }}
             openThread={openThread}
             openMessages={openMessages}
             context={
