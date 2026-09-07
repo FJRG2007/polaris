@@ -467,3 +467,11 @@ export const mailAttachFromDriveSchema = z.object({
 export const mailAttachFromAddressSchema = z.object({
     url: z.string().trim().url().max(2048)
 });
+
+/** Refusing a sender. `junk` teaches the provider as well as filing the message,
+ *  which is either what somebody wanted or more than they asked for - so it is
+ *  chosen rather than assumed. */
+export const mailBlockSenderSchema = z.object({
+    address: mailAddress,
+    as: z.enum(["trash", "junk"]).default("trash")
+});

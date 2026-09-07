@@ -1,6 +1,6 @@
 "use client";
 
-/** The settings sub-rail. Horizontal, because there are six of them and a
+/** The settings sub-rail. Horizontal, because there are several of them and a
  *  vertical rail beside a vertical rail is a maze. */
 
 import Link from "next/link";
@@ -14,6 +14,7 @@ const SCREENS = [
     { label: "Filters", href: "/mail/settings/rules" },
     { label: "Signature", href: "/mail/settings/signature" },
     { label: "Privacy", href: "/mail/settings/privacy" },
+    { label: "Blocked", href: "/mail/settings/blocked" },
     { label: "Away", href: "/mail/settings/away" }
 ];
 

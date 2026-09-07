@@ -26,6 +26,7 @@ import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
 import * as views from "@/lib/mailbox/views";
 import * as reading from "@/lib/mailbox/reading";
+import * as blocking from "@/lib/mailbox/blocking";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
@@ -552,5 +553,41 @@ export async function attachFromAddressAction(input: unknown) {
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
         return failure(caught, "That file could not be attached.");
+    }
+}
+
+/**
+ * Refuse a sender.
+ *
+ * There is no such thing at the protocol level - a message is delivered to the
+ * mailbox long before any client sees it - so this is the nearest honest thing:
+ * a rule that sends everything from that address straight to the trash, and
+ * clears out what they have already sent.
+ */
+export async function blockSenderAction(accountId: string, input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailBlockSenderSchema.safeParse(input);
+    if (!parsed.success) return { error: "That is not an email address." };
+    try {
+        await ownedAccount(userId, accountId);
+        await blocking.blockSender(userId, accountId, parsed.data.address, parsed.data.as);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That sender could not be blocked.");
+    }
+}
+
+/** Take a block off. What was already thrown away stays in the trash, where it
+ *  can be fetched back by hand. */
+export async function unblockSenderAction(accountId: string, ruleId: string) {
+    const userId = await actorId();
+    try {
+        await ownedAccount(userId, accountId);
+        await blocking.unblockSender(userId, accountId, ruleId);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That block could not be removed.");
     }
 }

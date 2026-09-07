@@ -80,7 +80,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes over one mailbox is two IMAP sessions per account,
             // which is how a client gets rate limited by the large services -
             // and sending a queued message twice is the one thing the outgoing
-            // queue must never do.
+            // queue must never do. Two passes over the backfill would decide the
+            // same batch of messages twice.
+            "mail-categories",
             "mail-send",
             "mail-sync",
             "task-reminders",
