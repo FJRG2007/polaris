@@ -1,0 +1,79 @@
+/**
+ * What a place that runs somebody else's services has to be able to answer.
+ *
+ * Four questions, and they are the only four every provider can answer about a
+ * service it builds and serves: what have you got, which of it am I looking at,
+ * what state is it in, and do it again. Anything past that is one vendor's idea -
+ * Vercel has previews and instant rollback, Railway has replicas and volumes -
+ * and a control plane that modelled those would be a worse copy of each of their
+ * dashboards.
+ *
+ * The deliberate omission is the build. Polaris does not build, upload or
+ * configure anything here: what goes into a release is the provider's, decided
+ * by the repository they are already connected to. That is the whole point of
+ * running something there rather than here, and a driver that started sending
+ * build settings would be quietly taking over a thing somebody chose not to give
+ * it.
+ *
+ * Server-only: a driver holds somebody's token and talks to their account.
+ */
+
+/** How a release is going, in the words Polaris uses for every provider. */
+export type ExternalStatus = "queued" | "building" | "live" | "failed" | "cancelled" | "unknown";
+
+/** Something that could be pointed at: a project, and whatever else that provider
+ *  needs to name one thing inside it. */
+export interface ProviderChoice {
+    /** Their id for it, kept on the row. */
+    readonly id: string;
+    readonly name: string;
+    /** What else has to be chosen before this is a single deployable thing, where
+     *  the provider has such a level. Empty when the project is enough. */
+    readonly children?: readonly ProviderChoice[];
+}
+
+/** The last release, as a screen shows it. */
+export interface ExternalState {
+    readonly status: ExternalStatus;
+    /** Where it can be reached, with a scheme. Null when the provider gives none. */
+    readonly url: string | null;
+    /** Their own page for the release, which is where "open it there" goes. */
+    readonly inspectUrl: string | null;
+    readonly at: Date | null;
+    readonly commitSha: string | null;
+    readonly commitMessage: string | null;
+    /** Their words for why it failed, where it did. */
+    readonly error: string | null;
+}
+
+/** What went wrong, and whether the credential is the problem - the same
+ *  distinction every other integration here keeps, and for the same reason: a
+ *  revoked token has to be said on the link, and a bad morning must not be. */
+export class ProviderError extends Error {
+    readonly kind: "unauthorized" | "refused" | "unreachable";
+
+    constructor(message: string, kind: ProviderError["kind"]) {
+        super(message);
+        this.name = "ProviderError";
+        this.kind = kind;
+    }
+}
+
+/**
+ * Whatever a provider needs to point at one service, past the project id.
+ *
+ * Opaque above the driver: a team for Vercel, a service and an environment for
+ * Railway, and something else again for the next one. Stored as JSON on the row
+ * and handed back to the driver that wrote it.
+ */
+export type ProviderRef = Readonly<Record<string, string>>;
+
+export interface ProviderDriver {
+    readonly provider: string;
+    /** Everything this token can see, for the screen that asks what to add. */
+    choices(token: string): Promise<ProviderChoice[]>;
+    /** What one service is doing now. */
+    state(token: string, externalId: string, ref: ProviderRef): Promise<ExternalState>;
+    /** Build and release it again, with whatever the provider already has. */
+    deploy(token: string, externalId: string, ref: ProviderRef): Promise<void>;
+}

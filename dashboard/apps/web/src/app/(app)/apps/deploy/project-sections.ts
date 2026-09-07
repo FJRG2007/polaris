@@ -12,7 +12,7 @@
  * on the one screen a project is configured from.
  */
 
-import { Activity, LayoutGrid, ScrollText, Settings, type LucideIcon } from "lucide-react";
+import { Activity, Cloud, LayoutGrid, ScrollText, Settings, type LucideIcon } from "lucide-react";
 
 export interface Section {
     label: string;
@@ -27,6 +27,7 @@ export interface Section {
 
 export const SECTIONS: Section[] = [
     { label: "Architecture", path: "", icon: LayoutGrid, hint: "Services and how they connect" },
+    { label: "Elsewhere", path: "/elsewhere", icon: Cloud, hint: "What this project runs on Vercel or Railway" },
     { label: "Observability", path: "/observability", icon: Activity, hint: "Metrics across the environment" },
     { label: "Logs", path: "/logs", icon: ScrollText, hint: "Every service's output in one stream" },
     { label: "Settings", path: "/settings", icon: Settings, hint: "Project configuration" }

@@ -3879,6 +3879,7 @@ model Environment {
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
     applications  Application[]
+    external      ExternalService[]
     databases     ManagedDatabase[]
     stagedChanges StagedChange[]
 
@@ -3932,6 +3933,66 @@ model Application {
 
     @@unique([environmentId, slug])
     @@index([targetId])
+}
+
+// A service this project runs somewhere that is not Polaris.
+//
+// The same repository is often on a Polaris server for staging and on Vercel or
+// Railway for production, and half of that was invisible from here: the project
+// board showed what Polaris runs and nothing about the half a customer actually
+// reaches. This is that half, on the same board.
+//
+// It is deliberately not an Application. An Application is a container Polaris
+// builds, places on a target, routes, mounts volumes into and can open a shell
+// on, and none of those words mean anything for a service somebody else builds
+// and serves. What is true of one of these is only what any provider can answer:
+// what it is called, what it last released, whether that worked, and where it
+// can be reached - so that is the whole of the row.
+//
+// No credential lives here. It is read through a UserConnection, the same link
+// the person made under Connected accounts, so revoking that revokes this.
+model ExternalService {
+    id            String @id @default(uuid(7)) @db.Uuid
+    environmentId String @db.Uuid
+    /// vercel | railway - who runs it.
+    provider      String
+    /// The link the provider is reached through. The row keeps working when a
+    /// second person links the same account, and stops when its own link goes.
+    connectionId  String @db.Uuid
+
+    name String
+    slug String
+
+    /// Their id for the project, which is what every call about it names.
+    externalId String
+    /// What else that provider needs to point at one thing: a team for Vercel, a
+    /// service and an environment for Railway. One JSON object rather than three
+    /// nullable columns, because the shape is the provider's business.
+    ref        String @default("{}")
+
+    // The last reading, kept on the row so a board of six services is one query
+    // rather than six calls to somebody else's API.
+    /// queued | building | live | failed | cancelled | unknown.
+    status            String    @default("unknown")
+    /// Where it can be reached, as they report it.
+    url               String?
+    /// Their page for the last release, which is where "Open on Vercel" goes.
+    inspectUrl        String?
+    lastDeployAt      DateTime?
+    lastCommitSha     String?
+    lastCommitMessage String?
+    /// Why the last read failed, where it did. Their words, not ours.
+    error             String?
+    checkedAt         DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+    @@unique([environmentId, slug])
+    @@index([environmentId])
+    @@index([connectionId])
 }
 
 model ManagedDatabase {

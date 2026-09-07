@@ -123,3 +123,103 @@ export async function vercelUser(token: string): Promise<VercelUser> {
     if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
     return parsed.data.user;
 }
+
+const teamSchema = z.object({ id: z.string(), name: z.string().default(""), slug: z.string().default("") });
+
+export type VercelTeam = z.infer<typeof teamSchema>;
+
+/**
+ * The teams this token can act for.
+ *
+ * Worth asking because most projects worth watching are not personal: a token
+ * with no team named answers with the account's own projects only, and somebody
+ * whose work is under a team would be shown an empty list and no reason for it.
+ */
+export async function vercelTeams(token: string): Promise<VercelTeam[]> {
+    const parsed = z
+        .object({ teams: z.array(teamSchema).default([]) })
+        .safeParse(await call(token, "/v2/teams?limit=100"));
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    return parsed.data.teams;
+}
+
+const projectSchema = z.object({
+    id: z.string(),
+    name: z.string().default(""),
+    framework: z.string().nullable().default(null)
+});
+
+export type VercelProject = z.infer<typeof projectSchema>;
+
+/** Every project the token reaches, in one scope. `team` is their id for a team,
+ *  or nothing for the account's own. */
+export async function vercelProjects(token: string, team?: string | null): Promise<VercelProject[]> {
+    const query = team ? `?limit=100&teamId=${encodeURIComponent(team)}` : "?limit=100";
+    const parsed = z
+        .object({ projects: z.array(projectSchema).default([]) })
+        .safeParse(await call(token, `/v9/projects${query}`));
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    return parsed.data.projects;
+}
+
+const deploymentSchema = z.object({
+    uid: z.string(),
+    name: z.string().default(""),
+    /** The hostname, without a scheme - theirs is always https. */
+    url: z.string().nullable().default(null),
+    /** QUEUED | INITIALIZING | BUILDING | READY | ERROR | CANCELED | BLOCKED. */
+    readyState: z.string().default(""),
+    state: z.string().default(""),
+    created: z.number().optional(),
+    createdAt: z.number().optional(),
+    target: z.string().nullable().default(null),
+    /** Their page for it, which is where "Open on Vercel" goes. */
+    inspectorUrl: z.string().nullable().default(null),
+    errorMessage: z.string().nullable().default(null),
+    /** Whatever the git provider told them: the commit and its message live in
+     *  here, under names that are the provider's rather than theirs. */
+    meta: z.record(z.string(), z.unknown()).default({})
+});
+
+export type VercelDeployment = z.infer<typeof deploymentSchema>;
+
+/** The most recent deployments of one project, newest first. */
+export async function vercelDeployments(
+    token: string,
+    input: { project: string; team?: string | null; limit?: number; target?: string | null }
+): Promise<VercelDeployment[]> {
+    const query = new URLSearchParams({
+        projectId: input.project,
+        limit: String(Math.max(1, Math.min(20, input.limit ?? 5)))
+    });
+    if (input.team) query.set("teamId", input.team);
+    if (input.target) query.set("target", input.target);
+    const parsed = z
+        .object({ deployments: z.array(deploymentSchema).default([]) })
+        .safeParse(await call(token, `/v7/deployments?${query.toString()}`));
+    if (!parsed.success) throw new VercelError("Vercel answered with something unexpected.", "refused");
+    return parsed.data.deployments;
+}
+
+/**
+ * Build and release one again.
+ *
+ * Their redeploy is a create that names an existing deployment: every setting
+ * and variable is inherited, and what comes out is a new build with a new id.
+ * Polaris does not choose what goes into it - the point of running somewhere
+ * else is that they own the build - so nothing is sent but which one to repeat.
+ */
+export async function vercelRedeploy(
+    token: string,
+    input: { name: string; deployment: string; team?: string | null; target?: string | null }
+): Promise<void> {
+    const query = input.team ? `?teamId=${encodeURIComponent(input.team)}` : "";
+    await call(token, `/v13/deployments${query}`, {
+        method: "POST",
+        body: JSON.stringify({
+            name: input.name,
+            deploymentId: input.deployment,
+            ...(input.target ? { target: input.target } : {})
+        })
+    });
+}

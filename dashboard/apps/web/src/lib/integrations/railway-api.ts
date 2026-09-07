@@ -122,3 +122,120 @@ export async function railwayAccount(token: string): Promise<RailwayAccount> {
     if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
     return parsed.data.me;
 }
+
+const nodesOf = <T extends z.ZodTypeAny>(node: T) =>
+    z.object({ edges: z.array(z.object({ node })).default([]) }).default({ edges: [] });
+
+const namedSchema = z.object({ id: z.string(), name: z.string().default("") });
+
+export type RailwayNamed = z.infer<typeof namedSchema>;
+
+/** Every project this token reaches. An account token sees every workspace its
+ *  owner is in; a project token sees the one it was made for. */
+export async function railwayProjects(token: string): Promise<RailwayNamed[]> {
+    const parsed = z
+        .object({ projects: nodesOf(namedSchema) })
+        .safeParse(await query(token, "query { projects { edges { node { id name } } } }"));
+    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    return parsed.data.projects.edges.map((edge) => edge.node);
+}
+
+const projectSchema = namedSchema.extend({
+    services: nodesOf(namedSchema),
+    environments: nodesOf(namedSchema)
+});
+
+export interface RailwayProject {
+    readonly id: string;
+    readonly name: string;
+    readonly services: readonly RailwayNamed[];
+    readonly environments: readonly RailwayNamed[];
+}
+
+/**
+ * One project, with what is inside it.
+ *
+ * Both lists are needed to point at anything: a deployment on Railway belongs to
+ * a service AND an environment, and neither of those is implied by the project.
+ */
+export async function railwayProject(token: string, id: string): Promise<RailwayProject> {
+    const parsed = z.object({ project: projectSchema }).safeParse(
+        await query(
+            token,
+            `query project($id: String!) {
+                project(id: $id) {
+                    id
+                    name
+                    services { edges { node { id name } } }
+                    environments { edges { node { id name } } }
+                }
+            }`,
+            { id }
+        )
+    );
+    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    const project = parsed.data.project;
+    return {
+        id: project.id,
+        name: project.name,
+        services: project.services.edges.map((edge) => edge.node),
+        environments: project.environments.edges.map((edge) => edge.node)
+    };
+}
+
+const railwayDeploymentSchema = z.object({
+    id: z.string(),
+    /** BUILDING | DEPLOYING | SUCCESS | FAILED | CRASHED | REMOVED | ... */
+    status: z.string().default(""),
+    createdAt: z.string().default(""),
+    staticUrl: z.string().nullable().default(null)
+});
+
+export type RailwayDeployment = z.infer<typeof railwayDeploymentSchema>;
+
+/** The most recent deployments of one service in one environment, newest first. */
+export async function railwayDeployments(
+    token: string,
+    input: { project: string; service: string; environment: string; limit?: number }
+): Promise<RailwayDeployment[]> {
+    const parsed = z.object({ deployments: nodesOf(railwayDeploymentSchema) }).safeParse(
+        await query(
+            token,
+            `query deployments($input: DeploymentListInput!, $first: Int!) {
+                deployments(input: $input, first: $first) {
+                    edges { node { id status createdAt staticUrl } }
+                }
+            }`,
+            {
+                input: {
+                    projectId: input.project,
+                    serviceId: input.service,
+                    environmentId: input.environment
+                },
+                first: Math.max(1, Math.min(20, input.limit ?? 5))
+            }
+        )
+    );
+    if (!parsed.success) throw new RailwayError("Railway answered with something unexpected.", "refused");
+    return parsed.data.deployments.edges.map((edge) => edge.node);
+}
+
+/**
+ * Build and release one service again.
+ *
+ * Their own words for it: a service instance in an environment is deployed. What
+ * goes into the build is Railway's to decide - which is the whole point of a
+ * service running there - so nothing is sent but which one to repeat.
+ */
+export async function railwayDeploy(
+    token: string,
+    input: { service: string; environment: string }
+): Promise<void> {
+    await query(
+        token,
+        `mutation serviceInstanceDeploy($serviceId: String!, $environmentId: String!) {
+            serviceInstanceDeploy(serviceId: $serviceId, environmentId: $environmentId)
+        }`,
+        { serviceId: input.service, environmentId: input.environment }
+    );
+}
