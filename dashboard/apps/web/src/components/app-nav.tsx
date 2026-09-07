@@ -28,6 +28,7 @@ import { usePathname } from "next/navigation";
 import { POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 import { badgeLabel } from "@/lib/notification-badge";
 import { useChatUnread } from "@/components/chat-unread";
+import { useMailUnread } from "@/components/mail-unread";
 
 export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAppIds?: string[] }) {
     const pathname = usePathname();
@@ -35,6 +36,7 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
     const asGuest = new Set(guestAppIds);
     const waiting = useChatUnread();
     const unread = badgeLabel(waiting.messages);
+    const mail = badgeLabel(useMailUnread().messages);
     const [places, setPlaces] = useState<Record<string, string>>({});
 
     // Re-read on every navigation: leaving Tasks is the moment the entry that
@@ -56,7 +58,9 @@ export function AppNav({ appIds, guestAppIds = [] }: { appIds: string[]; guestAp
                 // the app, so their entry leads to that subject and never to a
                 // remembered screen behind it.
                 : { ...app, href: places[app.id] ?? app.href };
-        return app.id === "chat" && unread ? { ...entry, badge: unread } : entry;
+        if (app.id === "chat" && unread) return { ...entry, badge: unread };
+        if (app.id === "mail" && mail) return { ...entry, badge: mail };
+        return entry;
     });
     const current = resolveActiveApp(pathname);
     return (

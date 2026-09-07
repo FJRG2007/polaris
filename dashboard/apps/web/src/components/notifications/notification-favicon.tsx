@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useChatUnread } from "@/components/chat-unread";
+import { useMailUnread } from "@/components/mail-unread";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { applyFavicon, currentFavicon, drawFavicon, type FaviconLink } from "@/lib/favicon";
 import {
@@ -32,10 +33,11 @@ import {
 export function NotificationFavicon() {
     const { unread } = useNotificationFeed();
     const chat = useChatUnread();
+    const mail = useMailUnread();
     // One number, because the icon has room for one. What it means is "there is
-    // something here for you", and which half it came from is a question the
-    // page itself answers.
-    const waiting = unread + chat.messages;
+    // something here for you", and which of the three it came from is a question
+    // the page itself answers.
+    const waiting = unread + chat.messages + mail.messages;
     // Storage is not readable while the page is rendered on the server, so the
     // default holds until the first paint has happened.
     const [style, setStyle] = useState<FaviconStyle>(DEFAULT_FAVICON_STYLE);

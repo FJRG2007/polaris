@@ -50,6 +50,8 @@ import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { unreadTotal } from "@/lib/chat/chat-service";
 import { ChatUnreadProvider } from "@/components/chat-unread";
+import { MailUnreadProvider } from "@/components/mail-unread";
+import { unreadCounts } from "@/lib/mailbox/views";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { buildStamp } from "@/lib/build-stamp";
 import { NewBuildBanner } from "@/components/new-build-banner";
@@ -69,6 +71,7 @@ import { NotificationsProvider } from "@/components/notifications/notifications-
  */
 /** Nothing waiting. Named so the two branches below cannot drift apart. */
 const NO_CHAT_UNREAD = { messages: 0, conversations: 0 };
+const NO_MAIL_UNREAD = { messages: 0, mailboxes: 0 };
 
 export async function AppChrome({ user, children }: { user: SessionUser; children: ReactNode }) {
     const capabilities = getCapabilities();
@@ -96,6 +99,17 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         ? await unreadTotal({ id: user.id }).catch(() => NO_CHAT_UNREAD)
         : NO_CHAT_UNREAD;
 
+    // The same, for mail. A person who spends the day in Deploy is told a
+    // message arrived by the same badge that tells them about a chat.
+    const mailUnread = apps.ids.includes("mail")
+        ? await unreadCounts(user.id)
+              .then((counts) => ({
+                  messages: counts.total,
+                  mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length
+              }))
+              .catch(() => NO_MAIL_UNREAD)
+        : NO_MAIL_UNREAD;
+
     const build = buildStamp();
 
     return (
@@ -114,6 +128,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                             initial={chatUnread}
                             enabled={apps.ids.includes("chat")}
                         >
+                        <MailUnreadProvider initial={mailUnread} enabled={apps.ids.includes("mail")}>
                             <NotificationsProvider initial={notifications}>
                                 <ToastProvider>
                                     {/* Where everybody on screen is, asked once for
@@ -238,6 +253,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     </PresenceProvider>
                                 </ToastProvider>
                             </NotificationsProvider>
+                        </MailUnreadProvider>
                         </ChatUnreadProvider>
                     </SessionScopeProvider>
                 </DisplayFormatProvider>
