@@ -41,6 +41,12 @@ export interface MailKeyActions {
     readonly back?: () => void;
     readonly search?: () => void;
     readonly refresh?: () => void;
+    /** Pick every conversation on screen. The one binding here that takes a
+     *  modifier, because it is the one everybody already presses. */
+    readonly selectAll?: () => void;
+    /** Let go of the selection. Tried before `back`, so Escape means "never
+     *  mind" about the nearest thing first. */
+    readonly clearSelection?: () => boolean;
 }
 
 /** Whether the key belongs to whatever has focus rather than to the screen. */
@@ -60,7 +66,6 @@ export function useMailKeys(actions: MailKeyActions): void {
     useEffect(() => {
         function onKey(event: KeyboardEvent): void {
             if (event.defaultPrevented || typing(event.target)) return;
-            if (event.metaKey || event.ctrlKey || event.altKey) return;
 
             const now = held.current;
             const run = (action: (() => void) | undefined): void => {
@@ -68,6 +73,15 @@ export function useMailKeys(actions: MailKeyActions): void {
                 event.preventDefault();
                 action();
             };
+
+            // Select-all is the one thing here that is a modifier chord, because
+            // it is the chord every list in every file manager has. Handled
+            // before the bail below, which exists to leave the browser's own
+            // chords alone.
+            if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a") {
+                return run(now.selectAll);
+            }
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
 
             switch (event.key) {
                 case "c":
@@ -80,9 +94,12 @@ export function useMailKeys(actions: MailKeyActions): void {
                     return run(now.forward);
                 case "e":
                     return run(now.archive);
-                // The one everybody's fingers know for delete, and the only
-                // shortcut here that needs a shift.
+                // Two spellings of the same thing. `#` is what a mail client
+                // has always used; Delete is what somebody who has never used
+                // one reaches for, and there is no reason it should not work.
                 case "#":
+                case "Delete":
+                case "Backspace":
                     return run(now.trash);
                 case "!":
                     return run(now.junk);
@@ -99,6 +116,12 @@ export function useMailKeys(actions: MailKeyActions): void {
                 case "Enter":
                     return run(now.open);
                 case "Escape":
+                    // Escape undoes the nearest thing first: a selection if
+                    // there is one, and only then the conversation being read.
+                    if (now.clearSelection?.()) {
+                        event.preventDefault();
+                        return;
+                    }
                     return run(now.back);
                 case "/":
                     return run(now.search);
@@ -125,7 +148,9 @@ export const MAIL_SHORTCUTS: readonly { keys: string; what: string }[] = [
     { keys: "a", what: "Reply to everybody" },
     { keys: "f", what: "Forward" },
     { keys: "e", what: "Archive" },
-    { keys: "#", what: "Move to the trash" },
+    { keys: "Delete or #", what: "Move to the trash" },
+    { keys: "Mod+a", what: "Select everything shown" },
+    { keys: "Shift+click", what: "Select a run of conversations" },
     { keys: "!", what: "Report as spam" },
     { keys: "s", what: "Star or unstar" },
     { keys: "u", what: "Mark unread" },

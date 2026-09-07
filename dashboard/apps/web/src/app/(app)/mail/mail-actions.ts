@@ -32,3 +32,24 @@ export function leavesTheView(action: MailAction): boolean {
             return false;
     }
 }
+
+/**
+ * The run of rows between the last one picked on its own and the one just
+ * clicked, both included.
+ *
+ * Identified by id rather than by position, because the list is redrawn from
+ * the server between two clicks - a sync lands, a message arrives - and a
+ * remembered index would by then be pointing at a different conversation than
+ * the one somebody actually clicked. Either end being gone leaves just the row
+ * that was clicked, which is what a plain click does and is never surprising.
+ */
+export function runBetween(
+    ids: readonly string[],
+    anchor: string,
+    target: string
+): readonly string[] {
+    const from = ids.indexOf(anchor);
+    const to = ids.indexOf(target);
+    if (from === -1 || to === -1) return target ? [target] : [];
+    return ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+}

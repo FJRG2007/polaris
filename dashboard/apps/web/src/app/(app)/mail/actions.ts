@@ -233,7 +233,7 @@ export async function openMessageAction(messageId: string) {
             bodyHtml: body.html || message.row.bodyHtml,
             bodyText: body.text || message.row.bodyText
         });
-        return { readable };
+        return { readable, envelope: message.envelope };
     } catch (caught) {
         return failure(caught, "That message could not be opened.");
     }

@@ -15,6 +15,7 @@
 
 import type { ReactNode } from "react";
 import { useMail } from "./mail-shell";
+import { useRouter } from "next/navigation";
 import { useAppUrl } from "@/components/app-url";
 import type { MailAction } from "@/lib/mailbox/messages";
 import type { MailThreadView } from "@/lib/mailbox/views";
@@ -23,9 +24,13 @@ import {
     Bug,
     Clock,
     Copy,
+    CornerUpLeft,
+    CornerUpRight,
+    Forward,
     Link2,
     Mail,
     MailOpen,
+    Search,
     Star,
     Tag,
     Trash2
@@ -39,6 +44,7 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
+    MenuShortcut,
     useToast
 } from "@polaris/ui";
 
@@ -49,6 +55,7 @@ export function ThreadContextMenu({
     onAct,
     onSnooze,
     onLabel,
+    onAnswer,
     children
 }: {
     thread: MailThreadView;
@@ -57,13 +64,19 @@ export function ThreadContextMenu({
     onAct: (action: MailAction, messageIds: readonly string[], announce: string) => void;
     onSnooze: (messageIds: readonly string[], until: Date) => void;
     onLabel: (labelId: string, messageIds: readonly string[]) => void;
+    /** Open the composer answering this conversation. The same three actions the
+     *  reading pane offers, because the point of a right-click is doing
+     *  something to a row without opening it first. */
+    onAnswer: (kind: "reply" | "reply-all" | "forward", messageId: string) => void;
     children: ReactNode;
 }) {
     const { labels } = useMail();
     const appUrl = useAppUrl();
     const toast = useToast();
+    const router = useRouter();
     const ids = [thread.leadMessageId].filter(Boolean);
     const unread = thread.unreadCount > 0;
+    const sender = thread.participants[0]?.address ?? "";
 
     async function copy(what: string, said: string): Promise<void> {
         try {
@@ -81,6 +94,33 @@ export function ThreadContextMenu({
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
             <ContextMenuContent>
                 <ContextMenuItem
+                    onSelect={() => onAnswer("reply", thread.leadMessageId)}
+                    disabled={!thread.leadMessageId}
+                >
+                    <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
+                    Reply
+                    <MenuShortcut keys="r" />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() => onAnswer("reply-all", thread.leadMessageId)}
+                    disabled={!thread.leadMessageId}
+                >
+                    <CornerUpRight className="size-3.5 shrink-0" aria-hidden />
+                    Reply to everybody
+                    <MenuShortcut keys="a" />
+                </ContextMenuItem>
+                <ContextMenuItem
+                    onSelect={() => onAnswer("forward", thread.leadMessageId)}
+                    disabled={!thread.leadMessageId}
+                >
+                    <Forward className="size-3.5 shrink-0" aria-hidden />
+                    Forward
+                    <MenuShortcut keys="f" />
+                </ContextMenuItem>
+
+                <ContextMenuSeparator />
+
+                <ContextMenuItem
                     onSelect={() =>
                         onAct(unread ? "read" : "unread", ids, unread ? "Marked as read." : "Marked as unread.")
                     }
@@ -91,6 +131,7 @@ export function ThreadContextMenu({
                         <Mail className="size-3.5 shrink-0" aria-hidden />
                     )}
                     {unread ? "Mark as read" : "Mark as unread"}
+                    <MenuShortcut keys="u" />
                 </ContextMenuItem>
                 <ContextMenuItem
                     onSelect={() =>
@@ -103,6 +144,7 @@ export function ThreadContextMenu({
                 >
                     <Star className="size-3.5 shrink-0" aria-hidden />
                     {thread.starred ? "Unstar" : "Star"}
+                    <MenuShortcut keys="s" />
                 </ContextMenuItem>
 
                 <ContextMenuSub>
@@ -146,13 +188,19 @@ export function ThreadContextMenu({
                     <ContextMenuItem onSelect={() => onAct("archive", ids, "Archived.")}>
                         <Archive className="size-3.5 shrink-0" aria-hidden />
                         Archive
+                        <MenuShortcut keys="e" />
                     </ContextMenuItem>
                 ) : null}
-                <ContextMenuItem onSelect={() => onAct("junk", ids, "Moved to spam.")}>
+                {/* The two that take mail away from somebody are drawn as what
+                    they are. Spam is destructive twice over: it moves the
+                    message AND teaches a provider about the sender. */}
+                <ContextMenuItem variant="danger" onSelect={() => onAct("junk", ids, "Moved to spam.")}>
                     <Bug className="size-3.5 shrink-0" aria-hidden />
                     Report as spam
+                    <MenuShortcut keys="!" />
                 </ContextMenuItem>
                 <ContextMenuItem
+                    variant="danger"
                     onSelect={() =>
                         onAct(
                             permanentDelete ? "delete" : "trash",
@@ -163,18 +211,22 @@ export function ThreadContextMenu({
                 >
                     <Trash2 className="size-3.5 shrink-0" aria-hidden />
                     {permanentDelete ? "Delete for ever" : "Move to trash"}
+                    <MenuShortcut keys="Delete" />
                 </ContextMenuItem>
 
                 <ContextMenuSeparator />
 
                 <ContextMenuItem
-                    onSelect={() =>
-                        void copy(
-                            thread.participants[0]?.address ?? "",
-                            "Address copied."
-                        )
-                    }
-                    disabled={!thread.participants[0]?.address}
+                    onSelect={() => router.push(SEARCH_FOR(sender))}
+                    disabled={!sender}
+                >
+                    <Search className="size-3.5 shrink-0" aria-hidden />
+                    Find everything from {sender || "this sender"}
+                </ContextMenuItem>
+
+                <ContextMenuItem
+                    onSelect={() => void copy(sender, "Address copied.")}
+                    disabled={!sender}
                 >
                     <Copy className="size-3.5 shrink-0" aria-hidden />
                     Copy the sender&apos;s address
@@ -191,6 +243,13 @@ export function ThreadContextMenu({
             </ContextMenuContent>
         </ContextMenu>
     );
+}
+
+/** Where a sender's whole correspondence lives: an ordinary search, so it
+ *  lands somewhere with an address bar that can be edited and kept rather than
+ *  in a filter that only exists while the menu is open. */
+function SEARCH_FOR(address: string): string {
+    return `/mail?q=${encodeURIComponent(`from:${address}`)}`;
 }
 
 /** The snoozes worth having on a menu. Anything finer belongs in a picker, and

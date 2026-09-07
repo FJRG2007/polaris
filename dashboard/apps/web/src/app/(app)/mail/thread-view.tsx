@@ -22,6 +22,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { leavesTheView } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
+import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import {
@@ -169,8 +170,13 @@ export function ThreadView({
                 const body = readable?.text ?? "";
                 openComposer(
                     kind === "forward"
-                        ? forwardOf(newest, body)
-                        : replyTo(newest, accounts, kind === "reply-all", body)
+                        ? forwardSeed(newest, body)
+                        : replySeed(
+                              newest,
+                              accounts.map((account) => account.address),
+                              kind === "reply-all",
+                              body
+                          )
                 );
             });
         },
@@ -423,83 +429,6 @@ const KEPT_FIRST = 1;
 type Shown =
     | { readonly kind: "message"; readonly message: MailMessageView }
     | { readonly kind: "gap"; readonly count: number };
-
-/**
- * What a reply starts with.
- *
- * The recipients come out of the shared rule, so a reply from here and a reply
- * from anywhere else address the same people. The body is two blank lines and
- * then the message being answered, attributed the way every other client
- * attributes it - so the result reads the same in theirs.
- */
-function replyTo(
-    message: MailMessageView,
-    accounts: ReturnType<typeof useMail>["accounts"],
-    all: boolean,
-    quoted: string
-) {
-    const self = accounts.map((account) => account.address);
-    const { to, cc } = core.replyRecipients(
-        {
-            messageId: "",
-            inReplyTo: "",
-            references: [],
-            subject: message.subject,
-            from: message.from,
-            to: message.to,
-            cc: message.cc,
-            replyTo: message.replyTo,
-            listId: message.listId,
-            sentAt: new Date(message.sentAt)
-        },
-        self,
-        all
-    );
-    const sender = message.from[0] ?? { name: "", address: "" };
-    return {
-        accountId: message.accountId,
-        to: [...to],
-        cc: [...cc],
-        subject: core.replySubject(message.subject),
-        body: quoted.trim()
-            ? `\n\n${core.quoteForReply(quoted, sender, new Date(message.sentAt))}`
-            : "",
-        inReplyToId: message.id,
-        forward: false
-    };
-}
-
-/**
- * What a forward starts with.
- *
- * The block above the original is the one every client writes and every reader
- * recognises, which matters more here than anywhere else: a forward with no
- * header is a message whose recipient cannot tell who originally sent it.
- *
- * The original's attachments do not come with it. That is a real gap and it is
- * said on the composer rather than left for somebody to discover after sending -
- * carrying them needs the parts fetched and re-uploaded, which is a server path
- * that does not exist yet.
- */
-function forwardOf(message: MailMessageView, quoted: string) {
-    const sender = message.from[0];
-    const header = [
-        "---------- Forwarded message ----------",
-        `From: ${sender ? core.formatAddress(sender) : "unknown"}`,
-        `Date: ${new Date(message.sentAt).toISOString().slice(0, 16).replace("T", " ")} UTC`,
-        `Subject: ${message.subject}`,
-        `To: ${core.formatAddressList(message.to)}`,
-        ...(message.cc.length > 0 ? [`Cc: ${core.formatAddressList(message.cc)}`] : [])
-    ].join("\n");
-    return {
-        accountId: message.accountId,
-        to: [],
-        subject: core.forwardSubject(message.subject),
-        body: `\n\n${header}\n\n${quoted}`,
-        inReplyToId: message.id,
-        forward: true
-    };
-}
 
 function MessageCard({
     message,

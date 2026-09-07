@@ -21,8 +21,9 @@
  */
 
 import Link from "next/link";
-import { leavesTheView } from "./mail-actions";
+import { leavesTheView, runBetween } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
+import { forwardSeed, replySeed } from "./answering";
 import { useMailLayout } from "./use-mail-layout";
 import { ThreadContextMenu } from "./thread-menu";
 import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
@@ -33,7 +34,7 @@ import { useRouter } from "next/navigation";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
-import { actOnAction, applyLabelAction, snoozeAction, syncAllAction } from "./actions";
+import { actOnAction, applyLabelAction, openMessageAction, snoozeAction, syncAllAction } from "./actions";
 import { useCallback, useEffect, useMemo, useState, useTransition, type ComponentPropsWithRef } from "react";
 import {
     Button,
@@ -97,6 +98,16 @@ export function MailView({
     // pointer and the keyboard are two ways of pointing at a row, and a keyboard
     // walk that ticked every checkbox on the way past would be unusable.
     const [onIndex, setOnIndex] = useState(0);
+    /**
+     * The last row picked on its own, which is where a run measured with Shift
+     * starts from.
+     *
+     * Held as an id rather than an index because the list is redrawn from the
+     * server between clicks - a sync lands, a message arrives - and an index
+     * would then be pointing at a different conversation than the one somebody
+     * clicked.
+     */
+    const [anchor, setAnchor] = useState("");
     const [helpOpen, setHelpOpen] = useState(false);
     const [layout, setLayout] = useMailLayout();
 
@@ -276,7 +287,19 @@ export function MailView({
             startBusy(async () => {
                 await syncAllAction();
                 refresh();
-            })
+            }),
+        selectAll: () => {
+            setSelected(threads.map((thread) => thread.id));
+            setAnchor(threads[0]?.id ?? "");
+        },
+        // Answers whether it had anything to let go of, so Escape falls through
+        // to closing the conversation when nothing is picked.
+        clearSelection: () => {
+            if (selected.length === 0) return false;
+            setSelected([]);
+            setAnchor("");
+            return true;
+        }
     });
 
     // `?` is bound here rather than in the hook: it is about this screen's own
@@ -337,6 +360,70 @@ export function MailView({
         }
         return held;
     }, [accounts, identities]);
+
+    /**
+     * Pick a row the way every list of anything is picked.
+     *
+     * A plain click on the box adds or removes the one row. Shift takes the run
+     * between the last one picked on its own and this one, which is the whole
+     * reason anybody selects with a keyboard hand on the shift key: fifty
+     * newsletters in one gesture rather than fifty clicks. The run is added to
+     * what is already picked rather than replacing it, so two runs can be
+     * gathered - and it is added rather than toggled, or dragging back over a
+     * run would unpick what was just picked.
+     */
+    const pick = useCallback(
+        (threadId: string, wanted: boolean, run: boolean) => {
+            if (!run || !anchor) {
+                setAnchor(threadId);
+                setSelected((held) =>
+                    wanted ? [...new Set([...held, threadId])] : held.filter((id) => id !== threadId)
+                );
+                return;
+            }
+            const between = runBetween(threads.map((thread) => thread.id), anchor, threadId);
+            setSelected((held) => [...new Set([...held, ...between])]);
+        },
+        [anchor, threads]
+    );
+
+    /**
+     * Reply, reply to everybody, or forward - from the list, without opening the
+     * conversation first.
+     *
+     * The body is fetched before the composer opens rather than after, because a
+     * reply whose quote arrives a second later is one somebody has already
+     * started typing above the wrong place. The plain text, never the HTML:
+     * quoting markup into a reply is how a thread turns into nested tables.
+     */
+    const answer = useCallback(
+        (kind: "reply" | "reply-all" | "forward", messageId: string) => {
+            if (!messageId) return;
+            startBusy(async () => {
+                const outcome = await openMessageAction(messageId);
+                const said = refusalOf(outcome);
+                if (said) {
+                    toast.show({ title: said });
+                    return;
+                }
+                const envelope = "envelope" in outcome ? outcome.envelope : null;
+                const readable = "readable" in outcome ? outcome.readable : null;
+                if (!envelope) return;
+                const quoted = readable?.text ?? "";
+                openComposer(
+                    kind === "forward"
+                        ? forwardSeed(envelope, quoted)
+                        : replySeed(
+                              envelope,
+                              accounts.map((account) => account.address),
+                              kind === "reply-all",
+                              quoted
+                          )
+                );
+            });
+        },
+        [accounts, openComposer, toast]
+    );
 
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
@@ -526,6 +613,7 @@ export function MailView({
                                     onAct={act}
                                     onSnooze={snooze}
                                     onLabel={label}
+                                    onAnswer={answer}
                                 >
                                     <ThreadRow
                                         thread={shown(thread)}
@@ -536,11 +624,7 @@ export function MailView({
                                         showColor={accounts.length > 1}
                                         wide={layout === "full" && !openThread}
                                         mine={mine}
-                                        onPick={(next) =>
-                                            setSelected((held) =>
-                                                next ? [...held, thread.id] : held.filter((id) => id !== thread.id)
-                                            )
-                                        }
+                                        onPick={(next, run) => pick(thread.id, next, run)}
                                         onStar={() =>
                                             act(
                                                 shown(thread).starred ? "unstar" : "star",
@@ -719,7 +803,9 @@ function ThreadRow({
     /** Every address belonging to the reader, so their own name is kept out of
      *  the column that says who a conversation is with. */
     mine: ReadonlySet<string>;
-    onPick: (next: boolean) => void;
+    /** `run` is Shift being held: take everything between the last row picked
+     *  on its own and this one. */
+    onPick: (next: boolean, run: boolean) => void;
     onStar: () => void;
 }) {
     const format = useDisplayFormat();
@@ -747,7 +833,17 @@ function ThreadRow({
                     className="mt-0.5"
                     checked={picked}
                     aria-label={`Select the conversation ${thread.subject || "with no subject"}`}
-                    onChange={(event) => onPick(event.target.checked)}
+                    // Read off the click rather than off a key handler: the
+                    // browser tells us which modifiers were down when the box
+                    // was ticked, and tracking that ourselves would be wrong
+                    // every time somebody alt-tabbed away holding shift.
+                    onClick={(event) => event.stopPropagation()}
+                    onChange={(event) =>
+                        onPick(
+                            event.target.checked,
+                            (event.nativeEvent as MouseEvent).shiftKey === true
+                        )
+                    }
                 />
                 <button
                     type="button"

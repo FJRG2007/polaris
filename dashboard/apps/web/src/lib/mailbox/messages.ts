@@ -19,6 +19,7 @@
 
 import { withImap } from "./imap";
 import { prisma } from "@polaris/db";
+import { addressesFrom } from "./json";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
@@ -526,6 +527,12 @@ export async function messageForReading(userId: string, messageId: string) {
             wantsReceipt: true,
             headers: true,
             fromJson: true,
+            subject: true,
+            toJson: true,
+            ccJson: true,
+            replyToJson: true,
+            listId: true,
+            sentAt: true,
             account: {
                 select: { remoteContent: true, cleanLinks: true, nameTrackers: true }
             }
@@ -535,6 +542,20 @@ export async function messageForReading(userId: string, messageId: string) {
     return {
         accountId: message.accountId,
         policy: message.account,
+        // Who the message was between, for answering it. Read here rather than
+        // in a second query, because every caller that wants the body to quote
+        // wants these in the same breath.
+        envelope: {
+            id: messageId,
+            accountId: message.accountId,
+            subject: message.subject,
+            from: addressesFrom(message.fromJson),
+            to: addressesFrom(message.toJson),
+            cc: addressesFrom(message.ccJson),
+            replyTo: addressesFrom(message.replyToJson),
+            listId: message.listId,
+            sentAt: message.sentAt.toISOString()
+        },
         row: {
             bodyHtml: message.bodyHtml,
             bodyText: message.bodyText,
