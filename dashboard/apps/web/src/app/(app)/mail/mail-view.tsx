@@ -29,6 +29,7 @@ import { ThreadContextMenu } from "./thread-menu";
 import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
+import { SenderFace } from "./sender-face";
 import { MailSearch } from "./mail-search";
 import * as core from "@polaris/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -1111,6 +1112,14 @@ function ThreadRow({
                 />
             ) : null}
             <div className="flex items-start gap-2 py-2 pl-3 pr-2">
+                {/* Who it is from, before the name is read. Drawn from the
+                    first person who is not the reader, which in an inbox is the
+                    sender and in Sent is who it went to. */}
+                <SenderFace
+                    className="mt-0.5"
+                    name={faceOf(thread, mine).name}
+                    address={faceOf(thread, mine).address}
+                />
                 <Checkbox
                     className="mt-0.5"
                     checked={picked}
@@ -1315,6 +1324,14 @@ function RowAction({
             <Icon className="size-3.5 shrink-0" aria-hidden />
         </button>
     );
+}
+
+/** Whose face a row wears: the first participant who is not the reader, so an
+ *  inbox shows the sender and Sent shows who it went to. */
+function faceOf(thread: MailThreadView, mine: ReadonlySet<string>): { name: string; address: string } {
+    const other = thread.participants.find((one) => !mine.has(one.address.trim().toLowerCase()));
+    const chosen = other ?? thread.participants[0];
+    return { name: chosen?.name ?? "", address: chosen?.address ?? "" };
 }
 
 /**
