@@ -184,6 +184,23 @@ export async function performAction(
 }
 
 /**
+ * Ask a lock to report where it is, now.
+ *
+ * Everything else here reads what Nuki last heard from the device, which is as
+ * old as the last thing that happened to it - a door locked by hand an hour ago
+ * is a door their server may still believe is open.
+ *
+ * Used only when somebody has asked, never on a timer. Waking a lock over its
+ * radio costs battery, and Nuki say so themselves: a background loop calling this
+ * is a lock flat in a month. It returns as soon as they have accepted the
+ * request, so the state it produces arrives on the read after it rather than in
+ * the answer to this.
+ */
+export async function syncSmartlock(token: string, smartlockId: string): Promise<void> {
+    await call(token, "POST", `/smartlock/${encodeURIComponent(smartlockId)}/sync`);
+}
+
+/**
  * The account's activity, newest first.
  *
  * Asked for the whole account rather than per lock: a place with six doors is one

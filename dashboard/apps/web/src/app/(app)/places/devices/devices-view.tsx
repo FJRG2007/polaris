@@ -21,12 +21,12 @@ import { DeviceDialog } from "./device-dialog";
 import { ConnectDialog } from "./connect-dialog";
 import * as kinds from "@/lib/home/device-kinds";
 import type { PlaceView } from "@/lib/home/place-kinds";
-import { useCallback, useEffect, useState } from "react";
-import { DeviceControls, DevicePanel } from "./device-panel";
 import type { NukiConnection } from "@/lib/home/nuki-devices";
 import { useDisplayFormat } from "@/components/display-format";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BatteryLow, Plug, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceView } from "@/lib/home/device-kinds";
-import { BatteryLow, DoorClosed, Plug, RefreshCw, Unplug } from "lucide-react";
+import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import {
     Badge,
     Button,
@@ -36,17 +36,31 @@ import {
     cn
 } from "@polaris/ui";
 
-/** How often the list goes and asks again, while the tab is in front. */
-const REFRESH_MS = 60_000;
+/** How often the list goes and asks again, while the tab is in front. Short
+ *  enough that a door somebody else just used is right by the time the reader
+ *  looks up; nothing is woken to answer it, so the cost is one call to the
+ *  account and no battery. */
+const REFRESH_MS = 30_000;
 
-function stateTone(device: DeviceView): string {
-    if (!device.online) return "border-border bg-muted text-muted-foreground";
-    if (device.state === "locked") return "border-success/30 bg-success/10 text-success";
-    if (device.state === "jammed" || device.state === "uncalibrated")
-        return "border-danger/30 bg-danger/10 text-danger";
-    if (device.state === "unlocked" || device.state === "unlatched")
-        return "border-warning/30 bg-warning/10 text-warning";
-    return "border-border bg-muted text-muted-foreground";
+/**
+ * The devices of one sort, together.
+ *
+ * A place with six doors reads as a list; the same place with six doors and
+ * thirty sockets reads as neither unless they are apart. The order is the order
+ * of the kinds themselves rather than of whatever synced first, so the doors are
+ * always at the top - which is what somebody opening this screen in a hurry came
+ * for.
+ */
+function groupDevices(devices: readonly DeviceView[]): { label: string; devices: DeviceView[] }[] {
+    const groups = new Map<string, { label: string; devices: DeviceView[] }>();
+    for (const kind of kinds.DEVICE_KINDS) {
+        const label = kinds.DEVICE_GROUP_LABELS[kind];
+        if (!groups.has(label)) groups.set(label, { label, devices: [] });
+    }
+    for (const device of devices) {
+        groups.get(kinds.DEVICE_GROUP_LABELS[kinds.deviceKind(device.kind)])?.devices.push(device);
+    }
+    return [...groups.values()].filter((group) => group.devices.length > 0);
 }
 
 export function DevicesView({
@@ -68,6 +82,7 @@ export function DevicesView({
     const [refreshing, setRefreshing] = useState(false);
     const [busy, setBusy] = useState<{ id: string; action: DeviceAction } | null>(null);
     const [error, setError] = useState("");
+    const groups = useMemo(() => groupDevices(devices ?? []), [devices]);
 
     useEffect(() => {
         let cancelled = false;
@@ -83,13 +98,27 @@ export function DevicesView({
         };
     }, []);
 
-    /** Ask the account what it has now. `quiet` is the timer's version, which must
-     *  not put a spinner on a screen nobody asked to wait. */
+    /**
+     * Ask the account what it has now.
+     *
+     * `quiet` is the timer's version, which must not put a spinner on a screen
+     * nobody asked to wait - and which reads what the account already knows
+     * rather than making the devices themselves speak up. The loud version is
+     * somebody pressing the button, and that one is allowed to wake them: it is
+     * the difference between "as far as we know" and "as of now", and it is only
+     * ever spent when a person asked for it.
+     *
+     * When it was last checked comes back with the devices. Without it the line
+     * at the top kept the time of the first read for as long as the tab was open,
+     * which is a screen refreshing itself every half a minute while saying it
+     * has not looked since you arrived.
+     */
     const sync = useCallback(async (quiet = false) => {
         if (!quiet) setRefreshing(true);
-        const result = await actions.syncDevicesAction();
+        const result = await actions.syncDevicesAction({ probe: !quiet });
         if (!quiet) setRefreshing(false);
         if (result.devices) setDevices(result.devices);
+        if (result.account) setAccount(result.account);
         if (!quiet) setError(result.error ?? "");
     }, []);
 
@@ -98,7 +127,18 @@ export function DevicesView({
         const timer = setInterval(() => {
             if (document.visibilityState === "visible") void sync(true);
         }, REFRESH_MS);
-        return () => clearInterval(timer);
+        // A tab that has been in the background is a tab whose every state is as
+        // old as the moment it was left. Coming back to it is exactly when
+        // somebody is about to read a door and believe it, so it is read again
+        // then rather than up to half a minute later.
+        const wake = () => {
+            if (document.visibilityState === "visible") void sync(true);
+        };
+        document.addEventListener("visibilitychange", wake);
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener("visibilitychange", wake);
+        };
     }, [account?.connected, sync]);
 
     /** Put a device back into both lists it can be in, so the row and the open
@@ -243,69 +283,83 @@ export function DevicesView({
 
             {devices.length === 0 ? (
                 <EmptyState
-                    title="The account answered with no doors."
-                    description="Check that this is the account the locks are on, and that the token it was connected with may see them."
+                    title="The account answered with nothing."
+                    description="Check that this is the account the devices are on, and that what it was connected with may see them."
                 />
             ) : (
-                <ul className="flex flex-col gap-2">
-                    {devices.map((device) => (
-                        <li
-                            key={device.id}
-                            className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3"
-                        >
-                            <button
-                                type="button"
-                                onClick={() => setOpened(device)}
-                                className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
-                            >
-                                <span className="flex items-center gap-2">
-                                    <DoorClosed className="size-4 shrink-0 text-muted-foreground" />
-                                    <span className="truncate text-sm font-medium" title={device.name}>{device.name}</span>
-                                    <Badge className={cn("shrink-0", stateTone(device))}>
-                                        {device.online
-                                            ? kinds.DEVICE_STATE_LABELS[device.state]
-                                            : "Not answering"}
-                                    </Badge>
-                                    {device.batteryCritical && (
-                                        <Badge className="shrink-0 gap-1 border-danger/30 bg-danger/10 text-danger">
-                                            <BatteryLow className="size-3 shrink-0" />
-                                            Battery
-                                        </Badge>
-                                    )}
-                                    {device.placeId === null && (
-                                        <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
-                                            Not placed
-                                        </Badge>
-                                    )}
-                                </span>
-                                <span className="truncate text-[0.6875rem] text-foreground-subtle">
-                                    {[
-                                        device.zone,
-                                        device.model,
-                                        device.doorState === "none"
-                                            ? null
-                                            : kinds.DOOR_STATE_LABELS[device.doorState],
-                                        device.batteryPercent === null
-                                            ? null
-                                            : `Battery ${device.batteryPercent}%`
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" - ")}
-                                </span>
-                            </button>
-                            <DeviceControls
-                                device={device}
-                                canControl={canControl}
-                                busy={busy?.id === device.id ? busy.action : null}
-                                onAct={(action) => {
-                                    // Thrown by `act` so the panel can show it; on
-                                    // the row the line above the list already has.
-                                    void act(device, action).catch(() => undefined);
-                                }}
-                            />
-                        </li>
+                <div className="flex flex-col gap-6">
+                    {groups.map((group) => (
+                        <section key={group.label} className="flex flex-col gap-2">
+                            {groups.length > 1 && (
+                                <h2 className="text-xs font-medium text-muted-foreground">{group.label}</h2>
+                            )}
+                            <ul className="flex flex-col gap-2">
+                                {group.devices.map((device) => (
+                                    <li
+                                        key={device.id}
+                                        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3"
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpened(device)}
+                                            className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <DeviceIcon
+                                                    kind={device.kind}
+                                                    className="size-4 shrink-0 text-muted-foreground"
+                                                />
+                                                <span className="truncate text-sm font-medium" title={device.name}>
+                                                    {device.name}
+                                                </span>
+                                                <Badge className={cn("shrink-0", stateClass(device))}>
+                                                    {device.online
+                                                        ? kinds.stateLabel(device.kind, device.state)
+                                                        : "Not answering"}
+                                                </Badge>
+                                                {device.batteryCritical && (
+                                                    <Badge className="shrink-0 gap-1 border-danger/30 bg-danger/10 text-danger">
+                                                        <BatteryLow className="size-3 shrink-0" />
+                                                        Battery
+                                                    </Badge>
+                                                )}
+                                                {device.placeId === null && (
+                                                    <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
+                                                        Not placed
+                                                    </Badge>
+                                                )}
+                                            </span>
+                                            <span className="truncate text-[0.6875rem] text-foreground-subtle">
+                                                {[
+                                                    device.zone,
+                                                    device.model,
+                                                    device.doorState === "none"
+                                                        ? null
+                                                        : kinds.DOOR_STATE_LABELS[device.doorState],
+                                                    device.batteryPercent === null
+                                                        ? null
+                                                        : `Battery ${device.batteryPercent}%`
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(" - ")}
+                                            </span>
+                                        </button>
+                                        <DeviceControls
+                                            device={device}
+                                            canControl={canControl}
+                                            busy={busy?.id === device.id ? busy.action : null}
+                                            onAct={(action) => {
+                                                // Thrown by `act` so the panel can show it; on
+                                                // the row the line above the list already has.
+                                                void act(device, action).catch(() => undefined);
+                                            }}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
                     ))}
-                </ul>
+                </div>
             )}
 
             <DevicePanel

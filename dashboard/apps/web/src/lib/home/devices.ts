@@ -17,15 +17,7 @@
 import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
 import { NUKI_VENDOR, actOnNuki, nukiConnection, syncNuki } from "@/lib/home/nuki-devices";
-import {
-    USAGE_DAYS,
-    actionsFor,
-    deviceState,
-    doorState,
-    type DeviceAction,
-    type DeviceEventView,
-    type DeviceView
-} from "@/lib/home/device-kinds";
+import * as kinds from "@/lib/home/device-kinds";
 
 /** The makes Polaris can talk to. One entry, and the shape is the point: it is
  *  what keeps every caller below from naming one. */
@@ -33,15 +25,22 @@ const DRIVERS = {
     [NUKI_VENDOR]: { act: actOnNuki, sync: syncNuki }
 } as const;
 
+/** What a sync was asked for. `probe` is somebody pressing the button rather than
+ *  a timer coming round, and a driver may spend something on it - waking a lock
+ *  over its radio, say - that a background read must never spend. */
+export interface SyncOptions {
+    readonly probe?: boolean;
+}
+
 function driverFor(vendor: string): (typeof DRIVERS)[keyof typeof DRIVERS] {
     const driver = DRIVERS[vendor as keyof typeof DRIVERS];
     if (!driver) throw new HomeError("That device is connected through something Polaris no longer supports");
     return driver;
 }
 
-/** Which of the actions this door counts as somebody using it, for the chart. A
- *  door opening on its own sensor is the same event seen twice. */
-const USED_ACTIONS = ["lock", "unlock", "unlatch", "lock-and-go"];
+/** Which of the actions count as somebody using the thing, for the chart. A door
+ *  opening on its own sensor is the same event seen twice. */
+const USED_ACTIONS = ["lock", "unlock", "unlatch", "lock-and-go", "turn-on", "turn-off"];
 
 /** A ceiling on the rows one usage window reads. A door used more often than this
  *  in a month is a turnstile, and the chart of it would be a solid block either
@@ -84,7 +83,7 @@ type DeviceRow = {
     stateAt: Date | null;
 };
 
-function toView(row: DeviceRow): DeviceView {
+function toView(row: DeviceRow): kinds.DeviceView {
     return {
         id: row.id,
         vendor: row.vendor,
@@ -94,8 +93,8 @@ function toView(row: DeviceRow): DeviceView {
         placeId: row.placeId,
         model: row.model ?? "",
         firmware: row.firmware ?? "",
-        state: deviceState(row.state),
-        doorState: doorState(row.doorState),
+        state: kinds.deviceState(row.state),
+        doorState: kinds.doorState(row.doorState),
         batteryPercent: row.batteryPercent,
         batteryCritical: row.batteryCritical,
         online: row.online,
@@ -118,7 +117,7 @@ function toView(row: DeviceRow): DeviceView {
  * nothing on it to open. They are listed and marked instead, and putting one
  * somewhere is what takes it off the other places' lists.
  */
-export async function listDevices(installedAppId: string, placeId?: string | null): Promise<DeviceView[]> {
+export async function listDevices(installedAppId: string, placeId?: string | null): Promise<kinds.DeviceView[]> {
     const rows = await prisma.placeDevice.findMany({
         where: { installedAppId, ...(placeId ? { OR: [{ placeId }, { placeId: null }] } : {}) },
         orderBy: [{ zone: "asc" }, { name: "asc" }],
@@ -137,7 +136,7 @@ async function requireDevice(installedAppId: string, id: string): Promise<Device
     return row;
 }
 
-export async function getDevice(installedAppId: string, id: string): Promise<DeviceView> {
+export async function getDevice(installedAppId: string, id: string): Promise<kinds.DeviceView> {
     return toView(await requireDevice(installedAppId, id));
 }
 
@@ -154,7 +153,7 @@ export async function updateDevice(
     installedAppId: string,
     id: string,
     edit: DeviceEdit
-): Promise<DeviceView> {
+): Promise<kinds.DeviceView> {
     await requireDevice(installedAppId, id);
     const row = await prisma.placeDevice.update({
         where: { id },
@@ -187,11 +186,12 @@ export async function updateDevice(
 export async function actOnDevice(
     installedAppId: string,
     id: string,
-    action: DeviceAction
-): Promise<DeviceView> {
+    action: kinds.DeviceAction
+): Promise<kinds.DeviceView> {
     const device = await requireDevice(installedAppId, id);
-    if (!actionsFor(device.kind).includes(action)) {
-        throw new HomeError(`A ${device.kind} cannot be told to ${action}`);
+    if (!kinds.actionsFor(device.kind).includes(action)) {
+        const what = kinds.DEVICE_KIND_LABELS[kinds.deviceKind(device.kind)].toLowerCase();
+        throw new HomeError(`A ${what} cannot be told to ${kinds.DEVICE_ACTION_VERBS[action]}`);
     }
     if (!device.controllable) throw new HomeError(`${device.name} is set to be watched, not operated`);
     if (!device.online) throw new HomeError(`${device.name} was not answering when it was last checked`);
@@ -217,7 +217,7 @@ export async function actOnDevice(
 
     const row = await prisma.placeDevice.update({
         where: { id: device.id },
-        data: { state: "moving", stateAt: new Date() },
+        data: { state: kinds.settledState(action) ?? "moving", stateAt: new Date() },
         select: DEVICE_FIELDS
     });
     return toView(row);
@@ -230,13 +230,16 @@ export async function actOnDevice(
  * stop the rest: a Nuki account that is refusing its token must not leave a
  * second make's doors unread.
  */
-export async function syncDevices(installedAppId: string): Promise<{ devices: number; error: string | null }> {
+export async function syncDevices(
+    installedAppId: string,
+    options: SyncOptions = {}
+): Promise<{ devices: number; error: string | null }> {
     let devices = 0;
     let error: string | null = null;
     for (const [vendor, driver] of Object.entries(DRIVERS)) {
         if (vendor === NUKI_VENDOR && !(await nukiConnection()).connected) continue;
         try {
-            devices += (await driver.sync(installedAppId)).devices;
+            devices += (await driver.sync(installedAppId, options)).devices;
         } catch (caught) {
             error = caught instanceof Error ? caught.message : "That account could not be reached";
         }
@@ -253,7 +256,7 @@ export async function syncDevices(installedAppId: string): Promise<{ devices: nu
 export async function listDeviceEvents(
     installedAppId: string,
     query: { deviceId?: string | null; placeId?: string | null; limit?: number }
-): Promise<DeviceEventView[]> {
+): Promise<kinds.DeviceEventView[]> {
     const rows = await prisma.placeDeviceEvent.findMany({
         where: {
             device: {
@@ -302,7 +305,7 @@ export async function listDeviceEvents(
  * office door is a few hundred entries - so sending the times costs less than
  * plumbing a timezone down to a query.
  */
-export async function deviceUsage(installedAppId: string, deviceId: string, days = USAGE_DAYS): Promise<number[]> {
+export async function deviceUsage(installedAppId: string, deviceId: string, days = kinds.USAGE_DAYS): Promise<number[]> {
     await requireDevice(installedAppId, deviceId);
     const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const rows = await prisma.placeDeviceEvent.findMany({

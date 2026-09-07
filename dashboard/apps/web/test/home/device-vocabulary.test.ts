@@ -1,5 +1,5 @@
 /**
- * The two pieces of the doors feature that are worth checking without a lock.
+ * The pieces of the devices feature that are worth checking without a lock.
  *
  * Somebody else's numbers turned into this app's words, and a month of
  * timestamps counted into the days they fall in. Both are pure, both are where a
@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import { translateLog } from "@/lib/home/nuki-devices";
-import { bucketUsage, USAGE_DAYS, describeEvent } from "@/lib/home/device-kinds";
+import { actionsFor, bucketUsage, describeEvent, settledState, USAGE_DAYS } from "@/lib/home/device-kinds";
 
 /** One entry as Nuki hands it over. */
 function entry(over: Partial<Parameters<typeof translateLog>[0]> = {}) {
@@ -103,5 +103,49 @@ describe("a month of use, counted into days", () => {
         const gaps = days.slice(1).map((day, index) => day.t - (days[index]?.t ?? 0));
         expect(gaps).toContain(25 * 60 * 60 * 1000);
         expect(new Set(gaps).size).toBe(2);
+    });
+});
+
+describe("the buttons a kind of device gets", () => {
+    it("gives a lock the bolt and the latch", () => {
+        expect(actionsFor("lock")).toEqual(["lock", "unlock", "unlatch"]);
+    });
+
+    it("gives an opener only the one thing it can do", () => {
+        // There is no bolt in a door opener. A "Lock" on it would be a button
+        // that cannot do what it says.
+        expect(actionsFor("opener")).toEqual(["unlatch"]);
+    });
+
+    it("gives a socket on and off, and no lock", () => {
+        expect(actionsFor("outlet")).toEqual(["turn-on", "turn-off"]);
+        expect(actionsFor("outlet")).not.toContain("lock");
+    });
+
+    it("reads a kind it does not know as a lock rather than as nothing", () => {
+        // A device synced by a newer build and read by an older one. It draws,
+        // and the service refuses the controls it should not have.
+        expect(actionsFor("thermostat")).toEqual(["lock", "unlock", "unlatch"]);
+    });
+
+    it("knows where a switch ends up and leaves a turning lock to report itself", () => {
+        expect(settledState("turn-on")).toBe("on");
+        expect(settledState("turn-off")).toBe("off");
+        expect(settledState("lock")).toBeNull();
+    });
+
+    it("writes a switch into the history in words rather than in codes", () => {
+        const line = describeEvent({
+            id: "e1",
+            deviceId: "d1",
+            deviceName: "Desk lamp",
+            action: "turn-on",
+            actor: "Ada",
+            via: "polaris",
+            outcome: "ok",
+            note: "",
+            at: "2026-09-01T08:30:00.000Z"
+        });
+        expect(line).toBe("Turned on by Ada from Polaris");
     });
 });

@@ -18,7 +18,7 @@
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { HomeError } from "@/lib/home/home-error";
-import type { DeviceAction } from "@/lib/home/device-kinds";
+import { DEVICE_ACTION_VERBS, type DeviceAction } from "@/lib/home/device-kinds";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     NUKI_ACTIONS,
@@ -27,6 +27,7 @@ import {
     listSmartlocks,
     nukiFirmware,
     performAction,
+    syncSmartlock,
     type NukiLog,
     type NukiSmartlock
 } from "@/lib/integrations/nuki-api";
@@ -62,6 +63,12 @@ const KEYS = {
  *  the ones already written are skipped, so re-reading the overlap costs nothing
  *  and is what makes a missed sync heal itself. */
 const LOG_PAGE = 200;
+
+/** How long a lock is given to answer after being asked to report, before it is
+ *  read. Long enough for a lock that is awake, short enough that somebody who
+ *  pressed a button is not left watching a spinner - and the read after this one
+ *  catches whatever was still on its way. */
+const PROBE_SETTLE_MS = 2500;
 
 // ---------------------------------------------------------------------------
 // The connection
@@ -360,8 +367,29 @@ export function translateLog(entry: NukiLog): {
  * Returns how many devices the account has, so a screen that asked for a sync can
  * say what came of it.
  */
-export async function syncNuki(installedAppId: string): Promise<{ devices: number }> {
+export async function syncNuki(
+    installedAppId: string,
+    options: { probe?: boolean } = {}
+): Promise<{ devices: number }> {
     const token = await requireToken();
+    // Somebody pressed "check again", so the locks are asked to say where they
+    // are before they are read. Only then: waking a lock over its radio is what
+    // empties its battery, and a timer doing it would flatten a door in a month.
+    // Failures are swallowed rather than raised - a lock that will not wake is
+    // still a lock whose last known state is worth showing.
+    if (options.probe) {
+        const known = await prisma.placeDevice.findMany({
+            where: { installedAppId, vendor: NUKI_VENDOR },
+            select: { externalId: true }
+        });
+        await Promise.all(
+            known.map((device) => syncSmartlock(token, device.externalId).catch(() => undefined))
+        );
+        // Their server answers the request before the lock has answered it. A
+        // pause here is the difference between reading the state somebody just
+        // asked for and reading the one they already had on screen.
+        await new Promise((resolve) => setTimeout(resolve, PROBE_SETTLE_MS));
+    }
     let locks: NukiSmartlock[];
     try {
         locks = await listSmartlocks(token);
@@ -460,7 +488,11 @@ async function ingestLogs(token: string, installedAppId: string): Promise<void> 
 // Acting
 // ---------------------------------------------------------------------------
 
-const ACTION_CODES: Readonly<Record<DeviceAction, number>> = {
+/** Only the actions a Nuki has. The list of buttons a kind of device gets is
+ *  `actionsFor`, and it never offers a lock an "On" - this is the same rule said
+ *  again at the edge, because what is on the other side of it is somebody's front
+ *  door and a number sent in error is not a mistake worth being relaxed about. */
+const ACTION_CODES: Readonly<Partial<Record<DeviceAction, number>>> = {
     lock: NUKI_ACTIONS.lock,
     unlock: NUKI_ACTIONS.unlock,
     unlatch: NUKI_ACTIONS.unlatch
@@ -475,6 +507,10 @@ const ACTION_CODES: Readonly<Record<DeviceAction, number>> = {
  * are not the same thing when a motor jams.
  */
 export async function actOnNuki(externalId: string, action: DeviceAction): Promise<void> {
+    const code = ACTION_CODES[action];
+    if (code === undefined) {
+        throw new HomeError(`A Nuki device cannot be told to ${DEVICE_ACTION_VERBS[action]}`);
+    }
     const token = await requireToken();
-    await speaking(() => performAction(token, externalId, ACTION_CODES[action]));
+    await speaking(() => performAction(token, externalId, code));
 }

@@ -26,7 +26,6 @@ import {
     Contact,
     Container,
     Database,
-    DoorClosed,
     EyeOff,
     FileText,
     FolderGit2,
@@ -66,6 +65,7 @@ import {
     Share2,
     ShieldCheck,
     SlidersHorizontal,
+    ToggleRight,
     Sparkles,
     SquareCheckBig,
     Star,
@@ -322,7 +322,7 @@ export interface AppSection {
  * rearranging a rail people have learned is a worse cost than one heading now.
  */
 const CAMERAS_GROUP = "Cameras";
-const DOORS_GROUP = "Doors";
+const DEVICES_GROUP = "Devices";
 
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
@@ -673,10 +673,10 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["faces", "known", "recognition", "family", "strangers"]
         },
         {
-            label: "Doors",
-            group: DOORS_GROUP,
+            label: "Devices",
+            group: DEVICES_GROUP,
             href: "/places/devices",
-            icon: DoorClosed,
+            icon: ToggleRight,
             keywords: [
                 "locks",
                 "lock",
@@ -686,7 +686,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "door",
                 "open the door",
                 "who opened",
-                "access"
+                "access",
+                "switch",
+                "socket",
+                "plug",
+                "light",
+                "tuya",
+                "smart home"
             ]
         },
         {

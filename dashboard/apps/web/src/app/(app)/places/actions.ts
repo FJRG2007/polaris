@@ -1108,18 +1108,30 @@ export async function listDevicesAction(): Promise<{
  * A read rather than a control: it changes nothing at the door, and somebody
  * looking at a screen of locks has to be able to find out whether it is current.
  */
-export async function syncDevicesAction(): Promise<{ devices?: DeviceView[]; error?: string; }> {
+export async function syncDevicesAction(
+    options: { probe?: boolean } = {}
+): Promise<{ devices?: DeviceView[]; account?: NukiConnection; error?: string; }> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
-        const outcome = await devices.syncDevices(install.id);
+        const outcome = await devices.syncDevices(install.id, { probe: options.probe === true });
         const { current } = await currentPlace(install.id);
-        return { outcome, list: await devices.listDevices(install.id, current.id) };
+        return {
+            outcome,
+            list: await devices.listDevices(install.id, current.id),
+            account: await nukiConnection()
+        };
     });
     if (result.error) return { error: result.error };
     // A sync that reached one account and not another has both an answer and a
     // complaint, so the screen gets the doors it did read alongside the line
-    // about the ones it did not.
-    return { devices: result.value?.list, error: result.value?.outcome.error ?? undefined };
+    // about the ones it did not. The account comes back with them because when
+    // it was last checked is the one thing on that screen that says whether any
+    // of the rest is current.
+    return {
+        devices: result.value?.list,
+        account: result.value?.account,
+        error: result.value?.outcome.error ?? undefined
+    };
 }
 
 /** Lock, unlock or open one door. */

@@ -1,23 +1,28 @@
 "use client";
 
 /**
- * One door: where it is, what it is doing, and everything it has done.
+ * One device: where it is, what it is doing, and everything it has done.
  *
  * The three questions in the order they are asked. The state and the controls are
- * at the top, because nine times out of ten somebody opened this to lock
- * something. The month of use is under them, because the second question about a
- * door is always "is this normal". The history is last and is the longest, since
- * it is the one people read rather than glance at.
+ * at the top, because nine times out of ten somebody opened this to lock or
+ * switch something. The month of use is under them, because the second question
+ * about anything in a building is always "is this normal". The history is last
+ * and is the longest, since it is the one people read rather than glance at.
  *
  * The chart counts uses rather than openings on the sensor: an unlock followed by
  * the door swinging is one person arriving, and counting both would double every
  * quiet week.
+ *
+ * Which controls it gets is `actionsFor`, never this file. A door has three
+ * buttons and a socket has two, and the moment a screen decides that for itself
+ * is the moment a lock somewhere grows an "On".
  */
 
 import * as actions from "../actions";
+import * as kinds from "@/lib/home/device-kinds";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BatteryLow, DoorOpen, Loader2, Lock, LockOpen, Pencil } from "lucide-react";
+import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
 import {
     Badge,
     Button,
@@ -29,32 +34,76 @@ import {
     TimeSeriesChart,
     cn
 } from "@polaris/ui";
-import * as kinds from "@/lib/home/device-kinds";
-import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
+import {
+    BatteryLow,
+    DoorClosed,
+    DoorOpen,
+    Lightbulb,
+    Loader2,
+    Lock,
+    LockOpen,
+    Pencil,
+    Plug,
+    Power,
+    PowerOff,
+    ToggleRight
+} from "lucide-react";
 
 /** The icon on each control, so the buttons are told apart at a glance rather
  *  than only read. */
 const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     lock: Lock,
     unlock: LockOpen,
-    unlatch: DoorOpen
+    unlatch: DoorOpen,
+    "turn-on": Power,
+    "turn-off": PowerOff
 };
+
+/** What each sort of device looks like in a list. A row of doors and a row of
+ *  sockets are read at a glance rather than by name, and the icon is what makes
+ *  that possible once a place holds both. */
+const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
+    lock: DoorClosed,
+    opener: DoorOpen,
+    switch: ToggleRight,
+    outlet: Plug,
+    light: Lightbulb
+};
+
+/** The one button of a pair that gets the weight. Locking up and switching a
+ *  light on are what people came to press; the other is the correction. */
+const PRIMARY_ACTIONS: readonly DeviceAction[] = ["lock", "turn-on"];
+
+export function DeviceIcon({ kind, className }: { kind: string; className?: string }) {
+    const Icon = KIND_ICONS[kinds.deviceKind(kind)];
+    return <Icon className={className} />;
+}
+
+/** The one place a state becomes a colour. Written once because the row, the
+ *  panel and anything later that shows a state must not disagree about what
+ *  jammed looks like. */
+const TONE_CLASSES: Record<kinds.DeviceTone, string> = {
+    success: "border-success/30 bg-success/10 text-success",
+    active: "border-accent/30 bg-accent/10 text-accent",
+    warning: "border-warning/30 bg-warning/10 text-warning",
+    danger: "border-danger/30 bg-danger/10 text-danger",
+    muted: "border-border bg-muted text-muted-foreground"
+};
+
+/** A device nobody can reach has no state worth colouring: whatever it was doing
+ *  when it last answered is not what it is doing now. */
+export function stateClass(device: DeviceView): string {
+    if (!device.online) return TONE_CLASSES.muted;
+    return TONE_CLASSES[kinds.DEVICE_STATE_TONES[device.state]];
+}
 
 /** How the state reads on the badge. Deliberately not a colour on its own: a
  *  colour is the glance and the word is the answer. */
 function StatePill({ device }: { device: DeviceView }) {
-    const tone =
-        device.state === "locked"
-            ? "border-success/30 bg-success/10 text-success"
-            : device.state === "jammed" || device.state === "uncalibrated"
-              ? "border-danger/30 bg-danger/10 text-danger"
-              : device.state === "unlocked" || device.state === "unlatched"
-                ? "border-warning/30 bg-warning/10 text-warning"
-                : "border-border bg-muted text-muted-foreground";
     return (
-        <Badge className={cn("gap-1.5", tone)}>
+        <Badge className={cn("gap-1.5", stateClass(device))}>
             {device.state === "moving" && <Loader2 className="size-3 animate-spin" />}
-            {device.online ? kinds.DEVICE_STATE_LABELS[device.state] : "Not answering"}
+            {device.online ? kinds.stateLabel(device.kind, device.state) : "Not answering"}
         </Badge>
     );
 }
@@ -87,12 +136,17 @@ export function DeviceControls({
         <div className={cn("flex flex-wrap gap-2", className)}>
             {kinds.actionsFor(device.kind).map((action) => {
                 const Icon = ACTION_ICONS[action];
+                // A socket that is already on has nothing to be told. The button
+                // stays where it is, so the pair does not jump about as it is
+                // pressed, and says by being flat that this is the state it is in.
+                const settled = kinds.settledState(action);
+                const already = settled !== null && device.state === settled;
                 return (
                     <Button
                         key={action}
                         size="sm"
-                        variant={action === "lock" ? "primary" : "outline"}
-                        disabled={busy !== null || !device.online}
+                        variant={PRIMARY_ACTIONS.includes(action) && !already ? "primary" : "outline"}
+                        disabled={busy !== null || !device.online || already}
                         onClick={() => onAct(action)}
                     >
                         {busy === action ? (
@@ -223,8 +277,8 @@ export function DevicePanel({
                                 {device.batteryCritical && (
                                     <p className="flex items-center gap-1.5 text-xs text-danger">
                                         <BatteryLow className="size-3.5 shrink-0" />
-                                        The battery is nearly flat. A lock that runs out stops answering
-                                        and has to be opened by hand.
+                                        The battery is nearly flat. Once it runs out it stops
+                                        answering, and whatever it does has to be done by hand.
                                     </p>
                                 )}
                                 {error && (
@@ -262,7 +316,7 @@ export function DevicePanel({
                                 ) : events.length === 0 ? (
                                     <EmptyState
                                         title="Nothing recorded yet."
-                                        description="Every lock, unlock and opening lands here, including the ones that did not finish."
+                                        description="Everything this has been told to do lands here, including whatever did not finish."
                                     />
                                 ) : (
                                     <ul className="divide-y divide-border rounded-lg border border-border">
