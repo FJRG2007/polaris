@@ -9,11 +9,16 @@
  * who reads one message at a time wants. Neither is right for both people, and
  * neither is right for the same person all the time.
  *
+ * `full` is the default because it is what a mail client looks like to almost
+ * everybody: a list, and the message you clicked. The reading pane beside it is
+ * the deliberate choice, not the thing somebody has to discover they can turn
+ * off.
+ *
  * Kept in the browser rather than on the account, because it is a preference
  * about this screen on this device - the same reason a collapsed section is. It
  * is read once on mount rather than during render: a value that differs between
- * the server's HTML and the browser's first paint is a hydration mismatch, and
- * the split view is the honest default to paint while the answer is read.
+ * the server's HTML and the browser's first paint is a hydration mismatch, so
+ * the default is what gets painted while the answer is read.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -23,7 +28,7 @@ export type MailLayout = "split" | "full";
 const KEY = "polaris.mail.layout";
 
 export function useMailLayout(): [MailLayout, (next: MailLayout) => void] {
-    const [layout, setLayout] = useState<MailLayout>("split");
+    const [layout, setLayout] = useState<MailLayout>("full");
 
     useEffect(() => {
         try {

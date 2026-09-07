@@ -34,7 +34,7 @@ import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { useDisplayFormat } from "@/components/display-format";
 import { actOnAction, applyLabelAction, snoozeAction, syncAllAction } from "./actions";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ComponentPropsWithRef } from "react";
 import {
     Button,
     Checkbox,
@@ -89,7 +89,7 @@ export function MailView({
     cursor: string;
 }) {
     const router = useRouter();
-    const { accounts, accountColor, askFolderRole, openComposer, refresh } = useMail();
+    const { accounts, accountColor, askFolderRole, identities, openComposer, refresh } = useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -317,6 +317,27 @@ export function MailView({
         [refresh, toast]
     );
 
+    /**
+     * Every address that is the reader's own.
+     *
+     * A conversation's participants include whoever it was addressed to, and in
+     * an inbox that is always the person looking at it. Printing their own name
+     * in the sender column of every row is a column of noise: no mail client
+     * does it, because the one thing a reader already knows about their inbox is
+     * that it is theirs. The mailboxes and every address they may send as, so an
+     * alias is recognised as them too.
+     */
+    const mine = useMemo(() => {
+        const held = new Set<string>();
+        for (const account of accounts) {
+            held.add(account.address.trim().toLowerCase());
+            for (const identity of identities[account.id] ?? []) {
+                held.add(identity.address.trim().toLowerCase());
+            }
+        }
+        return held;
+    }, [accounts, identities]);
+
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
     return (
@@ -337,11 +358,21 @@ export function MailView({
                     // the message once one is open, which is what somebody who
                     // reads one message at a time wants. Neither is right for
                     // both, which is why this is not a constant.
-                    openThread
-                        ? layout === "split"
+                    //
+                    // In `split` the list is the same width the whole time. It
+                    // used to take the screen until something was opened and then
+                    // snap to a fifth of it, so choosing the reading pane meant
+                    // watching the list jump every time you came back to an empty
+                    // one - a column that changes width is a column nobody can
+                    // learn to read. Narrow only where there is room for the pane
+                    // beside it; a phone gets the list and then the message.
+                    layout === "split"
+                        ? openThread
                             ? "hidden w-80 shrink-0 border-r border-border lg:flex"
-                            : "hidden"
-                        : "flex flex-1"
+                            : "flex flex-1 lg:w-80 lg:flex-none lg:shrink-0 lg:border-r lg:border-border"
+                        : openThread
+                          ? "hidden"
+                          : "flex flex-1"
                 )}
                 aria-label={context.title}
             >
@@ -504,6 +535,7 @@ export function MailView({
                                         color={accountColor(thread.accountId)}
                                         showColor={accounts.length > 1}
                                         wide={layout === "full" && !openThread}
+                                        mine={mine}
                                         onPick={(next) =>
                                             setSelected((held) =>
                                                 next ? [...held, thread.id] : held.filter((id) => id !== thread.id)
@@ -649,6 +681,16 @@ function tomorrowMorning(): Date {
     return when;
 }
 
+/**
+ * One row.
+ *
+ * It takes and passes on whatever else it is handed, and that is not tidiness:
+ * the right-click menu wraps this in a Radix trigger with `asChild`, which works
+ * by cloning the child and handing it the handler and the ref that make the menu
+ * open. A component that declares its props and drops the rest swallows both
+ * silently - no error, no warning, and a right-click on a conversation that does
+ * nothing at all. That is what it did.
+ */
 function ThreadRow({
     thread,
     onCursor,
@@ -657,9 +699,11 @@ function ThreadRow({
     color,
     showColor,
     wide,
+    mine,
     onPick,
-    onStar
-}: {
+    onStar,
+    ...rest
+}: ComponentPropsWithRef<"li"> & {
     thread: MailThreadView;
     /** Whether the keyboard is on this row. Drawn as an edge rather than a fill,
      *  so it stays legible over the fill an open or picked row already has. */
@@ -672,6 +716,9 @@ function ThreadRow({
      *  subject, snippet, date - the way a full-width list is read; narrow, it
      *  stacks, because three columns in twenty rems is unreadable. */
     wide: boolean;
+    /** Every address belonging to the reader, so their own name is kept out of
+     *  the column that says who a conversation is with. */
+    mine: ReadonlySet<string>;
     onPick: (next: boolean) => void;
     onStar: () => void;
 }) {
@@ -679,11 +726,13 @@ function ThreadRow({
     const unread = thread.unreadCount > 0;
     return (
         <li
+            {...rest}
             className={cn(
                 "relative border-b border-border/60",
                 open ? "bg-card" : "hover:bg-card/60",
                 picked && "bg-card",
-                onCursor && "ring-1 ring-inset ring-border-strong"
+                onCursor && "ring-1 ring-inset ring-border-strong",
+                rest.className
             )}
         >
             {showColor ? (
@@ -725,7 +774,7 @@ function ThreadRow({
                                 unread ? "font-semibold text-foreground" : "text-muted-foreground"
                             )}
                         >
-                            {people(thread)}
+                            {people(thread, mine)}
                         </span>
                         {thread.messageCount > 1 ? (
                             <span className="shrink-0 text-[11px] tabular-nums text-foreground-subtle">
@@ -784,10 +833,21 @@ function ThreadRow({
     );
 }
 
-/** Who a conversation is with, as a list shows it: the people, not the
- *  addresses, and never more than three names before it says how many more. */
-function people(thread: MailThreadView): string {
-    const names = thread.participants.map((entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address);
+/**
+ * Who a conversation is with, as a list shows it.
+ *
+ * The people, not the addresses, and never more than three names before it says
+ * how many more. The reader themself is not one of the people: they are on every
+ * conversation in their own mailbox, so their name in that column is a word
+ * repeated down the whole screen that tells nobody anything. A message somebody
+ * sent to themself is the one case where it is all there is, and then it stands.
+ */
+function people(thread: MailThreadView, mine: ReadonlySet<string>): string {
+    const others = thread.participants.filter(
+        (entry) => !mine.has(entry.address.trim().toLowerCase())
+    );
+    const shown = others.length > 0 ? others : thread.participants;
+    const names = shown.map((entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address);
     if (names.length === 0) return "(nobody)";
     if (names.length <= 3) return names.join(", ");
     return `${names.slice(0, 2).join(", ")} and ${names.length - 2} others`;
