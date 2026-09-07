@@ -619,6 +619,10 @@ async function threadFor(accountId: string, envelope: core.MailEnvelope): Promis
  * Run once at the end of a page rather than per message, so a page of thirty
  * replies to one conversation costs one recount.
  */
+/** The largest number the size column holds. Nothing real reaches it; a
+ *  conversation that did would otherwise fail the whole recount. */
+const MAX_THREAD_SIZE = 2_147_483_647;
+
 export async function refreshThreads(accountId: string): Promise<void> {
     const stale = await prisma.mailThread.findMany({
         where: { accountId },
@@ -637,7 +641,8 @@ export async function refreshThreads(accountId: string): Promise<void> {
                 subject: true,
                 fromJson: true,
                 toJson: true,
-                hasAttachments: true
+                hasAttachments: true,
+                size: true
             },
             orderBy: { sentAt: "asc" }
         });
@@ -663,6 +668,13 @@ export async function refreshThreads(accountId: string): Promise<void> {
                 unreadCount: messages.filter((message) => !message.seen).length,
                 starred: messages.some((message) => message.flagged),
                 hasAttachments: messages.some((message) => message.hasAttachments),
+                // What the server said each message weighs, added up. A message
+                // whose size the server never gave counts as nothing, which is
+                // the honest answer: nought is what is known about it.
+                size: Math.min(
+                    messages.reduce((total, message) => total + message.size, 0),
+                    MAX_THREAD_SIZE
+                ),
                 snippet: newest.snippet,
                 firstMessageAt: oldest.sentAt,
                 lastMessageAt: newest.sentAt

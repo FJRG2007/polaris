@@ -17,6 +17,7 @@
  */
 
 import { z } from "zod";
+import { DEFAULT_MAIL_SORT, MAIL_SORTS } from "../mailbox-list.js";
 
 /** The trim-then-lowercase every address goes through before it is compared,
  *  stored, or sent. One function so the browser and the server agree on what
@@ -444,13 +445,19 @@ export const mailPageSchema = z.object({
     role: z.enum(["inbox", "archive", "sent", "drafts", "trash", "junk", "none"]).nullable().default(null),
     labelId: z.string().trim().max(64).nullable().default(null),
     unreadOnly: z.boolean().default(false),
+    readOnly: z.boolean().default(false),
     starredOnly: z.boolean().default(false),
     snoozedOnly: z.boolean().default(false),
     withAttachments: z.boolean().default(false),
     category: z.string().trim().max(32).default(""),
     query: z.string().trim().max(500).default(""),
-    /** The moment the last row already on screen is at. */
-    cursor: z.string().trim().max(64).default("")
+    /** Which way round the list is read. An order nobody defined falls back to
+     *  the ordinary one rather than refusing the page. */
+    sort: z.enum(MAIL_SORTS).default(DEFAULT_MAIL_SORT),
+    /** Where the page already on screen ended, in whatever shape that order
+     *  pages by - a moment for the two by date, a size and a row for the two by
+     *  size. */
+    cursor: z.string().trim().max(80).default("")
 });
 
 export type MailPage = z.infer<typeof mailPageSchema>;

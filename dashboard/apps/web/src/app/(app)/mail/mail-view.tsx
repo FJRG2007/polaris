@@ -62,6 +62,12 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
     EmptyState,
     cn,
     useToast
@@ -71,9 +77,11 @@ import {
     Archive,
     BellOff,
     Bug,
+    Check,
     Clock,
     Columns2,
     Inbox,
+    ListFilter,
     Mail,
     MailOpen,
     Paperclip,
@@ -91,10 +99,12 @@ export interface MailPageNarrow {
     readonly role: string | null;
     readonly labelId: string | null;
     readonly unreadOnly: boolean;
+    readonly readOnly: boolean;
     readonly starredOnly: boolean;
     readonly snoozedOnly: boolean;
     readonly withAttachments: boolean;
     readonly category: string;
+    readonly sort: core.MailSort;
     readonly query: string;
 }
 
@@ -119,7 +129,10 @@ export function MailView({
     cursor: firstCursor,
     page,
     categorised,
-    category
+    category,
+    filter,
+    sort,
+    fixedFilter
 }: {
     threads: MailThreadView[];
     context: MailViewContext;
@@ -133,6 +146,13 @@ export function MailView({
     categorised: boolean;
     /** Which tab is showing, or "" for all of them. */
     category: string;
+    /** Which of the list is showing, or "" for all of it. */
+    filter: core.MailFilter | "";
+    /** Which way round it is being read. */
+    sort: core.MailSort;
+    /** The narrowing this screen IS, which the buttons then leave alone: the
+     *  Starred list does not offer a Starred filter. */
+    fixedFilter: core.MailFilter | "";
 }) {
     const router = useRouter();
     const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } = useMail();
@@ -642,6 +662,7 @@ export function MailView({
                                         <Columns2 className="size-4 shrink-0" aria-hidden />
                                     )}
                                 </Button>
+                                <ListFilters filter={filter} sort={sort} fixed={fixedFilter} />
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -772,6 +793,7 @@ export function MailView({
                                         showColor={accounts.length > 1}
                                         wide={layout === "full" && !openThread}
                                         mine={mine}
+                                        sort={sort}
                                         onPick={(next, run) => pick(thread.id, next, run)}
                                         dragging={() => dragging(thread)}
                                         canArchive={context.canArchive}
@@ -930,6 +952,137 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
  * time-sensitive mail anybody gets and the least worth keeping, and gathering
  * them is what makes it possible to offer to clear them up.
  */
+/**
+ * The two questions above the list that are not a search: which of it, and in
+ * what order.
+ *
+ * They live in the address rather than in state, exactly as the tabs and the
+ * search do, so a list narrowed to what is unread is a page somebody can go
+ * back to, bookmark, and open beside the one they came from. It also means the
+ * server builds the query - "unread" is a column with an index on it, answered
+ * over the whole folder, and not the search window read and matched.
+ *
+ * Unread gets a button of its own beside the menu because it is not one filter
+ * of four: it is the one somebody presses twenty times a day, and burying it a
+ * click deeper than the other nineteen things in this header would be a strange
+ * thing to have decided.
+ *
+ * A screen that already IS one of these - Starred - does not offer it again, and
+ * never offers its opposite: a Read button on the Unread list is a switch whose
+ * only effect is an empty page.
+ */
+function ListFilters({
+    filter,
+    sort,
+    fixed
+}: {
+    filter: core.MailFilter | "";
+    sort: core.MailSort;
+    fixed: core.MailFilter | "";
+}) {
+    const router = useRouter();
+    const search = useSearchParams();
+    const pathname = usePathname();
+
+    function go(change: { filter?: core.MailFilter | ""; sort?: core.MailSort }): void {
+        const url = new URLSearchParams(search.toString());
+        if (change.filter !== undefined) {
+            if (change.filter) url.set("filter", change.filter);
+            else url.delete("filter");
+        }
+        if (change.sort !== undefined) {
+            if (change.sort !== core.DEFAULT_MAIL_SORT) url.set("sort", change.sort);
+            else url.delete("sort");
+        }
+        // A different list: the cursor and whatever was open beside it belong to
+        // the one being left.
+        url.delete("before");
+        url.delete("open");
+        const query = url.toString();
+        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+
+    /** Whether an option would fight the narrowing the screen already is. Only
+     *  the same question asked twice conflicts: read and unread are one switch,
+     *  and starred on the Starred list is a tick that cannot be untucked. */
+    function settled(option: core.MailFilter): boolean {
+        if (!fixed) return false;
+        if (option === fixed) return true;
+        return (fixed === "unread" && option === "read") || (fixed === "read" && option === "unread");
+    }
+
+    const offered = core.MAIL_FILTERS.filter((option) => !settled(option));
+    const narrowed = core.mailListIsNarrowed(filter, sort);
+
+    return (
+        <>
+            {settled("unread") ? null : (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-pressed={filter === "unread"}
+                    aria-label={filter === "unread" ? "Show everything" : "Show only what is unread"}
+                    title={filter === "unread" ? "Show everything" : "Show only what is unread"}
+                    className={cn(filter === "unread" && "bg-muted text-foreground")}
+                    onClick={() => go({ filter: filter === "unread" ? "" : "unread" })}
+                >
+                    <Mail className="size-4 shrink-0" aria-hidden />
+                </Button>
+            )}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Filter and sort"
+                        title="Filter and sort"
+                        className={cn(narrowed && "text-primary")}
+                    >
+                        <ListFilter className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                    {offered.length > 0 ? (
+                        <>
+                            <DropdownMenuLabel>Show</DropdownMenuLabel>
+                            <Choice label="Everything" chosen={!filter} onChoose={() => go({ filter: "" })} />
+                            {offered.map((option) => (
+                                <Choice
+                                    key={option}
+                                    label={core.MAIL_FILTER_LABELS[option]}
+                                    chosen={filter === option}
+                                    onChoose={() => go({ filter: option })}
+                                />
+                            ))}
+                            <DropdownMenuSeparator />
+                        </>
+                    ) : null}
+                    <DropdownMenuLabel>Order</DropdownMenuLabel>
+                    {core.MAIL_SORTS.map((option) => (
+                        <Choice
+                            key={option}
+                            label={core.MAIL_SORT_LABELS[option]}
+                            chosen={sort === option}
+                            onChoose={() => go({ sort: option })}
+                        />
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </>
+    );
+}
+
+/** One option in that menu. A tick rather than a radio, because the menu closes
+ *  on the choice and what it is showing is where the ticks are. */
+function Choice({ label, chosen, onChoose }: { label: string; chosen: boolean; onChoose: () => void }) {
+    return (
+        <DropdownMenuItem onSelect={onChoose}>
+            <Check className={cn("size-3.5 shrink-0", chosen ? "opacity-100" : "opacity-0")} aria-hidden />
+            {label}
+        </DropdownMenuItem>
+    );
+}
+
 function CategoryTabs({ current }: { current: string }) {
     const router = useRouter();
     const search = useSearchParams();
@@ -1090,6 +1243,7 @@ function ThreadRow({
     dragging,
     canArchive,
     permanentDelete,
+    sort,
     onAct,
     onSnooze,
     onStar,
@@ -1117,12 +1271,21 @@ function ThreadRow({
     dragging: () => readonly string[];
     canArchive: boolean;
     permanentDelete: boolean;
+    /** Which way the list is ordered, which decides what the corner of the row
+     *  says. */
+    sort: core.MailSort;
     onAct: (action: MailAction, announce: string) => void;
     onSnooze: () => void;
     onStar: () => void;
 }) {
     const format = useDisplayFormat();
     const unread = thread.unreadCount > 0;
+    // A list read by size says the size where it would say the date. Sorting by
+    // something a row does not show is a list somebody has to take on trust -
+    // and the date is kept on the hover, so nothing is actually lost.
+    const bySize = sort === "largest" || sort === "smallest";
+    const stamp = bySize ? core.formatBytes(thread.size) : shortDate(thread.lastMessageAt, format);
+    const stampTitle = bySize ? shortDate(thread.lastMessageAt, format) : undefined;
     return (
         <li
             {...rest}
@@ -1215,8 +1378,11 @@ function ThreadRow({
                             </span>
                         ) : null}
                         {wide ? null : (
-                            <span className="shrink-0 text-[11px] text-foreground-subtle">
-                                {shortDate(thread.lastMessageAt, format)}
+                            <span
+                                title={stampTitle}
+                                className="shrink-0 text-[11px] tabular-nums text-foreground-subtle"
+                            >
+                                {stamp}
                             </span>
                         )}
                     </div>
@@ -1243,8 +1409,11 @@ function ThreadRow({
                         </div>
                     </div>
                     {wide ? (
-                        <span className="shrink-0 text-[11px] text-foreground-subtle">
-                            {shortDate(thread.lastMessageAt, format)}
+                        <span
+                            title={stampTitle}
+                            className="shrink-0 text-[11px] tabular-nums text-foreground-subtle"
+                        >
+                            {stamp}
                         </span>
                     ) : null}
                     {thread.labels.length > 0 && !wide ? (

@@ -9176,6 +9176,11 @@ model MailThread {
     messageCount   Int      @default(0)
     unreadCount    Int      @default(0)
     hasAttachments Boolean  @default(false)
+    // Everything in the conversation, in bytes, added up as the messages are
+    // rolled up. Held rather than summed on read for the same reason the counts
+    // above it are: the list orders fifty conversations by it, and a sum per row
+    // is fifty aggregates for one page.
+    size           Int      @default(0)
     starred        Boolean  @default(false)
     // Kept at the top of the list by its reader.
     pinned         Boolean  @default(false)
@@ -9191,6 +9196,8 @@ model MailThread {
 
     @@index([accountId, lastMessageAt])
     @@index([accountId, subjectKey])
+    // The list read by size, which is the one order that is not a date.
+    @@index([accountId, size])
 }
 
 // One message, cached.

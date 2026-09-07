@@ -20,6 +20,7 @@ import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
 import type { Prisma } from "@polaris/db";
 import { unifiedAccountIds } from "./access";
+import { mailCursorOf, mailCursorWhere, mailOrderBy } from "./list-order";
 
 /** One folder in the rail. */
 export interface MailFolderView {
@@ -88,6 +89,9 @@ export interface MailThreadView {
     readonly pinned: boolean;
     readonly muted: boolean;
     readonly hasAttachments: boolean;
+    /** Everything in it, in bytes: what the size orders read, and what the row
+     *  shows when it is being read that way. */
+    readonly size: number;
     readonly lastMessageAt: string;
     /** Where this list lets somebody off it, or "". Read from the newest
      *  message's headers, which are already stored - the body is not, until
@@ -109,6 +113,10 @@ export interface MailListQuery {
     readonly role: core.MailFolderRole | null;
     readonly labelId: string | null;
     readonly unreadOnly: boolean;
+    /** The other half of the same switch. Not the absence of `unreadOnly`: a
+     *  list with neither on it is the whole list, which is what most of them
+     *  are. */
+    readonly readOnly: boolean;
     readonly starredOnly: boolean;
     /** The other side of the snooze filter: only what is still put off, which is
      *  the one screen that exists to show it. */
@@ -120,7 +128,9 @@ export interface MailListQuery {
     readonly from: string;
     readonly since: Date | null;
     readonly before: Date | null;
-    /** The moment the last row on the previous page was at. */
+    /** Which way round the list is read. */
+    readonly sort: core.MailSort;
+    /** Where the previous page ended, in whatever shape that order pages by. */
     readonly cursor: string;
     readonly limit: number;
 }
@@ -131,6 +141,7 @@ export const EMPTY_QUERY: MailListQuery = {
     role: null,
     labelId: null,
     unreadOnly: false,
+    readOnly: false,
     starredOnly: false,
     snoozedOnly: false,
     withAttachments: false,
@@ -139,6 +150,7 @@ export const EMPTY_QUERY: MailListQuery = {
     from: "",
     since: null,
     before: null,
+    sort: core.DEFAULT_MAIL_SORT,
     cursor: "",
     limit: 50
 };
@@ -172,6 +184,7 @@ export async function listThreads(
         ...(query.folderId ? { folderId: query.folderId } : {}),
         ...(query.role ? { folder: { role: query.role } } : {}),
         ...(query.unreadOnly ? { seen: false } : {}),
+        ...(query.readOnly ? { seen: true } : {}),
         ...(query.starredOnly ? { flagged: true } : {}),
         ...(query.withAttachments ? { hasAttachments: true } : {}),
         ...(query.category ? { category: query.category } : {}),
@@ -199,13 +212,12 @@ export async function listThreads(
     const matched = core.searchIsEmpty(terms) ? null : await matchingThreads(accountIds, query, terms);
     if (matched && matched.size === 0) return { threads: [], cursor: "" };
 
-    const cursorAt = query.cursor ? new Date(query.cursor) : null;
     const threads = await prisma.mailThread.findMany({
         where: {
             accountId: { in: accountIds },
             messages: { some: messageWhere },
             ...(matched ? { id: { in: [...matched] } } : {}),
-            ...(cursorAt ? { lastMessageAt: { lt: cursorAt } } : {})
+            ...mailCursorWhere(query.sort, query.cursor)
         },
         select: {
             id: true,
@@ -219,6 +231,7 @@ export async function listThreads(
             pinned: true,
             muted: true,
             hasAttachments: true,
+            size: true,
             lastMessageAt: true,
             messages: {
                 where: messageWhere,
@@ -227,7 +240,7 @@ export async function listThreads(
                 take: 1
             }
         },
-        orderBy: [{ pinned: "desc" }, { lastMessageAt: "desc" }],
+        orderBy: mailOrderBy(query.sort),
         take: query.limit
     });
 
@@ -248,6 +261,7 @@ export async function listThreads(
         pinned: thread.pinned,
         muted: thread.muted,
         hasAttachments: thread.hasAttachments,
+        size: thread.size,
         lastMessageAt: thread.lastMessageAt.toISOString(),
         unsubscribe:
             core.unsubscribeFromHeaders(
@@ -261,15 +275,10 @@ export async function listThreads(
         leadMessageId: thread.messages[0]?.id ?? ""
     }));
 
-    // The cursor is the oldest row's moment. Pinned rows sort first and are few,
-    // so a page that is all pins would otherwise cursor on a date newer than the
-    // page below it; taking the smallest of the page rather than its last row is
-    // what stops that skipping conversations.
-    const oldest = rows.reduce<string>(
-        (low, row) => (low === "" || row.lastMessageAt < low ? row.lastMessageAt : low),
-        ""
-    );
-    return { threads: rows, cursor: rows.length < query.limit ? "" : oldest };
+    // Where the next page starts, in whatever shape this order pages by. The
+    // reasoning - and the reason it is the page's edge rather than its last row -
+    // is in `list-order`, where it can be tested.
+    return { threads: rows, cursor: mailCursorOf(query.sort, rows, query.limit) };
 }
 
 /**
@@ -310,6 +319,9 @@ async function matchingThreads(
             ...(query.labelId ? { labels: { some: { labelId: query.labelId } } } : {}),
             ...(query.category ? { category: query.category } : {}),
             ...(terms.hasAttachment || query.withAttachments ? { hasAttachments: true } : {}),
+            ...(query.unreadOnly ? { seen: false } : {}),
+            ...(query.readOnly ? { seen: true } : {}),
+            ...(query.starredOnly ? { flagged: true } : {}),
             ...(terms.unread === null ? {} : { seen: !terms.unread }),
             ...(terms.starred === null ? {} : { flagged: terms.starred }),
             ...(terms.after || terms.before

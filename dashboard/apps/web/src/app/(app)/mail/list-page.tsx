@@ -33,12 +33,25 @@ export type MailSearchParams = Promise<{
     open?: string;
     before?: string;
     tab?: string;
+    /** Which of the list is shown: unread, read, starred, with attachments. */
+    filter?: string;
+    /** Which way round it is read. */
+    sort?: string;
 }>;
 
 /** Whether what the address says is one of the tabs. Anything else is somebody
  *  editing a URL, and the answer to that is the whole list. */
 function isCategory(value: string | undefined): value is core.MailCategory {
     return Boolean(value) && (core.MAIL_CATEGORIES as readonly string[]).includes(value ?? "");
+}
+
+/** The narrowing a route has already done for itself, which the buttons above
+ *  the list then leave alone. */
+function fixedFilter(narrow: Partial<MailListQuery>): core.MailFilter | "" {
+    if (narrow.unreadOnly) return "unread";
+    if (narrow.starredOnly) return "starred";
+    if (narrow.withAttachments) return "attachments";
+    return "";
 }
 
 export async function MailListPage({
@@ -68,9 +81,21 @@ export async function MailListPage({
         );
     }
 
+    // The filter and the order are read off the address like everything else
+    // here, so a narrowed list is a page somebody can go back to, bookmark, and
+    // open in a second tab beside the first. A route that narrows to one of these
+    // itself - Starred, Unread - keeps its own narrowing whatever the buttons
+    // say: the screen is that list.
+    const filter = core.readMailFilter(params.filter);
+    const sort = core.readMailSort(params.sort);
     const query: MailListQuery = {
         ...EMPTY_QUERY,
+        unreadOnly: filter === "unread",
+        readOnly: filter === "read",
+        starredOnly: filter === "starred",
+        withAttachments: filter === "attachments",
         ...route.narrow,
+        sort,
         query: params.q?.trim() ?? "",
         // Only where the route offers tabs at all, which is the inbox. Sent,
         // Drafts and the trash are not a mixture of things to sort.
@@ -112,6 +137,11 @@ export async function MailListPage({
             pinned: false,
             muted: false,
             hasAttachments: openMessages.some((message) => message.attachments.length > 0),
+            // Not read: this one was built from its own messages rather than
+            // from the list, and their sizes are not part of that shape. It is
+            // only ever drawn as the conversation being read, where nothing
+            // shows a size.
+            size: 0,
             lastMessageAt: openMessages.at(-1)!.sentAt,
             unsubscribe: "",
             labels: [],
@@ -133,16 +163,24 @@ export async function MailListPage({
                 role: query.role,
                 labelId: query.labelId,
                 unreadOnly: query.unreadOnly,
+                readOnly: query.readOnly,
                 starredOnly: query.starredOnly,
                 snoozedOnly: query.snoozedOnly,
                 withAttachments: query.withAttachments,
                 category: query.category,
+                sort: query.sort,
                 query: query.query
             }}
             openThread={openThread}
             openMessages={openMessages}
             categorised={Boolean(route.categorised) && !searched}
             category={query.category}
+            filter={filter}
+            sort={sort}
+            // A route that IS one of the filters does not offer it again: the
+            // Starred screen with a "Starred" button on it reads as a switch that
+            // does nothing, because it is one.
+            fixedFilter={fixedFilter(route.narrow)}
             context={
                 searched
                     ? {
