@@ -53,3 +53,13 @@ export function runBetween(
     if (from === -1 || to === -1) return target ? [target] : [];
     return ids.slice(Math.min(from, to), Math.max(from, to) + 1);
 }
+
+/**
+ * How a dragged conversation names itself on the way to a folder.
+ *
+ * A type of its own rather than `text/plain`, so a rail entry can tell a
+ * conversation from a file somebody dragged off their desktop and refuse the
+ * one it cannot file - and so dropping mail into a text field elsewhere pastes
+ * nothing.
+ */
+export const MAIL_DRAG_TYPE = "application/x-polaris-mail";

@@ -21,7 +21,7 @@
  */
 
 import Link from "next/link";
-import { leavesTheView, runBetween } from "./mail-actions";
+import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { forwardSeed, replySeed } from "./answering";
 import { useMailLayout } from "./use-mail-layout";
@@ -543,6 +543,23 @@ export function MailView({
         []
     );
 
+    /**
+     * What a drag is carrying.
+     *
+     * Whatever is selected when the drag starts, or the one row under the
+     * pointer when nothing is. That is what every file manager does and what
+     * anybody dragging a row expects: dragging one of five picked rows moves the
+     * five, and dragging an unpicked row moves that one and leaves the selection
+     * alone.
+     */
+    const dragging = useCallback(
+        (thread: MailThreadView): string[] => {
+            if (selected.includes(thread.id) && selectedMessageIds.length > 0) return selectedMessageIds;
+            return [thread.leadMessageId].filter(Boolean);
+        },
+        [selected, selectedMessageIds]
+    );
+
     const allPicked = threads.length > 0 && selected.length === threads.length;
 
     return (
@@ -747,6 +764,7 @@ export function MailView({
                                         wide={layout === "full" && !openThread}
                                         mine={mine}
                                         onPick={(next, run) => pick(thread.id, next, run)}
+                                        dragging={() => dragging(thread)}
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
                                         onAct={(action, announce) =>
@@ -1060,6 +1078,7 @@ function ThreadRow({
     wide,
     mine,
     onPick,
+    dragging,
     canArchive,
     permanentDelete,
     onAct,
@@ -1085,6 +1104,8 @@ function ThreadRow({
     /** `run` is Shift being held: take everything between the last row picked
      *  on its own and this one. */
     onPick: (next: boolean, run: boolean) => void;
+    /** What a drag from this row is carrying, asked as it starts. */
+    dragging: () => readonly string[];
     canArchive: boolean;
     permanentDelete: boolean;
     onAct: (action: MailAction, announce: string) => void;
@@ -1096,6 +1117,22 @@ function ThreadRow({
     return (
         <li
             {...rest}
+            // Dragged onto a folder in the rail to file it there. The payload is
+            // ids and nothing else: what is dropped is looked up and authorized
+            // on the server, so a drag cannot become a way of naming somebody
+            // else's mail.
+            draggable
+            onDragStart={(event) => {
+                const carried = dragging();
+                if (carried.length === 0) {
+                    event.preventDefault();
+                    return;
+                }
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData(MAIL_DRAG_TYPE, carried.join(","));
+                // Firefox refuses a drag with no plain payload at all.
+                event.dataTransfer.setData("text/plain", "");
+            }}
             className={cn(
                 "group relative border-b border-border/60",
                 open ? "bg-card" : "hover:bg-card/60",

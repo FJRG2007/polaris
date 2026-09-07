@@ -21,10 +21,13 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
-import { useState } from "react";
+import { cn, useToast } from "@polaris/ui";
+import { useCallback, useState } from "react";
 import { useMail } from "./mail-shell";
-import { usePathname, useSearchParams } from "next/navigation";
+import { refusalOf } from "./refusal";
+import { moveToFolderAction } from "./actions";
+import { MAIL_DRAG_TYPE } from "./mail-actions";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     Archive,
     AlertTriangle,
@@ -59,7 +62,33 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const { accounts, folders, labels, unread } = useMail();
     const pathname = usePathname();
     const search = useSearchParams();
+    const router = useRouter();
+    const toast = useToast();
     const [expanded, setExpanded] = useState<string[]>([]);
+
+    /**
+     * File what was dragged into a folder.
+     *
+     * The server is told which messages and which folder and decides the rest:
+     * both are looked up against the person asking, so a drag can only ever move
+     * their own mail into their own folder.
+     */
+    const fileInto = useCallback(
+        async (folderId: string, name: string, messageIds: string[]) => {
+            if (messageIds.length === 0) return;
+            const outcome = await moveToFolderAction({ folderId, messageIds });
+            const said = refusalOf(outcome);
+            if (said) {
+                toast.show({ title: said });
+                return;
+            }
+            toast.show({
+                title: messageIds.length === 1 ? `Moved to ${name}.` : `${messageIds.length} moved to ${name}.`
+            });
+            router.refresh();
+        },
+        [router, toast]
+    );
 
     // The mailboxes that feed the merged views. One taken out of them still has
     // its own entry below; it just stops adding to the counts above.
@@ -157,6 +186,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                 count={folder.unread}
                                                 active={pathname === `/mail/f/${folder.id}`}
                                                 onNavigate={onNavigate}
+                                                onDropMail={(ids) => void fileInto(folder.id, folder.name, ids)}
                                             />
                                         </li>
                                     ))}
@@ -219,7 +249,8 @@ function RailLink({
     icon: Icon,
     count,
     active,
-    onNavigate
+    onNavigate,
+    onDropMail
 }: {
     href: string;
     label: string;
@@ -227,15 +258,48 @@ function RailLink({
     count: number;
     active: boolean;
     onNavigate?: () => void;
+    /** Given on the entries mail can be filed into, which is a real folder and
+     *  not a merged view: "everything starred" is not somewhere a message can
+     *  be put. */
+    onDropMail?: (messageIds: string[]) => void;
 }) {
+    const [over, setOver] = useState(false);
     return (
         <Link
             href={href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
+            onDragOver={
+                onDropMail
+                    ? (event) => {
+                          if (!event.dataTransfer.types.includes(MAIL_DRAG_TYPE)) return;
+                          // Both, and both matter: without the first the browser
+                          // refuses the drop, without the second the cursor says
+                          // "no" the whole way across.
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setOver(true);
+                      }
+                    : undefined
+            }
+            onDragLeave={onDropMail ? () => setOver(false) : undefined}
+            onDrop={
+                onDropMail
+                    ? (event) => {
+                          const carried = event.dataTransfer.getData(MAIL_DRAG_TYPE);
+                          if (!carried) return;
+                          event.preventDefault();
+                          setOver(false);
+                          onDropMail(carried.split(",").filter(Boolean));
+                      }
+                    : undefined
+            }
             className={cn(
                 "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
-                active ? "bg-card font-medium text-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground"
+                active ? "bg-card font-medium text-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground",
+                // Said on the target rather than on the thing being dragged: the
+                // question a reader has mid-drag is "will it land here".
+                over && "ring-1 ring-inset ring-primary"
             )}
         >
             <Icon className="size-4 shrink-0" aria-hidden />

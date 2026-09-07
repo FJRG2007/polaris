@@ -604,3 +604,17 @@ export async function discardDraftAction(draftId: string) {
         return failure(caught, "That draft could not be removed.");
     }
 }
+
+/** Put messages in a folder, for the drag onto the rail and the Move to menu. */
+export async function moveToFolderAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailMoveSchema.safeParse(input);
+    if (!parsed.success) return { error: "Nothing was moved." };
+    try {
+        const done = await messages.moveMessages(userId, parsed.data.messageIds, parsed.data.folderId);
+        refresh();
+        return { done };
+    } catch (caught) {
+        return failure(caught, "Those could not be moved.");
+    }
+}
