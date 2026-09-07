@@ -32,7 +32,9 @@ import type { PlaceView } from "@/lib/home/place-kinds";
 import type { DeviceAccountView } from "@/lib/home/device-accounts";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BatteryLow, Plug, RefreshCw, Unplug } from "lucide-react";
+import { IntegrationLogo } from "@/components/logos";
+import * as registry from "@/lib/home/device-connections";
+import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceView } from "@/lib/home/device-kinds";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import {
@@ -229,8 +231,8 @@ export function DevicesView({
                     action={
                         canManage ? (
                             <Button size="sm" onClick={() => setConnecting(true)}>
-                                <Plug className="size-4" />
-                                Connect devices
+                                <Plus className="size-4 shrink-0" />
+                                Connect a device
                             </Button>
                         ) : undefined
                     }
@@ -253,6 +255,10 @@ export function DevicesView({
                         key={account.id}
                         className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 pl-2.5 pr-1"
                     >
+                        <IntegrationLogo
+                            slug={registry.deviceConnection(account.connection)?.logo ?? ""}
+                            className="size-4 w-5 shrink-0 object-contain"
+                        />
                         <span className="text-xs font-medium">{account.label}</span>
                         <span className="text-[0.6875rem] text-foreground-subtle">
                             {account.status === "ok"
@@ -279,14 +285,9 @@ export function DevicesView({
                 ))}
                 <span className="flex-1" />
                 {canManage && (
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        aria-label="Connect something else"
-                        title="Connect something else"
-                        onClick={() => setConnecting(true)}
-                    >
-                        <Plug className="size-4" />
+                    <Button size="sm" onClick={() => setConnecting(true)}>
+                        <Plus className="size-4 shrink-0" />
+                        Connect a device
                     </Button>
                 )}
                 <Button

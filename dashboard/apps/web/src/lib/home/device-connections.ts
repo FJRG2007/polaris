@@ -67,6 +67,16 @@ export interface DeviceConnection {
     readonly id: string;
     /** Who makes the devices, as their owner would say it. */
     readonly brand: string;
+    /**
+     * The make's logo, as an integration slug.
+     *
+     * A slug rather than a component, because this file is read by the server as
+     * well and a picture has no business in it. What draws it is `IntegrationLogo`,
+     * which is where every other mark in Polaris already lives - so a make with
+     * one gets its own, and a make without gets the same honest neutral block an
+     * unknown integration gets rather than something drawn to look like a logo.
+     */
+    readonly logo: string;
     /** What this way in is called, in the maker's own words where they have one -
      *  somebody looking for it in their documentation has to find the same name. */
     readonly label: string;
@@ -102,6 +112,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "nuki-web",
         brand: "Nuki",
+        logo: "nuki",
         label: "Nuki Web account",
         reach: "anywhere",
         summary:
@@ -129,6 +140,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     {
         id: "tuya-cloud",
         brand: "Tuya",
+        logo: "tuya",
         label: "Tuya cloud project",
         reach: "anywhere",
         summary:
@@ -183,14 +195,35 @@ export function deviceConnection(id: string): DeviceConnection | null {
     return DEVICE_CONNECTIONS.find((connection) => connection.id === id) ?? null;
 }
 
-/** The brands, in the order their first connection appears, with how many ways in
- *  each has. A brand with two is worth saying so before it is opened. */
-export function deviceBrands(): readonly { readonly brand: string; readonly count: number }[] {
-    const counts = new Map<string, number>();
+/** One make, as the picker draws it: its name, its mark, and how many ways in it
+ *  has - a make with two is worth saying so before it is opened. */
+export interface DeviceBrand {
+    readonly brand: string;
+    readonly logo: string;
+    readonly count: number;
+    /** What it can bring in, across all its ways in, so a row can say "switches
+     *  and sockets" before anything is typed. */
+    readonly kinds: readonly DeviceKind[];
+}
+
+/** The brands, in the order their first connection appears. */
+export function deviceBrands(): readonly DeviceBrand[] {
+    const brands = new Map<string, { brand: string; logo: string; count: number; kinds: DeviceKind[] }>();
     for (const connection of DEVICE_CONNECTIONS) {
-        counts.set(connection.brand, (counts.get(connection.brand) ?? 0) + 1);
+        const held = brands.get(connection.brand);
+        if (held) {
+            held.count += 1;
+            for (const kind of connection.kinds) if (!held.kinds.includes(kind)) held.kinds.push(kind);
+            continue;
+        }
+        brands.set(connection.brand, {
+            brand: connection.brand,
+            logo: connection.logo,
+            count: 1,
+            kinds: [...connection.kinds]
+        });
     }
-    return [...counts].map(([brand, count]) => ({ brand, count }));
+    return [...brands.values()];
 }
 
 export function connectionsOfBrand(brand: string): readonly DeviceConnection[] {

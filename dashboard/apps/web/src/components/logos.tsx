@@ -82,7 +82,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     ngrok: brand.NgrokMark,
     giphy: brand.GiphyMark,
     krisp: brand.KrispMark,
-    dymo: DymoMark
+    dymo: DymoMark,
+    nuki: brand.NukiMark
 };
 
 /**
@@ -98,7 +99,11 @@ const SERVICE_IMAGES: Record<string, string> = {
     duckdns: "/logos/duckdns.webp",
     minecraft: "/logos/minecraft.webp",
     tenor: "/logos/tenor.webp",
-    criminalip: "/logos/criminalip.webp"
+    criminalip: "/logos/criminalip.webp",
+    // Tuya publish no vector mark anywhere that is theirs to take one from, so
+    // this is their own icon file. One flat brand orange on nothing, which is why
+    // it reads on both surfaces without being touched.
+    tuya: "/logos/tuya.webp"
 };
 
 /**

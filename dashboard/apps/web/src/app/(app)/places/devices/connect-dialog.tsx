@@ -24,12 +24,15 @@ import Link from "next/link";
 import * as actions from "../actions";
 import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
+import { IntegrationLogo } from "@/components/logos";
+import * as kinds from "@/lib/home/device-kinds";
 import type { DeviceView } from "@/lib/home/device-kinds";
 import * as registry from "@/lib/home/device-connections";
 import type { DeviceAccountView } from "@/lib/home/device-accounts";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -117,11 +120,18 @@ export function ConnectDialog({
     const ofBrand = useMemo(() => registry.connectionsOfBrand(brand), [brand]);
     const complete = connection ? registry.fieldsComplete(connection, fields) : false;
 
-    /** A make with one way in is not a question. The picker stays visible so it is
-     *  obvious there was a choice made, and there is nothing to weigh up. */
+    /** A make with one way in is not a question, so the second list is only drawn
+     *  where there is something to weigh up - and picking a make always settles on
+     *  its best one, which is the first. */
     const pickBrand = (next: string) => {
         setBrand(next);
         setChosen(registry.connectionsOfBrand(next)[0]?.id ?? "");
+        setFields({});
+        setError("");
+    };
+
+    const pickConnection = (next: string) => {
+        setChosen(next);
         setFields({});
         setError("");
     };
@@ -165,42 +175,88 @@ export function ConnectDialog({
 
                 <div className="flex flex-col gap-4">
                     {!reconnect && (
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-xs text-muted-foreground">Make</span>
-                                <Select
-                                    value={brand}
-                                    onValueChange={pickBrand}
-                                    options={brands.map((entry) => ({
-                                        value: entry.brand,
-                                        label: entry.brand
-                                    }))}
-                                    aria-label="Make"
-                                />
-                            </label>
-                            <label className="flex flex-col gap-1.5">
-                                <span className="text-xs text-muted-foreground">How to reach it</span>
-                                <Select
-                                    value={chosen}
-                                    onValueChange={(next) => {
-                                        setChosen(next);
-                                        setFields({});
-                                        setError("");
-                                    }}
-                                    options={ofBrand.map((entry, index) => ({
-                                        value: entry.id,
-                                        label: index === 0 ? `${entry.label} - recommended` : entry.label
-                                    }))}
-                                    aria-label="How to reach it"
-                                />
-                            </label>
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">Make</span>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                {brands.map((entry) => (
+                                    <button
+                                        key={entry.brand}
+                                        type="button"
+                                        onClick={() => pickBrand(entry.brand)}
+                                        aria-pressed={entry.brand === brand}
+                                        className={cn(
+                                            "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
+                                            entry.brand === brand
+                                                ? "border-accent bg-accent/10"
+                                                : "border-border bg-card hover:border-border-strong"
+                                        )}
+                                    >
+                                        <IntegrationLogo
+                                            slug={entry.logo}
+                                            className="size-6 w-8 shrink-0 object-contain"
+                                        />
+                                        <span className="flex min-w-0 flex-col">
+                                            <span className="truncate text-sm font-medium">{entry.brand}</span>
+                                            <span className="truncate text-[0.6875rem] text-foreground-subtle">
+                                                {entry.kinds
+                                                    .map((kind) => kinds.DEVICE_KIND_LABELS[kind].toLowerCase())
+                                                    .join(", ")}
+                                            </span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {!reconnect && ofBrand.length > 1 && (
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">How to reach it</span>
+                            <div className="flex flex-col gap-2">
+                                {ofBrand.map((entry, index) => (
+                                    <button
+                                        key={entry.id}
+                                        type="button"
+                                        onClick={() => pickConnection(entry.id)}
+                                        aria-pressed={entry.id === chosen}
+                                        className={cn(
+                                            "flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors duration-fast",
+                                            entry.id === chosen
+                                                ? "border-accent bg-accent/10"
+                                                : "border-border bg-card hover:border-border-strong"
+                                        )}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "mt-0.5 size-4 shrink-0",
+                                                entry.id === chosen ? "text-accent" : "text-transparent"
+                                            )}
+                                        />
+                                        <span className="flex min-w-0 flex-col gap-0.5">
+                                            <span className="text-sm font-medium">
+                                                {entry.label}
+                                                {index === 0 && (
+                                                    <span className="text-foreground-subtle"> - recommended</span>
+                                                )}
+                                            </span>
+                                            <span className="text-[0.6875rem] text-muted-foreground">
+                                                {registry.REACH_LABELS[entry.reach]} - {entry.summary}
+                                            </span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 
                     {connection && (
                         <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                            <span className="text-xs font-medium">
-                                {registry.REACH_LABELS[connection.reach]}
+                            <span className="flex items-center gap-2 text-xs font-medium">
+                                <IntegrationLogo
+                                    slug={connection.logo}
+                                    className="size-4 w-6 shrink-0 object-contain"
+                                />
+                                {connection.label} - {registry.REACH_LABELS[connection.reach]}
                             </span>
                             <span className="text-xs text-muted-foreground">{connection.summary}</span>
                             {connection.note && (
