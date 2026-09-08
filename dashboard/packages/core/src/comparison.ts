@@ -86,6 +86,15 @@ export interface Subject {
     readonly name: string;
     /** Their site, so a claim can be checked. */
     readonly url: string;
+    /**
+     * What they actually do, in one line.
+     *
+     * The thing a comparison is missing when somebody comes back to it six
+     * months later: the table says how they score and nothing says who they
+     * are. It is also what makes the map readable - a point on a chart needs a
+     * sentence behind it, or it is a dot with a brand name on it.
+     */
+    readonly does: string;
     readonly us: boolean;
 }
 
@@ -193,6 +202,86 @@ export function quadrantPoints(
     return points;
 }
 
+/** One competitor placed on the map, in the square the chart draws. */
+export interface PlottedSubject {
+    readonly subject: Subject;
+    /** The answers, as they were given. */
+    readonly x: number;
+    readonly y: number;
+    /** The same two, as a fraction of the spread the chart is showing: 0 is the
+     *  left or the bottom, 1 is the right or the top. */
+    readonly left: number;
+    readonly up: number;
+}
+
+/** What the map is showing, once it has looked at the answers. */
+export interface PerceptualMap {
+    readonly points: readonly PlottedSubject[];
+    /** The range each axis is drawn over, so the chart can label its corners. */
+    readonly across: { readonly low: number; readonly high: number };
+    readonly upward: { readonly low: number; readonly high: number };
+    /** How many competitors could not be placed, so the chart can say so rather
+     *  than quietly showing fewer than the table does. */
+    readonly missing: number;
+}
+
+/**
+ * A positioning map: everybody placed against two criteria.
+ *
+ * The chart marketing teams draw to see where a market is crowded and where it
+ * is not, and the reason a comparison is worth keeping structured rather than
+ * as a document - the same answers that fill the table place the points, with
+ * nobody retyping anything.
+ *
+ * **The spread is taken from the answers, not from the scale.** A rating runs 1
+ * to 5 and a price runs whatever it runs, so drawing both against a fixed axis
+ * would put every competitor in one corner of a price chart. The axis is the
+ * range the answers actually cover, which is what makes the picture show
+ * anything.
+ *
+ * Two ranges that would divide by nothing are the ones to get right: everybody
+ * answering the same on an axis is a real state, not an error, and those points
+ * go down the middle of it rather than at an edge or at NaN.
+ *
+ * Anything a competitor has not answered leaves them off the map and counted in
+ * `missing`. Plotting them at zero would read as "worst", which is a claim
+ * nobody made - and a chart that silently shows nine of twelve is worse than one
+ * that says so.
+ */
+export function perceptualMap(
+    subjects: readonly Subject[],
+    cells: ReadonlyMap<string, Cell>,
+    across: string,
+    up: string
+): PerceptualMap {
+    const placed = quadrantPoints(subjects, cells, across, up);
+    const spread = (values: readonly number[]): { low: number; high: number } => {
+        if (values.length === 0) return { low: 0, high: 1 };
+        const low = Math.min(...values);
+        const high = Math.max(...values);
+        // Everybody answered the same. A real state, and dividing by it is not.
+        return low === high ? { low: low - 1, high: high + 1 } : { low, high };
+    };
+
+    const acrossRange = spread(placed.map((one) => one.x));
+    const upRange = spread(placed.map((one) => one.y));
+    const fraction = (value: number, range: { low: number; high: number }): number =>
+        (value - range.low) / (range.high - range.low);
+
+    return {
+        points: placed.map((one) => ({
+            subject: one.subject,
+            x: one.x,
+            y: one.y,
+            left: fraction(one.x, acrossRange),
+            up: fraction(one.y, upRange)
+        })),
+        across: acrossRange,
+        upward: upRange,
+        missing: subjects.length - placed.length
+    };
+}
+
 /** Whether a criterion can be an axis. */
 export function isAxisKind(kind: CriterionKind): boolean {
     return kind === "rating" || kind === "number" || kind === "money";
@@ -230,6 +319,7 @@ export function comparisonRows(
 export const subjectSchema = z.object({
     name: z.string().trim().min(1, "Give them a name").max(80),
     url: z.string().trim().max(300).default(""),
+    does: z.string().trim().max(300).default(""),
     us: z.boolean().default(false)
 });
 

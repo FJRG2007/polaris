@@ -11,8 +11,14 @@ import { describe, expect, it } from "vitest";
 import * as comparison from "./comparison.js";
 import type { Cell, Criterion, Subject } from "./comparison.js";
 
-const US: Subject = { id: "s1", name: "Polaris", url: "", us: true };
-const THEM: Subject = { id: "s2", name: "Acme", url: "https://acme.example", us: false };
+const US: Subject = { id: "s1", name: "Polaris", url: "", does: "", us: true };
+const THEM: Subject = {
+    id: "s2",
+    name: "Acme",
+    url: "https://acme.example",
+    does: "",
+    us: false
+};
 
 function cell(over: Partial<Cell> = {}): Cell {
     return { ...comparison.EMPTY_CELL, ...over };
@@ -125,5 +131,110 @@ describe("the key a cell is stored under", () => {
         // Ids are uuids here, but the separator must not be one a name could
         // contain either.
         expect(comparison.cellKey("a:1", "b")).not.toBe(comparison.cellKey("a", "1:b"));
+    });
+});
+
+describe("a positioning map", () => {
+    const subjects: Subject[] = [
+        { id: "a", name: "Acme", url: "", does: "", us: false },
+        { id: "b", name: "Byte", url: "", does: "", us: false },
+        { id: "c", name: "Cirrus", url: "", does: "", us: true }
+    ];
+    const on = (entries: [string, string, string][]) =>
+        new Map(
+            entries.map(([subject, criterion, value]) => [
+                comparison.cellKey(subject, criterion),
+                { ...comparison.EMPTY_CELL, value }
+            ])
+        );
+
+    it("places everybody who answered both axes", () => {
+        const map = comparison.perceptualMap(
+            subjects,
+            on([
+                ["a", "price", "10"],
+                ["a", "ease", "1"],
+                ["b", "price", "50"],
+                ["b", "ease", "5"],
+                ["c", "price", "30"],
+                ["c", "ease", "3"]
+            ]),
+            "price",
+            "ease"
+        );
+        expect(map.points).toHaveLength(3);
+        expect(map.missing).toBe(0);
+    });
+
+    it("draws the axis over the answers rather than over the scale", () => {
+        // The whole reason this exists: a price axis fixed at 0-5 would put
+        // every competitor in one corner.
+        const map = comparison.perceptualMap(
+            subjects.slice(0, 2),
+            on([
+                ["a", "price", "1000"],
+                ["a", "ease", "1"],
+                ["b", "price", "1200"],
+                ["b", "ease", "5"]
+            ]),
+            "price",
+            "ease"
+        );
+        expect(map.across).toEqual({ low: 1000, high: 1200 });
+        expect(map.points[0]?.left).toBe(0);
+        expect(map.points[1]?.left).toBe(1);
+    });
+
+    it("puts everybody down the middle when they all answered the same", () => {
+        // A real state, and dividing by it is not.
+        const map = comparison.perceptualMap(
+            subjects.slice(0, 2),
+            on([
+                ["a", "price", "10"],
+                ["a", "ease", "3"],
+                ["b", "price", "10"],
+                ["b", "ease", "3"]
+            ]),
+            "price",
+            "ease"
+        );
+        expect(map.points.every((one) => one.left === 0.5 && one.up === 0.5)).toBe(true);
+        expect(map.points.every((one) => Number.isFinite(one.left))).toBe(true);
+    });
+
+    it("leaves out anybody who has not answered, and says how many", () => {
+        // Plotting them at zero would read as "worst", which is a claim nobody
+        // made - and a chart quietly showing fewer than the table is worse.
+        const map = comparison.perceptualMap(
+            subjects,
+            on([
+                ["a", "price", "10"],
+                ["a", "ease", "1"],
+                ["b", "price", "50"]
+            ]),
+            "price",
+            "ease"
+        );
+        expect(map.points.map((one) => one.subject.id)).toEqual(["a"]);
+        expect(map.missing).toBe(2);
+    });
+
+    it("has nothing to place when nobody has answered", () => {
+        const map = comparison.perceptualMap(subjects, new Map(), "price", "ease");
+        expect(map.points).toEqual([]);
+        expect(map.missing).toBe(3);
+    });
+});
+
+describe("which criteria can be an axis", () => {
+    it("is the ones with a position on a line", () => {
+        expect(comparison.isAxisKind("rating")).toBe(true);
+        expect(comparison.isAxisKind("number")).toBe(true);
+        expect(comparison.isAxisKind("money")).toBe(true);
+    });
+
+    it("is never a sentence, which has no position", () => {
+        expect(comparison.isAxisKind("text")).toBe(false);
+        expect(comparison.isAxisKind("yesNo")).toBe(false);
     });
 });

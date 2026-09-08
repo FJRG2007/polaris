@@ -22,9 +22,10 @@
 import * as Y from "yjs";
 import * as core from "@polaris/core";
 import { useDisplayFormat } from "@/components/display-format";
+import { PositioningMap } from "./positioning-map";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
-import { CircleAlert, Link2, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { CircleAlert, Link2, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import {
     Badge,
     Button,
@@ -34,6 +35,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    ScrollRow,
     Select,
     Textarea,
     cn,
@@ -59,6 +61,11 @@ export function ComparisonEditor({
     const criteria = useMemo(() => doc.getArray<core.Criterion>(CRITERIA), [doc]);
     const cells = useMemo(() => doc.getMap<core.Cell>(CELLS), [doc]);
 
+    /** Which of the two readings is on screen. */
+    const [view, setView] = useState<"table" | "map">("table");
+    /** Which competitor is being described, or null. */
+    const [describing, setDescribing] = useState<string | null>(null);
+
     // Redrawn whenever the document moves, from wherever. `useSyncExternalStore`
     // rather than a state mirror: the document is the state, and a copy of it in
     // React is a second thing to keep in step.
@@ -72,6 +79,11 @@ export function ComparisonEditor({
 
     const [editing, setEditing] = useState<{ subjectId: string; criterionId: string } | null>(null);
 
+    /** The answers as a plain map, for the reading that walks all of them at
+     *  once. Rebuilt with the document rather than read live, because the map is
+     *  a picture of a moment and a shared type is not one. */
+    const cellMap = useMemo(() => new Map(cells), [cells, version]);
+
     const cellOf = useCallback(
         (subjectId: string, criterionId: string): core.Cell =>
             cells.get(core.cellKey(subjectId, criterionId)) ?? core.EMPTY_CELL,
@@ -81,7 +93,39 @@ export function ComparisonEditor({
     return (
         <div className="min-h-0 flex-1 overflow-auto">
             <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
-                {columns.length === 0 && rows.length === 0 ? (
+                {/* Two ways of reading the same answers, and both are the point:
+                    the table is where the work is done and the map is what the
+                    work was for. Kept as one document rather than two, so a
+                    picture can never quietly disagree with the table under it. */}
+                {columns.length > 0 || rows.length > 0 ? (
+                    <ScrollRow
+                        className="-mx-1 mb-3 flex items-center gap-1 px-1"
+                        role="tablist"
+                        aria-label="How to read this"
+                    >
+                        {(["table", "map"] as const).map((one) => (
+                            <button
+                                key={one}
+                                type="button"
+                                role="tab"
+                                aria-selected={view === one}
+                                onClick={() => setView(one)}
+                                className={cn(
+                                    "shrink-0 rounded-md px-2.5 py-1 text-[13px]",
+                                    view === one
+                                        ? "bg-card font-medium text-foreground"
+                                        : "text-muted-foreground hover:bg-card hover:text-foreground"
+                                )}
+                            >
+                                {one === "table" ? "Table" : "Positioning map"}
+                            </button>
+                        ))}
+                    </ScrollRow>
+                ) : null}
+
+                {view === "map" && (columns.length > 0 || rows.length > 0) ? (
+                    <PositioningMap subjects={columns} criteria={rows} cells={cellMap} />
+                ) : columns.length === 0 && rows.length === 0 ? (
                     <Empty editable={editable} onStart={() => seed(doc)} />
                 ) : (
                     /* Its own scroller: a comparison of nine competitors is wider
@@ -120,18 +164,37 @@ export function ComparisonEditor({
                                                 )}
                                                 {subject.us ? <Badge variant="primary">Us</Badge> : null}
                                                 {editable ? (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="ml-auto"
-                                                        aria-label={`Remove ${subject.name}`}
-                                                        title="Remove"
-                                                        onClick={() => removeSubject(doc, subject.id)}
-                                                    >
-                                                        <Trash2 className="size-3.5 shrink-0" aria-hidden />
-                                                    </Button>
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="ml-auto"
+                                                            aria-label={`Describe ${subject.name}`}
+                                                            title="What they do"
+                                                            onClick={() => setDescribing(subject.id)}
+                                                        >
+                                                            <Pencil className="size-3.5 shrink-0" aria-hidden />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            aria-label={`Remove ${subject.name}`}
+                                                            title="Remove"
+                                                            onClick={() => removeSubject(doc, subject.id)}
+                                                        >
+                                                            <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                                        </Button>
+                                                    </>
                                                 ) : null}
                                             </span>
+                                            {subject.does ? (
+                                                <span
+                                                    className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground"
+                                                    title={subject.does}
+                                                >
+                                                    {subject.does}
+                                                </span>
+                                            ) : null}
                                         </th>
                                     ))}
                                     {editable ? (
@@ -207,6 +270,21 @@ export function ComparisonEditor({
                     onClose={() => setEditing(null)}
                 />
             ) : null}
+
+            {describing ? (
+                (() => {
+                    const subject = columns.find((one) => one.id === describing);
+                    // Removed while the form was open, which is ordinary in a
+                    // shared document rather than an error.
+                    return subject ? (
+                        <SubjectDialog
+                            doc={doc}
+                            subject={subject}
+                            onClose={() => setDescribing(null)}
+                        />
+                    ) : null;
+                })()
+            ) : null}
         </div>
     );
 }
@@ -272,6 +350,88 @@ function CellBox({
                 ) : null}
             </button>
         </td>
+    );
+}
+
+/**
+ * Who a competitor is, rather than how they score.
+ *
+ * Their name, their site and one line saying what they do - which is the thing a
+ * comparison is always missing when somebody comes back to it. The table says
+ * how they rate and nothing says who they are, and a point on the positioning
+ * map is a dot with a brand name on it until this is filled in.
+ */
+function SubjectDialog({
+    doc,
+    subject,
+    onClose
+}: {
+    doc: Y.Doc;
+    subject: core.Subject;
+    onClose: () => void;
+}) {
+    const [name, setName] = useState(subject.name);
+    const [url, setUrl] = useState(subject.url);
+    const [does, setDoes] = useState(subject.does);
+
+    const save = (): void => {
+        const parsed = core.subjectSchema.safeParse({ name, url, does, us: subject.us });
+        if (!parsed.success) return;
+        const list = doc.getArray<core.Subject>(SUBJECTS);
+        const at = list.toArray().findIndex((one) => one.id === subject.id);
+        if (at < 0) return;
+        doc.transact(() => {
+            list.delete(at, 1);
+            list.insert(at, [{ ...subject, ...parsed.data }]);
+        });
+        onClose();
+    };
+
+    return (
+        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{subject.name}</DialogTitle>
+                    <DialogDescription>
+                        What they do, so this table still makes sense in six months.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <label className="block">
+                        <span className="mb-1 block text-[12px] text-muted-foreground">Name</span>
+                        <Input value={name} onChange={(event) => setName(event.target.value)} />
+                    </label>
+                    <label className="block">
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            Their site
+                        </span>
+                        <Input
+                            value={url}
+                            inputMode="url"
+                            placeholder="https://acme.example"
+                            onChange={(event) => setUrl(event.target.value)}
+                        />
+                    </label>
+                    <label className="block">
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            What they do
+                        </span>
+                        <Textarea
+                            rows={3}
+                            value={does}
+                            placeholder="Sells the same thing to bigger companies, on a yearly contract."
+                            onChange={(event) => setDoes(event.target.value)}
+                        />
+                    </label>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="secondary" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button onClick={save}>Save</Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -428,7 +588,13 @@ function AddSubject({ doc }: { doc: Y.Doc }) {
         const parsed = core.subjectSchema.safeParse({ name });
         if (!parsed.success) return;
         doc.getArray<core.Subject>(SUBJECTS).push([
-            { id: crypto.randomUUID(), name: parsed.data.name, url: parsed.data.url, us: false }
+            {
+                id: crypto.randomUUID(),
+                name: parsed.data.name,
+                url: parsed.data.url,
+                does: parsed.data.does,
+                us: false
+            }
         ]);
         setName("");
         setOpen(false);
@@ -518,8 +684,8 @@ function Empty({ editable, onStart }: { editable: boolean; onStart: () => void }
 function seed(doc: Y.Doc): void {
     doc.transact(() => {
         doc.getArray<core.Subject>(SUBJECTS).push([
-            { id: crypto.randomUUID(), name: "Us", url: "", us: true },
-            { id: crypto.randomUUID(), name: "Competitor", url: "", us: false }
+            { id: crypto.randomUUID(), name: "Us", url: "", does: "", us: true },
+            { id: crypto.randomUUID(), name: "Competitor", url: "", does: "", us: false }
         ]);
         doc.getArray<core.Criterion>(CRITERIA).push(
             [
