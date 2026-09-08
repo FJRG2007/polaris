@@ -1,0 +1,21 @@
+{
+    "name": "@polaris/genoffice-i18n",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Language detection and message lookup as GenOffice does it. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {}
+}

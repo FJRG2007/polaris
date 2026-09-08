@@ -1,0 +1,17 @@
+{
+    // Vendored components, held to the contract they were written under - see the
+    // note in `packages/pptx/tsconfig.json`. They draw, so unlike the other ports
+    // they take the browser's own types as well as Node's.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "jsx": "react-jsx",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": ["node"],
+        "noUncheckedIndexedAccess": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"]
+}

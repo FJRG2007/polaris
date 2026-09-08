@@ -1,0 +1,14 @@
+{
+    // Vendored code, held to the contract it was written under - see the note in
+    // `packages/pptx/tsconfig.json`.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "types": ["node"],
+        "noUncheckedIndexedAccess": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"]
+}

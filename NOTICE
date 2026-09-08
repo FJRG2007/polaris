@@ -61,19 +61,30 @@ blocks, columns, spreads and search index. Only the files that stand on their
 own came across - the pagination engine, for one, reaches the editor's own DOM
 and would have meant dragging half an application over to satisfy it.
 
-What was deliberately NOT taken, and why: the Electron shell and
-`electron-utils` (Polaris is a web application), the `ui` package (Polaris has
-its own design system), `i18n` and `project-store` (Polaris has both already),
-and `agent-core`, `ai-provider` and `ai-search` (Polaris has its own agent
-runtime, provider catalogue and search). From the editors: their string tables,
-their Electron IPC contracts, their AI tool definitions, and every component
-that draws - the last because they are React and Konva against an application
-shell Polaris does not have.
+Also ported, each in its own package: `genoffice-i18n` (language detection and
+message lookup), `project-store` (a project's files and their recent history),
+`genoffice-agent` (its agent loop - turns, tools, results), `genoffice-ai` (its
+model providers and request shapes), `genoffice-search` (search and image
+generation through the Genspark CLI), `genoffice-ui` (its ribbon, colour picker,
+shape gallery and Markdown view), and `office-html` (the half of its shell
+helpers that is URL and remote-image safety rather than shell).
 
-The editors themselves are not taken. They are built on that shell, and they
-have no real-time collaboration in them at all - which is the one thing Polaris'
-own editors exist to do, and the reason those were written rather than adopted.
+Polaris has its own of several of those already and uses its own. They are here
+because the goal asked for the repository, and a package nobody imports still
+costs nothing to keep; `@polaris/genoffice-ui` in particular is kept strictly
+apart from `@polaris/ui`, which is Polaris' own design system.
 
-The Apache 2.0 licence text is at http://www.apache.org/licenses/LICENSE-2.0.
-The files carry a header saying where they came from; their behaviour is
-unchanged, and their formatting follows this repository's conventions.
+What could NOT be taken, and why:
+
+- **The Electron shell** and six of `electron-utils`' twelve modules - a menu
+  bar, a native file dialog, a print window. They import `electron`. There is no
+  version of them that runs in a browser.
+- **The four editor applications.** They are React and Konva against that shell.
+  What was portable inside them is in `office-layout`; the applications
+  themselves are not, and would not be wanted if they were: they have no
+  real-time collaboration in them, which is the first thing Polaris' own editors
+  were built to do.
+- **The pagination engine, the line-metrics table and the shape adjust-handles**
+  specifically. They were tried. Each reaches the editor's own DOM or its
+  sibling modules, and taking them would have meant dragging half an application
+  across to satisfy an import.
