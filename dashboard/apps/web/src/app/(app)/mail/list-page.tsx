@@ -8,8 +8,19 @@
  * slightly differently, which is how a back button starts landing on the wrong
  * page.
  *
- * Everything a list route can carry is read here: the search box, the cursor for
- * the next page, and which conversation is open beside it.
+ * **It reads the address and nothing else.** No conversations are fetched here,
+ * and that is the difference between Mail feeling like an application and
+ * feeling like a website. Rendering the list on the server meant every press on
+ * Starred or Inbox was a database query standing in front of the first pixel:
+ * the rail, the toolbar, the tabs and the search box all waited on the last row
+ * being counted, and the screen showed the previous one until it was. Now this
+ * settles what list is being asked for - which is reading a path and a handful
+ * of search parameters - and the browser fetches it, drawing what it already
+ * holds while it does. Every mail client that feels fast works this way.
+ *
+ * What is left here is what the address means, which is genuinely the server's:
+ * whether this person has any mailboxes at all, and how they have said they like
+ * to read.
  */
 
 import * as core from "@polaris/core";
@@ -18,14 +29,9 @@ import { requirePermission } from "@/lib/session";
 import { ownedAccountIds } from "@/lib/mailbox/access";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
 import { MailView, type MailViewContext } from "./mail-view";
+import type { MailPageNarrow } from "@/lib/mailbox/page-params";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
-import {
-    EMPTY_QUERY,
-    listThreads,
-    readThread,
-    type MailListQuery,
-    type MailThreadView
-} from "@/lib/mailbox/views";
+import { EMPTY_QUERY, type MailListQuery } from "@/lib/mailbox/views";
 
 /** What a route knows about itself, beyond the query it narrows to. */
 export interface ListRoute {
@@ -69,12 +75,19 @@ export async function MailListPage({
     searchParams: MailSearchParams;
 }) {
     const user = await requirePermission("mail.use");
-    const params = await searchParams;
+    // Together rather than one after the other. Both are single indexed reads,
+    // and both stand between a press on the rail and this screen rendering at
+    // all - which is the whole budget this route has left now that the
+    // conversations are fetched by the browser.
+    const [params, accounts, preferences] = await Promise.all([
+        searchParams,
+        ownedAccountIds(user.id),
+        readMailPreferences(user.id)
+    ]);
 
     // Nothing connected yet. Every list route lands here rather than drawing an
     // empty inbox, because an empty screen with a sentence in it reads as broken
     // and this reads as the first step.
-    const accounts = await ownedAccountIds(user.id);
     if (accounts.length === 0) {
         const options = await mailConnectOptions(user.id);
         return (
@@ -96,7 +109,6 @@ export async function MailListPage({
     const filter = core.readMailFilter(params.filter);
     // The reader's own order is what a list opens as; the address still wins for
     // the page it names, because a sorted list is a link somebody was sent.
-    const preferences = await readMailPreferences(user.id);
     const sort = core.readMailSort(params.sort, preferences.sort);
     const query: MailListQuery = {
         ...EMPTY_QUERY,
@@ -110,79 +122,17 @@ export async function MailListPage({
         // Only where the route offers tabs at all, which is the inbox. Sent,
         // Drafts and the trash are not a mixture of things to sort.
         category: route.categorised && isCategory(params.tab) ? params.tab : "",
-        cursor: params.before ?? ""
+        cursor: ""
     };
-
-    const { threads, cursor } = await listThreads(user.id, query);
-
-    // The conversation named in the address, whether or not it is on this page:
-    // a link to one is a link somebody was sent, and it has to open even when
-    // the list under it has moved on. It is looked up in the page first because
-    // that is nearly always where it is.
-    //
-    // A name that resolves to nothing is a list with nothing open beside it, and
-    // never a 404. Archiving or trashing the conversation being read is the
-    // ordinary way to arrive here - every move drops the rows and the address is
-    // still naming what was moved - and answering that with the not-found page
-    // took the whole screen away instead of the one message somebody asked to be
-    // rid of. It is also what a link to a conversation that has since been filed
-    // deserves: the mailbox it was in, rather than a dead end.
-    const wanted = params.open ?? "";
-    let openThread: MailThreadView | null = threads.find((thread) => thread.id === wanted) ?? null;
-    const openMessages = wanted ? await readThread(user.id, wanted) : [];
-    if (wanted && !openThread && openMessages.length > 0) {
-        // Not on this page. It still opens, drawn from its own messages, so long
-        // as it is on one of this person's mailboxes - `readThread` narrows by
-        // the reader, so an empty answer is both "not there" and "not yours".
-        const first = openMessages[0]!;
-        openThread = {
-            id: wanted,
-            accountId: first.accountId,
-            subject: first.subject,
-            snippet: first.snippet,
-            participants: first.from,
-            messageCount: openMessages.length,
-            unreadCount: openMessages.filter((message) => !message.seen).length,
-            starred: openMessages.some((message) => message.flagged),
-            pinned: false,
-            muted: false,
-            hasAttachments: openMessages.some((message) => message.attachments.length > 0),
-            // Not read: this one was built from its own messages rather than
-            // from the list, and their sizes are not part of that shape. It is
-            // only ever drawn as the conversation being read, where nothing
-            // shows a size.
-            size: 0,
-            lastMessageAt: openMessages.at(-1)!.sentAt,
-            unsubscribe: "",
-            labels: [],
-            leadMessageId: openMessages.at(-1)!.id
-        };
-    }
 
     const searched = Boolean(query.query);
     return (
         <MailView
-            threads={threads}
-            cursor={cursor}
-            // What this list IS, so the scroll can ask for the next page of the
-            // same one. Seven routes end up here and a path is a poor thing to
-            // reconstruct which from.
-            page={{
-                accountId: query.accountId,
-                folderId: query.folderId,
-                role: query.role,
-                labelId: query.labelId,
-                unreadOnly: query.unreadOnly,
-                readOnly: query.readOnly,
-                starredOnly: query.starredOnly,
-                snoozedOnly: query.snoozedOnly,
-                withAttachments: query.withAttachments,
-                category: query.category,
-                sort: query.sort,
-                query: query.query
-            }}
-            openThread={openThread}
-            openMessages={openMessages}
+            // What this list IS, which is the whole of what the browser needs to
+            // go and get it - and to know that the copy it is already holding is
+            // a copy of this list rather than of another one.
+            page={narrowOf(query)}
+            openThreadId={params.open ?? ""}
             categorised={Boolean(route.categorised) && !searched}
             category={query.category}
             filter={filter}
@@ -208,4 +158,23 @@ export async function MailListPage({
             }
         />
     );
+}
+
+/** The part of a query that identifies the list, which is all of it bar where a
+ *  page ended and how the database is asked. */
+function narrowOf(query: MailListQuery): MailPageNarrow {
+    return {
+        accountId: query.accountId,
+        folderId: query.folderId,
+        role: query.role,
+        labelId: query.labelId,
+        unreadOnly: query.unreadOnly,
+        readOnly: query.readOnly,
+        starredOnly: query.starredOnly,
+        snoozedOnly: query.snoozedOnly,
+        withAttachments: query.withAttachments,
+        category: query.category,
+        sort: query.sort,
+        query: query.query
+    };
 }

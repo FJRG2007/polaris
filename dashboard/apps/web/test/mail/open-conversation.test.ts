@@ -25,6 +25,7 @@ import { describe, expect, it } from "vitest";
 import { leavesTheView } from "@/app/(app)/mail/mail-actions";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
+const MAILBOX = fileURLToPath(new URL("../../src/lib/mailbox/", import.meta.url));
 
 describe("which actions take a conversation out of the view", () => {
     it("names every move, because every move drops the rows", () => {
@@ -53,11 +54,18 @@ describe("the page survives a conversation that is not there", () => {
     });
 
     it("draws the list with nothing open rather than falling over", async () => {
-        const page = await readFile(`${SCREENS}list-page.tsx`, "utf8");
-        // The fallback conversation is built only when there are messages to
-        // build it from. Reaching `openMessages[0]!` unguarded is the crash this
-        // guards, and it is one edit away.
-        expect(page).toContain("if (wanted && !openThread && openMessages.length > 0)");
+        // The row is built from the conversation's own messages, which is what
+        // makes a link to a filed conversation open at all - and it is built only
+        // when there are messages to build it from. Reaching `messages[0]!`
+        // unguarded is the crash this guards, and it is one edit away.
+        const views = await readFile(`${MAILBOX}views.ts`, "utf8");
+        expect(views).toContain("if (messages.length === 0) return { thread: null, messages: [] };");
+
+        // And the client half: a conversation the list does not have still opens
+        // from its own answer, rather than the screen deciding there is nothing
+        // to show.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain("?? opened.answer?.thread ?? null");
     });
 });
 

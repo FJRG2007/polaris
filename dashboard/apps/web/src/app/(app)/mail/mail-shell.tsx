@@ -42,6 +42,16 @@ export interface MailContextValue {
      *  one small query, against teaching the client to apply every kind of
      *  change to a shape the server already knows how to build. */
     readonly refresh: () => void;
+    /**
+     * How many times that has been asked for.
+     *
+     * The rail and the counts are the server's and come back with
+     * `router.refresh()`; the list and the conversation are fetched by the
+     * browser and would not notice it. So a refresh is also a number, and the
+     * reads that are not the router's watch it - which is the whole of how a
+     * message arriving reaches a list nobody re-rendered.
+     */
+    readonly revision: number;
     /** The colour standing for one mailbox, so a row in a merged list says which
      *  mailbox it came from without being read. */
     readonly accountColor: (accountId: string) => string;
@@ -133,7 +143,12 @@ export function MailShell({
     const [railOpen, setRailOpen] = useState(false);
     const [asking, setAsking] = useState<{ missing: MissingFolderRole; retry: () => void } | null>(null);
 
-    const refresh = useCallback(() => router.refresh(), [router]);
+    const [revision, setRevision] = useState(0);
+    const refresh = useCallback(() => {
+        // Both halves of the screen, which no longer come from the same place.
+        setRevision((count) => count + 1);
+        router.refresh();
+    }, [router]);
 
     /**
      * The live channel's own refreshes, coalesced.
@@ -184,12 +199,25 @@ export function MailShell({
             unread,
             viewerName,
             refresh,
+            revision,
             accountColor,
             composing,
             openComposer: setComposing,
             askFolderRole
         }),
-        [accounts, folders, labels, identities, unread, viewerName, refresh, accountColor, composing, askFolderRole]
+        [
+            accounts,
+            folders,
+            labels,
+            identities,
+            unread,
+            viewerName,
+            refresh,
+            revision,
+            accountColor,
+            composing,
+            askFolderRole
+        ]
     );
 
     // Inside a conversation on a phone the list steps aside, which is why this

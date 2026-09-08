@@ -493,6 +493,54 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
     }));
 }
 
+/**
+ * One conversation, with a row to head it, whether or not it is in any list.
+ *
+ * A link to a conversation is a link somebody was sent, and it has to open even
+ * when the list beside it has moved on - archived, trashed, or simply older than
+ * the page being looked at. So the row is built from the conversation's own
+ * messages rather than found in a list, which is also what makes it right after
+ * an action has dropped the row from under the reader.
+ *
+ * Nothing here decides who may see it: `readThread` narrows by the reader, so an
+ * empty answer is both "there is no such conversation" and "it is not yours",
+ * and the caller cannot tell the two apart. That is deliberate.
+ */
+export async function readThreadView(
+    userId: string,
+    threadId: string
+): Promise<{ thread: MailThreadView | null; messages: MailMessageView[] }> {
+    const messages = await readThread(userId, threadId);
+    if (messages.length === 0) return { thread: null, messages: [] };
+
+    const first = messages[0]!;
+    const newest = messages.at(-1)!;
+    return {
+        thread: {
+            id: threadId,
+            accountId: first.accountId,
+            subject: first.subject,
+            snippet: first.snippet,
+            participants: first.from,
+            messageCount: messages.length,
+            unreadCount: messages.filter((message) => !message.seen).length,
+            starred: messages.some((message) => message.flagged),
+            pinned: false,
+            muted: false,
+            hasAttachments: messages.some((message) => message.attachments.length > 0),
+            // Not read: this one is built from its own messages rather than from
+            // a list, and their sizes are not part of that shape. It is only ever
+            // drawn as the conversation being read, where nothing shows a size.
+            size: 0,
+            lastMessageAt: newest.sentAt,
+            unsubscribe: "",
+            labels: [],
+            leadMessageId: newest.id
+        },
+        messages
+    };
+}
+
 /** How many unread messages are waiting, per mailbox and in total, for the badge
  *  on the app switcher and the number beside each account. */
 export async function unreadCounts(

@@ -25,7 +25,6 @@ import * as rules from "@/lib/mailbox/rules";
 import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
 import * as prefs from "@/lib/mailbox/prefs";
-import * as views from "@/lib/mailbox/views";
 import * as reading from "@/lib/mailbox/reading";
 import * as blocking from "@/lib/mailbox/blocking";
 import * as attachFrom from "@/lib/mailbox/attach-from";
@@ -580,32 +579,6 @@ export async function reorderRulesAction(accountId: string, orderedIds: string[]
         return {};
     } catch (caught) {
         return failure(caught, "That order could not be saved.");
-    }
-}
-
-/**
- * The next page of a list, for the scroll rather than for a button.
- *
- * The narrowing travels from the screen because the screen is the only thing
- * that knows which list it is - there are seven of them and a path is a poor
- * thing to reconstruct one from. It is not a hole: `listThreads` resolves the
- * mailboxes from the reader inside its own query, so the worst somebody can do
- * by editing this is ask for a different folder of their own.
- */
-export async function moreThreadsAction(input: unknown) {
-    const userId = await actorId();
-    const parsed = core.mailPageSchema.safeParse(input);
-    if (!parsed.success) return { error: "That page could not be loaded." };
-    try {
-        const { cursor, query, ...narrow } = parsed.data;
-        return await views.listThreads(userId, {
-            ...views.EMPTY_QUERY,
-            ...narrow,
-            query,
-            cursor
-        });
-    } catch (caught) {
-        return failure(caught, "That page could not be loaded.");
     }
 }
 

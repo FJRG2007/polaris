@@ -37,11 +37,12 @@ import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
+import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
 import {
     actOnAction,
     applyLabelAction,
     blockSenderAction,
-    moreThreadsAction,
     openMessageAction,
     warmMessageAction,
     snoozeAction,
@@ -73,6 +74,7 @@ import {
     DropdownMenuTrigger,
     EmptyState,
     ScrollRow,
+    Skeleton,
     useToast
 } from "@polaris/ui";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
@@ -103,22 +105,9 @@ import {
  */
 const WARM_AFTER_MS = 250;
 
-/** What list this is, as the scroll asks the server for more of it. The shape
- *  the page schema validates on the way in. */
-export interface MailPageNarrow {
-    readonly accountId: string | null;
-    readonly folderId: string | null;
-    readonly role: string | null;
-    readonly labelId: string | null;
-    readonly unreadOnly: boolean;
-    readonly readOnly: boolean;
-    readonly starredOnly: boolean;
-    readonly snoozedOnly: boolean;
-    readonly withAttachments: boolean;
-    readonly category: string;
-    readonly sort: core.MailSort;
-    readonly query: string;
-}
+/** One array rather than a new one per render, so nothing downstream re-runs on
+ *  a screen with no conversation open. */
+const EMPTY_MESSAGES: MailMessageView[] = [];
 
 /** What the list is showing, so the empty state and the toolbar can say the
  *  right thing: "no mail" in an inbox and "nothing in the trash" are different
@@ -134,11 +123,8 @@ export interface MailViewContext {
 }
 
 export function MailView({
-    threads: firstPage,
     context,
-    openThread,
-    openMessages,
-    cursor: firstCursor,
+    openThreadId,
     page,
     categorised,
     category,
@@ -147,12 +133,13 @@ export function MailView({
     preferences,
     fixedFilter
 }: {
-    threads: MailThreadView[];
     context: MailViewContext;
-    openThread: MailThreadView | null;
-    openMessages: MailMessageView[];
-    cursor: string;
-    /** What this list is, so the scroll can ask for more of the same one. */
+    /** The conversation the address names, or "". Fetched here rather than
+     *  handed down, so a link to one opens beside a list that is already drawn
+     *  instead of holding the whole screen back. */
+    openThreadId: string;
+    /** What this list is: what to go and get, and the name of the copy this tab
+     *  may already be holding. */
     page: MailPageNarrow;
     /** Whether this list is worth sorting into tabs. An inbox is; Sent is not,
      *  and neither is a search - a search is already a narrowing. */
@@ -172,8 +159,31 @@ export function MailView({
     fixedFilter: core.MailFilter | "";
 }) {
     const router = useRouter();
-    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } =
-        useMail();
+    const {
+        accounts,
+        accountColor,
+        askFolderRole,
+        composing,
+        identities,
+        openComposer,
+        refresh,
+        revision
+    } = useMail();
+
+    /**
+     * The list, and the conversation open beside it.
+     *
+     * Both fetched here rather than rendered into the page. What that buys is
+     * the whole reason this screen changed shape: pressing Starred draws the
+     * toolbar, the tabs and the search box now, with the rows this tab already
+     * had under them, and the request that confirms them lands behind that. A
+     * mailbox never opened in this tab is the only case that waits, and it waits
+     * behind rows shaped like rows rather than behind nothing.
+     */
+    const list = useMailList(page, revision);
+    const firstPage = list.threads;
+    const firstCursor = list.cursor;
+    const opened = useMailThread(openThreadId, revision);
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -230,6 +240,23 @@ export function MailView({
 
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
 
+    /**
+     * The conversation being read, and what is in it.
+     *
+     * The row comes from the list when the list has it, so everything the reader
+     * has just done to that row - starred it, marked it read - is on the pane's
+     * header as well; and from the conversation's own answer when it does not,
+     * which is a link somebody was sent, a conversation older than this page, or
+     * one that has just been filed out from under them. A name that resolves to
+     * nothing is a list with nothing open beside it, and never a not-found page.
+     */
+    const openThread = useMemo(
+        () =>
+            threads.find((thread) => thread.id === openThreadId) ?? opened.answer?.thread ?? null,
+        [threads, openThreadId, opened.answer]
+    );
+    const openMessages = opened.answer?.messages ?? EMPTY_MESSAGES;
+
     const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
     /**
      * The overlay belonging to an action the mail server has not answered yet.
@@ -267,8 +294,12 @@ export function MailView({
         setLoadingMore(true);
         void (async () => {
             try {
-                const outcome = await moreThreadsAction({ ...page, cursor });
-                if (refusalOf(outcome) || !("threads" in outcome)) return;
+                const response = await fetch(
+                    `/api/mail/threads?${mailPageParams(page, cursor).toString()}`,
+                    { cache: "no-store" }
+                );
+                if (!response.ok) return;
+                const outcome = (await response.json()) as MailListAnswer;
                 // Anything already on screen is dropped rather than repeated: a
                 // message arriving between two pages shifts everything down by
                 // one, and the row on the seam would otherwise appear twice.
@@ -277,6 +308,10 @@ export function MailView({
                     return [...held, ...outcome.threads.filter((thread) => !known.has(thread.id))];
                 });
                 setCursor(outcome.cursor);
+            } catch {
+                // The bottom of the list stays where it is and the observer will
+                // ask again the next time it comes into view. Nothing is said:
+                // this was not something anybody pressed.
             } finally {
                 setLoadingMore(false);
             }
@@ -837,6 +872,16 @@ export function MailView({
     );
 
     const allPicked = threads.length > 0 && selected.length === threads.length;
+    /**
+     * Whether the screen is split, which is not quite "there is a conversation".
+     *
+     * A conversation named in the address is being fetched before it is a row, so
+     * the panes have to take their reading shape the moment it is asked for
+     * rather than the moment it arrives - otherwise opening one moves the list
+     * twice, once to nothing and once to narrow. A name that turns out to be
+     * nothing puts it back, which is the same screen as never having asked.
+     */
+    const reading = Boolean(openThreadId) && (opened.loading || openThread !== null);
 
     return (
         <div className="flex h-full min-h-0">
@@ -865,10 +910,10 @@ export function MailView({
                     // learn to read. Narrow only where there is room for the pane
                     // beside it; a phone gets the list and then the message.
                     layout === "split"
-                        ? openThread
+                        ? reading
                             ? "hidden w-80 shrink-0 border-r border-border lg:flex"
                             : "flex flex-1 lg:w-80 lg:flex-none lg:shrink-0 lg:border-r lg:border-border"
-                        : openThread
+                        : reading
                           ? "hidden"
                           : "flex flex-1"
                 )}
@@ -1032,7 +1077,27 @@ export function MailView({
                 </header>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                    {threads.every((thread) => patched[thread.id]?.gone) ? (
+                    {list.loading ? (
+                        // Nothing kept for this list and nothing arrived yet,
+                        // which is a first visit rather than the ordinary case.
+                        // Rows shaped like rows, under a toolbar that is already
+                        // real: a spinner over the whole screen would take away
+                        // the tabs and the search box, which work.
+                        <ThreadRowsSkeleton />
+                    ) : list.failed ? (
+                        <div className="p-6">
+                            <EmptyState
+                                icon={<Inbox className="size-5 shrink-0" aria-hidden />}
+                                title="This list could not be loaded"
+                                description={list.failed}
+                                action={
+                                    <Button variant="secondary" onClick={refresh}>
+                                        Try again
+                                    </Button>
+                                }
+                            />
+                        </div>
+                    ) : threads.every((thread) => patched[thread.id]?.gone) ? (
                         <div className="p-6">
                             <EmptyState
                                 icon={<Inbox className="size-5 shrink-0" aria-hidden />}
@@ -1065,7 +1130,7 @@ export function MailView({
                                             picked={selected.includes(thread.id)}
                                             color={accountColor(thread.accountId)}
                                             showColor={accounts.length > 1}
-                                            wide={layout === "full" && !openThread}
+                                            wide={layout === "full" && !reading}
                                             mine={mine}
                                             sort={sort}
                                             onPick={(next, run) => pick(thread.id, next, run)}
@@ -1138,7 +1203,7 @@ export function MailView({
                     // Same reason as the list beside it: this pane owns its own
                     // scrollbar, and it only can while its own height is bounded.
                     "min-h-0 min-w-0 flex-1",
-                    openThread ? "flex" : layout === "split" ? "hidden lg:flex" : "hidden"
+                    reading ? "flex" : layout === "split" ? "hidden lg:flex" : "hidden"
                 )}
                 aria-label="Conversation"
             >
@@ -1167,6 +1232,12 @@ export function MailView({
                                 : undefined
                         }
                     />
+                ) : opened.loading ? (
+                    // On its way. The shape of a message rather than a spinner,
+                    // for the same reason the list has one: what is coming is a
+                    // header and some paragraphs, and drawing that is the
+                    // difference between waiting and watching nothing.
+                    <ConversationSkeleton />
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
                         <p className="text-[13px] text-foreground-subtle">
@@ -1218,6 +1289,77 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
             </div>
             <span className="sr-only" role="status">
                 {busy ? "Loading older conversations" : ""}
+            </span>
+        </div>
+    );
+}
+
+/**
+ * The list before there is a list.
+ *
+ * Only ever seen once per list per tab: a mailbox that has been looked at is
+ * painted from what this tab kept, and the request behind that replaces it
+ * without any of this. It exists for the first visit, and it is shaped like the
+ * rows that are coming rather than like a spinner - the face, the tick, the
+ * star, two lines of text and a date - so the screen does not jump when they
+ * arrive.
+ *
+ * The widths differ down the column on purpose. A stack of identical bars reads
+ * as a placeholder; a stack of uneven ones reads as writing that has not
+ * finished loading, which is what it is.
+ */
+function ThreadRowsSkeleton() {
+    // Deliberately not random: a re-render must not reshuffle the shape of
+    // something that is standing still.
+    const widths = ["w-2/5", "w-3/5", "w-1/3", "w-1/2", "w-2/3", "w-2/5", "w-3/5", "w-1/2"];
+    return (
+        <ul aria-hidden>
+            {widths.map((width, index) => (
+                <li key={index} className="border-b border-border/60">
+                    <div className="flex items-start gap-2 py-2 pl-3 pr-2">
+                        <Skeleton className="mt-0.5 size-7 shrink-0 rounded-full" />
+                        <Skeleton className="mt-1 size-4 shrink-0" />
+                        <Skeleton className="mt-1 size-4 shrink-0" />
+                        <div className="min-w-0 flex-1 space-y-1.5 py-0.5">
+                            <Skeleton className={cn("h-3", width)} />
+                            <Skeleton className="h-3 w-11/12" />
+                        </div>
+                        <Skeleton className="mt-1 h-3 w-10 shrink-0" />
+                    </div>
+                </li>
+            ))}
+            <li className="sr-only" role="status">
+                Loading conversations
+            </li>
+        </ul>
+    );
+}
+
+/**
+ * The conversation before it arrives.
+ *
+ * The same argument as the rows beside it: what is coming is a subject, a
+ * sender, and some paragraphs, so that is what stands in for it. A pane that
+ * went blank and then filled was the one part of opening a message that still
+ * felt like a page load.
+ */
+function ConversationSkeleton() {
+    return (
+        <div className="flex min-h-0 flex-1 flex-col" aria-hidden>
+            <div className="shrink-0 space-y-2 border-b border-border px-4 py-3">
+                <Skeleton className="h-4 w-2/3" />
+                <div className="flex items-center gap-2">
+                    <Skeleton className="size-7 shrink-0 rounded-full" />
+                    <Skeleton className="h-3 w-40" />
+                </div>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 px-4 py-4">
+                {["w-full", "w-11/12", "w-4/5", "w-full", "w-3/5"].map((width, index) => (
+                    <Skeleton key={index} className={cn("h-3", width)} />
+                ))}
+            </div>
+            <span className="sr-only" role="status">
+                Loading the conversation
             </span>
         </div>
     );
