@@ -1,0 +1,29 @@
+Polaris
+Copyright 2026 FJRG2007
+
+This product includes software developed by third parties, listed below with
+the licence it is used under. Anything not listed here is Polaris' own.
+
+--------------------------------------------------------------------------------
+
+GenOffice
+Copyright 2026 Mainfunc, Inc.
+Licensed under the Apache License, Version 2.0
+https://github.com/genspark-ai/genoffice
+
+`dashboard/packages/core/src/sheets/` is ported from GenOffice's spreadsheet
+domain (`apps/sheets/src/domain` and the pivot definition types from
+`apps/sheets/src/gateway/xlsx-pivot.ts`). It is the pivot-table engine, the
+chart model and recommender, flash fill, range sorting, formula reference
+shifting, the A1 address reader and the in-memory workbook the rest of them are
+written against.
+
+Why it is here rather than written again: Polaris' spreadsheet is built on
+Univer, whose open edition ships the grid, the formulas and the formatting and
+deliberately does not ship pivot tables, charts or flash fill - those are what
+its makers sell. GenOffice had written exactly those, as pure TypeScript with
+no framework in it, under a licence that permits this.
+
+The Apache 2.0 licence text is at http://www.apache.org/licenses/LICENSE-2.0.
+The files carry a header saying where they came from; their behaviour is
+unchanged, and their formatting follows this repository's conventions.

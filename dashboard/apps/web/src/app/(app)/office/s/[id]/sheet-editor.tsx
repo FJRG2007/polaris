@@ -30,6 +30,8 @@ import "@univerjs/preset-sheets-core/lib/index.css";
 
 import * as Y from "yjs";
 import { Loader2 } from "lucide-react";
+import { SheetTools } from "./sheet-tools";
+import { setNumberFormatter } from "@polaris/core/sheets";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 import {
@@ -94,6 +96,17 @@ export function SheetEditor({
                         import("@univerjs/preset-sheets-core/locales/en-US")
                     ]);
                 if (disposed || !host.current) return;
+
+                // The engine's own number formatter, handed to the ported chart
+                // code. It asks for one rather than importing the framework,
+                // which is what keeps `@polaris/core` free of it - see
+                // `setNumberFormatter`.
+                setNumberFormatter((format, value) =>
+                    String(
+                        (sheetsCore as { numfmt?: { format: (f: string, v: number, o: object) => string } })
+                            .numfmt?.format(format, value, { throws: false }) ?? value
+                    )
+                );
 
                 const { univerAPI } = createUniver({
                     locale: LocaleType.EN_US,
@@ -179,12 +192,23 @@ export function SheetEditor({
         };
     }, [cells, doc, editable, shape]);
 
+    // The sheet the tools act on: the first one, which is the one anybody has
+    // when they reach for these.
+    const firstSheet = useMemo(() => {
+        const held = shape.get("sheets");
+        const named = held && typeof held === "object" ? Object.keys(held as object) : [];
+        return named[0] ?? "";
+    }, [shape, ready]);
+
     return (
-        <div className="relative min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+            {editable && firstSheet ? (
+                <SheetTools doc={doc} cells={cells} sheetId={firstSheet} />
+            ) : null}
             {/* The engine draws into this and measures it, so it needs a box with
                 a height of its own rather than one that grows to fit what it
                 draws. */}
-            <div ref={host} className="h-full w-full" />
+            <div ref={host} className="min-h-0 w-full flex-1" />
             {!ready && !failed ? (
                 <p className="absolute inset-0 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
