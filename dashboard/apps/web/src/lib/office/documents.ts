@@ -428,6 +428,25 @@ export async function applyUpdate(
     update: Uint8Array
 ): Promise<void> {
     await requireDocument(actor, documentId, "editor");
+    await writeUpdate(documentId, update, actor.id);
+}
+
+/**
+ * The same write, with the permission already decided.
+ *
+ * For the one caller that cannot ask `requireDocument`: somebody who arrived
+ * with a link and has no account here at all. The link route resolves what they
+ * may do before calling this, and `editedById` is null for them - a document
+ * edited by a visitor should not name somebody who was not there.
+ *
+ * Deliberately not exported anywhere a screen can reach: this is the write with
+ * the check taken off, and it belongs to the two callers above it.
+ */
+export async function writeUpdate(
+    documentId: string,
+    update: Uint8Array,
+    editedById: string | null
+): Promise<void> {
     const row = await prisma.officeDocument.findUnique({
         where: { id: documentId },
         select: { content: true }
@@ -442,7 +461,7 @@ export async function applyUpdate(
         data: {
             content: Buffer.from(documentState(doc)),
             excerpt: excerptOf(doc),
-            editedById: actor.id,
+            editedById,
             editedAt: new Date()
         }
     });

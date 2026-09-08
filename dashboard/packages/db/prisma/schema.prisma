@@ -4891,12 +4891,65 @@ model OfficeDocument {
     owner User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
     opens OfficeDocumentOpen[]
+    links OfficeLink[]
 
     // "everything of mine", "everything this organization has", and the two
     // orders a list is ever in.
     @@index([ownerId, kind])
     @@index([orgId, kind])
     @@index([editedAt])
+}
+
+// A link that opens one document, for somebody who has no account here.
+//
+// The other half of sharing. `AccessGrant` hands a document to a person, a team
+// or a role - all of which are accounts on this Polaris. This is for everybody
+// else: a client, a supplier, somebody on a phone who is not going to sign in
+// for one document.
+//
+// **The token is never stored.** Only its hash, so a database dump yields no
+// working links, exactly as a Drive share does. The token itself is kept
+// alongside under the master key so its owner can be shown the link again after
+// creating it - a link somebody cannot re-read is a link they have to replace.
+//
+// A link carries a role rather than being read-only by definition, because "send
+// them a link they can edit" is the thing people actually ask for. It is still
+// the weakest thing that works: a link can never share the document on, and
+// never delete it.
+model OfficeLink {
+    id         String @id @default(uuid(7)) @db.Uuid
+    documentId String @db.Uuid
+    /// viewer | commenter | editor - see OFFICE_ROLES. Never anything stronger:
+    /// handing a document on and throwing it away belong to an account.
+    role       String @default("viewer")
+
+    /// SHA-256 of the token. Lookups are by hash.
+    tokenHash      String  @unique
+    /// The token, envelope-encrypted, so the owner can be shown the link again.
+    encryptedToken Bytes?
+    tokenNonce     Bytes?
+    tokenKeyId     String?
+
+    /// Argon2 of the password, when the link has one.
+    passwordHash String?
+    expiresAt    DateTime?
+    revokedAt    DateTime?
+    /// How many openings it is worth, or null for unlimited.
+    maxUses      Int?
+    useCount     Int       @default(0)
+    lastUsedAt   DateTime?
+    /// Who it was made for, in the maker's own words. Shown only to them.
+    note         String    @default("")
+
+    /// Who made it. Not a relation: a link outlives the account that made it,
+    /// and the document's owner is who answers for it either way.
+    createdById String   @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    document OfficeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+    @@index([documentId])
 }
 
 // When one person last opened one document, and whether they keep it to hand.
