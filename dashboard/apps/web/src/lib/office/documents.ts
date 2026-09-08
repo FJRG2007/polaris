@@ -408,20 +408,40 @@ export async function renameDocument(
     return named;
 }
 
-/** Write the document itself, and the readable line beside it. Called by the
- *  editor's own save, debounced there rather than here. */
-export async function saveContent(
+/**
+ * Fold one person's changes into the document.
+ *
+ * A **delta** rather than the whole document, and merged here rather than
+ * replaced. That is what makes two people typing at once correct instead of
+ * merely usually correct: with whole documents, whoever saves second overwrites
+ * whoever saved first, and the two only converge if every frame between them
+ * arrived. A Yjs update is a set of changes - applying two in either order gives
+ * the same document - so the merge is the whole of the concurrency story.
+ *
+ * The excerpt is worked out from the merged result, not from what arrived: what
+ * the list says about a document should describe the document rather than the
+ * last paragraph somebody happened to touch.
+ */
+export async function applyUpdate(
     actor: OfficeActor,
     documentId: string,
-    content: Uint8Array,
-    excerpt: string
+    update: Uint8Array
 ): Promise<void> {
     await requireDocument(actor, documentId, "editor");
+    const row = await prisma.officeDocument.findUnique({
+        where: { id: documentId },
+        select: { content: true }
+    });
+    const { documentState, excerptOf, openDocument } = await import("@/lib/office/content");
+    const doc = openDocument(row?.content ? new Uint8Array(row.content) : null);
+    const { applyUpdate: applyYjsUpdate } = await import("yjs");
+    applyYjsUpdate(doc, update);
+
     await prisma.officeDocument.update({
         where: { id: documentId },
         data: {
-            content: Buffer.from(content),
-            excerpt: excerpt.slice(0, 2000),
+            content: Buffer.from(documentState(doc)),
+            excerpt: excerptOf(doc),
             editedById: actor.id,
             editedAt: new Date()
         }
