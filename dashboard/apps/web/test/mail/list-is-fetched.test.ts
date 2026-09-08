@@ -22,11 +22,7 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { mailPageSchema } from "@polaris/core";
-import {
-    mailPageParams,
-    readMailPageParams,
-    type MailPageNarrow
-} from "@/lib/mailbox/page-params";
+import { mailPageParams, readMailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
 
@@ -98,7 +94,9 @@ describe("the narrowing survives the trip", () => {
     });
 
     it("leaves out what is empty, so the plain inbox is a short key", () => {
-        expect(mailPageParams({ ...NARROW, role: "inbox" }).toString()).toBe("role=inbox&sort=newest");
+        expect(mailPageParams({ ...NARROW, role: "inbox" }).toString()).toBe(
+            "role=inbox&sort=newest"
+        );
     });
 
     it("reads an address nobody wrote as the whole list rather than refusing", () => {

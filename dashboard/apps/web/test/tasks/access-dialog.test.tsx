@@ -56,8 +56,20 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
-const OWNER = { userId: "u1", name: "Ada", contact: "ada@example.com", image: null, role: "owner" as const };
-const MEMBER = { userId: "u2", name: "Bo", contact: "bo@example.com", image: null, role: "member" as const };
+const OWNER = {
+    userId: "u1",
+    name: "Ada",
+    contact: "ada@example.com",
+    image: null,
+    role: "owner" as const
+};
+const MEMBER = {
+    userId: "u2",
+    name: "Bo",
+    contact: "bo@example.com",
+    image: null,
+    role: "member" as const
+};
 
 function spaceAnswer(canManage: boolean) {
     return { space: { id: "s1", name: "Product" }, members: [OWNER, MEMBER], canManage };
@@ -76,7 +88,10 @@ describe("a list, which has no access of its own", () => {
         listFolderMembersAction.mockResolvedValue(folderAnswer(true));
         render(
             <AccessDialog
-                target={{ scope: { kind: "folder", id: "f1" }, asked: { kind: "list", name: "Backlog" } }}
+                target={{
+                    scope: { kind: "folder", id: "f1" },
+                    asked: { kind: "list", name: "Backlog" }
+                }}
                 onClose={() => {}}
             />
         );
@@ -94,7 +109,10 @@ describe("a list, which has no access of its own", () => {
         listSpaceMembersAction.mockResolvedValue(spaceAnswer(true));
         render(
             <AccessDialog
-                target={{ scope: { kind: "space", id: "s1" }, asked: { kind: "list", name: "Inbox" } }}
+                target={{
+                    scope: { kind: "space", id: "s1" },
+                    asked: { kind: "list", name: "Inbox" }
+                }}
                 onClose={() => {}}
             />
         );
@@ -110,7 +128,10 @@ describe("a sprint", () => {
         listFolderMembersAction.mockResolvedValue(folderAnswer(true));
         render(
             <AccessDialog
-                target={{ scope: { kind: "folder", id: "f1" }, asked: { kind: "sprint", name: "Sprint 12" } }}
+                target={{
+                    scope: { kind: "folder", id: "f1" },
+                    asked: { kind: "sprint", name: "Sprint 12" }
+                }}
                 onClose={() => {}}
             />
         );
@@ -152,11 +173,20 @@ describe("who may change it", () => {
 describe("a grant made further up", () => {
     it("is listed and left alone, so nobody re-invites somebody who is already here", async () => {
         listFolderMembersAction.mockResolvedValue({
-            folder: { id: "f2", name: "Website", path: [{ id: "f1", name: "Acme" }, { id: "f2", name: "Website" }] },
+            folder: {
+                id: "f2",
+                name: "Website",
+                path: [
+                    { id: "f1", name: "Acme" },
+                    { id: "f2", name: "Website" }
+                ]
+            },
             members: [{ ...MEMBER, folderId: "f1", folderName: "Acme", inherited: true }],
             canManage: true
         });
-        render(<AccessDialog target={{ scope: { kind: "folder", id: "f2" } }} onClose={() => {}} />);
+        render(
+            <AccessDialog target={{ scope: { kind: "folder", id: "f2" } }} onClose={() => {}} />
+        );
 
         await screen.findByText("Bo");
         expect(screen.getByText("Through Acme")).toBeTruthy();

@@ -197,9 +197,9 @@ describe("what a grant says on screen", () => {
             startsAt: new Date("2026-09-01T00:00:00Z"),
             endsAt: new Date("2026-09-30T00:00:00Z")
         };
-        expect(describeGrant(grant, weekOrderFrom(1), (date) => date.toISOString().slice(0, 10))).toBe(
-            "2026-09-01 to 2026-09-30"
-        );
+        expect(
+            describeGrant(grant, weekOrderFrom(1), (date) => date.toISOString().slice(0, 10))
+        ).toBe("2026-09-01 to 2026-09-30");
     });
 });
 

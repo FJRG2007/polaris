@@ -52,7 +52,9 @@ describe("a snapshot from this build", () => {
         const now = await store();
         now.rememberSnapshotBuild("build-one");
         now.writeSnapshot("drive.listing", { files: 3 });
-        expect(now.readSnapshot<{ files: number }>("drive.listing", 60_000)?.value).toEqual({ files: 3 });
+        expect(now.readSnapshot<{ files: number }>("drive.listing", 60_000)?.value).toEqual({
+            files: 3
+        });
     });
 
     it("is still refused once it is older than the caller allows", async () => {

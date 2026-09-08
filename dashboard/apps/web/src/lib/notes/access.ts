@@ -66,7 +66,8 @@ function orgRoleGrants(
     const slug = org.members[0]?.role;
     if (!slug) return false;
     const row = org.roles.find((role) => role.slug === slug);
-    if (!row) return core.hasOrgPermission(core.ORG_SYSTEM_ROLES[slug]?.permissions ?? [], permission);
+    if (!row)
+        return core.hasOrgPermission(core.ORG_SYSTEM_ROLES[slug]?.permissions ?? [], permission);
     try {
         return core.hasOrgPermission(JSON.parse(row.permissions) as string[], permission);
     } catch {
@@ -83,7 +84,10 @@ function orgRoleGrants(
  * additive by design: somebody can be a guest through an organization and a
  * member through a team, and the answer has to be member.
  */
-export async function resolveSpaceRole(actor: NoteActor, spaceId: string): Promise<NoteAccess | null> {
+export async function resolveSpaceRole(
+    actor: NoteActor,
+    spaceId: string
+): Promise<NoteAccess | null> {
     const space = await prisma.noteSpace.findUnique({
         where: { id: spaceId },
         select: {
@@ -111,7 +115,8 @@ export async function resolveSpaceRole(actor: NoteActor, spaceId: string): Promi
         if (orgRoleGrants(space.org, "spaces.manage")) return "admin";
     }
 
-    let role: core.SpaceRole | null = (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
+    let role: core.SpaceRole | null =
+        (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
     for (const grant of space.teamGrants) {
         const granted = grant.role as core.SpaceRole;
         role = role ? core.strongerRole(role, granted) : granted;
@@ -224,7 +229,12 @@ export async function requireNote(
     });
     if (!note) throw new NoteAccessError("That note no longer exists");
     await requireShelf(actor, { spaceId: note.spaceId, ownerId: note.userId }, minimum);
-    return { noteId: note.id, spaceId: note.spaceId, folderId: note.folderId, ownerId: note.userId };
+    return {
+        noteId: note.id,
+        spaceId: note.spaceId,
+        folderId: note.folderId,
+        ownerId: note.userId
+    };
 }
 
 export async function requireFolder(

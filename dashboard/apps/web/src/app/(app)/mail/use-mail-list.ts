@@ -75,8 +75,7 @@ export function useMailList(
         // purpose: it is not part of the request, it is the thing that says the
         // last answer is out of date. A new identity here is what sends this
         // again, and it is the only thing that does.
-        (signal: AbortSignal) =>
-            readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal),
+        (signal: AbortSignal) => readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal),
         [params, revision]
     );
 

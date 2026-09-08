@@ -28,7 +28,16 @@ import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useMemo, useState, useEffect, useContext, useCallback, createContext, type ReactNode } from "react";
+import {
+    useRef,
+    useMemo,
+    useState,
+    useEffect,
+    useContext,
+    useCallback,
+    createContext,
+    type ReactNode
+} from "react";
 
 export interface MailContextValue {
     readonly accounts: readonly MailAccountView[];
@@ -141,7 +150,9 @@ export function MailShell({
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
     const [railOpen, setRailOpen] = useState(false);
-    const [asking, setAsking] = useState<{ missing: MissingFolderRole; retry: () => void } | null>(null);
+    const [asking, setAsking] = useState<{ missing: MissingFolderRole; retry: () => void } | null>(
+        null
+    );
 
     const [revision, setRevision] = useState(0);
     const refresh = useCallback(() => {
@@ -172,9 +183,12 @@ export function MailShell({
             refresh();
         }, STREAM_SETTLE_MS);
     }, [refresh]);
-    useEffect(() => () => {
-        if (settling.current) clearTimeout(settling.current);
-    }, []);
+    useEffect(
+        () => () => {
+            if (settling.current) clearTimeout(settling.current);
+        },
+        []
+    );
     useMailStream(onFrame);
 
     const accountColor = useCallback(

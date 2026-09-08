@@ -112,7 +112,9 @@ export async function shareAction(
                 principalType: parsed.data.principalType,
                 capability: parsed.data.capability,
                 // Never the note: it is free text somebody wrote about a person.
-                bounded: Boolean(parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses)
+                bounded: Boolean(
+                    parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses
+                )
             }
         });
         settled(kind);

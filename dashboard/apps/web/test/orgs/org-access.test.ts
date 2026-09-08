@@ -48,7 +48,11 @@ function space(options: {
     orgId?: string | null;
     members?: { role: string }[];
     teamGrants?: { role: string }[];
-    org?: { ownerId: string; members: { role: string }[]; roles?: { slug: string; permissions: string }[] } | null;
+    org?: {
+        ownerId: string;
+        members: { role: string }[];
+        roles?: { slug: string; permissions: string }[];
+    } | null;
 }) {
     return {
         ownerId: options.ownerId ?? "someone-else",
@@ -79,7 +83,9 @@ describe("what an organization's space gives somebody", () => {
         );
         expect(await resolveSpaceRole(READER, "s1")).toBe("admin");
 
-        spaceFindUnique.mockResolvedValue(space({ orgId: "o1", org: { ownerId: READER.id, members: [] } }));
+        spaceFindUnique.mockResolvedValue(
+            space({ orgId: "o1", org: { ownerId: READER.id, members: [] } })
+        );
         expect(await resolveSpaceRole(READER, "s1")).toBe("owner");
     });
 
@@ -155,7 +161,11 @@ describe("what an organization's space gives somebody", () => {
         // Not on it: invisible, even though the instance already trusts them
         // with the app.
         spaceFindUnique.mockResolvedValue(
-            space({ visibility: "internal", orgId: "o1", org: { ownerId: "someone-else", members: [] } })
+            space({
+                visibility: "internal",
+                orgId: "o1",
+                org: { ownerId: "someone-else", members: [] }
+            })
         );
         expect(await resolveSpaceRole(READER, "s1")).toBeNull();
     });

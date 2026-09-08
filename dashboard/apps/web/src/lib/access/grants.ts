@@ -169,7 +169,10 @@ export async function grantedCapability(
     now = new Date()
 ): Promise<string> {
     const held = await liveGrants(userId, subject, subjectId, now);
-    return core.strongest(subject, held.map((grant) => grant.capability));
+    return core.strongest(
+        subject,
+        held.map((grant) => grant.capability)
+    );
 }
 
 /**

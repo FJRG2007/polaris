@@ -14,7 +14,10 @@ import { cameraStream, CameraOfflineError } from "@/lib/home/live";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     // Checked against this camera below, once its id is known: a camera lent
@@ -28,7 +31,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     try {
         return await cameraStream(install.id, id, quality, request.signal);
     } catch (caught) {
-        if (caught instanceof CameraOfflineError) return new Response(caught.message, { status: 503 });
+        if (caught instanceof CameraOfflineError)
+            return new Response(caught.message, { status: 503 });
         throw caught;
     }
 }

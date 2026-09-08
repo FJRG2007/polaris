@@ -86,7 +86,9 @@ describe("sprints, for somebody who may not manage work", () => {
 
 describe("goals, for somebody who may not manage work", () => {
     it("offers no way to start, delete or add a target", () => {
-        const markup = draw(<GoalsView goals={[GOAL]} spaces={SPACES} lists={[]} canEdit={false} />);
+        const markup = draw(
+            <GoalsView goals={[GOAL]} spaces={SPACES} lists={[]} canEdit={false} />
+        );
         expect(markup).toContain(GOAL.name);
         expect(markup).not.toContain("New goal");
         expect(markup).not.toContain(`Delete ${GOAL.name}`);

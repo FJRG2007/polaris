@@ -251,8 +251,7 @@ export function MailView({
      * nothing is a list with nothing open beside it, and never a not-found page.
      */
     const openThread = useMemo(
-        () =>
-            threads.find((thread) => thread.id === openThreadId) ?? opened.answer?.thread ?? null,
+        () => threads.find((thread) => thread.id === openThreadId) ?? opened.answer?.thread ?? null,
         [threads, openThreadId, opened.answer]
     );
     const openMessages = opened.answer?.messages ?? EMPTY_MESSAGES;

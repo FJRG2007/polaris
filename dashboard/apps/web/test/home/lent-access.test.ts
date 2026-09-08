@@ -119,7 +119,12 @@ describe("seeing is not operating", () => {
 
 describe("what counts as a use", () => {
     it("counts one against a limited grant", async () => {
-        await sharing.countDeviceUse({ id: "g1", capability: "control", until: null, counted: true });
+        await sharing.countDeviceUse({
+            id: "g1",
+            capability: "control",
+            until: null,
+            counted: true
+        });
         expect(spendGrant).toHaveBeenCalledOnce();
     });
 

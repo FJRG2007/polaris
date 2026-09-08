@@ -152,21 +152,37 @@ export function Composer() {
             })();
         }, AUTOSAVE_MS);
         return () => clearTimeout(timer);
-    }, [composing, accountId, identityId, to, cc, bcc, subject, body, files, draftId, dirty, queued]);
+    }, [
+        composing,
+        accountId,
+        identityId,
+        to,
+        cc,
+        bcc,
+        subject,
+        body,
+        files,
+        draftId,
+        dirty,
+        queued
+    ]);
 
     const attach = useCallback(
         async (chosen: readonly File[]) => {
             for (const file of chosen) {
                 if (file.size > core.MAIL_MAX_ATTACHMENT_BYTES) {
-                    toast.show({ title: `${file.name} is bigger than most mail servers will accept.` });
+                    toast.show({
+                        title: `${file.name} is bigger than most mail servers will accept.`
+                    });
                     continue;
                 }
                 const form = new FormData();
                 form.set("file", file);
                 const response = await fetch("/api/mail/uploads", { method: "POST", body: form });
-                const answer = (await response.json().catch(() => null)) as
-                    | { upload?: Attached; error?: string }
-                    | null;
+                const answer = (await response.json().catch(() => null)) as {
+                    upload?: Attached;
+                    error?: string;
+                } | null;
                 if (!response.ok || !answer?.upload) {
                     toast.show({ title: answer?.error ?? "That file could not be attached." });
                     continue;
@@ -196,7 +212,10 @@ export function Composer() {
                 if (one.kind === "upload") continue;
                 const answer =
                     one.kind === "drive"
-                        ? await attachFromDriveAction({ connectionId: one.connectionId, path: one.path })
+                        ? await attachFromDriveAction({
+                              connectionId: one.connectionId,
+                              path: one.path
+                          })
                         : await attachFromAddressAction({ url: one.url });
                 const said = refusalOf(answer);
                 if (said) {
@@ -240,8 +259,16 @@ export function Composer() {
                     setProblem(said);
                     return;
                 }
-                if ("draftId" in outcome && outcome.draftId && "sendAt" in outcome && outcome.sendAt) {
-                    setQueued({ draftId: outcome.draftId, until: new Date(outcome.sendAt).getTime() });
+                if (
+                    "draftId" in outcome &&
+                    outcome.draftId &&
+                    "sendAt" in outcome &&
+                    outcome.sendAt
+                ) {
+                    setQueued({
+                        draftId: outcome.draftId,
+                        until: new Date(outcome.sendAt).getTime()
+                    });
                 }
                 refresh();
             });
@@ -269,10 +296,10 @@ export function Composer() {
             ? "inset-4 md:inset-10 rounded-lg border-b"
             : posture === "minimized"
               ? "bottom-0 right-6 w-[22rem]"
-              // Taller and wider than it was. A composer whose body is three
-              // lines is one people write three lines in, and the message
-              // being written is the whole point of the screen it covers.
-              : "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:right-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
+              : // Taller and wider than it was. A composer whose body is three
+                // lines is one people write three lines in, and the message
+                // being written is the whole point of the screen it covers.
+                "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:right-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
         <div
@@ -294,7 +321,9 @@ export function Composer() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    aria-label={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
+                    aria-label={
+                        posture === "minimized" ? "Open the composer" : "Minimize the composer"
+                    }
                     title={posture === "minimized" ? "Open the composer" : "Minimize the composer"}
                     onClick={() => setPosture(posture === "minimized" ? "docked" : "minimized")}
                 >
@@ -351,7 +380,11 @@ export function Composer() {
                                 <span className="w-12 shrink-0">From</span>
                                 {accounts.length > 1 || own.length > 0 ? (
                                     <Select
-                                        value={identityId ? `identity:${identityId}` : `account:${accountId}`}
+                                        value={
+                                            identityId
+                                                ? `identity:${identityId}`
+                                                : `account:${accountId}`
+                                        }
                                         onValueChange={(next) => {
                                             const [kind, id] = next.split(":");
                                             if (kind === "identity") {
@@ -366,7 +399,9 @@ export function Composer() {
                                         options={accounts.flatMap((one) => [
                                             {
                                                 value: `account:${one.id}`,
-                                                label: one.label ? `${one.label} - ${one.address}` : one.address
+                                                label: one.label
+                                                    ? `${one.label} - ${one.address}`
+                                                    : one.address
                                             },
                                             ...(identities[one.id] ?? []).map((alias) => ({
                                                 value: `identity:${alias.id}`,
@@ -375,7 +410,9 @@ export function Composer() {
                                         ])}
                                     />
                                 ) : (
-                                    <span className="min-w-0 truncate text-foreground" title={from}>{from}</span>
+                                    <span className="min-w-0 truncate text-foreground" title={from}>
+                                        {from}
+                                    </span>
                                 )}
                             </label>
 
@@ -429,8 +466,8 @@ export function Composer() {
 
                         {composing.forward ? (
                             <p className="px-3 pb-2 text-[12px] text-foreground-subtle">
-                                Files on the message you are forwarding are not carried with it yet. Attach them
-                                again if they matter.
+                                Files on the message you are forwarding are not carried with it yet.
+                                Attach them again if they matter.
                             </p>
                         ) : null}
 
@@ -441,8 +478,13 @@ export function Composer() {
                                         key={file.id}
                                         className="flex items-center gap-2 rounded-md border border-border px-2 py-1 text-[12px]"
                                     >
-                                        <Paperclip className="size-3.5 shrink-0 text-foreground-subtle" aria-hidden />
-                                        <span className="max-w-[14rem] truncate" title={file.name}>{file.name}</span>
+                                        <Paperclip
+                                            className="size-3.5 shrink-0 text-foreground-subtle"
+                                            aria-hidden
+                                        />
+                                        <span className="max-w-[14rem] truncate" title={file.name}>
+                                            {file.name}
+                                        </span>
                                         <button
                                             type="button"
                                             aria-label={`Remove ${file.name}`}
@@ -504,14 +546,18 @@ export function Composer() {
                                 size="icon"
                                 aria-label="Insert your signature"
                                 title="Insert your signature"
-                                onClick={() => setInsert({ token: Date.now(), text: `\n\n-- \n${signature}` })}
+                                onClick={() =>
+                                    setInsert({ token: Date.now(), text: `\n\n-- \n${signature}` })
+                                }
                             >
                                 <PenLine className="size-4 shrink-0" aria-hidden />
                             </Button>
                         ) : null}
 
                         {problem ? (
-                            <p className="min-w-0 flex-1 basis-full text-[12px] text-danger">{problem}</p>
+                            <p className="min-w-0 flex-1 basis-full text-[12px] text-danger">
+                                {problem}
+                            </p>
                         ) : null}
                     </footer>
                 </>
@@ -569,9 +615,13 @@ function SendLaterMenu({
                         </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => setAsking(true)}>Pick a time...</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setAsking(true)}>
+                        Pick a time...
+                    </DropdownMenuItem>
                     {chosen ? (
-                        <DropdownMenuItem onSelect={() => onChoose(null)}>Send it now instead</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onChoose(null)}>
+                            Send it now instead
+                        </DropdownMenuItem>
                     ) : null}
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -649,7 +699,8 @@ function withSignature(
     // and what lets the next one fold the signature away.
     const block = `-- 
 ${signature}`;
-    if (!body.trim()) return `
+    if (!body.trim())
+        return `
 
 ${block}`;
     return account?.signatureAboveQuote === false
@@ -727,7 +778,11 @@ function QueuedNotice({
     return (
         <div className="flex items-center gap-3 px-4 py-6">
             <p className="min-w-0 flex-1 text-[13px] text-muted-foreground">
-                {scheduled ? "Waiting until it is due." : left > 0 ? `Sending in ${left}s.` : "Sending."}
+                {scheduled
+                    ? "Waiting until it is due."
+                    : left > 0
+                      ? `Sending in ${left}s.`
+                      : "Sending."}
             </p>
             {scheduled || left > 0 ? (
                 <Button variant="secondary" onClick={onUndo}>

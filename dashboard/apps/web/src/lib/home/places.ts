@@ -21,7 +21,12 @@ import { PLACE_KINDS, type PlaceView } from "@/lib/home/place-kinds";
 
 // Re-exported so server code has one import for "places"; the browser reaches
 // for the pure module directly.
-export { PLACE_KINDS, PLACE_KIND_LABELS, type PlaceKind, type PlaceView } from "@/lib/home/place-kinds";
+export {
+    PLACE_KINDS,
+    PLACE_KIND_LABELS,
+    type PlaceKind,
+    type PlaceView
+} from "@/lib/home/place-kinds";
 
 /** What the first place is called when Polaris has to invent one. */
 const FIRST_PLACE = "Home";
@@ -42,7 +47,13 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
     const rows = await prisma.place.findMany({
         where: { installedAppId },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
 
     const places = rows.length > 0 ? rows : [await createFirstPlace(installedAppId)];
@@ -119,7 +130,13 @@ export async function placesHolding(
 async function createFirstPlace(installedAppId: string) {
     const created = await prisma.place.create({
         data: { installedAppId, name: FIRST_PLACE, kind: "house" },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
     return created;
 }
@@ -129,10 +146,22 @@ async function createFirstPlace(installedAppId: string) {
 export async function getPlace(installedAppId: string, id: string): Promise<PlaceView | null> {
     const row = await prisma.place.findFirst({
         where: { id, installedAppId },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
     return row
-        ? { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: row._count.cameras }
+        ? {
+              id: row.id,
+              name: row.name,
+              kind: row.kind,
+              address: row.address ?? "",
+              cameras: row._count.cameras
+          }
         : null;
 }
 
@@ -152,8 +181,15 @@ export async function createPlace(installedAppId: string, input: PlaceInput): Pr
     return { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: 0 };
 }
 
-export async function updatePlace(installedAppId: string, id: string, input: PlaceInput): Promise<PlaceView> {
-    const existing = await prisma.place.findFirst({ where: { id, installedAppId }, select: { id: true } });
+export async function updatePlace(
+    installedAppId: string,
+    id: string,
+    input: PlaceInput
+): Promise<PlaceView> {
+    const existing = await prisma.place.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!existing) throw new HomeError("Place not found");
     const name = input.name.trim();
     if (!name) throw new HomeError("Give it a name");
@@ -161,9 +197,21 @@ export async function updatePlace(installedAppId: string, id: string, input: Pla
     const row = await prisma.place.update({
         where: { id },
         data: { name, kind, address: input.address.trim() || null },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
-    return { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: row._count.cameras };
+    return {
+        id: row.id,
+        name: row.name,
+        kind: row.kind,
+        address: row.address ?? "",
+        cameras: row._count.cameras
+    };
 }
 
 /**

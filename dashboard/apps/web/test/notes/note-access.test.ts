@@ -23,7 +23,8 @@ interface SpaceRow {
 }
 
 let space: SpaceRow | null = null;
-let note: { id: string; userId: string; spaceId: string | null; folderId: string | null } | null = null;
+let note: { id: string; userId: string; spaceId: string | null; folderId: string | null } | null =
+    null;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -70,17 +71,21 @@ beforeEach(() => {
 describe("a note with no notebook", () => {
     it("is its author's", async () => {
         note = { id: "n1", userId: "u1", spaceId: null, folderId: null };
-        await expect(access.requireNote(me, "n1", "member")).resolves.toMatchObject({ noteId: "n1" });
+        await expect(access.requireNote(me, "n1", "member")).resolves.toMatchObject({
+            noteId: "n1"
+        });
     });
 
     it("is refused to everybody else, an instance administrator included", async () => {
         note = { id: "n1", userId: "u1", spaceId: null, folderId: null };
-        await expect(access.requireNote({ id: "u9", isAdmin: false }, "n1", "guest")).rejects.toThrow(
-            access.NoteAccessError
-        );
+        await expect(
+            access.requireNote({ id: "u9", isAdmin: false }, "n1", "guest")
+        ).rejects.toThrow(access.NoteAccessError);
         // The one place in Polaris where isAdmin buys nothing. It is the whole
         // promise the private shelf makes.
-        await expect(access.requireNote(admin, "n1", "guest")).rejects.toThrow(access.NoteAccessError);
+        await expect(access.requireNote(admin, "n1", "guest")).rejects.toThrow(
+            access.NoteAccessError
+        );
     });
 });
 
@@ -98,13 +103,17 @@ describe("a notebook", () => {
     it("is shut to somebody with no way in", async () => {
         space = shelf();
         await expect(access.resolveSpaceRole(me, "s1")).resolves.toBeNull();
-        await expect(access.requireSpace(me, "s1", "guest")).rejects.toThrow(access.NoteAccessError);
+        await expect(access.requireSpace(me, "s1", "guest")).rejects.toThrow(
+            access.NoteAccessError
+        );
     });
 
     it("refuses a writer's action to a reader", async () => {
         space = shelf({ members: [{ role: "guest" }] });
         await expect(access.requireSpace(me, "s1", "guest")).resolves.toBe("guest");
-        await expect(access.requireSpace(me, "s1", "member")).rejects.toThrow(access.NoteAccessError);
+        await expect(access.requireSpace(me, "s1", "member")).rejects.toThrow(
+            access.NoteAccessError
+        );
     });
 
     it("reads an internal one to anybody here, and an organization's to its roster only", async () => {

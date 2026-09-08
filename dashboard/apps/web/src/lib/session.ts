@@ -139,7 +139,8 @@ export async function resolveSession(): Promise<(SessionUser & { sessionCreatedA
  * policies.
  */
 export async function sessionCan(user: SessionUser, permission: Permission): Promise<boolean> {
-    if (user.viewingAs?.mode === "role") return hasPermission(user.viewingAs.grants ?? [], permission);
+    if (user.viewingAs?.mode === "role")
+        return hasPermission(user.viewingAs.grants ?? [], permission);
     if (user.isAdmin) return true;
     return userHasPermission(user.id, permission);
 }
@@ -156,7 +157,8 @@ export async function sessionCan(user: SessionUser, permission: Permission): Pro
  * not about a particular thing, stays on the global question.
  */
 export async function sessionCanAny(user: SessionUser, permission: Permission): Promise<boolean> {
-    if (user.viewingAs?.mode === "role") return hasPermission(user.viewingAs.grants ?? [], permission);
+    if (user.viewingAs?.mode === "role")
+        return hasPermission(user.viewingAs.grants ?? [], permission);
     if (user.isAdmin) return true;
     return canAny(user.id, permission);
 }

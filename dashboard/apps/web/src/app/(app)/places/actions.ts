@@ -141,7 +141,12 @@ async function reachablePlaces(
     all: places.PlaceView[]
 ): Promise<places.PlaceView[]> {
     if (reach.everything) return all;
-    return places.placesHolding(installId, all, [...reach.cameras.keys()], [...reach.devices.keys()]);
+    return places.placesHolding(
+        installId,
+        all,
+        [...reach.cameras.keys()],
+        [...reach.devices.keys()]
+    );
 }
 
 export async function savePlaceAction(
@@ -448,9 +453,7 @@ export async function testCameraStreamAction(
         const small = await relay.frameOrReason(endpoint, camera.id, "sub");
         if (!("reason" in small)) return { streams: "both" as const };
         const good = await relay.frameOrReason(endpoint, camera.id, "main");
-        return "reason" in good
-            ? { failed: small.reason }
-            : { streams: "main-only" as const };
+        return "reason" in good ? { failed: small.reason } : { streams: "main-only" as const };
     });
     if (result.error) return { error: result.error };
     if (!result.value || "failed" in result.value) {
@@ -1139,9 +1142,7 @@ export async function listDevicesAction(): Promise<{
  * A read rather than a control: it changes nothing at the door, and somebody
  * looking at a screen of locks has to be able to find out whether it is current.
  */
-export async function syncDevicesAction(
-    options: { probe?: boolean } = {}
-): Promise<{
+export async function syncDevicesAction(options: { probe?: boolean } = {}): Promise<{
     devices?: DeviceView[];
     accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
@@ -1184,7 +1185,7 @@ export async function syncDevicesAction(
 export async function operateDeviceAction(
     deviceId: string,
     action: DeviceAction
-): Promise<{ device?: DeviceView; error?: string; }> {
+): Promise<{ device?: DeviceView; error?: string }> {
     const user = await requireUser();
     const install = await requireHomeInstall();
     const lent = await guard(() => requireDeviceControl(user, String(deviceId)));
@@ -1221,11 +1222,16 @@ export async function operateDeviceAction(
 export async function saveDeviceAction(
     deviceId: string,
     input: unknown
-): Promise<{ device?: DeviceView; error?: string; }> {
+): Promise<{ device?: DeviceView; error?: string }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = schemas.deviceEditSchema.safeParse(schemas.normalizeDeviceInput((input ?? {}) as Record<string, unknown>));
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
-    const result = await guard(() => devices.updateDevice(install.id, String(deviceId), parsed.data));
+    const parsed = schemas.deviceEditSchema.safeParse(
+        schemas.normalizeDeviceInput((input ?? {}) as Record<string, unknown>)
+    );
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    const result = await guard(() =>
+        devices.updateDevice(install.id, String(deviceId), parsed.data)
+    );
     if (result.error) return { error: result.error };
     await recordAudit({
         actorId: user.id,
@@ -1240,7 +1246,7 @@ export async function saveDeviceAction(
 export async function deviceHistoryAction(
     deviceId: string | null,
     limit = 100
-): Promise<{ events?: DeviceEventView[]; error?: string; }> {
+): Promise<{ events?: DeviceEventView[]; error?: string }> {
     // Selecting a door opens the panel, and the panel asks for this at once, so a
     // visitor lent that door is a caller here as much as a resident is.
     const { install, reach } = await requireHomeShared();
@@ -1264,7 +1270,9 @@ export async function deviceHistoryAction(
 
 /** When a door was used, for the chart. Bare times: the day one falls in is the
  *  reader's own, and only their browser knows which zone that is. */
-export async function deviceUsageAction(deviceId: string): Promise<{ used?: number[]; error?: string; }> {
+export async function deviceUsageAction(
+    deviceId: string
+): Promise<{ used?: number[]; error?: string }> {
     const { install, reach } = await requireHomeShared();
     const result = await guard(() => {
         const one = String(deviceId);
@@ -1285,16 +1293,15 @@ export async function deviceUsageAction(deviceId: string): Promise<{ used?: numb
  * the ones it actually declared, and anything else in the object is dropped
  * rather than stored - what arrives here is somebody else's shape.
  */
-export async function connectDeviceAccountAction(
-    input: unknown
-): Promise<{
+export async function connectDeviceAccountAction(input: unknown): Promise<{
     devices?: DeviceView[];
     accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
 }> {
     const { user, install } = await requireHome("home.manage");
     const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
     if (!connection) return { error: "Polaris cannot connect that yet" };
     const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);
@@ -1342,7 +1349,8 @@ export async function reconnectDeviceAccountAction(
 }> {
     const { user, install } = await requireHome("home.manage");
     const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
+    if (!parsed.success)
+        return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
     if (!connection) return { error: "Polaris cannot connect that yet" };
     const fields = deviceConnections.normalizeFields(connection, parsed.data.fields);

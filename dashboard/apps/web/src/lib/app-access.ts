@@ -76,10 +76,16 @@ export async function reachableApps({
             if (app.hidden) return null;
             // Asked before the permission, because an app nobody installed is not
             // a thing anybody is being refused: there is nothing there yet.
-            if (app.requiresApp && isInstalled && !(await isInstalled(app.requiresApp))) return null;
+            if (app.requiresApp && isInstalled && !(await isInstalled(app.requiresApp)))
+                return null;
             if (app.adminOnly && !isAdmin) {
                 if (!app.guest || !(await can(app.guest.permission))) return null;
-                return { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href };
+                return {
+                    ...app,
+                    label: app.guest.label,
+                    description: app.guest.description,
+                    href: app.guest.href
+                };
             }
             if (app.permission && !(await can(app.permission))) {
                 // Nothing in the registry says which apps can be lent an item at
@@ -103,11 +109,15 @@ export async function reachableApps({
  * so it is told which entries to draw under their guest name rather than being
  * handed the resolved entry.
  */
-export async function reachableAppNav(input: AppAccessInput): Promise<{ ids: string[]; guestIds: string[] }> {
+export async function reachableAppNav(
+    input: AppAccessInput
+): Promise<{ ids: string[]; guestIds: string[] }> {
     const apps = await reachableApps(input);
     return {
         ids: apps.map((app) => app.id),
-        guestIds: apps.filter((app) => app.guest && app.href === app.guest.href).map((app) => app.id)
+        guestIds: apps
+            .filter((app) => app.guest && app.href === app.guest.href)
+            .map((app) => app.id)
     };
 }
 

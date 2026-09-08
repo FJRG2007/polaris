@@ -160,7 +160,12 @@ export async function owningOrgIds(
 async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promise<string | null> {
     switch (subject) {
         case "chat.space":
-            return orgOf(await prisma.chatSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.chatSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         case "chat.channel": {
             const channel = await prisma.chatChannel.findUnique({
                 where: { id: subjectId },
@@ -169,7 +174,12 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
             return channel?.space?.orgId ?? null;
         }
         case "task.space":
-            return orgOf(await prisma.taskSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.taskSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         case "task.folder": {
             const folder = await prisma.taskFolder.findUnique({
                 where: { id: subjectId },
@@ -178,7 +188,12 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
             return folder?.space?.orgId ?? null;
         }
         case "note.space":
-            return orgOf(await prisma.noteSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.noteSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         default:
             return null;
     }

@@ -27,11 +27,15 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         camera: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                cameras.filter((row) => where.id.in.includes(row.id)).map((row) => ({ placeId: row.placeId }))
+                cameras
+                    .filter((row) => where.id.in.includes(row.id))
+                    .map((row) => ({ placeId: row.placeId }))
         },
         placeDevice: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                devices.filter((row) => where.id.in.includes(row.id)).map((row) => ({ placeId: row.placeId }))
+                devices
+                    .filter((row) => where.id.in.includes(row.id))
+                    .map((row) => ({ placeId: row.placeId }))
         },
         place: { findMany: async () => [], findFirst: async () => null, create: async () => ({}) }
     }

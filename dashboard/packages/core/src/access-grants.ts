@@ -215,7 +215,11 @@ export function judgeGrant(schedule: GrantSchedule, now: Date, fallbackZone = "U
 
 /** Days named but no hours: the window is the whole of each of those days. */
 function judgeDays(schedule: GrantSchedule, now: Date, fallbackZone: string): GrantVerdict {
-    return judgeWindow({ ...schedule, startMinute: 0, endMinute: MINUTES_IN_DAY - 1 }, now, fallbackZone);
+    return judgeWindow(
+        { ...schedule, startMinute: 0, endMinute: MINUTES_IN_DAY - 1 },
+        now,
+        fallbackZone
+    );
 }
 
 function judgeWindow(schedule: GrantSchedule, now: Date, fallbackZone: string): GrantVerdict {
@@ -233,7 +237,9 @@ function judgeWindow(schedule: GrantSchedule, now: Date, fallbackZone: string): 
         if (now < window.openedAt || now >= window.closesAt) continue;
         // Whichever comes first: the hours shutting, or the last day passing.
         const until =
-            schedule.endsAt && schedule.endsAt < window.closesAt ? schedule.endsAt : window.closesAt;
+            schedule.endsAt && schedule.endsAt < window.closesAt
+                ? schedule.endsAt
+                : window.closesAt;
         return { standing: "live", until };
     }
     return { standing: "closed", until: null };

@@ -190,12 +190,12 @@ export async function channelAccess(
     // a moderation tool rather than a per-room nuisance - so the space's row is
     // read as well as this room's, and the later of the two is the one in force.
     const spaceTimeout = channel.spaceId
-        ? (
+        ? ((
               await prisma.chatSpaceMember.findUnique({
                   where: { spaceId_userId: { spaceId: channel.spaceId, userId: actor.id } },
                   select: { timeoutUntil: true }
               })
-          )?.timeoutUntil ?? null
+          )?.timeoutUntil ?? null)
         : null;
     const mutedUntil = latest(membership?.timeoutUntil ?? null, spaceTimeout);
     // Expired is the same as never: it ends on its own, which is the whole

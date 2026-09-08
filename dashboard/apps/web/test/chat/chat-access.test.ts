@@ -82,11 +82,7 @@ vi.mock("@polaris/db", () => ({
         // said no. Empty in every case but the two about being handed a space
         // or a room.
         accessGrant: {
-            findMany: async ({
-                where
-            }: {
-                where: { subjectType: string; subjectId?: string };
-            }) =>
+            findMany: async ({ where }: { where: { subjectType: string; subjectId?: string } }) =>
                 grants.filter(
                     (row) =>
                         row.subjectType === where.subjectType &&

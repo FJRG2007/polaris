@@ -60,7 +60,9 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                 </label>
 
                 <label className="mb-3 block">
-                    <span className="mb-1 block text-[12px] text-muted-foreground">When it goes in</span>
+                    <span className="mb-1 block text-[12px] text-muted-foreground">
+                        When it goes in
+                    </span>
                     <Select
                         value={auto}
                         onValueChange={setAuto}
@@ -77,11 +79,16 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                 </label>
 
                 <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
-                    <Switch checked={above} onChange={setAbove} aria-label="Put the signature above the quoted message" />
+                    <Switch
+                        checked={above}
+                        onChange={setAbove}
+                        aria-label="Put the signature above the quoted message"
+                    />
                     Above the quoted message
                 </label>
                 <p className="text-[12px] text-foreground-subtle">
-                    Above is what most people expect on a reply. Below is what a mailing list expects.
+                    Above is what most people expect on a reply. Below is what a mailing list
+                    expects.
                 </p>
 
                 <Button

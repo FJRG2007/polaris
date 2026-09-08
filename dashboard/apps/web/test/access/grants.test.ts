@@ -270,8 +270,6 @@ describe("writing one", () => {
     });
 
     it("still hands a thing to a person, who belongs to no organization here", async () => {
-        await expect(
-            writeGrant("place.device", "d1", writing(), "u0", [])
-        ).resolves.toBeTruthy();
+        await expect(writeGrant("place.device", "d1", writing(), "u0", [])).resolves.toBeTruthy();
     });
 });
