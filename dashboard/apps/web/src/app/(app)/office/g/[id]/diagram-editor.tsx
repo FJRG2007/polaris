@@ -26,6 +26,7 @@ import { Loader2 } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { reconcileScene, type SceneElement } from "@/lib/office/scene";
+import { useRegisterExporter } from "@/app/(app)/office/export-slot";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 
 const Excalidraw = dynamic(
@@ -68,7 +69,44 @@ export function DiagramEditor({
     const api = useRef<{
         updateScene: (scene: { elements: readonly SceneElement[] }) => void;
         getSceneElements: () => readonly SceneElement[];
+        getAppState: () => Record<string, unknown>;
+        getFiles: () => Record<string, unknown>;
     } | null>(null);
+
+    /**
+     * The drawing, as a picture.
+     *
+     * Registered with the chrome above rather than exported by a button here,
+     * because it belongs on the same menu as every other format - and it is the
+     * one format the server cannot make: rendering a drawing means having drawn
+     * it, and the thing that has is this canvas.
+     *
+     * Excalidraw's own exporters are loaded on demand for the same reason
+     * everything else about it is: they pull in the whole renderer, and nobody
+     * who never presses Export should pay for that.
+     */
+    useRegisterExporter(async (format) => {
+        const handle = api.current;
+        if (!handle) return null;
+        const { exportToBlob, exportToSvg } = await import("@excalidraw/excalidraw");
+        const scene = {
+            elements: handle.getSceneElements(),
+            appState: { ...handle.getAppState(), exportBackground: true },
+            files: handle.getFiles()
+        };
+        if (format === "png") {
+            return exportToBlob({ ...scene, mimeType: "image/png" } as never);
+        }
+        if (format === "svg") {
+            const svg = await exportToSvg(scene as never);
+            // Serialized here rather than handed over as a node: what the menu
+            // saves is a file, and an SVG element is not one.
+            return new Blob([new XMLSerializer().serializeToString(svg)], {
+                type: "image/svg+xml"
+            });
+        }
+        return null;
+    });
 
     /** Whether the change being handled came off the wire. Excalidraw calls
      *  `onChange` when the scene is updated programmatically too, and without

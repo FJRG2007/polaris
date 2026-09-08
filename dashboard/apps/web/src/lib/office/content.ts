@@ -25,6 +25,27 @@ import * as Y from "yjs";
  *  document beside a full one. */
 export const OFFICE_FIELD = "content";
 
+/**
+ * What each kind of document keeps, and under which name.
+ *
+ * Here rather than as a constant per editor, because the exporters have to read
+ * exactly what the editors write and a name that agrees by coincidence is a name
+ * that stops agreeing. A typo on either side is an empty export beside a full
+ * document, with nothing to say it went wrong.
+ */
+export const OFFICE_FIELDS = {
+    /** A rich-text document, bound to ProseMirror. */
+    doc: { body: OFFICE_FIELD },
+    /** A workbook: the cells, and the shape of the sheets around them. */
+    sheet: { cells: "cells", shape: "shape" },
+    /** A deck: the slides in order, and every box keyed by slide and box. */
+    slides: { slides: "slides", boxes: "boxes" },
+    /** A drawing: the elements, and the canvas state around them. */
+    diagram: { shapes: "shapes", scene: "scene" },
+    /** A comparison: what is being compared, against what, and every answer. */
+    comparison: { subjects: "subjects", criteria: "criteria", cells: "cells" }
+} as const;
+
 /** A document, opened from what was stored. An empty one for a document nobody
  *  has typed in yet, which is an ordinary state rather than a broken one. */
 export function openDocument(stored: Uint8Array | null): Y.Doc {

@@ -19,6 +19,8 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ExportMenu } from "./export-menu";
+import { OfficeExportProvider } from "./export-slot";
 import { OfficeLinkPanel } from "./link-panel";
 import { ShareDialog } from "@/components/access/share-dialog";
 import { Button, PAGE_BLEED, cn, useToast } from "@polaris/ui";
@@ -140,6 +142,8 @@ export function DocumentChrome({
                     />
                 </Button>
 
+                <ExportMenu documentId={row.id} kind={row.kind} title={title} />
+
                 {owned ? (
                     <Button size="sm" variant="secondary" onClick={() => setSharing(true)}>
                         <Share2 className="size-4 shrink-0" aria-hidden />
@@ -148,7 +152,7 @@ export function DocumentChrome({
                 ) : null}
             </header>
 
-            {children}
+            <OfficeExportProvider>{children}</OfficeExportProvider>
 
             {sharing ? (
                 <ShareDialog

@@ -16,7 +16,17 @@
  *
  * Loaded only in the browser: the engine draws on a canvas and measures fonts as
  * it starts.
+ *
+ * **The engine's stylesheet is imported at the top, statically.** Everything else
+ * about the engine is loaded on demand - it is megabytes, and four of the five
+ * kinds of document have no use for it - but its CSS cannot be: a stylesheet
+ * imported inside an effect is one the bundler has no idea about, so the grid
+ * mounted with no styles at all and drew as a column of bare text. Statically
+ * imported it costs one small stylesheet on this route and nothing anywhere
+ * else, since this file is only loaded on a spreadsheet.
  */
+
+import "@univerjs/preset-sheets-core/lib/index.css";
 
 import * as Y from "yjs";
 import { Loader2 } from "lucide-react";

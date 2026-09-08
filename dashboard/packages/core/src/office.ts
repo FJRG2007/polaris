@@ -93,18 +93,27 @@ export function officeKindForPath(segment: string): OfficeKind | null {
 /**
  * What a document can be exported as, per kind.
  *
- * `pdf` is on all five because "send me a copy" nearly always means a PDF, and
- * the native format is on each of the three that have one. A diagram exports the
- * two things a drawing is ever wanted as.
+ * The native format of each kind, plus the neutral ones anybody can open. Every
+ * one of these is a real file this Polaris writes - nothing here is declared and
+ * unimplemented, because a menu that offers a format and then fails is worse
+ * than one that never offered it.
+ *
+ * **PDF is deliberately not on this list.** Every format here opens in something
+ * that prints, and the browser's own print produces a better PDF than a
+ * hand-rolled writer ever would - it has the layout engine. So a document offers
+ * Print, which is a PDF on every operating system, rather than a worse PDF
+ * pretending to be a feature.
  */
 export const OFFICE_EXPORTS = {
-    doc: ["docx", "pdf", "md", "html"],
-    sheet: ["xlsx", "csv", "pdf"],
-    slides: ["pptx", "pdf"],
-    diagram: ["svg", "png", "pdf"],
+    doc: ["docx", "md", "html"],
+    sheet: ["xlsx", "csv"],
+    slides: ["pptx"],
+    // Made by the canvas that is already showing the drawing, rather than by
+    // redrawing it on a server that would need a browser to do it.
+    diagram: ["svg", "png"],
     // The whole point of keeping it structured: it leaves as a spreadsheet
-    // anybody can work on, and as the document people actually circulate.
-    comparison: ["xlsx", "csv", "pdf", "md"]
+    // anybody can work on, and as the table people paste into a document.
+    comparison: ["xlsx", "csv", "md"]
 } as const satisfies Record<OfficeKind, readonly string[]>;
 
 export type OfficeExport = (typeof OFFICE_EXPORTS)[OfficeKind][number];
@@ -118,9 +127,14 @@ export const OFFICE_EXPORT_LABELS: Record<string, string> = {
     md: "Markdown (.md)",
     html: "Web page (.html)",
     svg: "Vector image (.svg)",
-    png: "Image (.png)",
-    pdf: "PDF"
+    png: "Image (.png)"
 };
+
+/** Which formats the browser makes rather than the server. A drawing, because
+ *  the canvas showing it is already the renderer. */
+export function exportedInBrowser(format: string): boolean {
+    return format === "svg" || format === "png";
+}
 
 /** Whether a kind can be exported that way. The menu is built from this and the
  *  route checks it again, because a menu is not a guard. */
