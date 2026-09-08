@@ -19,6 +19,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { OfficeLinkPanel } from "./link-panel";
 import { ShareDialog } from "@/components/access/share-dialog";
 import { Button, PAGE_BLEED, cn, useToast } from "@polaris/ui";
 import type { OfficeDocumentView } from "@/lib/office/documents";
@@ -156,6 +157,7 @@ export function DocumentChrome({
                     subject="office.document"
                     subjectId={row.id}
                     name={title}
+                    extra={<OfficeLinkPanel documentId={row.id} />}
                 />
             ) : null}
         </div>

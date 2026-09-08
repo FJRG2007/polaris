@@ -21,7 +21,7 @@
  * Node runtime, and never cached.
  */
 
-import * as office from "@/lib/office/documents";
+import { officeReader } from "@/lib/office/reader";
 import { subscribeOfficeChanges } from "@/lib/office/live";
 import { resolveSession, sessionCan } from "@/lib/session";
 
@@ -36,25 +36,32 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
+    // Optional, because a link is a way into one document without a session.
+    // When there is one it still has to hold the app's own permission.
     const session = await resolveSession();
-    // A non-200 makes EventSource give up rather than reconnect every few
-    // seconds against a session that is gone.
-    if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (!(await sessionCan(session, "office.use"))) {
+    if (session && !(await sessionCan(session, "office.use"))) {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;
     // Resolved once, before anything is written. Everything below is inside this
-    // answer, which is why nothing below re-checks it.
-    const access = await office.documentAccess({ id: session.id }, id);
-    if (!access) return Response.json({ error: "Forbidden" }, { status: 403 });
+    // answer, which is why nothing below re-checks it. A non-200 makes
+    // EventSource give up rather than reconnect every few seconds against
+    // something that is not going to start working.
+    const reader = await officeReader(id, session?.id ?? null);
+    if (!reader) {
+        return Response.json({ error: session ? "Forbidden" : "Unauthorized" }, {
+            status: session ? 403 : 401
+        });
+    }
 
     // The tab that opened this. Named by the browser so two tabs of one account
     // can tell each other apart; used only to keep a tab from hearing its own
     // typing, so a made-up one costs its owner an echo and nobody else anything.
     const origin = new URL(request.url).searchParams.get("origin") ?? "";
-    const readerId = session.id;
+    // "" for somebody on a link, who has no account to be. Only used to keep a
+    // tab from hearing its own typing.
+    const readerId = reader.userId ?? "";
     const encoder = new TextEncoder();
     let unsubscribe: (() => void) | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -81,7 +88,7 @@ export async function GET(
 
             // Said once, so a tab knows it is connected rather than merely not
             // having heard anything yet.
-            write(`data: ${JSON.stringify({ kind: "open", role: access.role })}\n\n`);
+            write(`data: ${JSON.stringify({ kind: "open", role: reader.role })}\n\n`);
 
             unsubscribe = subscribeOfficeChanges((change) => {
                 if (closed) return;

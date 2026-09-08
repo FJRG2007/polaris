@@ -187,6 +187,36 @@ export const officeCreateSchema = z.object({
 
 export type OfficeCreateInput = z.infer<typeof officeCreateSchema>;
 
+/**
+ * A link somebody is about to hand out.
+ *
+ * The role can be `editor`, because "send them something they can edit" is what
+ * people actually ask for - and it is still the weakest thing that works: a link
+ * can never share the document on, and never delete it.
+ *
+ * Every limit is optional and every one of them is worth offering, because the
+ * question behind a link is always the same: how much do I trust the place I am
+ * about to paste this.
+ */
+export const officeLinkSchema = z.object({
+    role: z.enum(OFFICE_ROLES).default("viewer"),
+    /** Empty for a link with no password. */
+    password: z.string().max(200).default(""),
+    /** An ISO date, or "" for one that does not expire. */
+    expiresAt: z.string().trim().max(40).default(""),
+    /** How many openings it is worth, or null for unlimited. */
+    maxUses: z.coerce.number().int().min(1).max(10_000).nullable().default(null),
+    /** Who it was made for, in the maker's own words. Shown only to them. */
+    note: z.string().trim().max(200).default("")
+});
+
+export type OfficeLinkInput = z.infer<typeof officeLinkSchema>;
+
+/** What somebody typed into the password box on a link. */
+export const officeLinkUnlockSchema = z.object({
+    password: z.string().min(1, "Type the password").max(200)
+});
+
 export const officeRenameSchema = z.object({
     id: z.string().trim().min(1).max(64),
     title: z.string().trim().max(MAX_OFFICE_TITLE)

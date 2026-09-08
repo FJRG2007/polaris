@@ -18,7 +18,7 @@
 import * as core from "@polaris/core";
 import type { GrantView } from "@/lib/access/grants";
 import { useDisplayFormat } from "@/components/display-format";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
 import { CalendarClock, Loader2, Search, Trash2, UserRound, Users } from "lucide-react";
 import {
@@ -70,7 +70,8 @@ export function ShareDialog({
     subject,
     subjectId,
     name,
-    bounded = false
+    bounded = false,
+    extra
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -81,6 +82,14 @@ export function ShareDialog({
     /** Whether hours, dates and a number of uses mean anything here. They do for
      *  a door and a camera; they do not for a conversation. */
     bounded?: boolean;
+    /**
+     * Anything the thing being shared has of its own, under the grants.
+     *
+     * Office fills it with the links a document is handed out on. A slot rather
+     * than a branch here, because this dialog is chat's and tasks' and Places'
+     * as well, and it has no business knowing what a document is.
+     */
+    extra?: ReactNode;
 }) {
     const toast = useToast();
     const format = useDisplayFormat();
@@ -519,6 +528,7 @@ export function ShareDialog({
                         </Button>
                     </div>
                 </section>
+                {extra}
             </DialogContent>
         </Dialog>
     );

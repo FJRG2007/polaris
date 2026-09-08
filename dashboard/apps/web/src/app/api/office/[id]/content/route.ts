@@ -16,11 +16,18 @@
  * rather than on a second so there is one place an update can enter a document -
  * a second entrance is a second access check to keep in step, and the one that
  * gets forgotten is the one somebody finds.
+ *
+ * Two kinds of caller reach it: an account with standing on the document, and a
+ * browser carrying a pass an editing link gave it. Both are resolved by
+ * `officeReader`, which asks the account first - somebody signed in AND holding
+ * a viewer's link is still whatever their account makes them.
  */
 
+import * as core from "@polaris/core";
 import * as office from "@/lib/office/documents";
-import { apiPermission } from "@/lib/api-session";
+import { officeReader } from "@/lib/office/reader";
 import { publishOfficeChange } from "@/lib/office/live";
+import { resolveSession, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,10 +42,22 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-    const user = await apiPermission("office.use");
-    if (user instanceof Response) return user;
+    // A session is optional here and only here: a link is a way into one
+    // document without one. When there IS a session it still has to hold the
+    // app's own permission, so a link cannot be used to give somebody Office on
+    // an instance whose administrator took it away from them.
+    const session = await resolveSession();
+    if (session && !(await sessionCan(session, "office.use"))) {
+        return new Response("Forbidden", { status: 403 });
+    }
 
     const { id } = await params;
+    const reader = await officeReader(id, session?.id ?? null);
+    if (!reader) return new Response("Forbidden", { status: 403 });
+    if (!core.officeRoleAtLeast(reader.role, "editor")) {
+        return new Response("Forbidden", { status: 403 });
+    }
+
     const body = new Uint8Array(await request.arrayBuffer());
     if (body.length === 0) return new Response(null, { status: 204 });
     if (body.length > MAX_BYTES) return new Response("Too large", { status: 413 });
@@ -47,14 +66,17 @@ export async function POST(
     const origin = new URL(request.url).searchParams.get("origin") ?? "";
 
     try {
-        await office.applyUpdate({ id: user.id }, id, body);
+        // The permission is already decided above, for both kinds of caller, so
+        // this is the write with the check taken off rather than a second check
+        // that could disagree with the first.
+        await office.writeUpdate(id, body, reader.userId);
         // After the write, never before: an update the other side is shown and
         // this side failed to store is a document that disagrees with itself the
         // moment anybody reloads.
         publishOfficeChange({
             documentId: id,
             update: Buffer.from(body).toString("base64"),
-            actorId: user.id,
+            actorId: reader.userId ?? "",
             originId: origin
         });
     } catch (caught) {

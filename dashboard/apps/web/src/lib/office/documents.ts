@@ -352,6 +352,39 @@ export async function readDocument(
     };
 }
 
+/**
+ * One document, for somebody who arrived on a link.
+ *
+ * No actor, because there is nobody to be: the caller has already decided what
+ * this browser may do by resolving the link and spending its opening, and this
+ * only fetches what that decision was about. Kept apart from `readDocument`
+ * rather than given an "or a link" branch, so the function every screen calls
+ * still cannot be reached without an account.
+ *
+ * Nothing about who touched it comes back. A link is for reading or writing the
+ * document, not for learning who works on it.
+ */
+export async function readByLink(documentId: string): Promise<{
+    id: string;
+    kind: core.OfficeKind;
+    title: string;
+    content: Uint8Array | null;
+} | null> {
+    const row = await prisma.officeDocument.findFirst({
+        // A document in the bin is not handed out on a link: it was thrown away,
+        // and a link that outlives that is a link nobody remembers agreeing to.
+        where: { id: documentId, trashedAt: null },
+        select: { id: true, kind: true, title: true, content: true }
+    });
+    if (!row) return null;
+    return {
+        id: row.id,
+        kind: core.isOfficeKind(row.kind) ? row.kind : "doc",
+        title: row.title,
+        content: row.content ? new Uint8Array(row.content) : null
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Writing
 // ---------------------------------------------------------------------------
