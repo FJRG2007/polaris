@@ -196,8 +196,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
      * call being recorded is exactly the thing somebody must not be able to
      * forget by walking to another screen.
      */
-    const recorded =
-        call.recording || [...call.states.values()].some((state) => state.recording);
+    const recorded = call.recording || [...call.states.values()].some((state) => state.recording);
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
@@ -224,8 +223,15 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     room is exactly what somebody does while wondering whether
                     the other person can hear them - and a bar that looks
                     perfectly healthy is what made this take twenty minutes to
-                    notice. The way back is the link beside it. */}
-                {!call.audio.ok && (
+                    notice. The way back is the link beside it.
+
+                    Only for a fault in this call. Somebody else closing their
+                    tab, or never letting their browser share a microphone, put a
+                    yellow NO SOUND on a bar that had nothing wrong with it - and
+                    a warning that cries about other people's browsers is one
+                    nobody reads by the third time. The room itself says what
+                    happened, in the calmer of its two tones. */}
+                {!call.audio.ok && call.audio.blame === "fault" && (
                     <span
                         title={call.audio.headline}
                         className="flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase text-warning"

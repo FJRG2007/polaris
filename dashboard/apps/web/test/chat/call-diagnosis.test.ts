@@ -11,11 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    diagnoseCall,
-    type CallAudioFacts,
-    type HeardFrom
-} from "@/app/(app)/chat/call-diagnosis";
+import { diagnoseCall, type CallAudioFacts, type HeardFrom } from "@/app/(app)/chat/call-diagnosis";
 
 /** A call in which everything works, as the starting point for changing exactly
  *  one thing about it. */
@@ -39,6 +35,8 @@ function heard(over: Partial<HeardFrom> = {}): HeardFrom {
         name: "Ana",
         muted: false,
         subscribed: true,
+        sharing: true,
+        reachable: true,
         arriving: true,
         carrying: true,
         turnedDown: false,
@@ -74,9 +72,7 @@ describe("the ordinary reasons a call is quiet", () => {
     it("does not treat being alone as a fault", () => {
         const report = diagnoseCall(working({ others: [] }));
         expect(report.ok).toBe(true);
-        expect(row(working({ others: [] }), "What you are being sent")).toBe(
-            "Nobody else is here"
-        );
+        expect(row(working({ others: [] }), "What you are being sent")).toBe("Nobody else is here");
     });
 
     it("does not treat everybody else being muted as a fault", () => {
@@ -226,10 +222,7 @@ describe("what is arriving", () => {
 
     it("is satisfied by one person being audible in a room of several", () => {
         const mixed = working({
-            others: [
-                heard(),
-                heard({ id: "p3", name: "Bo", arriving: false, carrying: false })
-            ]
+            others: [heard(), heard({ id: "p3", name: "Bo", arriving: false, carrying: false })]
         });
         expect(diagnoseCall(mixed).ok).toBe(true);
         expect(row(mixed, "What you are being sent")).toBe("Sound from 1 of 2");
@@ -268,7 +261,9 @@ describe("a call that has never had a byte of sound", () => {
     });
 
     it("says the same when something subscribed but nothing ever arrived", () => {
-        const report = diagnoseCall(working({ everHeard: false, others: [heard({ arriving: false })] }));
+        const report = diagnoseCall(
+            working({ everHeard: false, others: [heard({ arriving: false })] })
+        );
 
         expect(report.fix).toContain("Call ports");
     });
@@ -276,9 +271,123 @@ describe("a call that has never had a byte of sound", () => {
     it("still says rejoin for a call that had sound and lost it", () => {
         // A different fault with a different answer, and the reason the fact is
         // "ever" rather than "now".
-        const report = diagnoseCall(working({ everHeard: true, others: [heard({ arriving: false })] }));
+        const report = diagnoseCall(
+            working({ everHeard: true, others: [heard({ arriving: false })] })
+        );
 
         expect(report.fix).toContain("between here and the call server");
         expect(report.fix).not.toContain("Call ports");
+    });
+});
+
+describe("what is happening at the other end", () => {
+    it("says somebody has stopped answering rather than blaming the call", () => {
+        // A closed tab is not a disconnection the instant it happens: the server
+        // waits out its own timeout, and for those seconds they are still in the
+        // room with nothing arriving. That used to read as a broken call, in
+        // yellow, telling somebody to leave and rejoin over a tab somebody else
+        // shut.
+        const gone = working({
+            others: [
+                heard({ reachable: false, subscribed: false, arriving: false, carrying: false })
+            ]
+        });
+        const report = diagnoseCall(gone);
+        expect(report.ok).toBe(false);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("Ana has stopped answering");
+        // Nothing to do, so nothing is suggested. An instruction here would be
+        // an instruction to fix somebody else's browser from this one.
+        expect(report.fix).toBe("");
+        expect(report.headline).not.toMatch(/Polaris/);
+    });
+
+    it("says a microphone was never shared rather than that sound is not arriving", () => {
+        // What a refused permission looks like from the other side. The advice is
+        // theirs to act on and it says so.
+        const silent = working({
+            others: [heard({ sharing: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        const report = diagnoseCall(silent);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("has not shared a microphone");
+        expect(report.fix).toContain("their own address bar");
+        expect(report.fix).not.toMatch(/leave the call/i);
+    });
+
+    it("draws neither of them as a failed check", () => {
+        const gone = working({
+            others: [
+                heard({ reachable: false, subscribed: false, arriving: false, carrying: false })
+            ]
+        });
+        expect(row(gone, "What you are being sent")).toBe("They have stopped answering");
+        const silent = working({
+            others: [heard({ sharing: false, subscribed: false, arriving: false, carrying: false })]
+        });
+        expect(row(silent, "What you are being sent")).toBe("No microphone shared");
+    });
+
+    it("does not report sound as arriving from somebody who has stopped answering", () => {
+        // The counters lag by design - sound that moved half a minute ago still
+        // reads as carrying - so a tab closed a second ago has a live-looking
+        // row underneath a headline saying they have gone. The two halves of one
+        // panel disagreeing is the panel failing at the moment it exists for.
+        const gone = working({ others: [heard({ reachable: false })] });
+        const report = diagnoseCall(gone);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("Ana has stopped answering");
+        const sent = report.lines.find((line) => line.label === "What you are being sent");
+        expect(sent?.value).toBe("They have stopped answering");
+        expect(sent?.state).toBe("idle");
+    });
+
+    it("does not report sound as arriving from somebody sharing no microphone", () => {
+        const silent = working({ others: [heard({ sharing: false })] });
+        const report = diagnoseCall(silent);
+        expect(report.blame).toBe("theirs");
+        expect(report.headline).toContain("has not shared a microphone");
+        const sent = report.lines.find((line) => line.label === "What you are being sent");
+        expect(sent?.value).toBe("No microphone shared");
+        expect(sent?.state).toBe("idle");
+    });
+
+    it("keeps blaming the call while one of several is still here", () => {
+        // Both verdicts are about everybody, so one person leaving a call of
+        // three is not an answer for the other two.
+        const mixed = working({
+            others: [
+                heard({
+                    id: "p2",
+                    name: "Ana",
+                    reachable: false,
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                }),
+                heard({
+                    id: "p3",
+                    name: "Bea",
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                })
+            ]
+        });
+        const report = diagnoseCall(mixed);
+        expect(report.blame).toBe("fault");
+        expect(report.fix).not.toBe("");
+        expect(row(mixed, "What you are being sent")).toBe("Nothing is being sent");
+    });
+
+    it("still blames the call when they are here and sharing", () => {
+        // The case this must not swallow: somebody present, publishing, and none
+        // of it arriving is a fault worth the yellow.
+        const broken = working({
+            others: [heard({ subscribed: false, arriving: false, carrying: false })]
+        });
+        const report = diagnoseCall(broken);
+        expect(report.blame).toBe("fault");
+        expect(report.fix).not.toBe("");
     });
 });
