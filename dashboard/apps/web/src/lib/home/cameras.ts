@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import { HomeError } from "@/lib/home/home-error";
+import { dropGrantsFor } from "@/lib/access/grants";
 
 import { loadEnv } from "@polaris/config";
 import { cameraVendor, rtspUrl, usesAccountPassword } from "@/lib/home/vendors";
@@ -331,6 +332,9 @@ export async function deleteCamera(installedAppId: string, id: string): Promise<
         select: { id: true }
     });
     if (!existing) throw new HomeError("Camera not found");
+    // The shares go by hand: a grant addresses its subject by kind and id rather
+    // than by foreign key, so nothing takes them away on the camera's behalf.
+    await dropGrantsFor("place.camera", id);
     await prisma.camera.delete({ where: { id } });
 }
 

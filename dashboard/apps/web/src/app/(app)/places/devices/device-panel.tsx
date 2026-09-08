@@ -19,6 +19,7 @@
  */
 
 import * as actions from "../actions";
+import { ShareDialog } from "@/components/access/share-dialog";
 import * as kinds from "@/lib/home/device-kinds";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -44,6 +45,7 @@ import {
     Lock,
     LockOpen,
     Pencil,
+    Share2,
     Plug,
     Power,
     PowerOff,
@@ -195,6 +197,9 @@ export function DevicePanel({
     const [events, setEvents] = useState<DeviceEventView[] | null>(null);
     const [used, setUsed] = useState<number[] | null>(null);
     const [busy, setBusy] = useState<DeviceAction | null>(null);
+    /** Whether the sharing dialog is up. Held here rather than in the screen
+     *  above, because what is being shared is whatever this panel is showing. */
+    const [sharing, setSharing] = useState(false);
     const [error, setError] = useState("");
     const deviceId = device?.id ?? null;
 
@@ -256,18 +261,44 @@ export function DevicePanel({
                                 </span>
                             )}
                             {canManage && (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="ml-auto"
-                                    aria-label={`Edit ${device.name}`}
-                                    title="Edit"
-                                    onClick={() => onEdit(device)}
-                                >
-                                    <Pencil className="size-4" />
-                                </Button>
+                                <div className="ml-auto flex items-center gap-1">
+                                    {/* Lending one door is the thing people came
+                                        to a connected lock for. It sits beside
+                                        Edit rather than inside it: taking a key
+                                        back is urgent, and it should never be
+                                        behind a form. */}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`Share ${device.name}`}
+                                        title="Share"
+                                        onClick={() => setSharing(true)}
+                                    >
+                                        <Share2 className="size-4" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`Edit ${device.name}`}
+                                        title="Edit"
+                                        onClick={() => onEdit(device)}
+                                    >
+                                        <Pencil className="size-4" />
+                                    </Button>
+                                </div>
                             )}
                         </header>
+
+                        <ShareDialog
+                            open={sharing}
+                            onOpenChange={setSharing}
+                            subject="place.device"
+                            subjectId={device.id}
+                            name={device.name}
+                            // A door is exactly the thing worth lending for an
+                            // afternoon, four times.
+                            bounded
+                        />
 
                         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
                             <section className="flex flex-col gap-3">

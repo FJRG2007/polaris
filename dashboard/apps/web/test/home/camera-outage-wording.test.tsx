@@ -20,6 +20,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let cameras: CameraView[] = [];
 
+// Sharing is a server action module, and a client component importing one is
+// how Next wires it - but here it is imported for real and drags the session and
+// the environment in with it. These cases are not about sharing.
+vi.mock("@/app/(app)/access-actions", () => ({
+    listGrantsAction: async () => ({ grants: [], candidates: [] }),
+    shareAction: async () => ({ grants: [] }),
+    revokeShareAction: async () => ({ grants: [] }),
+    findSharePeopleAction: async () => ({ people: [] })
+}));
+
 vi.mock("@/app/(app)/places/actions", () => ({
     listCamerasAction: async () => ({ cameras }),
     listServersAction: async () => ({ servers: [] }),

@@ -12,14 +12,15 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Wall } from "./wall";
 import { Button, PageHeader } from "@polaris/ui";
-import { requireHomeUser } from "@/lib/home/access";
+import { requireHomeReach } from "@/lib/home/access";
 import { currentPlace } from "@/lib/home/current-place";
 import { PlaceSwitcher } from "./place-switcher";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlacePage() {
-    const { install, canManage, canControl } = await requireHomeUser("home.read");
+    // A visitor lent one camera lands here too, and the wall draws that one.
+    const { install, canManage, canControl } = await requireHomeReach();
     const place = await currentPlace(install.id);
 
     return (

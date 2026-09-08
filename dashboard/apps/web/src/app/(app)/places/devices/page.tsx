@@ -10,13 +10,14 @@
 import { PageHeader } from "@polaris/ui";
 import { DevicesView } from "./devices-view";
 import { PlaceSwitcher } from "../place-switcher";
-import { requireHomeUser } from "@/lib/home/access";
+import { requireHomeReach } from "@/lib/home/access";
 import { currentPlace } from "@/lib/home/current-place";
 
 export const dynamic = "force-dynamic";
 
 export default async function DevicesPage() {
-    const { install, canControl, canManage } = await requireHomeUser("home.read");
+    // Somebody lent one door reaches this screen, and sees that door.
+    const { install, canControl, canManage } = await requireHomeReach();
     const place = await currentPlace(install.id);
 
     return (

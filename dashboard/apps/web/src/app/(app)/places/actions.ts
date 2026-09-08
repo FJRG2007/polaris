@@ -31,7 +31,9 @@ import * as cameras from "@/lib/home/cameras";
 import * as cameraZones from "@/lib/home/camera-zones";
 import { listHosts } from "@/lib/host-service";
 import { probeCamera } from "@/lib/home/onvif";
-import { requireHome } from "@/lib/home/access";
+import { requireHome, requireHomeInstall, requireHomeShared } from "@/lib/home/access";
+import { requireUser } from "@/lib/session";
+import { countDeviceUse, onlyReachable, requireDeviceControl } from "@/lib/home/sharing";
 import * as recording from "@/lib/home/recording";
 import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
@@ -94,10 +96,14 @@ export async function listCamerasAction(): Promise<{
     cameras?: cameras.CameraView[];
     error?: string;
 }> {
-    const { install } = await requireHome("home.read");
+    // A visitor lent one camera is here too, and sees that one. Somebody who
+    // lives here holds `home.read` and `onlyReachable` hands the list straight
+    // back, so this costs them nothing.
+    const { install, reach } = await requireHomeShared();
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
-        return cameras.listCameras(install.id, current.id);
+        const list = await cameras.listCameras(install.id, current.id);
+        return onlyReachable(list, reach.everything || reach.cameras);
     });
     return result.error ? { error: result.error } : { cameras: result.value };
 }
@@ -105,7 +111,7 @@ export async function listCamerasAction(): Promise<{
 /** Remember which place this person is looking at. Not authorization: it narrows
  *  what is listed, and every screen still resolves what they may do. */
 export async function choosePlaceAction(placeId: string): Promise<{ error?: string }> {
-    const { install } = await requireHome("home.read");
+    const { install } = await requireHomeShared();
     const result = await guard(async () => {
         const place = await places.getPlace(install.id, String(placeId));
         if (!place) throw new Error("No such place");
@@ -121,7 +127,7 @@ export async function choosePlaceAction(placeId: string): Promise<{ error?: stri
 }
 
 export async function listPlacesAction(): Promise<{ places?: places.PlaceView[]; error?: string }> {
-    const { install } = await requireHome("home.read");
+    const { install } = await requireHomeShared();
     const result = await guard(() => places.listPlaces(install.id));
     return result.error ? { error: result.error } : { places: result.value };
 }
@@ -1090,14 +1096,20 @@ export async function listDevicesAction(): Promise<{
     accounts?: deviceAccounts.DeviceAccountView[];
     error?: string;
 }> {
-    const { install } = await requireHome("home.read");
+    const { install, reach } = await requireHomeShared();
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
         // The accounts are read first: that read is what adopts a connection made
         // before they had a table of their own, and the devices it points at have
         // to be listed under it rather than under nothing.
         const connected = await deviceAccounts.listAccounts(install.id);
-        return { list: await devices.listDevices(install.id, current.id), connected };
+        const list = await devices.listDevices(install.id, current.id);
+        return {
+            list: onlyReachable(list, reach.everything || reach.devices),
+            // What Polaris is connected to is the house's business, not a
+            // visitor's: somebody lent one door is told about that door.
+            connected: reach.everything ? connected : []
+        };
     });
     if (result.error) return { error: result.error };
     return { devices: result.value?.list, accounts: result.value?.connected };
@@ -1139,12 +1151,27 @@ export async function syncDevicesAction(
     };
 }
 
-/** Lock, unlock or open one door. */
+/**
+ * Lock, unlock or open one door.
+ *
+ * Two ways to be allowed to. Somebody who lives here holds `home.control` and
+ * every door answers to them. Somebody who was lent this one holds a grant, and
+ * that is checked against this device, on this day, at this hour - and counted
+ * afterwards, if it was lent a number of times.
+ *
+ * The count happens after the door has actually moved. A lock that would not
+ * answer has not been used, and charging a visitor for it is how somebody ends
+ * up locked out by a failure that was not theirs.
+ */
 export async function operateDeviceAction(
     deviceId: string,
     action: DeviceAction
 ): Promise<{ device?: DeviceView; error?: string; }> {
-    const { user, install } = await requireHome("home.control");
+    const user = await requireUser();
+    const install = await requireHomeInstall();
+    const lent = await guard(() => requireDeviceControl(user, String(deviceId)));
+    if (lent.error) return { error: lent.error };
+
     const result = await guard(() =>
         devices.actOnDevice(install.id, String(deviceId), action, user.name)
     );
@@ -1159,12 +1186,15 @@ export async function operateDeviceAction(
         });
         return { error: result.error };
     }
+    await countDeviceUse(lent.value ?? null);
     await recordAudit({
         actorId: user.id,
         action: `places.device.${action}`,
         targetType: "placeDevice",
         targetId: String(deviceId),
-        metadata: { name: result.value?.name }
+        // Which of the two rights was used, so the log tells a resident opening
+        // their own door apart from a visitor spending one of four.
+        metadata: { name: result.value?.name, lent: Boolean(lent.value) }
     });
     return { device: result.value };
 }

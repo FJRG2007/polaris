@@ -21,7 +21,8 @@ import { filterCameras, zonesOf } from "@/lib/home/camera-filter";
 import { DiscoverDialog } from "./discover-dialog";
 import type { CameraView } from "@/lib/home/cameras";
 import type { DiscoveredCamera } from "@/lib/home/discovery";
-import { Cctv, Pencil, Plus, Radar, Search, Shapes, Trash2 } from "lucide-react";
+import { Cctv, Pencil, Plus, Radar, Search, Shapes, Share2, Trash2 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { DETECTOR_META, type Detector } from "@/lib/home/detection";
 import { focusAfterMove } from "@/lib/list-selection";
 import { quietSince } from "@/lib/home/availability";
@@ -100,6 +101,8 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
     const [adding, setAdding] = useState<{ address: string; vendor: string | null } | null>(null);
     const [discovering, setDiscovering] = useState(false);
     const [removing, setRemoving] = useState<CameraView | null>(null);
+    /** Which camera is being lent to somebody. */
+    const [sharing, setSharing] = useState<CameraView | null>(null);
     /** The camera whose areas are being drawn. */
     const [drawing, setDrawing] = useState<CameraView | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -342,6 +345,15 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
+                                                            aria-label={`Share ${camera.name}`}
+                                                            title="Share"
+                                                            onClick={() => setSharing(camera)}
+                                                        >
+                                                            <Share2 className="size-4 shrink-0" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
                                                             aria-label={`Remove ${camera.name}`}
                                                             title="Remove"
                                                             onClick={() => setRemoving(camera)}
@@ -368,6 +380,12 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                 >
                                                     <Shapes className="size-4 shrink-0" />
                                                     Draw areas
+                                                </ContextMenuItem>
+                                                <ContextMenuItem
+                                                    onSelect={() => setSharing(camera)}
+                                                >
+                                                    <Share2 className="size-4 shrink-0" />
+                                                    Share
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
                                                 <ContextMenuItem
@@ -423,6 +441,19 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                         setDiscovering(false);
                         setAdding({ address: found.address, vendor: found.vendor });
                     }}
+                />
+            ) : null}
+
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => !open && setSharing(null)}
+                    subject="place.camera"
+                    subjectId={sharing.id}
+                    name={sharing.name}
+                    // A camera lent to a neighbour for a fortnight, or to the
+                    // security team for the hours they are on.
+                    bounded
                 />
             ) : null}
 

@@ -36,6 +36,21 @@ export interface AppAccessInput {
      * installed today. Absent, every entry is treated as present.
      */
     isInstalled?: (catalogId: string) => Promise<boolean>;
+    /**
+     * A second reason one app might be open to somebody, asked only when its
+     * permission has already said no.
+     *
+     * There is exactly one shape of thing this is for: an app where a single
+     * item can be lent to somebody who holds none of its permissions. Places is
+     * that - a visitor given one door has an app to open and nothing else in it -
+     * and without this the switcher would offer them nothing while the screen
+     * itself let them in.
+     *
+     * Optional, and absent means "the permission is the whole answer". A role
+     * preview passes nothing: what a role reaches is what its grants say, and a
+     * grant written for one person is not part of it.
+     */
+    alsoReaches?: (appId: string) => Promise<boolean>;
 }
 
 /** The apps this person may open, in registry order. Hidden apps (the account
@@ -50,7 +65,12 @@ export interface AppAccessInput {
  *  is a view onto the other apps, so for an account that reaches none of them it
  *  is an empty grid offered as somewhere to be. Those accounts belong on their
  *  own account page, which is what dropping it here arranges. */
-export async function reachableApps({ isAdmin, can, isInstalled }: AppAccessInput): Promise<AppEntry[]> {
+export async function reachableApps({
+    isAdmin,
+    can,
+    isInstalled,
+    alsoReaches
+}: AppAccessInput): Promise<AppEntry[]> {
     const decided = await Promise.all(
         POLARIS_APPS.map(async (app) => {
             if (app.hidden) return null;
@@ -61,7 +81,12 @@ export async function reachableApps({ isAdmin, can, isInstalled }: AppAccessInpu
                 if (!app.guest || !(await can(app.guest.permission))) return null;
                 return { ...app, label: app.guest.label, description: app.guest.description, href: app.guest.href };
             }
-            if (app.permission && !(await can(app.permission))) return null;
+            if (app.permission && !(await can(app.permission))) {
+                // Nothing in the registry says which apps can be lent an item at
+                // a time, because the registry is read in the browser and the
+                // answer is a database query. The caller knows.
+                if (!alsoReaches || !(await alsoReaches(app.id))) return null;
+            }
             return app;
         })
     );

@@ -8,7 +8,7 @@
 
 import { homeInstall } from "@/lib/home/access";
 import { apiUser } from "@/lib/api-session";
-import { sessionCan } from "@/lib/session";
+import { mayWatchCamera } from "@/lib/home/sharing";
 import { cameraStream, CameraOfflineError } from "@/lib/home/live";
 
 export const runtime = "nodejs";
@@ -17,11 +17,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
-    if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });
+    // Checked against this camera below, once its id is known: a camera lent
+    // to somebody is watchable by them without `home.read`.
     const install = await homeInstall();
     if (!install) return new Response("Not found", { status: 404 });
 
     const { id } = await context.params;
+    if (!(await mayWatchCamera(user, id))) return new Response("Forbidden", { status: 403 });
     const quality = new URL(request.url).searchParams.get("q") === "sub" ? "sub" : "main";
     try {
         return await cameraStream(install.id, id, quality, request.signal);

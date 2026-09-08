@@ -11,7 +11,7 @@
 import { isHlsFile } from "@/lib/home/relay";
 import { apiUser } from "@/lib/api-session";
 import { homeInstall } from "@/lib/home/access";
-import { sessionCan } from "@/lib/session";
+import { mayWatchCamera } from "@/lib/home/sharing";
 import { cameraHls, CameraOfflineError } from "@/lib/home/live";
 
 export const runtime = "nodejs";
@@ -23,11 +23,13 @@ export async function GET(
 ): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
-    if (!(await sessionCan(user, "home.read"))) return new Response("Forbidden", { status: 403 });
+    // Checked against this camera below, once its id is known: a camera lent
+    // to somebody is watchable by them without `home.read`.
     const install = await homeInstall();
     if (!install) return new Response("Not found", { status: 404 });
 
     const { id, file } = await context.params;
+    if (!(await mayWatchCamera(user, id))) return new Response("Forbidden", { status: 403 });
     if (!isHlsFile(file)) return new Response("Not found", { status: 404 });
 
     const query = new URL(request.url).searchParams;

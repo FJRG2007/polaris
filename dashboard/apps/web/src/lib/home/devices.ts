@@ -18,6 +18,7 @@
 import { prisma } from "@polaris/db";
 import * as kinds from "@/lib/home/device-kinds";
 import { HomeError } from "@/lib/home/home-error";
+import { dropGrantsFor } from "@/lib/access/grants";
 import * as accounts from "@/lib/home/device-accounts";
 import { DriverError, type DeviceHistoryEntry } from "@/lib/home/drivers/contract";
 
@@ -334,11 +335,20 @@ async function syncAccount(
         // Anything on our side the account no longer has. A device somebody sold
         // is not a device this house has, and leaving the row would leave a button
         // that answers with an error nobody can act on.
-        await prisma.placeDevice.deleteMany({
+        const gone = await prisma.placeDevice.findMany({
             where: {
                 accountId,
                 externalId: { notIn: snapshots.map((snapshot) => snapshot.externalId) }
-            }
+            },
+            select: { id: true }
+        });
+        // Whatever was lent of a device that is no longer here. The rows are
+        // addressed by kind and id rather than by foreign key, so nothing drops
+        // them on the device's behalf - and a share of a door somebody sold
+        // should not be waiting if another arrives with the same id.
+        for (const device of gone) await dropGrantsFor("place.device", device.id);
+        await prisma.placeDevice.deleteMany({
+            where: { id: { in: gone.map((device) => device.id) } }
         });
 
         if (driver.history) await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
