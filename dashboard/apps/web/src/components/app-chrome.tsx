@@ -51,6 +51,8 @@ import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { unreadTotal } from "@/lib/chat/chat-service";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
+import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
+import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
 import { unreadCounts } from "@/lib/mailbox/views";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { buildStamp } from "@/lib/build-stamp";
@@ -110,6 +112,13 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
               .catch(() => NO_MAIL_UNREAD)
         : NO_MAIL_UNREAD;
 
+    // And the same for Management. Only for an administrator: nobody else can
+    // act on any of it, so for everybody else the honest count is nothing and
+    // asking would be two queries per page load for a badge that cannot appear.
+    const adminWaiting = user.isAdmin
+        ? await countAdminWaiting().catch(() => NO_ADMIN_WAITING)
+        : NO_ADMIN_WAITING;
+
     const build = buildStamp();
 
     return (
@@ -129,6 +138,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                             enabled={apps.ids.includes("chat")}
                         >
                         <MailUnreadProvider initial={mailUnread} enabled={apps.ids.includes("mail")}>
+                        <AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>
                             <NotificationsProvider initial={notifications}>
                                 <ToastProvider>
                                     {/* Where everybody on screen is, asked once for
@@ -253,6 +263,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     </PresenceProvider>
                                 </ToastProvider>
                             </NotificationsProvider>
+                        </AdminWaitingProvider>
                         </MailUnreadProvider>
                         </ChatUnreadProvider>
                     </SessionScopeProvider>

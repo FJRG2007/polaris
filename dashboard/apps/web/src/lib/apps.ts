@@ -100,6 +100,16 @@ export interface AppEntry {
     /** Only visible to administrators (filtered out of the switcher otherwise). */
     adminOnly?: boolean;
     /**
+     * What this app's badge is counting, in words, for the places that say it out
+     * loud - a tooltip, a screen reader.
+     *
+     * Here rather than at each badge because the badge machinery deliberately
+     * does not know which app it is drawing (see `app-unread`), and every one of
+     * them said "unread messages". Which is right for Chat and Mail and wrong for
+     * Management, where the number is reports and updates nobody has dealt with.
+     */
+    waiting?: { one: string; many: string };
+    /**
      * A subject an admin-only app carries that is not administration, for the
      * people whose work it is.
      *
@@ -258,6 +268,7 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: SlidersHorizontal,
         href: "/admin",
         adminOnly: true,
+        waiting: { one: "thing needs an administrator", many: "things need an administrator" },
         guest: {
             permission: "inbox.read",
             href: "/admin/inbox",

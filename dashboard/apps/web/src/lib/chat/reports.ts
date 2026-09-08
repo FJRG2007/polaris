@@ -29,6 +29,7 @@ import * as core from "@polaris/core";
 import { knownPreviews, type KnownPreview } from "./link-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-files";
+import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 
 /** How much of a message is copied onto the report. Enough to triage without
@@ -145,6 +146,33 @@ export async function reportMessage(
     // Rows, not bytes. They point at the same stored files the message points
     // at, and only become the report's own if the message is ever deleted.
     await copyOntoReport(made.id, message.id);
+
+    // And somebody is told. A report used to be filed in silence: the row
+    // appeared under /admin/safety and the only way to learn of it was to go and
+    // look, so a queue existed and nobody was queued to. The same alert a
+    // reported person raises, because it is the same queue and the same screen -
+    // one switch for the pair rather than two to get wrong.
+    //
+    // Only when the queue was empty, and this is the whole of the fan-out
+    // reasoning. The alert reaches every administrator by every route each of
+    // them has left on, and a spam wave is a hundred reports in a minute: raising
+    // one per report is a hundred alerts each, which is not a queue being
+    // announced, it is a queue being used as a weapon. What an administrator
+    // actually needs to hear is that there is work waiting, and that is true from
+    // the first row - the badge counts the rest, and the next empty queue
+    // announces itself again.
+    //
+    // Re-reporting is silent for the same reason: it updates the row it already
+    // has, so there is no new work to announce.
+    const open = await prisma.chatReport.count({ where: { status: "open" } });
+    if (open === 1) {
+        await alertAdmins({
+            title: "A message has been reported",
+            body: `Reported as: ${core.CHAT_REPORT_LABELS[input.reason]}. It is waiting in the safety queue.`,
+            // It is a decision waiting on a person, which is what this queue is.
+            actionRequired: true
+        }).catch(() => undefined);
+    }
     return { already: false };
 }
 

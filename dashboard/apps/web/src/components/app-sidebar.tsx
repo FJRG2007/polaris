@@ -26,7 +26,7 @@ import * as nav from "@/lib/apps";
 import { ChevronLeft } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
-import { badgeLabel } from "@/lib/notification-badge";
+import { badgeLabel, waitingSays } from "@/lib/notification-badge";
 import { useAppUnread } from "@/components/app-unread";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useInstalledNav } from "@/components/use-installed-nav";
@@ -131,6 +131,14 @@ const APP_BY_HREF: Readonly<Record<string, string>> = Object.fromEntries(
     nav.POLARIS_APPS.map((app) => [app.href, app.id])
 );
 
+/** What an app's badge is counting, said in words - the wording rule lives with
+ *  the number's, in `notification-badge`; the words themselves live with the app
+ *  they belong to. A Management badge reading "3 unread messages" would be
+ *  describing reports and a published update as post. */
+function waitingLabel(appId: string, count: number): string {
+    return waitingSays(count, nav.POLARIS_APPS.find((app) => app.id === appId)?.waiting);
+}
+
 function RailLink({
     item,
     pathname,
@@ -146,7 +154,8 @@ function RailLink({
     // Only where there is something, and only on an entry that IS an app rather
     // than a screen inside one. A count beside every entry would be a rail of
     // numbers; what this answers is "is anybody waiting for me".
-    const unread = waiting[APP_BY_HREF[item.href] ?? ""] ?? 0;
+    const appId = APP_BY_HREF[item.href] ?? "";
+    const unread = waiting[appId] ?? 0;
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
@@ -163,8 +172,8 @@ function RailLink({
             <span className="truncate" title={item.label}>{item.label}</span>
             {unread > 0 ? (
                 <span
-                    aria-label={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
-                    title={`${unread} unread ${unread === 1 ? "message" : "messages"}`}
+                    aria-label={waitingLabel(appId, unread)}
+                    title={waitingLabel(appId, unread)}
                     className="ml-auto shrink-0 rounded-full bg-primary px-1.5 text-[0.6875rem] font-medium leading-4 text-primary-foreground"
                 >
                     {badgeLabel(unread)}

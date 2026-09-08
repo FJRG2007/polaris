@@ -11,14 +11,17 @@
  * against Mail and no dot to say a number was there, which is precisely the
  * thing a dot is for.
  *
- * Anything that adds a fifth place to look, or a third app that can be waited
+ * Anything that adds a fifth place to look, or another app that can be waited
  * on, adds it here and every badge in Polaris follows. Nothing downstream is
- * allowed to name an app again.
+ * allowed to name an app again - which is what made Management free: a queue
+ * that had nowhere to be seen became a number on the switcher, the rail and the
+ * tab icon by being counted here.
  */
 
 import { useMemo } from "react";
 import { useChatUnread } from "@/components/chat-unread";
 import { useMailUnread } from "@/components/mail-unread";
+import { useAdminWaiting } from "@/components/admin-waiting";
 
 /** How much is waiting in each app, by the id the app catalogue uses. Apps with
  *  nothing to count are simply absent rather than zero, so a caller can ask
@@ -35,7 +38,15 @@ export type AppUnread = Readonly<Record<string, number>>;
 export function useAppUnread(): AppUnread {
     const chat = useChatUnread();
     const mail = useMailUnread();
-    return useMemo(() => ({ chat: chat.messages, mail: mail.messages }), [chat.messages, mail.messages]);
+    // Management counts work rather than messages - a report nobody has settled,
+    // an update nothing will install by itself - and that is the same question
+    // this answers for the other two: is anybody waiting for me. See
+    // `admin-waiting`.
+    const admin = useAdminWaiting();
+    return useMemo(
+        () => ({ chat: chat.messages, mail: mail.messages, admin: admin.total }),
+        [chat.messages, mail.messages, admin.total]
+    );
 }
 
 /** Whether anything anywhere is waiting, which is the whole question a dot on

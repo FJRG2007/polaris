@@ -228,7 +228,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         group: "system",
         label: "Something needs an administrator",
         description:
-            "An account locked itself down, or somebody reported a person. Only reaches administrators.",
+            "An account locked itself down, or somebody reported a person or a message. Only reaches administrators.",
         // An account shutting itself down means its owner believes somebody else
         // is in it. Whatever else an administrator has muted, they hear this.
         level: "warning",

@@ -17,9 +17,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { notify } from "@/lib/notifications/dispatch";
-
-/** Where an administrator reads these. */
-const QUEUE_HREF = "/admin/safety";
+import { alertAdmins } from "@/lib/notifications/admins";
 
 /** One case, as the queue draws it. */
 export interface SafetyCaseView {
@@ -249,32 +247,4 @@ async function describeSubject(userId: string, detail: string): Promise<string> 
     });
     const who = user ? `${user.name} (${user.email})` : "An account";
     return detail ? `${who}: ${detail}` : who;
-}
-
-/**
- * Tell every administrator.
- *
- * Every one of them rather than one: an instance with two administrators has two
- * because either of them may be the one who is around. Best-effort per
- * recipient - one muted bell must not swallow the alert for the rest.
- */
-async function alertAdmins(input: {
-    title: string;
-    body: string;
-    actionRequired: boolean;
-}): Promise<void> {
-    const admins = await prisma.user.findMany({
-        where: { isAdmin: true, bannedAt: null, disabledAt: null },
-        select: { id: true }
-    });
-    for (const admin of admins) {
-        await notify({
-            userId: admin.id,
-            event: "admin.safety.case",
-            title: input.title,
-            body: input.body,
-            href: QUEUE_HREF,
-            actionRequired: input.actionRequired
-        }).catch(() => undefined);
-    }
 }
