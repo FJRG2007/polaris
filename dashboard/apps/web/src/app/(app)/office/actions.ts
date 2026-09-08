@@ -171,6 +171,37 @@ export async function deleteDocumentAction(documentId: string): Promise<{ error?
     }
 }
 
+/**
+ * Write the document itself.
+ *
+ * The bytes are a Yjs update, which is what makes several people editing one
+ * document possible at all - see `lib/office/content.ts`. They arrive as a plain
+ * array because a server action's payload is JSON, and are put back into bytes
+ * here rather than anywhere the editor can see.
+ *
+ * Debounced by the editor rather than here: this is the write, and a write that
+ * decided for itself when to happen would fight the one place that knows whether
+ * somebody has stopped typing.
+ */
+export async function saveDocumentAction(
+    documentId: string,
+    update: number[]
+): Promise<{ error?: string }> {
+    try {
+        const user = await actor();
+        const bytes = Uint8Array.from(update);
+        const { openDocument, excerptOf } = await import("@/lib/office/content");
+        // The excerpt is worked out from the document that was just handed over,
+        // rather than asked of the editor: a client that lies about its own
+        // contents should not get to write the line the search reads.
+        const excerpt = excerptOf(openDocument(bytes));
+        await office.saveContent({ id: user.id }, String(documentId), bytes, excerpt);
+        return {};
+    } catch (caught) {
+        return refusal(caught, "That could not be saved");
+    }
+}
+
 /** The list, fetched by the browser rather than rendered into the page - the
  *  same arrangement Mail settled on, and for the same reason. */
 export async function listDocumentsAction(
