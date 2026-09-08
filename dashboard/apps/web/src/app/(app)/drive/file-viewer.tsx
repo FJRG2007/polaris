@@ -86,7 +86,8 @@ export function FilePreview({
         return <PdfView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     if (kind === "sheet")
         return <SheetEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
-    if (kind === "doc") return <DocView src={src} />;
+    if (kind === "doc")
+        return <DocView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     if (kind === "slides") return <PptxView src={src} />;
     if (kind === "markdown")
         return <MarkdownView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
