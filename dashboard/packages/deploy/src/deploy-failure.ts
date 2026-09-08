@@ -50,13 +50,14 @@ const MEANINGS: readonly Meaning[] = [
             "write /var/lib/docker",
             "write /var/lib/containerd"
         ],
-        // Naming the screen rather than the task. "Free some room on it" is
-        // an instruction to go and find a terminal, which is the one thing the
-        // reader of this sentence is assumed not to have - and Polaris has a
-        // button for exactly this, one screen away, that frees the build cache
-        // and the untagged layers without touching a volume. A failure that
-        // can be undone from inside Polaris has to say where.
-        says: "the machine ran out of disk space while fetching the image. Nothing was deployed. Free up space on that server under Servers > Storage, then deploy again."
+        // What a reader of this has already had done for them, and what is
+        // left. By the time this sentence exists the deploy has pruned that
+        // machine twice - once before the pull, because it was tight, and once
+        // after it failed - so telling them to go and free some room is telling
+        // them to press a button that has just run. What is still on the disk is
+        // data: a volume, a database, somebody's files, and none of it is
+        // Polaris's to remove. Storage is where they can see what it is.
+        says: "the machine ran out of disk space while fetching the image. Nothing was deployed, and Polaris has already handed back every unused image and build cache on it - what is left is data. Servers > Storage shows what is taking the room."
     },
     {
         // The image store fetched the image and then lost its own claim on the

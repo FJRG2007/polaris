@@ -10,6 +10,7 @@ import type { Client } from "ssh2";
 import { parseDuKilobytes } from "./ports-hostd";
 import { execCommand, openShell, openSshClient, type SshAuth } from "@polaris/ssh";
 import { parseReclaimedBytes, quoteArg, renderComposeYaml, type ComposeSpec, type ExecResult, type ExecSpec, type ExecStream, type LogOptions, type MountTarget, type OutputSink, type RuntimePorts } from "@polaris/deploy";
+import { DF_ROOT, PRUNE_EVERY_ENGINE, freeBytesFromDf } from "@/lib/deploy/server-space";
 
 /** Where compose files and volume data live on a managed remote server. */
 const REMOTE_DEPLOY_ROOT = "/var/lib/polaris/deploy";
@@ -152,7 +153,7 @@ export class SshPorts implements RuntimePorts {
      */
     public async diskFullness(): Promise<number | null> {
         let said = "";
-        await this.run("df -P /", (chunk) => {
+        await this.run(DF_ROOT, (chunk) => {
             said += chunk.toString("utf8");
         }).catch(() => undefined);
         const line = said
@@ -171,18 +172,32 @@ export class SshPorts implements RuntimePorts {
     }
 
     public async reclaimSpace(): Promise<number> {
+        // Measured on the disk rather than read off what a prune printed, and
+        // asked of every engine rather than of Docker alone. Both for the same
+        // reason: a machine Polaris deploys to is not necessarily a Docker
+        // machine, and the one that refused a deploy for want of room was being
+        // swept with a command it does not have and asked for a total it never
+        // prints. The commands and the reading are shared with the housekeeping
+        // sweep - see `deploy/server-space` - so what a failed deploy frees and
+        // what the timer frees can never drift apart.
+        const before = await this.freeBytes();
         let said = "";
         const keep = (chunk: Buffer): void => {
             said += chunk.toString("utf8");
         };
-        // `system prune` rather than the build cache and the images separately:
-        // it takes those and the stopped containers and the unused networks with
-        // them, which on a machine that has been deploying for months is more
-        // than either alone. Never `--volumes` - they are usually the largest
-        // thing on the disk and every byte is somebody's database or save file.
-        await this.run("docker system prune -af", keep).catch(() => undefined);
-        await this.run("docker builder prune -af", keep).catch(() => undefined);
+        await this.run(PRUNE_EVERY_ENGINE, keep).catch(() => undefined);
+        const after = await this.freeBytes();
+        if (before !== null && after !== null && after > before) return after - before;
         return parseReclaimedBytes(said);
+    }
+
+    /** How much room the machine has, or null where it could not be asked. */
+    private async freeBytes(): Promise<number | null> {
+        let said = "";
+        await this.run(DF_ROOT, (chunk) => {
+            said += chunk.toString("utf8");
+        }).catch(() => undefined);
+        return said ? freeBytesFromDf(said) : null;
     }
 
     public async login(registry: string, username: string, password: string): Promise<void> {

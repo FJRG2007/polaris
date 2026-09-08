@@ -112,7 +112,7 @@ async function onServer(hostId: string, command: string): Promise<string | null>
  * own line and the columns move.
  */
 export async function serverDiskFullness(hostId: string): Promise<number | null> {
-    const said = await onServer(hostId, "df -P /");
+    const said = await onServer(hostId, DF_ROOT);
     if (!said) return null;
     const line = said
         .split("\n")
@@ -130,18 +130,81 @@ export async function serverDiskFullness(hostId: string): Promise<number | null>
 }
 
 /**
+ * How many bytes are free on a server's root filesystem, or null where it could
+ * not be asked.
+ *
+ * The other half of `serverDiskFullness`, and the one a prune is measured with:
+ * a proportion cannot say how much room a sweep handed back, and the number the
+ * prune itself prints is not always there to read.
+ */
+export function freeBytesFromDf(said: string): number | null {
+    const line = said
+        .split("\n")
+        .map((row) => row.trim())
+        .filter((row) => row !== "")
+        .at(-1);
+    if (!line) return null;
+    // device, 1024-blocks, used, available, capacity%, mount
+    const available = Number(line.split(/\s+/)[3]);
+    return Number.isFinite(available) ? available * 1024 : null;
+}
+
+async function serverFreeBytes(hostId: string): Promise<number | null> {
+    const said = await onServer(hostId, DF_ROOT);
+    return said === null ? null : freeBytesFromDf(said);
+}
+
+/**
+ * Every engine a server might be running its containers with, asked in one pass.
+ *
+ * A machine Polaris deploys to is not necessarily a Docker machine, and until
+ * this it was treated as one: the sweep ran `docker system prune` and nothing
+ * else, so a host running containerd through k3s or nerdctl was swept by a
+ * command it does not have. It reported nothing freed, correctly, and the disk
+ * went on filling until a pull failed on a rename inside a content store nothing
+ * had ever pruned.
+ *
+ * Each is guarded by whether it is installed, so the ones that are not cost a
+ * `command -v`, and each failure is swallowed: a machine that will not prune is
+ * one the caller needs "nothing freed" from rather than an exception. The line
+ * every one of them is held to is the same as here and on Polaris' own box -
+ * build cache and images no container is on. Never a volume: those are usually
+ * the largest thing on the disk and every byte is somebody's database, save file
+ * or footage.
+ */
+/** How the free space on a machine is asked for. `-P` for the POSIX output
+ *  format, without which a long device name wraps onto its own line and the
+ *  columns move. */
+export const DF_ROOT = "df -P /";
+
+export const PRUNE_EVERY_ENGINE = [
+    "if command -v docker >/dev/null 2>&1; then docker system prune -af || true; docker builder prune -af || true; fi",
+    "if command -v nerdctl >/dev/null 2>&1; then nerdctl system prune -af || true; fi",
+    // cri-tools, which is what a Kubernetes-shaped host prunes images with. k3s
+    // ships it as a subcommand rather than on the path, so both spellings are
+    // tried and neither is required.
+    "if command -v crictl >/dev/null 2>&1; then crictl rmi --prune || true; elif command -v k3s >/dev/null 2>&1; then k3s crictl rmi --prune || true; fi"
+].join("; ");
+
+/**
  * Hand back the room nothing is using on a server.
  *
- * Both prunes run even when the first frees nothing - they hold different things
- * - and neither failing is fatal: this is called because a disk is tight, and a
- * machine that will not prune is one the caller needs "nothing freed" from rather
- * than an exception. Null means the server could not be reached at all.
+ * Measured with `df` on either side rather than read off what the prune printed.
+ * Only some of these engines print a total at all - `crictl` lists the images it
+ * removed and says nothing about bytes - so a sweep that worked would have
+ * reported freeing nothing, which is the answer that decides whether a failed
+ * deploy is worth trying again. What the disk says is true whichever ran.
+ *
+ * Null means the server could not be reached at all, which is a different answer
+ * from "nothing to free" and must never be read as one.
  */
 export async function reclaimServerSpace(hostId: string): Promise<number | null> {
-    // `system prune` takes the build cache, the dangling images, the stopped
-    // containers and the unused networks in one pass - more than the two
-    // separate prunes it replaces, on a machine that has been deploying for
-    // months. Never `--volumes`: see above.
-    const said = await onServer(hostId, "docker system prune -af; docker builder prune -af");
-    return said === null ? null : parseReclaimedBytes(said);
+    const before = await serverFreeBytes(hostId);
+    const said = await onServer(hostId, PRUNE_EVERY_ENGINE);
+    if (said === null) return null;
+    const after = await serverFreeBytes(hostId);
+    if (before !== null && after !== null && after > before) return after - before;
+    // No `df` on this machine, or a disk that moved under the measurement. What
+    // the prune printed, where it printed anything.
+    return parseReclaimedBytes(said);
 }
