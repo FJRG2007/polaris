@@ -24,6 +24,7 @@ import { revalidatePath } from "next/cache";
 import * as rules from "@/lib/mailbox/rules";
 import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
+import * as prefs from "@/lib/mailbox/prefs";
 import * as views from "@/lib/mailbox/views";
 import * as reading from "@/lib/mailbox/reading";
 import * as blocking from "@/lib/mailbox/blocking";
@@ -481,6 +482,29 @@ export async function applyLabelAction(input: unknown) {
         return { done };
     } catch (caught) {
         return failure(caught, "That label could not be applied.");
+    }
+}
+
+/**
+ * How this person wants Mail to behave.
+ *
+ * The whole shape at once rather than a field at a time: it is one form with a
+ * Save under it, and a screen that wrote each control as it was touched would
+ * leave somebody who changed their mind halfway with half of it applied.
+ */
+export async function setMailPreferencesAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailPreferencesSchema.safeParse(input);
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return { error: issue?.message ?? "Check the details.", field: String(issue?.path[0] ?? "") };
+    }
+    try {
+        await prefs.saveMailPreferences(userId, parsed.data);
+        refresh();
+        return { saved: true };
+    } catch (caught) {
+        return failure(caught, "That could not be saved.");
     }
 }
 

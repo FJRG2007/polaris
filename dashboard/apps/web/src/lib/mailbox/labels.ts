@@ -12,7 +12,9 @@
  * that makes people stop trusting a client.
  */
 
+import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
+import { MailSetupError } from "./accounts";
 import { MailAccessError, ownedAccount } from "./access";
 
 export interface MailLabelView {
@@ -181,7 +183,31 @@ export async function saveIdentity(
         isDefault: boolean;
     }
 ): Promise<string> {
-    await ownedAccount(userId, accountId);
+    const owned = await ownedAccount(userId, accountId);
+
+    /**
+     * Not one this mailbox already has.
+     *
+     * There is a unique index behind this, and until now that index was the only
+     * thing saying no: a repeat came back as a Prisma violation, which `failure`
+     * has no case for, so the screen said "That address could not be saved" and
+     * the person was left to guess which of the four fields was wrong. Its own
+     * address counts - sending as it is what the mailbox does anyway, and an
+     * identity for it is a second row that wins or loses by insertion order.
+     *
+     * Compared with `sameAddress` rather than by the index's exact match, so
+     * `Ana@` is refused against `ana@` here instead of a hundred milliseconds
+     * later in Postgres.
+     */
+    const clash =
+        core.sameAddress(owned.address, identity.address) ||
+        (await prisma.mailIdentity.findMany({
+            where: { accountId, ...(identityId ? { id: { not: identityId } } : {}) },
+            select: { address: true }
+        })).some((one) => core.sameAddress(one.address, identity.address));
+    if (clash) {
+        throw new MailSetupError("This mailbox can already send as that address.", "address");
+    }
 
     let id = identityId;
     if (id) {

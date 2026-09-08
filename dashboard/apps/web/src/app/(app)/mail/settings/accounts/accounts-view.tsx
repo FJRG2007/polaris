@@ -118,6 +118,10 @@ export function AccountsView({
                     microsoftReady={microsoftReady}
                     publicAddress={publicAddress}
                     canSetDomain={canSetDomain}
+                    // What this screen is a list of. The dialog can answer
+                    // "you already have that one" while it is being typed
+                    // rather than after a lookup and a password.
+                    taken={accounts.map((account) => account.address)}
                     onClose={() => setAdding(false)}
                 />
             ) : null}

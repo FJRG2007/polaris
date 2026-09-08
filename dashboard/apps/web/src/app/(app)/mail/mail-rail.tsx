@@ -24,6 +24,7 @@ import Link from "next/link";
 import { cn, useToast } from "@polaris/ui";
 import { useCallback, useState } from "react";
 import { useMail } from "./mail-shell";
+import { useMailRailOpen } from "./use-mail-rail";
 import { refusalOf } from "./refusal";
 import { moveToFolderAction } from "./actions";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
@@ -64,7 +65,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const search = useSearchParams();
     const router = useRouter();
     const toast = useToast();
-    const [expanded, setExpanded] = useState<string[]>([]);
+    // Remembered for this browser rather than held for this mount - see
+    // `use-mail-rail`. It closed on every reload, and on every navigation that
+    // remounted the rail.
+    const { open: expanded, toggle: toggleAccount } = useMailRailOpen();
 
     /**
      * File what was dragged into a folder.
@@ -144,7 +148,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
 
             <ul className="space-y-0.5">
                 {accounts.map((account) => {
-                    const open = expanded.includes(account.id);
+                    const open = expanded.has(account.id);
                     const own = folders.filter((folder) => folder.accountId === account.id);
                     return (
                         <li key={account.id}>
@@ -154,13 +158,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                     className="flex size-6 shrink-0 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
                                     aria-expanded={open}
                                     aria-label={open ? `Hide ${account.address} folders` : `Show ${account.address} folders`}
-                                    onClick={() =>
-                                        setExpanded((held) =>
-                                            held.includes(account.id)
-                                                ? held.filter((id) => id !== account.id)
-                                                : [...held, account.id]
-                                        )
-                                    }
+                                    onClick={() => toggleAccount(account.id)}
                                 >
                                     {open ? (
                                         <ChevronDown className="size-3.5 shrink-0" aria-hidden />

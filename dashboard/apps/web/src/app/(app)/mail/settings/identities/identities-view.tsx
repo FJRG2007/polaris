@@ -15,8 +15,9 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailIdentityView } from "@/lib/mailbox/labels";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Switch, Textarea, useToast } from "@polaris/ui";
+import { Button, Input, Switch, Textarea, cn, useToast } from "@polaris/ui";
 import { deleteIdentityAction, saveIdentityAction } from "@/app/(app)/mail/actions";
+import { addressState } from "@/app/(app)/mail/address-state";
 
 export function IdentitiesView({
     accounts,
@@ -94,6 +95,10 @@ export function IdentitiesView({
             {adding ? (
                 <IdentityForm
                     accountId={account.id}
+                    // Every address this mailbox can already send as, its own
+                    // included: adding the mailbox's own address as a send-as is
+                    // the same duplicate, and it is the one somebody types first.
+                    taken={[account.address, ...mine.map((identity) => identity.address)]}
                     onDone={() => {
                         setAdding(false);
                         router.refresh();
@@ -107,10 +112,15 @@ export function IdentitiesView({
 
 function IdentityForm({
     accountId,
+    taken,
     onDone,
     onCancel
 }: {
     accountId: string;
+    /** The addresses this mailbox already sends as. The server refuses a repeat
+     *  in the same words - see `saveIdentity` - and this says so while it is
+     *  being typed rather than after Add it. */
+    taken: readonly string[];
     onDone: () => void;
     onCancel: () => void;
 }) {
@@ -123,13 +133,37 @@ function IdentityForm({
     const [problem, setProblem] = useState("");
     const [saving, startSaving] = useTransition();
 
+    // Read as it is typed, against the list this screen is already showing.
+    const state = addressState(address, taken);
+    const wrong =
+        state === "invalid"
+            ? "That is not an email address yet."
+            : state === "taken"
+              ? "This mailbox can already send as that address."
+              : "";
+
     return (
         <div className="mt-3 space-y-2 rounded-md border border-border p-3">
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
                     Address <span aria-hidden>*</span>
                 </span>
-                <Input value={address} autoFocus onChange={(event) => setAddress(event.target.value)} />
+                <Input
+                    value={address}
+                    autoFocus
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    aria-invalid={wrong ? true : undefined}
+                    aria-describedby="identity-address"
+                    onChange={(event) => setAddress(event.target.value)}
+                />
+                <span
+                    id="identity-address"
+                    className={cn("mt-1 block text-[12px]", wrong ? "text-danger" : "text-foreground-subtle")}
+                >
+                    {wrong || "Mail sent from this address still goes out through this mailbox."}
+                </span>
             </label>
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">Name people will see</span>
@@ -156,7 +190,7 @@ function IdentityForm({
 
             <div className="flex gap-2">
                 <Button
-                    disabled={saving || !address.trim()}
+                    disabled={saving || state !== "ok"}
                     onClick={() =>
                         startSaving(async () => {
                             setProblem("");

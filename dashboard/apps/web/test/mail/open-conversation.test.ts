@@ -82,7 +82,12 @@ describe("the address stops naming what was moved", () => {
         expect(thread).toContain("onGone?.();");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // And the list is what it is told to do, or the pane calls into nothing.
-        expect(view).toContain("onGone={closeOpen}");
+        // Which of the two it does is the reader's own answer - back to the list,
+        // or straight on to the next conversation - and both are still the list
+        // acting on being told.
+        expect(view).toContain('preferences.afterFiling === "next"');
+        expect(view).toContain("? () => openNext([openThread.id])");
+        expect(view).toContain(": closeOpen");
     });
 
     it("closes it before the mail server answers, and puts it back if it refuses", async () => {

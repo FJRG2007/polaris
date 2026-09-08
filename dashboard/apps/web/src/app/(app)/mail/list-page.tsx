@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { MailOnboarding } from "./onboarding";
 import { requirePermission } from "@/lib/session";
 import { ownedAccountIds } from "@/lib/mailbox/access";
+import { readMailPreferences } from "@/lib/mailbox/prefs";
 import { MailView, type MailViewContext } from "./mail-view";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 import { EMPTY_QUERY, listThreads, readThread, type MailListQuery, type MailThreadView } from "@/lib/mailbox/views";
@@ -87,7 +88,10 @@ export async function MailListPage({
     // itself - Starred, Unread - keeps its own narrowing whatever the buttons
     // say: the screen is that list.
     const filter = core.readMailFilter(params.filter);
-    const sort = core.readMailSort(params.sort);
+    // The reader's own order is what a list opens as; the address still wins for
+    // the page it names, because a sorted list is a link somebody was sent.
+    const preferences = await readMailPreferences(user.id);
+    const sort = core.readMailSort(params.sort, preferences.sort);
     const query: MailListQuery = {
         ...EMPTY_QUERY,
         unreadOnly: filter === "unread",
@@ -177,6 +181,10 @@ export async function MailListPage({
             category={query.category}
             filter={filter}
             sort={sort}
+            // How this person reads: when an opened message stops being unread,
+            // and where the screen goes after one is filed. Both were constants
+            // in the client until there was a screen to answer them on.
+            preferences={preferences}
             // A route that IS one of the filters does not offer it again: the
             // Starred screen with a "Starred" button on it reads as a switch that
             // does nothing, because it is one.
