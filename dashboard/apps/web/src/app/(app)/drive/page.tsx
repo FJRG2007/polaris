@@ -1,4 +1,5 @@
 import { PageHeader } from "@polaris/ui";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { DriveExplorer } from "./drive-explorer";
 import { requirePermission } from "@/lib/session";
 import { driveAbilities } from "@/lib/drive-authz";
@@ -65,7 +66,7 @@ export default async function DrivePage({
     // Only the fast, local query runs on the server so the page paints instantly.
     // The actual listing / device metrics load client-side (skeletons + cache),
     // which is what removes the multi-second delay a slow NAS used to add here.
-    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id)).map(
+    const connections: ConnectionSummary[] = (await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id))).map(
         (row) => ({
             id: row.id,
             name: row.name,

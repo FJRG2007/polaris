@@ -6,6 +6,7 @@
  */
 
 import { requirePermission } from "@/lib/session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { listAccessibleConnections } from "@/lib/storage-service";
 import { RecentView } from "./recent-view";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RecentPage() {
     const user = await requirePermission("drive.read");
-    const connections = (await listAccessibleConnections(user.id)).map((row) => ({ id: row.id, name: row.name }));
+    const connections = (await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id))).map((row) => ({ id: row.id, name: row.name }));
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">

@@ -13,6 +13,7 @@
  */
 
 import { PageHeader } from "@polaris/ui";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { requirePermission } from "@/lib/session";
 import type { StorageProviderKind } from "@polaris/core";
 import { listAccessibleConnections } from "@/lib/storage-service";
@@ -29,7 +30,7 @@ export default async function DriveInsightsPage({
     const params = await searchParams;
     const asked = Array.isArray(params.c) ? params.c[0] : params.c;
 
-    const locations: InsightLocation[] = (await listAccessibleConnections(user.id)).map((row) => ({
+    const locations: InsightLocation[] = (await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id))).map((row) => ({
         id: row.id,
         name: row.name,
         kind: row.kind as StorageProviderKind

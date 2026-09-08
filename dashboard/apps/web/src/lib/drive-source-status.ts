@@ -22,6 +22,7 @@
  */
 
 import { probeTcp } from "./server-status";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { isLocalMachine, localMachineIdentity } from "./local-machine";
 import type { SourceStatus } from "@/app/(app)/drive/types";
 import { listAccessibleConnections } from "./storage-service";
@@ -83,7 +84,7 @@ export function sourceEndpoint(config: Record<string, unknown>): { host: string;
  */
 export async function driveSourceStatuses(userId: string): Promise<SourceStatus[]> {
     const [connections, identity] = await Promise.all([
-        listAccessibleConnections(userId),
+        listAccessibleConnections(userId, await scopeOrgIdFor(userId)),
         // Read once for the whole sweep rather than per source: it is three
         // settings reads and the answer is the same for all of them.
         localMachineIdentity().catch(() => null)

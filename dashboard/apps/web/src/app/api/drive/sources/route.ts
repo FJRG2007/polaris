@@ -11,6 +11,7 @@
  */
 
 import { apiUser } from "@/lib/api-session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { sessionCan } from "@/lib/session";
 import { listAccessibleConnections } from "@/lib/storage-service";
 
@@ -24,7 +25,7 @@ export async function GET(): Promise<Response> {
         return Response.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const connections = await listAccessibleConnections(user.id);
+    const connections = await listAccessibleConnections(user.id, await scopeOrgIdFor(user.id));
     return Response.json(
         {
             sources: connections.map((one) => ({

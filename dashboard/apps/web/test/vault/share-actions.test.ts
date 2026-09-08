@@ -65,6 +65,13 @@ const inviteMember = vi.fn(async () => ({ ok: true }));
 const removeMember = vi.fn(async () => true);
 const standingIn = vi.fn(async () => null as unknown);
 const mayAdminister = vi.fn(() => false);
+/** Which shelf is open. A cookie in the real thing, and every case here is on
+ *  somebody's own - the narrowing itself is pinned in `vault-shelf.test.ts`. */
+const shelfOrgId = vi.fn(async () => null as string | null);
+vi.mock("@/lib/workspace-scope", () => ({
+    scopeOrgIdFor: (...args: unknown[]) => shelfOrgId(...(args as [])),
+}));
+
 vi.mock("@/lib/vault/orgs", () => ({
     vaultById: (...args: unknown[]) => vaultById(...args),
     vaultsReachableBy: (...args: unknown[]) => vaultsReachableBy(...args),
@@ -130,6 +137,8 @@ const ownVault: VaultRow = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // Somebody's own shelf unless a case says otherwise.
+    shelfOrgId.mockResolvedValue(null);
     requirePermission.mockResolvedValue({ id: "u1", email: "ana@example.com", isAdmin: false });
     resolveOrgAccess.mockResolvedValue(null);
     orgCan.mockReturnValue(false);
@@ -233,6 +242,10 @@ describe("vaultListAction", () => {
     });
 
     it("lists an organization with no vault yet, so there is a way to make one", async () => {
+        // On that organization's shelf. It is not offered on somebody's own -
+        // a company's vault belongs to the company's shelf, and the entry that
+        // offers to create one belongs with it.
+        shelfOrgId.mockResolvedValue(ORG_ID);
         listMyOrgs.mockResolvedValue([{ id: ORG_ID, name: "Acme", slug: "acme" }]);
         orgCan.mockReturnValue(true);
         const views = (await actions.vaultListAction()).filter((entry) => !entry.account);
@@ -248,6 +261,7 @@ describe("vaultListAction", () => {
     });
 
     it("does not offer to administer an organization's vault without vault.manage", async () => {
+        shelfOrgId.mockResolvedValue(ORG_ID);
         listMyOrgs.mockResolvedValue([{ id: ORG_ID, name: "Acme", slug: "acme" }]);
         orgCan.mockReturnValue(false);
         vaultsReachableBy.mockResolvedValue([

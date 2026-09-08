@@ -690,10 +690,15 @@ export async function listConnections(ownerId: string, options?: { readonly pers
  * that reads the row alone offers Manage access to a whole roster and then
  * refuses every one of them.
  */
-async function organizationDrivesFor(userId: string) {
+async function organizationDrivesFor(userId: string, shelfOrgId: string | null) {
     const { memberOrgIds, resolveOrgAccess, orgCan } = await import("@/lib/orgs/org-service");
     const { ensureOrganizationDrive } = await import("@/lib/organization-drive");
-    const orgIds = await memberOrgIds(userId);
+    // The shelf that is open, and nothing else. Somebody working inside one
+    // company should not have another company's drive in their sidebar, and the
+    // membership is still what decides whether they may have this one - the
+    // shelf only ever narrows what was already allowed.
+    const onRoster = await memberOrgIds(userId);
+    const orgIds = shelfOrgId ? onRoster.filter((id) => id === shelfOrgId) : [];
     const drives = await Promise.all(
         orgIds.map(async (orgId) => {
             try {
@@ -725,12 +730,28 @@ async function organizationDrivesFor(userId: string) {
     return drives.filter((drive) => drive !== null);
 }
 
-export async function listAccessibleConnections(userId: string) {
+/**
+ * Everything this account may browse, on the shelf it is working from.
+ *
+ * The shelf is a required argument rather than a defaulted one, and that is the
+ * whole point: a default would silently hand somebody a company's files after
+ * they had switched away from it, and every caller here knows which shelf its
+ * screen is drawn for.
+ *
+ * What it narrows is what is *owned* - somebody's own drive, and the drives of
+ * the organizations they are on. What it leaves alone is infrastructure: a NAS
+ * the operator connected, a registered server, a folder somebody shared with
+ * them. None of those belongs to a shelf, and hiding them behind one would mean
+ * inventing an owner for them first.
+ */
+export async function listAccessibleConnections(userId: string, shelfOrgId: string | null) {
     const [owned, grantedIds, hosts, orgDrives] = await Promise.all([
-        listConnections(userId, { personal: true }),
+        // Your own drive is yours, so it is on your own shelf and on no
+        // company's. On a company shelf its place is taken by theirs.
+        shelfOrgId ? Promise.resolve([]) : listConnections(userId, { personal: true }),
         grantedConnectionIds(userId),
         listHosts(userId),
-        organizationDrivesFor(userId)
+        organizationDrivesFor(userId, shelfOrgId)
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
     const sharedIds = grantedIds.filter((id) => !ownedIds.has(id));

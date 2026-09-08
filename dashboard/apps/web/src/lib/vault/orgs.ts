@@ -198,17 +198,29 @@ export async function vaultById(vaultId: string) {
  * that last one appears even before anybody hands you its key, because it is
  * what the screen offers to let you in through.
  */
-export async function vaultsReachableBy(userId: string, organizationIds: string[]) {
+export async function vaultsReachableBy(
+    userId: string,
+    organizationIds: string[],
+    shelfOrgId: string | null
+) {
+    // The shelf that is open, and it only ever narrows. A vault belongs to a
+    // person or to one company; standing on one company's shelf and being shown
+    // another's is the same disclosure as standing on it and being shown
+    // somebody's own.
+    const reachable = {
+        OR: [
+            { ownerUserId: userId },
+            { members: { some: { userId, status: { not: core.ORG_USER_REVOKED } } } },
+            ...(organizationIds.length > 0 ? [{ organizationId: { in: organizationIds } }] : [])
+        ]
+    };
     return prisma.vaultOrganization.findMany({
-        where: {
-            OR: [
-                { ownerUserId: userId },
-                { members: { some: { userId, status: { not: core.ORG_USER_REVOKED } } } },
-                ...(organizationIds.length > 0
-                    ? [{ organizationId: { in: organizationIds } }]
-                    : [])
-            ]
-        },
+        where: shelfOrgId
+            ? { AND: [reachable, { organizationId: shelfOrgId }] }
+            : // A personal shelf holds what belongs to a person: their own vault
+              // and any personal one they were let into. A company's is on the
+              // company's shelf.
+              { AND: [reachable, { organizationId: null }] },
         orderBy: { createdAt: "asc" },
         select: {
             id: true,

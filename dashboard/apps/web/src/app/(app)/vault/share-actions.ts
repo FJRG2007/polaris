@@ -27,6 +27,7 @@ import { revalidatePath } from "next/cache";
 import * as vaultOrgs from "@/lib/vault/orgs";
 import * as ciphers from "@/lib/vault/ciphers";
 import { requirePermission } from "@/lib/session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as vaultAccount from "@/lib/vault/account";
 import { listMyOrgs, resolveOrgAccess, orgCan } from "@/lib/orgs/org-service";
 
@@ -72,11 +73,18 @@ export interface VaultView {
  */
 export async function vaultListAction(): Promise<VaultView[]> {
     const user = await requirePermission("vault.use");
-    const orgs = await listMyOrgs(user.id);
+    // The shelf that is open. A vault belongs to a person or to one company, so
+    // the switcher in the header means the same here as it does everywhere else:
+    // on a company's shelf this is that company's vault, and on your own it is
+    // yours and whatever personal one somebody let you into.
+    const shelfOrgId = await scopeOrgIdFor(user.id);
+    const all = await listMyOrgs(user.id);
+    const orgs = shelfOrgId ? all.filter((org) => org.id === shelfOrgId) : [];
     const [rows, accesses] = await Promise.all([
         vaultOrgs.vaultsReachableBy(
             user.id,
-            orgs.map((org) => org.id)
+            orgs.map((org) => org.id),
+            shelfOrgId
         ),
         // Not one query: resolving what somebody may do in an organization runs
         // through the role rules rather than a column. Concurrent is what is

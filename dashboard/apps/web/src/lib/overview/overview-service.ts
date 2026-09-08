@@ -412,7 +412,7 @@ async function assignedWork(user: SessionUser): Promise<OverviewTasks> {
  * same number a minute older.
  */
 async function storageUsage(userId: string): Promise<OverviewStorageEntry[]> {
-    const connections = (await listAccessibleConnections(userId)).filter(
+    const connections = (await listAccessibleConnections(userId, await scopeOrgIdFor(userId))).filter(
         (connection) => !connection.id.startsWith(HOST_CONNECTION_PREFIX)
     );
     if (connections.length === 0) return [];

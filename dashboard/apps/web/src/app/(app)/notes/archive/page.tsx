@@ -19,7 +19,9 @@ export default async function NotesArchivePage() {
     // Every shelf they can reach, not only the workspace they have open: the
     // archive is where somebody goes to find one thing, and hiding half of it
     // behind a switch they were not thinking about is how a note gets given up on.
-    const spaceIds = await access.visibleSpaceIds({ id: user.id, isAdmin: user.isAdmin });
+    // The shelf, like the shelf list itself: an archive is a listing, and a
+    // listing of somebody's own notes has no business on a company's shelf.
+    const spaceIds = await access.shelfSpaceIds({ id: user.id, isAdmin: user.isAdmin });
     const notes = await listArchivedNotes(user.id, spaceIds);
 
     return (
