@@ -18,8 +18,10 @@ const SCREENS = [
     { label: "Filters", href: "/mail/settings/rules" },
     { label: "Signature", href: "/mail/settings/signature" },
     { label: "Privacy", href: "/mail/settings/privacy" },
+    { label: "Junk", href: "/mail/settings/junk" },
     { label: "Blocked", href: "/mail/settings/blocked" },
-    { label: "Away", href: "/mail/settings/away" }
+    { label: "Away", href: "/mail/settings/away" },
+    { label: "Import and export", href: "/mail/settings/archive" }
 ];
 
 export function SettingsNav() {

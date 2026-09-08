@@ -72,6 +72,7 @@ import {
     Mail,
     MoreHorizontal,
     Paperclip,
+    ShieldAlert,
     Star,
     Tag,
     Trash2,
@@ -666,6 +667,33 @@ function MessageCard({
                         <p className="text-[13px] text-danger">{failed}</p>
                     ) : readable ? (
                         <>
+                            {/* What Polaris thought of it, and only when it
+                                thought something. A message that arrived
+                                without objection says nothing about itself -
+                                a badge on every message is a badge nobody
+                                reads by the third one.
+
+                                Shown as the reason rather than the number.
+                                "40 out of 100" is not something anybody can
+                                act on; "a link says bank.example.com and goes
+                                to evil.example.ru" is. */}
+                            {message.spamReason ? (
+                                <p className="mb-3 flex items-start gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-[12px] text-foreground">
+                                    <ShieldAlert
+                                        className="mt-px size-3.5 shrink-0 text-warning"
+                                        aria-hidden
+                                    />
+                                    <span className="min-w-0">
+                                        {message.folderRole === "junk"
+                                            ? "Polaris filed this as junk. "
+                                            : "This one looks off. "}
+                                        {message.spamReason}.{" "}
+                                        {message.folderRole === "junk"
+                                            ? "Not junk puts it back and teaches the filter."
+                                            : "Junk files it and teaches the filter."}
+                                    </span>
+                                </p>
+                            ) : null}
                             {readable.wantsReceipt ? (
                                 <p className="mb-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
                                     <UserRoundX className="size-3.5 shrink-0" aria-hidden />
@@ -754,6 +782,22 @@ function MessageCard({
                                         ))}
                                 </ul>
                             ) : null}
+                            {/* The message itself, as its server holds it.
+                                Not a convenience: a mail client that cannot
+                                hand a message back is one nobody should put
+                                their correspondence into, and this is the one
+                                place somebody is looking at the message they
+                                want out. */}
+                            <p className="mt-3 text-[12px] text-foreground-subtle">
+                                <a
+                                    className="inline-flex items-center gap-1 underline"
+                                    href={`/api/mail/export?messageId=${encodeURIComponent(message.id)}`}
+                                    download
+                                >
+                                    <Download className="size-3 shrink-0" aria-hidden />
+                                    Save this message
+                                </a>
+                            </p>
                             {readable.unsubscribe ? (
                                 <p className="mt-3 text-[12px] text-foreground-subtle">
                                     This looks like a mailing list.{" "}

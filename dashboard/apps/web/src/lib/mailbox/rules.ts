@@ -169,6 +169,9 @@ async function performActions(
             case "pin":
                 await prisma.mailMessage.update({ where: { id: messageId }, data: { pinned: true } });
                 break;
+            case "forward":
+                await forwardMessage(accountId, messageId, action.to);
+                break;
             case "mute":
                 await prisma.mailMessage
                     .findUnique({ where: { id: messageId }, select: { threadId: true } })
@@ -179,6 +182,130 @@ async function performActions(
                     );
                 break;
         }
+    }
+}
+
+/**
+ * Send a message on, because a filter said to.
+ *
+ * The only thing in the rules engine that leaves this machine, so it is the only
+ * one with refusals of its own:
+ *
+ * - **Never to an address on this account.** Forwarding a mailbox to itself is a
+ *   loop with one participant, and it is the shape somebody produces by accident
+ *   within a minute of finding the feature.
+ * - **Never a message that has already been forwarded.** The copy carries
+ *   `X-Polaris-Forwarded`, and a message arriving with it is one that has been
+ *   round at least once. Two mailboxes forwarding to each other otherwise fill
+ *   both servers overnight, and the person who set it up finds out from their
+ *   provider rather than from us.
+ * - **Never an automatic message.** Bounces and out-of-office replies are how a
+ *   loop restarts after the header is lost, which happens whenever the far end
+ *   is not Polaris.
+ *
+ * Failures are swallowed. A rule that could not reach its destination must not
+ * be the reason a sync stops - the message is already delivered, and the next
+ * one will try again.
+ */
+async function forwardMessage(
+    accountId: string,
+    messageId: string,
+    to: string
+): Promise<void> {
+    try {
+        const [{ composeMime, sendMime }, { ACCOUNT_COLUMNS }] = await Promise.all([
+            import("./send"),
+            import("./access")
+        ]);
+        const account = await prisma.mailAccount.findUnique({
+            where: { id: accountId },
+            select: { ...ACCOUNT_COLUMNS, user: { select: { name: true } } }
+        });
+        if (!account) return;
+
+        const wanted = to.trim().toLowerCase();
+        if (!wanted) return;
+        // Its own address, or any other mailbox this person has here. Both are
+        // loops; the second is the one nobody sees coming.
+        const mine = await prisma.mailAccount.findMany({
+            where: { userId: account.userId },
+            select: { address: true }
+        });
+        if (mine.some((one) => core.sameAddress(one.address, wanted))) return;
+
+        const message = await prisma.mailMessage.findUnique({
+            where: { id: messageId },
+            select: {
+                subject: true,
+                snippet: true,
+                bodyText: true,
+                fromJson: true,
+                headers: true,
+                listId: true
+            }
+        });
+        if (!message) return;
+
+        const headers = (message.headers ?? {}) as Record<string, unknown>;
+        // Been round once already.
+        if (typeof headers["x-polaris-forwarded"] === "string") return;
+        // Automatic mail. A bounce forwarded to a mailbox that bounces is the
+        // same loop with the header stripped off by whatever is in between.
+        const auto = String(headers["auto-submitted"] ?? "").toLowerCase();
+        if (auto && auto !== "no") return;
+        if (String(headers["precedence"] ?? "").toLowerCase() === "bulk") return;
+
+        const from = addressesFrom(message.fromJson)[0];
+        const self: core.MailAddress = {
+            name: account.displayName || account.user.name || "",
+            address: account.address
+        };
+        const body = [
+            `Forwarded from ${from ? core.addressLabel(from) : "an unnamed sender"}.`,
+            "",
+            message.bodyText || message.snippet || ""
+        ].join("\n");
+
+        const mime = await composeMime({
+            from: self,
+            to: [{ name: "", address: wanted }],
+            cc: [],
+            bcc: [],
+            // Replies go to whoever wrote it, not to the mailbox that passed it
+            // on: a forward is a delivery, not a conversation.
+            replyTo: from?.address ?? "",
+            subject: message.subject.toLowerCase().startsWith("fwd:")
+                ? message.subject
+                : `Fwd: ${message.subject}`,
+            body,
+            attachments: [],
+            inReplyTo: "",
+            references: [],
+            requestReceipt: false
+        });
+        // Stamped after composing, because this is the header the next hop reads
+        // to know the message has been round once.
+        const stamped = Buffer.concat([
+            Buffer.from("X-Polaris-Forwarded: 1\r\n", "utf8"),
+            mime
+        ]);
+        await sendMime(account, {
+            from: self,
+            to: [{ name: "", address: wanted }],
+            cc: [],
+            bcc: [],
+            replyTo: from?.address ?? "",
+            subject: message.subject,
+            body,
+            attachments: [],
+            inReplyTo: "",
+            references: [],
+            requestReceipt: false
+        }, stamped);
+    } catch (caught) {
+        // The message is already delivered. A forward that could not be sent is
+        // not a reason for a sync to stop.
+        console.error(caught);
     }
 }
 

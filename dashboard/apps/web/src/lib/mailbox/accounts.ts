@@ -53,6 +53,8 @@ export interface MailAccountView {
     readonly cleanLinks: boolean;
     readonly signatureAuto: string;
     readonly securityKeepMinutes: number;
+    /** Whether Polaris judges this mailbox's arriving mail for itself. */
+    readonly spamFilter: boolean;
     readonly vacationEnabled: boolean;
     readonly pollSeconds: number;
     readonly position: number;
@@ -88,6 +90,7 @@ export function accountView(row: AccountRow): MailAccountView {
         cleanLinks: row.cleanLinks,
         signatureAuto: row.signatureAuto,
         securityKeepMinutes: row.securityKeepMinutes,
+        spamFilter: row.spamFilter,
         vacationEnabled: row.vacationEnabled,
         pollSeconds: row.pollSeconds,
         position: row.position
@@ -296,6 +299,25 @@ export async function setAccountPrivacy(
 ): Promise<MailAccountView> {
     await ownedAccount(userId, accountId);
     await prisma.mailAccount.update({ where: { id: accountId }, data: privacy });
+    return accountView(await ownedAccount(userId, accountId));
+}
+
+/**
+ * Turn Polaris' own junk filter on or off for one mailbox.
+ *
+ * Per mailbox, like every other reading decision here: somebody can want it on
+ * for the address the world writes to and off for the one only their colleagues
+ * use. Switching it off changes what happens to mail arriving after that and
+ * never moves or rescans what is already here - a setting that reshuffled
+ * somebody's inbox behind them would be worse than the setting being wrong.
+ */
+export async function setSpamFilter(
+    userId: string,
+    accountId: string,
+    on: boolean
+): Promise<MailAccountView> {
+    await ownedAccount(userId, accountId);
+    await prisma.mailAccount.update({ where: { id: accountId }, data: { spamFilter: on } });
     return accountView(await ownedAccount(userId, accountId));
 }
 

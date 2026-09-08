@@ -27,6 +27,7 @@
 import { withImap } from "./imap";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
+import { judgeArrival } from "./spam";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
 import { decodePart } from "./decode";
@@ -466,8 +467,13 @@ async function storeMessages(
             await rememberContacts(account.id, folder.role, { from, to, cc });
             if (folder.role === "inbox") {
                 await applyRulesToMessage(account.id, row.id);
-                // After the rules, so a message a filter sent to junk is not
-                // answered with an away message.
+                // After the rules and before the away reply. After, because a
+                // rule is a decision its owner made and a second opinion about
+                // it would at best agree - and a message a rule has already
+                // filed is no longer in the inbox to judge. Before, because
+                // answering junk with an out-of-office is how a mailbox tells a
+                // sender that the address is real.
+                await judgeArrival(account.id, row.id);
                 await replyIfAway(account.id, row.id);
             }
         }

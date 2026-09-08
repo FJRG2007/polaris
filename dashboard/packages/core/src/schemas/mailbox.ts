@@ -400,7 +400,18 @@ export const mailRuleActionSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("trash") }),
     z.object({ kind: z.literal("junk") }),
     z.object({ kind: z.literal("pin") }),
-    z.object({ kind: z.literal("mute") })
+    z.object({ kind: z.literal("mute") }),
+    z.object({
+        kind: z.literal("forward"),
+        // Validated as an address here as well as on the form, because this is
+        // the one rule action that sends mail somewhere.
+        to: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .email("That is not an email address")
+            .max(320)
+    })
 ]);
 
 export const mailRuleSchema = z.object({

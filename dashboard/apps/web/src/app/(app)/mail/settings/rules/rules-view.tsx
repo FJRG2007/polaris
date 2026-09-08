@@ -181,6 +181,8 @@ function describe(
                     return "pin it";
                 case "mute":
                     return "mute the conversation";
+                case "forward":
+                    return `send it on to ${action.to}`;
             }
         })
         .join(", ");
@@ -208,6 +210,7 @@ function RuleForm({
     const [actionKind, setActionKind] = useState("archive");
     const [folderId, setFolderId] = useState(folders[0]?.id ?? "");
     const [labelId, setLabelId] = useState(labels[0]?.id ?? "");
+    const [forwardTo, setForwardTo] = useState("");
     const [stop, setStop] = useState(false);
     const [applyToExisting, setApplyToExisting] = useState(false);
     const [problem, setProblem] = useState("");
@@ -222,12 +225,14 @@ function RuleForm({
         { value: "junk", label: "put it in spam" },
         { value: "trash", label: "put it in the trash" },
         { value: "pin", label: "pin it" },
-        { value: "mute", label: "mute the conversation" }
+        { value: "mute", label: "mute the conversation" },
+        { value: "forward", label: "send it on to somebody" }
     ];
 
     function action(): core.MailRuleAction {
         if (actionKind === "move") return { kind: "move", folder: folderId };
         if (actionKind === "label") return { kind: "label", label: labelId };
+        if (actionKind === "forward") return { kind: "forward", to: forwardTo.trim().toLowerCase() };
         return { kind: actionKind } as core.MailRuleAction;
     }
 
@@ -296,7 +301,25 @@ function RuleForm({
                         className="w-48"
                     />
                 ) : null}
+                {actionKind === "forward" ? (
+                    <Input
+                        value={forwardTo}
+                        inputMode="email"
+                        placeholder="them@example.com"
+                        aria-label="Where to send it"
+                        className="w-56"
+                        onChange={(event) => setForwardTo(event.target.value)}
+                    />
+                ) : null}
             </div>
+
+            {actionKind === "forward" ? (
+                <p className="text-[12px] text-foreground-subtle">
+                    A copy is sent from this mailbox, and replies to it go to whoever wrote the
+                    original. It will not send to an address you have here - that is a loop - and a
+                    message that has already been forwarded once is left alone.
+                </p>
+            ) : null}
 
             <label className="flex items-center gap-2 text-[13px]">
                 <Switch checked={stop} onChange={setStop} aria-label="Stop the filters below this one" />

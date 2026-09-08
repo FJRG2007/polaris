@@ -31,6 +31,8 @@ export interface MailFolderView {
     readonly role: core.MailFolderRole;
     readonly unread: number;
     readonly total: number;
+    /** A colour its owner gave it, or "". Polaris' own: IMAP has none. */
+    readonly color: string;
     /** How deep it sits under its parent, for the indent. */
     readonly depth: number;
 }
@@ -54,7 +56,8 @@ export async function listFolders(userId: string, accountId?: string): Promise<M
             role: true,
             delimiter: true,
             unread: true,
-            total: true
+            total: true,
+            color: true
         }
     });
 
@@ -67,6 +70,7 @@ export async function listFolders(userId: string, accountId?: string): Promise<M
             role: row.role as core.MailFolderRole,
             unread: row.unread,
             total: row.total,
+            color: row.color,
             depth: row.delimiter ? Math.max(0, row.path.split(row.delimiter).length - 1) : 0
         }))
         .sort((left, right) => {
@@ -430,6 +434,12 @@ export interface MailMessageView {
     readonly answered: boolean;
     readonly wantsReceipt: boolean;
     readonly listId: string;
+    /** What Polaris' own junk filter made of it, 0 to 100, or null for a message
+     *  nothing judged. Shown rather than acted on here: the acting happened when
+     *  it arrived. */
+    readonly spamScore: number | null;
+    /** The heaviest thing said against it, in the reader's words, or "". */
+    readonly spamReason: string;
     readonly attachments: readonly {
         id: string;
         name: string;
@@ -461,6 +471,8 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             answered: true,
             wantsReceipt: true,
             listId: true,
+            spamScore: true,
+            spamReason: true,
             folder: { select: { role: true } },
             attachments: {
                 select: {
@@ -493,6 +505,8 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         answered: message.answered,
         wantsReceipt: message.wantsReceipt,
         listId: message.listId,
+        spamScore: message.spamScore,
+        spamReason: message.spamReason,
         attachments: message.attachments.map((file) => ({
             id: file.id,
             name: file.name,

@@ -21,12 +21,20 @@
  */
 
 import Link from "next/link";
-import { cn, useToast } from "@polaris/ui";
+import {
+    cn,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuTrigger,
+    useToast
+} from "@polaris/ui";
 import { useCallback, useMemo, useState } from "react";
 import { useMail } from "./mail-shell";
 import { useMailRailOpen } from "./use-mail-rail";
 import { refusalOf } from "./refusal";
-import { moveToFolderAction } from "./actions";
+import { moveToFolderAction, setFolderColorAction } from "./actions";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -46,6 +54,25 @@ import {
     Trash2,
     type LucideIcon
 } from "lucide-react";
+
+/**
+ * The colours a folder can be given.
+ *
+ * Eight, and swatches rather than a picker. A menu with an input in it is a menu
+ * that steals the input focus the moment it opens - see the note in
+ * `@polaris/ui` - and eight is already more than anybody needs to make three
+ * folders findable at a glance.
+ */
+const FOLDER_COLORS: readonly { hex: string; name: string }[] = [
+    { hex: "#6366f1", name: "Indigo" },
+    { hex: "#0ea5e9", name: "Blue" },
+    { hex: "#10b981", name: "Green" },
+    { hex: "#f59e0b", name: "Amber" },
+    { hex: "#ef4444", name: "Red" },
+    { hex: "#a855f7", name: "Purple" },
+    { hex: "#14b8a6", name: "Teal" },
+    { hex: "#f43f5e", name: "Pink" }
+];
 
 /** The merged views, in the order a mail client is read in. */
 const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: string }[] = [
@@ -79,6 +106,19 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
      * both are looked up against the person asking, so a drag can only ever move
      * their own mail into their own folder.
      */
+    /** Give a folder a colour, or take it off. The rail is the server's, so the
+     *  answer arrives with the refresh rather than being patched in - one small
+     *  write and one small re-render. */
+    const colour = useCallback(
+        async (folderId: string, hex: string) => {
+            const outcome = await setFolderColorAction(folderId, hex);
+            const said = refusalOf(outcome);
+            if (said) toast.show({ title: said });
+            else router.refresh();
+        },
+        [router, toast]
+    );
+
     const fileInto = useCallback(
         async (folderId: string, name: string, messageIds: string[]) => {
             if (messageIds.length === 0) return;
@@ -193,17 +233,58 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                     ) : null}
                                     {own.map((folder) => (
                                         <li key={folder.id}>
-                                            <RailLink
-                                                href={`/mail/f/${folder.id}`}
-                                                label={folder.name}
-                                                icon={Layers}
-                                                count={folder.unread}
-                                                active={pathname === `/mail/f/${folder.id}`}
-                                                onNavigate={onNavigate}
-                                                onDropMail={(ids) =>
-                                                    void fileInto(folder.id, folder.name, ids)
-                                                }
-                                            />
+                                            <ContextMenu>
+                                                <ContextMenuTrigger asChild>
+                                                    <div>
+                                                        <RailLink
+                                                            href={`/mail/f/${folder.id}`}
+                                                            label={folder.name}
+                                                            icon={Layers}
+                                                            color={folder.color}
+                                                            count={folder.unread}
+                                                            active={
+                                                                pathname === `/mail/f/${folder.id}`
+                                                            }
+                                                            onNavigate={onNavigate}
+                                                            onDropMail={(ids) =>
+                                                                void fileInto(
+                                                                    folder.id,
+                                                                    folder.name,
+                                                                    ids
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent>
+                                                    <div className="flex gap-1 px-2 py-1.5">
+                                                        {FOLDER_COLORS.map((swatch) => (
+                                                            <button
+                                                                key={swatch.hex}
+                                                                type="button"
+                                                                title={swatch.name}
+                                                                aria-label={swatch.name}
+                                                                onClick={() =>
+                                                                    void colour(folder.id, swatch.hex)
+                                                                }
+                                                                className={cn(
+                                                                    "size-4 shrink-0 rounded-full ring-offset-1 ring-offset-popover transition-shadow",
+                                                                    folder.color === swatch.hex &&
+                                                                        "ring-2 ring-foreground"
+                                                                )}
+                                                                style={{ backgroundColor: swatch.hex }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <ContextMenuSeparator />
+                                                    <ContextMenuItem
+                                                        disabled={!folder.color}
+                                                        onSelect={() => void colour(folder.id, "")}
+                                                    >
+                                                        No colour
+                                                    </ContextMenuItem>
+                                                </ContextMenuContent>
+                                            </ContextMenu>
                                         </li>
                                     ))}
                                 </ul>
@@ -267,6 +348,7 @@ function RailLink({
     href,
     label,
     icon: Icon,
+    color,
     count,
     active,
     onNavigate,
@@ -275,6 +357,10 @@ function RailLink({
     href: string;
     label: string;
     icon: LucideIcon;
+    /** A folder its owner gave a colour. The icon is tinted rather than replaced
+     *  by a dot beside it: the row still says what kind of thing it is, and a
+     *  coloured shape is what somebody scans a rail for. */
+    color?: string;
     count: number;
     active: boolean;
     onNavigate?: () => void;
@@ -324,7 +410,11 @@ function RailLink({
                 over && "ring-1 ring-inset ring-primary"
             )}
         >
-            <Icon className="size-4 shrink-0" aria-hidden />
+            <Icon
+                className="size-4 shrink-0"
+                style={color ? { color } : undefined}
+                aria-hidden
+            />
             <span className="min-w-0 flex-1 truncate" title={label}>
                 {label}
             </span>

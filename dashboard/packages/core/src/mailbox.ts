@@ -742,7 +742,17 @@ export type MailRuleAction =
     | { readonly kind: "trash" }
     | { readonly kind: "junk" }
     | { readonly kind: "pin" }
-    | { readonly kind: "mute" };
+    | { readonly kind: "mute" }
+    /**
+     * Send it on to somebody else.
+     *
+     * The one action here that leaves the building, which is why it is the one
+     * with rules of its own: it is refused to an address on this account, it is
+     * refused on a message that has already been forwarded once, and the copy
+     * carries a header saying so. A forward that can reach a mailbox which
+     * forwards back is a loop that fills two mail servers overnight.
+     */
+    | { readonly kind: "forward"; readonly to: string };
 
 /** What a rule needs to know about a message to judge it. Bodies are the plain
  *  text only: matching on HTML would match on markup nobody wrote. */

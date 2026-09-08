@@ -71,10 +71,18 @@ export async function replyIfAway(accountId: string, messageId: string): Promise
             listId: true,
             headers: true,
             messageId: true,
-            references: true
+            references: true,
+            folder: { select: { role: true } }
         }
     });
     if (!message) return false;
+
+    // Still in the inbox. A message a rule filed, or one the junk filter moved,
+    // has already been decided about - and answering junk with an out-of-office
+    // is how a mailbox confirms to a sender that the address is real and read.
+    // Checked here rather than by each caller in turn: the callers keep growing
+    // and every one of them would have to remember.
+    if (message.folder.role !== "inbox") return false;
 
     const from = addressesFrom(message.fromJson)[0];
     if (!from || NEVER_ANSWERED.test(from.address)) return false;

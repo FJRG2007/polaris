@@ -32,6 +32,8 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
 import * as accounts from "@/lib/mailbox/accounts";
+import * as spam from "@/lib/mailbox/spam";
+import * as mailImport from "@/lib/mailbox/import";
 import * as messages from "@/lib/mailbox/messages";
 import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
@@ -115,6 +117,89 @@ export async function addAccountAction(input: unknown) {
         return { account };
     } catch (caught) {
         return failure(caught, "That mailbox could not be added.");
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Bringing an archive in                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** How many messages are in an uploaded archive, and where they would go. */
+export async function openImportAction(input: {
+    accountId: string;
+    folderId: string;
+    uploadId: string;
+}) {
+    const userId = await actorId();
+    try {
+        return await mailImport.openImport(userId, input);
+    } catch (caught) {
+        return failure(caught, "That file could not be read.");
+    }
+}
+
+/**
+ * Append one slice of it.
+ *
+ * Driven from the screen a batch at a time rather than run to completion here:
+ * four thousand appends over one connection is minutes, which is far longer than
+ * a request should live and exactly the shape of thing that fails near the end
+ * with nothing to show for it.
+ */
+export async function importBatchAction(
+    input: { accountId: string; folderId: string; uploadId: string },
+    from: number
+) {
+    const userId = await actorId();
+    try {
+        const answer = await mailImport.importBatch(userId, input, from);
+        // The folder is only re-read when the last batch lands: a sync between
+        // every twenty-five messages would cost more than the import.
+        if (answer.next >= answer.total) {
+            await syncAccount(input.accountId).catch(() => undefined);
+            refresh();
+        }
+        return answer;
+    } catch (caught) {
+        return failure(caught, "That batch could not be imported.");
+    }
+}
+
+/** Give a folder a colour, or take one off. Polaris' own: a mail server has no
+ *  notion of it, so nothing is told about this but us. */
+export async function setFolderColorAction(folderId: string, color: string) {
+    const userId = await actorId();
+    try {
+        await messages.setFolderColor(userId, folderId, color);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "That colour could not be saved.");
+    }
+}
+
+/** Turn Polaris' own junk filter on or off for one mailbox. */
+export async function setSpamFilterAction(accountId: string, on: boolean) {
+    const userId = await actorId();
+    try {
+        const account = await accounts.setSpamFilter(userId, accountId, on);
+        refresh();
+        return { account };
+    } catch (caught) {
+        return failure(caught, "That could not be changed.");
+    }
+}
+
+/** Throw away everything one mailbox's filter has been taught. */
+export async function forgetSpamAction(accountId: string) {
+    const userId = await actorId();
+    try {
+        await ownedAccount(userId, accountId);
+        await spam.forgetSpamLearning(accountId);
+        refresh();
+        return { learning: await spam.spamLearning(accountId) };
+    } catch (caught) {
+        return failure(caught, "That could not be forgotten.");
     }
 }
 

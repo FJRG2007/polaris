@@ -9322,6 +9322,15 @@ model MailAccount {
     // somebody's mail without being asked is not a thing to opt out of.
     securityKeepMinutes Int @default(0)
 
+    // Whether Polaris judges arriving mail for itself as well as trusting what
+    // the provider decided. On by default, and it has to be: the mail this
+    // catches is by definition the mail the provider let through, so a filter
+    // nobody switches on catches nothing. Switching it off changes what happens
+    // to mail arriving after that and never moves or rescans what is already
+    // here - a setting that reshuffled somebody's inbox behind them would be
+    // worse than the setting being wrong.
+    spamFilter Boolean @default(true)
+
     vacationEnabled    Boolean   @default(false)
     vacationSubject    String    @default("")
     vacationBody       String    @default("")
@@ -9346,6 +9355,9 @@ model MailAccount {
     contacts    MailContact[]
     trusted     MailTrustedSender[]
     autoReplies MailAutoReply[]
+    spamTokens     MailSpamToken[]
+    spamReputation MailSpamReputation[]
+    spamFeedback   MailSpamFeedback[]
 
     @@unique([userId, address])
     @@index([userId, position])
@@ -9377,6 +9389,83 @@ model MailIdentity {
 // `role` is what the app acts against: every verb in the UI is "put this in
 // whatever this server calls Archive", so a mailbox whose Sent folder is called
 // Gesendete Objekte behaves exactly like one whose is not.
+// What one mailbox has learned about a word.
+//
+// The counting half of the junk filter, and the reason it gets better at one
+// person's mail rather than at mail in general. Per mailbox on purpose: a word
+// that means junk in a personal mailbox is often the whole subject matter of a
+// work one, and a shared table would average the two into uselessness.
+//
+// **Only explicit feedback writes here.** Somebody pressing Junk or Not junk is
+// the only thing that teaches it - never the filter's own verdict, which would
+// be a filter training itself on its own mistakes until it believed them.
+model MailSpamToken {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    /// The word. Numbers are never stored - see `tokensOf` - so this table
+    /// cannot become a record of somebody's invoice references.
+    token     String
+    junkCount Int    @default(0)
+    goodCount Int    @default(0)
+
+    updatedAt DateTime @updatedAt
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, token])
+    @@index([accountId])
+}
+
+// What one mailbox has learned about a sender, a domain, or a shape of message.
+//
+// The `key` is the address, the domain, or the fingerprint - a short string
+// describing the shape of a mailing rather than anything it said - and `kind`
+// says which. Three rows can name the same message and only the strongest is
+// ever used, so a bad sender at a bad domain is not counted twice.
+model MailSpamReputation {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    /// sender | domain | fingerprint
+    kind      String
+    key       String
+    junkCount Int    @default(0)
+    goodCount Int    @default(0)
+
+    updatedAt DateTime @updatedAt
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, kind, key])
+    @@index([accountId])
+}
+
+// What somebody has said about one message, so saying the opposite later takes
+// the first answer back.
+//
+// Without this a mistaken press of Junk is permanent: pressing Not junk would
+// add a good count without ever removing the junk one, and the mailbox would
+// hold both opinions for ever. One row per message, rewritten rather than added
+// to, and the counts are unwound before the new answer is applied.
+model MailSpamFeedback {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    /// The Message-Id, not the row id: a message moved between folders is a new
+    /// row, and what was said about it has to survive that.
+    messageKey String
+    /// "junk" or "good".
+    verdict   String
+    /// The words and identities that were counted for it, so exactly those can
+    /// be taken back. Stored as JSON, like everything else here.
+    counted   Json     @default("{}")
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, messageKey])
+    @@index([accountId])
+}
+
 model MailFolder {
     id        String @id @default(uuid(7)) @db.Uuid
     accountId String @db.Uuid
@@ -9394,6 +9483,12 @@ model MailFolder {
     subscribed Boolean @default(false)
     // Kept out of the rail without unsubscribing it.
     hidden     Boolean @default(false)
+    // A colour its owner gave it, or empty for none. Only ever set from here:
+    // IMAP has no notion of it, so a resync must not blank what somebody chose.
+    // Folders are how people actually file mail, and a rail of twenty identical
+    // grey rows is one nobody scans - the two or three that matter are the ones
+    // worth being able to find without reading.
+    color      String  @default("")
     // Whether a person said what this folder is for, rather than the server or a
     // name match. Their answer outlives a resync: without this the next pass
     // would read the role off the server again and forget what they told us.
@@ -9532,6 +9627,16 @@ model MailMessage {
     // which is what every row written before this existed holds until the
     // backfill reaches it - so the column is also the backfill's own queue.
     category       String    @default("")
+    // What Polaris' own junk filter made of it: 0 to 100, or null for a message
+    // nothing has judged - every row written before the filter existed, and
+    // every row on a mailbox that has it switched off. Kept rather than
+    // recomputed because it is shown: a message the filter held back has to be
+    // able to say why, and re-deciding it on every render would mean the reason
+    // changing as the mailbox learns.
+    spamScore      Int?
+    // The heaviest thing said against it, in the words the reader sees. Empty
+    // for a message that arrived without objection, which is nearly all of them.
+    spamReason     String    @default("")
     snoozedUntil   DateTime?
     // Where it came back to when the snooze ends.
     snoozeFolderId String?   @db.Uuid

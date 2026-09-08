@@ -22,6 +22,8 @@ import { withImap, type MailConnectionSource } from "./imap";
 import { prisma } from "@polaris/db";
 import { addressesFrom } from "./json";
 import { publishMail } from "./live";
+import { teachSpam } from "./spam";
+import { folderForRole } from "./folder-roles";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
@@ -61,50 +63,22 @@ const MOVE_ACTIONS: Partial<Record<MailAction, core.MailFolderRole>> = {
 };
 
 /**
- * Raised when an action needs a folder this mailbox has no equivalent of.
+ * Raised when an action needs a folder this mailbox has no equivalent of, and
+ * the folder with a role.
  *
- * It used to create one. That was wrong, and somebody found out the way people
- * find these things out: a mailbox whose trash is called `Papelera` ended up
+ * Both live in `folder-roles` now, because the junk filter needs the same answer
+ * and this module calls the junk filter - so the question had to move somewhere
+ * neither end of that owns. Re-exported here because the actions catch the error
+ * by name and it is the same error.
+ *
+ * The rule behind it has not changed and is worth keeping written down: it used
+ * to create the folder. That was wrong, and somebody found out the way people
+ * find these things out - a mailbox whose trash is called `Papelera` ended up
  * with a second, empty `Trash` that Polaris had written into their mail server,
  * and which they then saw in every other client they own. Making a folder in
  * somebody else's mailbox is not a default, whatever the convenience.
- *
- * So it refuses, and carries what the screen needs to ask: which role, and what
- * the account's folders are, so a reader can point at the one they already use.
  */
-export class MailFolderRoleMissing extends Error {
-    public readonly role: core.MailFolderRole;
-    public readonly accountId: string;
-
-    public constructor(role: core.MailFolderRole, accountId: string) {
-        super(`This mailbox has no folder set as its ${role}.`);
-        this.name = "MailFolderRoleMissing";
-        this.role = role;
-        this.accountId = accountId;
-    }
-}
-
-/**
- * The folder on this account with a given role.
- *
- * Never creates one. A mailbox that has no folder for a role either has one
- * under a name nobody recognised - which its owner can point at, once - or
- * genuinely has none, and then making it is their decision to take deliberately.
- */
-async function folderForRole(
-    accountId: string,
-    role: core.MailFolderRole
-): Promise<{ id: string; path: string }> {
-    const held = await prisma.mailFolder.findFirst({
-        where: { accountId, role },
-        // A role its owner chose wins over one matched from a name, so pointing
-        // at the right folder settles it even where a wrong one still matches.
-        orderBy: { roleLocked: "desc" },
-        select: { id: true, path: true }
-    });
-    if (!held) throw new MailFolderRoleMissing(role, accountId);
-    return held;
-}
+export { MailFolderRoleMissing } from "./folder-roles";
 
 /**
  * Say which folder is this mailbox's Trash, Archive or Junk.
@@ -130,6 +104,30 @@ export async function setFolderRole(
         }),
         prisma.mailFolder.update({ where: { id: folder.id }, data: { role, roleLocked: true } })
     ]);
+}
+
+/**
+ * Give a folder a colour, or take one off.
+ *
+ * Polaris' own and nothing to do with the mail server: IMAP has no notion of a
+ * folder's colour, so this is a column here and a resync leaves it alone.
+ *
+ * Worth having because folders are how people actually file mail, and a rail of
+ * twenty identical grey rows is one nobody scans - the two or three that matter
+ * are the ones worth being able to find without reading.
+ */
+export async function setFolderColor(
+    userId: string,
+    folderId: string,
+    color: string
+): Promise<void> {
+    const folder = await prisma.mailFolder.findFirst({
+        where: { id: folderId, account: { userId } },
+        select: { id: true }
+    });
+    if (!folder) throw new MailAccessError("That folder is not yours.");
+    const wanted = /^#[0-9a-fA-F]{6}$/.test(color.trim()) ? color.trim().toLowerCase() : "";
+    await prisma.mailFolder.update({ where: { id: folder.id }, data: { color: wanted } });
 }
 
 /**
@@ -190,6 +188,20 @@ export async function actOnMessages(
     // A flag is not a move, and it used to be treated as one.
     const flag = FLAG_ACTIONS[action];
     if (flag) return await setFlag(userId, messages, flag);
+
+    // What somebody just said about these messages, before they are moved.
+    //
+    // Before, because moving one to Junk deletes its row and writes a new one in
+    // the destination on the next pass - so the words and the sender have to be
+    // read while they are still here. Only these two actions teach anything: the
+    // filter's own verdicts teach it nothing, or it would converge on believing
+    // whatever it happened to think first.
+    if (action === "junk" || action === "not-junk") {
+        const verdict = action === "junk" ? "junk" : "good";
+        for (const message of messages) {
+            await teachSpam(message.accountId, message.id, verdict);
+        }
+    }
 
     let done = 0;
     for (const [accountId, mine] of groupByAccount(messages)) {
