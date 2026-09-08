@@ -36,7 +36,7 @@ ENV PUPPETEER_SKIP_DOWNLOAD=true
 # Plain `npm ci`, no BuildKit cache mount: an update builds this on the operator's
 # own machine, and `docker compose` falls back to the classic builder wherever the
 # buildx plugin is absent - which rejects `RUN --mount` and fails the update.
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY . .
 # @polaris/messaging must be built first (the bridge bundles from its dist).

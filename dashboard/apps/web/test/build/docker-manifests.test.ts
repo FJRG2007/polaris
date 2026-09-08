@@ -23,6 +23,12 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
  * asks `npm ci` for a workspace that is not on the disk. Three service images
  * were doing that for months, each of them copying `apps/web` - which names
  * fourteen `@polaris` packages - while copying ten or twelve.
+ *
+ * Nothing here is a list of images or of stages. Both are read off the disk: an
+ * image added to `services/` is covered the day it lands, and a stage is checked
+ * against what IT copies rather than against the file's total. `vision` installs
+ * twice, in two stages that share nothing, and a manifest added to one of them
+ * leaves the other installing against a workspace that is not all there.
  */
 describe("an image copies the manifests it needs", () => {
     const root = join(__dirname, "..", "..", "..", "..");
@@ -49,46 +55,86 @@ describe("an image copies the manifests it needs", () => {
         return Object.keys(named).filter((name) => name.startsWith("@polaris/"));
     };
 
-    /** The manifests one Dockerfile copies in. */
-    const copiedBy = (dockerfile: string): Set<string> =>
-        new Set(
-            [
-                ...read(dockerfile).matchAll(
-                    /^COPY ((?:packages|apps|services)\/[a-z0-9-]+)\/package\.json/gm
-                )
-            ].map((match) => match[1])
-        );
+    /** One build stage that installs the workspace, and the manifests it copies in. */
+    type InstallStage = { dockerfile: string; stage: string; copied: Set<string> };
 
-    const images = [
-        "docker/Dockerfile",
-        "services/edge-guard/Dockerfile",
-        "services/messaging-bridge/Dockerfile",
-        "services/vision/Dockerfile"
-    ];
-
-    it.each(images)("%s names what the manifests it copies ask for", (dockerfile) => {
-        const copied = copiedBy(dockerfile);
-        expect(copied.size, `${dockerfile} copies no workspace manifest`).toBeGreaterThan(0);
-        const missing = new Set<string>();
-        for (const directory of copied) {
-            for (const dependency of internalDeps(directory)) {
-                const home = workspaces.get(dependency);
-                if (home && !copied.has(home)) missing.add(home);
-            }
+    /**
+     * The install stages of one Dockerfile. A stage qualifies when it copies the
+     * root manifest and lockfile - which is what makes its `npm ci` resolve the
+     * whole workspace - and at least one member's manifest, which is what leaves
+     * `mdns` (its own tiny lockfile, no workspace) out.
+     */
+    const installStages = (dockerfile: string): InstallStage[] => {
+        const stages: InstallStage[] = [];
+        const chunks = read(dockerfile).split(/^FROM /m).slice(1);
+        for (const [index, chunk] of chunks.entries()) {
+            if (!/^COPY package\.json package-lock\.json/m.test(chunk)) continue;
+            const copied = new Set(
+                [
+                    ...chunk.matchAll(
+                        /^COPY ((?:packages|apps|services)\/[a-z0-9-]+)\/package\.json/gm
+                    )
+                ].map((match) => match[1])
+            );
+            if (copied.size === 0) continue;
+            const named = chunk.match(/^\S+\s+AS\s+(\S+)/i);
+            stages.push({ dockerfile, stage: named ? named[1] : `stage ${index + 1}`, copied });
         }
-        expect([...missing].sort()).toEqual([]);
+        return stages;
+    };
+
+    /** Every Dockerfile in the repository, whether or not this test knew about it. */
+    const dockerfiles = (directory: string): string[] => {
+        const found: string[] = [];
+        for (const entry of readdirSync(join(root, directory), { withFileTypes: true })) {
+            if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+            const path = directory ? `${directory}/${entry.name}` : entry.name;
+            if (entry.isDirectory()) found.push(...dockerfiles(path));
+            else if (entry.name === "Dockerfile") found.push(path);
+        }
+        return found;
+    };
+
+    const stages = dockerfiles("").sort().flatMap(installStages);
+
+    it("finds the stages that install the workspace", () => {
+        // A discovery that returns nothing would leave every check below with no
+        // case to run and the suite green, which is the one way this file can
+        // stop testing anything without saying so.
+        expect(stages.map((stage) => `${stage.dockerfile} (${stage.stage})`)).not.toEqual([]);
     });
 
-    it.each(images)("%s names nothing that is not there", (dockerfile) => {
-        const present = new Set(workspaces.values());
-        expect([...copiedBy(dockerfile)].filter((named) => !present.has(named))).toEqual([]);
-    });
+    for (const { dockerfile, stage, copied } of stages) {
+        it(`${dockerfile} (${stage}) names what the manifests it copies ask for`, () => {
+            const missing = new Set<string>();
+            const unknown = new Set<string>();
+            for (const directory of copied) {
+                for (const dependency of internalDeps(directory)) {
+                    const home = workspaces.get(dependency);
+                    // No workspace publishes that name at all, so no COPY line can
+                    // satisfy it and `npm ci` fails on the lockfile itself - a
+                    // typo, or a package removed without its dependents.
+                    if (!home) unknown.add(`${directory} -> ${dependency}`);
+                    else if (!copied.has(home)) missing.add(home);
+                }
+            }
+            expect([...unknown].sort()).toEqual([]);
+            expect([...missing].sort()).toEqual([]);
+        });
+
+        it(`${dockerfile} (${stage}) names nothing that is not there`, () => {
+            const present = new Set(workspaces.values());
+            expect([...copied].filter((named) => !present.has(named))).toEqual([]);
+        });
+    }
 
     it("the dashboard's own image names every package, because it builds them all", () => {
         // The one image where the list really is the whole workspace: `npm run
         // build` walks every member, so a missing manifest here is the failure
         // described above rather than a subset chosen on purpose.
-        const copied = copiedBy("docker/Dockerfile");
+        const copied = new Set(
+            installStages("docker/Dockerfile").flatMap((stage) => [...stage.copied])
+        );
         const packages = [...workspaces.values()].filter((named) =>
             named.startsWith("packages/")
         );

@@ -32,7 +32,7 @@ COPY services/edge-guard/package.json ./services/edge-guard/
 # Plain `npm ci`, no BuildKit cache mount: an update builds this on the operator's
 # own machine, and `docker compose` falls back to the classic builder wherever the
 # buildx plugin is absent - which rejects `RUN --mount` and fails the update.
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 COPY . .
 # @polaris/core must be built first (the guard bundles from its dist), then bundle.
