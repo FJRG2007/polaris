@@ -67,7 +67,10 @@ function atLeast(role: SpaceAccess, minimum: core.SpaceRole): boolean {
  * member. One query, with the memberships and grants filtered to this actor, so
  * a screen resolving several spaces does not pay a round trip per way in.
  */
-export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promise<SpaceAccess | null> {
+export async function resolveSpaceRole(
+    actor: TaskActor,
+    spaceId: string
+): Promise<SpaceAccess | null> {
     const space = await prisma.taskSpace.findUnique({
         where: { id: spaceId },
         select: {
@@ -100,7 +103,8 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
         if (orgRoleGrants(space.org, "spaces.manage")) return "admin";
     }
 
-    let role: core.SpaceRole | null = (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
+    let role: core.SpaceRole | null =
+        (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
     for (const grant of space.teamGrants) {
         const granted = grant.role as core.SpaceRole;
         role = role ? core.strongerRole(role, granted) : granted;
@@ -153,12 +157,19 @@ function orgRoleGrants(
     const slug = org.members[0]?.role;
     if (!slug) return false;
     const row = org.roles.find((role) => role.slug === slug);
-    if (!row) return core.hasOrgPermission(core.ORG_SYSTEM_ROLES[slug]?.permissions ?? [], permission);
+    if (!row)
+        return core.hasOrgPermission(core.ORG_SYSTEM_ROLES[slug]?.permissions ?? [], permission);
     try {
         const parsed: unknown = JSON.parse(row.permissions);
         // Anything unreadable grants nothing, which is the safe direction for a
         // permission list.
-        return Array.isArray(parsed) && core.hasOrgPermission(parsed.filter((v): v is string => typeof v === "string"), permission);
+        return (
+            Array.isArray(parsed) &&
+            core.hasOrgPermission(
+                parsed.filter((v): v is string => typeof v === "string"),
+                permission
+            )
+        );
     } catch {
         return false;
     }
@@ -166,7 +177,11 @@ function orgRoleGrants(
 
 /** Resolve the space role or refuse. Returns the role so the caller can branch
  *  on it without a second query. */
-export async function requireSpace(actor: TaskActor, spaceId: string, minimum: core.SpaceRole): Promise<SpaceAccess> {
+export async function requireSpace(
+    actor: TaskActor,
+    spaceId: string,
+    minimum: core.SpaceRole
+): Promise<SpaceAccess> {
     const role = await resolveSpaceRole(actor, spaceId);
     if (!role) throw new TaskAccessError();
     if (!atLeast(role, minimum)) {
@@ -188,7 +203,10 @@ export async function requireSpace(actor: TaskActor, spaceId: string, minimum: c
  * which is what lets somebody be a guest across a client and a member on the one
  * project they are actually working.
  */
-async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<string, core.SpaceRole>> {
+async function grantedFolders(
+    actor: TaskActor,
+    spaceId: string
+): Promise<Map<string, core.SpaceRole>> {
     const [folders, personal, team, shared] = await Promise.all([
         prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true, parentId: true } }),
         prisma.taskFolderMember.findMany({
@@ -225,7 +243,10 @@ async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<st
 /** How a grant on the chain above something combines with what the space itself
  *  gives: the stronger of the two, since a grant is there to reach somebody into
  *  a branch and never to narrow them out of one. */
-function withGrant(spaceRole: SpaceAccess | null, granted: core.SpaceRole | null): SpaceAccess | null {
+function withGrant(
+    spaceRole: SpaceAccess | null,
+    granted: core.SpaceRole | null
+): SpaceAccess | null {
     if (spaceRole === "owner" || !granted) return spaceRole;
     return spaceRole ? core.strongerRole(spaceRole, granted) : granted;
 }
@@ -343,7 +364,8 @@ export async function writableTasks(
         }
         let role = spaceRoles.get(list.spaceId) ?? null;
         if (role !== "owner" && list.folderId) {
-            if (!grants.has(list.spaceId)) grants.set(list.spaceId, await grantedFolders(actor, list.spaceId));
+            if (!grants.has(list.spaceId))
+                grants.set(list.spaceId, await grantedFolders(actor, list.spaceId));
             role = withGrant(role, grants.get(list.spaceId)?.get(list.folderId) ?? null);
         }
         if (role && atLeast(role, minimum)) writableLists.add(list.id);
@@ -545,9 +567,12 @@ export async function shelfScope(actor: TaskActor): Promise<TaskScope> {
     if (ids.length === 0) return scope;
 
     const onShelf = new Set(
-        (await prisma.taskSpace.findMany({ where: { id: { in: ids }, orgId }, select: { id: true } })).map(
-            (space) => space.id
-        )
+        (
+            await prisma.taskSpace.findMany({
+                where: { id: { in: ids }, orgId },
+                select: { id: true }
+            })
+        ).map((space) => space.id)
     );
 
     const partialSpaceIds = scope.partialSpaceIds.filter((id) => onShelf.has(id));
@@ -567,7 +592,10 @@ export async function shelfScope(actor: TaskActor): Promise<TaskScope> {
         keptFolders.length === 0
             ? []
             : await prisma.taskList.findMany({
-                  where: { id: { in: scope.listIds }, folderId: { in: keptFolders.map((folder) => folder.id) } },
+                  where: {
+                      id: { in: scope.listIds },
+                      folderId: { in: keptFolders.map((folder) => folder.id) }
+                  },
                   select: { id: true }
               });
     const partialRoles: Record<string, core.SpaceRole> = {};

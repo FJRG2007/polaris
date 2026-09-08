@@ -34,13 +34,20 @@ export async function GET(
 
     const query = new URL(request.url).searchParams;
     try {
-        return await cameraHls(install.id, id, file, {
-            quality: query.get("q") === "sub" ? "sub" : "main",
-            session: query.get("id"),
-            sequence: query.get("n")
-        }, request.signal);
+        return await cameraHls(
+            install.id,
+            id,
+            file,
+            {
+                quality: query.get("q") === "sub" ? "sub" : "main",
+                session: query.get("id"),
+                sequence: query.get("n")
+            },
+            request.signal
+        );
     } catch (caught) {
-        if (caught instanceof CameraOfflineError) return new Response(caught.message, { status: 503 });
+        if (caught instanceof CameraOfflineError)
+            return new Response(caught.message, { status: 503 });
         throw caught;
     }
 }

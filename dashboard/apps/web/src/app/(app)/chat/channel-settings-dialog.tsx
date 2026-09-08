@@ -69,7 +69,9 @@ export function ChannelSettingsDialog({
     const stored = useMemo(() => core.normalizeChannelName(name), [name]);
     const dirty =
         channel !== null &&
-        (stored !== channel.name || topic !== (channel.topic ?? "") || slowmode !== channel.slowmode);
+        (stored !== channel.name ||
+            topic !== (channel.topic ?? "") ||
+            slowmode !== channel.slowmode);
 
     const save = async () => {
         if (!channel) return;

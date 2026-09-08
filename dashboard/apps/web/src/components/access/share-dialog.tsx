@@ -139,10 +139,7 @@ export function ShareDialog({
         return () => clearTimeout(timer);
     }, [kind, query, subject, subjectId]);
 
-    const groups = useMemo(
-        () => candidates.filter((one) => one.type === kind),
-        [candidates, kind]
-    );
+    const groups = useMemo(() => candidates.filter((one) => one.type === kind), [candidates, kind]);
 
     const reset = (): void => {
         setPrincipalId("");
@@ -167,8 +164,12 @@ export function ShareDialog({
             note,
             ...(limited
                 ? {
-                      startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
-                      endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+                      // The picked day, in the reader's own zone, and the last
+                      // one lent whole: sent as a bare date these are both
+                      // midnight UTC, which begins a grant early and ends it a
+                      // day short.
+                      startsAt: core.dayBegins(startsAt)?.toISOString(),
+                      endsAt: core.dayEnds(endsAt)?.toISOString(),
                       days,
                       startMinute: core.clockMinute(hours.from),
                       endMinute: core.clockMinute(hours.to),
@@ -311,7 +312,10 @@ export function ShareDialog({
 
                     {kind === "user" ? (
                         <div className="flex flex-col gap-1">
-                            <label className="text-[12px] text-muted-foreground" htmlFor="share-who">
+                            <label
+                                className="text-[12px] text-muted-foreground"
+                                htmlFor="share-who"
+                            >
                                 Search for somebody
                             </label>
                             <div className="relative">
@@ -392,7 +396,11 @@ export function ShareDialog({
                                     />
                                     Only sometimes
                                 </span>
-                                <Switch checked={limited} onChange={setLimited} aria-label="Limit when this works" />
+                                <Switch
+                                    checked={limited}
+                                    onChange={setLimited}
+                                    aria-label="Limit when this works"
+                                />
                             </label>
 
                             {limited ? (
@@ -403,7 +411,9 @@ export function ShareDialog({
                                                 id="share-from-day"
                                                 type="date"
                                                 value={startsAt}
-                                                onChange={(event) => setStartsAt(event.target.value)}
+                                                onChange={(event) =>
+                                                    setStartsAt(event.target.value)
+                                                }
                                             />
                                         </Field>
                                         <Field label="Until this day" htmlFor="share-to-day">

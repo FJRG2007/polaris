@@ -59,7 +59,9 @@ describe("the page survives a conversation that is not there", () => {
         // when there are messages to build it from. Reaching `messages[0]!`
         // unguarded is the crash this guards, and it is one edit away.
         const views = await readFile(`${MAILBOX}views.ts`, "utf8");
-        expect(views).toContain("if (messages.length === 0) return { thread: null, messages: [] };");
+        expect(views).toContain(
+            "if (messages.length === 0) return { thread: null, messages: [] };"
+        );
 
         // And the client half: a conversation the list does not have still opens
         // from its own answer, rather than the screen deciding there is nothing

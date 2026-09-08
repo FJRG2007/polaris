@@ -161,7 +161,9 @@ export function DeviceControls({
                     <Button
                         key={action}
                         size="sm"
-                        variant={PRIMARY_ACTIONS.includes(action) && !already ? "primary" : "outline"}
+                        variant={
+                            PRIMARY_ACTIONS.includes(action) && !already ? "primary" : "outline"
+                        }
                         disabled={busy !== null || !device.online || already}
                         onClick={() => onAct(action)}
                     >
@@ -313,7 +315,8 @@ export function DevicePanel({
                                         device.zone,
                                         device.model,
                                         device.firmware && `firmware ${device.firmware}`,
-                                        device.batteryPercent !== null && `battery ${device.batteryPercent}%`,
+                                        device.batteryPercent !== null &&
+                                            `battery ${device.batteryPercent}%`,
                                         device.stateAt && `read at ${format.time(device.stateAt)}`
                                     ]
                                         .filter(Boolean)
@@ -327,7 +330,10 @@ export function DevicePanel({
                                     </p>
                                 )}
                                 {error && (
-                                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                                    <p
+                                        role="alert"
+                                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                                    >
                                         {error}
                                     </p>
                                 )}

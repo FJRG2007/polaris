@@ -82,11 +82,7 @@ vi.mock("@polaris/db", () => ({
         // said no. Empty in every case but the two about being handed a space
         // or a room.
         accessGrant: {
-            findMany: async ({
-                where
-            }: {
-                where: { subjectType: string; subjectId?: string };
-            }) =>
+            findMany: async ({ where }: { where: { subjectType: string; subjectId?: string } }) =>
                 grants.filter(
                     (row) =>
                         row.subjectType === where.subjectType &&
@@ -253,15 +249,40 @@ describe("reaching a channel", () => {
         // One room of a space handed to one team, which is what a grant on the
         // channel itself means - and a grant on the SPACE deliberately does not
         // do this: private means chosen.
+        // Nobody's own space, no org of theirs, and nothing that would let them
+        // reach it: the room is the whole of what they were handed.
         spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "internal" }];
-        orgIds = ["o1"];
+        orgIds = [];
         channels = [{ id: "c1", spaceId: "s1", kind: "text", private: true, archived: false }];
         teams = ["team-support"];
         grants = [handedTo("chat.channel", "c1", "team", "team-support", "member")];
+        expect(await access.spaceAccess(me, "s1")).toBeNull();
         const reach = await access.channelAccess(me, "c1");
         expect(reach?.channelId).toBe("c1");
         // Reached without a membership row, so nothing here writes a read mark.
         expect(reach?.member).toBe(false);
+        expect(reach?.mayPost).toBe(true);
+        expect(reach?.mayAdminister).toBe(false);
+    });
+
+    it("opens a public room handed on its own, in a space that is not theirs", async () => {
+        spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "private" }];
+        orgIds = [];
+        channels = [{ id: "c1", spaceId: "s1", kind: "text", private: false, archived: false }];
+        teams = ["team-support"];
+        grants = [handedTo("chat.channel", "c1", "team", "team-support", "admin")];
+        const reach = await access.channelAccess(me, "c1");
+        expect(reach?.channelId).toBe("c1");
+        expect(reach?.mayAdminister).toBe(true);
+        // Everything the rail lists has to open, or the room is drawn and refuses.
+        expect(await access.reachableChannelIds(me)).toContain("c1");
+    });
+
+    it("refuses a room in a space that is not theirs when nothing was handed over", async () => {
+        spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "private" }];
+        orgIds = [];
+        channels = [{ id: "c1", spaceId: "s1", kind: "text", private: false, archived: false }];
+        expect(await access.channelAccess(me, "c1")).toBeNull();
     });
 
     it("keeps a private channel shut to somebody who is in the space", async () => {

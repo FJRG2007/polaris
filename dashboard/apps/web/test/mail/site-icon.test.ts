@@ -74,13 +74,19 @@ describe("the icons a page names", () => {
     it("ignores Safari's pinned-tab silhouette", () => {
         // A single-path mask meant to be recoloured, which draws as a black blob.
         expect(
-            iconLinks(`<head><link rel="mask-icon" href="/pin.svg" color="#000"></head>`, "https://example.com/")
+            iconLinks(
+                `<head><link rel="mask-icon" href="/pin.svg" color="#000"></head>`,
+                "https://example.com/"
+            )
         ).toEqual([]);
     });
 
     it("never offers an address nothing can be fetched from", () => {
         expect(
-            iconLinks(`<head><link rel="icon" href="data:image/png;base64,AAAA"></head>`, "https://example.com/")
+            iconLinks(
+                `<head><link rel="icon" href="data:image/png;base64,AAAA"></head>`,
+                "https://example.com/"
+            )
         ).toEqual([]);
     });
 
@@ -92,12 +98,15 @@ describe("the icons a page names", () => {
     it("asks for no more than three of them", () => {
         const many = Array.from(
             { length: 9 },
-            (_, index) => `<link rel="icon" href="/${index}.png" sizes="${(index + 1) * 16}x${(index + 1) * 16}">`
+            (_, index) =>
+                `<link rel="icon" href="/${index}.png" sizes="${(index + 1) * 16}x${(index + 1) * 16}">`
         ).join("");
         expect(iconLinks(`<head>${many}</head>`, "https://example.com/")).toHaveLength(3);
     });
 
     it("has nothing to offer for a page that names none", () => {
-        expect(iconLinks("<head><title>nothing</title></head>", "https://example.com/")).toEqual([]);
+        expect(iconLinks("<head><title>nothing</title></head>", "https://example.com/")).toEqual(
+            []
+        );
     });
 });

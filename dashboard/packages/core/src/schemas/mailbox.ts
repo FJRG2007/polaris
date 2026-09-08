@@ -29,7 +29,10 @@ export function normalizeMailAddress(value: string): string {
 /** The display name beside an address, trimmed and stripped of the characters
  *  that would split a header if they reached one. */
 export function normalizeMailName(value: string): string {
-    return value.replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim();
+    return value
+        .replace(/[\r\n\t]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 export const mailAddress = z
@@ -54,7 +57,9 @@ export const mailRecipient = z.object({
     address: mailAddress
 });
 
-export const mailRecipientList = z.array(mailRecipient).max(200, "That is more recipients than one message should carry");
+export const mailRecipientList = z
+    .array(mailRecipient)
+    .max(200, "That is more recipients than one message should carry");
 
 export const mailHost = z
     .string()
@@ -191,10 +196,18 @@ export const mailVacationSchema = z
     })
     .superRefine((value, context) => {
         if (value.enabled && !value.body.trim()) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["body"], message: "Write what it should say" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["body"],
+                message: "Write what it should say"
+            });
         }
         if (value.startsAt && value.endsAt && value.endsAt <= value.startsAt) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["endsAt"], message: "It has to end after it starts" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["endsAt"],
+                message: "It has to end after it starts"
+            });
         }
     });
 
@@ -259,10 +272,18 @@ export const mailComposeSchema = z
     })
     .superRefine((value, context) => {
         if (value.to.length + value.cc.length + value.bcc.length === 0) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["to"], message: "Say who it goes to" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["to"],
+                message: "Say who it goes to"
+            });
         }
         if (value.sendAt && value.sendAt.getTime() < Date.now() - 60_000) {
-            context.addIssue({ code: z.ZodIssueCode.custom, path: ["sendAt"], message: "That time has passed" });
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["sendAt"],
+                message: "That time has passed"
+            });
         }
     });
 
@@ -323,10 +344,7 @@ export const mailSnoozeSchema = z.object({
 });
 
 export const mailLabelSchema = z.object({
-    name: z
-        .string()
-        .transform(normalizeMailName)
-        .pipe(z.string().min(1, "Give it a name").max(60)),
+    name: z.string().transform(normalizeMailName).pipe(z.string().min(1, "Give it a name").max(60)),
     color: z
         .string()
         .trim()
@@ -344,7 +362,16 @@ export const mailLabelApplySchema = z.object({
 /* Rules                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const mailRuleField = z.enum(["from", "to", "recipient", "subject", "body", "list", "attachment", "size"]);
+export const mailRuleField = z.enum([
+    "from",
+    "to",
+    "recipient",
+    "subject",
+    "body",
+    "list",
+    "attachment",
+    "size"
+]);
 
 export const mailRuleOperator = z.enum([
     "contains",
@@ -455,7 +482,10 @@ export type MailPrivacy = z.infer<typeof mailPrivacySchema>;
 export const mailPageSchema = z.object({
     accountId: z.string().trim().max(64).nullable().default(null),
     folderId: z.string().trim().max(64).nullable().default(null),
-    role: z.enum(["inbox", "archive", "sent", "drafts", "trash", "junk", "none"]).nullable().default(null),
+    role: z
+        .enum(["inbox", "archive", "sent", "drafts", "trash", "junk", "none"])
+        .nullable()
+        .default(null),
     labelId: z.string().trim().max(64).nullable().default(null),
     unreadOnly: z.boolean().default(false),
     readOnly: z.boolean().default(false),

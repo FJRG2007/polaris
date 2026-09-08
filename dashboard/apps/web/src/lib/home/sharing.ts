@@ -26,10 +26,17 @@
  * refused costs nothing.
  */
 
+import { cache } from "react";
 import * as core from "@polaris/core";
 import { HomeError } from "@/lib/home/home-error";
 import { sessionCan, type SessionUser } from "@/lib/session";
-import { grantedSubjects, liveGrants, spendGrant, type LiveGrant } from "@/lib/access/grants";
+import {
+    grantedSubjects,
+    liveGrants,
+    reachesAnySubject,
+    spendGrant,
+    type LiveGrant
+} from "@/lib/access/grants";
 
 /** What one account reaches in Places. */
 export interface PlacesReach {
@@ -62,15 +69,20 @@ export async function placesReach(user: SessionUser): Promise<PlacesReach> {
     return { everything: false, cameras, devices };
 }
 
-/** Whether they reach Places at all, which is what decides if the app is in
- *  their switcher. Somebody lent one door has an app to open. */
-export async function reachesPlaces(userId: string): Promise<boolean> {
-    const [cameras, devices] = await Promise.all([
-        grantedSubjects(userId, "place.camera"),
-        grantedSubjects(userId, "place.device")
-    ]);
-    return cameras.size > 0 || devices.size > 0;
-}
+/**
+ * Whether they reach Places at all, which is what decides if the app is in
+ * their switcher. Somebody lent one door has an app to open.
+ *
+ * On the path that draws the navigation of every screen in the app, and asked
+ * for everybody who does not hold `home.read` - which is most people. So it is
+ * one query for both kinds rather than one each, and it is held for the length
+ * of a request: a page that resolves its navigation, its landing path and a
+ * refusal's destination asks this three times and pays for it once.
+ */
+export const reachesPlaces = cache(
+    async (userId: string): Promise<boolean> =>
+        reachesAnySubject(userId, ["place.camera", "place.device"])
+);
 
 /** Whether a reach covers one camera. */
 export function reachesCamera(reach: PlacesReach, cameraId: string): boolean {
@@ -158,7 +170,17 @@ export async function requireDeviceView(user: SessionUser, deviceId: string): Pr
  *
  * Never before: a door that would not move has not been used, and charging a
  * visitor for it would leave them locked out by a failure that was not theirs.
+ *
+ * And never the other way round either. This is bookkeeping about an act that is
+ * already over - the door has moved - so a grant revoked in between, or anything
+ * else that goes wrong writing the count, is logged rather than raised. Telling
+ * somebody the door did not open when it did is the worse of the two answers.
  */
 export async function countDeviceUse(grant: LiveGrant | null): Promise<void> {
-    if (grant) await spendGrant(grant);
+    if (!grant) return;
+    try {
+        await spendGrant(grant);
+    } catch (caught) {
+        console.error("places: a use could not be counted", caught);
+    }
 }

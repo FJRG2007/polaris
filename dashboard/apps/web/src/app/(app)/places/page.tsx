@@ -31,15 +31,19 @@ export default async function PlacePage() {
                     description="Every camera here, and what it can see right now."
                 />
                 <div className="flex flex-wrap items-center gap-2">
-                    <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
-                {canManage ? (
-                    <Button asChild size="sm" variant="ghost">
-                        <Link href="/places/cameras">
-                            <Plus className="size-4 shrink-0" />
-                            Add a camera
-                        </Link>
-                    </Button>
-                ) : null}
+                    <PlaceSwitcher
+                        places={place.places}
+                        current={place.current}
+                        canManage={canManage}
+                    />
+                    {canManage ? (
+                        <Button asChild size="sm" variant="ghost">
+                            <Link href="/places/cameras">
+                                <Plus className="size-4 shrink-0" />
+                                Add a camera
+                            </Link>
+                        </Button>
+                    ) : null}
                 </div>
             </div>
             <Wall canManage={canManage} canControl={canControl} />

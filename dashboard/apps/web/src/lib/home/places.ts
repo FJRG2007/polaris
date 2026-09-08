@@ -21,7 +21,12 @@ import { PLACE_KINDS, type PlaceView } from "@/lib/home/place-kinds";
 
 // Re-exported so server code has one import for "places"; the browser reaches
 // for the pure module directly.
-export { PLACE_KINDS, PLACE_KIND_LABELS, type PlaceKind, type PlaceView } from "@/lib/home/place-kinds";
+export {
+    PLACE_KINDS,
+    PLACE_KIND_LABELS,
+    type PlaceKind,
+    type PlaceView
+} from "@/lib/home/place-kinds";
 
 /** What the first place is called when Polaris has to invent one. */
 const FIRST_PLACE = "Home";
@@ -42,7 +47,13 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
     const rows = await prisma.place.findMany({
         where: { installedAppId },
         orderBy: { createdAt: "asc" },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
 
     const places = rows.length > 0 ? rows : [await createFirstPlace(installedAppId)];
@@ -67,10 +78,65 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
     }));
 }
 
+/**
+ * The list, cut down to what somebody was actually lent.
+ *
+ * A place carries the street address of a property, so the switcher is not a
+ * harmless list: handing the whole one to somebody lent a single door tells them
+ * where every other property in the deployment is. This answers with the places
+ * that hold something they reach, and with the camera count of that much of it
+ * rather than of the whole place.
+ */
+export async function placesHolding(
+    installedAppId: string,
+    all: readonly PlaceView[],
+    cameraIds: readonly string[],
+    deviceIds: readonly string[]
+): Promise<PlaceView[]> {
+    if (cameraIds.length === 0 && deviceIds.length === 0) return [];
+    const [cameras, devices] = await Promise.all([
+        cameraIds.length > 0
+            ? prisma.camera.findMany({
+                  where: { installedAppId, id: { in: [...cameraIds] } },
+                  select: { placeId: true }
+              })
+            : [],
+        deviceIds.length > 0
+            ? prisma.placeDevice.findMany({
+                  where: { installedAppId, id: { in: [...deviceIds] } },
+                  select: { placeId: true }
+              })
+            : []
+    ]);
+    const seen = new Map<string, number>();
+    // A camera or a door that is in no place yet is listed under whichever place
+    // is being looked at, so the first one is where its holder finds it. Without
+    // this a visitor lent an unplaced door is shown no place at all, and then
+    // cannot choose the one their door is drawn in.
+    const first = all[0];
+    for (const row of cameras) {
+        const placeId = row.placeId ?? first?.id;
+        if (placeId) seen.set(placeId, (seen.get(placeId) ?? 0) + 1);
+    }
+    for (const row of devices) {
+        const placeId = row.placeId ?? first?.id;
+        if (placeId && !seen.has(placeId)) seen.set(placeId, 0);
+    }
+    return all
+        .filter((place) => seen.has(place.id))
+        .map((place) => ({ ...place, cameras: seen.get(place.id) ?? 0 }));
+}
+
 async function createFirstPlace(installedAppId: string) {
     const created = await prisma.place.create({
         data: { installedAppId, name: FIRST_PLACE, kind: "house" },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
     return created;
 }
@@ -80,10 +146,22 @@ async function createFirstPlace(installedAppId: string) {
 export async function getPlace(installedAppId: string, id: string): Promise<PlaceView | null> {
     const row = await prisma.place.findFirst({
         where: { id, installedAppId },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
     return row
-        ? { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: row._count.cameras }
+        ? {
+              id: row.id,
+              name: row.name,
+              kind: row.kind,
+              address: row.address ?? "",
+              cameras: row._count.cameras
+          }
         : null;
 }
 
@@ -103,8 +181,15 @@ export async function createPlace(installedAppId: string, input: PlaceInput): Pr
     return { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: 0 };
 }
 
-export async function updatePlace(installedAppId: string, id: string, input: PlaceInput): Promise<PlaceView> {
-    const existing = await prisma.place.findFirst({ where: { id, installedAppId }, select: { id: true } });
+export async function updatePlace(
+    installedAppId: string,
+    id: string,
+    input: PlaceInput
+): Promise<PlaceView> {
+    const existing = await prisma.place.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
     if (!existing) throw new HomeError("Place not found");
     const name = input.name.trim();
     if (!name) throw new HomeError("Give it a name");
@@ -112,9 +197,21 @@ export async function updatePlace(installedAppId: string, id: string, input: Pla
     const row = await prisma.place.update({
         where: { id },
         data: { name, kind, address: input.address.trim() || null },
-        select: { id: true, name: true, kind: true, address: true, _count: { select: { cameras: true } } }
+        select: {
+            id: true,
+            name: true,
+            kind: true,
+            address: true,
+            _count: { select: { cameras: true } }
+        }
     });
-    return { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: row._count.cameras };
+    return {
+        id: row.id,
+        name: row.name,
+        kind: row.kind,
+        address: row.address ?? "",
+        cameras: row._count.cameras
+    };
 }
 
 /**

@@ -14,7 +14,10 @@ import { cameraStill, CameraOfflineError } from "@/lib/home/live";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     // Checked against this camera below, once its id is known: a camera lent
@@ -29,7 +32,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     // of a megabyte, several times a second, to fill a postcard.
     const query = new URL(request.url).searchParams;
     const asked = Number(query.get("w"));
-    const width = Number.isFinite(asked) && asked >= 160 && asked <= 1920 ? Math.round(asked) : undefined;
+    const width =
+        Number.isFinite(asked) && asked >= 160 && asked <= 1920 ? Math.round(asked) : undefined;
     // Asked for by a screen showing one camera, where a picture a second reads
     // as a slideshow rather than as a view. A wall never asks for it: twelve
     // tiles at four frames a second is the cost the shared cache exists to
@@ -55,7 +59,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     } catch (caught) {
         // A camera that is asleep, starting, or off is not a server fault, and the
         // tile that asked has its own way of saying so.
-        if (caught instanceof CameraOfflineError) return new Response(caught.message, { status: 503 });
+        if (caught instanceof CameraOfflineError)
+            return new Response(caught.message, { status: 503 });
         throw caught;
     }
 }

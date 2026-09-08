@@ -28,12 +28,12 @@
  */
 
 import { can } from "@polaris/auth";
-import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
-import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
+import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
 export interface ChatActor {
@@ -190,12 +190,12 @@ export async function channelAccess(
     // a moderation tool rather than a per-room nuisance - so the space's row is
     // read as well as this room's, and the later of the two is the one in force.
     const spaceTimeout = channel.spaceId
-        ? (
+        ? ((
               await prisma.chatSpaceMember.findUnique({
                   where: { spaceId_userId: { spaceId: channel.spaceId, userId: actor.id } },
                   select: { timeoutUntil: true }
               })
-          )?.timeoutUntil ?? null
+          )?.timeoutUntil ?? null)
         : null;
     const mutedUntil = latest(membership?.timeoutUntil ?? null, spaceTimeout);
     // Expired is the same as never: it ends on its own, which is the whole
@@ -224,16 +224,21 @@ export async function channelAccess(
     }
 
     const space = await spaceAccess(actor, channel.spaceId);
-    if (!space) return null;
-    // A private channel is reached by a row in it, or by a grant naming the
-    // channel itself - which is how one room of a space goes to one team without
-    // the rest of the space going with it. A grant on the space does not open
-    // its private rooms: private means chosen, and a grant is not a choice about
-    // this room.
+    // A channel is reached by a grant naming the channel itself - which is how
+    // one room of a space goes to one team without the rest of the space going
+    // with it, and so it has to stand on its own: somebody handed the room and
+    // nothing else does not reach the space, and asking the space first would
+    // refuse them a room they were given. A grant on the SPACE is the other
+    // direction and does not open its private rooms: private means chosen, and a
+    // grant on the space is not a choice about this room.
+    //
+    // Asked only once every ordinary standing has come back short, so the common
+    // case still pays for no extra query.
     const granted =
-        channel.private && !membership
+        !space || (channel.private && !membership)
             ? await grantedCapability(actor.id, "chat.channel", channel.id)
             : "";
+    if (!space && !granted) return null;
     if (channel.private && !membership && !granted) return null;
 
     const admin =

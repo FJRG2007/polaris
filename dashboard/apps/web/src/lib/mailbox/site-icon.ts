@@ -48,7 +48,9 @@ const LINK_TAG = /<link\b[^>]*>/gi;
 
 /** One attribute off a tag, in any of the three ways markup writes one. */
 function attribute(tag: string, name: string): string {
-    const found = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i").exec(tag);
+    const found = new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i").exec(
+        tag
+    );
     return (found?.[2] ?? found?.[3] ?? found?.[4] ?? "").trim();
 }
 
@@ -91,7 +93,8 @@ export function iconLinks(html: string, base: string): IconLink[] {
 
     for (const [tag] of head.matchAll(LINK_TAG)) {
         const rel = attribute(tag, "rel").toLowerCase().split(/\s+/);
-        const apple = rel.includes("apple-touch-icon") || rel.includes("apple-touch-icon-precomposed");
+        const apple =
+            rel.includes("apple-touch-icon") || rel.includes("apple-touch-icon-precomposed");
         // `mask-icon` falls out here on its own: it is one token, and not the
         // one this is looking for.
         if (!apple && !rel.includes("icon")) continue;
@@ -121,5 +124,7 @@ export function iconLinks(html: string, base: string): IconLink[] {
         if (!held || distance(link) < distance(held)) found.set(link.href, link);
     }
 
-    return [...found.values()].sort((left, right) => distance(left) - distance(right)).slice(0, KEEP);
+    return [...found.values()]
+        .sort((left, right) => distance(left) - distance(right))
+        .slice(0, KEEP);
 }

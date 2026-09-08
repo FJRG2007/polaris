@@ -83,6 +83,18 @@ export function writeSnapshot<T>(key: string, value: T): void {
     }
 }
 
+/**
+ * Everything this tab kept, gone.
+ *
+ * What signing out does. A snapshot is what the reader last saw - a mailbox's
+ * subject lines, a folder's file names, which doors are open - and sessionStorage
+ * outlives a sign-out, so without this the next person to sign in on the same tab
+ * paints the previous one's list until the request behind it lands.
+ */
+export function dropAllSnapshots(): void {
+    dropSnapshots("");
+}
+
 /** Forget every snapshot whose key starts with `keyPrefix` - what a write does to
  *  the reads it invalidates. */
 export function dropSnapshots(keyPrefix: string): void {

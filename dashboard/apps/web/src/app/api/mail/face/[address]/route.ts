@@ -94,7 +94,10 @@ export async function GET(
         select: { id: true }
     });
     if (person) {
-        return Response.redirect(new URL(`/api/avatar/${person.id}`, "http://polaris.invalid"), 307);
+        return Response.redirect(
+            new URL(`/api/avatar/${person.id}`, "http://polaris.invalid"),
+            307
+        );
     }
 
     const held = remembered().get(domain);
@@ -103,7 +106,11 @@ export async function GET(
     }
 
     const found = await fetchMark(domain);
-    remembered().set(domain, { at: Date.now(), bytes: found?.bytes ?? null, type: found?.type ?? "" });
+    remembered().set(domain, {
+        at: Date.now(),
+        bytes: found?.bytes ?? null,
+        type: found?.type ?? ""
+    });
     return found ? picture(found.bytes, found.type) : gone();
 }
 
@@ -217,5 +224,8 @@ function picture(bytes: Uint8Array, type: string): Response {
 /** No picture. The list draws initials, which is what an `<img>` that fails
  *  tells it to do. */
 function gone(): Response {
-    return new Response(null, { status: 404, headers: { "cache-control": "private, max-age=3600" } });
+    return new Response(null, {
+        status: 404,
+        headers: { "cache-control": "private, max-age=3600" }
+    });
 }

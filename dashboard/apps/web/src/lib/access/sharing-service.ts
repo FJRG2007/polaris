@@ -145,8 +145,13 @@ export async function shareCandidates(
     ];
 }
 
-/** Which organizations' groups are on the table for this subject. */
-async function owningOrgIds(
+/**
+ * Which organizations' groups are on the table for this subject.
+ *
+ * Exported because the write needs the same answer the picker got: a form is
+ * filled in by a screen, and a share is written by whoever calls the action.
+ */
+export async function owningOrgIds(
     user: SessionUser,
     subject: core.GrantSubject,
     subjectId: string
@@ -169,7 +174,12 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
                 })
             );
         case "chat.space":
-            return orgOf(await prisma.chatSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.chatSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         case "chat.channel": {
             const channel = await prisma.chatChannel.findUnique({
                 where: { id: subjectId },
@@ -178,7 +188,12 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
             return channel?.space?.orgId ?? null;
         }
         case "task.space":
-            return orgOf(await prisma.taskSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.taskSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         case "task.folder": {
             const folder = await prisma.taskFolder.findUnique({
                 where: { id: subjectId },
@@ -187,7 +202,12 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
             return folder?.space?.orgId ?? null;
         }
         case "note.space":
-            return orgOf(await prisma.noteSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
+            return orgOf(
+                await prisma.noteSpace.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         default:
             return null;
     }

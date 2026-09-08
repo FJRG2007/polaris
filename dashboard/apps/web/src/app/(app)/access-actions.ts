@@ -20,6 +20,7 @@ import { requireUser } from "@/lib/session";
 import { findPeople } from "@/lib/people-search";
 import { recordAudit } from "@/lib/audit-service";
 import {
+    owningOrgIds,
     requireMayShare,
     shareCandidates,
     type GrantCandidate
@@ -93,7 +94,15 @@ export async function shareAction(
         if (!parsed.success) {
             return { error: parsed.error.issues[0]?.message ?? "That share could not be written" };
         }
-        await writeGrant(kind, String(subjectId), parsed.data, user.id);
+        // The same scoping the picker was filled from, asked again here: what a
+        // form offered is not what a call has to carry.
+        await writeGrant(
+            kind,
+            String(subjectId),
+            parsed.data,
+            user.id,
+            await owningOrgIds(user, kind, String(subjectId))
+        );
         await recordAudit({
             actorId: user.id,
             action: "access.shared",
@@ -103,7 +112,9 @@ export async function shareAction(
                 principalType: parsed.data.principalType,
                 capability: parsed.data.capability,
                 // Never the note: it is free text somebody wrote about a person.
-                bounded: Boolean(parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses)
+                bounded: Boolean(
+                    parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses
+                )
             }
         });
         settled(kind);

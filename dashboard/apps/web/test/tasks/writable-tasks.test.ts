@@ -13,7 +13,9 @@ const SPACE = "s1";
 const OTHER = "s2";
 
 const taskFindMany = vi.fn(async () => [] as { id: string; listId: string; spaceId: string }[]);
-const listFindMany = vi.fn(async () => [] as { id: string; spaceId: string; folderId: string | null }[]);
+const listFindMany = vi.fn(
+    async () => [] as { id: string; spaceId: string; folderId: string | null }[]
+);
 const spaceFindUnique = vi.fn(async (_args: unknown) => null as unknown);
 const folderFindMany = vi.fn(async () => [] as { id: string; parentId: string | null }[]);
 const folderMemberFindMany = vi.fn(
@@ -56,7 +58,9 @@ function showing(lists: { id: string; spaceId: string; folderId?: string | null 
     taskFindMany.mockResolvedValueOnce(
         lists.map((list) => ({ id: `t-${list.id}`, listId: list.id, spaceId: list.spaceId }))
     );
-    listFindMany.mockResolvedValueOnce(lists.map((list) => ({ ...list, folderId: list.folderId ?? null })));
+    listFindMany.mockResolvedValueOnce(
+        lists.map((list) => ({ ...list, folderId: list.folderId ?? null }))
+    );
 }
 
 /** A personal space, which is what these cases are about: no organization, and
@@ -84,7 +88,9 @@ describe("the tasks in a set somebody may write", () => {
         showing([{ id: "l1", spaceId: SPACE }]);
         spaceFindUnique.mockResolvedValue(space("internal", [{ role: "member" }]));
 
-        expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([{ id: "t-l1", spaceId: SPACE }]);
+        expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([
+            { id: "t-l1", spaceId: SPACE }
+        ]);
     });
 
     it("drops the tasks in the spaces they only read and keeps the rest", async () => {
@@ -94,10 +100,14 @@ describe("the tasks in a set somebody may write", () => {
         ]);
         spaceFindUnique.mockImplementation(async (args: unknown) => {
             const { where } = args as { where: { id: string } };
-            return where.id === SPACE ? space("private", [{ role: "member" }]) : space("internal", []);
+            return where.id === SPACE
+                ? space("private", [{ role: "member" }])
+                : space("internal", []);
         });
 
-        expect(await writableTasks(READER, ["t-l1", "t-l2"], "member")).toEqual([{ id: "t-l1", spaceId: SPACE }]);
+        expect(await writableTasks(READER, ["t-l1", "t-l2"], "member")).toEqual([
+            { id: "t-l1", spaceId: SPACE }
+        ]);
     });
 
     it("counts a folder grant that reaches the list, and only up to what it gives", async () => {
@@ -110,7 +120,9 @@ describe("the tasks in a set somebody may write", () => {
 
         folderMemberFindMany.mockResolvedValue([{ folderId: "f1", role: "member" }]);
         showing([{ id: "l1", spaceId: SPACE, folderId: "f1" }]);
-        expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([{ id: "t-l1", spaceId: SPACE }]);
+        expect(await writableTasks(READER, ["t-l1"], "member")).toEqual([
+            { id: "t-l1", spaceId: SPACE }
+        ]);
     });
 
     it("asks the database nothing when it was handed nothing", async () => {

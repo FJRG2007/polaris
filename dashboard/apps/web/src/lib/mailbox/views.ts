@@ -200,15 +200,15 @@ export async function listThreads(
         // as JSON, which the database cannot be asked about usefully - which is
         // why searching for the sender's own address found nothing at all. It is
         // answered in `matchingThreads` instead, over a bounded window.
-        ...(query.from
-            ? { fromJson: { string_contains: query.from.trim().toLowerCase() } }
-            : {})
+        ...(query.from ? { fromJson: { string_contains: query.from.trim().toLowerCase() } } : {})
     };
 
     // Which conversations the search admits, decided before the list is drawn so
     // the page, the cursor and the order below are the ordinary ones.
     const terms = query.query.trim() ? core.parseMailSearch(query.query) : core.EMPTY_SEARCH;
-    const matched = core.searchIsEmpty(terms) ? null : await matchingThreads(accountIds, query, terms);
+    const matched = core.searchIsEmpty(terms)
+        ? null
+        : await matchingThreads(accountIds, query, terms);
     if (matched && matched.size === 0) return { threads: [], cursor: "" };
 
     const threads = await prisma.mailThread.findMany({
@@ -385,7 +385,11 @@ async function matchingThreads(
             // One field rather than three, so a name in the To line scores the
             // same as the same name in the From line - which is what somebody
             // typing a colleague's name into the box means.
-            { name: "people", weight: 0.3, getFn: (message) => [...message.from, ...message.to, ...message.cc] },
+            {
+                name: "people",
+                weight: 0.3,
+                getFn: (message) => [...message.from, ...message.to, ...message.cc]
+            },
             { name: "snippet", weight: 0.2 },
             { name: "body", weight: 0.1 }
         ]

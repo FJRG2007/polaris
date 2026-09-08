@@ -27,7 +27,11 @@ export default async function DevicesPage() {
                     title="Devices"
                     description="The locks, switches and lights at this place: what they are doing, who has used them, and the buttons to work them."
                 />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <DevicesView places={place.places} canControl={canControl} canManage={canManage} />
         </div>

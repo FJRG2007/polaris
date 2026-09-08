@@ -169,7 +169,10 @@ export async function grantedCapability(
     now = new Date()
 ): Promise<string> {
     const held = await liveGrants(userId, subject, subjectId, now);
-    return core.strongest(subject, held.map((grant) => grant.capability));
+    return core.strongest(
+        subject,
+        held.map((grant) => grant.capability)
+    );
 }
 
 /**
@@ -242,6 +245,34 @@ export async function grantedSubjects(
 }
 
 /**
+ * Whether this account reaches anything at all of these kinds, right now.
+ *
+ * The question navigation asks on every page, for everybody who does not hold
+ * the app's own permission - which is most people. `grantedSubjects` per kind
+ * would resolve the caller's teams and roles once per kind and query once per
+ * kind; this resolves them once and asks once, whatever it is asked about.
+ *
+ * Unlike `liveGrants` there is no cheap "nothing is shared" short circuit to be
+ * had: the question is asked by principal, so the query has to be the one that
+ * matches the principal. Keeping it to a single query is what makes it bearable
+ * on a path that runs on every render.
+ */
+export async function reachesAnySubject(
+    userId: string,
+    subjects: readonly core.GrantSubject[],
+    now = new Date()
+): Promise<boolean> {
+    const principals = await principalsOf(userId);
+    const rows = await prisma.accessGrant.findMany({
+        where: { subjectType: { in: [...subjects] }, ...addressedTo(principals) },
+        select: GRANT_FIELDS
+    });
+    if (rows.length === 0) return false;
+    const zone = await houseZone(rows);
+    return rows.some((row) => core.judgeGrant(row, now, zone).standing === "live");
+}
+
+/**
  * Count one use against a grant, if it is counted at all.
  *
  * Bounded in the statement rather than read and then written, so two presses
@@ -251,7 +282,11 @@ export async function grantedSubjects(
  */
 export async function spendGrant(grant: LiveGrant): Promise<boolean> {
     if (!grant.counted) {
-        await prisma.accessGrant.update({
+        // `updateMany` rather than `update`: a grant taken back between the check
+        // and the act is a row that is no longer there, and stamping when it was
+        // last used is not worth turning into an error over something that has
+        // already happened.
+        await prisma.accessGrant.updateMany({
             where: { id: grant.id },
             data: { lastUsedAt: new Date() }
         });
@@ -413,19 +448,31 @@ export class GrantError extends Error {
  * subject's own rule, checked by whoever called. What is checked is that the
  * grant makes sense: a capability the subject has, a principal that exists, and
  * a ceiling on how many one thing may carry.
+ *
+ * `orgIds` is which organizations' teams and roles are on the table, resolved by
+ * the caller from what owns the subject. It is a parameter rather than something
+ * worked out here because only the dispatcher knows what owns a subject - but it
+ * is required, so the rule that a conversation belonging to one organization
+ * cannot be handed to another's people is enforced at the write and not only in
+ * the picker that fills the form.
  */
 export async function writeGrant(
     subject: core.GrantSubject,
     subjectId: string,
     input: core.AccessGrantInput,
-    grantedById: string
+    grantedById: string,
+    orgIds: readonly string[]
 ): Promise<string> {
     const allowed = core.GRANT_CAPABILITIES[subject] as readonly string[];
     if (!allowed.includes(input.capability)) {
         throw new GrantError("That is not something this can be shared as");
     }
-    if (!(await principalExists(input.principalType, input.principalId))) {
-        throw new GrantError("That person, team or role no longer exists");
+    if (!(await principalExists(input.principalType, input.principalId, orgIds))) {
+        throw new GrantError(
+            input.principalType === "user"
+                ? "That person no longer exists"
+                : "That team or role is not one this can be shared with"
+        );
     }
     const held = await prisma.accessGrant.count({ where: { subjectType: subject, subjectId } });
     if (held >= core.MAX_GRANTS_PER_SUBJECT) {
@@ -454,10 +501,29 @@ export async function writeGrant(
     return written.id;
 }
 
-async function principalExists(kind: core.GrantPrincipal, id: string): Promise<boolean> {
-    if (kind === "user") return Boolean(await prisma.user.findUnique({ where: { id } }));
-    if (kind === "team") return Boolean(await prisma.team.findUnique({ where: { id } }));
-    return Boolean(await prisma.orgRole.findUnique({ where: { id } }));
+/**
+ * Whether the chosen principal is one this subject may actually be handed to.
+ *
+ * A person is anybody on the instance: people are found by searching, and that
+ * search obeys the privacy rules on its own. A team and a role are not - they
+ * belong to an organization, and only the ones that own the subject are on
+ * offer. An empty list means nothing is, which is what a subject owned by no
+ * organization comes to for a sharer who is on none.
+ */
+async function principalExists(
+    kind: core.GrantPrincipal,
+    id: string,
+    orgIds: readonly string[]
+): Promise<boolean> {
+    if (kind === "user") {
+        return Boolean(await prisma.user.findUnique({ where: { id }, select: { id: true } }));
+    }
+    if (orgIds.length === 0) return false;
+    const where = { id, orgId: { in: [...orgIds] } };
+    if (kind === "team") {
+        return Boolean(await prisma.team.findFirst({ where, select: { id: true } }));
+    }
+    return Boolean(await prisma.orgRole.findFirst({ where, select: { id: true } }));
 }
 
 /**

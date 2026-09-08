@@ -73,7 +73,13 @@ interface AccessMember {
     through: string | null;
 }
 
-export function AccessDialog({ target, onClose }: { target: AccessTarget | null; onClose: () => void }) {
+export function AccessDialog({
+    target,
+    onClose
+}: {
+    target: AccessTarget | null;
+    onClose: () => void;
+}) {
     const [name, setName] = useState("");
     const [path, setPath] = useState("");
     const [members, setMembers] = useState<AccessMember[]>([]);
@@ -199,7 +205,9 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
         <Dialog open={target !== null} onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Access to {name || (whole ? "this space" : "this folder")}</DialogTitle>
+                    <DialogTitle>
+                        Access to {name || (whole ? "this space" : "this folder")}
+                    </DialogTitle>
                     <DialogDescription>
                         {path && <span className="font-mono text-xs">{path}</span>}
                         {path && <br />}
@@ -211,8 +219,8 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                             <>
                                 <span>
                                     {target.asked.kind === "sprint" ? "Sprint" : "List"}{" "}
-                                    <strong className="font-medium">{target.asked.name}</strong> has no
-                                    access of its own: it is reached through{" "}
+                                    <strong className="font-medium">{target.asked.name}</strong> has
+                                    no access of its own: it is reached through{" "}
                                     {whole ? "the space" : "the folder"} around it.
                                 </span>
                                 <br />
@@ -229,7 +237,10 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                 )}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                    >
                         {error}
                     </p>
                 )}
@@ -256,13 +267,12 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                                 >
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm" title={member.name}>
-                                            <PersonName
-                                                id={member.userId}
-                                                name={member.name}
-                                            />
+                                            <PersonName id={member.userId} name={member.name} />
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {member.through ? `Through ${member.through}` : member.contact}
+                                            {member.through
+                                                ? `Through ${member.through}`
+                                                : member.contact}
                                         </p>
                                     </div>
                                     {fixed ? (
@@ -339,8 +349,16 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                             const result = await runAction(
                                 () =>
                                     whole
-                                        ? actions.addSpaceMemberAction(scopeId, identifier.trim(), role)
-                                        : actions.addFolderMemberAction(scopeId, identifier.trim(), role),
+                                        ? actions.addSpaceMemberAction(
+                                              scopeId,
+                                              identifier.trim(),
+                                              role
+                                          )
+                                        : actions.addFolderMemberAction(
+                                              scopeId,
+                                              identifier.trim(),
+                                              role
+                                          ),
                                 setError
                             );
                             if (result?.error) {
@@ -392,7 +410,10 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                                         key={grant.teamId}
                                         className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
                                     >
-                                        <p className="min-w-0 flex-1 truncate text-sm" title={grant.teamName}>
+                                        <p
+                                            className="min-w-0 flex-1 truncate text-sm"
+                                            title={grant.teamName}
+                                        >
                                             {grant.teamName}
                                         </p>
                                         {canManage ? (
@@ -459,7 +480,9 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                         )}
 
                         {canManage &&
-                            available.some((team) => !granted.some((grant) => grant.teamId === team.id)) && (
+                            available.some(
+                                (team) => !granted.some((grant) => grant.teamId === team.id)
+                            ) && (
                                 <div className="flex flex-wrap items-end gap-2">
                                     <Select
                                         value={teamPick}
@@ -468,7 +491,10 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                                         className="h-9 min-w-48 flex-1"
                                         options={available
                                             .filter(
-                                                (team) => !granted.some((grant) => grant.teamId === team.id)
+                                                (team) =>
+                                                    !granted.some(
+                                                        (grant) => grant.teamId === team.id
+                                                    )
                                             )
                                             .map((team) => ({ value: team.id, label: team.name }))}
                                         onValueChange={setTeamPick}
@@ -478,7 +504,9 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                                         options={ROLE_OPTIONS}
                                         aria-label="Role for the team"
                                         className="h-9 w-32"
-                                        onValueChange={(next) => setTeamRole(next as core.SpaceRole)}
+                                        onValueChange={(next) =>
+                                            setTeamRole(next as core.SpaceRole)
+                                        }
                                     />
                                     <Button
                                         type="button"
@@ -596,7 +624,10 @@ function RoleGrants({
                             >
                                 {grant.principalName}
                                 {grant.orgName ? (
-                                    <span className="text-muted-foreground"> - {grant.orgName}</span>
+                                    <span className="text-muted-foreground">
+                                        {" "}
+                                        - {grant.orgName}
+                                    </span>
                                 ) : null}
                             </p>
                             <span className="shrink-0 text-xs text-muted-foreground">

@@ -134,7 +134,8 @@ export async function addAccount(
     const service = setup.provider ? core.findMailService(setup.provider) : null;
     const connectionId = setup.auth === "oauth" ? await usableConnection(userId, setup) : null;
 
-    const sealed = setup.auth === "password" && setup.password ? sealMailSecret(setup.password) : null;
+    const sealed =
+        setup.auth === "password" && setup.password ? sealMailSecret(setup.password) : null;
     const candidate = {
         address: setup.address,
         username: setup.username,
@@ -208,12 +209,20 @@ export async function addAccount(
  * mail, and "authorize it again" is the only thing that fixes it.
  */
 async function usableConnection(userId: string, setup: core.MailAccountSetup): Promise<string> {
-    if (!setup.connectionId) throw new MailSetupError("Choose the account that authorizes this mailbox.", "connectionId");
+    if (!setup.connectionId)
+        throw new MailSetupError(
+            "Choose the account that authorizes this mailbox.",
+            "connectionId"
+        );
     const link = await prisma.userConnection.findFirst({
         where: { id: setup.connectionId, userId },
         select: { id: true, provider: true, scope: true }
     });
-    if (!link) throw new MailSetupError("That authorized account is not linked here any more.", "connectionId");
+    if (!link)
+        throw new MailSetupError(
+            "That authorized account is not linked here any more.",
+            "connectionId"
+        );
     if (!grantsMailAccess(link.provider, link.scope)) {
         throw new MailSetupError(
             "That account is linked, but it has not been given access to its mail. Authorize it again from here.",
@@ -331,7 +340,10 @@ export async function removeAccount(userId: string, accountId: string): Promise<
 /** Reorder the rail. The whole list is sent rather than the move, the way the
  *  chat rail does it: a reorder that arrives as one statement cannot land
  *  half-applied. */
-export async function reorderAccounts(userId: string, orderedIds: readonly string[]): Promise<void> {
+export async function reorderAccounts(
+    userId: string,
+    orderedIds: readonly string[]
+): Promise<void> {
     const mine = new Set((await ownedAccounts(userId)).map((account) => account.id));
     const wanted = orderedIds.filter((id) => mine.has(id));
     await prisma.$transaction(

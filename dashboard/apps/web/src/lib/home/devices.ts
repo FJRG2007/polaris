@@ -122,7 +122,10 @@ function toView(row: DeviceRow): kinds.DeviceView {
  * nothing on it to open. They are listed and marked instead, and putting one
  * somewhere is what takes it off the other places' lists.
  */
-export async function listDevices(installedAppId: string, placeId?: string | null): Promise<kinds.DeviceView[]> {
+export async function listDevices(
+    installedAppId: string,
+    placeId?: string | null
+): Promise<kinds.DeviceView[]> {
     const rows = await prisma.placeDevice.findMany({
         where: { installedAppId, ...(placeId ? { OR: [{ placeId }, { placeId: null }] } : {}) },
         orderBy: [{ zone: "asc" }, { name: "asc" }],
@@ -132,7 +135,10 @@ export async function listDevices(installedAppId: string, placeId?: string | nul
 }
 
 /** One device, refusing rather than answering when it is not this install's. */
-async function requireDevice(installedAppId: string, id: string): Promise<DeviceRow & { externalId: string }> {
+async function requireDevice(
+    installedAppId: string,
+    id: string
+): Promise<DeviceRow & { externalId: string }> {
     const row = await prisma.placeDevice.findFirst({
         where: { id, installedAppId },
         select: { ...DEVICE_FIELDS, externalId: true }
@@ -201,11 +207,16 @@ export async function actOnDevice(
         const what = kinds.DEVICE_KIND_LABELS[kinds.deviceKind(device.kind)].toLowerCase();
         throw new HomeError(`A ${what} cannot be told to ${kinds.DEVICE_ACTION_VERBS[action]}`);
     }
-    if (!device.controllable) throw new HomeError(`${device.name} is set to be watched, not operated`);
+    if (!device.controllable)
+        throw new HomeError(`${device.name} is set to be watched, not operated`);
     if (!device.accountId) throw new HomeError(`${device.name} is not connected to anything`);
-    if (!device.online) throw new HomeError(`${device.name} was not answering when it was last checked`);
+    if (!device.online)
+        throw new HomeError(`${device.name} was not answering when it was last checked`);
 
-    const { view, credentials } = await accounts.accountWithCredentials(installedAppId, device.accountId);
+    const { view, credentials } = await accounts.accountWithCredentials(
+        installedAppId,
+        device.accountId
+    );
     const driver = accounts.driverFor(view.connection);
     try {
         await driver.act(credentials, { externalId: device.externalId, kind: device.kind }, action);
@@ -272,7 +283,8 @@ export async function syncDevices(
         try {
             devices += await syncAccount(installedAppId, account.id, options);
         } catch (caught) {
-            error = caught instanceof Error ? caught.message : `${account.label} could not be reached`;
+            error =
+                caught instanceof Error ? caught.message : `${account.label} could not be reached`;
         }
     }
     return { devices, error };
@@ -351,7 +363,8 @@ async function syncAccount(
             where: { id: { in: gone.map((device) => device.id) } }
         });
 
-        if (driver.history) await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
+        if (driver.history)
+            await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));
         await accounts.markSynced(accountId);
         return snapshots.length;
     } catch (caught) {
@@ -374,7 +387,10 @@ async function syncAccount(
  * on (device, their id) is what decides, so two syncs racing each other write the
  * same history once and neither has to hold a lock to be sure.
  */
-async function ingestHistory(accountId: string, entries: readonly DeviceHistoryEntry[]): Promise<void> {
+async function ingestHistory(
+    accountId: string,
+    entries: readonly DeviceHistoryEntry[]
+): Promise<void> {
     if (entries.length === 0) return;
     const devices = await prisma.placeDevice.findMany({
         where: { accountId },
@@ -410,13 +426,23 @@ async function ingestHistory(accountId: string, entries: readonly DeviceHistoryE
  */
 export async function listDeviceEvents(
     installedAppId: string,
-    query: { deviceId?: string | null; placeId?: string | null; limit?: number }
+    query: {
+        deviceId?: string | null;
+        /** The only doors the reader may be told about, when that is narrower
+         *  than the place. Narrowed in the query rather than after it: a limit
+         *  applied first would answer a visitor with somebody else's rows
+         *  filtered away and nothing of their own left. */
+        deviceIds?: readonly string[] | null;
+        placeId?: string | null;
+        limit?: number;
+    }
 ): Promise<kinds.DeviceEventView[]> {
     const rows = await prisma.placeDeviceEvent.findMany({
         where: {
             device: {
                 installedAppId,
                 ...(query.deviceId ? { id: query.deviceId } : {}),
+                ...(query.deviceIds ? { id: { in: [...query.deviceIds] } } : {}),
                 // Unplaced devices belong to this list for the same reason they
                 // belong to the one above: they are on the screen, so what they
                 // did has to be readable from it.
