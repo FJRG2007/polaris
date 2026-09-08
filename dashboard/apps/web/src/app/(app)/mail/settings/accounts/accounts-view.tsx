@@ -31,7 +31,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { AlertTriangle, CheckCircle2, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { editAccountAction, removeAccountAction, syncAccountAction } from "@/app/(app)/mail/actions";
+import {
+    editAccountAction,
+    removeAccountAction,
+    syncAccountAction
+} from "@/app/(app)/mail/actions";
 import { Button, ConfirmDeleteDialog, Switch, cn, useToast } from "@polaris/ui";
 
 export function AccountsView({
@@ -59,15 +63,15 @@ export function AccountsView({
         <div className="space-y-4">
             {outcome === "linked" ? (
                 <p className="rounded-md border border-border bg-card px-3 py-2 text-[13px] text-muted-foreground">
-                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} account authorized. Add the
-                    mailbox below and it will be offered without a password.
+                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} account authorized.
+                    Add the mailbox below and it will be offered without a password.
                 </p>
             ) : null}
             {outcome === "not_public" ? (
                 <p className="rounded-md border border-danger/40 bg-card px-3 py-2 text-[13px] text-danger">
-                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} had nowhere to send you back
-                    to. Polaris is only reachable on this network, and an address like that is one they
-                    refuse.{" "}
+                    {outcomeProvider === "microsoft" ? "Microsoft" : "Google"} had nowhere to send
+                    you back to. Polaris is only reachable on this network, and an address like that
+                    is one they refuse.{" "}
                     {canSetDomain ? (
                         <Link href="/admin/domains" className="underline">
                             Give Polaris a public address
@@ -86,7 +90,8 @@ export function AccountsView({
                 <div>
                     <h2 className="text-[15px] font-semibold tracking-tight">Your mailboxes</h2>
                     <p className="text-[13px] text-muted-foreground">
-                        Connect as many as you like. They share one inbox and each keeps its own colour.
+                        Connect as many as you like. They share one inbox and each keeps its own
+                        colour.
                     </p>
                 </div>
                 <Button onClick={() => setAdding(true)}>
@@ -100,7 +105,8 @@ export function AccountsView({
                     <Mail className="mx-auto size-5 shrink-0 text-foreground-subtle" aria-hidden />
                     <p className="mt-2 text-[13px] font-medium">No mailboxes yet</p>
                     <p className="mt-1 text-[13px] text-muted-foreground">
-                        Connect one and your mail is read here instead of in somebody else&apos;s browser tab.
+                        Connect one and your mail is read here instead of in somebody else&apos;s
+                        browser tab.
                     </p>
                 </div>
             ) : (
@@ -118,6 +124,10 @@ export function AccountsView({
                     microsoftReady={microsoftReady}
                     publicAddress={publicAddress}
                     canSetDomain={canSetDomain}
+                    // What this screen is a list of. The dialog can answer
+                    // "you already have that one" while it is being typed
+                    // rather than after a lookup and a password.
+                    taken={accounts.map((account) => account.address)}
                     onClose={() => setAdding(false)}
                 />
             ) : null}
@@ -153,7 +163,12 @@ function AccountRow({ account }: { account: MailAccountView }) {
                             </span>
                         ) : null}
                     </p>
-                    <p className="truncate text-[12px] text-muted-foreground" title={account.address}>{account.address}</p>
+                    <p
+                        className="truncate text-[12px] text-muted-foreground"
+                        title={account.address}
+                    >
+                        {account.address}
+                    </p>
                     <p
                         className={cn(
                             "mt-0.5 flex items-center gap-1.5 text-[12px]",
@@ -215,7 +230,10 @@ function AccountRow({ account }: { account: MailAccountView }) {
                         })
                     }
                 >
-                    <RefreshCw className={cn("size-4 shrink-0", busy && "animate-spin")} aria-hidden />
+                    <RefreshCw
+                        className={cn("size-4 shrink-0", busy && "animate-spin")}
+                        aria-hidden
+                    />
                 </Button>
                 <Button
                     variant="ghost"

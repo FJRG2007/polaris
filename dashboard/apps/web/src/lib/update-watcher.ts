@@ -22,14 +22,20 @@
 
 import { prisma } from "@polaris/db";
 import { getUpdateSource } from "@/lib/update-source";
-import { getUpdateStatus } from "@/lib/update-service";
+import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { sweepExpiringModelKeys } from "@/lib/agents/model-key-expiry";
 import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
 import { markNotificationsReadByType } from "@/lib/notification-service";
 import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
-import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
+import {
+    lastUpdateOutcome,
+    publishUpdateSource,
+    startHostUpdate,
+    updateTriggerReason,
+    type UpdateTrigger
+} from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
     parseAutoUpdatePolicy,
@@ -226,20 +232,29 @@ async function reportFailedInstall(sha: string): Promise<void> {
  * bell by hand after every release. The container that notices is the new build's
  * own: it is the one whose stamp matches what was announced.
  *
+ * A deployment that reports nothing left to install has landed it too, whatever
+ * sha the row happens to name. Installing pulls the latest build rather than the
+ * one that was announced, so an operator who installs while a newer build has
+ * already been published ends up on a sha the row never named - and a row that
+ * only ever matched the exact build it announced would then sit there forever,
+ * describing an update that does not exist to everything that reads it.
+ *
  * Both rows are dropped rather than marked, which is what makes this happen once
  * across the containers serving at the same time - the delete is a conditional
  * write exactly one of them can win. A later build re-announces itself normally,
  * since the claims are keyed by version and this one's are gone with it.
  */
-async function retireLandedNotices(current: string | null): Promise<void> {
-    if (!current) return;
+async function retireLandedNotices(status: UpdateStatus): Promise<void> {
     const announced = (await getSetting(ANNOUNCED_KEY))?.split(" ")[0];
-    if (announced !== current) return;
+    if (!announced) return;
+    if (announced !== status.current && !status.upToDate) return;
     const claimed = await prisma.setting.deleteMany({
-        where: { key: ANNOUNCED_KEY, value: { startsWith: `${current} ` } }
+        where: { key: ANNOUNCED_KEY, value: { startsWith: `${announced} ` } }
     });
     if (claimed.count !== 1) return;
-    await prisma.setting.deleteMany({ where: { key: INSTALLED_KEY, value: { startsWith: `${current} ` } } });
+    await prisma.setting.deleteMany({
+        where: { key: INSTALLED_KEY, value: { startsWith: `${announced} ` } }
+    });
     await markNotificationsReadByType(UPDATE_EVENTS);
 }
 
@@ -247,13 +262,11 @@ async function retireLandedNotices(current: string | null): Promise<void> {
 export async function checkForUpdate(): Promise<void> {
     const status = await getUpdateStatus();
     // Before anything else: the build this deployment was told about may be the
-    // one it is now serving, in which case what it was told is answered.
-    await retireLandedNotices(status.current);
-    // And whatever build they named, an alert saying an update is ready to
-    // install is answered the moment there is nothing left to install. That is
-    // the case the check above misses: it only recognises the build it last
-    // announced, so an operator who installed while a newer one was already
-    // announced kept an "Action needed" for work they had done.
+    // one it is now serving - or there may be nothing left to install at all -
+    // in which case what it was told is answered.
+    await retireLandedNotices(status);
+    // And the standing alert goes with it, whichever build it named, even where
+    // another container got to the row first.
     if (status.upToDate) await markNotificationsReadByType([READY_EVENT]);
     // Only a published image that this deployment can actually move to. Anything
     // else - up to date, still building, a commit that failed its checks - is
@@ -280,7 +293,9 @@ export function startUpdateWatcher(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
-        void checkForUpdate().catch((error) => console.error("polaris: update watcher tick failed:", error));
+        void checkForUpdate().catch((error) =>
+            console.error("polaris: update watcher tick failed:", error)
+        );
         // Rides along rather than starting a timer of its own: both ask "is this
         // deployment waiting on somebody", both are cheap when the answer is no,
         // and one interval is one thing to reason about. An update that widened

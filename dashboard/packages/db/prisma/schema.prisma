@@ -106,6 +106,12 @@ model User {
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.
     notifyPrefs   String?
+    // How this account reads mail - the order lists come in, when an opened
+    // message stops being unread, where the screen goes after one is filed, and
+    // how long a sent message can be caught back - as stringified JSON. A
+    // mailbox's own settings stay on the mailbox; this is the person. Absent
+    // fields (and a null column) follow the defaults in @polaris/core.
+    mailPrefs     String?
     // How this account has arranged its Overview - which cards, in what order and
     // size, and the links it pinned - as stringified JSON. Cards absent here (and
     // a null column) follow the catalogue, so one added later still appears.

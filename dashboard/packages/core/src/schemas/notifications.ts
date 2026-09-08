@@ -228,7 +228,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         group: "system",
         label: "Something needs an administrator",
         description:
-            "An account locked itself down, or somebody reported a person. Only reaches administrators.",
+            "An account locked itself down, or somebody reported a person or a message. Only reaches administrators.",
         // An account shutting itself down means its owner believes somebody else
         // is in it. Whatever else an administrator has muted, they hear this.
         level: "warning",
@@ -409,7 +409,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "server.space",
         group: "deploy",
         label: "A server is running out of room",
-        description: "Polaris freed everything nothing was using and the disk is still nearly full.",
+        description:
+            "Polaris freed everything nothing was using and the disk is still nearly full.",
         level: "warning",
         // On, and it means it. By the time this is raised the automatic
         // housekeeping has already run and not been enough, so what is left is

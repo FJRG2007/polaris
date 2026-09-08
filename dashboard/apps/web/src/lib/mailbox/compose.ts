@@ -16,6 +16,7 @@
 
 import { withImap, type MailConnectionSource } from "./imap";
 import { prisma } from "@polaris/db";
+import { readMailPreferences } from "./prefs";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { refreshThreads } from "./sync";
@@ -25,15 +26,6 @@ import { readUpload, attachUploads } from "./uploads";
 import { composeMime, sendMime, type OutgoingMessage } from "./send";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
 import { addressesFrom, asJson, stringsFrom } from "./json";
-
-/**
- * How long a sent message sits in the queue before it actually goes.
- *
- * Long enough to catch the two mistakes everybody makes - the wrong recipient
- * and the missing attachment - and short enough that nobody wonders whether it
- * sent. Every client that has this sets it around here.
- */
-export const UNDO_WINDOW_MS = 10_000;
 
 /** What the composer sends up. */
 export interface ComposeInput {
@@ -109,7 +101,11 @@ export async function queueSend(
     input: ComposeInput
 ): Promise<{ draftId: string; sendAt: Date }> {
     const draftId = await saveDraft(userId, input);
-    const sendAt = input.sendAt ?? new Date(Date.now() + UNDO_WINDOW_MS);
+    // A message somebody scheduled goes when they said. Everything else waits
+    // out the reader's own undo window - see `mail-prefs`, where zero means Send
+    // is final and is a choice somebody has to make rather than the default.
+    const held = await readMailPreferences(userId);
+    const sendAt = input.sendAt ?? new Date(Date.now() + held.undoSeconds * 1_000);
     await prisma.mailDraft.update({
         where: { id: draftId },
         data: { state: "queued", sendAt, attempts: 0, failure: "" }
@@ -190,10 +186,13 @@ function scheduleQueued(draftId: string, sendAt: Date): void {
     clearTimeout(held.get(draftId));
     held.set(
         draftId,
-        setTimeout(() => {
-            held.delete(draftId);
-            void deliverQueued(draftId).catch(() => undefined);
-        }, Math.max(0, delay))
+        setTimeout(
+            () => {
+                held.delete(draftId);
+                void deliverQueued(draftId).catch(() => undefined);
+            },
+            Math.max(0, delay)
+        )
     );
 }
 
@@ -375,7 +374,11 @@ function withSignature(body: string, signature: string, above: boolean): string 
  */
 export async function sweepDueSends(): Promise<number> {
     const due = await prisma.mailDraft.findMany({
-        where: { state: { in: ["queued", "failed"] }, sendAt: { not: null, lte: new Date() }, attempts: { lt: 5 } },
+        where: {
+            state: { in: ["queued", "failed"] },
+            sendAt: { not: null, lte: new Date() },
+            attempts: { lt: 5 }
+        },
         select: { id: true, state: true },
         orderBy: { sendAt: "asc" },
         take: 50

@@ -29,11 +29,44 @@ import * as core from "@polaris/core";
 import { knownPreviews, type KnownPreview } from "./link-preview";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-files";
+import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 
 /** How much of a message is copied onto the report. Enough to triage without
  *  opening the conversation, short of copying the conversation. */
 const EXCERPT = 300;
+
+/** The row that says this queue has already announced itself, dropped again when
+ *  the last report in it is settled. */
+const ANNOUNCED_KEY = "chat.reports.announced";
+
+/**
+ * Take the announcement, once, for whoever files the report that ends the quiet.
+ *
+ * A count taken after the write cannot decide this: two reports filed at the
+ * same moment against an empty queue are both the second one by the time either
+ * counts, so neither says anything and the queue announces itself never - the
+ * spam wave the once-only rule exists for is exactly when two arrive at once.
+ * The create is a conditional write on a unique key, so one caller wins it and
+ * the rest lose it, whichever container they landed on.
+ */
+async function claimQueueAnnouncement(): Promise<boolean> {
+    try {
+        await prisma.setting.create({
+            data: { key: ANNOUNCED_KEY, value: new Date().toISOString(), scope: "global" }
+        });
+        return true;
+    } catch {
+        // Already claimed, or the settings table would not answer. Either way
+        // this report is not the one that ends the quiet.
+        return false;
+    }
+}
+
+/** Give it back, so the next report announces the queue again. */
+async function releaseQueueAnnouncement(): Promise<void> {
+    await prisma.setting.deleteMany({ where: { key: ANNOUNCED_KEY } }).catch(() => undefined);
+}
 
 /** One row of the queue. */
 export interface ChatReportView {
@@ -145,6 +178,32 @@ export async function reportMessage(
     // Rows, not bytes. They point at the same stored files the message points
     // at, and only become the report's own if the message is ever deleted.
     await copyOntoReport(made.id, message.id);
+
+    // And somebody is told. A report used to be filed in silence: the row
+    // appeared under /admin/safety and the only way to learn of it was to go and
+    // look, so a queue existed and nobody was queued to. The same alert a
+    // reported person raises, because it is the same queue and the same screen -
+    // one switch for the pair rather than two to get wrong.
+    //
+    // Only when the queue was empty, and this is the whole of the fan-out
+    // reasoning. The alert reaches every administrator by every route each of
+    // them has left on, and a spam wave is a hundred reports in a minute: raising
+    // one per report is a hundred alerts each, which is not a queue being
+    // announced, it is a queue being used as a weapon. What an administrator
+    // actually needs to hear is that there is work waiting, and that is true from
+    // the first row - the badge counts the rest, and the next empty queue
+    // announces itself again.
+    //
+    // Re-reporting is silent for the same reason: it updates the row it already
+    // has, so there is no new work to announce.
+    if (await claimQueueAnnouncement()) {
+        await alertAdmins({
+            title: "A message has been reported",
+            body: `Reported as: ${core.CHAT_REPORT_LABELS[input.reason]}. It is waiting in the safety queue.`,
+            // It is a decision waiting on a person, which is what this queue is.
+            actionRequired: true
+        }).catch(releaseQueueAnnouncement);
+    }
     return { already: false };
 }
 
@@ -154,7 +213,9 @@ export async function reportMessage(
  * Open by default, because a moderator arriving here is arriving to do the ones
  * nobody has answered for. The settled ones are a record and are asked for.
  */
-export async function listReports(status: core.ChatReportStatus | "all"): Promise<ChatReportView[]> {
+export async function listReports(
+    status: core.ChatReportStatus | "all"
+): Promise<ChatReportView[]> {
     const rows = await prisma.chatReport.findMany({
         where: status === "all" ? {} : { status },
         orderBy: { createdAt: "desc" },
@@ -182,7 +243,11 @@ export async function listReports(status: core.ChatReportStatus | "all"): Promis
     // - and the channel name is what tells a moderator where this happened.
     const [authors, channels] = await Promise.all([
         prisma.user.findMany({
-            where: { id: { in: [...new Set(rows.map((row) => row.authorId).filter(Boolean))] as string[] } },
+            where: {
+                id: {
+                    in: [...new Set(rows.map((row) => row.authorId).filter(Boolean))] as string[]
+                }
+            },
             select: { id: true, name: true }
         }),
         prisma.chatChannel.findMany({
@@ -278,6 +343,16 @@ export async function settleReport(
         where: { id: report.id },
         data: { status: decision, handledById: admin.id, handledAt: new Date() }
     });
+
+    // An empty queue announces itself again the next time somebody fills it. The
+    // wrong way round is the safe one: a report filed while this ran is a queue
+    // that says so twice, where the other order is a queue that never does.
+    //
+    // Best-effort, and after the decision is stored: the report is settled either
+    // way, and a moderator being told their answer failed because a count did is
+    // an answer they will give again.
+    const open = await prisma.chatReport.count({ where: { status: "open" } }).catch(() => -1);
+    if (open === 0) await releaseQueueAnnouncement();
 }
 
 /**

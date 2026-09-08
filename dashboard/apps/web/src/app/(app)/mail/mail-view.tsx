@@ -143,6 +143,7 @@ export function MailView({
     category,
     filter,
     sort,
+    preferences,
     fixedFilter
 }: {
     threads: MailThreadView[];
@@ -161,6 +162,10 @@ export function MailView({
     filter: core.MailFilter | "";
     /** Which way round it is being read. */
     sort: core.MailSort;
+    /** How this person reads mail - see `mail-prefs`. Two of the four are
+     *  answered on this screen: when an opened message stops being unread, and
+     *  where the reader is left after one is filed. */
+    preferences: core.MailPreferences;
     /** The narrowing this screen IS, which the buttons then leave alone: the
      *  Starred list does not offer a Starred filter. */
     fixedFilter: core.MailFilter | "";
@@ -422,6 +427,39 @@ export function MailView({
         [router]
     );
 
+    /**
+     * Open the conversation under the one that is leaving.
+     *
+     * What somebody clearing four hundred messages actually wants: going back to
+     * the list to click the row beneath the one they just archived is the job
+     * done twice. Off by default, because the safe answer to "the thing you were
+     * reading is gone" is the list - see `MAIL_AFTER_FILING`.
+     *
+     * "Under" is under the conversation being READ, not under the first row the
+     * action happened to name. Filing a scattered selection while the fifth of
+     * them is open would otherwise land on the row after the first, which is
+     * above where the reader was and on its way out of the view as well.
+     *
+     * The next one is read off the rows this screen is already showing, skipping
+     * everything the same action took with it: archiving a selection of ten must
+     * not open the second of the ten. Nothing left below is the end of the list,
+     * and the end of the list is the list.
+     */
+    const openNext = useCallback(
+        (leaving: readonly string[]) => {
+            const rows = threads.map((thread) => thread.id);
+            const from = openThread ? rows.indexOf(openThread.id) : -1;
+            const next =
+                from < 0 ? undefined : rows.slice(from + 1).find((id) => !leaving.includes(id));
+            if (!next) {
+                closeOpen();
+                return;
+            }
+            openAgain(next);
+        },
+        [closeOpen, openAgain, openThread, threads]
+    );
+
     /** The conversations an action was aimed at, from the messages it named. */
     const threadsOf = useCallback(
         (messageIds: readonly string[]) =>
@@ -460,7 +498,10 @@ export function MailView({
             const leaving =
                 leavesTheView(action) && openThread !== null && aimed.includes(openThread.id);
             const reopen = leaving ? openThread.id : "";
-            if (leaving) closeOpen();
+            if (leaving) {
+                if (preferences.afterFiling === "next") openNext(aimed);
+                else closeOpen();
+            }
 
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds: [...messageIds], action });
@@ -512,8 +553,10 @@ export function MailView({
             clearPatches,
             closeOpen,
             openAgain,
+            openNext,
             openThread,
             patchUntilAnswered,
+            preferences.afterFiling,
             refresh,
             threadsOf,
             toast
@@ -1086,7 +1129,12 @@ export function MailView({
                         onRead={() => patch([openThread.id], { unreadCount: 0 })}
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
-                        onGone={closeOpen}
+                        markRead={preferences.markRead}
+                        onGone={
+                            preferences.afterFiling === "next"
+                                ? () => openNext([openThread.id])
+                                : closeOpen
+                        }
                         onStayed={() => openAgain(openThread.id)}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.

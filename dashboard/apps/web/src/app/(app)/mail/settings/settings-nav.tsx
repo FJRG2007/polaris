@@ -8,6 +8,10 @@ import { cn } from "@polaris/ui";
 import { usePathname } from "next/navigation";
 
 const SCREENS = [
+    // First, because it is the only one about the person rather than about one
+    // of their mailboxes - and the only one worth opening before there is a
+    // mailbox at all.
+    { label: "General", href: "/mail/settings/general" },
     { label: "Mailboxes", href: "/mail/settings/accounts" },
     { label: "Send-as", href: "/mail/settings/identities" },
     { label: "Labels", href: "/mail/settings/labels" },
@@ -21,7 +25,10 @@ const SCREENS = [
 export function SettingsNav() {
     const pathname = usePathname();
     return (
-        <nav className="flex flex-wrap gap-1 border-b border-border pb-2" aria-label="Mail settings">
+        <nav
+            className="flex flex-wrap gap-1 border-b border-border pb-2"
+            aria-label="Mail settings"
+        >
             {SCREENS.map((screen) => (
                 <Link
                     key={screen.href}

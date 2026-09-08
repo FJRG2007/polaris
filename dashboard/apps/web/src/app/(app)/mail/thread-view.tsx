@@ -82,6 +82,7 @@ export function ThreadView({
     thread,
     messages,
     context,
+    markRead,
     onBack,
     onRead,
     onGone,
@@ -90,6 +91,11 @@ export function ThreadView({
     thread: MailThreadView;
     messages: MailMessageView[];
     context: MailViewContext;
+    /** When an opened message stops being unread - see `mail-prefs`. It was
+     *  always the instant it opened, which is wrong for anybody who arrows
+     *  through a list with a reading pane: passing over a message is not reading
+     *  it, and marking it read is how one is lost. */
+    markRead: core.MailMarkRead;
     /** Given when the list is not on screen beside this - reading one message at
      *  a time, or on a phone - because then this is the only way back to it. */
     onBack?: () => void;
@@ -378,6 +384,7 @@ export function ThreadView({
                             <MessageCard
                                 key={entry.message.id}
                                 message={entry.message}
+                                markRead={markRead}
                                 onRead={onRead}
                                 open={open.includes(entry.message.id)}
                                 onToggle={() =>
@@ -500,11 +507,13 @@ type Shown =
 function MessageCard({
     message,
     open,
+    markRead,
     onToggle,
     onRead
 }: {
     message: MailMessageView;
     open: boolean;
+    markRead: core.MailMarkRead;
     onToggle: () => void;
     onRead?: () => void;
 }) {
@@ -547,18 +556,37 @@ function MessageCard({
     const marked = useRef(false);
     useEffect(() => {
         if (!open || message.seen || marked.current) return;
-        marked.current = true;
-        // The list stops being bold now. The server is told in the same breath,
-        // and the round trip is no longer something anybody watches.
-        onRead?.();
-        void (async () => {
-            const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
-            // A server that refused leaves it unread, which is the truth. Nothing
-            // is said about it: nobody asked for this, so a failure is not news -
-            // and the next refresh brings the bold row back on its own.
-            if (!refusalOf(outcome)) refresh();
-        })();
-    }, [open, message.id, message.seen, onRead, refresh]);
+        // Left to the toolbar, for somebody whose unread list is their to-do
+        // list. Nothing here is a promise that it stays unread - marking it read
+        // by hand still works - only that opening it does not do it for them.
+        if (markRead === "never") return;
+
+        const mark = () => {
+            if (marked.current) return;
+            marked.current = true;
+            // The list stops being bold now. The server is told in the same
+            // breath, and the round trip is no longer something anybody watches.
+            onRead?.();
+            void (async () => {
+                const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+                // A server that refused leaves it unread, which is the truth.
+                // Nothing is said about it: nobody asked for this, so a failure is
+                // not news - and the next refresh brings the bold row back on its
+                // own.
+                if (!refusalOf(outcome)) refresh();
+            })();
+        };
+
+        if (markRead === "open") {
+            mark();
+            return;
+        }
+        // Waited out, and cancelled by leaving. Somebody walking down a list with
+        // the arrow keys passes over a dozen messages on the way to one, and the
+        // wait is the whole difference between passing over and reading.
+        const timer = setTimeout(mark, core.MAIL_MARK_READ_DELAY_MS);
+        return () => clearTimeout(timer);
+    }, [open, markRead, message.id, message.seen, onRead, refresh]);
 
     const sender = message.from[0];
 

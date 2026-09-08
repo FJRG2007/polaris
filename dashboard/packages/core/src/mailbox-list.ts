@@ -60,10 +60,20 @@ export function readMailFilter(value: string | undefined | null): MailFilter | "
     return isMailFilter(value) ? value : "";
 }
 
-/** The order an address asks for, falling back to the one a mailbox is read in.
- *  Same reasoning: a sort nobody defined is not worth refusing over. */
-export function readMailSort(value: string | undefined | null): MailSort {
-    return isMailSort(value) ? value : DEFAULT_MAIL_SORT;
+/**
+ * The order an address asks for, falling back to the reader's own.
+ *
+ * Same reasoning as the filter: a sort nobody defined is not worth refusing
+ * over. The fallback is a parameter because there are two answers to "unless
+ * somebody says otherwise" - the reader's setting where there is one, and this
+ * module's own where there is not, which is what everything that has no reader
+ * to hand uses.
+ */
+export function readMailSort(
+    value: string | undefined | null,
+    fallback: MailSort = DEFAULT_MAIL_SORT
+): MailSort {
+    return isMailSort(value) ? value : fallback;
 }
 
 /** Whether the list is showing something other than all of it, in its ordinary

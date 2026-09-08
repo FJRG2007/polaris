@@ -22,8 +22,9 @@
 
 import Link from "next/link";
 import { cn, useToast } from "@polaris/ui";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMail } from "./mail-shell";
+import { useMailRailOpen } from "./use-mail-rail";
 import { refusalOf } from "./refusal";
 import { moveToFolderAction } from "./actions";
 import { MAIL_DRAG_TYPE } from "./mail-actions";
@@ -64,7 +65,12 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const search = useSearchParams();
     const router = useRouter();
     const toast = useToast();
-    const [expanded, setExpanded] = useState<string[]>([]);
+    // Remembered for this browser rather than held for this mount - see
+    // `use-mail-rail`. It closed on every reload, and on every navigation that
+    // remounted the rail. The mailboxes go in so what is remembered can be
+    // measured against the ones that are still connected.
+    const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
+    const { open: expanded, toggle: toggleAccount } = useMailRailOpen(accountIds);
 
     /**
      * File what was dragged into a folder.
@@ -83,7 +89,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                 return;
             }
             toast.show({
-                title: messageIds.length === 1 ? `Moved to ${name}.` : `${messageIds.length} moved to ${name}.`
+                title:
+                    messageIds.length === 1
+                        ? `Moved to ${name}.`
+                        : `${messageIds.length} moved to ${name}.`
             });
             router.refresh();
         },
@@ -93,7 +102,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     // The mailboxes that feed the merged views. One taken out of them still has
     // its own entry below; it just stops adding to the counts above.
     const merged = accounts.filter((account) => account.unified);
-    const mergedUnread = merged.reduce((total, account) => total + (unread.byAccount[account.id] ?? 0), 0);
+    const mergedUnread = merged.reduce(
+        (total, account) => total + (unread.byAccount[account.id] ?? 0),
+        0
+    );
 
     return (
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4" aria-label="Mailboxes">
@@ -144,7 +156,7 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
 
             <ul className="space-y-0.5">
                 {accounts.map((account) => {
-                    const open = expanded.includes(account.id);
+                    const open = expanded.has(account.id);
                     const own = folders.filter((folder) => folder.accountId === account.id);
                     return (
                         <li key={account.id}>
@@ -153,14 +165,12 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                     type="button"
                                     className="flex size-6 shrink-0 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
                                     aria-expanded={open}
-                                    aria-label={open ? `Hide ${account.address} folders` : `Show ${account.address} folders`}
-                                    onClick={() =>
-                                        setExpanded((held) =>
-                                            held.includes(account.id)
-                                                ? held.filter((id) => id !== account.id)
-                                                : [...held, account.id]
-                                        )
+                                    aria-label={
+                                        open
+                                            ? `Hide ${account.address} folders`
+                                            : `Show ${account.address} folders`
                                     }
+                                    onClick={() => toggleAccount(account.id)}
                                 >
                                     {open ? (
                                         <ChevronDown className="size-3.5 shrink-0" aria-hidden />
@@ -168,7 +178,11 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                         <ChevronRight className="size-3.5 shrink-0" aria-hidden />
                                     )}
                                 </button>
-                                <AccountLink account={account} count={unread.byAccount[account.id] ?? 0} onNavigate={onNavigate} />
+                                <AccountLink
+                                    account={account}
+                                    count={unread.byAccount[account.id] ?? 0}
+                                    onNavigate={onNavigate}
+                                />
                             </div>
                             {open ? (
                                 <ul className="ml-6 space-y-0.5 border-l border-border pl-2">
@@ -186,7 +200,9 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                 count={folder.unread}
                                                 active={pathname === `/mail/f/${folder.id}`}
                                                 onNavigate={onNavigate}
-                                                onDropMail={(ids) => void fileInto(folder.id, folder.name, ids)}
+                                                onDropMail={(ids) =>
+                                                    void fileInto(folder.id, folder.name, ids)
+                                                }
                                             />
                                         </li>
                                     ))}
@@ -220,7 +236,9 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                         style={{ color: label.color }}
                                         aria-hidden
                                     />
-                                    <span className="min-w-0 flex-1 truncate" title={label.name}>{label.name}</span>
+                                    <span className="min-w-0 flex-1 truncate" title={label.name}>
+                                        {label.name}
+                                    </span>
                                     {label.count > 0 ? (
                                         <span className="text-[11px] tabular-nums text-foreground-subtle">
                                             {label.count}
@@ -240,7 +258,9 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
  *  whose href is a prefix of the others, so it is matched exactly. */
 function isActive(pathname: string, search: URLSearchParams, href: string): boolean {
     void search;
-    return href === "/mail" ? pathname === "/mail" || pathname.startsWith("/mail/t/") : pathname === href;
+    return href === "/mail"
+        ? pathname === "/mail" || pathname.startsWith("/mail/t/")
+        : pathname === href;
 }
 
 function RailLink({
@@ -296,16 +316,22 @@ function RailLink({
             }
             className={cn(
                 "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px]",
-                active ? "bg-card font-medium text-foreground" : "text-muted-foreground hover:bg-card hover:text-foreground",
+                active
+                    ? "bg-card font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-card hover:text-foreground",
                 // Said on the target rather than on the thing being dragged: the
                 // question a reader has mid-drag is "will it land here".
                 over && "ring-1 ring-inset ring-primary"
             )}
         >
             <Icon className="size-4 shrink-0" aria-hidden />
-            <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
+            <span className="min-w-0 flex-1 truncate" title={label}>
+                {label}
+            </span>
             {count > 0 ? (
-                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">{count}</span>
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
+                    {count}
+                </span>
             ) : null}
         </Link>
     );
@@ -358,9 +384,14 @@ function AccountLink({
                 {account.label || account.address}
             </span>
             {broken ? (
-                <AlertTriangle className="size-3.5 shrink-0 text-danger" aria-label={whyBroken(account.state)} />
+                <AlertTriangle
+                    className="size-3.5 shrink-0 text-danger"
+                    aria-label={whyBroken(account.state)}
+                />
             ) : count > 0 ? (
-                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">{count}</span>
+                <span className="shrink-0 text-[11px] font-medium tabular-nums text-foreground">
+                    {count}
+                </span>
             ) : null}
         </Link>
     );
