@@ -35,6 +35,7 @@ import * as core from "@polaris/core";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
+import { RelativeTime } from "@/components/relative-time";
 import { useDisplayFormat } from "@/components/display-format";
 import {
     actOnAction,
@@ -1565,14 +1566,10 @@ function ThreadRow({
     onSnooze: () => void;
     onStar: () => void;
 }) {
-    const format = useDisplayFormat();
     const unread = thread.unreadCount > 0;
-    // A list read by size says the size where it would say the date. Sorting by
-    // something a row does not show is a list somebody has to take on trust -
-    // and the date is kept on the hover, so nothing is actually lost.
+    /** Whether this list is being read by size rather than by date - see
+     *  `Stamp`, which is what the row shows for it. */
     const bySize = sort === "largest" || sort === "smallest";
-    const stamp = bySize ? core.formatBytes(thread.size) : shortDate(thread.lastMessageAt, format);
-    const stampTitle = bySize ? shortDate(thread.lastMessageAt, format) : undefined;
     return (
         <li
             {...rest}
@@ -1707,14 +1704,7 @@ function ThreadRow({
                                 {thread.messageCount}
                             </span>
                         ) : null}
-                        {wide ? null : (
-                            <span
-                                title={stampTitle}
-                                className="shrink-0 text-[11px] tabular-nums text-foreground-subtle"
-                            >
-                                {stamp}
-                            </span>
-                        )}
+                        {wide ? null : <Stamp thread={thread} bySize={bySize} />}
                     </div>
                     <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>
                         <p
@@ -1735,12 +1725,6 @@ function ThreadRow({
                             {thread.subject || "(no subject)"}
                         </p>
                         <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                            {thread.hasAttachments ? (
-                                <Paperclip
-                                    className="size-3 shrink-0 text-foreground-subtle"
-                                    aria-label="Has attachments"
-                                />
-                            ) : null}
                             <p
                                 title={thread.snippet}
                                 className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle"
@@ -1749,14 +1733,7 @@ function ThreadRow({
                             </p>
                         </div>
                     </div>
-                    {wide ? (
-                        <span
-                            title={stampTitle}
-                            className="shrink-0 text-[11px] tabular-nums text-foreground-subtle"
-                        >
-                            {stamp}
-                        </span>
-                    ) : null}
+                    {wide ? <Stamp thread={thread} bySize={bySize} /> : null}
                     {thread.labels.length > 0 && !wide ? (
                         <div className="mt-1 flex flex-wrap gap-1">
                             {thread.labels.map((label) => (
@@ -1923,15 +1900,56 @@ function people(thread: MailThreadView, mine: ReadonlySet<string>): string {
 }
 
 /**
- * The date a mail list shows: the time for something that arrived today, the
- * date for everything else.
+ * The right-hand end of a row: whether it carries anything, and how old it is.
  *
- * Deliberately not "3 days ago". A mail list is scanned for a date somebody half
- * remembers, and a relative date makes that arithmetic the reader's job. Both
- * halves go through the display format, which is where the clock and the date
- * order this deployment uses are decided - never through the browser's locale,
- * because the whole point of that setting is that the order is chosen rather
- * than implied.
+ * How old rather than when, and that is a reversal. This used to print the time
+ * for today and the date for everything else, on the argument that a list is
+ * scanned for a date somebody half remembers and a relative one makes that
+ * arithmetic the reader's job. The argument holds for a message from March and
+ * not at all for one from this morning, which is most of an inbox: "14:02" is
+ * itself arithmetic, against a clock the reader has to go and look at.
+ *
+ * So it says the age, keeps saying it as the minutes pass, and holds the exact
+ * moment on the hover - and past a fortnight it goes back to printing the date,
+ * because "14 months ago" is a worse answer than the month it happened in. The
+ * half-remembered date is answered where it was actually being asked.
+ *
+ * Narrow, because this column is a few characters wide beside a subject that is
+ * already being truncated: "3h ago" rather than "3 hours ago".
+ *
+ * The paperclip sits here rather than out on the preview line, where it was.
+ * Whether a conversation has something attached is read in the same glance as
+ * how old it is - both are why somebody picks one row out of forty - and the
+ * preview line is the one thing on the row that is genuinely prose.
+ */
+function Stamp({ thread, bySize }: { thread: MailThreadView; bySize: boolean }) {
+    const format = useDisplayFormat();
+    return (
+        <span className="flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-foreground-subtle">
+            {thread.hasAttachments ? (
+                <Paperclip className="size-3 shrink-0" aria-label="Has attachments" />
+            ) : null}
+            {bySize ? (
+                // A list sorted by size says the size where it would say the
+                // age, and keeps the date on the hover - sorting by something a
+                // row does not show is a list somebody has to take on trust.
+                <span title={shortDate(thread.lastMessageAt, format)}>
+                    {core.formatBytes(thread.size)}
+                </span>
+            ) : (
+                <RelativeTime iso={thread.lastMessageAt} formatStyle="narrow" threshold="P14D" />
+            )}
+        </span>
+    );
+}
+
+/**
+ * The absolute form, for the hover and for a list read by size.
+ *
+ * Both halves go through the display format, which is where the clock and the
+ * date order this deployment uses are decided - never through the browser's
+ * locale, because the whole point of that setting is that the order is chosen
+ * rather than implied.
  */
 function shortDate(iso: string, format: DisplayFormat): string {
     const when = new Date(iso);

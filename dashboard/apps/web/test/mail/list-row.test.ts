@@ -75,3 +75,43 @@ describe("a row that is showing half of what it holds", () => {
         expect(view).toContain("title={thread.snippet}");
     });
 });
+
+describe("the right-hand end of a row", () => {
+    it("says how old a conversation is rather than when it arrived", async () => {
+        // "14:02" is arithmetic against a clock the reader has to go and look
+        // at, and most of an inbox is from today. The exact moment stays on the
+        // hover, which the element writes itself.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain("<RelativeTime iso={thread.lastMessageAt}");
+    });
+
+    it("goes back to a date once the age stops being the useful answer", async () => {
+        // "14 months ago" is a worse answer than the month it happened in, and
+        // an old message is exactly the one somebody is scanning for by date.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain('threshold="P14D"');
+    });
+
+    it("fits the column it is in", async () => {
+        // A few characters wide, beside a subject already being truncated.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain('formatStyle="narrow"');
+    });
+
+    it("puts the paperclip beside it rather than out on the preview line", async () => {
+        // Whether a conversation carries anything is read in the same glance as
+        // how old it is: both are why somebody picks one row out of forty.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        const stamp = view.slice(view.indexOf("function Stamp("), view.indexOf("The absolute form"));
+        expect(stamp).toContain("<Paperclip");
+        expect(stamp).toContain("<RelativeTime");
+    });
+
+    it("still says the size when that is what the list is sorted by", async () => {
+        // Sorting by something a row does not show is a list somebody has to
+        // take on trust.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain("{core.formatBytes(thread.size)}");
+        expect(view).toContain("title={shortDate(thread.lastMessageAt, format)}");
+    });
+});
