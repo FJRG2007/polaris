@@ -49,7 +49,17 @@ describe("fetching a body before it is asked for", () => {
         // The answer is kept on the row, so a second ask is a database read for
         // nothing.
         expect(list).toContain("warmed.current.has(messageId)");
-        expect(list).toContain("warmed.current.add(messageId)");
+        expect(list).toContain("warmed.current.add(next)");
+    });
+
+    it("runs one at a time, however fast the pointer moves", () => {
+        // A body that is not held yet is a whole IMAP session, and the large
+        // mail hosts answer a dozen at once by locking the account out of its
+        // own mailbox. So a rest that lands while one is in the air waits in a
+        // single slot rather than opening a second connection.
+        expect(list).toContain("if (fetching.current) return;");
+        expect(list).toContain("while (onScreen.current && wanted.current)");
+        expect(list).toContain("await warmMessageAction(next)");
     });
 
     it("is reached by the pointer and by the keyboard", () => {
@@ -67,8 +77,9 @@ describe("fetching a body before it is asked for", () => {
     });
 
     it("stops when the screen goes", () => {
-        // A timer that fires after this list is gone asks for a body nobody is
-        // waiting for.
+        // A timer that fires after this list is gone, or a slot drained after
+        // it, asks for a body nobody is waiting for.
         expect(list).toContain("if (warming.current) clearTimeout(warming.current);");
+        expect(list).toContain("onScreen.current = false;");
     });
 });

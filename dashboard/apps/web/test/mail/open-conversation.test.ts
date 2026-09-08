@@ -105,6 +105,21 @@ describe("the address stops naming what was moved", () => {
         expect(view).toContain('url.searchParams.set("open", threadId)');
     });
 
+    it("keeps the row hidden while the list it left comes back unchanged", async () => {
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        // Closing the pane is a navigation, and these routes are dynamic: a
+        // fresh list arrives in a few tens of milliseconds with the row still in
+        // it, seconds before the mail server has moved anything. Clearing every
+        // overlay on a new list put the conversation somebody had just deleted
+        // back on screen for as long as the delete took - which is the one
+        // moment the overlay exists for.
+        expect(view).toContain("setPatched(inFlight.current);");
+        expect(view).toContain("patchUntilAnswered(aimed, ahead)");
+        // And dropped as soon as the answer is in, either way, so the screen
+        // never disagrees with the mailbox for longer than the action takes.
+        expect(view).toContain("inFlight.current = {};");
+    });
+
     /**
      * Closing the pane is a navigation, and asking the router to refresh in the
      * same breath is a second fetch racing it - the navigation is the one that

@@ -2561,9 +2561,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             const judged = diagnoseCall(facts);
             // A call that has just connected, or just come back, is given time
             // before it is accused of anything - and a call that has never heard
-            // a byte is given more of it. Both hand the rows back, so the panel
-            // can be opened and read while it settles.
-            const waiting = settlingFor(everHeard.current);
+            // a byte is given more of it, but only for a verdict that needed the
+            // far end. A microphone that is not open, or one that stopped, was
+            // settled here without waiting on a packet, and holding that back for
+            // three quarters of a minute - restarted every time anybody joins or
+            // leaves - is a blank panel on the one fault the reader could have
+            // fixed themselves. Both hand the rows back, so the panel can be
+            // opened and read while it settles.
+            const waiting = settlingFor(everHeard.current, judged.farEnd);
             const report =
                 at - settledAt.current < waiting
                     ? { ...UNKNOWN_AUDIO, lines: judged.lines }

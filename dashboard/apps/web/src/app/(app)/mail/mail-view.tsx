@@ -199,7 +199,10 @@ export function MailView({
      *
      * Cleared whenever the server's own answer arrives, which is what
      * `threads` becoming a new array means. Keeping a patch past that would
-     * mean the screen quietly disagreeing with the server for ever.
+     * mean the screen quietly disagreeing with the server for ever - except
+     * for the one an action is still waiting on, which is held in `inFlight`
+     * and laid back over the new list, because a list that arrived is not
+     * necessarily the answer to what was asked.
      */
     /**
      * The pages fetched below the first one.
@@ -221,8 +224,27 @@ export function MailView({
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
 
     const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
-    useEffect(() => {
+    /**
+     * The overlay belonging to an action the mail server has not answered yet.
+     *
+     * Held apart from `patched` because a new `threads` is not always the
+     * server's answer to what was just done. Filing the conversation that is
+     * open closes the reading pane first, and closing it is a navigation: these
+     * routes are dynamic, so the list comes back in a few tens of milliseconds
+     * with the row still in it, seconds before the mail server has moved
+     * anything. Clearing everything on that would put the row somebody just
+     * archived back on screen until the action landed, which is the one moment
+     * the overlay exists for.
+     */
+    const inFlight = useRef<Record<string, ThreadPatch>>({});
+    /** Both together, always: an overlay that outlives the array under it has to
+     *  be dropped from both or it comes back on the next list. */
+    const clearPatches = useCallback(() => {
+        inFlight.current = {};
         setPatched({});
+    }, []);
+    useEffect(() => {
+        setPatched(inFlight.current);
     }, [threads]);
 
     /**
@@ -261,6 +283,20 @@ export function MailView({
             return next;
         });
     }, []);
+
+    /** The same, for a change the mail server has been asked for and has not
+     *  answered yet, so it survives a list arriving in between - see
+     *  `inFlight`. Only an action uses this: a read mark is the server catching
+     *  up with a screen rather than something being waited on. */
+    const patchUntilAnswered = useCallback(
+        (ids: readonly string[], change: ThreadPatch) => {
+            const held = { ...inFlight.current };
+            for (const id of ids) held[id] = { ...held[id], ...change };
+            inFlight.current = held;
+            patch(ids, change);
+        },
+        [patch]
+    );
 
     /** The row as the reader should see it: what the server sent, with anything
      *  they have just done laid over it. */
@@ -307,27 +343,67 @@ export function MailView({
      * second ask would be a database read for nothing. Fired on a rest rather
      * than on every crossing, so running the pointer down a list of fifty does
      * not ask for fifty bodies.
+     *
+     * And one at a time. A body that is not held yet is a whole IMAP session -
+     * connect, authenticate, fetch, log out - and nothing about a pointer moving
+     * down a list bounds how many of those start at once: a rest every second on
+     * cold mail opens one a second, each of which takes several, and the large
+     * mail hosts answer a dozen simultaneous logins by locking the account out
+     * of its own mailbox. So one runs, and what is waiting is a single slot
+     * holding the latest - which is the only one worth having, because whatever
+     * the pointer is on now is what is about to be opened.
      */
     const warmed = useRef(new Set<string>());
     const warming = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const warm = useCallback((messageId: string) => {
-        if (!messageId || warmed.current.has(messageId)) return;
-        if (warming.current) clearTimeout(warming.current);
-        warming.current = setTimeout(() => {
-            if (warmed.current.has(messageId)) return;
-            warmed.current.add(messageId);
-            void warmMessageAction(messageId);
-        }, WARM_AFTER_MS);
+    const wanted = useRef("");
+    const fetching = useRef(false);
+    const onScreen = useRef(true);
+    const warmSoon = useCallback((messageId: string) => {
+        wanted.current = messageId;
+        if (fetching.current) return;
+        fetching.current = true;
+        void (async () => {
+            try {
+                while (onScreen.current && wanted.current) {
+                    const next = wanted.current;
+                    wanted.current = "";
+                    if (warmed.current.has(next)) continue;
+                    // Marked here rather than where it was asked for, so a row
+                    // the pointer passed over and left behind is not remembered
+                    // as fetched when it never was.
+                    warmed.current.add(next);
+                    await warmMessageAction(next).catch(() => undefined);
+                }
+            } finally {
+                fetching.current = false;
+            }
+        })();
     }, []);
-
-    // Nothing outlives the screen: a timer that fires after this list is gone
-    // asks for a body nobody is waiting for.
-    useEffect(
-        () => () => {
+    const warm = useCallback(
+        (messageId: string) => {
+            if (!messageId || warmed.current.has(messageId)) return;
             if (warming.current) clearTimeout(warming.current);
+            warming.current = setTimeout(() => {
+                warming.current = null;
+                warmSoon(messageId);
+            }, WARM_AFTER_MS);
         },
-        []
+        [warmSoon]
     );
+
+    // Nothing outlives the screen: a timer that fires after this list is gone,
+    // or a slot drained after it, asks for a body nobody is waiting for.
+    useEffect(() => {
+        // Set on the way in as well as cleared on the way out: development
+        // mounts every screen twice, and a flag only ever cleared would leave
+        // the second mount unable to fetch anything.
+        onScreen.current = true;
+        return () => {
+            onScreen.current = false;
+            wanted.current = "";
+            if (warming.current) clearTimeout(warming.current);
+        };
+    }, []);
 
     /**
      * Put the conversation back on screen after the server refused to move it.
@@ -372,7 +448,7 @@ export function MailView({
             const ahead = optimistically(action);
             // The row moves now. A mail server is slow enough that waiting for it
             // reads as the screen having ignored the click.
-            if (ahead) patch(aimed, ahead);
+            if (ahead) patchUntilAnswered(aimed, ahead);
             // And the conversation being read closes now, for the same reason and
             // more so: the row it came from is already gone from the list behind
             // it, so waiting left somebody looking at a message that had been
@@ -390,7 +466,7 @@ export function MailView({
                 // costs one question rather than the action being lost.
                 const missing = missingFolderRole(outcome);
                 if (missing) {
-                    setPatched({});
+                    clearPatches();
                     if (reopen) openAgain(reopen);
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
@@ -401,11 +477,16 @@ export function MailView({
                     // the change after the server refused it would be lying about
                     // somebody's mail - and a reader taken out of a conversation
                     // that was never filed has to be put back in it.
-                    setPatched({});
+                    clearPatches();
                     if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
                 }
+                // Done. The overlay stops being something to carry across the
+                // next list: what comes back now is the server agreeing with it,
+                // and holding it past that is the screen disagreeing with the
+                // mailbox for ever.
+                inFlight.current = {};
                 setSelected([]);
                 toast.show({ title: announce });
                 // Done from the list, but it may have been aimed at whatever is
@@ -423,7 +504,17 @@ export function MailView({
                 refresh();
             });
         },
-        [askFolderRole, closeOpen, openAgain, openThread, patch, refresh, threadsOf, toast]
+        [
+            askFolderRole,
+            clearPatches,
+            closeOpen,
+            openAgain,
+            openThread,
+            patchUntilAnswered,
+            refresh,
+            threadsOf,
+            toast
+        ]
     );
 
     const snooze = useCallback(

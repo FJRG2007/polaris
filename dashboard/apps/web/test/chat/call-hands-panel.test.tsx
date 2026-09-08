@@ -46,8 +46,17 @@ const render = (state: CallState): string => renderToStaticMarkup(<HandStrip cal
 const words = (state: CallState): string => render(state).replace(/<[^>]*>/g, "");
 
 describe("the strip of raised hands", () => {
-    it("is not there at all when nobody has asked to speak", () => {
-        expect(render(call())).toBe("");
+    it("draws nothing when nobody has asked to speak", () => {
+        expect(words(call())).toBe("");
+    });
+
+    it("keeps the region that says so mounted while it is empty", () => {
+        // A live region and its first content inserted in one commit is a
+        // mutation nothing was watching for, and the announcement most screen
+        // readers drop is therefore the first hand - the one this exists for.
+        const empty = render(call());
+        expect(empty).toContain('aria-live="polite"');
+        expect(render(call({ hands: ["seat-ada"] }))).toContain('aria-live="polite"');
     });
 
     it("names the one person who has, rather than counting them", () => {

@@ -192,3 +192,21 @@ export function handsSummary(hands: readonly HandInQueue[]): string {
     }
     return `${hands.length} hands are up`;
 }
+
+/**
+ * The same, with whoever is next, for a screen that cannot draw the queue.
+ *
+ * The call bar has room for a count and nothing else, so the order it is hiding
+ * has to be said in the sentence behind it. Written here rather than there
+ * because it is the same sentence as the strip's plus one clause, and a bar that
+ * builds its own is a bar that says "You has a hand up" the first time somebody
+ * raises their own and walks to another screen - which is exactly when the bar
+ * is the only thing saying anything at all.
+ */
+export function handsQueueSummary(hands: readonly HandInQueue[]): string {
+    const summary = handsSummary(hands);
+    if (hands.length < 2) return summary;
+    const first = hands[0];
+    if (!first) return summary;
+    return `${summary}. ${first.own ? "You are first" : `${first.name} is first`}`;
+}

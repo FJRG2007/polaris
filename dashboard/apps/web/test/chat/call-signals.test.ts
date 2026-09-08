@@ -19,6 +19,7 @@ import {
     handQueue,
     handRaised,
     handRaisedAt,
+    handsQueueSummary,
     handsSummary
 } from "@/app/(app)/chat/call-signals";
 
@@ -101,6 +102,31 @@ describe("what the queue is drawn as", () => {
 
     it("says nothing at all when nobody has asked", () => {
         expect(handsSummary([])).toBe("");
+    });
+
+    it("names who is next for a bar that has no room to draw the queue", () => {
+        const hands = [
+            { id: "a", name: "Ada", own: false },
+            { id: "b", name: "Bo", own: true }
+        ];
+        expect(handsQueueSummary(hands)).toBe("2 hands are up. Ada is first");
+    });
+
+    it("never puts the reader's own hand in the third person", () => {
+        // The bar built this sentence itself and substituted a pronoun into it,
+        // which read "You has a hand up" to the one person it was about - and
+        // "3 hands are up. You is first" once there were three.
+        expect(handsQueueSummary([{ id: "b", name: "Bo", own: true }])).toBe("Your hand is up");
+        expect(
+            handsQueueSummary([
+                { id: "b", name: "Bo", own: true },
+                { id: "a", name: "Ada", own: false }
+            ])
+        ).toBe("2 hands are up. You are first");
+    });
+
+    it("says nothing when no hand is up", () => {
+        expect(handsQueueSummary([])).toBe("");
     });
 });
 
