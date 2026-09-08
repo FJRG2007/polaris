@@ -59,3 +59,19 @@ describe("what a row looks like before it has been read", () => {
         expect(view).toContain('open || picked ? "bg-primary/10"');
     });
 });
+
+describe("a row that is showing half of what it holds", () => {
+    it("hands over the whole subject on a hover", async () => {
+        // A subject is the one thing in a row somebody is deciding on, and in a
+        // narrow list it is the first thing cut. "Re: your invoice for Aug..."
+        // is not an answer to whether this is the message they want.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain('title={thread.subject || "(no subject)"}');
+    });
+
+    it("does the same for the names and the preview, which are cut too", async () => {
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain("title={people(thread, mine)}");
+        expect(view).toContain("title={thread.snippet}");
+    });
+});

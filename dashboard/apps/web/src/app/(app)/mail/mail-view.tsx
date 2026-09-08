@@ -1690,6 +1690,11 @@ function ThreadRow({
                 >
                     <div className={cn("flex items-baseline gap-2", wide && "w-56 shrink-0")}>
                         <span
+                            // Same reason, same row: three names in a group
+                            // conversation are cut after the first, and which
+                            // three it is decides whether this is the thread
+                            // somebody meant.
+                            title={people(thread, mine)}
                             className={cn(
                                 "min-w-0 flex-1 truncate text-[13px]",
                                 unread ? "font-semibold text-foreground" : "text-muted-foreground"
@@ -1713,6 +1718,14 @@ function ThreadRow({
                     </div>
                     <div className={cn("min-w-0", wide && "flex flex-1 items-baseline gap-2")}>
                         <p
+                            // The whole of it, for a row that is showing half.
+                            // A subject is the one thing in a row somebody is
+                            // actually deciding on, and in a narrow list it is
+                            // the thing most likely to be cut - "Re: your invoice
+                            // for Aug..." is not an answer to whether this is the
+                            // message they are looking for. Every other mail
+                            // client answers it by hovering; this is that.
+                            title={thread.subject || "(no subject)"}
                             className={cn(
                                 "truncate text-[13px]",
                                 wide && "shrink-0 max-w-[50%]",
@@ -1728,7 +1741,10 @@ function ThreadRow({
                                     aria-label="Has attachments"
                                 />
                             ) : null}
-                            <p className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
+                            <p
+                                title={thread.snippet}
+                                className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle"
+                            >
                                 {thread.snippet}
                             </p>
                         </div>
