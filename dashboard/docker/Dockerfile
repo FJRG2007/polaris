@@ -25,14 +25,39 @@ WORKDIR /build
 # The npm cache mount avoids re-downloading even when the layer does rebuild.
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
+# Every workspace manifest, one line each and all of them: a package missing here
+# is a package `npm ci` never links into node_modules, so it builds its own output
+# and every other package that imports it fails to resolve its types - which is
+# what happened, in this image alone, while the same build passed everywhere else.
+# `test/build/docker-manifests.test.ts` fails when this list and `packages/` stop
+# agreeing, because nothing else notices until an image build breaks.
+COPY packages/agent-core/package.json ./packages/agent-core/
+COPY packages/agent-runtime/package.json ./packages/agent-runtime/
+COPY packages/ai-provider/package.json ./packages/ai-provider/
+COPY packages/ai-search/package.json ./packages/ai-search/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
+COPY packages/docx/package.json ./packages/docx/
+COPY packages/electron-utils/package.json ./packages/electron-utils/
+COPY packages/file-parse/package.json ./packages/file-parse/
+COPY packages/font-metrics/package.json ./packages/font-metrics/
+COPY packages/genoffice-docs/package.json ./packages/genoffice-docs/
+COPY packages/genoffice-markdown/package.json ./packages/genoffice-markdown/
+COPY packages/genoffice-pdf/package.json ./packages/genoffice-pdf/
+COPY packages/genoffice-slides/package.json ./packages/genoffice-slides/
+COPY packages/genoffice-ui/package.json ./packages/genoffice-ui/
 COPY packages/hostd-client/package.json ./packages/hostd-client/
+COPY packages/i18n/package.json ./packages/i18n/
 COPY packages/messaging/package.json ./packages/messaging/
+COPY packages/office-layout/package.json ./packages/office-layout/
+COPY packages/pdf2docx/package.json ./packages/pdf2docx/
+COPY packages/pptx/package.json ./packages/pptx/
+COPY packages/pptx-render/package.json ./packages/pptx-render/
+COPY packages/project-store/package.json ./packages/project-store/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/

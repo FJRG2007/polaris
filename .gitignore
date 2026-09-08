@@ -14,8 +14,15 @@ __pycache__/
 venv/
 
 # Build artifacts
+#
+# `dist/` is bare because that is where every package in the dashboard writes its
+# output, at four different depths. `build/` was bare too, and nothing in this
+# repository ever writes one: what it actually swallowed was three folders of
+# SOURCE named build - the cross-compile script and systemd unit the hostd README
+# tells an operator to run, the same pair for the plugin agent, and a test folder.
+# None of the three were ever committed, and nothing said so. The same trap as
+# `/temp/` below, which carries the same note.
 dist/
-build/
 *.whl
 
 # Private local-only working folders - never commit (folders included)

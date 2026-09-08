@@ -1,0 +1,18 @@
+[Unit]
+Description=Polaris UniFi UNAS agent (monitoring + fan control)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Secrets and per-device settings are provided by the env file the Home
+# Assistant integration writes at deploy time; none are baked into the binary.
+EnvironmentFile=/etc/polaris-unas-agent.env
+ExecStart=/root/polaris-unas-agent
+Restart=always
+RestartSec=5
+# Needs root for sysfs PWM writes and privileged tools (smartctl, smbstatus).
+User=root
+
+[Install]
+WantedBy=multi-user.target

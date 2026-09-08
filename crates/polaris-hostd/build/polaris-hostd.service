@@ -1,0 +1,23 @@
+[Unit]
+Description=Polaris host daemon (privileged host API for the dashboard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Optional overrides (socket path, root allowlist, TCP fallback) go here; every
+# knob has a safe default, so the file may be absent.
+EnvironmentFile=-/etc/polaris-hostd.env
+ExecStart=/usr/local/bin/polaris-hostd
+Restart=always
+RestartSec=5
+# The daemon brokers host-level filesystem and mount operations, so it needs
+# root. This is the privileged half of the "full" edition; keep its socket
+# (0660) reachable only by the dashboard container's group.
+User=root
+# /run/polaris holds the socket and the per-run token file (tmpfs, 0700).
+RuntimeDirectory=polaris
+RuntimeDirectoryMode=0700
+
+[Install]
+WantedBy=multi-user.target
