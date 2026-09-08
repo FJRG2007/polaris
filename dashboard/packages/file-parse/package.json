@@ -1,0 +1,28 @@
+{
+    "name": "@polaris/file-parse",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Reading text out of a document, whatever it is: Office, PDF, the old binary formats. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./src/index.ts"
+        }
+    },
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/docx": "*",
+        "cfb": "1.2.2",
+        "fast-xml-parser": "5.11.1",
+        "jszip": "3.10.1",
+        "pdfjs-dist": "6.1.200",
+        "ppt-to-text": "1.0.1",
+        "word-extractor": "1.0.4"
+    }
+}

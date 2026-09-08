@@ -14,7 +14,7 @@ const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
-    transpilePackages: ["@polaris/ui"],
+    transpilePackages: ["@polaris/ui", "@polaris/file-parse"],
     serverExternalPackages: [
         "@prisma/client",
         "@polaris/db",

@@ -1,0 +1,29 @@
+{
+    "name": "@polaris/pptx-render",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Drawing a parsed presentation: text layout, shape geometry, fills. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./preset-geometry": {
+            "types": "./dist/preset-geometry.d.ts",
+            "import": "./dist/preset-geometry.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts src/preset-geometry.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/pptx": "*",
+        "bidi-js": "1.1.0",
+        "opentype.js": "2.0.0"
+    }
+}

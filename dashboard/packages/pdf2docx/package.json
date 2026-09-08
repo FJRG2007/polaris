@@ -1,0 +1,28 @@
+{
+    "name": "@polaris/pdf2docx",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Turning a PDF into an editable Word document: text runs, columns, tables, images. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@embedpdf/pdfium": "2.15.0",
+        "@polaris/docx": "*",
+        "@polaris/font-metrics": "*",
+        "@polaris/pptx": "*",
+        "bidi-js": "1.1.0",
+        "jszip": "3.10.1"
+    }
+}

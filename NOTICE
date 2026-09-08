@@ -33,11 +33,33 @@ animations, comments, sections.
 its parser, its fragment generators and a paragraph-level patching save -
 styles, numbering, sections, fields, tables, drawings, maths.
 
-Those two are why an exported `.docx` or `.pptx` from Polaris is a real Office
-package rather than a zip with the minimum set of parts in it. Both are held to
-the TypeScript strictness they were written under rather than Polaris' own, which
-is stated in their `tsconfig.json`; everything Polaris writes against them is
+`dashboard/packages/pptx-render/` is `packages/pptx-render`: drawing a parsed
+presentation - text layout, shape geometry, fills, preset geometries.
+
+`dashboard/packages/font-metrics/` is `packages/font-metrics`: reading the
+tables a layout needs to measure text, without a font renderer.
+
+`dashboard/packages/file-parse/` is `packages/file-parse`: taking the words out
+of a document whatever it is - the Office formats, PDF, and the binary ones from
+before them.
+
+`dashboard/packages/pdf2docx/` is `packages/pdf2docx`: turning a PDF into an
+editable Word document - text runs, columns, tables, images.
+
+Together these are why an exported `.docx` or `.pptx` from Polaris is a real
+Office package rather than a zip with the minimum set of parts in it, and why
+reading one is something this repository can do at all. Every ported package is
+held to the TypeScript strictness it was written under rather than Polaris' own,
+which is stated in its `tsconfig.json`; everything Polaris writes against them is
 still checked strictly at the call site.
+
+What was deliberately NOT taken, and why: the Electron shell and
+`electron-utils` (Polaris is a web application), the `ui` package (Polaris has
+its own design system), `i18n` and `project-store` (Polaris has both already),
+and `agent-core`, `ai-provider` and `ai-search` (Polaris has its own agent
+runtime, provider catalogue and search). The editors themselves are not taken
+either: they are built on that Electron shell and have no real-time
+collaboration in them, which is the thing Polaris' own editors exist to do.
 
 The Apache 2.0 licence text is at http://www.apache.org/licenses/LICENSE-2.0.
 The files carry a header saying where they came from; their behaviour is

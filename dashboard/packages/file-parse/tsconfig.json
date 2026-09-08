@@ -1,0 +1,15 @@
+{
+    // Vendored code, held to the contract it was written under - see the note in
+    // `packages/pptx/tsconfig.json`, which explains why the two flags Polaris
+    // turns on are off inside a port and nowhere else.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "types": ["node"],
+        "noUncheckedIndexedAccess": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"]
+}
