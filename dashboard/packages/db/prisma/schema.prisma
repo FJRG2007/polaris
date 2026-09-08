@@ -9793,6 +9793,12 @@ model MailUpload {
     // Sent inline as a picture the body refers to, rather than as a file.
     inline    Boolean  @default(false)
     contentId String   @default("")
+    // "attachment" or "archive". The two have very different ceilings - a mail
+    // server will not take 200 MB and an mbox routinely is - so the kind is
+    // recorded rather than taken from the request that reads it back. Without
+    // it, asking for the archive ceiling and then attaching the file to a
+    // message is a way round the attachment limit.
+    kind      String   @default("attachment")
     createdAt DateTime @default(now())
 
     user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)

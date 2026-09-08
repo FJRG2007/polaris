@@ -27,7 +27,7 @@
 import { withImap } from "./imap";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
-import { judgeArrival } from "./spam";
+import { fileJudgedJunk, judgeArrival } from "./spam";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
 import { decodePart } from "./decode";
@@ -387,6 +387,9 @@ async function storeMessages(
     fetched: readonly Fetched[]
 ): Promise<void> {
     const snippets = await fetchSnippets(client, fetched);
+    /** What the junk filter said to file, gathered rather than acted on one at a
+     *  time: filing opens a connection, and this function is already inside one. */
+    const judged: string[] = [];
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -496,11 +499,19 @@ async function storeMessages(
                 // filed is no longer in the inbox to judge. Before, because
                 // answering junk with an out-of-office is how a mailbox tells a
                 // sender that the address is real.
-                await judgeArrival(account.id, row.id);
-                await replyIfAway(account.id, row.id);
+                if (await judgeArrival(account.id, row.id)) judged.push(row.id);
+                // The away reply reads the folder itself, so a message about to
+                // be filed as junk is still in the inbox here - it is filed at
+                // the end of the pass. Answering junk with an out-of-office is
+                // how a mailbox confirms to a sender that the address is real,
+                // so the two are ordered rather than left to chance.
+                else await replyIfAway(account.id, row.id);
             }
         }
     }
+
+    // One connection for the whole page, after the loop rather than inside it.
+    await fileJudgedJunk(account.userId, judged);
 
     await refreshThreads(account.id);
     publishMail({

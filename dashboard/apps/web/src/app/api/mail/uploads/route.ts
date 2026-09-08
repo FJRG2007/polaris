@@ -28,7 +28,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** How big a file of this kind may be, and what to say when it is not. */
+/** What kind of upload this is, and therefore how big it may be and what to say
+ *  when it is not. The ceiling is not the caller's to choose - see `storeUpload`,
+ *  which reads it back off the kind it records. */
 function ceilingFor(kind: string): { max: number; refusal: string } {
     return kind === "archive"
         ? {
@@ -47,7 +49,8 @@ export async function POST(request: Request): Promise<Response> {
 
     // Said in the query rather than the form, because the declared length is
     // refused before a byte of the body is read.
-    const ceiling = ceilingFor(new URL(request.url).searchParams.get("kind") ?? "");
+    const asked = new URL(request.url).searchParams.get("kind") ?? "";
+    const ceiling = ceilingFor(asked);
     const declared = Number(request.headers.get("content-length") ?? 0);
     if (declared > ceiling.max * 1.1) {
         return Response.json({ error: ceiling.refusal }, { status: 413 });
@@ -77,7 +80,10 @@ export async function POST(request: Request): Promise<Response> {
                 type: file.type,
                 bytes
             },
-            { inline: form.get("inline") === "1", maxBytes: ceiling.max }
+            {
+                inline: form.get("inline") === "1",
+                kind: asked === "archive" ? "archive" : "attachment"
+            }
         );
         return Response.json({ upload: stored });
     } catch (caught) {

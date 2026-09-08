@@ -47,7 +47,7 @@ export async function handOutMailboxAction(
     }
     if (!holderId) return { error: "Choose who this mailbox is for.", field: "holderId" };
     try {
-        const mailboxes = await register.handOutMailbox(user.id, orgId, holderId, parsed.data);
+        const mailboxes = await register.handOutMailbox({ id: user.id, isAdmin: user.isAdmin }, orgId, holderId, parsed.data);
         refresh(slug);
         return { mailboxes };
     } catch (caught) {
@@ -58,7 +58,7 @@ export async function handOutMailboxAction(
 export async function takeBackMailboxAction(orgId: string, slug: string, accountId: string) {
     const user = await requireUser();
     try {
-        const mailboxes = await register.takeBackMailbox(user.id, orgId, accountId);
+        const mailboxes = await register.takeBackMailbox({ id: user.id, isAdmin: user.isAdmin }, orgId, accountId);
         refresh(slug);
         return { mailboxes };
     } catch (caught) {

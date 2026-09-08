@@ -15,6 +15,12 @@
  * the destination, because the sync it runs inside reads Junk later in the same
  * pass.
  *
+ * The filing was then moved off the per-message path for the same reason the
+ * settle was: `actOnMessages` opens a connection, and the sync is already
+ * holding one, so doing it per message was a connection per junk message on a
+ * pass that may see hundreds. `judgeArrival` answers, the pass collects, and
+ * `fileJudgedJunk` files the lot once.
+ *
  * The loop guard beside it has the same shape of failure: a header nothing ever
  * fetched is a guard that cannot fire.
  */
@@ -28,8 +34,19 @@ const MAILBOX = fileURLToPath(new URL("../../src/lib/mailbox/", import.meta.url)
 describe("the junk filter files on the mail server", () => {
     it("moves through the ordinary action rather than rewriting the row", async () => {
         const spam = await readFile(`${MAILBOX}spam.ts`, "utf8");
-        expect(spam).toContain('actOnMessages(account.userId, [row.id], "junk"');
+        expect(spam).toContain('actOnMessages(userId, [...messageIds], "junk"');
         expect(spam).not.toContain("data: { folderId: junk.id }");
+    });
+
+    it("files what a whole pass judged in one go rather than one at a time", async () => {
+        // The connection is the cost, not the move: one per junk message on a
+        // sync that already holds one is what this shape exists to avoid.
+        const spam = await readFile(`${MAILBOX}spam.ts`, "utf8");
+        const sync = await readFile(`${MAILBOX}sync.ts`, "utf8");
+        expect(spam).toContain("export async function fileJudgedJunk(");
+        expect(sync).toContain("fileJudgedJunk(account.userId, judged)");
+        // Gathered inside the loop, spent outside it.
+        expect(sync).toContain("judged.push(row.id)");
     });
 
     it("teaches nothing and settles nothing", async () => {
@@ -42,7 +59,7 @@ describe("the junk filter files on the mail server", () => {
         // `findFolderForRole`, which answers null, rather than the one that makes
         // a folder: inventing one is not the filter's decision to take.
         expect(spam).toContain('findFolderForRole(accountId, "junk")');
-        expect(spam).toContain("if (!junk || junk.id === row.folderId) return;");
+        expect(spam).toContain("return Boolean(junk && junk.id !== row.folderId);");
     });
 });
 

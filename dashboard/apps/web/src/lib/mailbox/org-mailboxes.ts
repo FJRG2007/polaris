@@ -29,7 +29,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addAccount } from "./accounts";
 import { recordAudit } from "@/lib/audit-service";
-import { orgIdsWhere } from "@/lib/orgs/org-service";
+import { orgIdsWhere, type OrgActor } from "@/lib/orgs/org-service";
 
 /** Raised when somebody asks to run an organization's mailboxes and may not. */
 export class OrgMailboxError extends Error {
@@ -39,9 +39,20 @@ export class OrgMailboxError extends Error {
     }
 }
 
-/** Refuse unless this account runs the organization's mailboxes. */
-export async function requireMailManager(actorId: string, orgId: string): Promise<void> {
-    const running = await orgIdsWhere({ id: actorId, isAdmin: false }, "mail.manage");
+/**
+ * Refuse unless this account runs the organization's mailboxes.
+ *
+ * `isAdmin` is carried rather than assumed false. The screen that opens this is
+ * gated by `requireOrgPage`, which grants an instance administrator every
+ * organization permission - so hardcoding it here let them through the door and
+ * then refused them at the desk, which on this screen is a thrown error rather
+ * than an empty list.
+ *
+ * It widens who may see the register and changes nothing about who may read a
+ * mailbox: that is `userId` on the row, and there is no path from here to one.
+ */
+export async function requireMailManager(actor: OrgActor, orgId: string): Promise<void> {
+    const running = await orgIdsWhere(actor, "mail.manage");
     if (!running.includes(orgId)) throw new OrgMailboxError();
 }
 
@@ -63,8 +74,8 @@ export interface OrgMailboxView {
 }
 
 /** Every mailbox this organization has handed out, newest last. */
-export async function listOrgMailboxes(actorId: string, orgId: string): Promise<OrgMailboxView[]> {
-    await requireMailManager(actorId, orgId);
+export async function listOrgMailboxes(actor: OrgActor, orgId: string): Promise<OrgMailboxView[]> {
+    await requireMailManager(actor, orgId);
     const rows = await prisma.mailAccount.findMany({
         where: { orgId },
         orderBy: [{ createdAt: "asc" }],
@@ -104,12 +115,12 @@ export async function listOrgMailboxes(actorId: string, orgId: string): Promise<
  * a mailbox this organization then believes it controls.
  */
 export async function handOutMailbox(
-    actorId: string,
+    actor: OrgActor,
     orgId: string,
     holderId: string,
     setup: core.MailAccountSetup
 ): Promise<OrgMailboxView[]> {
-    await requireMailManager(actorId, orgId);
+    await requireMailManager(actor, orgId);
 
     const onRoster = await prisma.organization.findFirst({
         where: {
@@ -120,8 +131,8 @@ export async function handOutMailbox(
     });
     if (!onRoster) throw new OrgMailboxError("That person is not in this organization.");
 
-    await addAccount(holderId, setup, orgId, actorId);
-    return listOrgMailboxes(actorId, orgId);
+    await addAccount(holderId, setup, orgId, actor.id);
+    return listOrgMailboxes(actor, orgId);
 }
 
 /**
@@ -133,11 +144,11 @@ export async function handOutMailbox(
  * the two is somebody's own mail being deleted by their employer.
  */
 export async function takeBackMailbox(
-    actorId: string,
+    actor: OrgActor,
     orgId: string,
     accountId: string
 ): Promise<OrgMailboxView[]> {
-    await requireMailManager(actorId, orgId);
+    await requireMailManager(actor, orgId);
     const row = await prisma.mailAccount.findFirst({
         where: { id: accountId, orgId },
         select: { id: true, address: true, userId: true }
@@ -151,11 +162,11 @@ export async function takeBackMailbox(
     await prisma.mailAccount.delete({ where: { id: row.id } });
 
     await recordAudit({
-        actorId,
+        actorId: actor.id,
         action: "mail.account.revoke",
         targetType: "mail-account",
         targetId: row.id,
         metadata: { address: row.address, orgId, from: row.userId }
     });
-    return listOrgMailboxes(actorId, orgId);
+    return listOrgMailboxes(actor, orgId);
 }

@@ -184,25 +184,31 @@ async function knowledgeFor(
 }
 
 /**
- * Judge one message, write down what was decided, and file it if the answer was
- * strong enough.
+ * Judge one message and write down what was decided.
  *
- * Never throws. This runs inside a sync, and a filter that fails must fail as a
- * message nobody judged rather than as a folder that stopped syncing.
+ * Answers whether it should be filed as junk; the filing itself belongs to the
+ * caller. Split that way because filing goes through `actOnMessages`, which
+ * opens a connection to the mail server - and this runs inside a sync that is
+ * already holding one. Doing it here meant a second connection per junk message
+ * on a pass that may see hundreds of them; the sync now collects the verdicts
+ * and files them together, which is one connection for the whole pass.
+ *
+ * Never throws, and answers false when it fails. A filter that breaks has to
+ * break as a message nobody judged, not as a folder that stopped syncing.
  */
-export async function judgeArrival(accountId: string, messageId: string): Promise<void> {
+export async function judgeArrival(accountId: string, messageId: string): Promise<boolean> {
     try {
         const account = await prisma.mailAccount.findUnique({
             where: { id: accountId },
             select: { spamFilter: true, userId: true }
         });
-        if (!account?.spamFilter) return;
+        if (!account?.spamFilter) return false;
 
         const row = (await prisma.mailMessage.findUnique({
             where: { id: messageId },
             select: JUDGE_SELECT
         })) as JudgeRow | null;
-        if (!row) return;
+        if (!row) return false;
 
         const message = judgeable(row);
         const fingerprint = core.spamFingerprint(message);
@@ -212,33 +218,49 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
             where: { id: row.id },
             data: { spamScore: judged.score, spamReason: judged.reason }
         });
-        if (judged.verdict !== "junk") return;
+        if (judged.verdict !== "junk") return false;
 
-        // Filed, and only when this mailbox has somewhere to file it. A server
-        // with no Junk folder is a mailbox where the answer is to say so on the
-        // message rather than to invent a folder or to throw the message away.
+        // Only when this mailbox has somewhere to file it. A server with no Junk
+        // folder is one where the answer is to say so on the message rather than
+        // to invent a folder or to throw the message away.
         const junk = await findFolderForRole(accountId, "junk");
-        if (!junk || junk.id === row.folderId) return;
-
-        // Through the ordinary action, so the mail server is told and the row is
-        // dropped for the next pass to pick up under the uid the destination
-        // gave it. Rewriting `folderId` here instead left the message in the
-        // inbox on every other client, and left a row filed under Junk carrying
-        // the inbox's uid - which is a Not junk that moves somebody else's
-        // message. Imported at the call site because that module reads this one
-        // back for its teaching, and a cycle resolved at module load is a cycle
-        // that breaks on the day somebody reorders an import.
-        const { actOnMessages } = await import("./messages");
-        // Nothing is taught: this is the filter's own verdict, and a classifier
-        // trained on its own output converges on believing whatever it happened
-        // to think first. And nothing settles: this runs inside a sync that reads
-        // Junk later in the same pass and rebuilds the conversations when the
-        // folder is through, so doing either here would be a second connection
-        // and five hundred rebuilt conversations for every arriving message.
-        await actOnMessages(account.userId, [row.id], "junk", { teach: false, settle: false });
+        return Boolean(junk && junk.id !== row.folderId);
     } catch (caught) {
         // A message nobody judged is a message that arrived, which is the
         // failure this is allowed to have.
+        console.error(caught);
+        return false;
+    }
+}
+
+/**
+ * File everything a pass judged as junk, in one go.
+ *
+ * Through the ordinary action, so the mail server is told and the rows are
+ * dropped for the next pass to pick up under the uids the destination gave
+ * them. Writing `folderId` here instead left the message in the inbox on every
+ * other client, and left a row filed under Junk carrying the inbox's uid - which
+ * is a Not junk that moves somebody else's message.
+ *
+ * Nothing is taught: this is the filter's own verdict, and a classifier trained
+ * on its own output converges on believing whatever it happened to think first.
+ * Nothing settles either - the sync that calls this reads Junk later in the same
+ * pass and rebuilds the conversations when the folder is through.
+ */
+export async function fileJudgedJunk(
+    userId: string,
+    messageIds: readonly string[]
+): Promise<void> {
+    if (messageIds.length === 0) return;
+    try {
+        // Imported here because that module reads this one back for its
+        // teaching, and a cycle resolved at module load is a cycle that breaks
+        // on the day somebody reorders an import.
+        const { actOnMessages } = await import("./messages");
+        await actOnMessages(userId, [...messageIds], "junk", { teach: false, settle: false });
+    } catch (caught) {
+        // The mail is delivered and the scores are written; what did not happen
+        // is the move. The next sync sees them again and judges them again.
         console.error(caught);
     }
 }

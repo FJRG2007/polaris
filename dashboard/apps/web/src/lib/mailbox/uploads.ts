@@ -43,6 +43,12 @@ export const MAX_ARCHIVE_BYTES = MAIL_MAX_ARCHIVE_BYTES;
 const ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** One file, as it was stored. */
+/** What an upload is for. An archive is read by the importer and can never be
+ *  attached to a message; an attachment is the other way round. The two have
+ *  ceilings an order of magnitude apart, which is why this is a column rather
+ *  than something the request that reads it back gets to say. */
+export type UploadKind = "attachment" | "archive";
+
 export interface StoredUpload {
     readonly id: string;
     readonly name: string;
@@ -72,10 +78,19 @@ function safeName(name: string): string {
 export async function storeUpload(
     userId: string,
     file: { name: string; type: string; bytes: Uint8Array },
-    options: { inline?: boolean; maxBytes?: number } = {}
+    options: { inline?: boolean; kind?: UploadKind } = {}
 ): Promise<StoredUpload> {
-    if (file.bytes.length > (options.maxBytes ?? MAX_ATTACHMENT_BYTES)) {
-        throw new Error("That file is bigger than most mail servers will accept.");
+    // The ceiling follows the kind rather than being passed in beside it. They
+    // were two arguments that had to agree, and the one place they did not was
+    // the request deciding which ceiling applied to a file it then attached to a
+    // message - the attachment limit, gone round.
+    const kind: UploadKind = options.kind === "archive" ? "archive" : "attachment";
+    if (file.bytes.length > (kind === "archive" ? MAX_ARCHIVE_BYTES : MAX_ATTACHMENT_BYTES)) {
+        throw new Error(
+            kind === "archive"
+                ? "That archive is more than Polaris can read in one go."
+                : "That file is bigger than most mail servers will accept."
+        );
     }
     const folder = `${UPLOAD_ROOT}/${userId}`;
     const path = `${folder}/${crypto.randomUUID()}`;
@@ -99,6 +114,7 @@ export async function storeUpload(
             connectionId: placed.targetId === LOCAL_TARGET ? null : placed.targetId,
             path,
             inline,
+            kind,
             // A picture the body refers to needs an id the markup can name. Made
             // here rather than by the composer, so the id in the message and the
             // id on the part are the same by construction.
@@ -189,8 +205,12 @@ export async function attachUploads(
     draftId: string,
     uploadIds: readonly string[]
 ): Promise<void> {
+    // `kind` is in the match, not checked after it: an archive is a file that
+    // was allowed to be two hundred megabytes because nothing was ever going to
+    // send it, and attaching one is how that ceiling becomes the attachment
+    // ceiling.
     await prisma.mailUpload.updateMany({
-        where: { userId, id: { in: [...uploadIds] } },
+        where: { userId, id: { in: [...uploadIds] }, kind: "attachment" },
         data: { draftId }
     });
     // Anything that was on this draft and is not on it now was removed in the

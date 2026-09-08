@@ -58,7 +58,7 @@ const ARCHIVE_TTL_MS = 30 * 60 * 1000;
 
 /** How many are held at once. An archive is megabytes; two people importing at
  *  the same time is ordinary, ten is somebody filling the memory. */
-const ARCHIVES_HELD = 4;
+const ARCHIVES_HELD = 1;
 
 function archiveKey(userId: string, uploadId: string): string {
     return `${userId}:${uploadId}`;

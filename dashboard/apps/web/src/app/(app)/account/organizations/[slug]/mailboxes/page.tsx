@@ -22,7 +22,7 @@ export default async function OrganizationMailboxesPage({
     const { slug } = await params;
     const { org, user } = await requireOrgPage(slug, "mail.manage");
     const [mailboxes, members] = await Promise.all([
-        listOrgMailboxes(user.id, org.id),
+        listOrgMailboxes({ id: user.id, isAdmin: user.isAdmin }, org.id),
         listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
     ]);
 

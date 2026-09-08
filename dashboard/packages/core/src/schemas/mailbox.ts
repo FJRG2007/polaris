@@ -242,11 +242,16 @@ export const MAIL_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
  *
  * Nothing to do with what a mail server accepts: an archive is read here and
  * appended message by message, so the only ceiling that matters is what this
- * server can hold in memory while it reads one. Far above the attachment limit,
- * which an mbox of a few thousand messages passes without being unusual, and
- * still a number rather than none.
+ * server can hold while it reads one. And it genuinely holds it - the file is
+ * read whole, decoded to a string and split into an array of messages, which is
+ * several times the file resident at once. A ceiling well above that is not a
+ * limit, it is an out-of-memory waiting for the day somebody uses it.
+ *
+ * Fifty megabytes is comfortably ten thousand messages, which is most people's
+ * whole archive, and the screen says to split anything larger and bring the
+ * parts in one after another.
  */
-export const MAIL_MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
+export const MAIL_MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 
 /** A file already uploaded and waiting to be attached, by its id. */
 const attachmentIds = z.array(z.string().uuid()).max(50);
