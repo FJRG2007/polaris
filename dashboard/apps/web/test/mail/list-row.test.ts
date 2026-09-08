@@ -38,3 +38,24 @@ describe("a row carries what the menu hands it", () => {
         expect(menu).toContain("<ContextMenuTrigger asChild>{children}</ContextMenuTrigger>");
     });
 });
+
+describe("what a row looks like before it has been read", () => {
+    it("changes its tone as well as its weight", async () => {
+        // Bold text alone is what a list of forty read messages and three unread
+        // ones looked like: three rows in a slightly darker grey, which is not
+        // something anybody scans for. Every mail client people already use
+        // gives the row itself a tone - on the light theme this is exactly
+        // Protonmail's, where the page is grey and an unread row is white.
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain('unread && !open && !picked && "bg-card hover:bg-card-hover"');
+    });
+
+    it("keeps the one being read louder than the ones not yet read", async () => {
+        // And it cannot do that with another shade of the same grey: on the
+        // light theme every tier above the page is white, so a selected row and
+        // an unread row were the same colour the moment unread had one. Accent
+        // for "this one", tone for "not read yet".
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        expect(view).toContain('open || picked ? "bg-primary/10"');
+    });
+});

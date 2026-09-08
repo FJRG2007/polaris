@@ -1609,8 +1609,28 @@ function ThreadRow({
             }}
             className={cn(
                 "group relative border-b border-border/60",
-                open ? "bg-card" : "hover:bg-card/60",
-                picked && "bg-card",
+                // Unread is a lift off the page as well as bolder text. Weight
+                // alone is what a list of forty read messages and three unread
+                // ones looked like: three rows in a slightly darker grey,
+                // which is not something anybody scans for. A tone difference
+                // is - it is what every mail client people already use does,
+                // and on the light theme it is exactly Protonmail's: the page
+                // is grey and an unread row is white.
+                //
+                // A tier rather than a wash of its own, and `card` rather than
+                // `surface`: on the dark theme surface is two per cent off the
+                // page, which measures as a lift and reads as nothing. Card is
+                // the first tone anybody actually sees there, and on the light
+                // theme both are the same white.
+                unread && !open && !picked && "bg-card hover:bg-card-hover",
+                // The one being read, and the ones ticked, take the accent
+                // instead of a tone. They have to outrank unread and they
+                // cannot do it by being another shade of the same grey - on the
+                // light theme every tier above the page is white, so a selected
+                // row and an unread row were the same colour the moment unread
+                // had one. Accent for "this one", tone for "not read yet"; the
+                // rail already spends its colour the same way.
+                open || picked ? "bg-primary/10" : !unread && "hover:bg-card/60",
                 onCursor && "ring-1 ring-inset ring-border-strong",
                 rest.className
             )}
