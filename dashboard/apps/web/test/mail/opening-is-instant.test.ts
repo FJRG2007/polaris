@@ -85,3 +85,45 @@ describe("fetching a body before it is asked for", () => {
         expect(list).toContain("onScreen.current = false;");
     });
 });
+
+describe("marking it read", () => {
+    it("writes the row before it tells the mail server", async () => {
+        // It went the way a move does - connection, mailbox lock, STORE, and
+        // only then the row - so opening a message cost a full round trip to
+        // somebody else's server before the list stopped being bold. And when
+        // that failed it failed in silence, which is "I open it and it does not
+        // go read" reported as a mystery.
+        const messages = await readFile(new URL("../../src/lib/mailbox/messages.ts", import.meta.url), "utf8");
+        expect(messages).toContain("const flag = FLAG_ACTIONS[action];");
+        expect(messages).toContain("if (flag) return await setFlag(userId, messages, flag);");
+        const set = messages.slice(messages.indexOf("async function setFlag("));
+        const body = set.slice(0, set.indexOf("/** What one folder"));
+        // The row and the conversation's counts first...
+        expect(body.indexOf("prisma.mailMessage.updateMany")).toBeLessThan(body.indexOf("withImap"));
+        expect(body).toContain("await refreshThreadsFor(accountIds)");
+        // ...and the server after the answer has gone, on the same `after` the
+        // folder catch-up already uses.
+        expect(body).toContain("after(push)");
+    });
+
+    it("leaves a move alone, which must not be believed before the server agrees", async () => {
+        // Deleting a row for a message the server still holds is a message that
+        // comes back on the next sync having been gone from the screen.
+        const messages = await readFile(new URL("../../src/lib/mailbox/messages.ts", import.meta.url), "utf8");
+        const move = messages.slice(messages.indexOf("const role = MOVE_ACTIONS[action];"));
+        expect(move).toContain("await client.messageMove(uids, target.path, { uid: true })");
+        // The server first, the row after - the opposite order to a flag.
+        expect(move.indexOf("messageMove")).toBeLessThan(move.indexOf("deleteMany"));
+    });
+});
+
+describe("a press, rather than a pointer passing", () => {
+    it("asks for the body with no wait at all", async () => {
+        // The wait exists so running down a list of fifty asks for nothing. A
+        // press is somebody having decided, a moment before the navigation - and
+        // most people click a row without hovering it first.
+        expect(list).toContain("const warmNow = useCallback(");
+        expect(list).toContain("onPointerDown={(event) => {");
+        expect(list).toContain("onDecided();");
+    });
+});

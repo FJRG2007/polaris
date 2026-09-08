@@ -397,6 +397,27 @@ export function MailView({
         },
         [warmSoon]
     );
+    /**
+     * The same, with the wait taken off.
+     *
+     * The wait exists so that running the pointer down a list of fifty does not
+     * ask for fifty bodies. A press is not that: it is somebody having decided,
+     * and it happens a moment before the navigation it starts - which is exactly
+     * the moment worth spending. Without this, anybody who clicks without
+     * hovering first - which is most people, most of the time - got none of the
+     * head start and waited the full round trip with a spinner in front of them.
+     */
+    const warmNow = useCallback(
+        (messageId: string) => {
+            if (!messageId || warmed.current.has(messageId)) return;
+            if (warming.current) {
+                clearTimeout(warming.current);
+                warming.current = null;
+            }
+            warmSoon(messageId);
+        },
+        [warmSoon]
+    );
 
     // Nothing outlives the screen: a timer that fires after this list is gone,
     // or a slot drained after it, asks for a body nobody is waiting for.
@@ -1039,6 +1060,7 @@ export function MailView({
                                             thread={shown(thread)}
                                             onCursor={onRow?.id === thread.id}
                                             onPeek={() => warm(thread.leadMessageId)}
+                                            onDecided={() => warmNow(thread.leadMessageId)}
                                             open={openThread?.id === thread.id}
                                             picked={selected.includes(thread.id)}
                                             color={accountColor(thread.accountId)}
@@ -1518,6 +1540,7 @@ function ThreadRow({
     thread,
     onCursor,
     onPeek,
+    onDecided,
     open,
     picked,
     color,
@@ -1541,6 +1564,9 @@ function ThreadRow({
     /** Somebody is looking at this row. Fetching its body now is what makes
      *  opening it feel instant - see `WARM_AFTER_MS`. */
     onPeek: () => void;
+    /** Somebody has decided on this row - a press, which is a moment before the
+     *  navigation it starts. Worth spending, unlike a pointer crossing. */
+    onDecided: () => void;
     open: boolean;
     picked: boolean;
     color: string;
@@ -1583,6 +1609,14 @@ function ThreadRow({
             onPointerEnter={(event) => {
                 rest.onPointerEnter?.(event);
                 onPeek();
+            }}
+            // A press, which is the moment somebody has decided: no wait, and it
+            // lands before the navigation does. Most people click a row without
+            // hovering it first, and they were the ones paying the whole round
+            // trip with a spinner in front of them.
+            onPointerDown={(event) => {
+                rest.onPointerDown?.(event);
+                onDecided();
             }}
             onFocus={(event) => {
                 rest.onFocus?.(event);

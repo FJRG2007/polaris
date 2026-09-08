@@ -186,6 +186,10 @@ export async function actOnMessages(
     const messages = await ownedMessages(userId, messageIds);
     if (messages.length === 0) return 0;
 
+    // A flag is not a move, and it used to be treated as one.
+    const flag = FLAG_ACTIONS[action];
+    if (flag) return await setFlag(userId, messages, flag);
+
     let done = 0;
     for (const [accountId, mine] of groupByAccount(messages)) {
         const account = await ownedAccount(userId, accountId);
@@ -268,6 +272,91 @@ function settle(
         // there is nothing waiting on it to be kind to.
         void read();
     }
+}
+
+/**
+ * Set or clear a flag: here first, on the mail server after the answer.
+ *
+ * This is the one action that happens because somebody is reading, rather than
+ * because they pressed something, and it was the slowest thing on the screen. It
+ * went the same way a move does - open a connection, take a mailbox lock, STORE,
+ * and only then write the row - so opening a message cost a full round trip to
+ * somebody else's IMAP server before the list stopped being bold. Behind a
+ * connection already busy fetching the body of the message being opened, it cost
+ * that wait twice.
+ *
+ * And when it failed it failed silently. The row is written only after the
+ * server says yes, so a refused or timed-out STORE left the message unread with
+ * nothing said to anybody - which is exactly "I open it and it does not go
+ * read", reported as a mystery because from the screen that is what it is.
+ *
+ * So the order is turned around. The row and its conversation are written now,
+ * which is what every screen reads and therefore what the reader sees; the flag
+ * goes to the mail server once the answer has been flushed, on the same `after`
+ * the folder catch-up already uses. A push that never lands is not lost data -
+ * the next sync reads the server's own flags and puts the message back to
+ * whatever the server believes, which is the truth and was always going to win.
+ *
+ * A move is deliberately NOT done this way. Deleting a row for a message the
+ * server still holds is a message that comes back on the next sync having been
+ * gone from the screen, and that is a worse lie than a slow click.
+ */
+async function setFlag(
+    userId: string,
+    messages: readonly {
+        id: string;
+        uid: bigint;
+        accountId: string;
+        folderId: string;
+    }[],
+    flag: { flag: string; add: boolean; column: string }
+): Promise<number> {
+    await prisma.mailMessage.updateMany({
+        where: { id: { in: messages.map((message) => message.id) } },
+        data: { [flag.column]: flag.add }
+    });
+    const accountIds = [...new Set(messages.map((message) => message.accountId))];
+    // The conversation's own counts, which is what the list draws: a message
+    // marked read whose thread still says one unread is a row that stays bold.
+    await refreshThreadsFor(accountIds);
+    for (const accountId of accountIds) {
+        publishMail({ accountId, kind: "messages", actorId: userId });
+    }
+
+    const push = async (): Promise<void> => {
+        for (const [accountId, mine] of groupByAccount(messages)) {
+            const account = await ownedAccount(userId, accountId).catch(() => null);
+            if (!account) continue;
+            await withImap(account, async (client) => {
+                for (const [folderId, rows] of byFolder(mine)) {
+                    const folder = await prisma.mailFolder.findUnique({
+                        where: { id: folderId },
+                        select: { path: true }
+                    });
+                    if (!folder) continue;
+                    const uids = rows.map((row) => Number(row.uid));
+                    const lock = await client.getMailboxLock(folder.path);
+                    try {
+                        if (flag.add) {
+                            await client.messageFlagsAdd(uids, [flag.flag], { uid: true });
+                        } else {
+                            await client.messageFlagsRemove(uids, [flag.flag], { uid: true });
+                        }
+                    } finally {
+                        lock.release();
+                    }
+                }
+            }).catch(() => undefined);
+        }
+    };
+    try {
+        after(push);
+    } catch {
+        // No request to be after - a rule firing on a sync, a sweep - so there is
+        // nothing waiting on this to be kind to.
+        void push();
+    }
+    return messages.length;
 }
 
 /** What one folder's worth of an action did: how many messages it touched, and
