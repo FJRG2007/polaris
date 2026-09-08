@@ -392,7 +392,7 @@ function Row({
 /** The five kinds, offered as one press each rather than a press and a menu. */
 function NewButton({ onPick }: { onPick: (kind: core.OfficeKind) => void }) {
     return (
-        <ScrollRow aria-label="Make something new">
+        <ScrollRow className="-mx-1 flex items-center gap-2 px-1" aria-label="Make something new">
             {core.OFFICE_KINDS.map((kind) => {
                 const Icon = KIND_ICONS[kind];
                 return (

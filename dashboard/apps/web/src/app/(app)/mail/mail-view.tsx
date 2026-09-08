@@ -164,12 +164,52 @@ export function MailView({
         accountColor,
         askFolderRole,
         composing,
+        folders,
         identities,
+        nudgeUnread,
         openComposer,
         refresh,
         reloadLists,
         revision
     } = useMail();
+
+    /**
+     * Which folder a row in this list is sitting in.
+     *
+     * The rail draws a number per folder, so taking one off it takes knowing
+     * which folder the mail was in - and a row does not carry that, because in
+     * the merged views it is a different folder per mailbox. It is the folder
+     * being looked at when the list is one folder, and each mailbox's folder of
+     * that role when the list is a merged view of a role.
+     *
+     * Null for a label or a search, which span folders: no folder is named, so
+     * no number is moved, and the count simply arrives with the server's answer
+     * as it always did. A guess here would be a number going down on a folder
+     * nothing happened in.
+     */
+    const listedFolder = useCallback(
+        (accountId: string): string | null => {
+            if (page.folderId) return page.folderId;
+            if (!page.role) return null;
+            return (
+                folders.find((one) => one.accountId === accountId && one.role === page.role)?.id ??
+                null
+            );
+        },
+        [folders, page.folderId, page.role]
+    );
+
+    /** What a set of conversations leaving unread behind means for the rail. */
+    const unreadNudges = useCallback(
+        (rows: readonly { accountId: string; unreadCount: number }[]) =>
+            rows.flatMap((row) => {
+                const folderId = listedFolder(row.accountId);
+                return folderId && row.unreadCount > 0
+                    ? [{ folderId, by: -row.unreadCount }]
+                    : [];
+            }),
+        [listedFolder]
+    );
 
     /**
      * The list, and the conversation open beside it.
@@ -547,6 +587,27 @@ export function MailView({
             // The row moves now. A mail server is slow enough that waiting for it
             // reads as the screen having ignored the click.
             if (ahead) patchUntilAnswered(aimed, ahead);
+            // And so does the number in the rail beside it. Measured off what
+            // the reader can already see rather than off the server's last word,
+            // so marking an already-read conversation read again takes nothing
+            // off - the row had stopped being bold, and the count has to agree
+            // with the row or the screen is arguing with itself.
+            const aimedRows = aimed.flatMap((id) => {
+                const row = threads.find((thread) => thread.id === id);
+                return row ? [shown(row)] : [];
+            });
+            if (action === "read" || leavesTheView(action)) {
+                nudgeUnread(unreadNudges(aimedRows));
+            } else if (action === "unread") {
+                nudgeUnread(
+                    unreadNudges(
+                        aimedRows.map((row) => ({
+                            accountId: row.accountId,
+                            unreadCount: -(row.messageCount - row.unreadCount)
+                        }))
+                    )
+                );
+            }
             // And the conversation being read closes now, for the same reason and
             // more so: the row it came from is already gone from the list behind
             // it, so waiting left somebody looking at a message that had been
@@ -620,6 +681,7 @@ export function MailView({
             askFolderRole,
             clearPatches,
             closeOpen,
+            nudgeUnread,
             openAgain,
             openNext,
             openThread,
@@ -627,8 +689,11 @@ export function MailView({
             preferences.afterFiling,
             refresh,
             reloadLists,
+            shown,
+            threads,
             threadsOf,
-            toast
+            toast,
+            unreadNudges
         ]
     );
 
@@ -1226,7 +1291,10 @@ export function MailView({
                         context={context}
                         // Opening a message marks it read on the server, which
                         // takes a round trip. The row stops being bold now.
-                        onRead={() => patch([openThread.id], { unreadCount: 0 })}
+                        onRead={() => {
+                            nudgeUnread(unreadNudges([openThread]));
+                            patch([openThread.id], { unreadCount: 0 });
+                        }}
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
                         markRead={preferences.markRead}

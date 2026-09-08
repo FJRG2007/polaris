@@ -72,6 +72,20 @@ export interface MailContextValue {
      * message arriving reaches a list nobody re-rendered.
      */
     readonly revision: number;
+    /**
+     * Take unread off a folder and a mailbox now, before the server says so.
+     *
+     * The numbers in the rail come from the server, and the server is on the far
+     * side of a click that also has to reach somebody else's IMAP host. Marking
+     * a message read and watching "Inbox 3" stay at three is the screen telling
+     * the reader their click did nothing - and the row beside it has already
+     * gone un-bold, so they can see the two disagree.
+     *
+     * Laid over the server's own figures and dropped the moment those figures
+     * move, which is the same shape the list's row overlay has and for the same
+     * reason: this is what somebody just did, not what is true.
+     */
+    readonly nudgeUnread: (entries: readonly UnreadNudge[]) => void;
     /** The colour standing for one mailbox, so a row in a merged list says which
      *  mailbox it came from without being read. */
     readonly accountColor: (accountId: string) => string;
@@ -86,6 +100,13 @@ export interface MailContextValue {
      * being drawn twice.
      */
     readonly askFolderRole: (missing: MissingFolderRole, retry: () => void) => void;
+}
+
+/** One folder with fewer (or more) unread than the server last said. */
+export interface UnreadNudge {
+    readonly folderId: string;
+    /** Negative for mail that stopped being unread. */
+    readonly by: number;
 }
 
 /** What the composer opens with. Null closes it. */
@@ -165,6 +186,75 @@ export function MailShell({
         null
     );
 
+    /**
+     * What this browser has already done that the server's counts predate.
+     *
+     * Keyed by folder and by mailbox, so one map covers both numbers the rail
+     * draws. Dropped the instant the server's own figures move rather than after
+     * a wait: the signature below is the counts themselves, so the overlay lives
+     * exactly as long as the disagreement it exists to cover, and never doubles
+     * a change that has already landed.
+     */
+    const [drift, setDrift] = useState<Record<string, number>>({});
+    const truth = useMemo(
+        () =>
+            `${unread.total}|${folders.map((folder) => `${folder.id}:${folder.unread}`).join(",")}`,
+        [unread, folders]
+    );
+    useEffect(() => {
+        setDrift((held) => (Object.keys(held).length === 0 ? held : {}));
+    }, [truth]);
+
+    const nudgeUnread = useCallback(
+        (entries: readonly UnreadNudge[]) => {
+            const wanted = entries.filter((entry) => entry.by !== 0);
+            if (wanted.length === 0) return;
+            setDrift((held) => {
+                const next = { ...held };
+                for (const entry of wanted) {
+                    const folder = folders.find((one) => one.id === entry.folderId);
+                    if (!folder) continue;
+                    next[`f:${folder.id}`] = (next[`f:${folder.id}`] ?? 0) + entry.by;
+                    // The badge on the mailbox counts inboxes and nothing else,
+                    // so mail read in Archive moves the folder's number and not
+                    // that one. Decided here rather than by the caller: the
+                    // screen knows which folder a row was in, not what that
+                    // folder means.
+                    if (folder.role === "inbox") {
+                        next[`a:${folder.accountId}`] =
+                            (next[`a:${folder.accountId}`] ?? 0) + entry.by;
+                    }
+                }
+                return next;
+            });
+        },
+        [folders]
+    );
+
+    /** The counts as the reader should see them: the server's, with what they
+     *  have just done laid over, and never below nothing. */
+    const shownFolders = useMemo(
+        () =>
+            Object.keys(drift).length === 0
+                ? folders
+                : folders.map((folder) => {
+                      const by = drift[`f:${folder.id}`] ?? 0;
+                      return by === 0 ? folder : { ...folder, unread: Math.max(0, folder.unread + by) };
+                  }),
+        [folders, drift]
+    );
+    const shownUnread = useMemo(() => {
+        if (Object.keys(drift).length === 0) return unread;
+        const byAccount: Record<string, number> = {};
+        let total = 0;
+        for (const account of accounts) {
+            const count = Math.max(0, (unread.byAccount[account.id] ?? 0) + (drift[`a:${account.id}`] ?? 0));
+            if (count > 0) byAccount[account.id] = count;
+            total += count;
+        }
+        return { total, byAccount };
+    }, [accounts, unread, drift]);
+
     const [revision, setRevision] = useState(0);
     const reloadLists = useCallback(() => setRevision((count) => count + 1), []);
     const refresh = useCallback(() => {
@@ -219,14 +309,15 @@ export function MailShell({
     const value = useMemo<MailContextValue>(
         () => ({
             accounts,
-            folders,
+            folders: shownFolders,
             labels,
             identities,
-            unread,
+            unread: shownUnread,
             viewerName,
             refresh,
             reloadLists,
             revision,
+            nudgeUnread,
             accountColor,
             composing,
             openComposer: setComposing,
@@ -234,14 +325,15 @@ export function MailShell({
         }),
         [
             accounts,
-            folders,
+            shownFolders,
             labels,
             identities,
-            unread,
+            shownUnread,
             viewerName,
             refresh,
             reloadLists,
             revision,
+            nudgeUnread,
             accountColor,
             composing,
             askFolderRole

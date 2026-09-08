@@ -22,6 +22,7 @@ import { withImap, type MailConnectionSource } from "./imap";
 import { prisma } from "@polaris/db";
 import { addressesFrom } from "./json";
 import { publishMail } from "./live";
+import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import * as core from "@polaris/core";
 import { readShape } from "./structure";
 import { decodePart, unflow } from "./decode";
@@ -196,6 +197,9 @@ export async function actOnMessages(
         /** Where the messages went, so it can be read again before anybody looks
          *  for them there. */
         const landed = new Set<string>();
+        /** What each folder's unread number owes this action, so the rail is
+         *  right the moment the answer lands rather than at the next sync. */
+        const deltas = new Map<string, number>();
         await withImap(account, async (client) => {
             for (const [folderId, rows] of byFolder(mine)) {
                 const folder = await prisma.mailFolder.findUnique({
@@ -210,6 +214,10 @@ export async function actOnMessages(
                     const outcome = await applyOne(client, account.id, folderId, uids, rows, action);
                     done += outcome.done;
                     target = outcome.movedTo;
+                    // Unread mail leaving is unread mail the folder no longer
+                    // has, whether it went to Trash or was destroyed outright.
+                    addDelta(deltas, folderId, -outcome.unseen);
+                    if (target) addDelta(deltas, target, outcome.unseen);
                 } finally {
                     lock.release();
                 }
@@ -217,6 +225,7 @@ export async function actOnMessages(
             }
 
         });
+        await nudgeFolderUnread(deltas);
         publishMail({ accountId, kind: "messages", actorId: userId });
         // Where they landed, read after the answer rather than before it.
         //
@@ -308,6 +317,7 @@ async function setFlag(
         uid: bigint;
         accountId: string;
         folderId: string;
+        seen: boolean;
     }[],
     flag: { flag: string; add: boolean; column: string }
 ): Promise<number> {
@@ -319,6 +329,18 @@ async function setFlag(
     // The conversation's own counts, which is what the list draws: a message
     // marked read whose thread still says one unread is a row that stays bold.
     await refreshThreadsFor(accountIds);
+    // And the number beside the folder in the rail, which is the server's and
+    // therefore moves for nobody until a sync - counted off what actually
+    // changed state rather than off how many were asked for, so marking four
+    // messages read when three already were takes one off, not four.
+    if (flag.column === "seen") {
+        const deltas = new Map<string, number>();
+        for (const message of messages) {
+            if (message.seen === flag.add) continue;
+            addDelta(deltas, message.folderId, flag.add ? -1 : 1);
+        }
+        await nudgeFolderUnread(deltas);
+    }
     for (const accountId of accountIds) {
         publishMail({ accountId, kind: "messages", actorId: userId });
     }
@@ -364,6 +386,9 @@ async function setFlag(
 interface Applied {
     readonly done: number;
     readonly movedTo: string;
+    /** How many of them were unread, so the folder they left and the folder they
+     *  arrived in can both say so before the next sync. */
+    readonly unseen: number;
 }
 
 async function applyOne(
@@ -371,44 +396,45 @@ async function applyOne(
     accountId: string,
     folderId: string,
     uids: number[],
-    rows: readonly { id: string }[],
+    rows: readonly { id: string; seen: boolean }[],
     action: MailAction
 ): Promise<Applied> {
+    const unseen = rows.filter((row) => !row.seen).length;
     const flag = FLAG_ACTIONS[action];
     if (flag) {
         const changed = flag.add
             ? await client.messageFlagsAdd(uids, [flag.flag], { uid: true })
             : await client.messageFlagsRemove(uids, [flag.flag], { uid: true });
-        if (!changed) return { done: 0, movedTo: "" };
+        if (!changed) return { done: 0, movedTo: "", unseen: 0 };
         await prisma.mailMessage.updateMany({
             where: { id: { in: rows.map((row) => row.id) } },
             data: { [flag.column]: flag.add }
         });
-        return { done: rows.length, movedTo: "" };
+        return { done: rows.length, movedTo: "", unseen: 0 };
     }
 
     if (action === "delete") {
         // Deleting outright, not into Trash. Only ever reached from the Trash
         // folder's own Delete button and from Empty trash, both of which say so.
         const removed = await client.messageDelete(uids, { uid: true });
-        if (!removed) return { done: 0, movedTo: "" };
+        if (!removed) return { done: 0, movedTo: "", unseen: 0 };
         await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
-        return { done: rows.length, movedTo: "" };
+        return { done: rows.length, movedTo: "", unseen };
     }
 
     const role = MOVE_ACTIONS[action];
-    if (!role) return { done: 0, movedTo: "" };
+    if (!role) return { done: 0, movedTo: "", unseen: 0 };
     const target = await folderForRole(accountId, role);
-    if (target.id === folderId) return { done: 0, movedTo: "" };
+    if (target.id === folderId) return { done: 0, movedTo: "", unseen: 0 };
     const moved = await client.messageMove(uids, target.path, { uid: true });
-    if (!moved) return { done: 0, movedTo: "" };
+    if (!moved) return { done: 0, movedTo: "", unseen: 0 };
     // The uids the messages now have are the destination's, and the server may
     // not have said what they are. The rows are dropped rather than guessed at:
     // the next pass over the destination folder picks them up with the uids the
     // server actually gave them, and a guessed uid is a row that points at
     // somebody else's message.
     await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
-    return { done: rows.length, movedTo: target.id };
+    return { done: rows.length, movedTo: target.id, unseen };
 }
 
 function groupByAccount<T extends { accountId: string }>(rows: readonly T[]): Map<string, T[]> {
@@ -445,6 +471,8 @@ export async function moveMessages(
 
     const account = await ownedAccount(userId, destination.accountId);
     let moved = 0;
+    /** What the move owes each folder's unread number - see `folder-counts`. */
+    const deltas = new Map<string, number>();
     await withImap(account, async (client) => {
         for (const [sourceId, rows] of byFolder(messages)) {
             if (sourceId === destination.id) continue;
@@ -463,11 +491,14 @@ export async function moveMessages(
                 if (!ok) continue;
                 await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
                 moved += rows.length;
+                for (const [source, by] of unseenByFolder(rows, -1)) addDelta(deltas, source, by);
+                addDelta(deltas, destination.id, rows.filter((row) => !row.seen).length);
             } finally {
                 lock.release();
             }
         }
     });
+    await nudgeFolderUnread(deltas);
     await refreshThreads(destination.accountId);
     publishMail({ accountId: destination.accountId, kind: "messages", actorId: userId });
     return moved;
