@@ -12,7 +12,7 @@ import { sharingBaseUrl } from "@/lib/domain-service";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { SpaceScreen } from "@/app/(app)/tasks/space-view";
 import { listAutomations } from "@/lib/tasks/automation-service";
-import { requireSpace, visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { requireSpace, shelfScopeWith, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +56,10 @@ export default async function SpacePage({
 
     const canManage = mayManage && (role === "owner" || role === "admin");
     const [tree, statuses, fields, tags, members, automations, forms, baseUrl] = await Promise.all([
-        spaces.listSpaceTree(user.id, await visibleScope(actor), user.isAdmin),
+        // The tree follows the shelf; the space being opened is put back into it
+        // when the shelf would have taken it out, so a link always opens and the
+        // sidebar never loses the space you are standing in.
+        spaces.listSpaceTree(user.id, await shelfScopeWith(actor, spaceId), user.isAdmin),
         spaces.listStatuses(spaceId),
         spaces.listCustomFields(spaceId),
         spaces.listTags(spaceId),

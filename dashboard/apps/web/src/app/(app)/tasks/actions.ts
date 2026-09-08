@@ -21,7 +21,8 @@ import * as docs from "@/lib/tasks/doc-service";
 import * as time from "@/lib/tasks/time-service";
 import { recordAudit } from "@/lib/audit-service";
 import { prisma } from "@polaris/db";
-import { requirePermission, sessionCan } from "@/lib/session";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { requirePermission, requireUser, sessionCan } from "@/lib/session";
 import { agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import { startSessionAction } from "@/app/(app)/apps/agents/sessions/actions";
 import * as tasks from "@/lib/tasks/task-service";
@@ -464,11 +465,31 @@ export async function removeFolderMemberAction(
  *  are in no organization at all and the form then asks nothing extra. */
 export async function spaceOwnerOptionsAction(): Promise<{
     orgs?: { id: string; name: string }[];
+    /** Whoever is asking, so the picker can draw them the way every other list
+     *  of people in Polaris draws somebody: their face and their name, not the
+     *  words "your own space". */
+    me?: { id: string; name: string };
+    /** The shelf that is open. What the picker starts on: somebody working from
+     *  a client's shelf who presses "new space" means a space for that client,
+     *  and defaulting to their own is how a company's work ends up on somebody's
+     *  personal shelf where nobody else can find it. */
+    scopeOrgId?: string | null;
     error?: string;
 }> {
     const caller = await actor();
     try {
-        return { orgs: await orgs.listAdministeredOrgs(caller) };
+        const [list, scopeOrgId] = await Promise.all([
+            orgs.listAdministeredOrgs(caller),
+            scopeOrgIdFor(caller.id)
+        ]);
+        const user = await requireUser();
+        return {
+            orgs: list,
+            me: { id: user.id, name: user.name },
+            // Only when it is one they may actually create for; a shelf they
+            // merely belong to is not an answer the picker can start on.
+            scopeOrgId: list.some((org) => org.id === scopeOrgId) ? scopeOrgId : null
+        };
     } catch (caught) {
         return failure(caught, "Could not read your organizations");
     }

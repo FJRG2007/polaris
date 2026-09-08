@@ -24,6 +24,8 @@ import Link from "next/link";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { runAction } from "@/lib/run-action";
+import { avatarUrl } from "@/lib/avatar-url";
+import { Avatar, OrgAvatar } from "@/components/avatar";
 import { usePathname } from "next/navigation";
 import { AccessDialog, type AccessTarget } from "./access-dialog";
 import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
@@ -339,6 +341,22 @@ function TreeRow({
                 if (event.key === "F2" && editable) {
                     event.preventDefault();
                     onRenameStart();
+                    return;
+                }
+                // Delete opens the same confirmation the menu does - never the
+                // deletion itself. The key is a faster way to reach the
+                // question, not a way to skip it.
+                //
+                // Backspace as well, which is the same key on a Mac laptop. The
+                // shortcut is drawn from the action rather than written here, so
+                // a row that offers no deletion advertises none: a menu that
+                // names a key nothing listens for is worse than a menu with no
+                // key on it at all.
+                if (event.key === "Delete" || event.key === "Backspace") {
+                    const removal = rowActions.find((action) => action.shortcut === "Del");
+                    if (!removal) return;
+                    event.preventDefault();
+                    removal.onSelect();
                 }
             }}
             // Double-click renames only where the row is not also a link: the
@@ -478,6 +496,9 @@ export function SpaceTree({
     // usually empty afterwards too - most people are in no organization, and the
     // picker is not drawn when there is only one answer.
     const [spaceOrgs, setSpaceOrgs] = useState<{ id: string; name: string }[]>([]);
+    /** Whoever is asking, so the picker draws them the way every other list of
+     *  people in Polaris does rather than as a phrase. */
+    const [me, setMe] = useState<{ id: string; name: string } | null>(null);
     const [spaceOwner, setSpaceOwner] = useState("");
     const [error, setError] = useState("");
 
@@ -584,6 +605,13 @@ export function SpaceTree({
                                     setError
                                 );
                                 setSpaceOrgs(result?.orgs ?? []);
+                                setMe(result?.me ?? null);
+                                // Start on the shelf that is open. Somebody
+                                // working from a client's shelf who presses
+                                // "new space" means one for that client, and
+                                // defaulting to their own is how a company's
+                                // work ends up somewhere nobody else can find.
+                                setSpaceOwner(result?.scopeOrgId ?? "");
                             })();
                         }}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -607,9 +635,40 @@ export function SpaceTree({
                             value={spaceOwner}
                             aria-label="Who this space belongs to"
                             className="h-8 text-sm"
+                            // Faces, not words. Which shelf a space lands on is
+                            // the one thing on this form that cannot be undone
+                            // by renaming it afterwards, so it is drawn the way
+                            // every other list of people and organizations in
+                            // Polaris is drawn: the picture and the name, with
+                            // a person round and an organization square, which
+                            // is what tells the two apart before either is read.
                             options={[
-                                { value: "", label: "Your own space" },
-                                ...spaceOrgs.map((org) => ({ value: org.id, label: org.name }))
+                                {
+                                    value: "",
+                                    label: (
+                                        <span className="flex items-center gap-2">
+                                            <Avatar
+                                                size={18}
+                                                status={false}
+                                                person={{
+                                                    id: me?.id ?? "",
+                                                    name: me?.name ?? "You",
+                                                    image: me ? avatarUrl(me.id) : null
+                                                }}
+                                            />
+                                            <span className="truncate">{me?.name ?? "You"}</span>
+                                        </span>
+                                    )
+                                },
+                                ...spaceOrgs.map((org) => ({
+                                    value: org.id,
+                                    label: (
+                                        <span className="flex items-center gap-2">
+                                            <OrgAvatar size={18} org={org} />
+                                            <span className="truncate">{org.name}</span>
+                                        </span>
+                                    )
+                                }))
                             ]}
                             onValueChange={setSpaceOwner}
                         />
@@ -626,7 +685,6 @@ export function SpaceTree({
                                     })
                                 );
                                 setSpaceName("");
-                                setSpaceOwner("");
                                 setNewSpace(false);
                             }}
                         >
@@ -869,6 +927,7 @@ function SpaceSection({
                               ? [
                                     {
                                         label: "Delete list",
+                                        shortcut: "Del",
                                         Icon: Trash2,
                                         danger: true,
                                         onSelect: () =>
@@ -923,6 +982,7 @@ function SpaceSection({
                 ? [
                       {
                           label: "Delete folder",
+                          shortcut: "Del",
                           Icon: Trash2,
                           danger: true,
                           onSelect: () =>

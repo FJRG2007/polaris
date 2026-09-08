@@ -15,7 +15,7 @@ import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { ListScreen } from "@/app/(app)/tasks/list-view";
 import { buildSpaceContext } from "@/lib/tasks/screen-context";
 import { getList, listSpaceTree } from "@/lib/tasks/space-service";
-import { requireList, visibleScope, type TaskActor } from "@/lib/tasks/access";
+import { requireList, shelfScopeWith, visibleScope, type TaskActor } from "@/lib/tasks/access";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +38,13 @@ export default async function TaskListPage({ params }: { params: Promise<{ listI
     const list = await getList(listId);
     if (!list) notFound();
 
+    // Authorization, which never moves with the shelf: a link to a list opens
+    // whatever shelf happens to be selected.
     const scope = await visibleScope(actor);
     const [tree, tasks, views, context, siblingLists] = await Promise.all([
-        listSpaceTree(user.id, scope, user.isAdmin),
+        // The sidebar beside it is a listing, so it follows the shelf - with the
+        // space being opened put back when the shelf would have dropped it.
+        listSpaceTree(user.id, await shelfScopeWith(actor, list.spaceId), user.isAdmin),
         listTasks({ listId }, { limit: 2000 }),
         listViews(user.id, { listId }),
         buildSpaceContext(list.spaceId, role, user.id, mayManage, scope),

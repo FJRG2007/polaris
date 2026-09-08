@@ -585,6 +585,64 @@ export async function shelfScope(actor: TaskActor): Promise<TaskScope> {
     };
 }
 
+/**
+ * The shelf, plus the one space being looked at.
+ *
+ * What the sidebar of a detail page takes. The two halves pull opposite ways and
+ * both are right: a link has to open whatever shelf is selected, so the space
+ * itself resolves through `visibleScope`; but the tree beside it is a listing,
+ * and a listing follows the shelf - somebody working from a client's shelf
+ * should not have their own shopping list in the sidebar.
+ *
+ * Reconciling them is this: the shelf, and then the space that is open put back
+ * if the shelf took it out. Without that last step somebody who opens a personal
+ * task from a search while an organization is selected is inside a space the
+ * sidebar does not list, which reads as the tree having lost it.
+ */
+export async function shelfScopeWith(actor: TaskActor, spaceId: string): Promise<TaskScope> {
+    const [shelf, whole] = await Promise.all([shelfScope(actor), visibleScope(actor)]);
+    if (!spaceId) return shelf;
+    if (shelf.spaceIds.includes(spaceId) || shelf.partialSpaceIds.includes(spaceId)) return shelf;
+
+    // Off the shelf, and open. It comes back exactly as `visibleScope` had it -
+    // in full or through the folders a grant reaches - so the tree draws it the
+    // way that space is actually reached rather than pretending it is whole.
+    if (whole.spaceIds.includes(spaceId)) {
+        return { ...shelf, spaceIds: [...shelf.spaceIds, spaceId] };
+    }
+    if (!whole.partialSpaceIds.includes(spaceId)) return shelf;
+
+    const folders = await prisma.taskFolder.findMany({
+        where: { id: { in: Object.keys(whole.folderRoles) }, spaceId },
+        select: { id: true }
+    });
+    const folderRoles: Record<string, core.SpaceRole> = { ...shelf.folderRoles };
+    for (const folder of folders) {
+        const role = whole.folderRoles[folder.id];
+        if (role) folderRoles[folder.id] = role;
+    }
+    const lists =
+        folders.length === 0
+            ? []
+            : await prisma.taskList.findMany({
+                  where: {
+                      id: { in: whole.listIds },
+                      folderId: { in: folders.map((folder) => folder.id) }
+                  },
+                  select: { id: true }
+              });
+    const partialRole = whole.partialRoles[spaceId];
+    return {
+        ...shelf,
+        partialSpaceIds: [...shelf.partialSpaceIds, spaceId],
+        folderRoles,
+        listIds: [...shelf.listIds, ...lists.map((list) => list.id)],
+        partialRoles: partialRole
+            ? { ...shelf.partialRoles, [spaceId]: partialRole }
+            : shelf.partialRoles
+    };
+}
+
 /** The role a screen spanning one space should render with, whether the reader
  *  holds the space itself or only a branch of it. */
 export async function scopedSpaceRole(
