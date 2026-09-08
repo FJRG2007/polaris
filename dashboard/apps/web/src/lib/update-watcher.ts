@@ -29,7 +29,13 @@ import { sweepExpiringModelKeys } from "@/lib/agents/model-key-expiry";
 import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
 import { markNotificationsReadByType } from "@/lib/notification-service";
 import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
-import { lastUpdateOutcome, publishUpdateSource, startHostUpdate, updateTriggerReason, type UpdateTrigger } from "@/lib/update-runner";
+import {
+    lastUpdateOutcome,
+    publishUpdateSource,
+    startHostUpdate,
+    updateTriggerReason,
+    type UpdateTrigger
+} from "@/lib/update-runner";
 import {
     autoUpdateRunsAt,
     parseAutoUpdatePolicy,
@@ -246,7 +252,9 @@ async function retireLandedNotices(status: UpdateStatus): Promise<void> {
         where: { key: ANNOUNCED_KEY, value: { startsWith: `${announced} ` } }
     });
     if (claimed.count !== 1) return;
-    await prisma.setting.deleteMany({ where: { key: INSTALLED_KEY, value: { startsWith: `${announced} ` } } });
+    await prisma.setting.deleteMany({
+        where: { key: INSTALLED_KEY, value: { startsWith: `${announced} ` } }
+    });
     await markNotificationsReadByType(UPDATE_EVENTS);
 }
 
@@ -285,7 +293,9 @@ export function startUpdateWatcher(): void {
     if (started) return;
     started = true;
     const tick = (): void => {
-        void checkForUpdate().catch((error) => console.error("polaris: update watcher tick failed:", error));
+        void checkForUpdate().catch((error) =>
+            console.error("polaris: update watcher tick failed:", error)
+        );
         // Rides along rather than starting a timer of its own: both ask "is this
         // deployment waiting on somebody", both are cheap when the answer is no,
         // and one interval is one thing to reason about. An update that widened

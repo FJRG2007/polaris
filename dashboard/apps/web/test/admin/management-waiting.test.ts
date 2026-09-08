@@ -78,7 +78,9 @@ describe("the count reaching every badge in Polaris", () => {
         // And asked for nobody else: two queries per page load for a badge that
         // cannot appear is two queries for nothing.
         expect(chrome).toContain("user.isAdmin\n        ? await countAdminWaiting()");
-        expect(chrome).toContain("<AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>");
+        expect(chrome).toContain(
+            "<AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>"
+        );
     });
 
     it("counts what is open rather than what is unread", async () => {

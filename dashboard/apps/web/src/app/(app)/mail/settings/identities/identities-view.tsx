@@ -39,10 +39,12 @@ export function IdentitiesView({
 
             <div className="mb-3 flex items-center justify-between">
                 <div>
-                    <h2 className="text-[13px] font-medium">Addresses {account.address} can send as</h2>
+                    <h2 className="text-[13px] font-medium">
+                        Addresses {account.address} can send as
+                    </h2>
                     <p className="text-[12px] text-muted-foreground">
-                        Whether the mail server accepts one is its decision. If it refuses, the message comes back
-                        with its reason.
+                        Whether the mail server accepts one is its decision. If it refuses, the
+                        message comes back with its reason.
                     </p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
@@ -59,10 +61,18 @@ export function IdentitiesView({
 
             <ul className="space-y-2">
                 {mine.map((identity) => (
-                    <li key={identity.id} className="rounded-md border border-border bg-card px-3 py-2">
+                    <li
+                        key={identity.id}
+                        className="rounded-md border border-border bg-card px-3 py-2"
+                    >
                         <div className="flex items-center gap-3">
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-[13px] font-medium" title={identity.address}>{identity.address}</p>
+                                <p
+                                    className="truncate text-[13px] font-medium"
+                                    title={identity.address}
+                                >
+                                    {identity.address}
+                                </p>
                                 <p className="truncate text-[12px] text-muted-foreground">
                                     {identity.displayName || "No name set"}
                                     {identity.isDefault ? " - used by default" : ""}
@@ -75,7 +85,10 @@ export function IdentitiesView({
                                 title={`Remove ${identity.address}`}
                                 onClick={() =>
                                     void (async () => {
-                                        const answer = await deleteIdentityAction(account.id, identity.id);
+                                        const answer = await deleteIdentityAction(
+                                            account.id,
+                                            identity.id
+                                        );
                                         const said = refusalOf(answer);
                                         if (said) {
                                             toast.show({ title: said });
@@ -160,14 +173,22 @@ function IdentityForm({
                 />
                 <span
                     id="identity-address"
-                    className={cn("mt-1 block text-[12px]", wrong ? "text-danger" : "text-foreground-subtle")}
+                    className={cn(
+                        "mt-1 block text-[12px]",
+                        wrong ? "text-danger" : "text-foreground-subtle"
+                    )}
                 >
                     {wrong || "Mail sent from this address still goes out through this mailbox."}
                 </span>
             </label>
             <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">Name people will see</span>
-                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+                <span className="mb-1 block text-[12px] text-muted-foreground">
+                    Name people will see
+                </span>
+                <Input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                />
             </label>
             <label className="block">
                 <span className="mb-1 block text-[12px] text-muted-foreground">
@@ -179,10 +200,18 @@ function IdentityForm({
                 <span className="mb-1 block text-[12px] text-muted-foreground">
                     Signature for this address
                 </span>
-                <Textarea rows={3} value={signature} onChange={(event) => setSignature(event.target.value)} />
+                <Textarea
+                    rows={3}
+                    value={signature}
+                    onChange={(event) => setSignature(event.target.value)}
+                />
             </label>
             <label className="flex items-center gap-2 text-[13px]">
-                <Switch checked={isDefault} onChange={setIsDefault} aria-label="Send from this address by default" />
+                <Switch
+                    checked={isDefault}
+                    onChange={setIsDefault}
+                    aria-label="Send from this address by default"
+                />
                 Send from this one by default
             </label>
 

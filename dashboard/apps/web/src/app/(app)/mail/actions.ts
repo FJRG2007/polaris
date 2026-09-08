@@ -497,7 +497,10 @@ export async function setMailPreferencesAction(input: unknown) {
     const parsed = core.mailPreferencesSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the details.", field: String(issue?.path[0] ?? "") };
+        return {
+            error: issue?.message ?? "Check the details.",
+            field: String(issue?.path[0] ?? "")
+        };
     }
     try {
         await prefs.saveMailPreferences(userId, parsed.data);

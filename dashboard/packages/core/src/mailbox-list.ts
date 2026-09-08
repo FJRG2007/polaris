@@ -69,7 +69,10 @@ export function readMailFilter(value: string | undefined | null): MailFilter | "
  * module's own where there is not, which is what everything that has no reader
  * to hand uses.
  */
-export function readMailSort(value: string | undefined | null, fallback: MailSort = DEFAULT_MAIL_SORT): MailSort {
+export function readMailSort(
+    value: string | undefined | null,
+    fallback: MailSort = DEFAULT_MAIL_SORT
+): MailSort {
     return isMailSort(value) ? value : fallback;
 }
 

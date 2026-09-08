@@ -409,7 +409,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "server.space",
         group: "deploy",
         label: "A server is running out of room",
-        description: "Polaris freed everything nothing was using and the disk is still nearly full.",
+        description:
+            "Polaris freed everything nothing was using and the disk is still nearly full.",
         level: "warning",
         // On, and it means it. By the time this is raised the automatic
         // housekeeping has already run and not been enough, so what is left is

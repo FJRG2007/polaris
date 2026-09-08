@@ -135,7 +135,9 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                     <Select
                         aria-label="Reading layout"
                         value={layout}
-                        onValueChange={(value) => chooseLayout(value === "split" ? "split" : "full")}
+                        onValueChange={(value) =>
+                            chooseLayout(value === "split" ? "split" : "full")
+                        }
                         options={[
                             { value: "full", label: "The message fills the screen" },
                             { value: "split", label: "A list beside the message" }

@@ -213,7 +213,9 @@ export async function reportMessage(
  * Open by default, because a moderator arriving here is arriving to do the ones
  * nobody has answered for. The settled ones are a record and are asked for.
  */
-export async function listReports(status: core.ChatReportStatus | "all"): Promise<ChatReportView[]> {
+export async function listReports(
+    status: core.ChatReportStatus | "all"
+): Promise<ChatReportView[]> {
     const rows = await prisma.chatReport.findMany({
         where: status === "all" ? {} : { status },
         orderBy: { createdAt: "desc" },
@@ -241,7 +243,11 @@ export async function listReports(status: core.ChatReportStatus | "all"): Promis
     // - and the channel name is what tells a moderator where this happened.
     const [authors, channels] = await Promise.all([
         prisma.user.findMany({
-            where: { id: { in: [...new Set(rows.map((row) => row.authorId).filter(Boolean))] as string[] } },
+            where: {
+                id: {
+                    in: [...new Set(rows.map((row) => row.authorId).filter(Boolean))] as string[]
+                }
+            },
             select: { id: true, name: true }
         }),
         prisma.chatChannel.findMany({

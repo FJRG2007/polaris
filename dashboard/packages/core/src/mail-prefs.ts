@@ -130,8 +130,12 @@ export function parseMailPreferences(raw: string | null | undefined): MailPrefer
             ? (bag.sort as MailSort)
             : MAIL_PREF_DEFAULTS.sort,
         markRead: isMarkRead(bag.markRead) ? bag.markRead : MAIL_PREF_DEFAULTS.markRead,
-        afterFiling: isAfterFiling(bag.afterFiling) ? bag.afterFiling : MAIL_PREF_DEFAULTS.afterFiling,
-        undoSeconds: isUndoSeconds(bag.undoSeconds) ? bag.undoSeconds : MAIL_PREF_DEFAULTS.undoSeconds
+        afterFiling: isAfterFiling(bag.afterFiling)
+            ? bag.afterFiling
+            : MAIL_PREF_DEFAULTS.afterFiling,
+        undoSeconds: isUndoSeconds(bag.undoSeconds)
+            ? bag.undoSeconds
+            : MAIL_PREF_DEFAULTS.undoSeconds
     };
 }
 

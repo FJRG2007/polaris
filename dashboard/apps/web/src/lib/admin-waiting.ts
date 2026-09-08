@@ -88,7 +88,10 @@ export function updateIsWaiting(input: {
 async function updateWaiting(): Promise<boolean> {
     const running = loadEnv().POLARIS_BUILD_SHA ?? null;
     if (!running) return false;
-    const [announced, policy] = await Promise.all([getSetting(ANNOUNCED_KEY), getAutoUpdatePolicy()]);
+    const [announced, policy] = await Promise.all([
+        getSetting(ANNOUNCED_KEY),
+        getAutoUpdatePolicy()
+    ]);
     return updateIsWaiting({
         running,
         announced: announced?.split(" ")[0] ?? null,

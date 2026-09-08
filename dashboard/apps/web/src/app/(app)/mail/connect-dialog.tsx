@@ -156,7 +156,11 @@ export function ConnectMailboxDialog({
     }, [address, valid, already]);
 
     const oauthReady =
-        discovery?.oauth === "google" ? googleReady : discovery?.oauth === "microsoft" ? microsoftReady : false;
+        discovery?.oauth === "google"
+            ? googleReady
+            : discovery?.oauth === "microsoft"
+              ? microsoftReady
+              : false;
     const authorizable = Boolean(discovery?.oauth) && oauthReady && !usePassword;
     const usable = links.filter((link) => link.provider === discovery?.oauth && link.readyForMail);
     const chosenConnection = connectionId || usable[0]?.id || "";
@@ -202,7 +206,10 @@ export function ConnectMailboxDialog({
     }
 
     const ready =
-        valid && !already && Boolean(discovery) && (authorizable ? Boolean(chosenConnection) : password.length > 0);
+        valid &&
+        !already &&
+        Boolean(discovery) &&
+        (authorizable ? Boolean(chosenConnection) : password.length > 0);
 
     return (
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
@@ -271,18 +278,21 @@ export function ConnectMailboxDialog({
                                                 />
                                             </label>
                                             <p className="text-[12px] text-foreground-subtle">
-                                                No password is stored. Polaris uses the account you already
-                                                authorized.
+                                                No password is stored. Polaris uses the account you
+                                                already authorized.
                                             </p>
                                         </>
                                     ) : (
                                         <>
                                             <p className="text-[13px] text-muted-foreground">
-                                                {discovery.serviceName} can connect this without a password. You
-                                                will be sent to their sign-in and back here.
+                                                {discovery.serviceName} can connect this without a
+                                                password. You will be sent to their sign-in and back
+                                                here.
                                             </p>
                                             <Button asChild className="w-full">
-                                                <a href={`/api/connections/${discovery.oauth}/link?scope=mail`}>
+                                                <a
+                                                    href={`/api/connections/${discovery.oauth}/link?scope=mail`}
+                                                >
                                                     Authorize {discovery.serviceName}
                                                 </a>
                                             </Button>
@@ -304,9 +314,10 @@ export function ConnectMailboxDialog({
                                         Polaris cannot be returned to. */}
                                     {discovery.oauth && !publicAddress ? (
                                         <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
-                                            {discovery.serviceName} could connect this without a password, but
-                                            it has nowhere to send you back to: Polaris is only reachable on
-                                            this network, and an address like that is one they refuse.{" "}
+                                            {discovery.serviceName} could connect this without a
+                                            password, but it has nowhere to send you back to:
+                                            Polaris is only reachable on this network, and an
+                                            address like that is one they refuse.{" "}
                                             {canSetDomain ? (
                                                 <Link href="/admin/domains" className="underline">
                                                     Give Polaris a public address
@@ -365,7 +376,10 @@ export function ConnectMailboxDialog({
                                         onClick={() => setShowServers((held) => !held)}
                                     >
                                         <ChevronDown
-                                            className={cn("size-3.5 shrink-0", showServers && "rotate-180")}
+                                            className={cn(
+                                                "size-3.5 shrink-0",
+                                                showServers && "rotate-180"
+                                            )}
                                             aria-hidden
                                         />
                                         Server settings
@@ -381,7 +395,9 @@ export function ConnectMailboxDialog({
                                                 port={servers.imapPort}
                                                 security={servers.imapSecurity}
                                                 invalid={field === "imapHost"}
-                                                onChange={(next) => setServers({ ...servers, ...next })}
+                                                onChange={(next) =>
+                                                    setServers({ ...servers, ...next })
+                                                }
                                                 names={{
                                                     host: "imapHost",
                                                     port: "imapPort",
@@ -394,7 +410,9 @@ export function ConnectMailboxDialog({
                                                 port={servers.smtpPort}
                                                 security={servers.smtpSecurity}
                                                 invalid={field === "smtpHost"}
-                                                onChange={(next) => setServers({ ...servers, ...next })}
+                                                onChange={(next) =>
+                                                    setServers({ ...servers, ...next })
+                                                }
                                                 names={{
                                                     host: "smtpHost",
                                                     port: "smtpPort",
@@ -407,7 +425,9 @@ export function ConnectMailboxDialog({
                                                 </span>
                                                 <Input
                                                     value={username}
-                                                    onChange={(event) => setUsername(event.target.value)}
+                                                    onChange={(event) =>
+                                                        setUsername(event.target.value)
+                                                    }
                                                 />
                                             </label>
                                         </div>
@@ -420,8 +440,14 @@ export function ConnectMailboxDialog({
                     {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
 
                     {!authorizable || usable.length > 0 ? (
-                        <Button className="w-full" disabled={!ready || connecting} onClick={connect}>
-                            {connecting ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                        <Button
+                            className="w-full"
+                            disabled={!ready || connecting}
+                            onClick={connect}
+                        >
+                            {connecting ? (
+                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                            ) : null}
                             Connect this mailbox
                         </Button>
                     ) : null}

@@ -202,7 +202,8 @@ export const POLARIS_APPS: AppEntry[] = [
          */
         id: "home",
         label: "Places",
-        description: "Your places, the cameras in them and the doors of them - what they saw, and what to do about it",
+        description:
+            "Your places, the cameras in them and the doors of them - what they saw, and what to do about it",
         icon: House,
         // Never "/home": that path belongs to Overview and spent a release
         // redirecting permanently to Drive, so browsers that followed it once
@@ -552,7 +553,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/apps/telemetry",
             icon: Bug,
             group: OPERATIONS_GROUP,
-            keywords: ["errors", "exceptions", "crashes", "stack trace", "sentry", "issues", "logging"]
+            keywords: [
+                "errors",
+                "exceptions",
+                "crashes",
+                "stack trace",
+                "sentry",
+                "issues",
+                "logging"
+            ]
         },
         {
             label: "Databases",
@@ -815,7 +824,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             hidden: true,
             keywords: ["junk", "phishing", "unwanted"]
         },
-        { label: "Trash", href: "/mail/trash", icon: Trash2, hidden: true, keywords: ["deleted", "bin"] },
+        {
+            label: "Trash",
+            href: "/mail/trash",
+            icon: Trash2,
+            hidden: true,
+            keywords: ["deleted", "bin"]
+        },
         {
             label: "Mailboxes",
             href: "/mail/settings/accounts",
@@ -947,7 +962,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Preferences",
             href: "/account/preferences",
             icon: SlidersHorizontal,
-            keywords: ["units", "language", "timezone", "week start", "calendar", "text size", "accessibility"]
+            keywords: [
+                "units",
+                "language",
+                "timezone",
+                "week start",
+                "calendar",
+                "text size",
+                "accessibility"
+            ]
         },
         // The microphone, the camera and everything around them. Its own screen
         // rather than a card under Preferences: what is answered here is a fact

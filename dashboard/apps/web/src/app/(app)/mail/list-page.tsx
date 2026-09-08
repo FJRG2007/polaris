@@ -19,7 +19,13 @@ import { ownedAccountIds } from "@/lib/mailbox/access";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
 import { MailView, type MailViewContext } from "./mail-view";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
-import { EMPTY_QUERY, listThreads, readThread, type MailListQuery, type MailThreadView } from "@/lib/mailbox/views";
+import {
+    EMPTY_QUERY,
+    listThreads,
+    readThread,
+    type MailListQuery,
+    type MailThreadView
+} from "@/lib/mailbox/views";
 
 /** What a route knows about itself, beyond the query it narrows to. */
 export interface ListRoute {

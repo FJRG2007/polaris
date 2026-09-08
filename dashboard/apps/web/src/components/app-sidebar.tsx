@@ -43,7 +43,8 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     const installedId = nav.installedAppIdForPath(pathname);
     const installed = useInstalledNav(installedId);
     const subapp =
-        (installedId && installed ? nav.installedAppSubapp(installedId, installed) : null) ?? nav.resolveSubapp(pathname);
+        (installedId && installed ? nav.installedAppSubapp(installedId, installed) : null) ??
+        nav.resolveSubapp(pathname);
 
     // Hidden sections still nest under a root, so the whole list decides what is
     // an exact match even though only some of it is drawn.
@@ -75,7 +76,11 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     // Inside an organization the heading is its name once that is known, and its
     // handle until then - the rail is drawn from the path, and the path only
     // carries the handle.
-    const heading = subapp ? (org?.name ?? subapp.label) : app.id === nav.OVERVIEW_APP_ID ? "Apps" : app.label;
+    const heading = subapp
+        ? (org?.name ?? subapp.label)
+        : app.id === nav.OVERVIEW_APP_ID
+          ? "Apps"
+          : app.label;
     const groups: { label: string; items: nav.AppSection[] }[] = [];
     for (const item of items) {
         const label = item.group ?? heading;
@@ -85,7 +90,8 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
     }
 
     // Drawn unless the way back leads somewhere this account cannot go.
-    const showParent = subapp !== null && (!subapp.parentAppId || appIds.includes(subapp.parentAppId));
+    const showParent =
+        subapp !== null && (!subapp.parentAppId || appIds.includes(subapp.parentAppId));
 
     return (
         <nav className="flex flex-col gap-1">
@@ -104,7 +110,12 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
                         {group.label}
                     </p>
                     {group.items.map((item) => (
-                        <RailLink key={item.href} item={item} pathname={pathname} sections={sections} />
+                        <RailLink
+                            key={item.href}
+                            item={item}
+                            pathname={pathname}
+                            sections={sections}
+                        />
                     ))}
                 </div>
             ))}
@@ -115,7 +126,9 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
 /** The apps this account can open, as rail entries. The Overview itself is left
  *  out: it is the screen the rail is being drawn on. */
 function appRail(appIds: readonly string[]): nav.AppSection[] {
-    return nav.POLARIS_APPS.filter((app) => app.id !== nav.OVERVIEW_APP_ID && appIds.includes(app.id)).map((app) => ({
+    return nav.POLARIS_APPS.filter(
+        (app) => app.id !== nav.OVERVIEW_APP_ID && appIds.includes(app.id)
+    ).map((app) => ({
         label: app.label,
         href: app.href,
         icon: app.icon
@@ -168,8 +181,15 @@ function RailLink({
                 active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >
-            <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-foreground-subtle")} />
-            <span className="truncate" title={item.label}>{item.label}</span>
+            <Icon
+                className={cn(
+                    "size-4 shrink-0",
+                    active ? "text-primary" : "text-foreground-subtle"
+                )}
+            />
+            <span className="truncate" title={item.label}>
+                {item.label}
+            </span>
             {unread > 0 ? (
                 <span
                     aria-label={waitingLabel(appId, unread)}

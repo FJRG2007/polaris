@@ -25,7 +25,10 @@ const SCREENS = [
 export function SettingsNav() {
     const pathname = usePathname();
     return (
-        <nav className="flex flex-wrap gap-1 border-b border-border pb-2" aria-label="Mail settings">
+        <nav
+            className="flex flex-wrap gap-1 border-b border-border pb-2"
+            aria-label="Mail settings"
+        >
             {SCREENS.map((screen) => (
                 <Link
                     key={screen.href}

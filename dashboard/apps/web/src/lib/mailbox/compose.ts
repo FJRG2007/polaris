@@ -186,10 +186,13 @@ function scheduleQueued(draftId: string, sendAt: Date): void {
     clearTimeout(held.get(draftId));
     held.set(
         draftId,
-        setTimeout(() => {
-            held.delete(draftId);
-            void deliverQueued(draftId).catch(() => undefined);
-        }, Math.max(0, delay))
+        setTimeout(
+            () => {
+                held.delete(draftId);
+                void deliverQueued(draftId).catch(() => undefined);
+            },
+            Math.max(0, delay)
+        )
     );
 }
 
@@ -371,7 +374,11 @@ function withSignature(body: string, signature: string, above: boolean): string 
  */
 export async function sweepDueSends(): Promise<number> {
     const due = await prisma.mailDraft.findMany({
-        where: { state: { in: ["queued", "failed"] }, sendAt: { not: null, lte: new Date() }, attempts: { lt: 5 } },
+        where: {
+            state: { in: ["queued", "failed"] },
+            sendAt: { not: null, lte: new Date() },
+            attempts: { lt: 5 }
+        },
         select: { id: true, state: true },
         orderBy: { sendAt: "asc" },
         take: 50

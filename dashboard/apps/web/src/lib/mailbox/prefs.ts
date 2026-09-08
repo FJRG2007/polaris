@@ -18,7 +18,10 @@ import * as core from "@polaris/core";
 
 /** What this person has chosen, with every field decided. */
 export const readMailPreferences = cache(async (userId: string): Promise<core.MailPreferences> => {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { mailPrefs: true } });
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { mailPrefs: true }
+    });
     return core.parseMailPreferences(row?.mailPrefs);
 });
 

@@ -22,10 +22,10 @@ const SHA = "abc1234";
 const rows = new Map<string, string>();
 
 const setting = {
-    findUnique: vi.fn(async ({ where }: { where: { key: string; }; }) =>
+    findUnique: vi.fn(async ({ where }: { where: { key: string } }) =>
         rows.has(where.key) ? { value: rows.get(where.key) } : null
     ),
-    create: vi.fn(async ({ data }: { data: { key: string; value: string; }; }) => {
+    create: vi.fn(async ({ data }: { data: { key: string; value: string } }) => {
         if (rows.has(data.key)) throw new Error("Unique constraint failed on the fields: (`key`)");
         rows.set(data.key, data.value);
         return data;
@@ -35,8 +35,12 @@ const setting = {
             where,
             data
         }: {
-            where: { key: string; value?: { startsWith: string; }; NOT?: { value: { startsWith: string; }; }; };
-            data: { value: string; };
+            where: {
+                key: string;
+                value?: { startsWith: string };
+                NOT?: { value: { startsWith: string } };
+            };
+            data: { value: string };
         }) => {
             const current = rows.get(where.key);
             if (current === undefined) return { count: 0 };
@@ -46,17 +50,21 @@ const setting = {
             return { count: 1 };
         }
     ),
-    upsert: vi.fn(async ({ where, create }: { where: { key: string; }; create: { value: string; }; }) => {
-        rows.set(where.key, create.value);
-        return create;
-    }),
-    deleteMany: vi.fn(async ({ where }: { where: { key: string; value?: { startsWith: string; }; }; }) => {
-        const current = rows.get(where.key);
-        if (current === undefined) return { count: 0 };
-        if (where.value && !current.startsWith(where.value.startsWith)) return { count: 0 };
-        rows.delete(where.key);
-        return { count: 1 };
-    })
+    upsert: vi.fn(
+        async ({ where, create }: { where: { key: string }; create: { value: string } }) => {
+            rows.set(where.key, create.value);
+            return create;
+        }
+    ),
+    deleteMany: vi.fn(
+        async ({ where }: { where: { key: string; value?: { startsWith: string } } }) => {
+            const current = rows.get(where.key);
+            if (current === undefined) return { count: 0 };
+            if (where.value && !current.startsWith(where.value.startsWith)) return { count: 0 };
+            rows.delete(where.key);
+            return { count: 1 };
+        }
+    )
 };
 
 /** Marking a whole event read, which is how the watcher puts its own alerts down. */
@@ -66,12 +74,18 @@ const notify = vi.fn(async () => {});
 const startHostUpdate = vi.fn(async () => "started" as const);
 /** What the host is told to run, which every start has to publish first. */
 const publishUpdateSource = vi.fn(async (_source: string) => {});
-const lastUpdateOutcome = vi.fn(async () => null as { exitCode: number | null; endedAt: number; } | null);
+const lastUpdateOutcome = vi.fn(
+    async () => null as { exitCode: number | null; endedAt: number } | null
+);
 let status: UpdateStatus;
 
-vi.mock("@polaris/db", () => ({ prisma: { setting, notification: { updateMany: notificationUpdateMany } } }));
+vi.mock("@polaris/db", () => ({
+    prisma: { setting, notification: { updateMany: notificationUpdateMany } }
+}));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: (input: unknown) => notify(input as never) }));
+vi.mock("@/lib/notifications/dispatch", () => ({
+    notify: (input: unknown) => notify(input as never)
+}));
 vi.mock("@/lib/update-service", () => ({ getUpdateStatus: async () => status }));
 vi.mock("@/lib/update-runner", () => ({
     startHostUpdate: () => startHostUpdate(),
@@ -113,9 +127,9 @@ function cleared(event: string): MarkRead[] {
 }
 
 /** Every alert raised so far, by event id. */
-function raised(event: string): { title: string; body: string; }[] {
+function raised(event: string): { title: string; body: string }[] {
     return notify.mock.calls
-        .map(([input]) => input as unknown as { event: string; title: string; body: string; })
+        .map(([input]) => input as unknown as { event: string; title: string; body: string })
         .filter((input) => input.event === event);
 }
 
@@ -160,7 +174,9 @@ describe("announcing a build", () => {
         // Only the alert that says one is ready. Installing goes to the newest
         // build, never to the one the older alert named, so leaving it standing
         // is one instruction and one that is wrong.
-        const cleared = notificationUpdateMany.mock.calls.map(([input]) => input as unknown as MarkRead);
+        const cleared = notificationUpdateMany.mock.calls.map(
+            ([input]) => input as unknown as MarkRead
+        );
         expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
         // And never the ones that report what happened: a failure swept away by
         // the next build's announcement is a deployment that quietly stopped
@@ -177,10 +193,18 @@ describe("announcing a build", () => {
         // installed while a newer build had already been announced, so what is
         // being served is not what was last announced - and they were left with
         // an "Action needed" for work they had done.
-        status = { ...available(null), phase: "up-to-date", latest: null, upToDate: true, behindBy: 0 };
+        status = {
+            ...available(null),
+            phase: "up-to-date",
+            latest: null,
+            upToDate: true,
+            behindBy: 0
+        };
         await checkForUpdate();
 
-        const cleared = notificationUpdateMany.mock.calls.map(([input]) => input as unknown as MarkRead);
+        const cleared = notificationUpdateMany.mock.calls.map(
+            ([input]) => input as unknown as MarkRead
+        );
         expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
         // And the row goes with it. Left behind, it names a build nothing is
         // running and nothing can install, which is a badge on Management that
@@ -291,7 +315,10 @@ describe("installing on its own", () => {
     it("installs once the window has passed", async () => {
         await saveAutoUpdatePolicy({ mode: "daily", at: "05:00" });
         // The build was noticed at 04:00 yesterday, so its 05:00 is long gone.
-        rows.set("updates.announced", `${SHA} ${new Date(Date.now() - 36 * 3_600_000).toISOString()}`);
+        rows.set(
+            "updates.announced",
+            `${SHA} ${new Date(Date.now() - 36 * 3_600_000).toISOString()}`
+        );
         await checkForUpdate();
         expect(startHostUpdate).toHaveBeenCalledTimes(1);
     });

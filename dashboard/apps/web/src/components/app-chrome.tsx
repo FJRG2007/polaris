@@ -77,21 +77,30 @@ const NO_MAIL_UNREAD = { messages: 0, mailboxes: 0 };
 
 export async function AppChrome({ user, children }: { user: SessionUser; children: ReactNode }) {
     const capabilities = getCapabilities();
-    const [notifications, display, reportedZone, baseUrl, apps, scope, organizations, presence, status] =
-        await Promise.all([
-            listNotifications(user.id),
-            resolveDisplayPreferencesFor(user.id),
-            // What this account's browser last said. Read beside the preferences
-            // it resolves - the same memoized row - so the reporter below stays
-            // quiet on every load after the first.
-            getReportedTimeZone(user.id),
-            appBaseUrl(),
-            reachableAppNav(accessFor(user)),
-            resolveScope(user.id),
-            scopeChoices(user.id),
-            presenceChoiceOf(user.id),
-            ownStatus(user.id)
-        ]);
+    const [
+        notifications,
+        display,
+        reportedZone,
+        baseUrl,
+        apps,
+        scope,
+        organizations,
+        presence,
+        status
+    ] = await Promise.all([
+        listNotifications(user.id),
+        resolveDisplayPreferencesFor(user.id),
+        // What this account's browser last said. Read beside the preferences
+        // it resolves - the same memoized row - so the reporter below stays
+        // quiet on every load after the first.
+        getReportedTimeZone(user.id),
+        appBaseUrl(),
+        reachableAppNav(accessFor(user)),
+        resolveScope(user.id),
+        scopeChoices(user.id),
+        presenceChoiceOf(user.id),
+        ownStatus(user.id)
+    ]);
     // Seeded here rather than fetched by the provider, so the badge on the tab
     // icon is right on the first paint instead of appearing a second into the
     // page - which reads as a message that has just arrived when it has been
@@ -137,134 +146,153 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                             initial={chatUnread}
                             enabled={apps.ids.includes("chat")}
                         >
-                        <MailUnreadProvider initial={mailUnread} enabled={apps.ids.includes("mail")}>
-                        <AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>
-                            <NotificationsProvider initial={notifications}>
-                                <ToastProvider>
-                                    {/* Where everybody on screen is, asked once for
+                            <MailUnreadProvider
+                                initial={mailUnread}
+                                enabled={apps.ids.includes("mail")}
+                            >
+                                <AdminWaitingProvider initial={adminWaiting} enabled={user.isAdmin}>
+                                    <NotificationsProvider initial={notifications}>
+                                        <ToastProvider>
+                                            {/* Where everybody on screen is, asked once for
                                     the page rather than once per face. Above
                                     everything, because faces are drawn on every
                                     screen there is. */}
-                                    <PresenceProvider>
-                                        {/* And what everybody has chosen to
+                                            <PresenceProvider>
+                                                {/* And what everybody has chosen to
                                     look like, asked the same way and kept for
                                     the session: a decoration is a decision
                                     rather than a state, so it does not go
                                     stale between requests. */}
-                                        <ProfileStyleProvider>
-                                        {/* The call is held above every screen rather
+                                                <ProfileStyleProvider>
+                                                    {/* The call is held above every screen rather
                                     than by the conversation that started it, so
                                     walking off to look something up shrinks it
                                     into a bar instead of hanging up. */}
-                                        <CallHolder
-                                            viewerId={user.id}
-                                            hasChat={apps.ids.includes("chat")}
-                                        >
-                                            <NotificationFavicon />
-                                            <PresenceReporter />
-                                            <TimeZoneReporter reported={reportedZone} />
-                                            <VisitRecorder />
-                                            {/* The bottom corner, laid out once. Each of these
+                                                    <CallHolder
+                                                        viewerId={user.id}
+                                                        hasChat={apps.ids.includes("chat")}
+                                                    >
+                                                        <NotificationFavicon />
+                                                        <PresenceReporter />
+                                                        <TimeZoneReporter reported={reportedZone} />
+                                                        <VisitRecorder />
+                                                        {/* The bottom corner, laid out once. Each of these
                                     used to pin itself there, so an update landing
                                     while the phone was ringing drew one card on top
                                     of the other. They stack instead, urgent nearest
                                     the corner, and the column takes no clicks of its
                                     own - only the cards in it do. */}
-                                            <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
-                                                {/* An update landing under an open tab, said out
+                                                        <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
+                                                            {/* An update landing under an open tab, said out
                                         loud before a click is refused by a server that
                                         no longer knows this bundle. */}
-                                                <NewBuildBanner served={build} />
-                                                {/* Out here rather than inside Chat: a call you only
+                                                            <NewBuildBanner served={build} />
+                                                            {/* Out here rather than inside Chat: a call you only
                                         hear about while looking at the conversation it
                                         is in is a notice, not a call. Only for somebody
                                         who has Chat at all - the stream it listens on
                                         refuses anybody else. */}
-                                                {apps.ids.includes("chat") ? (
-                                                    <IncomingCalls viewerId={user.id} />
-                                                ) : null}
-                                                {/* Beside the ringing card and never at the same
+                                                            {apps.ids.includes("chat") ? (
+                                                                <IncomingCalls viewerId={user.id} />
+                                                            ) : null}
+                                                            {/* Beside the ringing card and never at the same
                                         time as one: a call you are already in
                                         somewhere is not a call coming in. */}
-                                                {apps.ids.includes("chat") ? (
-                                                    <CallElsewhere />
-                                                ) : null}
-                                            </div>
-                                            {/* Messages announce themselves in the corner and
+                                                            {apps.ids.includes("chat") ? (
+                                                                <CallElsewhere />
+                                                            ) : null}
+                                                        </div>
+                                                        {/* Messages announce themselves in the corner and
                                     are then gone. Never through the bell: that is a
                                     record of things to come back to, and a chat
                                     message would bury the four that are. */}
-                                            {apps.ids.includes("chat") ? <MessageToasts /> : null}
-                                            <AppShell
-                                                mark={
-                                                    <Link
-                                                        href="/home"
-                                                        aria-label="Polaris overview"
-                                                        className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                    >
-                                                        <PolarisMark nameClassName="hidden sm:inline" />
-                                                    </Link>
-                                                }
-                                                switcher={
-                                                    <>
-                                                        <AppNav
-                                                            appIds={apps.ids}
-                                                            guestAppIds={apps.guestIds}
-                                                        />
-                                                        <ScopeSwitcher
-                                                            personalName={user.name}
-                                                            organizations={organizations}
-                                                            current={scope.org}
-                                                        />
-                                                    </>
-                                                }
-                                                navButton={<AppNavDrawer appIds={apps.ids} />}
-                                                search={
-                                                    <CommandPalette
-                                                        isAdmin={user.isAdmin}
-                                                        appIds={apps.ids}
-                                                    />
-                                                }
-                                                sidebar={<AppSidebar appIds={apps.ids} />}
-                                                account={
-                                                    <>
-                                                        {user.isAdmin ? <UpdateIndicator /> : null}
-                                                        <NotificationBell />
-                                                        <AccountMenu
-                                                            id={user.id}
-                                                            name={user.name}
-                                                            email={user.email}
-                                                            presence={presence.choice}
-                                                            presenceUntil={presence.until}
-                                                            presenceScheduled={presence.scheduled}
-                                                            presenceNextChange={
-                                                                presence.nextChangeAt
+                                                        {apps.ids.includes("chat") ? (
+                                                            <MessageToasts />
+                                                        ) : null}
+                                                        <AppShell
+                                                            mark={
+                                                                <Link
+                                                                    href="/home"
+                                                                    aria-label="Polaris overview"
+                                                                    className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                                >
+                                                                    <PolarisMark nameClassName="hidden sm:inline" />
+                                                                </Link>
                                                             }
-                                                            status={status.text}
-                                                            statusUntil={status.until}
-                                                        />
-                                                    </>
-                                                }
-                                            >
-                                                <DeniedNotice />
-                                                <RouteSkeletonCapture>
-                                                    {children}
-                                                </RouteSkeletonCapture>
-                                                {user.viewingAs ? (
-                                                    <ViewAsBanner
-                                                        mode={user.viewingAs.mode}
-                                                        label={user.viewingAs.label}
-                                                        actorName={user.viewingAs.actorName}
-                                                    />
-                                                ) : null}
-                                            </AppShell>
-                                        </CallHolder>
-                                        </ProfileStyleProvider>
-                                    </PresenceProvider>
-                                </ToastProvider>
-                            </NotificationsProvider>
-                        </AdminWaitingProvider>
-                        </MailUnreadProvider>
+                                                            switcher={
+                                                                <>
+                                                                    <AppNav
+                                                                        appIds={apps.ids}
+                                                                        guestAppIds={apps.guestIds}
+                                                                    />
+                                                                    <ScopeSwitcher
+                                                                        personalName={user.name}
+                                                                        organizations={
+                                                                            organizations
+                                                                        }
+                                                                        current={scope.org}
+                                                                    />
+                                                                </>
+                                                            }
+                                                            navButton={
+                                                                <AppNavDrawer appIds={apps.ids} />
+                                                            }
+                                                            search={
+                                                                <CommandPalette
+                                                                    isAdmin={user.isAdmin}
+                                                                    appIds={apps.ids}
+                                                                />
+                                                            }
+                                                            sidebar={
+                                                                <AppSidebar appIds={apps.ids} />
+                                                            }
+                                                            account={
+                                                                <>
+                                                                    {user.isAdmin ? (
+                                                                        <UpdateIndicator />
+                                                                    ) : null}
+                                                                    <NotificationBell />
+                                                                    <AccountMenu
+                                                                        id={user.id}
+                                                                        name={user.name}
+                                                                        email={user.email}
+                                                                        presence={presence.choice}
+                                                                        presenceUntil={
+                                                                            presence.until
+                                                                        }
+                                                                        presenceScheduled={
+                                                                            presence.scheduled
+                                                                        }
+                                                                        presenceNextChange={
+                                                                            presence.nextChangeAt
+                                                                        }
+                                                                        status={status.text}
+                                                                        statusUntil={status.until}
+                                                                    />
+                                                                </>
+                                                            }
+                                                        >
+                                                            <DeniedNotice />
+                                                            <RouteSkeletonCapture>
+                                                                {children}
+                                                            </RouteSkeletonCapture>
+                                                            {user.viewingAs ? (
+                                                                <ViewAsBanner
+                                                                    mode={user.viewingAs.mode}
+                                                                    label={user.viewingAs.label}
+                                                                    actorName={
+                                                                        user.viewingAs.actorName
+                                                                    }
+                                                                />
+                                                            ) : null}
+                                                        </AppShell>
+                                                    </CallHolder>
+                                                </ProfileStyleProvider>
+                                            </PresenceProvider>
+                                        </ToastProvider>
+                                    </NotificationsProvider>
+                                </AdminWaitingProvider>
+                            </MailUnreadProvider>
                         </ChatUnreadProvider>
                     </SessionScopeProvider>
                 </DisplayFormatProvider>

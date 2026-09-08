@@ -147,7 +147,10 @@ export interface MailIdentityView {
     readonly isDefault: boolean;
 }
 
-export async function listIdentities(userId: string, accountId: string): Promise<MailIdentityView[]> {
+export async function listIdentities(
+    userId: string,
+    accountId: string
+): Promise<MailIdentityView[]> {
     await ownedAccount(userId, accountId);
     return prisma.mailIdentity.findMany({
         where: { accountId },
@@ -201,10 +204,12 @@ export async function saveIdentity(
      */
     const clash =
         core.sameAddress(owned.address, identity.address) ||
-        (await prisma.mailIdentity.findMany({
-            where: { accountId, ...(identityId ? { id: { not: identityId } } : {}) },
-            select: { address: true }
-        })).some((one) => core.sameAddress(one.address, identity.address));
+        (
+            await prisma.mailIdentity.findMany({
+                where: { accountId, ...(identityId ? { id: { not: identityId } } : {}) },
+                select: { address: true }
+            })
+        ).some((one) => core.sameAddress(one.address, identity.address));
     if (clash) {
         throw new MailSetupError("This mailbox can already send as that address.", "address");
     }
@@ -224,7 +229,12 @@ export async function saveIdentity(
         // would say whether an id is a real one on somebody else's mailbox.
         if (changed.count === 0) throw new MailAccessError("That address is not on this mailbox.");
     } else {
-        id = (await prisma.mailIdentity.create({ data: { accountId, ...identity }, select: { id: true } })).id;
+        id = (
+            await prisma.mailIdentity.create({
+                data: { accountId, ...identity },
+                select: { id: true }
+            })
+        ).id;
     }
 
     // One default, always. Set in the same transaction as the row that claimed
@@ -239,7 +249,11 @@ export async function saveIdentity(
     return id;
 }
 
-export async function deleteIdentity(userId: string, accountId: string, identityId: string): Promise<void> {
+export async function deleteIdentity(
+    userId: string,
+    accountId: string,
+    identityId: string
+): Promise<void> {
     await ownedAccount(userId, accountId);
     await prisma.mailIdentity.deleteMany({ where: { id: identityId, accountId } });
 }
