@@ -166,6 +166,7 @@ shares at once, and walking into a voice channel by opening it.
 | Per-person volume in a call   | ✅     | -    | -    | Right-click a tile.                                                                                                                |
 | Recording a call              | ✅     | -    | -    | Done in the browser of whoever presses record - no second container. See `call-recorder`, and the honest limits written at the top of it. |
 | Combining audio in one room   | ✅     | -    | -    | Several devices sitting together share one microphone. Detected acoustically; see `call-nearby` and `call-combine`.                 |
+| Raise a hand, react in a call | ✅     | -    | -    | A hand is a queue, drawn above the faces with who is next and a way for the chair to lower one; a raised hand also plays a quiet sound to whoever is chairing. Reactions are the emoji menu on a tile. See `call-hands-panel` and `call-signals`. |
 | Watch together / streams      | ⬜     | P2   | L    |                                                                                                                                    |
 
 ### What Nextcloud Talk (spreed) has that Polaris does not
@@ -186,7 +187,6 @@ happening.
 | Connection warnings that say what to do | P1  | M    | `utils/webrtc/analyzers/PeerConnectionAnalyzer.js`      | 30% loss over 5s, under 10 packets a second, or RTT over 1.5s, and it says "turn your video off" rather than "poor connection". Polaris reads encoder evidence already; this is the sentence, not the metric. |
 | Check the devices before joining    | P1   | M    | `components/MediaSettings/`, `MediaDevicesSpeakerTest.vue` | A preview, a level meter and a speaker test before the call starts. Polaris opens the devices as the room opens, so a broken microphone is found by the other person.                                        |
 | Background blur                     | P1   | L    | `utils/media/effects/virtual-background/`                | MediaPipe selfie segmentation, tflite model **vendored in the repo** and a WebGL compositor - no network and no vendor. It fits beside `mic-filter`, which is the same shape of thing for sound.             |
-| Raise a hand, react in a call       | P2   | M    | `stores/participantActivity.ts`, `ReactionToaster.vue`   | Rides on participant state, which Polaris already broadcasts as attributes.                                                                                                                                |
 | Picture-in-picture call window      | P2   | M    | `mainFloatingCall.ts`, `ViewerOverlayCallView.vue`       | Polaris shrinks a call to a bar; spreed keeps the faces in a floating window, which is what people want while reading the document being discussed.                                                          |
 
 **Deliberately not taken:**
