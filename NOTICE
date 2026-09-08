@@ -74,17 +74,29 @@ because the goal asked for the repository, and a package nobody imports still
 costs nothing to keep; `@polaris/genoffice-ui` in particular is kept strictly
 apart from `@polaris/ui`, which is Polaris' own design system.
 
+`dashboard/packages/genoffice-docs/`, `genoffice-slides/`, `genoffice-pdf/` and
+`genoffice-markdown/` are the four editor applications - their `renderer` half,
+which is React and Konva, together with the `shared` IPC contract, which is
+types only and describes the bridge each one expects.
+
+They compile and they are not wired to a route. The bridge they talk to
+(`window.slidesApi`, `window.docsApi` and so on) is an Electron channel injected
+by a preload script; Polaris' equivalent is server actions, and writing that
+adapter is a separate piece of work from carrying the code across. Polaris' own
+Office apps are unaffected and remain what `/office` serves: these are here as
+the repository asked, not as a replacement, and they have no real-time
+collaboration in them - which is the first thing Polaris' own editors were built
+to do.
+
 What could NOT be taken, and why:
 
-- **The Electron shell** and six of `electron-utils`' twelve modules - a menu
-  bar, a native file dialog, a print window. They import `electron`. There is no
-  version of them that runs in a browser.
-- **The four editor applications.** They are React and Konva against that shell.
-  What was portable inside them is in `office-layout`; the applications
-  themselves are not, and would not be wanted if they were: they have no
-  real-time collaboration in them, which is the first thing Polaris' own editors
-  were built to do.
-- **The pagination engine, the line-metrics table and the shape adjust-handles**
-  specifically. They were tried. Each reaches the editor's own DOM or its
-  sibling modules, and taking them would have meant dragging half an application
-  across to satisfy an import.
+- **The Electron main and preload processes** of all four applications, and six
+  of `electron-utils`' twelve modules - a menu bar, a native file dialog, a print
+  window. They import `electron`. There is no version of them that runs in a
+  browser.
+- **The pagination engine, the line-metrics table and the shape
+  adjust-handles**, as standalone geometry. They were tried for
+  `office-layout`, and each reaches its own editor's DOM - so they came across
+  inside their editor's package instead, where that DOM exists.
+
+Everything else in that repository is here.

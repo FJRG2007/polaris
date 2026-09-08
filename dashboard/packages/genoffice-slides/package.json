@@ -1,0 +1,32 @@
+{
+    "name": "@polaris/genoffice-slides",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "GenOffice's slides editor, its renderer half. Ported from GenOffice (Apache-2.0) - see NOTICE. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
+    "exports": {
+        ".": {
+            "types": "./src/renderer/App.tsx",
+            "import": "./src/renderer/App.tsx"
+        }
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/docx": "*",
+        "@polaris/genoffice-agent": "*",
+        "@polaris/genoffice-ai": "*",
+        "@polaris/genoffice-i18n": "*",
+        "@polaris/genoffice-ui": "*",
+        "@polaris/pptx": "*",
+        "@polaris/pptx-render": "*",
+        "@polaris/project-store": "*",
+        "acorn": "8.14.0",
+        "konva": "9.3.16",
+        "react": "19.0.0",
+        "react-dom": "19.0.0",
+        "react-konva": "19.0.3"
+    }
+}

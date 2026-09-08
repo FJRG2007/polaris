@@ -1,0 +1,146 @@
+/*
+ * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
+ * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
+ */
+
+import { aiStrings } from './strings-ai'
+import { appStrings } from './strings-app'
+import { editorStrings } from './strings-editor'
+import { ribbonStrings } from './strings-ribbon'
+import { tableStrings } from './strings-table'
+
+export const strings = {
+  zh: {
+    ...appStrings.zh,
+    ...ribbonStrings.zh,
+    ...tableStrings.zh,
+    ...editorStrings.zh,
+    ...aiStrings.zh,
+  },
+  en: {
+    ...appStrings.en,
+    ...ribbonStrings.en,
+    ...tableStrings.en,
+    ...editorStrings.en,
+    ...aiStrings.en,
+  },
+  ja: {
+    ...appStrings.ja,
+    ...ribbonStrings.ja,
+    ...tableStrings.ja,
+    ...editorStrings.ja,
+    ...aiStrings.ja,
+  },
+  ko: {
+    ...appStrings.ko,
+    ...ribbonStrings.ko,
+    ...tableStrings.ko,
+    ...editorStrings.ko,
+    ...aiStrings.ko,
+  },
+  fr: {
+    ...appStrings.fr,
+    ...ribbonStrings.fr,
+    ...tableStrings.fr,
+    ...editorStrings.fr,
+    ...aiStrings.fr,
+  },
+  de: {
+    ...appStrings.de,
+    ...ribbonStrings.de,
+    ...tableStrings.de,
+    ...editorStrings.de,
+    ...aiStrings.de,
+  },
+  es: {
+    ...appStrings.es,
+    ...ribbonStrings.es,
+    ...tableStrings.es,
+    ...editorStrings.es,
+    ...aiStrings.es,
+  },
+  th: {
+    ...appStrings.th,
+    ...ribbonStrings.th,
+    ...tableStrings.th,
+    ...editorStrings.th,
+    ...aiStrings.th,
+  },
+  id: {
+    ...appStrings.id,
+    ...ribbonStrings.id,
+    ...tableStrings.id,
+    ...editorStrings.id,
+    ...aiStrings.id,
+  },
+  ru: {
+    ...appStrings.ru,
+    ...ribbonStrings.ru,
+    ...tableStrings.ru,
+    ...editorStrings.ru,
+    ...aiStrings.ru,
+  },
+  ar: {
+    ...appStrings.ar,
+    ...ribbonStrings.ar,
+    ...tableStrings.ar,
+    ...editorStrings.ar,
+    ...aiStrings.ar,
+  },
+  pt: {
+    ...appStrings.pt,
+    ...ribbonStrings.pt,
+    ...tableStrings.pt,
+    ...editorStrings.pt,
+    ...aiStrings.pt,
+  },
+  it: {
+    ...appStrings.it,
+    ...ribbonStrings.it,
+    ...tableStrings.it,
+    ...editorStrings.it,
+    ...aiStrings.it,
+  },
+  pl: {
+    ...appStrings.pl,
+    ...ribbonStrings.pl,
+    ...tableStrings.pl,
+    ...editorStrings.pl,
+    ...aiStrings.pl,
+  },
+  nl: {
+    ...appStrings.nl,
+    ...ribbonStrings.nl,
+    ...tableStrings.nl,
+    ...editorStrings.nl,
+    ...aiStrings.nl,
+  },
+  ms: {
+    ...appStrings.ms,
+    ...ribbonStrings.ms,
+    ...tableStrings.ms,
+    ...editorStrings.ms,
+    ...aiStrings.ms,
+  },
+  he: {
+    ...appStrings.he,
+    ...ribbonStrings.he,
+    ...tableStrings.he,
+    ...editorStrings.he,
+    ...aiStrings.he,
+  },
+  hi: {
+    ...appStrings.hi,
+    ...ribbonStrings.hi,
+    ...tableStrings.hi,
+    ...editorStrings.hi,
+    ...aiStrings.hi,
+  },
+  'zh-TW': {
+    ...appStrings['zh-TW'],
+    ...ribbonStrings['zh-TW'],
+    ...tableStrings['zh-TW'],
+    ...editorStrings['zh-TW'],
+    ...aiStrings['zh-TW'],
+  },
+}

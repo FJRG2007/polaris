@@ -1,0 +1,18 @@
+{
+    // A vendored editor, held to the contract it was written under - see the note
+    // in `packages/pptx/tsconfig.json`. It draws, so it takes the browser's own
+    // types as well as Node's.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "jsx": "react-jsx",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": ["node"],
+        "verbatimModuleSyntax": false,
+        "noUncheckedIndexedAccess": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"]
+}

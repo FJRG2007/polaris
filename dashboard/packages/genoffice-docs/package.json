@@ -1,0 +1,32 @@
+{
+    "name": "@polaris/genoffice-docs",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "GenOffice's docs editor, its renderer half. Ported from GenOffice (Apache-2.0) - see NOTICE. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
+    "exports": {
+        ".": {
+            "types": "./src/renderer/App.tsx",
+            "import": "./src/renderer/App.tsx"
+        },
+        "./icons": {
+            "types": "./src/renderer/components/icons.tsx",
+            "import": "./src/renderer/components/icons.tsx"
+        }
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/docx": "*",
+        "@polaris/genoffice-agent": "*",
+        "@polaris/genoffice-ai": "*",
+        "@polaris/genoffice-i18n": "*",
+        "@polaris/genoffice-ui": "*",
+        "@polaris/office-layout": "*",
+        "@polaris/project-store": "*",
+        "react": "19.0.0",
+        "react-dom": "19.0.0"
+    }
+}

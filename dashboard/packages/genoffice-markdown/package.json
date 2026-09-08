@@ -1,0 +1,40 @@
+{
+    "name": "@polaris/genoffice-markdown",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "GenOffice's markdown editor, its renderer half. Ported from GenOffice (Apache-2.0) - see NOTICE. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
+    "exports": {
+        ".": {
+            "types": "./src/renderer/App.tsx",
+            "import": "./src/renderer/App.tsx"
+        }
+    },
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/genoffice-agent": "*",
+        "@polaris/genoffice-ai": "*",
+        "@polaris/genoffice-docs": "*",
+        "@polaris/genoffice-i18n": "*",
+        "@polaris/genoffice-ui": "*",
+        "@polaris/project-store": "*",
+        "@tiptap/core": "3.31.0",
+        "@tiptap/extension-code-block": "3.31.0",
+        "@tiptap/extension-image": "3.31.0",
+        "@tiptap/extension-list": "3.31.0",
+        "@tiptap/extension-mathematics": "3.31.0",
+        "@tiptap/extension-table": "3.31.0",
+        "@tiptap/extensions": "3.31.0",
+        "@tiptap/markdown": "3.31.0",
+        "@tiptap/pm": "3.31.0",
+        "@tiptap/react": "3.31.0",
+        "@tiptap/starter-kit": "3.31.0",
+        "@tiptap/suggestion": "3.31.0",
+        "katex": "0.16.11",
+        "react": "19.0.0",
+        "react-dom": "19.0.0"
+    }
+}
