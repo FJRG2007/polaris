@@ -36,6 +36,38 @@ import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "
  *  opening the conversation, short of copying the conversation. */
 const EXCERPT = 300;
 
+/** The row that says this queue has already announced itself, dropped again when
+ *  the last report in it is settled. */
+const ANNOUNCED_KEY = "chat.reports.announced";
+
+/**
+ * Take the announcement, once, for whoever files the report that ends the quiet.
+ *
+ * A count taken after the write cannot decide this: two reports filed at the
+ * same moment against an empty queue are both the second one by the time either
+ * counts, so neither says anything and the queue announces itself never - the
+ * spam wave the once-only rule exists for is exactly when two arrive at once.
+ * The create is a conditional write on a unique key, so one caller wins it and
+ * the rest lose it, whichever container they landed on.
+ */
+async function claimQueueAnnouncement(): Promise<boolean> {
+    try {
+        await prisma.setting.create({
+            data: { key: ANNOUNCED_KEY, value: new Date().toISOString(), scope: "global" }
+        });
+        return true;
+    } catch {
+        // Already claimed, or the settings table would not answer. Either way
+        // this report is not the one that ends the quiet.
+        return false;
+    }
+}
+
+/** Give it back, so the next report announces the queue again. */
+async function releaseQueueAnnouncement(): Promise<void> {
+    await prisma.setting.deleteMany({ where: { key: ANNOUNCED_KEY } }).catch(() => undefined);
+}
+
 /** One row of the queue. */
 export interface ChatReportView {
     readonly id: string;
@@ -164,14 +196,13 @@ export async function reportMessage(
     //
     // Re-reporting is silent for the same reason: it updates the row it already
     // has, so there is no new work to announce.
-    const open = await prisma.chatReport.count({ where: { status: "open" } });
-    if (open === 1) {
+    if (await claimQueueAnnouncement()) {
         await alertAdmins({
             title: "A message has been reported",
             body: `Reported as: ${core.CHAT_REPORT_LABELS[input.reason]}. It is waiting in the safety queue.`,
             // It is a decision waiting on a person, which is what this queue is.
             actionRequired: true
-        }).catch(() => undefined);
+        }).catch(releaseQueueAnnouncement);
     }
     return { already: false };
 }
@@ -306,6 +337,16 @@ export async function settleReport(
         where: { id: report.id },
         data: { status: decision, handledById: admin.id, handledAt: new Date() }
     });
+
+    // An empty queue announces itself again the next time somebody fills it. The
+    // wrong way round is the safe one: a report filed while this ran is a queue
+    // that says so twice, where the other order is a queue that never does.
+    //
+    // Best-effort, and after the decision is stored: the report is settled either
+    // way, and a moderator being told their answer failed because a count did is
+    // an answer they will give again.
+    const open = await prisma.chatReport.count({ where: { status: "open" } }).catch(() => -1);
+    if (open === 0) await releaseQueueAnnouncement();
 }
 
 /**

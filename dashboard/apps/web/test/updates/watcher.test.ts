@@ -182,6 +182,10 @@ describe("announcing a build", () => {
 
         const cleared = notificationUpdateMany.mock.calls.map(([input]) => input as unknown as MarkRead);
         expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
+        // And the row goes with it. Left behind, it names a build nothing is
+        // running and nothing can install, which is a badge on Management that
+        // counts an update forever with nothing to press.
+        expect(rows.has("updates.announced")).toBe(false);
     });
 
     it("says nothing while there is nothing to install", async () => {

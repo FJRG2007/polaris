@@ -22,7 +22,7 @@
 
 import Link from "next/link";
 import { cn, useToast } from "@polaris/ui";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMail } from "./mail-shell";
 import { useMailRailOpen } from "./use-mail-rail";
 import { refusalOf } from "./refusal";
@@ -67,8 +67,10 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
     const toast = useToast();
     // Remembered for this browser rather than held for this mount - see
     // `use-mail-rail`. It closed on every reload, and on every navigation that
-    // remounted the rail.
-    const { open: expanded, toggle: toggleAccount } = useMailRailOpen();
+    // remounted the rail. The mailboxes go in so what is remembered can be
+    // measured against the ones that are still connected.
+    const accountIds = useMemo(() => accounts.map((account) => account.id), [accounts]);
+    const { open: expanded, toggle: toggleAccount } = useMailRailOpen(accountIds);
 
     /**
      * File what was dragged into a folder.

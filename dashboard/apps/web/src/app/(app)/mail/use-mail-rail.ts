@@ -26,7 +26,7 @@
  * never grows without bound.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const KEY = "polaris.mail.rail.open";
 
@@ -46,11 +46,19 @@ function read(): string[] {
     }
 }
 
-export function useMailRailOpen(): {
+export function useMailRailOpen(mailboxes: readonly string[]): {
     readonly open: ReadonlySet<string>;
     readonly toggle: (accountId: string) => void;
 } {
     const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+    /** The mailboxes there actually are, as of the last render. Read through a
+     *  ref so a list that is a new array every render does not rebuild `toggle`,
+     *  and so what is written is measured against the rail being looked at. */
+    const known = useRef<readonly string[]>(mailboxes);
+
+    useEffect(() => {
+        known.current = mailboxes;
+    }, [mailboxes]);
 
     useEffect(() => {
         const held = read();
@@ -61,8 +69,12 @@ export function useMailRailOpen(): {
         setOpen((held) => {
             const next = new Set(held);
             if (!next.delete(accountId)) next.add(accountId);
+            // Only what is still there is written back, which is where the dead
+            // ids go - a slot held by a mailbox that was removed a year ago is a
+            // slot the rail cannot use.
+            const kept = [...next].filter((id) => known.current.includes(id)).slice(0, LIMIT);
             try {
-                window.localStorage.setItem(KEY, JSON.stringify([...next].slice(0, LIMIT)));
+                window.localStorage.setItem(KEY, JSON.stringify(kept));
             } catch {
                 // It still opens for this visit; it just will not be remembered.
             }

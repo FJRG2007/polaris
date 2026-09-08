@@ -52,6 +52,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                 hint="What every list opens as. The buttons above a list still win for the page you are on, and that page is a link you can send."
             >
                 <Select
+                    aria-label="Sort lists by"
                     value={held.sort}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, sort: value as core.MailSort }))
@@ -68,6 +69,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                 hint="Passing over a message in a reading pane is not the same as reading it, and a message marked read is a message lost."
             >
                 <Select
+                    aria-label="Mark a message as read"
                     value={held.markRead}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, markRead: value as core.MailMarkRead }))
@@ -84,6 +86,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                 hint="Clearing four hundred messages by going back to the list each time is the job done twice."
             >
                 <Select
+                    aria-label="After archiving or deleting"
                     value={held.afterFiling}
                     onValueChange={(value) =>
                         setHeld((current) => ({
@@ -103,6 +106,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                 hint="How long a message waits before it actually goes. Off means Send is final."
             >
                 <Select
+                    aria-label="Undo send"
                     value={String(held.undoSeconds)}
                     onValueChange={(value) =>
                         setHeld((current) => ({ ...current, undoSeconds: Number(value) }))
@@ -129,6 +133,7 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
                     hint="Remembered for this browser rather than for your account: a phone and a desk are not the same shape."
                 >
                     <Select
+                        aria-label="Reading layout"
                         value={layout}
                         onValueChange={(value) => chooseLayout(value === "split" ? "split" : "full")}
                         options={[
@@ -144,7 +149,12 @@ export function GeneralView({ preferences }: { preferences: core.MailPreferences
 
 /** One question, its answer, and the sentence that says why it is worth asking.
  *  A label over a control with the reasoning under it, which is the shape the
- *  rest of Mail's settings already use. */
+ *  rest of Mail's settings already use.
+ *
+ *  The question is drawn here and said again on the control as its `aria-label`,
+ *  because what this wraps is a listbox rather than a labelable field: without
+ *  it, somebody reading the screen aloud is offered five dropdowns and told what
+ *  none of them is for. */
 function Field({ label, hint, children }: { label: string; hint: string; children: ReactNode }) {
     return (
         <div className="space-y-1">

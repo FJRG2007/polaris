@@ -104,8 +104,9 @@ describe("the count reaching every badge in Polaris", () => {
         // Once, when the queue stops being empty. The alert reaches every
         // administrator by every route they have left on, so one per report turns
         // a spam wave into a hundred alerts each - the badge counts the rest.
-        expect(reports).toContain('const open = await prisma.chatReport.count({ where: { status: "open" } });');
-        expect(reports).toContain("if (open === 1) {");
+        // Claimed rather than counted: a count taken after the write makes both
+        // of two simultaneous reports the second one, and neither says anything.
+        expect(reports).toContain("if (await claimQueueAnnouncement()) {");
         // And never on a re-report, which updates the row it already has.
         const again = reports.slice(
             reports.indexOf("if (existing) {"),

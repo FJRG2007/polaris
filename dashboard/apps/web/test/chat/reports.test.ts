@@ -30,9 +30,21 @@ const requireChannel = vi.fn();
 const remove = vi.fn();
 /** What was on the message, and what the report ends up holding a copy of. */
 const findAttachments = vi.fn();
-/** How many reports are open once this one is filed, which is what decides
- *  whether anybody is told. */
+/** How many are still open once one is settled, which is what decides whether
+ *  the queue is left able to announce itself again. */
 const countReports = vi.fn(async () => 0);
+/** The row that says the queue has already announced itself. It behaves like the
+ *  real one - a create only the first caller can win. */
+const announced = new Set<string>();
+const createSetting = vi.fn(async ({ data }: { data: { key: string } }) => {
+    if (announced.has(data.key)) throw new Error("Unique constraint failed on the fields: (`key`)");
+    announced.add(data.key);
+    return data;
+});
+const deleteSettings = vi.fn(async ({ where }: { where: { key: string } }) => {
+    const had = announced.delete(where.key);
+    return { count: had ? 1 : 0 };
+});
 const findReportFiles = vi.fn();
 const createReportFiles = vi.fn();
 const deleteReportFiles = vi.fn();
@@ -48,6 +60,7 @@ vi.mock("@polaris/db", () => ({
             count: countReports
         },
         chatAttachment: { findMany: findAttachments },
+        setting: { create: createSetting, deleteMany: deleteSettings },
         chatReportFile: {
             findMany: findReportFiles,
             createMany: createReportFiles,
@@ -80,6 +93,7 @@ const actor = { id: "ada" };
 
 beforeEach(() => {
     vi.clearAllMocks();
+    announced.clear();
     requireChannel.mockImplementation(async () => ({ mayAdminister: false }));
     findMessage.mockImplementation(async () => ({
         id: MESSAGE,
@@ -188,8 +202,6 @@ describe("reporting a message", () => {
     it("tells the administrators when the queue stops being empty", async () => {
         // A queue nobody is queued to is a page somebody has to remember, and
         // people do not: this was filed in silence until now.
-        countReports.mockImplementation(async () => 1);
-
         await reportMessage(actor, { messageId: MESSAGE, reason: "abuse", note: "" });
 
         expect(alertAdmins).toHaveBeenCalledTimes(1);
@@ -201,12 +213,42 @@ describe("reporting a message", () => {
         // left on. One per report turns a spam wave into a hundred alerts each,
         // which is the queue being used as a weapon rather than announced. The
         // badge counts the rest.
-        countReports.mockImplementation(async () => 7);
+        await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
+        await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
+        await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
+
+        expect(createReport).toHaveBeenCalledTimes(3);
+        expect(alertAdmins).toHaveBeenCalledTimes(1);
+    });
+
+    it("says it once when two arrive at the same moment", async () => {
+        // The reason it is not a count taken after the write: both of those see
+        // two rows and neither says anything, so the wave nobody is watching for
+        // is the one nobody is told about.
+        await Promise.all([
+            reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" }),
+            reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" })
+        ]);
+
+        expect(alertAdmins).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets the next report announce the queue again once it is emptied", async () => {
+        await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
+        expect(alertAdmins).toHaveBeenCalledTimes(1);
+
+        findReport.mockImplementation(async () => ({
+            id: "r1",
+            messageId: MESSAGE,
+            status: "open"
+        }));
+        countReports.mockImplementation(async () => 0);
+        await settleReport({ id: "root" }, "r1", "kept");
+        findReport.mockImplementation(async () => null);
 
         await reportMessage(actor, { messageId: MESSAGE, reason: "spam", note: "" });
 
-        expect(createReport).toHaveBeenCalledTimes(1);
-        expect(alertAdmins).not.toHaveBeenCalled();
+        expect(alertAdmins).toHaveBeenCalledTimes(2);
     });
 });
 

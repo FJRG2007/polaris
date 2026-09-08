@@ -412,35 +412,6 @@ export function MailView({
     }, []);
 
     /**
-     * Open the conversation under the one that is leaving.
-     *
-     * What somebody clearing four hundred messages actually wants: going back to
-     * the list to click the row beneath the one they just archived is the job
-     * done twice. Off by default, because the safe answer to "the thing you were
-     * reading is gone" is the list - see `MAIL_AFTER_FILING`.
-     *
-     * The next one is read off the rows this screen is already showing, skipping
-     * everything the same action took with it: archiving a selection of ten must
-     * not open the second of the ten. Nothing left below is the end of the list,
-     * and the end of the list is the list.
-     */
-    const openNext = useCallback(
-        (leaving: readonly string[]) => {
-            const rows = threads.map((thread) => thread.id);
-            const from = rows.indexOf(leaving[0] ?? "");
-            const next = rows.slice(from + 1).find((id) => !leaving.includes(id));
-            if (!next) {
-                closeOpen();
-                return;
-            }
-            const url = new URL(window.location.href);
-            url.searchParams.set("open", next);
-            router.replace(`${url.pathname}${url.search}`, { scroll: false });
-        },
-        [closeOpen, router, threads]
-    );
-
-    /**
      * Put the conversation back on screen after the server refused to move it.
      *
      * The other half of leaving before the answer arrives. Replaced rather than
@@ -454,6 +425,39 @@ export function MailView({
             router.replace(`${url.pathname}${url.search}`, { scroll: false });
         },
         [router]
+    );
+
+    /**
+     * Open the conversation under the one that is leaving.
+     *
+     * What somebody clearing four hundred messages actually wants: going back to
+     * the list to click the row beneath the one they just archived is the job
+     * done twice. Off by default, because the safe answer to "the thing you were
+     * reading is gone" is the list - see `MAIL_AFTER_FILING`.
+     *
+     * "Under" is under the conversation being READ, not under the first row the
+     * action happened to name. Filing a scattered selection while the fifth of
+     * them is open would otherwise land on the row after the first, which is
+     * above where the reader was and on its way out of the view as well.
+     *
+     * The next one is read off the rows this screen is already showing, skipping
+     * everything the same action took with it: archiving a selection of ten must
+     * not open the second of the ten. Nothing left below is the end of the list,
+     * and the end of the list is the list.
+     */
+    const openNext = useCallback(
+        (leaving: readonly string[]) => {
+            const rows = threads.map((thread) => thread.id);
+            const from = openThread ? rows.indexOf(openThread.id) : -1;
+            const next =
+                from < 0 ? undefined : rows.slice(from + 1).find((id) => !leaving.includes(id));
+            if (!next) {
+                closeOpen();
+                return;
+            }
+            openAgain(next);
+        },
+        [closeOpen, openAgain, openThread, threads]
     );
 
     /** The conversations an action was aimed at, from the messages it named. */
