@@ -10,6 +10,15 @@
  * them, decides, writes, and stops finding work once there is none. Nobody is
  * asked to resync a mailbox.
  *
+ * **And it re-decides.** The queue is not only the empty ones: a row stamped
+ * with an older `MAIL_CATEGORY_VERSION` is stale rather than undecided, and it
+ * goes through the same pass. Without that, every rule ever added applied to
+ * mail that had not arrived yet and to nothing else - a notice that a trial was
+ * ending sat under the wrong tab for good, because it was filed before the
+ * phrase existed and nothing was ever going to look at it again. Bumping the
+ * version in `mailbox-category` is the whole of applying a new rule to the mail
+ * that is already here.
+ *
  * Nothing is fetched to do it. The subject, the preview line, the sender and the
  * headers are all already on the row - which is the whole reason the categoriser
  * was written to read only those.
@@ -40,7 +49,15 @@ const BATCH = 500;
  *  the job's own log says whether there is still a backlog. */
 export async function backfillCategories(): Promise<number> {
     const rows = await prisma.mailMessage.findMany({
-        where: { category: "" },
+        // Undecided, or decided by rules that have since changed. One query for
+        // both because they are the same job: work out what this message is with
+        // what Polaris knows today.
+        where: {
+            OR: [
+                { category: "" },
+                { categoryVersion: { lt: core.MAIL_CATEGORY_VERSION } }
+            ]
+        },
         select: {
             id: true,
             subject: true,
@@ -73,7 +90,10 @@ export async function backfillCategories(): Promise<number> {
     }
 
     for (const [category, ids] of byCategory) {
-        await prisma.mailMessage.updateMany({ where: { id: { in: ids } }, data: { category } });
+        await prisma.mailMessage.updateMany({
+            where: { id: { in: ids } },
+            data: { category, categoryVersion: core.MAIL_CATEGORY_VERSION }
+        });
     }
     return rows.length;
 }

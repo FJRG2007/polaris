@@ -9644,6 +9644,12 @@ model MailMessage {
     // which is what every row written before this existed holds until the
     // backfill reaches it - so the column is also the backfill's own queue.
     category       String    @default("")
+    // Which set of rules decided that. Behind the current one means the answer
+    // above is stale rather than absent, and the same pass that fills an empty
+    // category decides it again - which is what makes a rule added today apply
+    // to mail that arrived last year. Zero on every row written before this
+    // existed, so they are all re-decided once.
+    categoryVersion Int      @default(0)
     // What Polaris' own junk filter made of it: 0 to 100, or null for a message
     // nothing has judged - every row written before the filter existed, and
     // every row on a mailbox that has it switched off. Kept rather than
@@ -9674,6 +9680,7 @@ model MailMessage {
     @@index([folderId, sentAt])
     @@index([accountId, messageId])
     @@index([accountId, category, sentAt])
+    @@index([categoryVersion, sentAt])
     @@index([accountId, seen])
     @@index([accountId, snoozedUntil])
 }

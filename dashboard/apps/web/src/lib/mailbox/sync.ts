@@ -439,7 +439,8 @@ async function storeMessages(
                 // put an accent, and a resync is the one moment the good line
                 // can replace it for good.
                 snippet,
-                category
+                category,
+                categoryVersion: core.MAIL_CATEGORY_VERSION
             },
             create: {
                 accountId: account.id,
@@ -457,6 +458,7 @@ async function storeMessages(
                 replyToJson: asJson(addresses(envelope?.replyTo)),
                 snippet,
                 category,
+                categoryVersion: core.MAIL_CATEGORY_VERSION,
                 sentAt,
                 receivedAt: message.internalDate ?? sentAt,
                 size: message.size,

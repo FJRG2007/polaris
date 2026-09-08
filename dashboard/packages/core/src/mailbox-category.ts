@@ -36,6 +36,24 @@
  * feature doing harm.
  */
 
+/**
+ * Which set of rules decided a message's category.
+ *
+ * Stored beside the answer, and the reason is the whole difference between a
+ * categoriser that improves and one that only improves for mail that has not
+ * arrived yet. A category is decided once, as a message lands, and written to
+ * the row - so every rule added afterwards was invisible on every message
+ * already in the mailbox, for ever. A Stripe notice that a trial was ending sat
+ * under the wrong tab because it was filed before "trial ends" was a phrase
+ * Polaris knew, and nothing was ever going to look at it again.
+ *
+ * **Bump this in the same change that changes a rule.** A row behind the current
+ * number is re-decided by the pass in `mailbox/categories`, in batches, with
+ * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
+ * new rule apply to tomorrow's mail and no further.
+ */
+export const MAIL_CATEGORY_VERSION = 2;
+
 export const MAIL_CATEGORIES = ["primary", "social", "promotions", "billing", "updates", "security"] as const;
 
 export type MailCategory = (typeof MAIL_CATEGORIES)[number];
@@ -130,7 +148,6 @@ const SECURITY_WORDS: readonly string[] = [
     "reset your password",
     "password reset",
     "change your password",
-    "password was changed",
     "your otp",
     "otp code",
     // Spanish
@@ -152,7 +169,6 @@ const SECURITY_WORDS: readonly string[] = [
     "restablecer tu contrasena",
     "restablecer contrasena",
     "cambiar tu contrasena",
-    "tu contrasena ha sido",
     "nueva contrasena",
     // Portuguese
     "codigo de verificacao",
@@ -225,6 +241,35 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "has been disabled",
     "was locked",
     "password expired",
+    // Something about an account CHANGED, which is the most common security mail
+    // there is and the one nobody thinks to look for: it arrives worded as news
+    // rather than as a warning, so none of the words above appear in it. "Your
+    // password has been updated" is the whole message, and if it was not you who
+    // updated it, it is the most urgent mail of the year.
+    //
+    // Every ordering, because senders write them all: a subject is "Password
+    // Changed", "Your password was updated" or "We have changed your password"
+    // depending on the house style, and matching one of the three is matching
+    // none of the mail from the other two.
+    "password changed",
+    "password updated",
+    "password has been",
+    "password was changed",
+    "password was updated",
+    "changed your password",
+    "updated your password",
+    "email address changed",
+    "email address was changed",
+    "phone number changed",
+    "recovery email",
+    "recovery phone",
+    "backup codes",
+    "passkey added",
+    "new passkey",
+    "signed in from",
+    "new sign-in",
+    "new sign in",
+    "new login",
     // Spanish
     "alerta de seguridad",
     "actividad sospechosa",
@@ -237,22 +282,41 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "cuenta suspendida",
     "doble factor",
     "verificacion en dos pasos",
+    "contrasena actualizada",
+    "contrasena cambiada",
+    "contrasena modificada",
+    "tu contrasena ha sido",
+    "cambio de contrasena",
+    "hemos cambiado tu contrasena",
+    "correo de recuperacion",
+    "nuevo inicio de sesion",
     // Portuguese
     "alerta de seguranca",
     "atividade suspeita",
     "acesso nao autorizado",
+    "senha alterada",
+    "senha atualizada",
+    "sua senha foi",
     // French
     "alerte de securite",
     "activite suspecte",
     "acces non autorise",
+    "mot de passe modifie",
+    "mot de passe a ete",
+    "mot de passe mis a jour",
     // German
     "sicherheitswarnung",
     "sicherheitshinweis",
     "verdachtige aktivitat",
     "unbefugter zugriff",
+    "passwort geandert",
+    "passwort wurde",
     // Italian
     "avviso di sicurezza",
-    "attivita sospetta"
+    "attivita sospetta",
+    "password modificata",
+    "password aggiornata",
+    "la tua password e stata"
 ];
 
 /**

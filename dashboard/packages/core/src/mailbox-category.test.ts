@@ -232,6 +232,22 @@ describe("money that is about to move", () => {
             )
         ).toBe("security");
     });
+    it("knows a trial about to bill, whoever is sending it", () => {
+        // Stripe sends these on behalf of whoever is charging, so the sender says
+        // nothing and the subject is all there is. The pattern is the tense: this
+        // has not happened yet, and it is the last chance to stop it.
+        expect(
+            categoriseMail(
+                message({
+                    subject: "Your Osintly trial ends soon",
+                    snippet:
+                        "Your free trial for Pro with Osintly will end soon. You have an upcoming payment on September 9, 2026.",
+                    fromAddress: "trial-ending+acct_1tevifdlwma5blqj@stripe.com",
+                    headers: { "list-unsubscribe": "<https://example.invalid/u>" }
+                })
+            )
+        ).toBe("billing");
+    });
 });
 
 describe("what is left", () => {
@@ -281,6 +297,35 @@ describe("mail about the safety of an account", () => {
         expect(
             categoriseMail(message("Action needed", "Anyone with read access can view exposed secrets."))
         ).toBe("security");
+    });
+
+    it("knows an account change said as news rather than as a warning", () => {
+        // The commonest security mail there is, and the one that used to land in
+        // Primary: nothing in it is worded as an alert. "Password Changed" is the
+        // whole subject, and if it was not you, it is the most urgent mail of the
+        // year.
+        for (const subject of [
+            "Rockstar Games Password Changed",
+            "Your password has been updated",
+            "We have changed your password",
+            "Your recovery email was changed",
+            "New sign-in from Madrid",
+            "Tu contrasena ha sido actualizada",
+            "Cambio de contraseña en tu cuenta",
+            "Sua senha foi alterada",
+            "Votre mot de passe a été modifié",
+            "Ihr Passwort wurde geändert",
+            "La tua password è stata modificata"
+        ]) {
+            expect(categoriseMail(message(subject)), subject).toBe("security");
+        }
+    });
+
+    it("never sweeps one of those, because it is the record", () => {
+        // A code expires; the notice that somebody changed your password is the
+        // evidence, and it has to still be there in a month.
+        expect(isDisposableSecurityMail(message("Rockstar Games Password Changed"))).toBe(false);
+        expect(isDisposableSecurityMail(message("Your password has been updated"))).toBe(false);
     });
 
     it("is never swept, however old it gets", () => {
