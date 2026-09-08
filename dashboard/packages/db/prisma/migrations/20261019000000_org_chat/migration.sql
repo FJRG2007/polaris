@@ -14,13 +14,10 @@ ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "chatIsolated" BOOLEAN NOT N
 
 ALTER TABLE "ChatChannel" ADD COLUMN IF NOT EXISTS "orgId" UUID;
 
-DO $$
-BEGIN
-    ALTER TABLE "ChatChannel"
-        ADD CONSTRAINT "ChatChannel_orgId_fkey"
-        FOREIGN KEY ("orgId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ChatChannel" DROP CONSTRAINT IF EXISTS "ChatChannel_orgId_fkey";
+
+ALTER TABLE "ChatChannel"
+    ADD CONSTRAINT "ChatChannel_orgId_fkey"
+    FOREIGN KEY ("orgId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE INDEX IF NOT EXISTS "ChatChannel_orgId_idx" ON "ChatChannel"("orgId");

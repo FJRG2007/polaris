@@ -61,8 +61,7 @@ export interface ScopeChoice {
  * it once between them.
  */
 export const resolveScope = cache(async (userId: string): Promise<ResolvedScope> => {
-    const raw = (await cookies()).get(SCOPE_COOKIE)?.value;
-    const scope = core.parseScope(raw);
+    const scope = core.parseScope(await chosenScope());
     const orgId = core.scopeOrgId(scope);
     if (!orgId) return { scope: core.personalScope, org: null };
 
@@ -75,6 +74,24 @@ export const resolveScope = cache(async (userId: string): Promise<ResolvedScope>
     if (!org) return { scope: core.personalScope, org: null };
     return { scope: core.orgScope(org.id), org };
 });
+
+/**
+ * What the browser asked for, or nothing.
+ *
+ * Not everything that reaches a scoped read is a request. A scheduled pass, a
+ * sweep, a live-channel handler - none of them have cookies, and `cookies()`
+ * throws rather than answering when there is no request around it. The personal
+ * shelf is the right answer for all of them, and it is the same answer this
+ * already gives an unreadable cookie: a scope narrows a listing, so the widest
+ * thing anybody owns is never wrong to fall back to.
+ */
+async function chosenScope(): Promise<string | undefined> {
+    try {
+        return (await cookies()).get(SCOPE_COOKIE)?.value;
+    } catch {
+        return undefined;
+    }
+}
 
 /** The organizations this account can work from, named, for the switcher. */
 export async function scopeChoices(userId: string): Promise<ScopeChoice[]> {
