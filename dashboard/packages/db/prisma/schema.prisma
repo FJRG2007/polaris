@@ -264,6 +264,8 @@ model User {
     successorTo         AccountSuccessor[]   @relation("AccountSuccessorHeir")
     orgSuccessorTo      OrganizationSuccessor[] @relation("OrganizationSuccessorHeir")
     notes               Note[]
+    officeDocuments     OfficeDocument[]
+    officeOpens         OfficeDocumentOpen[]
     noteSpaces          NoteSpace[]
     noteSpaceMemberships NoteSpaceMember[]
     noteFolders         NoteFolder[]
@@ -4537,6 +4539,7 @@ model Organization {
     roles    OrgRole[]
     spaces   TaskSpace[]
     noteSpaces NoteSpace[]
+    officeDocuments OfficeDocument[]
     telemetryProjects TelemetryProject[]
     chatSpaces ChatSpace[]
     projects Project[]
@@ -4819,6 +4822,104 @@ model TaskFolderTeam {
 
     @@unique([folderId, teamId])
     @@index([teamId])
+}
+
+// ---------------------------------------------------------------------------
+// Office (documents, spreadsheets, presentations, diagrams, comparisons)
+// ---------------------------------------------------------------------------
+
+// One thing somebody made, whichever of the five it is.
+//
+// A document, a spreadsheet, a deck, a diagram and a comparison are edited by
+// five different surfaces and are otherwise the same row: something with a name
+// and an owner, that other people are given, that is exported, that goes in a
+// bin before it goes. Five tables would be five places for sharing, trashing and
+// listing to drift apart, and the differences between them are entirely inside
+// `content`.
+//
+// **The content is a CRDT, not a document format.** `content` holds the merged
+// Yjs state, which is what lets several people type at once and what lets a
+// laptop that closed on a train reconnect and keep its edits. It is bytes
+// because that is what Yjs produces; re-encoding it as text to make it readable
+// in a database client would double it and help nobody, since it is not readable
+// either way. What IS readable is `excerpt`, written beside it for the list and
+// for search.
+//
+// Nothing here is a file. Exporting writes `.docx`, `.xlsx`, `.pptx` or a PDF on
+// the way out - see `OFFICE_EXPORTS` in @polaris/core - and importing reads one
+// in. What Polaris stores between those two moments is this.
+model OfficeDocument {
+    id      String @id @default(uuid(7)) @db.Uuid
+    /// doc | sheet | slides | diagram | comparison - see OFFICE_KINDS. It never
+    /// changes: a spreadsheet that became a presentation is a new document, and
+    /// pretending otherwise would hand one editor another's content.
+    kind    String
+    title   String
+    /// Whose it is. A person always - somebody made it - and an organization as
+    /// well when it belongs to the group rather than to them, which is what
+    /// makes it survive their account being closed.
+    ownerId String  @db.Uuid
+    orgId   String? @db.Uuid
+
+    /// The document itself: the merged Yjs state. Null on one nobody has typed
+    /// in yet, which is a real state and not a broken one - a document exists
+    /// from the moment it is named.
+    content Bytes?
+    /// The first few hundred characters as plain text, for the list and for
+    /// search. Written when the content is and never read back into an editor:
+    /// it is a description of the document, not a copy of it.
+    excerpt String @default("")
+
+    /// Out of the way without being gone. Archiving is the reader's own filing;
+    /// the bin below is on its way out.
+    archived  Boolean   @default(false)
+    /// When it went in the bin, or null. A moment rather than a flag so the
+    /// sweep that empties it has something to measure, and so "deleted 3 days
+    /// ago" can be said.
+    trashedAt DateTime?
+
+    createdById String    @db.Uuid
+    /// Who touched it last and when, which is what a list of shared work is
+    /// actually sorted by. Bare ids: an account being deleted must not take the
+    /// document with it, and the name is resolved when it is drawn.
+    editedById  String?   @db.Uuid
+    editedAt    DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    opens OfficeDocumentOpen[]
+
+    // "everything of mine", "everything this organization has", and the two
+    // orders a list is ever in.
+    @@index([ownerId, kind])
+    @@index([orgId, kind])
+    @@index([editedAt])
+}
+
+// When one person last opened one document, and whether they keep it to hand.
+//
+// Its own row rather than a column, because both facts are about the pair rather
+// than about the document: a shared deck somebody else edited this morning is
+// not more relevant to me than the one I was in yesterday, and starring is
+// mine - a document I star must not appear starred to the person who wrote it.
+//
+// Written on every open, so it is the smallest row that gets the most writes:
+// nothing else belongs on it.
+model OfficeDocumentOpen {
+    documentId String   @db.Uuid
+    userId     String   @db.Uuid
+    at         DateTime @default(now())
+    starred    Boolean  @default(false)
+
+    document OfficeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([documentId, userId])
+    // The default order of every list: what I opened, most recent first.
+    @@index([userId, at])
 }
 
 // Handing one thing to somebody who is not on its roster.

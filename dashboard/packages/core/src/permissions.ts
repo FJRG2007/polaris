@@ -20,6 +20,7 @@ export const PERMISSIONS = [
     "snippets.write",
     "vault.use",
     "notes.use",
+    "office.use",
     "mail.use",
     "chat.use",
     "chat.spaces",
@@ -93,6 +94,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "snippets.write",
         "vault.use",
         "notes.use",
+        "office.use",
         "mail.use",
         "chat.use",
         "chat.spaces",
@@ -129,6 +131,11 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // The same reasoning: notes are the account's own and nobody else reads
         // them, so read-only has nothing to say about them.
         "notes.use",
+        // And office documents, for the same reason again: a read-only account
+        // still writes its own. What read-only governs is somebody else's work,
+        // and a document reached through a share carries its own capability -
+        // being handed a document to read is not the same grant as this one.
+        "office.use",
         // And again for mail. A mailbox is reached with a credential its owner
         // supplied about an account that is theirs; read-only inside Polaris has
         // no bearing on whether somebody may read their own mail.
@@ -178,6 +185,7 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     "snippets.write": { area: "Snippets", label: "Write snippets and share them by link" },
     "vault.use": { area: "Vault", label: "Keep a password vault and connect a client to it" },
     "notes.use": { area: "Notes", label: "Keep private notes" },
+    "office.use": { area: "Office", label: "Write documents, spreadsheets, slides and diagrams" },
     "mail.use": { area: "Mail", label: "Link mailboxes and read mail here" },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split

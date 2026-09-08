@@ -24,6 +24,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "snippets.write": "Write snippets",
     "vault.use": "Use the vault",
     "notes.use": "Keep notes",
+    "office.use": "Write documents",
     "mail.use": "Read and send mail",
     "chat.use": "Use chat",
     "chat.spaces": "Create chat servers",
@@ -68,6 +69,8 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     // it is.
     "vault.use": "Sync the vault. The items stay encrypted; a key cannot read them.",
     "notes.use": "Read and write the owner's own notes.",
+    "office.use":
+        "Read and write the documents, spreadsheets, slides and diagrams the owner can reach.",
     "mail.use": "Read the owner's linked mailboxes and send from them.",
     "chat.use": "Read and post in the channels the owner is in.",
     "chat.spaces": "Create servers and the channels inside them.",
@@ -111,6 +114,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     { title: "Snippets", scopes: ["snippets.read", "snippets.write"] },
     { title: "Vault", scopes: ["vault.use"] },
     { title: "Notes", scopes: ["notes.use"] },
+    { title: "Office", scopes: ["office.use"] },
     { title: "Mail", scopes: ["mail.use"] },
     {
         title: "Chat",

@@ -21,6 +21,7 @@ export * from "./geo.js";
 export * from "./hostnames.js";
 export * from "./local-network.js";
 export * from "./names.js";
+export * from "./office.js";
 export * from "./passkeys.js";
 export * from "./colors.js";
 export * from "./contrast.js";
