@@ -76,11 +76,15 @@ describe("the address stops naming what was moved", () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         expect(view).toContain('url.searchParams.delete("open")');
         // Replaced, not pushed: Back into a conversation that has been filed is a
-        // step that leads nowhere.
-        expect(view).toMatch(/router\.replace\(`\$\{path\}\$\{url\.search\}`/);
+        // step that leads nowhere. And shallow - the address moves without the
+        // page being asked for again, because the list and the pane are both
+        // fetched by this tab. See `mail/address`.
+        expect(view).toMatch(/goShallow\([^)]*\{ replace: true \}\)/);
         // A link straight to a conversation names it in the path instead, where
-        // there is nothing to strip - the way out is the list.
+        // there is nothing to strip - that one is a different screen, so it is a
+        // real navigation.
         expect(view).toContain('url.pathname.startsWith("/mail/t/")');
+        expect(view).toMatch(/router\.replace\(`\/mail\$\{url\.search\}`/);
         expect(view).toContain(
             "leavesTheView(action) && openThread !== null && aimed.includes(openThread.id)"
         );
@@ -124,7 +128,7 @@ describe("the address stops naming what was moved", () => {
         expect(view).toContain("openAgain(openThread.id);");
         // Both halves go back on a refusal, not only the reader.
         expect(view).toContain("clearPatches();");
-        expect(view).toContain('url.searchParams.set("open", threadId)');
+        expect(view).toContain("mailAddress({ open: threadId })");
     });
 
     it("keeps the row hidden while the list it left comes back unchanged", async () => {

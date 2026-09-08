@@ -11,6 +11,14 @@
  * What it adds over the toolbar is that it acts on the row under the pointer
  * without selecting it first, which is the whole reason anybody right-clicks a
  * list.
+ *
+ * **Unless that row is one of several ticked.** Then it acts on all of them, and
+ * says how many in every item that does. Right-clicking inside a selection and
+ * being given a menu that quietly does the thing to one message is how somebody
+ * loses a selection they spent a minute building - every list in every operating
+ * system works the other way round, and so does this one. A right-click on a row
+ * OUTSIDE the selection is still about that row, because that is what pointing
+ * at it means.
  */
 
 import type { ReactNode } from "react";
@@ -58,9 +66,14 @@ export function ThreadContextMenu({
     onLabel,
     onAnswer,
     onBlock,
+    selection,
     children
 }: {
     thread: MailThreadView;
+    /** The conversations ticked, as message ids, when this row is one of them
+     *  and there is more than one. Null for the ordinary case: a right-click on
+     *  a row that is not part of a selection. */
+    selection: readonly string[] | null;
     canArchive: boolean;
     permanentDelete: boolean;
     onAct: (action: MailAction, messageIds: readonly string[], announce: string) => void;
@@ -78,7 +91,15 @@ export function ThreadContextMenu({
     const appUrl = useAppUrl();
     const toast = useToast();
     const router = useRouter();
-    const ids = [thread.leadMessageId].filter(Boolean);
+    // What every item that acts on mail acts on: the selection when this row is
+    // inside one, and this row alone otherwise.
+    const ids = selection ?? [thread.leadMessageId].filter(Boolean);
+    const many = selection ? selection.length : 0;
+    /** An item's own words when it is about one conversation, and its words when
+     *  it is about several. Said rather than counted in a corner: "Move to
+     *  trash" and "Move 12 to trash" are different decisions. */
+    const said = (one: string, more: (count: number) => string): string =>
+        many > 1 ? more(many) : one;
     const unread = thread.unreadCount > 0;
     const sender = thread.participants[0]?.address ?? "";
 
@@ -134,7 +155,9 @@ export function ThreadContextMenu({
                     ) : (
                         <Mail className="size-3.5 shrink-0" aria-hidden />
                     )}
-                    {unread ? "Mark as read" : "Mark as unread"}
+                    {unread
+                        ? said("Mark as read", (n) => `Mark ${n} as read`)
+                        : said("Mark as unread", (n) => `Mark ${n} as unread`)}
                     <MenuShortcut keys="u" />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -147,14 +170,16 @@ export function ThreadContextMenu({
                     }
                 >
                     <Star className="size-3.5 shrink-0" aria-hidden />
-                    {thread.starred ? "Unstar" : "Star"}
+                    {thread.starred
+                        ? said("Unstar", (n) => `Unstar ${n}`)
+                        : said("Star", (n) => `Star ${n}`)}
                     <MenuShortcut keys="s" />
                 </ContextMenuItem>
 
                 <ContextMenuSub>
                     <ContextMenuSubTrigger>
                         <Clock className="size-3.5 shrink-0" aria-hidden />
-                        Snooze
+                        {said("Snooze", (n) => `Snooze ${n}`)}
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {SNOOZES.map((snooze) => (
@@ -169,7 +194,7 @@ export function ThreadContextMenu({
                     <ContextMenuSub>
                         <ContextMenuSubTrigger>
                             <Tag className="size-3.5 shrink-0" aria-hidden />
-                            Label
+                            {said("Label", (n) => `Label ${n}`)}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {labels.map((label) => (
@@ -191,7 +216,7 @@ export function ThreadContextMenu({
                 {canArchive ? (
                     <ContextMenuItem onSelect={() => onAct("archive", ids, "Archived.")}>
                         <Archive className="size-3.5 shrink-0" aria-hidden />
-                        Archive
+                        {said("Archive", (n) => `Archive ${n}`)}
                         <MenuShortcut keys="e" />
                     </ContextMenuItem>
                 ) : null}
@@ -200,7 +225,7 @@ export function ThreadContextMenu({
                     message AND teaches a provider about the sender. */}
                 <ContextMenuItem variant="danger" onSelect={() => onAct("junk", ids, "Moved to spam.")}>
                     <Bug className="size-3.5 shrink-0" aria-hidden />
-                    Report as spam
+                    {said("Report as spam", (n) => `Report ${n} as spam`)}
                     <MenuShortcut keys="!" />
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -214,7 +239,9 @@ export function ThreadContextMenu({
                     }
                 >
                     <Trash2 className="size-3.5 shrink-0" aria-hidden />
-                    {permanentDelete ? "Delete for ever" : "Move to trash"}
+                    {permanentDelete
+                        ? said("Delete for ever", (n) => `Delete ${n} for ever`)
+                        : said("Move to trash", (n) => `Move ${n} to the trash`)}
                     <MenuShortcut keys="Delete" />
                 </ContextMenuItem>
 

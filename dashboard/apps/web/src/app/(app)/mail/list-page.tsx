@@ -135,9 +135,6 @@ export async function MailListPage({
             page={narrowOf(query)}
             openThreadId={params.open ?? ""}
             categorised={Boolean(route.categorised) && !searched}
-            category={query.category}
-            filter={filter}
-            sort={sort}
             // How this person reads: when an opened message stops being unread,
             // and where the screen goes after one is filed. Both were constants
             // in the client until there was a screen to answer them on.
@@ -145,6 +142,11 @@ export async function MailListPage({
             // A route that IS one of the filters does not offer it again: the
             // Starred screen with a "Starred" button on it reads as a switch that
             // does nothing, because it is one.
+            //
+            // The tab, the filter and the order are NOT passed: the screen reads
+            // them off the address itself, because it changes them there without
+            // asking for this page again. What is passed is the list they start
+            // from.
             fixedFilter={fixedFilter(route.narrow)}
             context={
                 searched

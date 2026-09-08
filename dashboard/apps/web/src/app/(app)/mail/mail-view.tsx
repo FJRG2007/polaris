@@ -32,7 +32,8 @@ import { ThreadView } from "./thread-view";
 import { SenderFace } from "./sender-face";
 import { MailSearch } from "./mail-search";
 import * as core from "@polaris/core";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { goShallow, mailAddress, plainClick } from "./address";
 import type { DisplayFormat } from "@polaris/core";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
@@ -122,34 +123,31 @@ export interface MailViewContext {
     readonly permanentDelete: boolean;
 }
 
+/** What the address says the tab is, when it says something Polaris knows.
+ *  Anything else is somebody editing a URL, and the answer to that is the whole
+ *  list. */
+function asCategory(value: string | null): string {
+    return value && (core.MAIL_CATEGORIES as readonly string[]).includes(value) ? value : "";
+}
+
 export function MailView({
     context,
-    openThreadId,
-    page,
+    openThreadId: openedWhenRendered,
+    page: pageWhenRendered,
     categorised,
-    category,
-    filter,
-    sort,
     preferences,
     fixedFilter
 }: {
     context: MailViewContext;
-    /** The conversation the address names, or "". Fetched here rather than
-     *  handed down, so a link to one opens beside a list that is already drawn
-     *  instead of holding the whole screen back. */
+    /** The conversation the address named when the server read it. What is open
+     *  now is read from the address itself - see `opened` below - and this is
+     *  only the value the first paint starts from. */
     openThreadId: string;
-    /** What this list is: what to go and get, and the name of the copy this tab
-     *  may already be holding. */
+    /** The same, for the list: what the server made of the address. */
     page: MailPageNarrow;
     /** Whether this list is worth sorting into tabs. An inbox is; Sent is not,
      *  and neither is a search - a search is already a narrowing. */
     categorised: boolean;
-    /** Which tab is showing, or "" for all of them. */
-    category: string;
-    /** Which of the list is showing, or "" for all of it. */
-    filter: core.MailFilter | "";
-    /** Which way round it is being read. */
-    sort: core.MailSort;
     /** How this person reads mail - see `mail-prefs`. Two of the four are
      *  answered on this screen: when an opened message stops being unread, and
      *  where the reader is left after one is filed. */
@@ -159,6 +157,48 @@ export function MailView({
     fixedFilter: core.MailFilter | "";
 }) {
     const router = useRouter();
+    /**
+     * What the address says right now.
+     *
+     * The two props above are what the server read when it rendered this. They
+     * are right for the first paint and stale a moment later, because opening a
+     * conversation, choosing a tab, narrowing the list and reordering it all
+     * change the address WITHOUT asking the server for the page again - which is
+     * the whole of why a press on a row used to sit there, and why a press that
+     * failed left a screen only a reload could fix. See `address`.
+     *
+     * So everything this screen can answer for itself is read from here. The
+     * server still decides what it alone knows - whether there are any mailboxes,
+     * and what a search should be called.
+     */
+    const live = useSearchParams();
+    const openThreadId = live.get("open") ?? openedWhenRendered;
+    const category = categorised ? asCategory(live.get("tab")) : "";
+    // A screen that IS one of the filters keeps its own narrowing whatever the
+    // address says, exactly as the server decides it.
+    const filter = fixedFilter || core.readMailFilter(live.get("filter"));
+    const sort = core.readMailSort(live.get("sort"), preferences.sort);
+    /**
+     * Which list to fetch, rebuilt from that.
+     *
+     * `page` as it arrived is the server's reading of the same address, so on the
+     * first render the two agree; after a shallow change this is the one that has
+     * moved. It is the identity of the list as far as the fetch and the copy this
+     * tab keeps are concerned, so reading it from the live address is what makes
+     * a tab draw its own rows instead of the previous tab's.
+     */
+    const page = useMemo(
+        () => ({
+            ...pageWhenRendered,
+            unreadOnly: filter === "unread",
+            readOnly: filter === "read",
+            starredOnly: filter === "starred",
+            withAttachments: filter === "attachments",
+            category,
+            sort
+        }),
+        [pageWhenRendered, filter, category, sort]
+    );
     const {
         accounts,
         accountColor,
@@ -416,8 +456,13 @@ export function MailView({
     const closeOpen = useCallback(() => {
         const url = new URL(window.location.href);
         url.searchParams.delete("open");
-        const path = url.pathname.startsWith("/mail/t/") ? "/mail" : url.pathname;
-        router.replace(`${path}${url.search}`, { scroll: false });
+        if (url.pathname.startsWith("/mail/t/")) {
+            // A different screen rather than a narrower one, so this one is a
+            // real navigation: /mail is a page this tab may not have.
+            router.replace(`/mail${url.search}`, { scroll: false });
+            return;
+        }
+        goShallow(`${url.pathname}${url.search}`, { replace: true });
     }, [router]);
 
     /**
@@ -523,14 +568,9 @@ export function MailView({
      * pushed, like the close it undoes: a Back that walks through a conversation
      * closing and reopening is a Back nobody meant.
      */
-    const openAgain = useCallback(
-        (threadId: string) => {
-            const url = new URL(window.location.href);
-            url.searchParams.set("open", threadId);
-            router.replace(`${url.pathname}${url.search}`, { scroll: false });
-        },
-        [router]
-    );
+    const openAgain = useCallback((threadId: string) => {
+        goShallow(mailAddress({ open: threadId }), { replace: true });
+    }, []);
 
     /**
      * Open the conversation under the one that is leaving.
@@ -749,10 +789,10 @@ export function MailView({
                       setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
                   previous: () => setOnIndex((held) => Math.max(0, held - 1)),
                   open: () => {
-                      if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
+                      if (onRow) goShallow(mailAddress({ open: onRow.id }));
                   },
                   back: () => {
-                      if (openThread) router.push(window.location.pathname, { scroll: false });
+                      if (openThread) goShallow(mailAddress({ open: null }));
                   },
                   archive: () => {
                       if (context.canArchive) act("archive", rowMessageIds, "Archived.");
@@ -1198,6 +1238,16 @@ export function MailView({
                                     <ThreadContextMenu
                                         key={thread.id}
                                         thread={shown(thread)}
+                                        // Inside a selection, the menu is about
+                                        // the selection; outside one, about the
+                                        // row it was opened on. The same rule a
+                                        // drag from a row already follows.
+                                        selection={
+                                            selected.length > 1 &&
+                                            selected.includes(thread.id)
+                                                ? selectedMessageIds
+                                                : null
+                                        }
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
                                         onAct={act}
@@ -1504,26 +1554,20 @@ function ListFilters({
     sort: core.MailSort;
     fixed: core.MailFilter | "";
 }) {
-    const router = useRouter();
-    const search = useSearchParams();
-    const pathname = usePathname();
-
     function go(change: { filter?: core.MailFilter | ""; sort?: core.MailSort }): void {
-        const url = new URLSearchParams(search.toString());
-        if (change.filter !== undefined) {
-            if (change.filter) url.set("filter", change.filter);
-            else url.delete("filter");
-        }
-        if (change.sort !== undefined) {
-            if (change.sort !== core.DEFAULT_MAIL_SORT) url.set("sort", change.sort);
-            else url.delete("sort");
-        }
-        // A different list: the cursor and whatever was open beside it belong to
-        // the one being left.
-        url.delete("before");
-        url.delete("open");
-        const query = url.toString();
-        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+        // Narrowing and reordering are the same shape of change as a tab, and
+        // are made the same way: the address moves, the list this tab fetches
+        // moves with it, and no page is rendered again for it.
+        goShallow(
+            mailAddress({
+                ...(change.filter === undefined ? {} : { filter: change.filter || null }),
+                ...(change.sort === undefined
+                    ? {}
+                    : { sort: change.sort === core.DEFAULT_MAIL_SORT ? null : change.sort }),
+                before: null,
+                open: null
+            })
+        );
     }
 
     /** Whether an option would fight the narrowing the screen already is. Only
@@ -1627,20 +1671,12 @@ function Choice({
 }
 
 function CategoryTabs({ current }: { current: string }) {
-    const router = useRouter();
-    const search = useSearchParams();
-    const pathname = usePathname();
-
     function go(next: string): void {
-        const url = new URLSearchParams(search.toString());
-        if (next) url.set("tab", next);
-        else url.delete("tab");
         // A different tab is a different list: the cursor and whatever was open
-        // belong to the one being left.
-        url.delete("before");
-        url.delete("open");
-        const query = url.toString();
-        router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+        // belong to the one being left. No request - the list beneath is fetched
+        // by this tab, so asking the server to render the page again would only
+        // put a round trip in front of a press. See `address`.
+        goShallow(mailAddress({ tab: next || null, before: null, open: null }));
     }
 
     return (
@@ -1957,6 +1993,18 @@ function ThreadRow({
                 <Link
                     href={`?open=${thread.id}`}
                     scroll={false}
+                    // A press opens the conversation by changing the address,
+                    // with no request: the pane beside the list fetches the
+                    // conversation itself, so a round trip here bought nothing
+                    // and cost everything - a slow one sat there, a failed one
+                    // did nothing at all. Anything that is not a plain press -
+                    // a middle click, a modifier - is left to the browser, so
+                    // opening a conversation in a new tab still works.
+                    onClick={(event) => {
+                        if (!plainClick(event.nativeEvent)) return;
+                        event.preventDefault();
+                        goShallow(mailAddress({ open: thread.id }));
+                    }}
                     className={cn("min-w-0 flex-1", wide && "flex items-baseline gap-3")}
                     aria-current={open ? "true" : undefined}
                 >
