@@ -220,9 +220,10 @@ Tasks (work management):
       every other screen showing that space without a reload, scoped server-side
       so a signal only ever reaches somebody who could already read the work
 - [x] Organizations and teams: work owned by a group rather than a person, with
-      a roster, teams inside it, and a team granted a whole space or one folder
-      of it; an administrator can turn organizations off, restrict who may start
-      one, and cap organizations per account, members and teams
+      a roster, teams inside it, and a team or one of the organization's roles
+      granted a whole space or one folder of it; an administrator can turn
+      organizations off, restrict who may start one, and cap organizations per
+      account, members and teams
 - [x] Connected trackers: Linear and Jira linked to a space with the person's
       own credential, polled rather than pushed, mirroring title, description
       and status in - statuses mapped by the provider's own category first and
@@ -337,9 +338,10 @@ Notes (personal writing):
       the same privacy as before: only the author reads them, an instance
       administrator included
 - [x] Notebooks: a shelf a group writes on, beside the private one everybody
-      has. Reached the way a Tasks space is - a membership, a team grant, or the
-      organization that owns it - and a note with no notebook is still readable
-      by its author alone, an instance administrator included
+      has. Reached the way a Tasks space is - a membership, a team grant, a
+      grant to one of the organization's roles, or the organization that owns
+      it - and a note with no notebook is still readable by its author alone,
+      an instance administrator included
 - [x] Folders, nested, on either shelf. A folder is where things are filed and a
       parent note is what they are part of; keeping both is what lets a vault
       arrive with the arrangement its author gave it. Deleting one lifts what was
@@ -395,7 +397,9 @@ Chat (talking to the people here):
       answered for by a separate stamp rather than read back out of the ticks.
       Only offered where the ticks already are, and only what the other
       person's privacy setting allows
-- [x] Reached by being in it. No administrator override, no instance-wide read
+- [x] Reached by being in it, or by a grant handing a space or one channel of
+      it to an organization's team or role. No administrator override, no
+      instance-wide read
 - [x] Calls: audio and video started from a conversation through the media
       server the stack runs, browsers never exchanging media directly. Mute,
       camera, and a roster of who is in the room. Capped at 8
@@ -550,12 +554,13 @@ Telemetry (what breaks):
   leaves nothing behind when it is refused.
 - Being on an organization's roster reaches no work, exactly as being in a
   GitHub organization hands you no repositories. Access comes from a team grant,
-  a direct space membership, or administering the organization that owns the
-  space. A team grant resolves to the same guest/member/admin vocabulary a
-  personal membership uses, so nothing downstream has to know whether somebody
-  arrived as a person or as part of a team - and where both apply, the stronger
-  wins. On an organization's space, `internal` means that roster rather than
-  everybody on the instance.
+  a grant to one of the organization's roles, a direct space membership, or
+  administering the organization that owns the space. A team or role grant
+  resolves to the same guest/member/admin vocabulary a personal membership
+  uses, so nothing downstream has to know whether somebody arrived as a
+  person, as part of a team, or through a role they hold - and where more than
+  one applies, the stronger wins. On an organization's space, `internal` means
+  that roster rather than everybody on the instance.
 - A privacy setting names an audience from one shared vocabulary - everyone,
   everyone except, friends, friends except, only, or nobody - never a switch
   or a dropdown of its own, so "who sees this" is answered the same way for a

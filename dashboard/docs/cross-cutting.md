@@ -16,6 +16,7 @@ about *any* object answers it about exactly one kind:
 | A saved way of looking | `TaskView`                | Tasks                          |
 | Starting from a shape | `TaskTemplate`, `ServerTemplate`, `DropPointTemplate` | Tasks, Servers, Drop points |
 | Marking a favourite  | `VaultFavorite`             | Vault                          |
+| Handing a thing to somebody off its roster | `AccessGrant` | Chat, Tasks, Notes, Places |
 
 Meanwhile `Notification`, `NotificationDestination` and `NotificationDelivery`
 are already generic: any app can raise an alert, choose an audience, and have it
