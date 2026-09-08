@@ -30,6 +30,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { canOn, grantedResourceIds } from "@polaris/auth";
 import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
+import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
 export interface TaskActor {
@@ -110,6 +111,12 @@ export async function resolveSpaceRole(actor: TaskActor, spaceId: string): Promi
     // membership already gave and never narrow it.
     const written = await spaceGrantRole(actor, spaceId);
     if (written) role = role ? core.strongerRole(role, written) : written;
+    // And a sixth: the space handed to one of the organization's roles, or to a
+    // team, or to a person, by name rather than by permission. `teamGrants`
+    // above is the older table and still the one a team grant is written into;
+    // this is what carries a grant to a role, which teams have no way to say.
+    const shared = await grantedCapability(actor.id, "task.space", spaceId);
+    if (core.isSpaceRole(shared)) role = role ? core.strongerRole(role, shared) : shared;
     if (role) return role;
 
     // An internal space is readable by anyone already trusted with the app -
@@ -182,7 +189,7 @@ export async function requireSpace(actor: TaskActor, spaceId: string, minimum: c
  * project they are actually working.
  */
 async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<string, core.SpaceRole>> {
-    const [folders, personal, team] = await Promise.all([
+    const [folders, personal, team, shared] = await Promise.all([
         prisma.taskFolder.findMany({ where: { spaceId }, select: { id: true, parentId: true } }),
         prisma.taskFolderMember.findMany({
             where: { userId: actor.id, folder: { spaceId } },
@@ -193,10 +200,19 @@ async function grantedFolders(actor: TaskActor, spaceId: string): Promise<Map<st
         prisma.taskFolderTeam.findMany({
             where: { team: { members: { some: { userId: actor.id } } }, folder: { spaceId } },
             select: { folderId: true, role: true }
-        })
+        }),
+        // And one handed to a role, which a team grant has no way to say.
+        grantedSubjects(actor.id, "task.folder")
     ]);
+    const known = new Set(folders.map((folder) => folder.id));
+    const sharedHere = [...shared]
+        // Grants are read for the whole account in one query, so the ones
+        // belonging to another space are dropped here rather than fetched twice.
+        .filter(([folderId, role]) => known.has(folderId) && core.isSpaceRole(role))
+        .map(([folderId, role]) => ({ folderId, role: role as core.SpaceRole }));
+
     const reachable = new Map<string, core.SpaceRole>();
-    for (const grant of [...personal, ...team]) {
+    for (const grant of [...personal, ...team, ...sharedHere]) {
         const role = grant.role as core.SpaceRole;
         for (const id of core.folderBranch(folders, grant.folderId)) {
             const existing = reachable.get(id);
@@ -401,11 +417,18 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
     // Which organizations this account runs, and which it merely belongs to.
     // The first opens every space they own; the second only opens the ones the
     // organization marked internal.
-    const [administered, onRoster, written] = await Promise.all([
+    const [administered, onRoster, written, shared, sharedFolders] = await Promise.all([
         administeredOrgIds(actor),
         memberOrgIds(actor.id),
-        grantedResourceIds(actor.id, "space", "tasks.read")
+        grantedResourceIds(actor.id, "space", "tasks.read"),
+        // Handed to a team, a role, or this person by name - see
+        // `lib/access/grants.ts`. Two reads rather than one because a space and a
+        // branch of one are answered differently below: the first lists the whole
+        // space, the second only what hangs off the folder.
+        grantedSubjects(actor.id, "task.space"),
+        grantedSubjects(actor.id, "task.folder")
     ]);
+    const sharedSpaceIds = [...shared.keys()];
 
     const [full, personalGrants, teamGrants] = await Promise.all([
         prisma.taskSpace.findMany({
@@ -422,7 +445,10 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
                     { visibility: "internal", orgId: null },
                     { visibility: "internal", orgId: { in: onRoster } },
                     // Written for one space, rather than through a roster.
-                    ...(written.ids.length > 0 ? [{ id: { in: written.ids } }] : [])
+                    ...(written.ids.length > 0 ? [{ id: { in: written.ids } }] : []),
+                    // Shared with a team or a role of the organization that owns
+                    // it, which is the same thing said about a group of people.
+                    ...(sharedSpaceIds.length > 0 ? [{ id: { in: sharedSpaceIds } }] : [])
                 ]
             },
             select: { id: true }
@@ -440,7 +466,27 @@ export async function visibleScope(actor: TaskActor): Promise<TaskScope> {
         })
     ]);
 
-    const grants = [...personalGrants, ...teamGrants];
+    // A branch handed to a team or a role reads exactly as one handed to a
+    // person: the folder, the role it carries, and the space it is in.
+    const sharedBranches =
+        sharedFolders.size === 0
+            ? []
+            : (
+                  await prisma.taskFolder.findMany({
+                      where: {
+                          id: { in: [...sharedFolders.keys()] },
+                          space: { archived: false }
+                      },
+                      select: { id: true, spaceId: true }
+                  })
+              ).flatMap((folder) => {
+                  const role = sharedFolders.get(folder.id);
+                  return core.isSpaceRole(role)
+                      ? [{ folderId: folder.id, role, folder: { spaceId: folder.spaceId } }]
+                      : [];
+              });
+
+    const grants = [...personalGrants, ...teamGrants, ...sharedBranches];
     const spaceIds = full.map((space) => space.id);
     // A grant inside a space the actor already reaches in full adds nothing, and
     // listing it as partial would narrow them instead of widening them.

@@ -20,6 +20,16 @@ import { GoalsView, SprintsView } from "@/app/(app)/tasks/planning-view";
 
 // The views reach for the server actions at import time, and those drag in the
 // database and the session. Nothing here presses a button, so they are stubbed.
+// Sharing is a server action module, and a client component importing one is
+// how Next wires it - but here it is imported for real and drags the session and
+// the environment in with it. These cases are not about sharing.
+vi.mock("@/app/(app)/access-actions", () => ({
+    listGrantsAction: async () => ({ grants: [], candidates: [] }),
+    shareAction: async () => ({ grants: [] }),
+    revokeShareAction: async () => ({ grants: [] }),
+    findSharePeopleAction: async () => ({ people: [] })
+}));
+
 vi.mock("@/app/(app)/tasks/actions", () => ({}));
 
 const SPACES = [{ id: "s1", name: "Engineering" }];

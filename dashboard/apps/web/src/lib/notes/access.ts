@@ -26,6 +26,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { administeredOrgIds, memberOrgIds } from "@/lib/orgs/org-service";
+import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
 export interface NoteActor {
@@ -115,6 +116,10 @@ export async function resolveSpaceRole(actor: NoteActor, spaceId: string): Promi
         const granted = grant.role as core.SpaceRole;
         role = role ? core.strongerRole(role, granted) : granted;
     }
+    // A shelf handed to one of the organization's roles, which the team grants
+    // above have no way to say. Same ladder, same strongest-wins rule.
+    const shared = await grantedCapability(actor.id, "note.space", spaceId);
+    if (core.isSpaceRole(shared)) role = role ? core.strongerRole(role, shared) : shared;
     if (role) return role;
 
     if (space.visibility !== "internal") return null;
@@ -160,9 +165,11 @@ export async function visibleSpaceIds(actor: NoteActor): Promise<string[]> {
         const all = await prisma.noteSpace.findMany({ select: { id: true } });
         return all.map((space) => space.id);
     }
-    const [administered, onRoster] = await Promise.all([
+    const [administered, onRoster, shared] = await Promise.all([
         administeredOrgIds(actor),
-        memberOrgIds(actor.id)
+        memberOrgIds(actor.id),
+        // Handed to a team, a role, or this person by name.
+        grantedSubjects(actor.id, "note.space")
     ]);
     const spaces = await prisma.noteSpace.findMany({
         where: {
@@ -174,7 +181,8 @@ export async function visibleSpaceIds(actor: NoteActor): Promise<string[]> {
                 // An internal shelf with no organization is the instance-wide
                 // case; one with an organization is internal to that roster only.
                 { visibility: "internal", orgId: null },
-                { visibility: "internal", orgId: { in: onRoster } }
+                { visibility: "internal", orgId: { in: onRoster } },
+                ...(shared.size ? [{ id: { in: [...shared.keys()] } }] : [])
             ]
         },
         select: { id: true }

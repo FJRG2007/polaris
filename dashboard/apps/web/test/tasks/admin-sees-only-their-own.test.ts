@@ -21,7 +21,19 @@ const taskFolder = { findMany: vi.fn() };
 const taskList = { findMany: vi.fn() };
 
 vi.mock("@polaris/db", () => ({
-    prisma: { taskSpace, taskFolderMember, taskFolderTeam, taskFolder, taskList }
+    prisma: {
+        taskSpace,
+        taskFolderMember,
+        taskFolderTeam,
+        taskFolder,
+        taskList,
+        // Nothing is shared here: a grant is the last way in, and answering
+        // empty keeps each case about the narrowing it is actually pinning.
+        accessGrant: { findMany: async () => [] },
+        teamMember: { findMany: async () => [] },
+        organizationMember: { findMany: async () => [] },
+        orgRole: { findMany: async () => [] }
+    }
 }));
 vi.mock("@polaris/auth", () => ({
     canOn: vi.fn(async () => false),
@@ -29,7 +41,10 @@ vi.mock("@polaris/auth", () => ({
 }));
 vi.mock("@/lib/orgs/org-service", () => ({
     administeredOrgIds: vi.fn(async () => []),
-    memberOrgIds: vi.fn(async () => [])
+    memberOrgIds: vi.fn(async () => []),
+    // Read by the grant resolver, which is a sixth way in and answers nothing
+    // here: these cases are about what an administrator is LISTED, not shared.
+    teamIdsFor: vi.fn(async () => [])
 }));
 
 const access = await import("@/lib/tasks/access");

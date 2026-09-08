@@ -24,10 +24,13 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
+import type { GrantView } from "@/lib/access/grants";
 import { Loader2, Trash2, UserPlus } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import type { GrantCandidate } from "@/lib/access/sharing-service";
+import { listGrantsAction, revokeShareAction, shareAction } from "@/app/(app)/access-actions";
 import {
     Button,
     Dialog,
@@ -512,7 +515,176 @@ export function AccessDialog({ target, onClose }: { target: AccessTarget | null;
                             )}
                     </div>
                 )}
+
+                {!loading && scopeId ? (
+                    <RoleGrants
+                        subject={whole ? "task.space" : "task.folder"}
+                        subjectId={scopeId}
+                        canManage={canManage}
+                        whole={whole}
+                    />
+                ) : null}
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The same access, given to a role rather than to a team.
+ *
+ * A team is who somebody works with and a role is what they are trusted with,
+ * and organizations use both - "everybody who is support" is a sentence a team
+ * cannot say. It sits under the teams rather than beside them because it is the
+ * rarer of the two and answers the same question, and it draws nothing at all
+ * where there is nothing to give: a personal space has no organization behind
+ * it, and an empty section reads as something broken.
+ *
+ * The rows come from the general sharing endpoint rather than from Tasks' own
+ * actions, which is also where they are stored - see `lib/access/grants.ts`.
+ */
+function RoleGrants({
+    subject,
+    subjectId,
+    canManage,
+    whole
+}: {
+    subject: core.GrantSubject;
+    subjectId: string;
+    canManage: boolean;
+    whole: boolean;
+}) {
+    const [grants, setGrants] = useState<GrantView[]>([]);
+    const [roles, setRoles] = useState<GrantCandidate[]>([]);
+    const [pick, setPick] = useState("");
+    const [role, setRole] = useState<core.SpaceRole>("member");
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState("");
+
+    const load = useCallback(async (): Promise<void> => {
+        const answer = await listGrantsAction(subject, subjectId);
+        setGrants((answer.grants ?? []).filter((one) => one.principalType === "role"));
+        setRoles((answer.candidates ?? []).filter((one) => one.type === "role"));
+    }, [subject, subjectId]);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    const held = new Set(grants.map((grant) => grant.principalId));
+    const offered = roles.filter((one) => !held.has(one.id));
+    if (grants.length === 0 && offered.length === 0) return null;
+
+    return (
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <p className="text-xs font-medium">Roles</p>
+            {grants.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    {whole
+                        ? "No role has this space yet."
+                        : "No role has this folder on its own yet."}
+                </p>
+            ) : (
+                <ul className="flex flex-col gap-1">
+                    {grants.map((grant) => (
+                        <li
+                            key={grant.id}
+                            className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
+                        >
+                            <p
+                                className="min-w-0 flex-1 truncate text-sm"
+                                title={grant.principalName}
+                            >
+                                {grant.principalName}
+                                {grant.orgName ? (
+                                    <span className="text-muted-foreground"> - {grant.orgName}</span>
+                                ) : null}
+                            </p>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                                {core.SPACE_ROLE_LABELS[grant.capability as core.SpaceRole] ??
+                                    grant.capability}
+                            </span>
+                            {canManage ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={busy}
+                                    aria-label={`Take ${grant.principalName} off this`}
+                                    title="Take this role off"
+                                    onClick={async () => {
+                                        setBusy(true);
+                                        const answer = await revokeShareAction(
+                                            subject,
+                                            subjectId,
+                                            grant.id
+                                        );
+                                        setBusy(false);
+                                        if (answer.error) {
+                                            setError(answer.error);
+                                            return;
+                                        }
+                                        await load();
+                                    }}
+                                >
+                                    <Trash2 className="size-4 shrink-0" />
+                                </Button>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {canManage && offered.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                        aria-label="Which role"
+                        className="min-w-40 flex-1"
+                        value={pick}
+                        onValueChange={setPick}
+                        placeholder="Pick a role"
+                        options={offered.map((one) => ({
+                            value: one.id,
+                            label: one.orgName ? `${one.orgName} - ${one.name}` : one.name
+                        }))}
+                    />
+                    <Select
+                        aria-label="What that role can do here"
+                        value={role}
+                        onValueChange={(next) => setRole(next as core.SpaceRole)}
+                        options={core.SPACE_ROLES.map((one) => ({
+                            value: one,
+                            label: core.SPACE_ROLE_LABELS[one]
+                        }))}
+                    />
+                    <Button
+                        size="sm"
+                        disabled={busy || !pick}
+                        aria-disabled={busy || !pick}
+                        onClick={async () => {
+                            setBusy(true);
+                            const answer = await shareAction(subject, subjectId, {
+                                principalType: "role",
+                                principalId: pick,
+                                capability: role
+                            });
+                            setBusy(false);
+                            if (answer.error) {
+                                setError(answer.error);
+                                return;
+                            }
+                            setPick("");
+                            await load();
+                        }}
+                    >
+                        <UserPlus className="size-4 shrink-0" /> Give access
+                    </Button>
+                </div>
+            ) : null}
+
+            {error ? (
+                <p role="alert" className="text-xs text-danger">
+                    {error}
+                </p>
+            ) : null}
+        </div>
     );
 }

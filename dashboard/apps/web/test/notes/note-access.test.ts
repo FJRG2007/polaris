@@ -27,6 +27,13 @@ let note: { id: string; userId: string; spaceId: string | null; folderId: string
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // Nothing is shared with anybody in these cases: a grant is the last
+        // way in and is asked about only when every other has said no, so it
+        // answers empty and each case stays about the way in it is pinning.
+        accessGrant: { findMany: async () => [] },
+        teamMember: { findMany: async () => [] },
+        organizationMember: { findMany: async () => [] },
+        orgRole: { findMany: async () => [] },
         noteSpace: { findUnique: async () => space, findMany: async () => [] },
         note: { findUnique: async () => note },
         noteFolder: { findUnique: async () => null }

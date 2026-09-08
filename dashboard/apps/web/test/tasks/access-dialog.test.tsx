@@ -22,6 +22,16 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 const listSpaceMembersAction = vi.fn();
 const listFolderMembersAction = vi.fn();
 
+// Sharing is a server action module, and a client component importing one is
+// how Next wires it - but here it is imported for real and drags the session and
+// the environment in with it. These cases are not about sharing.
+vi.mock("@/app/(app)/access-actions", () => ({
+    listGrantsAction: async () => ({ grants: [], candidates: [] }),
+    shareAction: async () => ({ grants: [] }),
+    revokeShareAction: async () => ({ grants: [] }),
+    findSharePeopleAction: async () => ({ people: [] })
+}));
+
 vi.mock("@/app/(app)/tasks/actions", () => ({
     listSpaceMembersAction: (id: string) => listSpaceMembersAction(id),
     listFolderMembersAction: (id: string) => listFolderMembersAction(id),
