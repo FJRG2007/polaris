@@ -24,8 +24,8 @@ import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { imageItems } from "@/components/image-actions";
 import { useRef, useState, type ReactNode } from "react";
-import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import { plainText } from "@/components/rich-text/excerpt";
+import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
@@ -113,15 +113,23 @@ export function MessageMenu({
     /**
      * What the pointer was over when the menu was opened.
      *
-     * A ref rather than state: it is written in the same event that opens the
-     * menu, and the menu's contents are built after that event - so the value is
-     * already there to read, and a message row does not re-render on every press
-     * to carry it. Recorded on the press as well as on the menu, because a long
+     * Two halves, and the second one is not optional. The ref records the
+     * gesture, on the press as well as on the context-menu event, because a long
      * press on a touch screen opens this without a context-menu event ever
-     * happening.
+     * happening - and a ref costs no render on a press that opens nothing.
+     *
+     * But the menu's items are React elements, built when this row last
+     * rendered, not when the menu opens. Reading the ref straight into the
+     * markup meant the items were always one gesture behind: the first
+     * right-click on a picture recorded it and drew a menu with no picture
+     * section, and it only appeared once something else re-rendered the row -
+     * opening the picture in the viewer, which is exactly what people did, after
+     * which the menu looked right for ever and the bug looked like it had never
+     * been there. So opening the menu settles what was under the pointer into
+     * state, which is the render the items are built in.
      */
     const pointed = useRef<MessageTarget>(NOTHING);
-    const at = pointed.current;
+    const [at, setAt] = useState<MessageTarget>(NOTHING);
     const link = at.link;
     const picture = at.image;
     const clip = at.video;
@@ -167,7 +175,14 @@ export function MessageMenu({
     };
 
     return (
-        <ContextMenu>
+        <ContextMenu
+            // Radix runs the trigger's own handler before it opens, so by the
+            // time this fires the gesture has already been read. Both updates
+            // land in one render, which is the one the items are built in.
+            onOpenChange={(open) => {
+                if (open) setAt(pointed.current);
+            }}
+        >
             <ContextMenuTrigger
                 asChild
                 onPointerDown={(event) => {
