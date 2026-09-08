@@ -11,13 +11,14 @@ import { requirePermission } from "@/lib/session";
 import { NoMailboxes } from "../empty-accounts";
 import { PrivacyView } from "./privacy-view";
 import { listAccountViews } from "@/lib/mailbox/accounts";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { listTrustedSenders } from "@/lib/mailbox/reading";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailPrivacyPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id);
+    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
     if (accounts.length === 0) return <NoMailboxes what="Privacy" />;
 
     const trusted: Record<string, string[]> = {};

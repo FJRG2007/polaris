@@ -139,7 +139,7 @@ describe("one organization's own rail", () => {
 
     it("gates exactly the screens that turn a plain member away", () => {
         const gated = subapp.sections.filter((section) => section.permission).map((section) => section.label);
-        expect(gated).toEqual(["Roles", "Domains", "Activity", "Settings"]);
+        expect(gated).toEqual(["Roles", "Mailboxes", "Domains", "Activity", "Settings"]);
     });
 });
 

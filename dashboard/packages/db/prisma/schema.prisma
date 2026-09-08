@@ -4540,6 +4540,7 @@ model Organization {
     spaces   TaskSpace[]
     noteSpaces NoteSpace[]
     officeDocuments OfficeDocument[]
+    mailAccounts MailAccount[]
     telemetryProjects TelemetryProject[]
     chatSpaces ChatSpace[]
     projects Project[]
@@ -9243,6 +9244,13 @@ model TelemetryDay {
 model MailAccount {
     id           String   @id @default(uuid(7)) @db.Uuid
     userId       String   @db.Uuid
+    // The organization whose work this mailbox is part of, or null for somebody's
+    // own. It says which shelf the mailbox appears on and nothing else: an
+    // organization's mailbox is still reached by exactly one person - `userId` -
+    // and the rule in lib/mailbox/access.ts is untouched by it. Whoever runs the
+    // organization's work can see that the mailbox exists and who holds it, and
+    // can take it back; they can never read a message in it.
+    orgId        String?  @db.Uuid
     // The mailbox itself, lowercased. One person may link the same address twice
     // only by unlinking it first.
     address      String
@@ -9327,6 +9335,7 @@ model MailAccount {
     updatedAt DateTime @updatedAt
 
     user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    org         Organization?       @relation(fields: [orgId], references: [id], onDelete: Cascade)
     connection  UserConnection?     @relation(fields: [connectionId], references: [id], onDelete: SetNull)
     folders     MailFolder[]
     threads     MailThread[]
@@ -9340,6 +9349,9 @@ model MailAccount {
 
     @@unique([userId, address])
     @@index([userId, position])
+    // "every mailbox this organization has handed out", for the screen that
+    // manages them.
+    @@index([orgId])
 }
 
 // A second address the same mailbox may send from, and the signature that goes

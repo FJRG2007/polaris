@@ -11,12 +11,13 @@ import { NoMailboxes } from "../empty-accounts";
 import { listFolders } from "@/lib/mailbox/views";
 import { listLabels } from "@/lib/mailbox/labels";
 import { listAccountViews } from "@/lib/mailbox/accounts";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailRulesPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id);
+    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
     if (accounts.length === 0) return <NoMailboxes what="A filter" />;
 
     const [folders, labels] = await Promise.all([listFolders(user.id), listLabels(user.id)]);

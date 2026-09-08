@@ -25,7 +25,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailDiscovery } from "@/lib/mailbox/autoconfig";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { addAccountAction, discoverAction } from "@/app/(app)/mail/actions";
 import { addressState } from "@/app/(app)/mail/address-state";
@@ -51,6 +51,15 @@ export interface LinkedAccount {
     readonly readyForMail: boolean;
 }
 
+/** Which field a refusal was about, when it named one. Read the same way
+ *  `refusalOf` reads the sentence: the two shapes are a union at every call
+ *  site, and narrowing by hand is how one of them ends up unhandled. */
+function fieldAtFault(answer: unknown): string {
+    if (typeof answer !== "object" || answer === null) return "";
+    const named = (answer as { field?: unknown }).field;
+    return typeof named === "string" ? named : "";
+}
+
 /** How long the address settles before Polaris goes looking. Long enough that
  *  typing a domain is one lookup rather than eight. */
 const SETTLE_MS = 600;
@@ -62,6 +71,10 @@ export function ConnectMailboxDialog({
     canSetDomain,
     microsoftReady,
     taken = [],
+    title = "Add a mailbox",
+    done = "",
+    lead,
+    submit,
     onClose
 }: {
     links: readonly LinkedAccount[];
@@ -82,6 +95,28 @@ export function ConnectMailboxDialog({
     /** Whether the person looking can go and set that address themself. */
     canSetDomain: boolean;
     microsoftReady: boolean;
+    /** What the dialog is called. The other caller is an organization handing a
+     *  mailbox to somebody, which is not "adding" one. */
+    title?: string;
+    /** What the toast says instead of the default sentence. */
+    done?: string;
+    /**
+     * Anything that has to be answered before the address - who the mailbox is
+     * for, on the organization's screen.
+     *
+     * Above the address rather than below it because it changes what the rest of
+     * the form means, and a question that comes after the answer is a question
+     * people fill the form in twice for.
+     */
+    lead?: ReactNode;
+    /**
+     * Where the finished setup goes, when it is not this person's own mailbox.
+     *
+     * The form, the lookup and every sentence on it are the same either way -
+     * only the destination differs - and copying six hundred lines to change one
+     * call is how the two drift into disagreeing about what a valid address is.
+     */
+    submit?: (setup: unknown) => Promise<unknown>;
     onClose: () => void;
 }) {
     const router = useRouter();
@@ -170,7 +205,8 @@ export function ConnectMailboxDialog({
         startConnecting(async () => {
             setProblem("");
             setField("");
-            const answer = await addAccountAction({
+            const send = submit ?? addAccountAction;
+            const answer = await send({
                 address,
                 displayName,
                 label: "",
@@ -193,13 +229,13 @@ export function ConnectMailboxDialog({
             const said = refusalOf(answer);
             if (said) {
                 setProblem(said);
-                setField("field" in answer && typeof answer.field === "string" ? answer.field : "");
+                setField(fieldAtFault(answer));
                 // A refusal about the servers opens them, so the thing being
                 // complained about is on screen.
                 if (said.toLowerCase().includes("server")) setShowServers(true);
                 return;
             }
-            toast.show({ title: `${address} is connected. Its mail is on its way.` });
+            toast.show({ title: done || `${address} is connected. Its mail is on its way.` });
             router.refresh();
             onClose();
         });
@@ -215,10 +251,11 @@ export function ConnectMailboxDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Add a mailbox</DialogTitle>
+                    <DialogTitle>{title}</DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-3">
+                    {lead}
                     <label className="block">
                         <span className="mb-1 block text-[12px] text-muted-foreground">
                             Email address <span aria-hidden>*</span>

@@ -1942,6 +1942,13 @@ export function orgSubapp(slug: string): AppSubapp {
                 keywords: ["tasks", "work", "boards", "lists", "projects"]
             },
             {
+                label: "Mailboxes",
+                href: `${base}/mailboxes`,
+                icon: Mail,
+                permission: "mail.manage",
+                keywords: ["email", "addresses", "company address", "support", "hand out"]
+            },
+            {
                 label: "Domains",
                 href: `${base}/domains`,
                 icon: Globe,

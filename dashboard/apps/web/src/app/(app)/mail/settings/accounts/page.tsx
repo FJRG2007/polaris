@@ -10,6 +10,7 @@
 import { AccountsView } from "./accounts-view";
 import { requirePermission } from "@/lib/session";
 import { listAccountViews } from "@/lib/mailbox/accounts";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { mailConnectOptions } from "@/lib/mailbox/connect-options";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export default async function MailAccountsPage({
     const user = await requirePermission("mail.use");
     const params = await searchParams;
     const [accounts, options] = await Promise.all([
-        listAccountViews(user.id),
+        listAccountViews(user.id, await scopeOrgIdFor(user.id)),
         mailConnectOptions(user.id)
     ]);
 

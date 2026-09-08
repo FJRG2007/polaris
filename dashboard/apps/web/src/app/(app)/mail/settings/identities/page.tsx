@@ -11,12 +11,13 @@ import { NoMailboxes } from "../empty-accounts";
 import { IdentitiesView } from "./identities-view";
 import { listIdentities } from "@/lib/mailbox/labels";
 import { listAccountViews } from "@/lib/mailbox/accounts";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 
 export const dynamic = "force-dynamic";
 
 export default async function MailIdentitiesPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id);
+    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
     if (accounts.length === 0) return <NoMailboxes what="A send-as address" />;
 
     const identities: Record<string, Awaited<ReturnType<typeof listIdentities>>> = {};

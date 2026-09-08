@@ -87,6 +87,11 @@ export const ORG_PERMISSIONS = [
     "deploy.manage",
     "domains.manage",
     "vault.manage",
+    // Handing out the organization's mailboxes and taking them back. Reading one
+    // is not a permission and cannot be made into one: a mailbox is reached by
+    // being the person it was given to, and nothing an organization writes about
+    // its own roles changes that.
+    "mail.manage",
     // Changing what is in the organization's Drive. Reading it is not a
     // permission and deliberately never was: being on the roster is what lets
     // somebody open the company's shelf, because a permission no existing role
@@ -129,7 +134,10 @@ export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string;
         "vault.manage": { area: "Work", label: "Run the shared vault's collections and members" },
         // Reading is not here because reading is not a permission: every member
         // opens the organization's files. This is being able to change them.
-        "drive.manage": { area: "Work", label: "Add to and change the organization's files" }
+        "drive.manage": { area: "Work", label: "Add to and change the organization's files" },
+        // Giving somebody the company address or the support mailbox, and taking
+        // it back when they leave. Never reading what is in one.
+        "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" }
     };
 
 /** The areas in the order the editor draws them. Read off the meta rather than

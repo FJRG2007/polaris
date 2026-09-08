@@ -95,11 +95,14 @@ export function watchedReaders(): ReadonlySet<string> {
  */
 async function sweepFor(userId: string): Promise<void> {
     try {
-        const [{ syncAccount }, { ownedAccountIds }] = await Promise.all([
+        const [{ syncAccount }, { everyAccountId }] = await Promise.all([
             import("./sync"),
             import("./access")
         ]);
-        const ids = await ownedAccountIds(userId);
+        // Every mailbox, not one shelf: mail arriving in a company mailbox
+        // its owner is not currently looking at is exactly the mail somebody
+        // wants to be told about.
+        const ids = await everyAccountId(userId);
         // One at a time. A person with four mailboxes opening four IMAP sessions
         // at once every twenty seconds is how a provider starts refusing them,
         // and `syncAccount` already joins a pass that is running.

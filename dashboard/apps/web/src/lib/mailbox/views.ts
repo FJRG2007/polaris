@@ -166,11 +166,18 @@ export const EMPTY_QUERY: MailListQuery = {
  */
 export async function listThreads(
     userId: string,
-    query: MailListQuery
+    query: MailListQuery,
+    /** The shelf being worked from - null for their own mailboxes, an
+     *  organization's id for its work. A separate argument rather than a field
+     *  on the query, because the query is built from the address bar and the
+     *  shelf never is. */
+    shelfOrgId: string | null
 ): Promise<{ threads: MailThreadView[]; cursor: string }> {
     // A view that names a mailbox opens that one whatever its switch says; a
-    // merged view is only the mailboxes their owner put in it.
-    const accountIds = query.accountId ? [query.accountId] : await unifiedAccountIds(userId);
+    // merged view is only the mailboxes their owner put in it, on this shelf.
+    const accountIds = query.accountId
+        ? [query.accountId]
+        : await unifiedAccountIds(userId, shelfOrgId);
     if (accountIds.length === 0) return { threads: [], cursor: "" };
 
     const messageWhere: Prisma.MailMessageWhereInput = {

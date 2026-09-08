@@ -21,7 +21,7 @@
 
 import { subscribeMail } from "@/lib/mailbox/live";
 import { watchMailboxes } from "@/lib/mailbox/watch";
-import { ownedAccountIds } from "@/lib/mailbox/access";
+import { everyAccountId } from "@/lib/mailbox/access";
 import { resolveSession, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -68,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
     let moved = new Set<string>();
 
     async function resolveMine(): Promise<void> {
-        mine = new Set(await ownedAccountIds(readerId));
+        mine = new Set(await everyAccountId(readerId));
         resolvedAt = Date.now();
     }
 

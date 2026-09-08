@@ -94,8 +94,11 @@ export function accountView(row: AccountRow): MailAccountView {
     };
 }
 
-export async function listAccountViews(userId: string): Promise<MailAccountView[]> {
-    return (await ownedAccounts(userId)).map(accountView);
+export async function listAccountViews(
+    userId: string,
+    shelfOrgId: string | null
+): Promise<MailAccountView[]> {
+    return (await ownedAccounts(userId, shelfOrgId)).map(accountView);
 }
 
 /** Raised when a mailbox cannot be added for a reason the person can fix, with
@@ -123,7 +126,14 @@ export class MailSetupError extends Error {
  */
 export async function addAccount(
     userId: string,
-    setup: core.MailAccountSetup
+    setup: core.MailAccountSetup,
+    /** Whose work the mailbox is part of, and therefore which shelf it appears
+     *  on. Null is somebody's own. */
+    orgId: string | null,
+    /** Who is doing it, when that is not the person it is for - an organization
+     *  handing out the company address. Only the audit line differs: the mailbox
+     *  that comes out belongs to `userId` and to nobody else. */
+    byId: string = userId
 ): Promise<MailAccountView> {
     const existing = await prisma.mailAccount.findFirst({
         where: { userId, address: setup.address },
@@ -157,7 +167,7 @@ export async function addAccount(
     await tryServer(() => checkSmtp(candidate), "smtpHost");
 
     const last = await prisma.mailAccount.findFirst({
-        where: { userId },
+        where: { userId, orgId },
         orderBy: { position: "desc" },
         select: { position: true }
     });
@@ -165,6 +175,7 @@ export async function addAccount(
     const created = await prisma.mailAccount.create({
         data: {
             userId,
+            orgId,
             ...candidate,
             displayName: setup.displayName,
             label: setup.label,
@@ -180,14 +191,20 @@ export async function addAccount(
     });
 
     await recordAudit({
-        actorId: userId,
+        actorId: byId,
         action: "mail.account.add",
         targetType: "mail-account",
         targetId: created.id,
         // The address and how it was authorized. Never the credential, and never
         // the host, which is derivable from the address and is nobody's business
-        // in an audit log they did not ask for.
-        metadata: { address: setup.address, auth: setup.auth }
+        // in an audit log they did not ask for. `for` appears only when somebody
+        // else did this, which is the whole point of recording it.
+        metadata: {
+            address: setup.address,
+            auth: setup.auth,
+            ...(orgId ? { orgId } : {}),
+            ...(byId === userId ? {} : { for: userId })
+        }
     });
 
     // The first sync runs behind the redirect rather than in front of it: a
@@ -342,9 +359,11 @@ export async function removeAccount(userId: string, accountId: string): Promise<
  *  half-applied. */
 export async function reorderAccounts(
     userId: string,
+    shelfOrgId: string | null,
     orderedIds: readonly string[]
 ): Promise<void> {
-    const mine = new Set((await ownedAccounts(userId)).map((account) => account.id));
+    // One shelf's rail at a time, which is the only rail anybody can drag.
+    const mine = new Set((await ownedAccounts(userId, shelfOrgId)).map((account) => account.id));
     const wanted = orderedIds.filter((id) => mine.has(id));
     await prisma.$transaction(
         wanted.map((id, index) =>

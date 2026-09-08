@@ -20,6 +20,7 @@
 
 import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { apiPermission } from "@/lib/api-session";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
 import { EMPTY_QUERY, listThreads } from "@/lib/mailbox/views";
@@ -41,7 +42,13 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const { cursor, query, ...narrow } = parsed.data;
-    const page = await listThreads(user.id, { ...EMPTY_QUERY, ...narrow, query, cursor });
+    // The shelf comes from the cookie, never from the query string: the address
+    // says which list, and the switch in the header says whose.
+    const page = await listThreads(
+        user.id,
+        { ...EMPTY_QUERY, ...narrow, query, cursor },
+        await scopeOrgIdFor(user.id)
+    );
     return NextResponse.json(page, {
         headers: { "cache-control": "private, no-store" }
     });

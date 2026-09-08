@@ -28,6 +28,7 @@ import * as prefs from "@/lib/mailbox/prefs";
 import * as reading from "@/lib/mailbox/reading";
 import * as blocking from "@/lib/mailbox/blocking";
 import * as attachFrom from "@/lib/mailbox/attach-from";
+import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { syncAccount } from "@/lib/mailbox/sync";
 import { requirePermission } from "@/lib/session";
 import * as accounts from "@/lib/mailbox/accounts";
@@ -102,7 +103,14 @@ export async function addAccountAction(input: unknown) {
         };
     }
     try {
-        const account = await accounts.addAccount(userId, parsed.data);
+        // On whichever shelf they are working from: connecting a mailbox while
+        // the header says a company is connecting it for that company's work,
+        // and it appears there rather than beside their own.
+        const account = await accounts.addAccount(
+            userId,
+            parsed.data,
+            await scopeOrgIdFor(userId)
+        );
         refresh();
         return { account };
     } catch (caught) {
@@ -182,7 +190,9 @@ export async function syncAccountAction(accountId: string) {
 /** Every mailbox at once, for the refresh on the unified view. */
 export async function syncAllAction() {
     const userId = await actorId();
-    const ids = await ownedAccountIds(userId);
+    // The shelf being looked at, because this is the refresh button on a rail:
+    // it syncs what is in front of somebody, not every mailbox they have.
+    const ids = await ownedAccountIds(userId, await scopeOrgIdFor(userId));
     for (const id of ids) await syncAccount(id).catch(() => undefined);
     refresh();
     return {};
@@ -425,7 +435,9 @@ export async function undoSendAction(draftId: string) {
 /** Who to offer as somebody types a recipient. */
 export async function suggestContactsAction(query: string) {
     const userId = await actorId();
-    const accountIds = await ownedAccountIds(userId);
+    // The people this shelf writes to. A company address suggesting a personal
+    // contact is the wrong recipient offered on the wrong letterhead.
+    const accountIds = await ownedAccountIds(userId, await scopeOrgIdFor(userId));
     return { suggestions: await contacts.suggestContacts(accountIds, query) };
 }
 
