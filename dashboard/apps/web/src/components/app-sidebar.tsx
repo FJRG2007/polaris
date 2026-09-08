@@ -31,7 +31,22 @@ import { useAppUnread } from "@/components/app-unread";
 import { useOrgNav } from "@/components/use-org-nav";
 import { useInstalledNav } from "@/components/use-installed-nav";
 
-export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
+export function AppSidebar({
+    appIds = [],
+    held = [],
+    isAdmin = false
+}: {
+    appIds?: string[];
+    /**
+     * The instance permissions this account holds, out of the ones any section
+     * names. Resolved on the server and handed down, because whether somebody
+     * holds a capability is a policy evaluation rather than a column - roles,
+     * groups, policies and the account's own override all get a say - and none
+     * of that can be asked from the browser.
+     */
+    held?: string[];
+    isAdmin?: boolean;
+}) {
     const pathname = usePathname();
     const app = nav.resolveActiveApp(pathname);
     // Null everywhere except inside an organization, where it says what this
@@ -60,6 +75,13 @@ export function AppSidebar({ appIds = [] }: { appIds?: string[] }) {
           : (nav.APP_SECTIONS[app.id] ?? []);
     const items = sections.filter((section) => {
         if (section.hidden) return false;
+        // A screen this account cannot open is left out rather than drawn and
+        // then refused on the click. Being told "that page is not open to your
+        // role" after following a link the app itself offered is the worst of
+        // the three: it advertises something, spends a navigation, and says no
+        // somewhere nobody can act on it.
+        if (section.adminOnly && !isAdmin) return false;
+        if (section.needs && !isAdmin && !held.includes(section.needs)) return false;
         // Outside an organization - and inside one before the answer arrives -
         // the baseline rail is the entries that ask for nothing.
         if (!org) return !section.permission;

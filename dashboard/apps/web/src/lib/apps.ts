@@ -306,6 +306,28 @@ export interface AppSection {
      *  the organization permission this screen needs. Sections with none are open
      *  to anybody who can see the subject at all. */
     permission?: OrgPermission;
+    /**
+     * The instance permission this screen needs, where it is not the one the app
+     * itself costs.
+     *
+     * Most sections need nothing: reaching Drive is what reaches its files, its
+     * favourites and its bin. A few are a different subject that happens to live
+     * in the same rail - Snippets under Drive, half of Apps - and those were
+     * drawn for everybody and then turned people away on the click, which is the
+     * worst of the three possible behaviours: it advertises something, wastes a
+     * navigation, and says "not for you" in a place nobody can act on.
+     *
+     * A section that names one is left out of the rail entirely rather than
+     * drawn greyed. A permanent row saying there is something here you cannot
+     * have is noise on every render for the many accounts that will never have
+     * it, and it is not how the app switcher behaves either - an app nobody can
+     * open is simply not in it.
+     */
+    needs?: Permission;
+    /** The same, for a screen only an administrator may open inside an app that
+     *  is not itself admin-only - or inside one reached through its guest
+     *  subject, where the whole rail would otherwise be offered. */
+    adminOnly?: boolean;
     /** Shown as well to somebody who may end the organization without running it -
      *  the successor its owner named. Deleting is deliberately not a permission,
      *  so it cannot be expressed as one above. */
@@ -390,6 +412,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Snippets",
             href: "/drive/snippets",
+            needs: "snippets.read",
             icon: Code2,
             keywords: ["paste", "pastebin", "code", "text", "env", "secret", "gist", "share text"]
         },
@@ -485,6 +508,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Game servers",
             href: "/apps/games",
+            needs: "games.read",
             icon: Gamepad2,
             keywords: [
                 "minecraft",
@@ -502,6 +526,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Servers",
             href: "/apps/servers",
+            needs: "system.manage",
             icon: Server,
             group: MACHINES_GROUP,
             keywords: ["hosts", "machines", "ssh"]
@@ -509,6 +534,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Runners",
             href: "/apps/runners",
+            needs: "system.manage",
             icon: Workflow,
             group: MACHINES_GROUP,
             keywords: ["github actions", "ci"]
@@ -516,12 +542,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Agents",
             href: "/apps/agents",
+            needs: "agents.read",
             icon: Bot,
             keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"]
         },
         {
             label: "Code",
             href: "/apps/code",
+            needs: "agents.read",
             icon: GitPullRequest,
             keywords: [
                 "pull requests",
@@ -537,6 +565,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Firewall",
             href: "/apps/firewall",
+            needs: "deploy.manage",
             icon: ShieldCheck,
             group: OPERATIONS_GROUP,
             keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
@@ -544,6 +573,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Analytics",
             href: "/apps/analytics",
+            needs: "deploy.manage",
             icon: ChartColumn,
             group: OPERATIONS_GROUP,
             keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
@@ -551,6 +581,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Telemetry",
             href: "/apps/telemetry",
+            needs: "deploy.manage",
             icon: Bug,
             group: OPERATIONS_GROUP,
             keywords: [
@@ -594,6 +625,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Backups",
             href: "/apps/backups",
+            adminOnly: true,
             icon: Archive,
             group: OPERATIONS_GROUP,
             keywords: ["restore", "snapshots"]
@@ -768,6 +800,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Connected trackers",
             href: "/tasks/trackers",
+            needs: "tasks.manage",
             icon: Link2,
             keywords: ["linear", "jira", "import", "sync", "issues", "two-way"]
         }
@@ -1141,11 +1174,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     admin: [
-        { label: "Overview", href: "/admin", icon: LayoutDashboard },
-        { label: "Activity", href: "/admin/activity", icon: Activity, keywords: ["audit", "logs"] },
+        { label: "Overview", href: "/admin",
+            adminOnly: true, icon: LayoutDashboard },
+        { label: "Activity", href: "/admin/activity",
+            adminOnly: true, icon: Activity, keywords: ["audit", "logs"] },
         {
             label: "Users",
             href: "/admin/users",
+            adminOnly: true,
             icon: Users,
             keywords: ["accounts", "invites"],
             group: ADMIN_PEOPLE_GROUP
@@ -1153,6 +1189,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Groups",
             href: "/admin/groups",
+            adminOnly: true,
             icon: UsersRound,
             keywords: ["teams"],
             group: ADMIN_PEOPLE_GROUP
@@ -1160,6 +1197,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Organizations",
             href: "/admin/organizations",
+            adminOnly: true,
             icon: Building2,
             keywords: ["org", "orgs", "teams", "company", "limits", "turn off"],
             group: ADMIN_PEOPLE_GROUP
@@ -1167,6 +1205,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Roles",
             href: "/admin/roles",
+            adminOnly: true,
             icon: IdCard,
             keywords: [
                 "permissions",
@@ -1182,6 +1221,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Policies",
             href: "/admin/policies",
+            adminOnly: true,
             icon: Scale,
             keywords: ["permissions", "access"],
             group: ADMIN_ACCESS_GROUP
@@ -1189,6 +1229,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Security",
             href: "/admin/security",
+            adminOnly: true,
             icon: ShieldCheck,
             keywords: [
                 "2fa",
@@ -1221,6 +1262,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Email",
             href: "/admin/email",
+            adminOnly: true,
             icon: Mail,
             keywords: [
                 "smtp",
@@ -1237,6 +1279,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Chat",
             href: "/admin/chat",
+            adminOnly: true,
             icon: MessageSquare,
             keywords: [
                 "messages",
@@ -1257,6 +1300,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Safety",
             href: "/admin/safety",
+            adminOnly: true,
             icon: Flag,
             keywords: [
                 "reports",
@@ -1276,6 +1320,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Consumption",
             href: "/admin/consumption",
+            adminOnly: true,
             icon: Gauge,
             keywords: [
                 "usage",
@@ -1295,6 +1340,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Domains",
             href: "/admin/domains",
+            adminOnly: true,
             icon: Globe,
             keywords: ["dns", "tunnels", "certificates"],
             group: ADMIN_PLATFORM_GROUP
@@ -1302,6 +1348,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Display defaults",
             href: "/admin/display",
+            adminOnly: true,
             icon: SlidersHorizontal,
             keywords: ["units", "formats"],
             group: ADMIN_PLATFORM_GROUP
@@ -1309,6 +1356,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Agent defaults",
             href: "/admin/agents",
+            adminOnly: true,
             icon: Bot,
             keywords: [
                 "agents",
@@ -1324,6 +1372,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Keeping records",
             href: "/admin/retention",
+            adminOnly: true,
             icon: Trash2,
             keywords: [
                 "retention",
@@ -1346,6 +1395,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Uploads",
             href: "/admin/uploads",
+            adminOnly: true,
             icon: HardDrive,
             keywords: [
                 "attachments",
@@ -1362,6 +1412,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Integrations",
             href: "/admin/integrations",
+            adminOnly: true,
             icon: Blocks,
             keywords: ["github", "cloudflare", "connect"],
             group: ADMIN_PLATFORM_GROUP
@@ -1369,6 +1420,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "AI providers",
             href: "/admin/integrations/models",
+            adminOnly: true,
             icon: Sparkles,
             keywords: [
                 "models",
@@ -1390,6 +1442,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         {
             label: "Updates & settings",
             href: "/admin/settings",
+            adminOnly: true,
             icon: Settings,
             keywords: ["version", "upgrade"],
             group: ADMIN_PLATFORM_GROUP
@@ -1474,6 +1527,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Repositories",
                 href: "/apps/agents/repos",
+            needs: "agents.read",
                 icon: FolderGit2,
                 keywords: [
                     "repos",
@@ -1488,6 +1542,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Automations",
                 href: "/apps/agents/automations",
+            needs: "agents.read",
                 icon: Workflow,
                 keywords: [
                     "triggers",
@@ -1501,6 +1556,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Sessions",
                 href: "/apps/agents/sessions",
+            needs: "agents.read",
                 icon: MessagesSquare,
                 keywords: [
                     "live",
@@ -1516,12 +1572,14 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Runs",
                 href: "/apps/agents/runs",
+            needs: "agents.read",
                 icon: History,
                 keywords: ["history", "logs", "failed", "what happened"]
             },
             {
                 label: "Settings",
                 href: "/apps/agents/settings",
+            needs: "agents.read",
                 icon: SlidersHorizontal,
                 keywords: [
                     "defaults",
@@ -1537,6 +1595,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Set up",
                 href: "/apps/agents/setup",
+            needs: "agents.read",
                 icon: BookOpen,
                 hidden: true,
                 keywords: ["wizard", "getting started", "connect", "install"]
@@ -1559,6 +1618,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Repositories",
                 href: "/apps/runners/repos",
+            needs: "system.manage",
                 icon: FolderGit2,
                 keywords: [
                     "repos",
@@ -1573,18 +1633,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Runs",
                 href: "/apps/runners/runs",
+            needs: "system.manage",
                 icon: History,
                 keywords: ["history", "jobs", "workflow runs", "builds", "logs", "failed"]
             },
             {
                 label: "Secrets",
                 href: "/apps/runners/secrets",
+            needs: "system.manage",
                 icon: KeyRound,
                 keywords: ["variables", "env", "credentials", "tokens", "passwords"]
             },
             {
                 label: "How it works",
                 href: "/apps/runners/guide",
+            needs: "system.manage",
                 icon: BookOpen,
                 keywords: ["help", "setup", "runs-on", "getting started", "guide", "docs"]
             }

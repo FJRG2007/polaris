@@ -19,7 +19,7 @@ import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
-import { reachableAppNav } from "@/lib/app-access";
+import { heldSectionPermissions, reachableAppNav } from "@/lib/app-access";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppUrlProvider } from "@/components/app-url";
 import { CallHolder } from "@/components/call-holder";
@@ -83,6 +83,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         reportedZone,
         baseUrl,
         apps,
+        held,
         scope,
         organizations,
         presence,
@@ -96,6 +97,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         getReportedTimeZone(user.id),
         appBaseUrl(),
         reachableAppNav(accessFor(user)),
+        heldSectionPermissions(accessFor(user)),
         resolveScope(user.id),
         scopeChoices(user.id),
         presenceChoiceOf(user.id),
@@ -235,7 +237,11 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 </>
                                                             }
                                                             navButton={
-                                                                <AppNavDrawer appIds={apps.ids} />
+                                                                <AppNavDrawer
+                                                                    appIds={apps.ids}
+                                                                    held={held}
+                                                                    isAdmin={user.isAdmin}
+                                                                />
                                                             }
                                                             search={
                                                                 <CommandPalette
@@ -244,7 +250,11 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                 />
                                                             }
                                                             sidebar={
-                                                                <AppSidebar appIds={apps.ids} />
+                                                                <AppSidebar
+                                                                    appIds={apps.ids}
+                                                                    held={held}
+                                                                    isAdmin={user.isAdmin}
+                                                                />
                                                             }
                                                             account={
                                                                 <>

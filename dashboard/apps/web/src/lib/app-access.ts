@@ -14,7 +14,7 @@
  */
 
 import type { Permission } from "@polaris/core";
-import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
+import { APP_SECTIONS, POLARIS_APPS, type AppEntry } from "@/lib/apps";
 
 /** Where somebody with no app at all belongs. */
 export const ACCOUNT_HOME = "/account";
@@ -109,6 +109,27 @@ export async function reachableAppNav(input: AppAccessInput): Promise<{ ids: str
         ids: apps.map((app) => app.id),
         guestIds: apps.filter((app) => app.guest && app.href === app.guest.href).map((app) => app.id)
     };
+}
+
+/**
+ * Of the permissions the rails name, the ones this account actually holds.
+ *
+ * Resolved once per render and handed to the sidebar, which cannot ask: whether
+ * somebody holds a capability is a policy evaluation - roles, groups, policies
+ * and the account's own override each get a say - and none of that exists in the
+ * browser. Only the permissions some section names are asked about, which is a
+ * handful rather than the whole list.
+ */
+export async function heldSectionPermissions({ can }: AppAccessInput): Promise<string[]> {
+    const named = [
+        ...new Set(
+            Object.values(APP_SECTIONS)
+                .flat()
+                .flatMap((section) => (section.needs ? [section.needs] : []))
+        )
+    ];
+    const verdicts = await Promise.all(named.map(async (one) => [one, await can(one)] as const));
+    return verdicts.filter(([, allowed]) => allowed).map(([one]) => one);
 }
 
 /** The ids of the apps this person may open, for the client components that only

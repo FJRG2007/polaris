@@ -8,7 +8,17 @@ import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { APP_SECTIONS, OVERVIEW_APP_ID, resolveActiveApp, resolveSubapp } from "@/lib/apps";
 
-export function AppNavDrawer({ appIds = [] }: { appIds?: string[] }) {
+export function AppNavDrawer({
+    appIds = [],
+    held = [],
+    isAdmin = false
+}: {
+    appIds?: string[];
+    /** See `AppSidebar`: the same narrowing, so the drawer and the rail beside
+     *  it never offer different things. */
+    held?: string[];
+    isAdmin?: boolean;
+}) {
     const pathname = usePathname();
     const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
@@ -18,11 +28,16 @@ export function AppNavDrawer({ appIds = [] }: { appIds?: string[] }) {
     const hasRail =
         !subapp && app.id === OVERVIEW_APP_ID
             ? appIds.some((id) => id !== OVERVIEW_APP_ID)
-            : sections.some((section) => !section.hidden);
+            : sections.some(
+                  (section) =>
+                      !section.hidden &&
+                      (isAdmin || !section.adminOnly) &&
+                      (isAdmin || !section.needs || held.includes(section.needs))
+              );
     if (!hasRail) return null;
     return (
         <MobileNav>
-            <AppSidebar appIds={appIds} />
+            <AppSidebar appIds={appIds} held={held} isAdmin={isAdmin} />
         </MobileNav>
     );
 }
