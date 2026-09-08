@@ -61,7 +61,8 @@ function failure(
         };
     }
     if (caught instanceof MailAccessError) return { error: caught.message };
-    if (caught instanceof accounts.MailSetupError) return { error: caught.message, field: caught.field };
+    if (caught instanceof accounts.MailSetupError)
+        return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
@@ -95,7 +96,10 @@ export async function addAccountAction(input: unknown) {
     const parsed = core.mailAccountSetupSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the details.", field: String(issue?.path[0] ?? "") };
+        return {
+            error: issue?.message ?? "Check the details.",
+            field: String(issue?.path[0] ?? "")
+        };
     }
     try {
         const account = await accounts.addAccount(userId, parsed.data);
@@ -137,7 +141,10 @@ export async function setVacationAction(accountId: string, input: unknown) {
     const parsed = core.mailVacationSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the details.", field: String(issue?.path[0] ?? "") };
+        return {
+            error: issue?.message ?? "Check the details.",
+            field: String(issue?.path[0] ?? "")
+        };
     }
     try {
         const account = await accounts.setVacation(userId, accountId, parsed.data);
@@ -190,7 +197,11 @@ export async function actOnAction(input: unknown) {
     const parsed = core.mailActionSchema.safeParse(input);
     if (!parsed.success) return { error: "Nothing was selected." };
     try {
-        const done = await messages.actOnMessages(userId, parsed.data.messageIds, parsed.data.action);
+        const done = await messages.actOnMessages(
+            userId,
+            parsed.data.messageIds,
+            parsed.data.action
+        );
         refresh();
         return { done };
     } catch (caught) {
@@ -203,7 +214,11 @@ export async function moveAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: "Nothing was selected." };
     try {
-        const done = await messages.moveMessages(userId, parsed.data.messageIds, parsed.data.folderId);
+        const done = await messages.moveMessages(
+            userId,
+            parsed.data.messageIds,
+            parsed.data.folderId
+        );
         refresh();
         return { done };
     } catch (caught) {
@@ -216,7 +231,11 @@ export async function snoozeAction(input: unknown) {
     const parsed = core.mailSnoozeSchema.safeParse(input);
     if (!parsed.success) return { error: "Nothing was selected." };
     try {
-        const done = await messages.snoozeMessages(userId, parsed.data.messageIds, parsed.data.until);
+        const done = await messages.snoozeMessages(
+            userId,
+            parsed.data.messageIds,
+            parsed.data.until
+        );
         refresh();
         return { done };
     } catch (caught) {
@@ -231,11 +250,17 @@ export async function openMessageAction(messageId: string) {
         const body = await messages.loadBody(userId, messageId);
         const message = await messages.messageForReading(userId, messageId);
         if (!message) return { error: "That message is no longer here." };
-        const readable = await reading.readableMessage(message.accountId, messageId, userId, message.policy, {
-            ...message.row,
-            bodyHtml: body.html || message.row.bodyHtml,
-            bodyText: body.text || message.row.bodyText
-        });
+        const readable = await reading.readableMessage(
+            message.accountId,
+            messageId,
+            userId,
+            message.policy,
+            {
+                ...message.row,
+                bodyHtml: body.html || message.row.bodyHtml,
+                bodyText: body.text || message.row.bodyText
+            }
+        );
         return { readable, envelope: message.envelope };
     } catch (caught) {
         return failure(caught, "That message could not be opened.");
@@ -371,7 +396,10 @@ export async function sendAction(input: unknown) {
     const parsed = core.mailComposeSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the message.", field: String(issue?.path[0] ?? "") };
+        return {
+            error: issue?.message ?? "Check the message.",
+            field: String(issue?.path[0] ?? "")
+        };
     }
     try {
         const queued = await compose.queueSend(userId, composeInput(parsed.data));
@@ -456,12 +484,19 @@ export async function applyLabelAction(input: unknown) {
     }
 }
 
-export async function saveIdentityAction(accountId: string, identityId: string | null, input: unknown) {
+export async function saveIdentityAction(
+    accountId: string,
+    identityId: string | null,
+    input: unknown
+) {
     const userId = await actorId();
     const parsed = core.mailIdentitySchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: issue?.message ?? "Check the details.", field: String(issue?.path[0] ?? "") };
+        return {
+            error: issue?.message ?? "Check the details.",
+            field: String(issue?.path[0] ?? "")
+        };
     }
     try {
         const id = await labels.saveIdentity(userId, accountId, identityId, parsed.data);
@@ -558,7 +593,11 @@ export async function attachFromDriveAction(input: unknown) {
     const parsed = core.mailAttachFromDriveSchema.safeParse(input);
     if (!parsed.success) return { error: "That file could not be attached." };
     try {
-        const upload = await attachFrom.attachFromDrive(userId, parsed.data.connectionId, parsed.data.path);
+        const upload = await attachFrom.attachFromDrive(
+            userId,
+            parsed.data.connectionId,
+            parsed.data.path
+        );
         return { upload };
     } catch (caught) {
         if (caught instanceof attachFrom.AttachRefused) return { error: caught.message };
@@ -636,7 +675,11 @@ export async function moveToFolderAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: "Nothing was moved." };
     try {
-        const done = await messages.moveMessages(userId, parsed.data.messageIds, parsed.data.folderId);
+        const done = await messages.moveMessages(
+            userId,
+            parsed.data.messageIds,
+            parsed.data.folderId
+        );
         refresh();
         return { done };
     } catch (caught) {

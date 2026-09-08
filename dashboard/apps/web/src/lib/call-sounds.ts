@@ -208,7 +208,9 @@ let context: AudioContext | null = null;
 /** The one audio context, made the first time something is played. */
 function audio(): AudioContext | null {
     if (typeof window === "undefined") return null;
-    const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctor =
+        window.AudioContext ??
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     context ??= new Ctor();
     // Suspended is the ordinary state for a context made before the reader

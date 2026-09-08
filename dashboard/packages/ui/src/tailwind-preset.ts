@@ -25,13 +25,22 @@ const preset: Omit<Config, "content"> = {
                 elevated: withAlpha("elevated"),
                 // Text, brightest to faintest. `muted.foreground` is the second
                 // step and `foreground.subtle` the third.
-                foreground: { DEFAULT: withAlpha("foreground"), subtle: withAlpha("subtle-foreground") },
+                foreground: {
+                    DEFAULT: withAlpha("foreground"),
+                    subtle: withAlpha("subtle-foreground")
+                },
                 muted: { DEFAULT: withAlpha("muted"), foreground: withAlpha("muted-foreground") },
                 field: withAlpha("field"),
                 border: { DEFAULT: withAlpha("border"), strong: withAlpha("border-strong") },
                 ring: withAlpha("ring"),
-                primary: { DEFAULT: withAlpha("primary"), foreground: withAlpha("primary-foreground") },
-                accent: { DEFAULT: withAlpha("accent"), foreground: withAlpha("accent-foreground") },
+                primary: {
+                    DEFAULT: withAlpha("primary"),
+                    foreground: withAlpha("primary-foreground")
+                },
+                accent: {
+                    DEFAULT: withAlpha("accent"),
+                    foreground: withAlpha("accent-foreground")
+                },
                 success: withAlpha("success"),
                 warning: {
                     DEFAULT: withAlpha("warning"),

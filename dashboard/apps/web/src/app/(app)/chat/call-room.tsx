@@ -188,8 +188,7 @@ export function CallRoom({
     const mine = admitted?.find((person) => person.id === call.participantId);
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
     const recordedBy =
-        call.meeting?.participants.find((person) => person.id === recording[0])?.name ??
-        "Somebody";
+        call.meeting?.participants.find((person) => person.id === recording[0])?.name ?? "Somebody";
 
     /**
      * What somebody else's tile says and offers about sharing a room with them.
@@ -770,10 +769,10 @@ export function CallRoom({
                     <DialogHeader>
                         <DialogTitle>Record this call?</DialogTitle>
                         <DialogDescription>
-                            The recording is made in this browser, from what it can see and hear, and
-                            it stops if you leave the call or close the tab. Everybody in the call is
-                            told while it runs. When you stop, you choose whether it goes into the
-                            conversation or stays on this machine.
+                            The recording is made in this browser, from what it can see and hear,
+                            and it stops if you leave the call or close the tab. Everybody in the
+                            call is told while it runs. When you stop, you choose whether it goes
+                            into the conversation or stays on this machine.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -792,7 +791,6 @@ export function CallRoom({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
         </div>
     );
 }
@@ -1283,11 +1281,7 @@ function Tile({
                 // hand loudly enough on its own. Otherwise a raised hand takes
                 // it: across a grid of eight faces the ring is what the eye
                 // actually finds.
-                speaking
-                    ? "ring-2 ring-success"
-                    : hand
-                      ? "ring-2 ring-warning"
-                      : "ring-border",
+                speaking ? "ring-2 ring-success" : hand ? "ring-2 ring-warning" : "ring-border",
                 zoomable && look.zoomed && "cursor-grab active:cursor-grabbing"
             )}
         >

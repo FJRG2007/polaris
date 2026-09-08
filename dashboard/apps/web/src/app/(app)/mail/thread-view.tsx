@@ -227,7 +227,9 @@ export function ThreadView({
     if (!newest) {
         return (
             <div className="flex flex-1 items-center justify-center p-8">
-                <p className="text-[13px] text-foreground-subtle">This conversation is no longer here.</p>
+                <p className="text-[13px] text-foreground-subtle">
+                    This conversation is no longer here.
+                </p>
             </div>
         );
     }
@@ -313,7 +315,13 @@ export function ThreadView({
                         disabled={busy}
                         onClick={() => act(thread.starred ? "unstar" : "star")}
                     >
-                        <Star className={cn("size-4 shrink-0", thread.starred && "fill-current text-warning")} aria-hidden />
+                        <Star
+                            className={cn(
+                                "size-4 shrink-0",
+                                thread.starred && "fill-current text-warning"
+                            )}
+                            aria-hidden
+                        />
                     </Button>
                     <Button
                         variant="ghost"
@@ -362,7 +370,8 @@ export function ThreadView({
                                     onClick={() => setExpandAll(true)}
                                 >
                                     <MoreHorizontal className="size-3.5 shrink-0" aria-hidden />
-                                    {entry.count} earlier {entry.count === 1 ? "message" : "messages"}
+                                    {entry.count} earlier{" "}
+                                    {entry.count === 1 ? "message" : "messages"}
                                 </button>
                             </li>
                         ) : (
@@ -384,12 +393,20 @@ export function ThreadView({
                 </ul>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="secondary" disabled={answering} onClick={() => answer("reply")}>
+                    <Button
+                        variant="secondary"
+                        disabled={answering}
+                        onClick={() => answer("reply")}
+                    >
                         <CornerUpLeft className="size-4 shrink-0" aria-hidden />
                         Reply
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
-                        <Button variant="secondary" disabled={answering} onClick={() => answer("reply-all")}>
+                        <Button
+                            variant="secondary"
+                            disabled={answering}
+                            onClick={() => answer("reply-all")}
+                        >
                             <CornerUpRight className="size-4 shrink-0" aria-hidden />
                             Reply to all
                         </Button>
@@ -419,7 +436,12 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Label this conversation" title="Label this conversation">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Label this conversation"
+                    title="Label this conversation"
+                >
                     <Tag className="size-4 shrink-0" aria-hidden />
                 </Button>
             </DropdownMenuTrigger>
@@ -449,7 +471,11 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
                                 })()
                             }
                         >
-                            <Tag className="size-3.5 shrink-0" style={{ color: label.color }} aria-hidden />
+                            <Tag
+                                className="size-3.5 shrink-0"
+                                style={{ color: label.color }}
+                                aria-hidden
+                            />
                             {label.name}
                         </DropdownMenuItem>
                     ))
@@ -562,7 +588,9 @@ function MessageCard({
                             </span>
                         </div>
                         <p className="mt-0.5 truncate text-[12px] text-foreground-subtle">
-                            to {message.to.map((entry) => core.addressLabel(entry)).join(", ") || "nobody"}
+                            to{" "}
+                            {message.to.map((entry) => core.addressLabel(entry)).join(", ") ||
+                                "nobody"}
                             {message.cc.length > 0
                                 ? `, copy to ${message.cc.map((entry) => core.addressLabel(entry)).join(", ")}`
                                 : ""}
@@ -573,7 +601,9 @@ function MessageCard({
                         <span
                             className={cn(
                                 "w-40 shrink-0 truncate text-[13px]",
-                                message.seen ? "text-muted-foreground" : "font-semibold text-foreground"
+                                message.seen
+                                    ? "text-muted-foreground"
+                                    : "font-semibold text-foreground"
                             )}
                         >
                             {sender ? core.addressLabel(sender) : "(nobody)"}
@@ -584,7 +614,9 @@ function MessageCard({
                     </>
                 )}
                 <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
-                    {open ? format.dateTime(new Date(message.sentAt)) : shortWhen(message.sentAt, format)}
+                    {open
+                        ? format.dateTime(new Date(message.sentAt))
+                        : shortWhen(message.sentAt, format)}
                 </span>
                 <ChevronDown
                     className={cn("size-4 shrink-0 text-foreground-subtle", open && "rotate-180")}
@@ -601,7 +633,8 @@ function MessageCard({
                             {readable.wantsReceipt ? (
                                 <p className="mb-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
                                     <UserRoundX className="size-3.5 shrink-0" aria-hidden />
-                                    The sender asked to be told when this was opened. Polaris did not tell them.
+                                    The sender asked to be told when this was opened. Polaris did
+                                    not tell them.
                                 </p>
                             ) : null}
                             <MessageBody
@@ -638,8 +671,14 @@ function MessageCard({
                                                             })
                                                         }
                                                     >
-                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                        <Paperclip
+                                                            className="size-3.5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                        <span
+                                                            className="max-w-[16rem] truncate"
+                                                            title={file.name}
+                                                        >
                                                             {file.name}
                                                         </span>
                                                         <span className="shrink-0 text-foreground-subtle">
@@ -648,8 +687,14 @@ function MessageCard({
                                                     </button>
                                                 ) : (
                                                     <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
-                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                        <Paperclip
+                                                            className="size-3.5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                        <span
+                                                            className="max-w-[16rem] truncate"
+                                                            title={file.name}
+                                                        >
                                                             {file.name}
                                                         </span>
                                                         <span className="shrink-0 text-foreground-subtle">
@@ -664,7 +709,10 @@ function MessageCard({
                                                     title={`Save ${file.name}`}
                                                     download
                                                 >
-                                                    <Download className="size-3.5 shrink-0" aria-hidden />
+                                                    <Download
+                                                        className="size-3.5 shrink-0"
+                                                        aria-hidden
+                                                    />
                                                 </a>
                                             </li>
                                         ))}
@@ -685,7 +733,10 @@ function MessageCard({
                             ) : null}
                         </>
                     ) : (
-                        <div className="h-24 animate-pulse rounded-md bg-surface" aria-label="Opening the message" />
+                        <div
+                            className="h-24 animate-pulse rounded-md bg-surface"
+                            aria-label="Opening the message"
+                        />
                     )}
                 </div>
             ) : null}
@@ -710,7 +761,9 @@ function MessageCard({
  *  otherwise. Short, because it sits at the end of a one-line row. */
 function shortWhen(iso: string, format: ReturnType<typeof useDisplayFormat>): string {
     const when = new Date(iso);
-    return when.toDateString() === new Date().toDateString() ? format.time(when) : format.date(when);
+    return when.toDateString() === new Date().toDateString()
+        ? format.time(when)
+        : format.date(when);
 }
 
 /** A file size somebody can read. Not a locale format: the units are the same

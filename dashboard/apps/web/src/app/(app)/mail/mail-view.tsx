@@ -166,7 +166,8 @@ export function MailView({
     fixedFilter: core.MailFilter | "";
 }) {
     const router = useRouter();
-    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } = useMail();
+    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } =
+        useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -424,7 +425,9 @@ export function MailView({
     /** The conversations an action was aimed at, from the messages it named. */
     const threadsOf = useCallback(
         (messageIds: readonly string[]) =>
-            threads.filter((thread) => messageIds.includes(thread.leadMessageId)).map((thread) => thread.id),
+            threads
+                .filter((thread) => messageIds.includes(thread.leadMessageId))
+                .map((thread) => thread.id),
         [threads]
     );
 
@@ -552,57 +555,62 @@ export function MailView({
      * from the recipient box opened whichever conversation the list's cursor
      * happened to be on, in the middle of somebody typing an address.
      */
-    useMailKeys(composing ? {} : {
-        compose: () => openComposer({}),
-        next: () => setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
-        previous: () => setOnIndex((held) => Math.max(0, held - 1)),
-        open: () => {
-            if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
-        },
-        back: () => {
-            if (openThread) router.push(window.location.pathname, { scroll: false });
-        },
-        archive: () => {
-            if (context.canArchive) act("archive", rowMessageIds, "Archived.");
-        },
-        trash: () =>
-            act(
-                context.permanentDelete ? "delete" : "trash",
-                rowMessageIds,
-                context.permanentDelete ? "Deleted." : "Moved to the trash."
-            ),
-        junk: () => act("junk", rowMessageIds, "Moved to spam."),
-        star: () => {
-            if (!onRow) return;
-            act(
-                onRow.starred ? "unstar" : "star",
-                rowMessageIds,
-                onRow.starred ? "Unstarred." : "Starred."
-            );
-        },
-        markUnread: () => act("unread", rowMessageIds, "Marked as unread."),
-        search: () => {
-            const box = document.querySelector<HTMLInputElement>(SEARCH_BOX);
-            box?.focus();
-        },
-        refresh: () =>
-            startBusy(async () => {
-                await syncAllAction();
-                refresh();
-            }),
-        selectAll: () => {
-            setSelected(threads.map((thread) => thread.id));
-            setAnchor(threads[0]?.id ?? "");
-        },
-        // Answers whether it had anything to let go of, so Escape falls through
-        // to closing the conversation when nothing is picked.
-        clearSelection: () => {
-            if (selected.length === 0) return false;
-            setSelected([]);
-            setAnchor("");
-            return true;
-        }
-    });
+    useMailKeys(
+        composing
+            ? {}
+            : {
+                  compose: () => openComposer({}),
+                  next: () =>
+                      setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
+                  previous: () => setOnIndex((held) => Math.max(0, held - 1)),
+                  open: () => {
+                      if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
+                  },
+                  back: () => {
+                      if (openThread) router.push(window.location.pathname, { scroll: false });
+                  },
+                  archive: () => {
+                      if (context.canArchive) act("archive", rowMessageIds, "Archived.");
+                  },
+                  trash: () =>
+                      act(
+                          context.permanentDelete ? "delete" : "trash",
+                          rowMessageIds,
+                          context.permanentDelete ? "Deleted." : "Moved to the trash."
+                      ),
+                  junk: () => act("junk", rowMessageIds, "Moved to spam."),
+                  star: () => {
+                      if (!onRow) return;
+                      act(
+                          onRow.starred ? "unstar" : "star",
+                          rowMessageIds,
+                          onRow.starred ? "Unstarred." : "Starred."
+                      );
+                  },
+                  markUnread: () => act("unread", rowMessageIds, "Marked as unread."),
+                  search: () => {
+                      const box = document.querySelector<HTMLInputElement>(SEARCH_BOX);
+                      box?.focus();
+                  },
+                  refresh: () =>
+                      startBusy(async () => {
+                          await syncAllAction();
+                          refresh();
+                      }),
+                  selectAll: () => {
+                      setSelected(threads.map((thread) => thread.id));
+                      setAnchor(threads[0]?.id ?? "");
+                  },
+                  // Answers whether it had anything to let go of, so Escape falls through
+                  // to closing the conversation when nothing is picked.
+                  clearSelection: () => {
+                      if (selected.length === 0) return false;
+                      setSelected([]);
+                      setAnchor("");
+                      return true;
+                  }
+              }
+    );
 
     // `?` is bound here rather than in the hook: it is about this screen's own
     // help sheet, and a hook that owned it would have to know the sheet exists.
@@ -679,11 +687,17 @@ export function MailView({
             if (!run || !anchor) {
                 setAnchor(threadId);
                 setSelected((held) =>
-                    wanted ? [...new Set([...held, threadId])] : held.filter((id) => id !== threadId)
+                    wanted
+                        ? [...new Set([...held, threadId])]
+                        : held.filter((id) => id !== threadId)
                 );
                 return;
             }
-            const between = runBetween(threads.map((thread) => thread.id), anchor, threadId);
+            const between = runBetween(
+                threads.map((thread) => thread.id),
+                anchor,
+                threadId
+            );
             setSelected((held) => [...new Set([...held, ...between])]);
         },
         [anchor, threads]
@@ -734,13 +748,10 @@ export function MailView({
      * message somebody will ever get from an address rather than on the one in
      * front of them - and because what it does is throw mail away.
      */
-    const block = useCallback(
-        (accountId: string, address: string) => {
-            if (!address) return;
-            setBlocking({ accountId, address });
-        },
-        []
-    );
+    const block = useCallback((accountId: string, address: string) => {
+        if (!address) return;
+        setBlocking({ accountId, address });
+    }, []);
 
     /**
      * What a drag is carrying.
@@ -753,7 +764,8 @@ export function MailView({
      */
     const dragging = useCallback(
         (thread: MailThreadView): string[] => {
-            if (selected.includes(thread.id) && selectedMessageIds.length > 0) return selectedMessageIds;
+            if (selected.includes(thread.id) && selectedMessageIds.length > 0)
+                return selectedMessageIds;
             return [thread.leadMessageId].filter(Boolean);
         },
         [selected, selectedMessageIds]
@@ -801,9 +813,13 @@ export function MailView({
                     <div className="flex items-center gap-2">
                         <Checkbox
                             checked={allPicked}
-                            aria-label={allPicked ? "Clear the selection" : "Select everything shown"}
+                            aria-label={
+                                allPicked ? "Clear the selection" : "Select everything shown"
+                            }
                             onChange={(event) =>
-                                setSelected(event.target.checked ? threads.map((thread) => thread.id) : [])
+                                setSelected(
+                                    event.target.checked ? threads.map((thread) => thread.id) : []
+                                )
                             }
                         />
                         {selected.length === 0 ? (
@@ -846,7 +862,10 @@ export function MailView({
                                         })
                                     }
                                 >
-                                    <RefreshCw className={cn("size-4 shrink-0", busy && "animate-spin")} aria-hidden />
+                                    <RefreshCw
+                                        className={cn("size-4 shrink-0", busy && "animate-spin")}
+                                        aria-hidden
+                                    />
                                 </Button>
                             </>
                         ) : (
@@ -861,7 +880,9 @@ export function MailView({
                                         aria-label="Archive"
                                         title="Archive"
                                         disabled={busy}
-                                        onClick={() => act("archive", selectedMessageIds, "Archived.")}
+                                        onClick={() =>
+                                            act("archive", selectedMessageIds, "Archived.")
+                                        }
                                     >
                                         <Archive className="size-4 shrink-0" aria-hidden />
                                     </Button>
@@ -872,7 +893,9 @@ export function MailView({
                                     aria-label="Mark as read"
                                     title="Mark as read"
                                     disabled={busy}
-                                    onClick={() => act("read", selectedMessageIds, "Marked as read.")}
+                                    onClick={() =>
+                                        act("read", selectedMessageIds, "Marked as read.")
+                                    }
                                 >
                                     <MailOpen className="size-4 shrink-0" aria-hidden />
                                 </Button>
@@ -882,7 +905,9 @@ export function MailView({
                                     aria-label="Mark as unread"
                                     title="Mark as unread"
                                     disabled={busy}
-                                    onClick={() => act("unread", selectedMessageIds, "Marked as unread.")}
+                                    onClick={() =>
+                                        act("unread", selectedMessageIds, "Marked as unread.")
+                                    }
                                 >
                                     <Mail className="size-4 shrink-0" aria-hidden />
                                 </Button>
@@ -902,21 +927,33 @@ export function MailView({
                                     aria-label="Report as spam"
                                     title="Report as spam"
                                     disabled={busy}
-                                    onClick={() => act("junk", selectedMessageIds, "Moved to spam.")}
+                                    onClick={() =>
+                                        act("junk", selectedMessageIds, "Moved to spam.")
+                                    }
                                 >
                                     <Bug className="size-4 shrink-0" aria-hidden />
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label={context.permanentDelete ? "Delete for ever" : "Move to trash"}
-                                    title={context.permanentDelete ? "Delete for ever" : "Move to trash"}
+                                    aria-label={
+                                        context.permanentDelete
+                                            ? "Delete for ever"
+                                            : "Move to trash"
+                                    }
+                                    title={
+                                        context.permanentDelete
+                                            ? "Delete for ever"
+                                            : "Move to trash"
+                                    }
                                     disabled={busy}
                                     onClick={() =>
                                         act(
                                             context.permanentDelete ? "delete" : "trash",
                                             selectedMessageIds,
-                                            context.permanentDelete ? "Deleted." : "Moved to the trash."
+                                            context.permanentDelete
+                                                ? "Deleted."
+                                                : "Moved to the trash."
                                         )
                                     }
                                 >
@@ -943,47 +980,49 @@ export function MailView({
                             {threads
                                 .filter((thread) => !patched[thread.id]?.gone)
                                 .map((thread) => (
-                                <ThreadContextMenu
-                                    key={thread.id}
-                                    thread={shown(thread)}
-                                    canArchive={context.canArchive}
-                                    permanentDelete={context.permanentDelete}
-                                    onAct={act}
-                                    onSnooze={snooze}
-                                    onLabel={label}
-                                    onAnswer={answer}
-                                    onBlock={block}
-                                >
-                                    <ThreadRow
+                                    <ThreadContextMenu
+                                        key={thread.id}
                                         thread={shown(thread)}
-                                        onCursor={onRow?.id === thread.id}
-                                        onPeek={() => warm(thread.leadMessageId)}
-                                        open={openThread?.id === thread.id}
-                                        picked={selected.includes(thread.id)}
-                                        color={accountColor(thread.accountId)}
-                                        showColor={accounts.length > 1}
-                                        wide={layout === "full" && !openThread}
-                                        mine={mine}
-                                        sort={sort}
-                                        onPick={(next, run) => pick(thread.id, next, run)}
-                                        dragging={() => dragging(thread)}
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
-                                        onAct={(action, announce) =>
-                                            act(action, [thread.leadMessageId], announce)
-                                        }
-                                        onSnooze={() =>
-                                            snooze([thread.leadMessageId], tomorrowMorning())
-                                        }
-                                        onStar={() =>
-                                            act(
-                                                shown(thread).starred ? "unstar" : "star",
-                                                [thread.leadMessageId],
-                                                shown(thread).starred ? "Unstarred." : "Starred."
-                                            )
-                                        }
-                                    />
-                                </ThreadContextMenu>
+                                        onAct={act}
+                                        onSnooze={snooze}
+                                        onLabel={label}
+                                        onAnswer={answer}
+                                        onBlock={block}
+                                    >
+                                        <ThreadRow
+                                            thread={shown(thread)}
+                                            onCursor={onRow?.id === thread.id}
+                                            onPeek={() => warm(thread.leadMessageId)}
+                                            open={openThread?.id === thread.id}
+                                            picked={selected.includes(thread.id)}
+                                            color={accountColor(thread.accountId)}
+                                            showColor={accounts.length > 1}
+                                            wide={layout === "full" && !openThread}
+                                            mine={mine}
+                                            sort={sort}
+                                            onPick={(next, run) => pick(thread.id, next, run)}
+                                            dragging={() => dragging(thread)}
+                                            canArchive={context.canArchive}
+                                            permanentDelete={context.permanentDelete}
+                                            onAct={(action, announce) =>
+                                                act(action, [thread.leadMessageId], announce)
+                                            }
+                                            onSnooze={() =>
+                                                snooze([thread.leadMessageId], tomorrowMorning())
+                                            }
+                                            onStar={() =>
+                                                act(
+                                                    shown(thread).starred ? "unstar" : "star",
+                                                    [thread.leadMessageId],
+                                                    shown(thread).starred
+                                                        ? "Unstarred."
+                                                        : "Starred."
+                                                )
+                                            }
+                                        />
+                                    </ThreadContextMenu>
                                 ))}
                         </ul>
                     )}
@@ -1059,7 +1098,9 @@ export function MailView({
                     />
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
-                        <p className="text-[13px] text-foreground-subtle">Pick a conversation to read it.</p>
+                        <p className="text-[13px] text-foreground-subtle">
+                            Pick a conversation to read it.
+                        </p>
                     </div>
                 )}
             </section>
@@ -1110,7 +1151,6 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
         </div>
     );
 }
-
 
 /**
  * The tabs above the inbox.
@@ -1180,7 +1220,9 @@ function ListFilters({
     function settled(option: core.MailFilter): boolean {
         if (!fixed) return false;
         if (option === fixed) return true;
-        return (fixed === "unread" && option === "read") || (fixed === "read" && option === "unread");
+        return (
+            (fixed === "unread" && option === "read") || (fixed === "read" && option === "unread")
+        );
     }
 
     const offered = core.MAIL_FILTERS.filter((option) => !settled(option));
@@ -1193,7 +1235,9 @@ function ListFilters({
                     variant="ghost"
                     size="icon"
                     aria-pressed={filter === "unread"}
-                    aria-label={filter === "unread" ? "Show everything" : "Show only what is unread"}
+                    aria-label={
+                        filter === "unread" ? "Show everything" : "Show only what is unread"
+                    }
                     title={filter === "unread" ? "Show everything" : "Show only what is unread"}
                     className={cn(filter === "unread" && "bg-muted text-foreground")}
                     onClick={() => go({ filter: filter === "unread" ? "" : "unread" })}
@@ -1217,7 +1261,11 @@ function ListFilters({
                     {offered.length > 0 ? (
                         <>
                             <DropdownMenuLabel>Show</DropdownMenuLabel>
-                            <Choice label="Everything" chosen={!filter} onChoose={() => go({ filter: "" })} />
+                            <Choice
+                                label="Everything"
+                                chosen={!filter}
+                                onChoose={() => go({ filter: "" })}
+                            />
                             {offered.map((option) => (
                                 <Choice
                                     key={option}
@@ -1246,10 +1294,21 @@ function ListFilters({
 
 /** One option in that menu. A tick rather than a radio, because the menu closes
  *  on the choice and what it is showing is where the ticks are. */
-function Choice({ label, chosen, onChoose }: { label: string; chosen: boolean; onChoose: () => void }) {
+function Choice({
+    label,
+    chosen,
+    onChoose
+}: {
+    label: string;
+    chosen: boolean;
+    onChoose: () => void;
+}) {
     return (
         <DropdownMenuItem onSelect={onChoose}>
-            <Check className={cn("size-3.5 shrink-0", chosen ? "opacity-100" : "opacity-0")} aria-hidden />
+            <Check
+                className={cn("size-3.5 shrink-0", chosen ? "opacity-100" : "opacity-0")}
+                aria-hidden
+            />
             {label}
         </DropdownMenuItem>
     );
@@ -1273,7 +1332,11 @@ function CategoryTabs({ current }: { current: string }) {
     }
 
     return (
-        <ScrollRow className="-mb-2 flex items-center gap-1" role="tablist" aria-label="Sort the inbox">
+        <ScrollRow
+            className="-mb-2 flex items-center gap-1"
+            role="tablist"
+            aria-label="Sort the inbox"
+        >
             <TabButton label="All" active={!current} onClick={() => go("")} />
             {core.MAIL_CATEGORIES.map((one) => (
                 <TabButton
@@ -1544,7 +1607,10 @@ function ThreadRow({
                     onClick={onStar}
                 >
                     <Star
-                        className={cn("size-4 shrink-0", thread.starred && "fill-current text-warning")}
+                        className={cn(
+                            "size-4 shrink-0",
+                            thread.starred && "fill-current text-warning"
+                        )}
                         aria-hidden
                     />
                 </button>
@@ -1613,7 +1679,10 @@ function ThreadRow({
                                 <span
                                     key={label.id}
                                     className="rounded px-1 text-[10px] font-medium"
-                                    style={{ backgroundColor: `${label.color}22`, color: label.color }}
+                                    style={{
+                                        backgroundColor: `${label.color}22`,
+                                        color: label.color
+                                    }}
                                 >
                                     {label.name}
                                 </span>
@@ -1655,7 +1724,11 @@ function ThreadRow({
                                 )
                             }
                         />
-                        <RowAction icon={Clock} label="Snooze until tomorrow morning" onClick={onSnooze} />
+                        <RowAction
+                            icon={Clock}
+                            label="Snooze until tomorrow morning"
+                            onClick={onSnooze}
+                        />
                         <RowAction
                             icon={Trash2}
                             danger
@@ -1734,7 +1807,10 @@ function RowAction({
 
 /** Whose face a row wears: the first participant who is not the reader, so an
  *  inbox shows the sender and Sent shows who it went to. */
-function faceOf(thread: MailThreadView, mine: ReadonlySet<string>): { name: string; address: string } {
+function faceOf(
+    thread: MailThreadView,
+    mine: ReadonlySet<string>
+): { name: string; address: string } {
     const other = thread.participants.find((one) => !mine.has(one.address.trim().toLowerCase()));
     const chosen = other ?? thread.participants[0];
     return { name: chosen?.name ?? "", address: chosen?.address ?? "" };
@@ -1754,7 +1830,9 @@ function people(thread: MailThreadView, mine: ReadonlySet<string>): string {
         (entry) => !mine.has(entry.address.trim().toLowerCase())
     );
     const shown = others.length > 0 ? others : thread.participants;
-    const names = shown.map((entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address);
+    const names = shown.map(
+        (entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address
+    );
     if (names.length === 0) return "(nobody)";
     if (names.length <= 3) return names.join(", ");
     return `${names.slice(0, 2).join(", ")} and ${names.length - 2} others`;

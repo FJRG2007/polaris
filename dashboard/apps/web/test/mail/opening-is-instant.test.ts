@@ -30,7 +30,9 @@ describe("fetching a body before it is asked for", () => {
         // Nothing comes back on purpose: the body lands on the row it belongs to
         // and the open that follows finds it there. Returning it would be sending
         // a megabyte to a screen that has not asked for it.
-        expect(actions).toContain("export async function warmMessageAction(messageId: string): Promise<void>");
+        expect(actions).toContain(
+            "export async function warmMessageAction(messageId: string): Promise<void>"
+        );
         expect(actions).toContain("await messages.loadBody(userId, messageId);");
     });
 
