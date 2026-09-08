@@ -5,12 +5,16 @@
  * arranging and every piece of escaping is pure and lives in "@polaris/core";
  * this is the half that knows what each editor keeps and how to pack a zip.
  *
- * **The Office formats are written by hand.** A ".docx", an ".xlsx" and a
- * ".pptx" are each a zip of XML with a fixed set of parts, and writing the
- * minimum that every reader accepts is a few hundred lines - against two
- * dependencies of a few megabytes each, carrying features nothing here uses. The
- * parts below are the ones the format requires and no more, which is also why
- * they are readable: there is nothing in them that is not needed.
+ * **Word and PowerPoint go through the real engines.** `@polaris/docx` and
+ * `@polaris/pptx` are ported from GenOffice (Apache-2.0, see NOTICE) and are the
+ * OOXML packages proper - styles, numbering, sections, layouts, the parts a
+ * reader other than Word will look for. This file used to write those two by
+ * hand: a zip with the minimum set of parts, which opened, and which was a
+ * document with no styles in it.
+ *
+ * The spreadsheet still goes through the library the Drive viewer already
+ * carries, so there is one spreadsheet writer in this repository rather than
+ * two.
  *
  * What is deliberately NOT here:
  *
@@ -24,11 +28,11 @@
  */
 
 import * as Y from "yjs";
-import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import * as deck from "./deck";
 import * as core from "@polaris/core";
 import { OFFICE_FIELDS, openDocument } from "./content";
+import { writeDocx, writePptx } from "./ooxml";
 
 /** A finished export, ready to be a response. */
 export interface ExportedFile {
@@ -184,161 +188,6 @@ function deckSlides(doc: Y.Doc): { notes: string; lines: string[] }[] {
 /* Office formats                                                              */
 /* -------------------------------------------------------------------------- */
 
-/** XML text, escaped. The same five as HTML: an Office part is XML, and a
- *  document whose text holds "<" is a file every reader refuses to open. */
-function xml(text: string): string {
-    return core.escapeHtml(text).replace(/&#39;/g, "&apos;");
-}
-
-/** The two parts every Office format begins with, and which differ only in what
- *  they point at. Written once because getting either wrong fails the same way:
- *  the file opens as "corrupt" with nothing to say which part was wrong. */
-function shell(zip: JSZip, main: string, type: string, extension: string): void {
-    zip.file(
-        "[Content_Types].xml",
-        [
-            "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-            "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>",
-            "<Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/>",
-            "<Default Extension='xml' ContentType='application/xml'/>",
-            `<Override PartName="/${main}" ContentType="${type}"/>`,
-            extension,
-            "</Types>"
-        ].join("")
-    );
-    zip.file(
-        "_rels/.rels",
-        [
-            "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
-            `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="${main}"/>`,
-            "</Relationships>"
-        ].join("")
-    );
-}
-
-/** A document, as Word. */
-async function toDocx(title: string, blocks: readonly core.DocBlock[]): Promise<Uint8Array> {
-    const zip = new JSZip();
-    shell(
-        zip,
-        "word/document.xml",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
-        ""
-    );
-
-    const paragraph = (style: string, text: string): string => {
-        const styled = style ? `<w:pPr><w:pStyle w:val='${style}'/></w:pPr>` : "";
-        // `xml:space='preserve'` is not optional: without it Word eats leading
-        // and trailing spaces, which is every indented line in a document.
-        return `<w:p>${styled}<w:r><w:t xml:space='preserve'>${xml(text)}</w:t></w:r></w:p>`;
-    };
-
-    const styleFor = (kind: string): string => {
-        if (/^h[1-6]$/.test(kind)) return `Heading${kind.slice(1)}`;
-        if (kind === "li") return "ListParagraph";
-        if (kind === "quote") return "Quote";
-        return "";
-    };
-
-    const body = [
-        paragraph("Title", title),
-        ...blocks.map((block) => paragraph(styleFor(block.kind), block.text))
-    ].join("");
-
-    zip.file(
-        "word/document.xml",
-        [
-            "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-            "<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>",
-            `<w:body>${body}<w:sectPr/></w:body></w:document>`
-        ].join("")
-    );
-    return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-}
-
-/** A deck, as PowerPoint.
- *
- *  One text box per slide holding that slide's words, which is the honest
- *  version of this: the positions are fractions of the slide and translating
- *  them into EMUs faithfully is a layout engine. What comes out is every word,
- *  in order, on the right slide - which is what somebody exporting a deck to
- *  send it actually needs. */
-async function toPptx(slides: readonly { notes: string; lines: string[] }[]): Promise<Uint8Array> {
-    const zip = new JSZip();
-    const kept = slides.length > 0 ? slides : [{ notes: "", lines: [] }];
-    const overrides = kept
-        .map(
-            (_, index) =>
-                `<Override PartName="/ppt/slides/slide${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`
-        )
-        .join("");
-    shell(
-        zip,
-        "ppt/presentation.xml",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
-        overrides
-    );
-
-    const slideIds = kept
-        .map((_, index) => `<p:sldId id='${256 + index}' r:id='rId${index + 1}'/>`)
-        .join("");
-    zip.file(
-        "ppt/presentation.xml",
-        [
-            "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-            "<p:presentation xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' ",
-            "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' ",
-            "xmlns:p='http://schemas.openxmlformats.org/presentationml/2006/main'>",
-            `<p:sldIdLst>${slideIds}</p:sldIdLst>`,
-            // Sixteen by nine, in EMUs, which is the unit the format counts in.
-            "<p:sldSz cx='12192000' cy='6858000'/><p:notesSz cx='6858000' cy='9144000'/>",
-            "</p:presentation>"
-        ].join("")
-    );
-    const slideLinks = kept
-        .map(
-            (_, index) =>
-                `<Relationship Id='rId${index + 1}' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide' Target='slides/slide${index + 1}.xml'/>`
-        )
-        .join("");
-    zip.file(
-        "ppt/_rels/presentation.xml.rels",
-        [
-            "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-            "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
-            slideLinks,
-            "</Relationships>"
-        ].join("")
-    );
-
-    kept.forEach((slide, index) => {
-        const lines = slide.lines.length > 0 ? slide.lines : [""];
-        const paragraphs = lines
-            .map((line) => `<a:p><a:r><a:t>${xml(line)}</a:t></a:r></a:p>`)
-            .join("");
-        zip.file(
-            `ppt/slides/slide${index + 1}.xml`,
-            [
-                "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
-                "<p:sld xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' ",
-                "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' ",
-                "xmlns:p='http://schemas.openxmlformats.org/presentationml/2006/main'>",
-                "<p:cSld><p:spTree>",
-                "<p:nvGrpSpPr><p:cNvPr id='1' name=''/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>",
-                "<p:grpSpPr/>",
-                "<p:sp><p:nvSpPr><p:cNvPr id='2' name='Text'/><p:cNvSpPr txBox='1'/><p:nvPr/></p:nvSpPr>",
-                "<p:spPr><a:xfrm><a:off x='838200' y='838200'/><a:ext cx='10515600' cy='5181600'/></a:xfrm>",
-                "<a:prstGeom prst='rect'><a:avLst/></a:prstGeom></p:spPr>",
-                `<p:txBody><a:bodyPr/><a:lstStyle/>${paragraphs}</p:txBody></p:sp>`,
-                "</p:spTree></p:cSld><p:clrMapOvr/></p:sld>"
-            ].join("")
-        );
-    });
-
-    return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-}
-
 /** A grid, as Excel. Through the library the Drive viewer already carries, so
  *  there is one spreadsheet writer here rather than two. */
 function toXlsx(grids: readonly { name: string; rows: string[][] }[]): Uint8Array {
@@ -381,7 +230,7 @@ export async function exportDocument(
         if (format === "md") return text(core.toMarkdown(title, blocks), "md");
         if (format === "html") return text(core.toHtml(title, blocks), "html");
         if (format === "docx") {
-            return { bytes: await toDocx(title, blocks), filename: named("docx"), contentType: type };
+            return { bytes: await writeDocx(title, blocks), filename: named("docx"), contentType: type };
         }
         return null;
     }
@@ -412,7 +261,7 @@ export async function exportDocument(
     if (kind === "slides") {
         const slides = deckSlides(doc);
         if (format === "pptx") {
-            return { bytes: await toPptx(slides), filename: named("pptx"), contentType: type };
+            return { bytes: await writePptx(slides), filename: named("pptx"), contentType: type };
         }
         return null;
     }

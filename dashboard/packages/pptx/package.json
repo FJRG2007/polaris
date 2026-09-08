@@ -1,0 +1,40 @@
+{
+    "name": "@polaris/pptx",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Reading and writing PowerPoint: the OOXML presentation model, its parser and its generator. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./custgeom": {
+            "types": "./dist/custgeom.d.ts",
+            "import": "./dist/custgeom.js"
+        },
+        "./table-grid": {
+            "types": "./dist/table-grid.d.ts",
+            "import": "./dist/table-grid.js"
+        },
+        "./identity": {
+            "types": "./dist/identity.d.ts",
+            "import": "./dist/identity.js"
+        },
+        "./background-promote": {
+            "types": "./dist/background-promote.d.ts",
+            "import": "./dist/background-promote.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts src/custgeom.ts src/table-grid.ts src/identity.ts src/background-promote.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "fast-xml-parser": "5.11.1",
+        "jszip": "3.10.1"
+    }
+}

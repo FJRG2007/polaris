@@ -1,0 +1,34 @@
+{
+    "name": "@polaris/docx",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Reading and writing Word: the OOXML document model, its parser and a paragraph-level patching save. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./math": {
+            "types": "./dist/math.d.ts",
+            "import": "./dist/math.js"
+        },
+        "./metafile": {
+            "types": "./dist/metafile.d.ts",
+            "import": "./dist/metafile.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts src/math.ts src/metafile.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@polaris/pptx": "*",
+        "fast-xml-parser": "5.11.1",
+        "jszip": "3.10.1",
+        "utif2": "4.1.0"
+    }
+}

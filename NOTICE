@@ -11,18 +11,33 @@ Copyright 2026 Mainfunc, Inc.
 Licensed under the Apache License, Version 2.0
 https://github.com/genspark-ai/genoffice
 
-`dashboard/packages/core/src/sheets/` is ported from GenOffice's spreadsheet
-domain (`apps/sheets/src/domain` and the pivot definition types from
-`apps/sheets/src/gateway/xlsx-pivot.ts`). It is the pivot-table engine, the
-chart model and recommender, flash fill, range sorting, formula reference
-shifting, the A1 address reader and the in-memory workbook the rest of them are
-written against.
+Three parts of GenOffice are ported into Polaris.
+
+`dashboard/packages/core/src/sheets/` is its spreadsheet domain
+(`apps/sheets/src/domain`, plus the pivot definition types from
+`apps/sheets/src/gateway/xlsx-pivot.ts`): the pivot-table engine, the chart
+model and recommender, flash fill, range sorting, formula reference shifting,
+the A1 address reader and the in-memory workbook the rest are written against.
 
 Why it is here rather than written again: Polaris' spreadsheet is built on
 Univer, whose open edition ships the grid, the formulas and the formatting and
 deliberately does not ship pivot tables, charts or flash fill - those are what
 its makers sell. GenOffice had written exactly those, as pure TypeScript with
 no framework in it, under a licence that permits this.
+
+`dashboard/packages/pptx/` is `packages/pptx-engine`: the OOXML presentation
+model, its parser and its generator - layouts, masters, themes, charts, shapes,
+animations, comments, sections.
+
+`dashboard/packages/docx/` is `packages/docx-engine`: the OOXML document model,
+its parser, its fragment generators and a paragraph-level patching save -
+styles, numbering, sections, fields, tables, drawings, maths.
+
+Those two are why an exported `.docx` or `.pptx` from Polaris is a real Office
+package rather than a zip with the minimum set of parts in it. Both are held to
+the TypeScript strictness they were written under rather than Polaris' own, which
+is stated in their `tsconfig.json`; everything Polaris writes against them is
+still checked strictly at the call site.
 
 The Apache 2.0 licence text is at http://www.apache.org/licenses/LICENSE-2.0.
 The files carry a header saying where they came from; their behaviour is
