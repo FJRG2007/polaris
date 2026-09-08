@@ -19,6 +19,7 @@ import { ReporterRules } from "./reporter-rules";
 import { ProjectsGrid } from "./projects-grid";
 import { DEFAULT_SECTION, SECTIONS, sectionFor } from "./project-sections";
 import { runAction } from "@/lib/run-action";
+import { useShelfScope } from "@/components/shelf-scope";
 import { CopyButton } from "@/components/copy-button";
 import { RelativeTime } from "@/components/relative-time";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -80,6 +81,7 @@ export function TelemetryView({
     const [data, setData] = useState<Overview | null>(null);
     const [issue, setIssue] = useState<IssueDetail | null>(null);
     const [query, setQuery] = useState("");
+    const on = useShelfScope();
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
 
@@ -98,7 +100,12 @@ export function TelemetryView({
             return;
         }
         setData(result.data ?? null);
-    }, [projectId, status, query]);
+        // `on` is not read here: the projects are narrowed by the shelf on the
+        // server, from the cookie. It is in the dependencies because that is
+        // what re-runs this when somebody switches shelves - without it the
+        // switch changed what the server rendered and this screen went on
+        // showing the other shelf's projects.
+    }, [on, projectId, status, query]);
 
     useEffect(() => {
         void load();

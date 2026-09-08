@@ -18,6 +18,7 @@
  */
 
 import { mergeUnchanged } from "@/lib/structural-merge";
+import { useShelfScope } from "@/components/shelf-scope";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readSnapshot, writeSnapshot, type Snapshot } from "@/lib/snapshot-cache";
 
@@ -64,7 +65,7 @@ export interface LiveResource<T> {
  */
 export function useLiveRead<T>({
     load,
-    cacheKey,
+    cacheKey: subject,
     intervalMs,
     initial,
     enabled = true,
@@ -83,6 +84,19 @@ export function useLiveRead<T>({
     enabled?: boolean;
     paused?: boolean;
 }): LiveResource<T> {
+    /**
+     * The shelf, in front of the key the caller gave.
+     *
+     * Two shelves ask the same question and get different answers - the
+     * documents on this shelf, the mail on this shelf - so the key of what is
+     * kept has to say which. Without it the two wrote over each other, and
+     * switching shelves painted the other one's rows out of the cache before any
+     * request left. It is also what re-runs the fetch: the key changing is how
+     * this hook already knows it is looking at something else.
+     */
+    const shelf = useShelfScope();
+    const cacheKey = `${shelf}:${subject}`;
+
     // One read of the kept snapshot, seeding both the reading and its age.
     const [seeded] = useState(() => read<T>(cacheKey) ?? initial ?? null);
     const [data, setData] = useState<T | null>(seeded?.value ?? null);

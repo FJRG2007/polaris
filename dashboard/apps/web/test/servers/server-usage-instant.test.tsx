@@ -16,6 +16,8 @@
  */
 
 import { writeSnapshot } from "@/lib/snapshot-cache";
+// A kept reading is kept per shelf - see `shelf-scope` - so the keys below
+// name one. `personal` is where a component rendered outside a shelf is.
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -76,7 +78,7 @@ describe("A server's usage panel", () => {
     });
 
     it("paints the last reading of this machine before the probe answers", () => {
-        writeSnapshot("servers.usage.host-a", metrics);
+        writeSnapshot("personal:servers.usage.host-a", metrics);
 
         const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
 
@@ -89,7 +91,7 @@ describe("A server's usage panel", () => {
     });
 
     it("says a reading has aged rather than letting it pass for this instant's", () => {
-        writeSnapshot("servers.usage.host-a", metrics);
+        writeSnapshot("personal:servers.usage.host-a", metrics);
         vi.advanceTimersByTime(5 * 60_000);
 
         const markup = renderToStaticMarkup(<ServerUsage hostId="host-a" />);
@@ -98,7 +100,7 @@ describe("A server's usage panel", () => {
     });
 
     it("does not paint another machine's figures under this one", () => {
-        writeSnapshot("servers.usage.host-a", metrics);
+        writeSnapshot("personal:servers.usage.host-a", metrics);
 
         const markup = renderToStaticMarkup(<ServerUsage hostId="host-b" />);
 
@@ -124,7 +126,7 @@ describe("A server's usage panel", () => {
     });
 
     it("prefers what the tab holds over the server's copy, being the newer of the two", () => {
-        writeSnapshot("servers.usage.host-a", {
+        writeSnapshot("personal:servers.usage.host-a", {
             ...metrics,
             consumers: [{ kind: "process", name: "postgres", cpuPercent: 1.2, memoryBytes: 174_000_000 }]
         });

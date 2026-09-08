@@ -17,6 +17,7 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { RelativeTime } from "@/components/relative-time";
+import { useShelfScope } from "@/components/shelf-scope";
 import type { OfficeDocumentView } from "@/lib/office/documents";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -98,6 +99,7 @@ export function OfficeView({
 }: OfficeViewProps) {
     const router = useRouter();
     const toast = useToast();
+    const on = useShelfScope();
     const [documents, setDocuments] = useState<OfficeDocumentView[] | null>(null);
     const [sort, setSort] = useState<core.OfficeSort>(core.DEFAULT_OFFICE_SORT);
     const [query, setQuery] = useState("");
@@ -112,7 +114,18 @@ export function OfficeView({
             return;
         }
         setDocuments(answer.documents ?? []);
-    }, [shelf, kind, starredOnly, sort, query, toast]);
+        // `on` is not read: the list is narrowed by the shelf on the server,
+        // from the cookie, so what this is for is the dependency itself. Without
+        // it the switch changed what the server rendered and this effect never
+        // ran again, leaving one shelf's documents under another's name.
+    }, [on, shelf, kind, starredOnly, sort, query, toast]);
+
+    // A different shelf is a different list, so what is on screen is not a
+    // stale copy of it - it is somebody else's. Cleared rather than left to be
+    // replaced when the answer lands.
+    useEffect(() => {
+        setDocuments(null);
+    }, [on]);
 
     // Searched as they type, after a beat. A query per keystroke is a round trip
     // per letter, and the answer to "in" is not worth one.

@@ -14,13 +14,26 @@
  *
  * Rendered to static markup: the assertion is what the first paint contains, which
  * is exactly what a person sees before anything resolves.
+ *
+ * What is kept is kept PER SHELF, which is why the snapshots here are written
+ * under a key that names one. Two shelves ask the same panel the same question
+ * and get different answers - this organization's servers, or somebody's own -
+ * and before that was true of the key as well, switching shelves painted the
+ * other one's figures out of the cache before any request left.
  */
 
 import { useCallback } from "react";
 import { writeSnapshot } from "@/lib/snapshot-cache";
 import { renderToStaticMarkup } from "react-dom/server";
 import { useLiveRead } from "@/components/use-live-resource";
+import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Where a reading taken on one shelf is kept. The shape `useLiveRead` writes:
+ *  the shelf, then the subject the caller named. */
+function kept(shelf: string, subject: string): string {
+    return `${shelf}:${subject}`;
+}
 
 /** sessionStorage as the cache expects it; jsdom is not loaded for these tests. */
 class MemoryStorage {
@@ -43,6 +56,16 @@ class MemoryStorage {
     public clear(): void {
         this.items.clear();
     }
+}
+
+/** The panel as a screen would mount it: inside a shelf. Defaults to the
+ *  personal one, which is what a component rendered on its own gets. */
+function onShelf(shelf: string, cacheKey: string): string {
+    return renderToStaticMarkup(
+        <ShelfScopeProvider shelf={shelf}>
+            <Panel cacheKey={cacheKey} />
+        </ShelfScopeProvider>
+    );
 }
 
 function Panel({ cacheKey }: { cacheKey: string }) {
@@ -73,30 +96,39 @@ describe("A cached live read", () => {
     });
 
     it("paints the last reading it holds, before anything is fetched", () => {
-        writeSnapshot("servers.usage.host-a", { cpuPercent: 62 });
+        writeSnapshot(kept("personal", "servers.usage.host-a"), { cpuPercent: 62 });
 
-        const markup = renderToStaticMarkup(<Panel cacheKey="servers.usage.host-a" />);
+        const markup = onShelf("personal", "servers.usage.host-a");
 
         expect(markup).toContain("62% cpu");
         expect(markup).not.toContain("loading");
     });
 
     it("says how old that reading is, rather than passing it off as this instant's", () => {
-        writeSnapshot("servers.usage.host-a", { cpuPercent: 62 });
+        writeSnapshot(kept("personal", "servers.usage.host-a"), { cpuPercent: 62 });
         vi.advanceTimersByTime(5 * 60_000);
 
-        const markup = renderToStaticMarkup(<Panel cacheKey="servers.usage.host-a" />);
+        const markup = onShelf("personal", "servers.usage.host-a");
 
         expect(markup).toContain(`age ${5 * 60_000}`);
     });
 
     it("loads, rather than painting another subject's numbers, for one it has not read", () => {
-        writeSnapshot("servers.usage.host-a", { cpuPercent: 62 });
+        writeSnapshot(kept("personal", "servers.usage.host-a"), { cpuPercent: 62 });
 
-        const markup = renderToStaticMarkup(<Panel cacheKey="servers.usage.host-b" />);
+        const markup = onShelf("personal", "servers.usage.host-b");
 
         expect(markup).toContain("loading");
         expect(markup).not.toContain("62% cpu");
         expect(markup).toContain("age unknown");
+    });
+
+    it("never paints another shelf's reading of the same subject", () => {
+        writeSnapshot(kept("personal", "servers.usage.host-a"), { cpuPercent: 62 });
+
+        const markup = onShelf("acme", "servers.usage.host-a");
+
+        expect(markup).toContain("loading");
+        expect(markup).not.toContain("62% cpu");
     });
 });

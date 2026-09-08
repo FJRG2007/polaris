@@ -20,6 +20,7 @@ import { ShortcutPicker } from "./shortcut-picker";
 import { CustomizeDialog } from "./customize-dialog";
 import { saveOverviewPreferencesAction } from "./actions";
 import { packOverviewSpans } from "@/lib/overview/pack";
+import { useShelfScope } from "@/components/shelf-scope";
 import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import type { OverviewData } from "@/lib/overview/overview-service";
@@ -245,10 +246,17 @@ export function OverviewGrid({
                 .sort(),
         [widgets]
     );
-    const key = wanted.join(",");
+    const asked = wanted.join(",");
+    // The shelf is part of what is being asked for, and part of what is kept:
+    // these cards are the organization's servers, its tasks and its storage on
+    // one shelf and somebody's own on another. Without it the switch left every
+    // card showing the shelf that was open before - and the kept copy was
+    // written over by whichever shelf asked last.
+    const on = useShelfScope();
+    const key = `${on}|${asked}`;
 
     useEffect(() => {
-        if (!key) {
+        if (!asked) {
             setData({});
             return;
         }
@@ -258,7 +266,7 @@ export function OverviewGrid({
         }
         const controller = new AbortController();
         setData(undefined);
-        void fetch(`/api/overview?widgets=${encodeURIComponent(key)}`, {
+        void fetch(`/api/overview?widgets=${encodeURIComponent(asked)}`, {
             cache: "no-store",
             signal: controller.signal
         })
@@ -273,7 +281,7 @@ export function OverviewGrid({
                 setData({});
             });
         return () => controller.abort();
-    }, [key, nonce]);
+    }, [key, asked, nonce]);
 
     function refresh(): void {
         dataCache = null;

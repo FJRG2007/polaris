@@ -39,6 +39,7 @@ import { ProfileStyleProvider } from "@/components/profile-style-store";
 import { listNotifications } from "@/lib/notification-service";
 import { UpdateIndicator } from "@/components/update-indicator";
 import { SessionScopeProvider } from "@/components/session-scope";
+import { ShelfScopeProvider } from "@/components/shelf-scope";
 import { NotificationBell } from "@/components/notification-bell";
 import { resolveScope, scopeChoices } from "@/lib/workspace-scope";
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
@@ -142,6 +143,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                 request. */}
             <SnapshotBuild build={build} />
             <AppUrlProvider baseUrl={baseUrl}>
+                {/* Which shelf is open, as a value every screen that fetches its
+                    own data can depend on. Without it the switch changed what
+                    the server rendered and nothing else - see `shelf-scope`. */}
+                <ShelfScopeProvider shelf={scope.org?.id ?? "personal"}>
                 <DisplayFormatProvider preferences={display}>
                     <SessionScopeProvider userId={user.id}>
                         <ChatUnreadProvider
@@ -306,6 +311,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                         </ChatUnreadProvider>
                     </SessionScopeProvider>
                 </DisplayFormatProvider>
+                </ShelfScopeProvider>
             </AppUrlProvider>
         </CapabilityProvider>
     );
