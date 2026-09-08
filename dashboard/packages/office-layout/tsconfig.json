@@ -1,0 +1,26 @@
+{
+    // Vendored code, held to the contract it was written under.
+    //
+    // This package is ported from GenOffice (Apache-2.0, see NOTICE) and is
+    // forty thousand lines of OOXML handling that has been exercised against
+    // real files for far longer than it has been here. Polaris compiles its own
+    // code with `noUncheckedIndexedAccess`, which this was not written for -
+    // turning it on produces five hundred diagnostics that are all the same
+    // shape, and satisfying them means editing five hundred sites of somebody
+    // else's tested logic to change nothing.
+    //
+    // So the two flags it predates are off HERE and nowhere else. Everything
+    // Polaris writes against this package is still checked at the call site,
+    // because the app's own configuration is unchanged - what is relaxed is the
+    // inside of the vendored code, not the boundary with it.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist",
+        "types": ["node"],
+        "noUncheckedIndexedAccess": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["src"]
+}

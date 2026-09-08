@@ -1,0 +1,21 @@
+{
+    "name": "@polaris/office-layout",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Page, slide and PDF geometry: pagination, snapping, text lines and columns. Ported from GenOffice (Apache-2.0) - see NOTICE.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {}
+}
