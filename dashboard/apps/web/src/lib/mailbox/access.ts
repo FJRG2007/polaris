@@ -130,7 +130,10 @@ export function ownedAccounts(userId: string, shelfOrgId: string | null) {
 }
 
 /** The ids of them, for the queries that span all of them. */
-export async function ownedAccountIds(userId: string, shelfOrgId: string | null): Promise<string[]> {
+export async function ownedAccountIds(
+    userId: string,
+    shelfOrgId: string | null
+): Promise<string[]> {
     const rows = await prisma.mailAccount.findMany({
         where: onShelf(userId, shelfOrgId),
         select: { id: true }

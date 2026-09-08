@@ -115,7 +115,9 @@ describe("what the sending server said", () => {
     });
 
     it("reads a softfail as a failure", () => {
-        const signals = spam.authenticationSignals({ "authentication-results": "mx; spf=softfail" });
+        const signals = spam.authenticationSignals({
+            "authentication-results": "mx; spf=softfail"
+        });
         expect(signals[0]?.id).toBe("spf_fail");
     });
 });
@@ -124,7 +126,8 @@ describe("the links in it", () => {
     it("catches one that says one domain and goes to another", () => {
         const found = spam.urlSignals(
             message({
-                bodyHtml: '<a href="https://secure-login.example.ru/pay">https://bank.example.com</a>'
+                bodyHtml:
+                    '<a href="https://secure-login.example.ru/pay">https://bank.example.com</a>'
             })
         );
         expect(found.map((one) => one.id)).toContain("url_disguised");
@@ -251,7 +254,9 @@ describe("what it has learned from words", () => {
 
     it("stays silent on a mailbox that has been taught nothing", () => {
         expect(spam.contentScore(["viagra"], counts, { junkMessages: 0, goodMessages: 0 })).toBe(0);
-        expect(spam.contentScore(["viagra"], counts, { junkMessages: 2, goodMessages: 40 })).toBe(0);
+        expect(spam.contentScore(["viagra"], counts, { junkMessages: 2, goodMessages: 40 })).toBe(
+            0
+        );
     });
 
     it("can never decide a message on its own", () => {
@@ -389,8 +394,13 @@ describe("the verdict", () => {
 
     it("never reports less than nothing or more than everything", () => {
         const kept = spam.judgeSpam(
-            message({ headers: { "authentication-results": "mx; spf=pass; dkim=pass; dmarc=pass" } }),
-            knows({ writtenTo: true, reputation: [{ kind: "sender", junkCount: 0, goodCount: 30 }] })
+            message({
+                headers: { "authentication-results": "mx; spf=pass; dkim=pass; dmarc=pass" }
+            }),
+            knows({
+                writtenTo: true,
+                reputation: [{ kind: "sender", junkCount: 0, goodCount: 30 }]
+            })
         );
         expect(kept.score).toBe(0);
         expect(kept.verdict).toBe("clean");

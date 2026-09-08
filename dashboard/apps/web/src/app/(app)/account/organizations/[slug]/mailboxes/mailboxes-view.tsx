@@ -21,7 +21,16 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMailboxView } from "@/lib/mailbox/org-mailboxes";
 import { ConnectMailboxDialog } from "@/app/(app)/mail/connect-dialog";
 import { handOutMailboxAction, takeBackMailboxAction } from "./actions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, useToast } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Select,
+    useToast
+} from "@polaris/ui";
 
 /** What each state means, said as the reader would say it rather than as the
  *  column stores it. */
@@ -119,9 +128,17 @@ export function MailboxesView({
                                     key={row.id}
                                     className="group flex items-center gap-3 rounded-lg border border-border px-3 py-2.5"
                                 >
-                                    <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                                    <Mail
+                                        className="size-4 shrink-0 text-muted-foreground"
+                                        aria-hidden
+                                    />
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium" title={row.address}>{row.address}</p>
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={row.address}
+                                        >
+                                            {row.address}
+                                        </p>
                                         <p className="truncate text-[12px] text-muted-foreground">
                                             {row.holderName}
                                             {row.stateDetail ? ` - ${row.stateDetail}` : ""}

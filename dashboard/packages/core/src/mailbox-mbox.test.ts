@@ -48,7 +48,8 @@ describe("a file of messages", () => {
 
     it("comes back exactly as it went in", () => {
         const file =
-            mbox.mboxEntry(first, "a@example.net", AT) + mbox.mboxEntry(second, "b@example.net", AT);
+            mbox.mboxEntry(first, "a@example.net", AT) +
+            mbox.mboxEntry(second, "b@example.net", AT);
         const read = mbox.readMbox(file);
         expect(read).toHaveLength(2);
         expect(read[0]).toBe(first.replace(/\n*$/, ""));

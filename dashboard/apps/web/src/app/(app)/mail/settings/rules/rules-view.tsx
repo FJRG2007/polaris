@@ -76,7 +76,8 @@ export function RulesView({
                 <div>
                     <h2 className="text-[13px] font-medium">Filters on {account.address}</h2>
                     <p className="text-[12px] text-muted-foreground">
-                        Run on arrival, top to bottom. A rule set to stop there is the last one a message meets.
+                        Run on arrival, top to bottom. A rule set to stop there is the last one a
+                        message meets.
                     </p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
@@ -99,12 +100,18 @@ export function RulesView({
                                 {index + 1}
                             </span>
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-[13px] font-medium" title={rule.name}>{rule.name}</p>
-                                <p className="text-[12px] text-muted-foreground">{describe(rule, folders, labels)}</p>
+                                <p className="truncate text-[13px] font-medium" title={rule.name}>
+                                    {rule.name}
+                                </p>
+                                <p className="text-[12px] text-muted-foreground">
+                                    {describe(rule, folders, labels)}
+                                </p>
                                 <p className="text-[11px] text-foreground-subtle">
                                     {rule.enabled ? "On" : "Off"}
                                     {rule.stop ? " - stops the filters below it" : ""}
-                                    {rule.matchCount > 0 ? ` - matched ${rule.matchCount} times` : ""}
+                                    {rule.matchCount > 0
+                                        ? ` - matched ${rule.matchCount} times`
+                                        : ""}
                                 </p>
                             </div>
                             <Button
@@ -156,8 +163,11 @@ function describe(
     const joiner = rule.match === "all" ? " and " : " or ";
     const conditions = rule.conditions
         .map((condition) => {
-            const field = FIELDS.find((one) => one.value === condition.field)?.label ?? condition.field;
-            const operator = OPERATORS.find((one) => one.value === condition.operator)?.label ?? condition.operator;
+            const field =
+                FIELDS.find((one) => one.value === condition.field)?.label ?? condition.field;
+            const operator =
+                OPERATORS.find((one) => one.value === condition.operator)?.label ??
+                condition.operator;
             return `${field} ${operator} "${condition.value}"`;
         })
         .join(joiner);
@@ -240,7 +250,8 @@ function RuleForm({
     function action(): core.MailRuleAction {
         if (actionKind === "move") return { kind: "move", folder: folderId };
         if (actionKind === "label") return { kind: "label", label: labelId };
-        if (actionKind === "forward") return { kind: "forward", to: forwardTo.trim().toLowerCase() };
+        if (actionKind === "forward")
+            return { kind: "forward", to: forwardTo.trim().toLowerCase() };
         return { kind: actionKind } as core.MailRuleAction;
     }
 
@@ -295,7 +306,10 @@ function RuleForm({
                     <Select
                         value={folderId}
                         onValueChange={setFolderId}
-                        options={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
+                        options={folders.map((folder) => ({
+                            value: folder.id,
+                            label: folder.name
+                        }))}
                         aria-label="Which folder"
                         className="w-48"
                     />
@@ -340,7 +354,11 @@ function RuleForm({
             ) : null}
 
             <label className="flex items-center gap-2 text-[13px]">
-                <Switch checked={stop} onChange={setStop} aria-label="Stop the filters below this one" />
+                <Switch
+                    checked={stop}
+                    onChange={setStop}
+                    aria-label="Stop the filters below this one"
+                />
                 Stop here - do not run the filters below this one
             </label>
             <label className="flex items-center gap-2 text-[13px]">

@@ -110,8 +110,7 @@ export function ThreadView({
      *  already stepped out of the way. */
     onStayed?: () => void;
 }) {
-    const { refresh, reloadLists, openComposer, accounts, accountColor, askFolderRole } =
-        useMail();
+    const { refresh, reloadLists, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
     const [answering, startAnswering] = useTransition();

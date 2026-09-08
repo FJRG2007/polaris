@@ -30,7 +30,12 @@ export const dynamic = "force-dynamic";
  *  newlines, and a newline in a response header is a header somebody else
  *  wrote. */
 function headerSafe(name: string): string {
-    return name.replace(/[\r\n"\\]/g, " ").slice(0, 200).trim() || "mail";
+    return (
+        name
+            .replace(/[\r\n"\\]/g, " ")
+            .slice(0, 200)
+            .trim() || "mail"
+    );
 }
 
 function download(name: string): Record<string, string> {

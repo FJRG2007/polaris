@@ -20,7 +20,9 @@ vi.mock("@polaris/core/link-password", () => ({
     hashLinkPassword: vi.fn(),
     verifyLinkPassword: vi.fn()
 }));
-vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: vi.fn(async () => "https://example.com") }));
+vi.mock("@/lib/domain-service", () => ({
+    sharingBaseUrl: vi.fn(async () => "https://example.com")
+}));
 
 const {
     officeLinkPath,

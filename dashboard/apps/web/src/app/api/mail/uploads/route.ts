@@ -35,7 +35,10 @@ function ceilingFor(kind: string): { max: number; refusal: string } {
               max: MAX_ARCHIVE_BYTES,
               refusal: `That archive is larger than ${Math.round(MAX_ARCHIVE_BYTES / (1024 * 1024))} MB, which is more than Polaris can read in one go. Split it and bring the parts in one after another.`
           }
-        : { max: MAX_ATTACHMENT_BYTES, refusal: "That file is bigger than most mail servers will accept." };
+        : {
+              max: MAX_ATTACHMENT_BYTES,
+              refusal: "That file is bigger than most mail servers will accept."
+          };
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -57,7 +60,8 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ error: "That upload did not arrive." }, { status: 400 });
     }
     const file = form.get("file");
-    if (!(file instanceof File)) return Response.json({ error: "No file was sent." }, { status: 400 });
+    if (!(file instanceof File))
+        return Response.json({ error: "No file was sent." }, { status: 400 });
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length === 0) return Response.json({ error: "That file is empty." }, { status: 400 });
@@ -66,11 +70,15 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     try {
-        const stored = await storeUpload(user.id, {
-            name: file.name,
-            type: file.type,
-            bytes
-        }, { inline: form.get("inline") === "1", maxBytes: ceiling.max });
+        const stored = await storeUpload(
+            user.id,
+            {
+                name: file.name,
+                type: file.type,
+                bytes
+            },
+            { inline: form.get("inline") === "1", maxBytes: ceiling.max }
+        );
         return Response.json({ upload: stored });
     } catch (caught) {
         console.error("polaris: a mail attachment could not be stored:", caught);

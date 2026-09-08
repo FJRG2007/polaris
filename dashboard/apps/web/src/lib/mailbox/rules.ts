@@ -84,11 +84,22 @@ export interface RuleOutcome {
  * and the check is one indexed query - this is on the path of every message that
  * arrives.
  */
-export async function applyRulesToMessage(accountId: string, messageId: string): Promise<RuleOutcome> {
+export async function applyRulesToMessage(
+    accountId: string,
+    messageId: string
+): Promise<RuleOutcome> {
     const rows = await prisma.mailRule.findMany({
         where: { accountId, enabled: true },
         orderBy: { position: "asc" },
-        select: { id: true, name: true, enabled: true, match: true, conditions: true, actions: true, stop: true }
+        select: {
+            id: true,
+            name: true,
+            enabled: true,
+            match: true,
+            conditions: true,
+            actions: true,
+            stop: true
+        }
     });
     if (rows.length === 0) return { actions: [], applied: false };
 
@@ -101,7 +112,9 @@ export async function applyRulesToMessage(accountId: string, messageId: string):
 
     // Which rules fired, so the screen can say a rule that matches everything
     // matches everything.
-    const fired = rules.filter((rule) => core.mailRuleMatches(rule, subject)).map((rule) => rule.id);
+    const fired = rules
+        .filter((rule) => core.mailRuleMatches(rule, subject))
+        .map((rule) => rule.id);
     await prisma.mailRule.updateMany({
         where: { id: { in: fired } },
         data: { matchCount: { increment: 1 }, lastRunAt: new Date() }
@@ -167,7 +180,10 @@ async function performActions(
                     .catch(() => undefined);
                 break;
             case "pin":
-                await prisma.mailMessage.update({ where: { id: messageId }, data: { pinned: true } });
+                await prisma.mailMessage.update({
+                    where: { id: messageId },
+                    data: { pinned: true }
+                });
                 break;
             case "forward":
                 await forwardMessage(accountId, messageId, action.to);
@@ -177,7 +193,10 @@ async function performActions(
                     .findUnique({ where: { id: messageId }, select: { threadId: true } })
                     .then((message) =>
                         message
-                            ? prisma.mailThread.update({ where: { id: message.threadId }, data: { muted: true } })
+                            ? prisma.mailThread.update({
+                                  where: { id: message.threadId },
+                                  data: { muted: true }
+                              })
                             : undefined
                     );
                 break;
@@ -207,11 +226,7 @@ async function performActions(
  * be the reason a sync stops - the message is already delivered, and the next
  * one will try again.
  */
-async function forwardMessage(
-    accountId: string,
-    messageId: string,
-    to: string
-): Promise<void> {
+async function forwardMessage(accountId: string, messageId: string, to: string): Promise<void> {
     try {
         const [{ composeMime, sendMime }, { ACCOUNT_COLUMNS }] = await Promise.all([
             import("./send"),
@@ -285,23 +300,24 @@ async function forwardMessage(
         });
         // Stamped after composing, because this is the header the next hop reads
         // to know the message has been round once.
-        const stamped = Buffer.concat([
-            Buffer.from("X-Polaris-Forwarded: 1\r\n", "utf8"),
-            mime
-        ]);
-        await sendMime(account, {
-            from: self,
-            to: [{ name: "", address: wanted }],
-            cc: [],
-            bcc: [],
-            replyTo: from?.address ?? "",
-            subject: message.subject,
-            body,
-            attachments: [],
-            inReplyTo: "",
-            references: [],
-            requestReceipt: false
-        }, stamped);
+        const stamped = Buffer.concat([Buffer.from("X-Polaris-Forwarded: 1\r\n", "utf8"), mime]);
+        await sendMime(
+            account,
+            {
+                from: self,
+                to: [{ name: "", address: wanted }],
+                cc: [],
+                bcc: [],
+                replyTo: from?.address ?? "",
+                subject: message.subject,
+                body,
+                attachments: [],
+                inReplyTo: "",
+                references: [],
+                requestReceipt: false
+            },
+            stamped
+        );
     } catch (caught) {
         // The message is already delivered. A forward that could not be sent is
         // not a reason for a sync to stop.
@@ -339,7 +355,11 @@ export async function listRules(userId: string, accountId: string): Promise<Mail
         where: { accountId },
         orderBy: { position: "asc" }
     });
-    return rows.map((row) => ({ ...toRule(row), position: row.position, matchCount: row.matchCount }));
+    return rows.map((row) => ({
+        ...toRule(row),
+        position: row.position,
+        matchCount: row.matchCount
+    }));
 }
 
 export async function saveRule(
@@ -368,7 +388,10 @@ export async function saveRule(
 
     let id = ruleId;
     if (id) {
-        const held = await prisma.mailRule.findFirst({ where: { id, accountId }, select: { id: true } });
+        const held = await prisma.mailRule.findFirst({
+            where: { id, accountId },
+            select: { id: true }
+        });
         if (!held) throw new Error("That rule is not on this mailbox.");
         await prisma.mailRule.update({ where: { id }, data });
     } else {
@@ -423,11 +446,15 @@ export async function reorderRules(
 ): Promise<void> {
     await ownedAccount(userId, accountId);
     const mine = new Set(
-        (await prisma.mailRule.findMany({ where: { accountId }, select: { id: true } })).map((row) => row.id)
+        (await prisma.mailRule.findMany({ where: { accountId }, select: { id: true } })).map(
+            (row) => row.id
+        )
     );
     await prisma.$transaction(
         orderedIds
             .filter((id) => mine.has(id))
-            .map((id, index) => prisma.mailRule.update({ where: { id }, data: { position: index } }))
+            .map((id, index) =>
+                prisma.mailRule.update({ where: { id }, data: { position: index } })
+            )
     );
 }

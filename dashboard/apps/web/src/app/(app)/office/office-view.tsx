@@ -540,7 +540,8 @@ function emptyBody(
 ): string {
     if (query) return "No document here has that in its name.";
     if (shelf === "trashed") return "Documents you delete wait here until you empty it.";
-    if (shelf === "archived") return "Archiving takes something out of the way without deleting it.";
+    if (shelf === "archived")
+        return "Archiving takes something out of the way without deleting it.";
     if (starred) return "Star a document to keep it at the top of this list.";
     if (shared) return "Documents other people give you appear here.";
     if (kind) return core.OFFICE_KIND_HINTS[kind];

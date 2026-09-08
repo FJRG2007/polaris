@@ -21,6 +21,7 @@ export default async function MailIdentitiesPage() {
     if (accounts.length === 0) return <NoMailboxes what="A send-as address" />;
 
     const identities: Record<string, Awaited<ReturnType<typeof listIdentities>>> = {};
-    for (const account of accounts) identities[account.id] = await listIdentities(user.id, account.id);
+    for (const account of accounts)
+        identities[account.id] = await listIdentities(user.id, account.id);
     return <IdentitiesView accounts={accounts} identities={identities} />;
 }

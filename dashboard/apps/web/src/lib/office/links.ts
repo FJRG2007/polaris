@@ -303,7 +303,10 @@ export function signLinkPass(documentId: string, role: core.OfficeRole): string 
  * promote a viewer's cookie to an editor's by editing the half in front of the
  * dot.
  */
-export function readLinkPass(documentId: string, value: string | undefined): core.OfficeRole | null {
+export function readLinkPass(
+    documentId: string,
+    value: string | undefined
+): core.OfficeRole | null {
     if (!value) return null;
     const at = value.indexOf(".");
     if (at < 0) return null;

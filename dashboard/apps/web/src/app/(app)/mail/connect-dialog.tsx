@@ -201,14 +201,13 @@ export function ConnectMailboxDialog({
         return () => clearTimeout(timer);
     }, [address, valid, already]);
 
-    const oauthReady =
-        !allowOauth
-            ? false
-            : discovery?.oauth === "google"
-              ? googleReady
-              : discovery?.oauth === "microsoft"
-                ? microsoftReady
-                : false;
+    const oauthReady = !allowOauth
+        ? false
+        : discovery?.oauth === "google"
+          ? googleReady
+          : discovery?.oauth === "microsoft"
+            ? microsoftReady
+            : false;
     const authorizable = Boolean(discovery?.oauth) && oauthReady && !usePassword;
     const usable = links.filter((link) => link.provider === discovery?.oauth && link.readyForMail);
     const chosenConnection = connectionId || usable[0]?.id || "";

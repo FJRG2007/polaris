@@ -278,12 +278,16 @@ export async function listDocuments(
     // somebody else edited this morning is not more relevant to me than the one
     // I was in yesterday. Anything never opened sorts under everything opened.
     if (query.sort !== "opened") return views;
-    return [...views].sort((left, right) => (right.openedAt ?? "").localeCompare(left.openedAt ?? ""));
+    return [...views].sort((left, right) =>
+        (right.openedAt ?? "").localeCompare(left.openedAt ?? "")
+    );
 }
 
 /** The names behind "last edited by", in one query however long the list. */
 async function nameEditors(rows: readonly ListRow[]): Promise<Map<string, string>> {
-    const ids = [...new Set(rows.map((row) => row.editedById).filter((id): id is string => Boolean(id)))];
+    const ids = [
+        ...new Set(rows.map((row) => row.editedById).filter((id): id is string => Boolean(id)))
+    ];
     if (ids.length === 0) return new Map();
     const people = await prisma.user.findMany({
         where: { id: { in: ids } },

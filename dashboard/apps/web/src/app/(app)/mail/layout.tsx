@@ -42,7 +42,9 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     // because the composer is mounted by the shell rather than by a screen.
     const identities = Object.fromEntries(
         await Promise.all(
-            accounts.map(async (account) => [account.id, await listIdentities(user.id, account.id)] as const)
+            accounts.map(
+                async (account) => [account.id, await listIdentities(user.id, account.id)] as const
+            )
         )
     );
 

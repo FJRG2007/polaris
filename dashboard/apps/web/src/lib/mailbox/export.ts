@@ -156,7 +156,9 @@ export function rebuildMessage(row: {
         ].join("\n");
     }
     headers.push(
-        html ? 'Content-Type: text/html; charset="utf-8"' : 'Content-Type: text/plain; charset="utf-8"'
+        html
+            ? 'Content-Type: text/html; charset="utf-8"'
+            : 'Content-Type: text/plain; charset="utf-8"'
     );
     // The snippet when nothing was ever downloaded, so a message that was never
     // opened still exports as itself rather than as an empty body.
@@ -165,7 +167,8 @@ export function rebuildMessage(row: {
 
 function hash(value: string): number {
     let held = 0;
-    for (let index = 0; index < value.length; index += 1) held = (held * 31 + value.charCodeAt(index)) | 0;
+    for (let index = 0; index < value.length; index += 1)
+        held = (held * 31 + value.charCodeAt(index)) | 0;
     return held;
 }
 
