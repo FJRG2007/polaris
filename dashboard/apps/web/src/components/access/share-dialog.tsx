@@ -167,8 +167,12 @@ export function ShareDialog({
             note,
             ...(limited
                 ? {
-                      startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
-                      endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
+                      // The picked day, in the reader's own zone, and the last
+                      // one lent whole: sent as a bare date these are both
+                      // midnight UTC, which begins a grant early and ends it a
+                      // day short.
+                      startsAt: core.dayBegins(startsAt)?.toISOString(),
+                      endsAt: core.dayEnds(endsAt)?.toISOString(),
                       days,
                       startMinute: core.clockMinute(hours.from),
                       endMinute: core.clockMinute(hours.to),

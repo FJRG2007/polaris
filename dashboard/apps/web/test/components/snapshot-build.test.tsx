@@ -106,3 +106,31 @@ describe("where the shell tells the store", () => {
         expect(seen).toBeNull();
     });
 });
+
+describe("signing out", () => {
+    it("takes every kept reading with it, whatever screen wrote it", async () => {
+        // A tab that has been signed out of is a tab somebody else may sign into,
+        // and a mail list painted from the last reader's snapshot is that reader's
+        // subject lines on a stranger's screen.
+        const cache = await store();
+        cache.writeSnapshot("mail.list.inbox", { rows: ["a pay slip"] });
+        cache.writeSnapshot("drive.folder.root", { files: [] });
+        sessionStorage.setItem("something.else", "kept");
+
+        vi.doMock("better-auth/react", () => ({
+            createAuthClient: () => ({
+                signIn: {},
+                signUp: {},
+                useSession: () => null,
+                signOut: async () => ({ data: null })
+            })
+        }));
+        const { signOut } = await import("@/lib/auth-client");
+        await signOut();
+
+        expect(cache.readSnapshot("mail.list.inbox", 60_000)).toBeNull();
+        expect(cache.readSnapshot("drive.folder.root", 60_000)).toBeNull();
+        // Only this store's namespace: nothing else in the tab is its to clear.
+        expect(sessionStorage.getItem("something.else")).toBe("kept");
+    });
+});

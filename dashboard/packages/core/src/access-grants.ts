@@ -300,6 +300,52 @@ export function grantIsBounded(schedule: GrantSchedule): boolean {
 export const MAX_GRANTS_PER_SUBJECT = 100;
 
 /**
+ * The moment a picked day begins, in the reader's own zone.
+ *
+ * A date field answers with "2026-03-31", and `new Date` reads a bare date as
+ * midnight **UTC**. West of it that moment is the evening before, so a grant
+ * meant to begin today would already be in force while it was still yesterday.
+ * "From this day" has to mean the start of that day where the reader is.
+ */
+export function dayBegins(day: string): Date | null {
+    const parts = day.split("-").map(Number);
+    const [year, month, date] = parts;
+    if (parts.length !== 3 || !year || !month || !date) return null;
+    const at = new Date(year, month - 1, date, 0, 0, 0, 0);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * And the moment it ends, which is the one that matters.
+ *
+ * `judgeGrant` expires a grant once now is past `endsAt`, so a door lent "until
+ * 31 March" against midnight at the start of the 31st stops working a whole day
+ * early. The last day is part of what was lent.
+ */
+export function dayEnds(day: string): Date | null {
+    const begins = dayBegins(day);
+    if (!begins) return null;
+    begins.setHours(23, 59, 59, 999);
+    return begins;
+}
+
+/**
+ * One end of the date range, as a moment that can actually be read.
+ *
+ * Checked for parseability here rather than left to the write: an unparseable
+ * bound becomes an Invalid Date, the database refuses it, and what comes back is
+ * the generic "that share could not be written" instead of a sentence naming the
+ * field somebody has to fix.
+ */
+function grantMoment(message: string) {
+    return z
+        .string()
+        .trim()
+        .max(40)
+        .refine((value) => !Number.isNaN(Date.parse(value)), { message });
+}
+
+/**
  * What a screen sends to make or replace one.
  *
  * The subject is never in here: it comes from the route being called, so a
@@ -310,8 +356,8 @@ export const accessGrantSchema = z
         principalType: z.enum(GRANT_PRINCIPALS),
         principalId: z.string().trim().min(1).max(64),
         capability: z.string().trim().min(1).max(32),
-        startsAt: z.string().trim().max(40).optional(),
-        endsAt: z.string().trim().max(40).optional(),
+        startsAt: grantMoment("Give the first day as a date").optional(),
+        endsAt: grantMoment("Give the last day as a date").optional(),
         days: z.number().int().min(1).max(EVERY_DAY).default(EVERY_DAY),
         startMinute: z
             .number()

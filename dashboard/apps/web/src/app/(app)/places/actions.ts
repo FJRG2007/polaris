@@ -16,50 +16,45 @@
  */
 
 import * as ptz from "@/lib/home/ptz";
-import { HomeError } from "@/lib/home/home-error";
-import { marksForClip, type ClipMark } from "@polaris/core";
-import { cameraActivity, type CameraActivity } from "@/lib/home/vision-activity";
 import { cookies } from "next/headers";
 import * as relay from "@/lib/home/relay";
 import { revalidatePath } from "next/cache";
 import * as events from "@/lib/home/events";
 import * as alerts from "@/lib/home/alerts";
 import * as places from "@/lib/home/places";
-import * as devices from "@/lib/home/devices";
 import * as people from "@/lib/home/people";
+import { requireUser } from "@/lib/session";
+import * as devices from "@/lib/home/devices";
 import * as cameras from "@/lib/home/cameras";
-import * as cameraZones from "@/lib/home/camera-zones";
+import * as schemas from "@/lib/home/schemas";
 import { listHosts } from "@/lib/host-service";
 import { probeCamera } from "@/lib/home/onvif";
-import { requireHome, requireHomeInstall, requireHomeShared } from "@/lib/home/access";
-import { requireUser } from "@/lib/session";
-import { countDeviceUse, onlyReachable, requireDeviceControl } from "@/lib/home/sharing";
+import { HomeError } from "@/lib/home/home-error";
 import * as recording from "@/lib/home/recording";
 import { footageTarget } from "@/lib/home/stills";
 import { cameraVendor } from "@/lib/home/vendors";
+import { recordAudit } from "@/lib/audit-service";
 import { faceImageType } from "@/lib/home/face-image";
-import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "@/lib/home/discovery";
+import * as cameraZones from "@/lib/home/camera-zones";
 import { ensureVisionWorker } from "@/lib/home/vision";
 import * as defaults from "@/lib/home/detection-defaults";
-import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
-import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/detection";
-import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
-import { recordAudit } from "@/lib/audit-service";
-import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
+import { marksForClip, type ClipMark } from "@polaris/core";
 import * as deviceAccounts from "@/lib/home/device-accounts";
 import * as deviceConnections from "@/lib/home/device-connections";
+import { LOCAL_TARGET, storageTargetOptions } from "@/lib/storage-target";
+import { cameraActivity, type CameraActivity } from "@/lib/home/vision-activity";
+import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "@/lib/home/discovery";
+import { requireHome, requireHomeInstall, requireHomeShared } from "@/lib/home/access";
+import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "@/lib/home/detection";
+import type { DeviceAction, DeviceEventView, DeviceView } from "@/lib/home/device-kinds";
+import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "@/lib/home/current-place";
 import {
-    alertRuleInputSchema,
-    cameraInputSchema,
-    cameraProbeInputSchema,
-    cameraZoneInputSchema,
-    deviceAccountSchema,
-    deviceEditSchema,
-    discoveryInputSchema,
-    normalizeCameraInput,
-    normalizeDeviceInput,
-    normalizeZoneInput
-} from "@/lib/home/schemas";
+    countDeviceUse,
+    onlyReachable,
+    reachesDevice,
+    requireDeviceControl,
+    type PlacesReach
+} from "@/lib/home/sharing";
 import {
     faceEndpoint,
     faceRecognitionSettings,
@@ -111,10 +106,14 @@ export async function listCamerasAction(): Promise<{
 /** Remember which place this person is looking at. Not authorization: it narrows
  *  what is listed, and every screen still resolves what they may do. */
 export async function choosePlaceAction(placeId: string): Promise<{ error?: string }> {
-    const { install } = await requireHomeShared();
+    const { install, reach } = await requireHomeShared();
     const result = await guard(async () => {
         const place = await places.getPlace(install.id, String(placeId));
         if (!place) throw new Error("No such place");
+        // A visitor may only stand in a place that holds something of theirs.
+        // Otherwise the switcher is a way to read every property's address.
+        const allowed = await reachablePlaces(install.id, reach, [place]);
+        if (allowed.length === 0) throw new HomeError("You do not have access to that");
         (await cookies()).set(PLACE_COOKIE, place.id, {
             path: "/",
             maxAge: PLACE_COOKIE_MAX_AGE,
@@ -127,9 +126,22 @@ export async function choosePlaceAction(placeId: string): Promise<{ error?: stri
 }
 
 export async function listPlacesAction(): Promise<{ places?: places.PlaceView[]; error?: string }> {
-    const { install } = await requireHomeShared();
-    const result = await guard(() => places.listPlaces(install.id));
+    const { install, reach } = await requireHomeShared();
+    const result = await guard(async () =>
+        reachablePlaces(install.id, reach, await places.listPlaces(install.id))
+    );
     return result.error ? { error: result.error } : { places: result.value };
+}
+
+/** The places somebody may be told about: all of them for the house's own
+ *  people, and only the ones holding something they were lent for a visitor. */
+async function reachablePlaces(
+    installId: string,
+    reach: PlacesReach,
+    all: places.PlaceView[]
+): Promise<places.PlaceView[]> {
+    if (reach.everything) return all;
+    return places.placesHolding(installId, all, [...reach.cameras.keys()], [...reach.devices.keys()]);
 }
 
 export async function savePlaceAction(
@@ -200,7 +212,7 @@ export async function saveAlertAction(
     input: unknown
 ): Promise<{ rule?: alerts.AlertRuleView; error?: string }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = alertRuleInputSchema.safeParse(input ?? {});
+    const parsed = schemas.alertRuleInputSchema.safeParse(input ?? {});
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     }
@@ -309,8 +321,8 @@ export async function probeCameraAction(input: unknown): Promise<{
     error?: string;
 }> {
     await requireHome("home.manage");
-    const parsed = cameraProbeInputSchema.safeParse(
-        normalizeCameraInput((input ?? {}) as Record<string, unknown>)
+    const parsed = schemas.cameraProbeInputSchema.safeParse(
+        schemas.normalizeCameraInput((input ?? {}) as Record<string, unknown>)
     );
     if (!parsed.success) return { error: "Check the address and the account." };
 
@@ -453,7 +465,7 @@ export async function discoverCamerasAction(input: unknown): Promise<{
     error?: string;
 }> {
     const { install } = await requireHome("home.manage");
-    const parsed = discoveryInputSchema.safeParse(input ?? {});
+    const parsed = schemas.discoveryInputSchema.safeParse(input ?? {});
     if (!parsed.success) return { error: "Write the network as 192.168.1.0/24." };
     // Looking from another server is only meaningful with a range to look at:
     // the multicast probe is a thing Polaris does on its own segment.
@@ -476,8 +488,8 @@ export async function saveCameraAction(
     input: unknown
 ): Promise<{ camera?: cameras.CameraView; error?: string }> {
     const { install } = await requireHome("home.manage");
-    const parsed = cameraInputSchema.safeParse(
-        normalizeCameraInput((input ?? {}) as Record<string, unknown>)
+    const parsed = schemas.cameraInputSchema.safeParse(
+        schemas.normalizeCameraInput((input ?? {}) as Record<string, unknown>)
     );
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
@@ -587,7 +599,7 @@ export async function saveCameraZoneAction(
     input: unknown
 ): Promise<{ zone?: cameraZones.CameraZoneView; error?: string }> {
     const { install } = await requireHome("home.manage");
-    const parsed = cameraZoneInputSchema.safeParse(normalizeZoneInput(input));
+    const parsed = schemas.cameraZoneInputSchema.safeParse(schemas.normalizeZoneInput(input));
     if (!parsed.success)
         return { error: parsed.error.issues[0]?.message ?? "Some of that is not right." };
     const result = await guard(() =>
@@ -1061,9 +1073,15 @@ export async function deleteClipsAction(input: {
 /** Which cameras the relay is actually serving, so a tile can tell "not started
  *  yet" from "started and the camera is down". */
 export async function liveCamerasAction(): Promise<{ live?: string[]; error?: string }> {
-    const { install } = await requireHome("home.read");
+    // The wall asks for this the moment it has drawn a tile, so a visitor lent a
+    // camera is a caller here. A permission check would redirect them, and a
+    // redirect from an action navigates the screen that asked - out of Places.
+    const { install, reach } = await requireHomeShared();
     const result = await guard(async () => {
-        const all = await cameras.listCameras(install.id);
+        const all = onlyReachable(
+            await cameras.listCameras(install.id),
+            reach.everything || reach.cameras
+        );
         const servers = [...new Set(all.map((camera) => relay.relayServerFor(camera.reachVia)))];
         const names = await Promise.all(
             servers.map(async (server) => {
@@ -1205,7 +1223,7 @@ export async function saveDeviceAction(
     input: unknown
 ): Promise<{ device?: DeviceView; error?: string; }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = deviceEditSchema.safeParse(normalizeDeviceInput((input ?? {}) as Record<string, unknown>));
+    const parsed = schemas.deviceEditSchema.safeParse(schemas.normalizeDeviceInput((input ?? {}) as Record<string, unknown>));
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const result = await guard(() => devices.updateDevice(install.id, String(deviceId), parsed.data));
     if (result.error) return { error: result.error };
@@ -1223,12 +1241,21 @@ export async function deviceHistoryAction(
     deviceId: string | null,
     limit = 100
 ): Promise<{ events?: DeviceEventView[]; error?: string; }> {
-    const { install } = await requireHome("home.read");
+    // Selecting a door opens the panel, and the panel asks for this at once, so a
+    // visitor lent that door is a caller here as much as a resident is.
+    const { install, reach } = await requireHomeShared();
     const result = await guard(async () => {
+        const one = deviceId ? String(deviceId) : null;
+        if (one && !reachesDevice(reach, one)) {
+            throw new HomeError("That device is not shared with you");
+        }
         const { current } = await currentPlace(install.id);
         return devices.listDeviceEvents(install.id, {
-            deviceId: deviceId ? String(deviceId) : null,
-            placeId: deviceId ? null : current.id,
+            deviceId: one,
+            placeId: one ? null : current.id,
+            // The whole place's history is the whole place's business. A visitor
+            // asking for it is answered with the doors they hold and no others.
+            deviceIds: one || reach.everything ? null : [...reach.devices.keys()],
             limit
         });
     });
@@ -1238,8 +1265,12 @@ export async function deviceHistoryAction(
 /** When a door was used, for the chart. Bare times: the day one falls in is the
  *  reader's own, and only their browser knows which zone that is. */
 export async function deviceUsageAction(deviceId: string): Promise<{ used?: number[]; error?: string; }> {
-    const { install } = await requireHome("home.read");
-    const result = await guard(() => devices.deviceUsage(install.id, String(deviceId)));
+    const { install, reach } = await requireHomeShared();
+    const result = await guard(() => {
+        const one = String(deviceId);
+        if (!reachesDevice(reach, one)) throw new HomeError("That device is not shared with you");
+        return devices.deviceUsage(install.id, one);
+    });
     return result.error ? { error: result.error } : { used: result.value };
 }
 
@@ -1262,7 +1293,7 @@ export async function connectDeviceAccountAction(
     error?: string;
 }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
+    const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
     if (!connection) return { error: "Polaris cannot connect that yet" };
@@ -1310,7 +1341,7 @@ export async function reconnectDeviceAccountAction(
     error?: string;
 }> {
     const { user, install } = await requireHome("home.manage");
-    const parsed = deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
+    const parsed = schemas.deviceAccountSchema.safeParse((input ?? {}) as Record<string, unknown>);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Check the details and try again" };
     const connection = deviceConnections.deviceConnection(parsed.data.connection);
     if (!connection) return { error: "Polaris cannot connect that yet" };

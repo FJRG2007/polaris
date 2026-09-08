@@ -67,6 +67,55 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
     }));
 }
 
+/**
+ * The list, cut down to what somebody was actually lent.
+ *
+ * A place carries the street address of a property, so the switcher is not a
+ * harmless list: handing the whole one to somebody lent a single door tells them
+ * where every other property in the deployment is. This answers with the places
+ * that hold something they reach, and with the camera count of that much of it
+ * rather than of the whole place.
+ */
+export async function placesHolding(
+    installedAppId: string,
+    all: readonly PlaceView[],
+    cameraIds: readonly string[],
+    deviceIds: readonly string[]
+): Promise<PlaceView[]> {
+    if (cameraIds.length === 0 && deviceIds.length === 0) return [];
+    const [cameras, devices] = await Promise.all([
+        cameraIds.length > 0
+            ? prisma.camera.findMany({
+                  where: { installedAppId, id: { in: [...cameraIds] } },
+                  select: { placeId: true }
+              })
+            : [],
+        deviceIds.length > 0
+            ? prisma.placeDevice.findMany({
+                  where: { installedAppId, id: { in: [...deviceIds] } },
+                  select: { placeId: true }
+              })
+            : []
+    ]);
+    const seen = new Map<string, number>();
+    // A camera or a door that is in no place yet is listed under whichever place
+    // is being looked at, so the first one is where its holder finds it. Without
+    // this a visitor lent an unplaced door is shown no place at all, and then
+    // cannot choose the one their door is drawn in.
+    const first = all[0];
+    for (const row of cameras) {
+        const placeId = row.placeId ?? first?.id;
+        if (placeId) seen.set(placeId, (seen.get(placeId) ?? 0) + 1);
+    }
+    for (const row of devices) {
+        const placeId = row.placeId ?? first?.id;
+        if (placeId && !seen.has(placeId)) seen.set(placeId, 0);
+    }
+    return all
+        .filter((place) => seen.has(place.id))
+        .map((place) => ({ ...place, cameras: seen.get(place.id) ?? 0 }));
+}
+
 async function createFirstPlace(installedAppId: string) {
     const created = await prisma.place.create({
         data: { installedAppId, name: FIRST_PLACE, kind: "house" },

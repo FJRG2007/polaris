@@ -410,13 +410,23 @@ async function ingestHistory(accountId: string, entries: readonly DeviceHistoryE
  */
 export async function listDeviceEvents(
     installedAppId: string,
-    query: { deviceId?: string | null; placeId?: string | null; limit?: number }
+    query: {
+        deviceId?: string | null;
+        /** The only doors the reader may be told about, when that is narrower
+         *  than the place. Narrowed in the query rather than after it: a limit
+         *  applied first would answer a visitor with somebody else's rows
+         *  filtered away and nothing of their own left. */
+        deviceIds?: readonly string[] | null;
+        placeId?: string | null;
+        limit?: number;
+    }
 ): Promise<kinds.DeviceEventView[]> {
     const rows = await prisma.placeDeviceEvent.findMany({
         where: {
             device: {
                 installedAppId,
                 ...(query.deviceId ? { id: query.deviceId } : {}),
+                ...(query.deviceIds ? { id: { in: [...query.deviceIds] } } : {}),
                 // Unplaced devices belong to this list for the same reason they
                 // belong to the one above: they are on the screen, so what they
                 // did has to be readable from it.

@@ -138,8 +138,13 @@ export async function shareCandidates(
     ];
 }
 
-/** Which organizations' groups are on the table for this subject. */
-async function owningOrgIds(
+/**
+ * Which organizations' groups are on the table for this subject.
+ *
+ * Exported because the write needs the same answer the picker got: a form is
+ * filled in by a screen, and a share is written by whoever calls the action.
+ */
+export async function owningOrgIds(
     user: SessionUser,
     subject: core.GrantSubject,
     subjectId: string

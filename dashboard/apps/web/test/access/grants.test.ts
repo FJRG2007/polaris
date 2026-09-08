@@ -20,6 +20,8 @@ let grants: Record<string, unknown>[] = [];
 let teams: string[] = [];
 let memberships: { orgId: string; role: string }[] = [];
 let roles: { id: string }[] = [];
+/** Which organization the team or role being handed the thing belongs to. */
+let principalOrg = "org-a";
 
 const updateMany = vi.fn(async () => ({ count: 1 }));
 const update = vi.fn(async () => ({}));
@@ -45,9 +47,19 @@ vi.mock("@polaris/db", () => ({
             deleteMany: async () => ({ count: 1 })
         },
         organizationMember: { findMany: async () => memberships },
-        orgRole: { findMany: async () => roles },
+        orgRole: {
+            findMany: async () => roles,
+            // A role is only offered by the organization that owns the subject,
+            // so the write asks for it scoped rather than by id alone.
+            findFirst: async ({ where }: { where: { orgId: { in: string[] } } }) =>
+                where.orgId.in.includes(principalOrg) ? { id: "r1" } : null
+        },
         user: { findUnique: async () => ({ id: "u1" }), findMany: async () => [] },
-        team: { findUnique: async () => ({ id: "t1" }), findMany: async () => [] }
+        team: {
+            findFirst: async ({ where }: { where: { orgId: { in: string[] } } }) =>
+                where.orgId.in.includes(principalOrg) ? { id: "t1" } : null,
+            findMany: async () => []
+        }
     }
 }));
 
@@ -84,6 +96,7 @@ beforeEach(() => {
     teams = [];
     memberships = [];
     roles = [];
+    principalOrg = "org-a";
     vi.clearAllMocks();
 });
 
@@ -181,33 +194,84 @@ describe("spending one", () => {
         const [held] = await liveGrants("u1", "place.device", "d1");
         expect(held?.counted).toBe(false);
         expect(await spendGrant(held!)).toBe(true);
-        expect(updateMany).not.toHaveBeenCalled();
-        expect(update).toHaveBeenCalledOnce();
+        // `updateMany` even here: a grant taken back between the check and the
+        // act is a row that is gone, and `update` would raise over a stamp.
+        expect(update).not.toHaveBeenCalled();
+        expect(updateMany).toHaveBeenCalledOnce();
+        expect(updateMany.mock.calls[0]?.[0]).toMatchObject({ where: { id: "g1" } });
     });
 });
 
 describe("writing one", () => {
+    /** A written grant, with only the parts a case cares about spelled out. */
+    function writing(over: Record<string, unknown> = {}) {
+        return {
+            principalType: "user",
+            principalId: "u1",
+            capability: "control",
+            days: EVERY_DAY,
+            startMinute: null,
+            endMinute: null,
+            timeZone: "",
+            maxUses: null,
+            note: "",
+            ...over
+        } as Parameters<typeof writeGrant>[2];
+    }
+
     it("refuses a capability the subject does not have", async () => {
         // `admin` is a space's word, not a door's. A stored row nobody can read
         // would reach nothing, but it would also sit on a screen looking like
         // access somebody has.
         await expect(
+            writeGrant("place.device", "d1", writing({ capability: "admin" }), "u0", ["org-a"])
+        ).rejects.toThrow(/shared as/);
+    });
+
+    it("hands a thing to a team of the organization that owns it", async () => {
+        principalOrg = "org-a";
+        await expect(
             writeGrant(
                 "place.device",
                 "d1",
-                {
-                    principalType: "user",
-                    principalId: "u1",
-                    capability: "admin",
-                    days: EVERY_DAY,
-                    startMinute: null,
-                    endMinute: null,
-                    timeZone: "",
-                    maxUses: null,
-                    note: ""
-                },
-                "u0"
+                writing({ principalType: "team", principalId: "t1" }),
+                "u0",
+                ["org-a"]
             )
-        ).rejects.toThrow(/shared as/);
+        ).resolves.toBeTruthy();
+    });
+
+    it("refuses a team of another organization, whatever the picker offered", async () => {
+        // The picker only ever offers the owning organization's groups, but a
+        // picker is a screen: the rule has to hold against a call that was not
+        // made by one.
+        principalOrg = "org-b";
+        await expect(
+            writeGrant(
+                "place.device",
+                "d1",
+                writing({ principalType: "team", principalId: "t1" }),
+                "u0",
+                ["org-a"]
+            )
+        ).rejects.toThrow(/team or role/);
+    });
+
+    it("refuses a role when no organization is on the table at all", async () => {
+        await expect(
+            writeGrant(
+                "place.device",
+                "d1",
+                writing({ principalType: "role", principalId: "r1" }),
+                "u0",
+                []
+            )
+        ).rejects.toThrow(/team or role/);
+    });
+
+    it("still hands a thing to a person, who belongs to no organization here", async () => {
+        await expect(
+            writeGrant("place.device", "d1", writing(), "u0", [])
+        ).resolves.toBeTruthy();
     });
 });

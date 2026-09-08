@@ -15,7 +15,10 @@
 import { describe, expect, it } from "vitest";
 import { EVERY_DAY, dayBit, weekOrderFrom } from "./schemas/presence-schedule.js";
 import {
+    accessGrantSchema,
     atLeast,
+    dayBegins,
+    dayEnds,
     describeGrant,
     grantIsBounded,
     grantIsLive,
@@ -197,5 +200,70 @@ describe("what a grant says on screen", () => {
         expect(describeGrant(grant, weekOrderFrom(1), (date) => date.toISOString().slice(0, 10))).toBe(
             "2026-09-01 to 2026-09-30"
         );
+    });
+});
+
+describe("the day somebody picked", () => {
+    it("begins at the start of it where the reader is, not at midnight UTC", () => {
+        const begins = dayBegins("2026-03-31");
+        expect(begins?.getFullYear()).toBe(2026);
+        expect(begins?.getMonth()).toBe(2);
+        expect(begins?.getDate()).toBe(31);
+        expect(begins?.getHours()).toBe(0);
+    });
+
+    it("ends at the end of it, so a door lent until then works all of that day", () => {
+        const ends = dayEnds("2026-03-31");
+        expect(ends?.getDate()).toBe(31);
+        expect(ends?.getHours()).toBe(23);
+        // The whole point: the last day is part of what was lent, and judging it
+        // against the start of that day takes it away.
+        const grant: GrantSchedule = { ...OPEN, endsAt: ends };
+        expect(grantIsLive(grant, new Date(2026, 2, 31, 18, 0, 0))).toBe(true);
+        expect(grantIsLive(grant, new Date(2026, 3, 1, 0, 0, 1))).toBe(false);
+    });
+
+    it("answers nothing for an empty field or a day that is not one", () => {
+        expect(dayBegins("")).toBeNull();
+        expect(dayEnds("")).toBeNull();
+        expect(dayEnds("not-a-day")).toBeNull();
+    });
+});
+
+describe("what a form may send", () => {
+    /** The parts every case carries, so each one is only its own bound. */
+    const FORM = { principalType: "team", principalId: "t1", capability: "member" } as const;
+
+    it("names the field when one bound alone cannot be read", () => {
+        const parsed = accessGrantSchema.safeParse({ ...FORM, endsAt: "the end of March" });
+        expect(parsed.success).toBe(false);
+        expect(parsed.error?.issues[0]?.message).toBe("Give the last day as a date");
+        expect(parsed.error?.issues[0]?.path).toEqual(["endsAt"]);
+    });
+
+    it("and when it is the first one", () => {
+        const parsed = accessGrantSchema.safeParse({ ...FORM, startsAt: "soon" });
+        expect(parsed.success).toBe(false);
+        expect(parsed.error?.issues[0]?.message).toBe("Give the first day as a date");
+    });
+
+    it("takes a pair of real moments", () => {
+        expect(
+            accessGrantSchema.safeParse({
+                ...FORM,
+                startsAt: "2026-03-01T00:00:00.000Z",
+                endsAt: "2026-03-31T23:59:59.999Z"
+            }).success
+        ).toBe(true);
+    });
+
+    it("still refuses a last day before the first", () => {
+        const parsed = accessGrantSchema.safeParse({
+            ...FORM,
+            startsAt: "2026-03-31T00:00:00.000Z",
+            endsAt: "2026-03-01T00:00:00.000Z"
+        });
+        expect(parsed.success).toBe(false);
+        expect(parsed.error?.issues[0]?.message).toBe("The last day is before the first");
     });
 });

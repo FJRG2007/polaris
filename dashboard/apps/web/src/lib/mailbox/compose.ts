@@ -14,18 +14,18 @@
  * lost.
  */
 
-import { withImap, type MailConnectionSource } from "./imap";
 import { prisma } from "@polaris/db";
-import { readMailPreferences } from "./prefs";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
 import { refreshThreads } from "./sync";
+import { readMailPreferences } from "./prefs";
 import { rememberContacts } from "./contacts";
 import { MailAuthError } from "./credentials";
 import { readUpload, attachUploads } from "./uploads";
+import { addressesFrom, asJson, stringsFrom } from "./json";
+import { withImap, type MailConnectionSource } from "./imap";
 import { composeMime, sendMime, type OutgoingMessage } from "./send";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
-import { addressesFrom, asJson, stringsFrom } from "./json";
 
 /** What the composer sends up. */
 export interface ComposeInput {
@@ -261,7 +261,11 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             bcc: addressesFrom(draft.bccJson),
             replyTo: draft.replyTo,
             subject: draft.subject,
-            body: withSignature(draft.body, signature, account.signatureAboveQuote),
+            body: withSignature(draft.body, signature, {
+                above: account.signatureAboveQuote,
+                auto: account.signatureAuto,
+                answering: Boolean(draft.inReplyToHeader)
+            }),
             attachments,
             inReplyTo: draft.inReplyToHeader,
             references: stringsFrom(draft.references),
@@ -341,15 +345,38 @@ async function markAnswered(accountId: string, inReplyToHeader: string): Promise
 }
 
 /**
+ * The line every client reads as "the signature starts here".
+ *
+ * Tolerant of the trailing space being eaten in transit, which some clients do,
+ * and of a carriage return, which a body that came back from a mail server has.
+ */
+const SIGNATURE_LINE = /^-- ?\r?$/m;
+
+/**
  * The signature, put where its owner wants it.
  *
  * Above the quoted history is what everybody expects; below is what a mailing
  * list expects, and the setting exists because both camps are certain. Nothing
  * else is ever added to a message here.
+ *
+ * This is the backstop for a draft that never passed through the composer - one
+ * queued by another client, or restored from somewhere else. The composer puts
+ * the signature in itself, so a body already carrying the two-hyphen line is
+ * left exactly as it is; adding a second one is what the reader would see. The
+ * mailbox's own answer to when a signature goes in unasked is obeyed here too,
+ * so "only when I insert it" means nothing inserts it for them.
  */
-function withSignature(body: string, signature: string, above: boolean): string {
+function withSignature(
+    body: string,
+    signature: string,
+    how: { readonly above: boolean; readonly auto: string; readonly answering: boolean }
+): string {
     const trimmed = signature.trim();
     if (!trimmed) return body;
+    if (how.auto === "never") return body;
+    if (how.auto === "new" && how.answering) return body;
+    if (SIGNATURE_LINE.test(body)) return body;
+    const above = how.above;
     // The two-hyphen line is the convention every client recognises as the start
     // of a signature, which is what lets them collapse it.
     const block = `-- \n${trimmed}`;

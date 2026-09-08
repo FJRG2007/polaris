@@ -35,6 +35,8 @@ vi.mock("@/lib/access/grants", () => ({
                 .filter(([key]) => key.startsWith(`${subject}:`))
                 .map(([key, grants]) => [key.split(":").slice(1).join(":"), grants[0]!.capability])
         ),
+    reachesAnySubject: async (_userId: string, subjects: readonly string[]) =>
+        Object.keys(lent).some((key) => subjects.some((subject) => key.startsWith(`${subject}:`))),
     spendGrant
 }));
 
@@ -124,6 +126,18 @@ describe("what counts as a use", () => {
     it("counts nothing for a resident, who has no grant to spend", async () => {
         await sharing.countDeviceUse(null);
         expect(spendGrant).not.toHaveBeenCalled();
+    });
+
+    it("does not turn a door that opened into a failure when the count cannot be written", async () => {
+        // The grant was taken back between the check and the act. The door has
+        // already moved, so the visitor must not be told it did not.
+        spendGrant.mockRejectedValueOnce(new Error("no such row"));
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+        await expect(
+            sharing.countDeviceUse({ id: "g1", capability: "control", until: null, counted: true })
+        ).resolves.toBeUndefined();
+        expect(quiet).toHaveBeenCalled();
+        quiet.mockRestore();
     });
 });
 
