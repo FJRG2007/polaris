@@ -25,6 +25,11 @@
  * credits through a surface they never configured.
  */
 
+// The editor's own stylesheets, fenced inside the class it is rendered in - see
+// `scripts/scope-editor-styles`. Statically: a stylesheet imported inside an
+// effect is one the bundler never sees.
+import "@polaris/genoffice-markdown/styles.css";
+
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
@@ -123,5 +128,12 @@ export function RichMarkdownEditor({
         };
     }, [api]);
 
-    return <Editor />;
+    // Fenced, like the Word editor beside it: every rule in the stylesheet above
+    // is written under this class, so the editor's `*` and `body` rules cannot
+    // reach the viewer around it.
+    return (
+        <div className="genoffice-markdown h-full">
+            <Editor />
+        </div>
+    );
 }

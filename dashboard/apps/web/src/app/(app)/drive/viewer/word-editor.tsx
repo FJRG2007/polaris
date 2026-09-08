@@ -40,6 +40,14 @@
  *   never configured.
  */
 
+// The editor's own stylesheets, fenced inside the class it is rendered in - see
+// `scripts/scope-editor-styles`. Statically, and not inside the dynamic import:
+// a stylesheet imported inside an effect is one the bundler never sees, which is
+// how the spreadsheet came to mount with no styles at all. It costs one file on
+// the routes that can open a document and nothing anywhere else, because this
+// module is only loaded when somebody presses Edit.
+import "@polaris/genoffice-docs/styles.css";
+
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import type { RefObject } from "react";
@@ -307,5 +315,12 @@ export function WordEditor({
             </p>
         );
     }
-    return <Editor />;
+    // Everything the editor draws lives under this class, and so does every rule
+    // in the stylesheet above. Without the fence its `*`, `html` and `body`
+    // rules would reach Drive's own chrome.
+    return (
+        <div className="genoffice-docs h-full">
+            <Editor />
+        </div>
+    );
 }

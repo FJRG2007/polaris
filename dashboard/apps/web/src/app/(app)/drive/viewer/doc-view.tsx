@@ -23,6 +23,7 @@ import { WordEditor } from "./word-editor";
 import type { WordEditorControl } from "./word-editor";
 import { EditorActions } from "./editor-actions";
 import { Loading, ViewerError } from "./status";
+import { pageIsDark } from "@/lib/page-theme";
 import type { ViewerTarget } from "./types";
 
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -50,11 +51,12 @@ export function DocView({
     const [revision, setRevision] = useState(0);
     /** How the toolbar asks the editor for the document. */
     const control = useRef<WordEditorControl | null>(null);
-    const theme =
-        typeof document !== "undefined" &&
-        document.documentElement.getAttribute("data-theme") === "dark"
-            ? ("dark" as const)
-            : ("light" as const);
+    // Asked of the page rather than read off an attribute. Polaris keeps the
+    // theme as a class on the root - dark carries none at all - so looking for
+    // `data-theme` found nothing on every page and settled on light, which on
+    // the default theme is exactly backwards. `pageIsDark` is the one place
+    // that question is answered.
+    const theme = pageIsDark() ? ("dark" as const) : ("light" as const);
 
     useEffect(() => {
         let alive = true;

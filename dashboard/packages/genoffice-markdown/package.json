@@ -9,10 +9,11 @@
             "types": "./dist/App.d.ts",
             "import": "./dist/App.js",
             "default": "./dist/App.js"
-        }
+        },
+        "./styles.css": "./dist/styles.css"
     },
     "scripts": {
-        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom",
+        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom && node ../../scripts/scope-editor-styles.mjs genoffice-markdown @ui/tokens.css @ui/screentip.css @ui/dropdown.css @ui/ribbon-collapse.css @ui/markdown.css src/renderer/styles.css",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
@@ -40,5 +41,9 @@
         "react-dom": "19.0.0"
     },
     "main": "./dist/App.js",
-    "types": "./dist/App.d.ts"
+    "types": "./dist/App.d.ts",
+    "devDependencies": {
+        "postcss": "^8.5.19",
+        "postcss-selector-parser": "^6.1.4"
+    }
 }

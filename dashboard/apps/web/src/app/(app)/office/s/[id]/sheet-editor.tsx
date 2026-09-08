@@ -32,6 +32,8 @@ import * as Y from "yjs";
 import { Loader2 } from "lucide-react";
 import { SheetTools } from "./sheet-tools";
 import { setNumberFormatter } from "@polaris/core/sheets";
+import { polarisUniverTheme } from "@/lib/office/editor-theme";
+import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 import {
@@ -86,6 +88,7 @@ export function SheetEditor({
         let disposed = false;
         let settle: ReturnType<typeof setTimeout> | null = null;
         let stop: (() => void) | null = null;
+        let unwatchTheme: (() => void) | null = null;
 
         void (async () => {
             try {
@@ -111,10 +114,24 @@ export function SheetEditor({
                 const { univerAPI } = createUniver({
                     locale: LocaleType.EN_US,
                     locales: { [LocaleType.EN_US]: merge({}, locale.default ?? locale) },
-                    theme: defaultTheme,
+                    // Polaris' own violet and Polaris' own neutrals, and the
+                    // page's theme. The engine draws its toolbar, its sheet tabs
+                    // and its menus itself, from a palette of its own - left
+                    // alone that is a white page and a blue accent, which is an
+                    // application somebody embedded rather than a screen of this
+                    // one. See `office/univer-theme`.
+                    theme: polarisUniverTheme(defaultTheme),
+                    darkMode: pageIsDark(),
                     presets: [sheetsCore.UniverSheetsCorePreset({ container: host.current })]
                 });
                 api.current = univerAPI as unknown as UniverFacade;
+
+                // And it follows the page afterwards. A spreadsheet is a screen
+                // somebody leaves open; without this it stays light while
+                // everything around it goes dark.
+                unwatchTheme = watchPageTheme((dark) =>
+                    (univerAPI as unknown as UniverFacade).toggleDarkMode?.(dark)
+                );
 
                 // Everything that was stored, put back before anybody sees the
                 // grid: a workbook that appears empty and then fills in is one
@@ -188,6 +205,7 @@ export function SheetEditor({
             disposed = true;
             if (settle) clearTimeout(settle);
             stop?.();
+            unwatchTheme?.();
             api.current = null;
         };
     }, [cells, doc, editable, shape]);
@@ -229,6 +247,9 @@ export function SheetEditor({
  *  says what this depends on. */
 interface UniverFacade {
     createWorkbook: (data: object) => UniverWorkbook;
+    /** Present from 0.6 on. Optional so a version without it is a spreadsheet
+     *  that does not follow the theme rather than one that fails to open. */
+    toggleDarkMode?: (dark: boolean) => void;
 }
 
 interface UniverWorkbook {

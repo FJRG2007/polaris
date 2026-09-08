@@ -24,7 +24,8 @@ import * as Y from "yjs";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import "@excalidraw/excalidraw/index.css";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
 import { reconcileScene, type SceneElement } from "@/lib/office/scene";
 import { useRegisterExporter } from "@/app/(app)/office/export-slot";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
@@ -145,6 +146,11 @@ export function DiagramEditor({
         []
     );
 
+    // Which way round the page is, watched rather than read once: a diagram is a
+    // screen somebody leaves open while they change the theme elsewhere.
+    const [dark, setDark] = useState(pageIsDark);
+    useEffect(() => watchPageTheme(setDark), []);
+
     /** Somebody else drew something. */
     useEffect(() => {
         const observe = (_event: unknown, transaction: Y.Transaction): void => {
@@ -201,6 +207,11 @@ export function DiagramEditor({
                 <Excalidraw
                     initialData={initial}
                     viewModeEnabled={!editable}
+                    // The canvas has a light and a dark mode of its own and
+                    // defaults to light, so on a dark Polaris the whole editor -
+                    // its toolbar, its panels, its own menus - was a white
+                    // application sitting inside a dark one.
+                    theme={dark ? "dark" : "light"}
                     excalidrawAPI={(handle: unknown) => {
                         api.current = handle as typeof api.current;
                     }}

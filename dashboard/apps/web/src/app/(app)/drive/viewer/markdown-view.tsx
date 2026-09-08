@@ -13,6 +13,7 @@ import { EditorActions } from "./editor-actions";
 import { MarkdownContent } from "./markdown-content";
 import { renderMarkdown } from "./markdown-render";
 import { Loading, ViewerError } from "./status";
+import { pageIsDark } from "@/lib/page-theme";
 import { readOnlyReason, useTextFile } from "./text-file";
 import { RichMarkdownEditor } from "./rich-markdown";
 import type { ViewerTarget } from "./types";
@@ -57,11 +58,12 @@ export function MarkdownView({
     /** The theme the editor is told, so it does not paint a white page under a
      *  dark one. Read from the document rather than from a preference: what
      *  matters is what is on screen. */
-    const theme =
-        typeof document !== "undefined" &&
-        document.documentElement.getAttribute("data-theme") === "dark"
-            ? ("dark" as const)
-            : ("light" as const);
+    // Asked of the page rather than read off an attribute. Polaris keeps the
+    // theme as a class on the root - dark carries none at all - so looking for
+    // `data-theme` found nothing on every page and settled on light, which on
+    // the default theme is exactly backwards. `pageIsDark` is the one place
+    // that question is answered.
+    const theme = pageIsDark() ? ("dark" as const) : ("light" as const);
     const [html, setHtml] = useState("");
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
