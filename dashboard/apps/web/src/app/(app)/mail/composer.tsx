@@ -28,7 +28,7 @@
 
 import * as core from "@polaris/core";
 import { refusalOf } from "./refusal";
-import { useMail } from "./mail-shell";
+import { useMail, type ComposerSeed } from "./mail-shell";
 import { RecipientField } from "./recipient-field";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import {
@@ -120,7 +120,7 @@ export function Composer() {
         setBcc([]);
         setShowCopies((composing.cc ?? []).length > 0);
         setSubject(composing.subject ?? "");
-        setBody(composing.body ?? "");
+        setBody(withSignature(composing, accounts, identities, account));
         setFiles([]);
         setDraftId(composing.draftId ?? null);
         setSendAt(null);
@@ -607,6 +607,59 @@ function SendLaterMenu({
             ) : null}
         </>
     );
+}
+
+/**
+ * What the composer opens with, signature included.
+ *
+ * A signature that has to be inserted by hand every time is one nobody ever
+ * sends, which is what "very basic" meant. Each mailbox says when its own goes
+ * in: never, on a message somebody starts, or on replies and forwards as well.
+ *
+ * Where it goes is the other half and it is not decoration. Above the quoted
+ * history is what everybody expects and what makes a reply readable; below it is
+ * what a mailing list expects. The mailbox already carried that choice and
+ * nothing had ever read it.
+ *
+ * A draft being reopened is left exactly as it was: it already has whatever its
+ * author decided, and adding a second signature to it every time they come back
+ * to it is the bug this feature usually ships with.
+ */
+function withSignature(
+    seed: ComposerSeed,
+    accounts: ReturnType<typeof useMail>["accounts"],
+    identities: ReturnType<typeof useMail>["identities"],
+    accountId: string
+): string {
+    const body = seed.body ?? "";
+    if (seed.draftId) return body;
+
+    const account = accounts.find((one) => one.id === accountId);
+    const own = identities[accountId] ?? [];
+    const identity = own.find((one) => one.isDefault);
+    const signature = (identity?.signature || account?.signature || "").trim();
+    if (!signature) return body;
+
+    const when = account?.signatureAuto ?? "new";
+    const answering = Boolean(seed.inReplyToId);
+    if (when === "never") return body;
+    if (when === "new" && answering) return body;
+
+    // The two dashes and the space are the convention every client recognises,
+    // and what lets the next one fold the signature away.
+    const block = `-- 
+${signature}`;
+    if (!body.trim()) return `
+
+${block}`;
+    return account?.signatureAboveQuote === false
+        ? `${body}
+
+${block}`
+        : `
+
+${block}
+${body}`;
 }
 
 /** The times worth having on a menu. Anything else is the picker. */

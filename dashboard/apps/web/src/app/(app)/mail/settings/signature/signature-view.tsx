@@ -14,7 +14,8 @@ import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import { editAccountAction } from "@/app/(app)/mail/actions";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Switch, Textarea, useToast } from "@polaris/ui";
+import * as core from "@polaris/core";
+import { Button, Select, Switch, Textarea, useToast } from "@polaris/ui";
 
 export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
     const router = useRouter();
@@ -24,6 +25,7 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
 
     const [signature, setSignature] = useState(account.signature);
     const [above, setAbove] = useState(account.signatureAboveQuote);
+    const [auto, setAuto] = useState(account.signatureAuto);
     const [saving, startSaving] = useTransition();
 
     function pick(next: string): void {
@@ -32,9 +34,13 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
         setAccountId(next);
         setSignature(chosen.signature);
         setAbove(chosen.signatureAboveQuote);
+        setAuto(chosen.signatureAuto);
     }
 
-    const dirty = signature !== account.signature || above !== account.signatureAboveQuote;
+    const dirty =
+        signature !== account.signature ||
+        above !== account.signatureAboveQuote ||
+        auto !== account.signatureAuto;
 
     return (
         <div>
@@ -51,6 +57,23 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                         onChange={(event) => setSignature(event.target.value)}
                         placeholder="Your name, and whatever else belongs at the bottom of your mail."
                     />
+                </label>
+
+                <label className="mb-3 block">
+                    <span className="mb-1 block text-[12px] text-muted-foreground">When it goes in</span>
+                    <Select
+                        value={auto}
+                        onValueChange={setAuto}
+                        aria-label="When the signature is added"
+                        className="w-64"
+                        options={core.mailSignatureAuto.options.map((one) => ({
+                            value: one,
+                            label: core.MAIL_SIGNATURE_AUTO_LABELS[one] ?? one
+                        }))}
+                    />
+                    <span className="mt-1 block text-[12px] text-foreground-subtle">
+                        A signature you have to insert by hand every time is one you never send.
+                    </span>
                 </label>
 
                 <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
@@ -74,7 +97,8 @@ export function SignatureView({ accounts }: { accounts: MailAccountView[] }) {
                                 unified: account.unified,
                                 appendToSent: account.appendToSent,
                                 signature,
-                                signatureAboveQuote: above
+                                signatureAboveQuote: above,
+                                signatureAuto: auto
                             });
                             const said = refusalOf(answer);
                             if (said) {

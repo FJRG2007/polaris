@@ -51,6 +51,7 @@ export interface MailAccountView {
     readonly nameTrackers: boolean;
     readonly answerReceipts: boolean;
     readonly cleanLinks: boolean;
+    readonly signatureAuto: string;
     readonly securityKeepMinutes: number;
     readonly vacationEnabled: boolean;
     readonly pollSeconds: number;
@@ -85,6 +86,7 @@ export function accountView(row: AccountRow): MailAccountView {
         nameTrackers: row.nameTrackers,
         answerReceipts: row.answerReceipts,
         cleanLinks: row.cleanLinks,
+        signatureAuto: row.signatureAuto,
         securityKeepMinutes: row.securityKeepMinutes,
         vacationEnabled: row.vacationEnabled,
         pollSeconds: row.pollSeconds,

@@ -135,6 +135,16 @@ export type MailAccountSetup = z.infer<typeof mailAccountSetupSchema>;
 /** Asking Polaris where an address's mail lives, before any password is typed. */
 export const mailDiscoverySchema = z.object({ address: mailAddress });
 
+/** When a signature goes in without being asked for: never, on a message
+ *  somebody starts, or on replies and forwards as well. */
+export const mailSignatureAuto = z.enum(["never", "new", "always"]);
+
+export const MAIL_SIGNATURE_AUTO_LABELS: Readonly<Record<string, string>> = {
+    never: "Only when I insert it",
+    new: "On messages I start",
+    always: "On everything, replies included"
+};
+
 /** What can be changed about an account after it exists. Servers and credentials
  *  are changed by reconnecting it, not edited in place: a half-changed account
  *  is one that syncs against one server and sends through another. */
@@ -161,7 +171,10 @@ export const mailAccountEditSchema = z.object({
     signature: z.string().max(20000).default(""),
     /** Whether the signature goes above the quoted history or below it. Above is
      *  what everybody expects; below is what a mailing list expects. */
-    signatureAboveQuote: z.boolean().default(true)
+    signatureAboveQuote: z.boolean().default(true),
+    /** When it goes in without being asked for. A signature that has to be
+     *  inserted by hand every time is one nobody ever sends. */
+    signatureAuto: mailSignatureAuto.default("new")
 });
 
 /** The out-of-office reply. Off means the fields are kept and nothing is sent. */
