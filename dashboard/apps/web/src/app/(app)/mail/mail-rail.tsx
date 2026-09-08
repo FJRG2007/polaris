@@ -21,6 +21,7 @@
  */
 
 import Link from "next/link";
+import * as core from "@polaris/core";
 import {
     cn,
     ContextMenu,
@@ -54,6 +55,29 @@ import {
     Trash2,
     type LucideIcon
 } from "lucide-react";
+
+/**
+ * What each kind of folder is drawn as.
+ *
+ * The reading is `core.folderLook`, which takes the server's own answer when it
+ * gave one and the folder's name in six languages when it did not - so a mailbox
+ * in Spanish gets a bin for Papelera rather than the same grey stack of paper
+ * twenty times. This half is only the picture that goes with each answer.
+ */
+const FOLDER_ICONS: Record<core.FolderLook, LucideIcon> = {
+    inbox: Inbox,
+    drafts: FileText,
+    sent: SendHorizontal,
+    archive: Archive,
+    junk: Bug,
+    trash: Trash2,
+    starred: Star,
+    snoozed: Clock,
+    important: AlertTriangle,
+    notes: FileText,
+    outbox: SendHorizontal,
+    folder: Layers
+};
 
 /**
  * The colours a folder can be given.
@@ -239,7 +263,14 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                         <RailLink
                                                             href={`/mail/f/${folder.id}`}
                                                             label={folder.name}
-                                                            icon={Layers}
+                                                            icon={
+                                                                FOLDER_ICONS[
+                                                                    core.folderLook(
+                                                                        folder.name,
+                                                                        folder.role
+                                                                    )
+                                                                ]
+                                                            }
                                                             color={folder.color}
                                                             count={folder.unread}
                                                             active={

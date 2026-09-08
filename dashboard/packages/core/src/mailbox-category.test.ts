@@ -12,7 +12,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { categoriseMail, type CategorisableMessage } from "./mailbox-category.js";
+import {
+    categoriseMail,
+    isDisposableSecurityMail,
+    type CategorisableMessage
+} from "./mailbox-category.js";
 
 function message(over: Partial<CategorisableMessage> = {}): CategorisableMessage {
     return { subject: "", snippet: "", fromAddress: "", fromName: "", headers: null, ...over };
@@ -249,5 +253,62 @@ describe("what is left", () => {
         // behind a tab nobody opens is the feature doing harm.
         expect(categoriseMail(message({ subject: "???", fromAddress: "x@y.example" }))).toBe("primary");
         expect(categoriseMail(message())).toBe("primary");
+    });
+});
+
+describe("mail about the safety of an account", () => {
+    const message = (subject: string, snippet = "") => ({
+        subject,
+        snippet,
+        fromAddress: "noreply@github.com",
+        fromName: "GitHub",
+        headers: null
+    });
+
+    it("lands under Security, not under Updates", () => {
+        // The one that was reported: a secret-scanning alert read as ordinary
+        // transactional mail and sat with the receipts.
+        expect(categoriseMail(message("Action needed: Secrets detected in FJRG2007/rook"))).toBe(
+            "security"
+        );
+        expect(categoriseMail(message("Security alert: unusual sign-in"))).toBe("security");
+        expect(categoriseMail(message("Your account has been locked"))).toBe("security");
+    });
+
+    it("is read from the line under the subject too", () => {
+        // "Action needed" says nothing on its own. What it is about is in the
+        // snippet, which is where these are always written.
+        expect(
+            categoriseMail(message("Action needed", "Anyone with read access can view exposed secrets."))
+        ).toBe("security");
+    });
+
+    it("is never swept, however old it gets", () => {
+        // The whole reason the two halves are told apart: a code is worthless
+        // within the hour, and this is the most important mail of somebody's
+        // week.
+        expect(
+            isDisposableSecurityMail(message("Action needed: Secrets detected in FJRG2007/rook"))
+        ).toBe(false);
+        expect(isDisposableSecurityMail(message("Security alert: unusual sign-in"))).toBe(false);
+    });
+
+    it("still sweeps a code, which is what the clear-up is for", () => {
+        expect(isDisposableSecurityMail(message("Your verification code is 402913"))).toBe(true);
+        expect(isDisposableSecurityMail(message("Tu codigo de verificacion"))).toBe(true);
+    });
+
+    it("keeps a code that also carries an alert word", () => {
+        // A message saying both is the dangerous one to guess at, so the answer
+        // is the cautious one: it stays.
+        expect(
+            isDisposableSecurityMail(
+                message("Your verification code", "We noticed suspicious activity on your account.")
+            )
+        ).toBe(false);
+    });
+
+    it("has nothing to say about ordinary mail", () => {
+        expect(isDisposableSecurityMail(message("Lunch on Thursday"))).toBe(false);
     });
 });

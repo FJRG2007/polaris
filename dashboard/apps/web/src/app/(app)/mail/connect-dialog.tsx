@@ -308,6 +308,16 @@ export function ConnectMailboxDialog({
 
                     {discovery && !looking ? (
                         <>
+                            {/* Before anything is typed, because it is the
+                                reason the settings underneath do not mean what
+                                they appear to. One service needs it, and
+                                without it that service's form reads as
+                                everything being fine. */}
+                            {discovery.note ? (
+                                <p className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[12px]">
+                                    {discovery.note}
+                                </p>
+                            ) : null}
                             {authorizable ? (
                                 <div className="space-y-2">
                                     {usable.length > 0 ? (

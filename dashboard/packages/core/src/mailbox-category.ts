@@ -46,7 +46,7 @@ export const MAIL_CATEGORY_LABELS: Readonly<Record<MailCategory, string>> = {
     promotions: "Promotions",
     billing: "Subscriptions and bills",
     updates: "Updates",
-    security: "Codes and sign-ins"
+    security: "Security"
 };
 
 export const MAIL_CATEGORY_NOTES: Readonly<Record<MailCategory, string>> = {
@@ -55,7 +55,7 @@ export const MAIL_CATEGORY_NOTES: Readonly<Record<MailCategory, string>> = {
     promotions: "Offers, newsletters, and anything else selling something.",
     billing: "Renewals, charges and invoices - what is about to be taken, while there is still time to do something about it.",
     updates: "Receipts, orders, deliveries and statements.",
-    security: "Verification codes, sign-in links and password notices. They stop working long before they stop taking up room."
+    security: "Codes, sign-in links, password notices - and anything else about the safety of an account you have. The codes stop working long before they stop taking up room; the alerts are the ones worth reading first."
 };
 
 /** What the categoriser reads. Everything is already on the row: no message body
@@ -176,6 +176,105 @@ const SECURITY_WORDS: readonly string[] = [
     "codice di sicurezza",
     "reimposta la password"
 ];
+
+/**
+ * Words that mean something about the safety of an account, rather than a code
+ * to type into one.
+ *
+ * Held apart from the codes above on purpose. A verification code stops working
+ * in ten minutes and can be swept up automatically; "secrets detected in your
+ * repository" is the opposite kind of message - it does not expire, it is the
+ * most important mail somebody gets that week, and nothing may ever clear it up
+ * on its own. Both belong under Security, because both are about an account
+ * being safe; only one of them is disposable.
+ *
+ * That difference is what `MAIL_SECURITY_DISPOSABLE` answers, and it is why the
+ * sweep reads that rather than the category.
+ */
+const SECURITY_ALERT_WORDS: readonly string[] = [
+    // English
+    "secret detected",
+    "secrets detected",
+    "secret scanning",
+    "exposed secret",
+    "leaked credential",
+    "security alert",
+    "security advisory",
+    "security warning",
+    "suspicious activity",
+    "unusual activity",
+    "unauthorized access",
+    "unauthorised access",
+    "data breach",
+    "vulnerability",
+    "vulnerable dependency",
+    "action needed",
+    "action required",
+    "compromised",
+    "two-factor",
+    "two factor",
+    "2fa",
+    "recovery code",
+    "account locked",
+    "account suspended",
+    // The same three things said as sentences, which is how they are actually
+    // written: "Your account has been locked" is the common form and "account
+    // locked" is the rare one.
+    "has been locked",
+    "has been suspended",
+    "has been disabled",
+    "was locked",
+    "password expired",
+    // Spanish
+    "alerta de seguridad",
+    "actividad sospechosa",
+    "acceso no autorizado",
+    "brecha de seguridad",
+    "vulnerabilidad",
+    "accion necesaria",
+    "accion requerida",
+    "cuenta bloqueada",
+    "cuenta suspendida",
+    "doble factor",
+    "verificacion en dos pasos",
+    // Portuguese
+    "alerta de seguranca",
+    "atividade suspeita",
+    "acesso nao autorizado",
+    // French
+    "alerte de securite",
+    "activite suspecte",
+    "acces non autorise",
+    // German
+    "sicherheitswarnung",
+    "sicherheitshinweis",
+    "verdachtige aktivitat",
+    "unbefugter zugriff",
+    // Italian
+    "avviso di sicurezza",
+    "attivita sospetta"
+];
+
+/**
+ * Whether a message in Security is one that stops mattering.
+ *
+ * A code or a sign-in link is worthless within the hour and is what the
+ * clear-up offers to sweep. An alert about an account is the opposite: it does
+ * not expire, and deleting one automatically would be deleting the most
+ * important mail somebody got that week.
+ *
+ * So the sweep asks this rather than asking the category, and the two kinds
+ * share a tab without sharing a fate.
+ */
+export function isDisposableSecurityMail(message: CategorisableMessage): boolean {
+    const subject = flatten(message.subject);
+    const words = `${subject} ${flatten(message.snippet)}`;
+    if (SECURITY_ALERT_WORDS.some((word) => words.includes(word))) return false;
+    return (
+        SECURITY_WORDS.some((word) => subject.includes(word)) ||
+        (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word)))
+    );
+}
 
 /** Words that mean somebody is selling something. */
 const PROMOTION_WORDS: readonly string[] = [
@@ -367,6 +466,12 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // always are, because the whole point is to be readable without opening it.
     if (SECURITY_WORDS.some((word) => subject.includes(word))) return "security";
     if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word))) return "security";
+    // And anything about the safety of an account rather than a code to type
+    // into one: a leaked credential, a suspicious sign-in, a repository with a
+    // secret in it. Read from the snippet as well as the subject, because these
+    // are written as sentences rather than as headlines - "Action needed" says
+    // nothing on its own, and the line under it says everything.
+    if (SECURITY_ALERT_WORDS.some((word) => words.includes(word))) return "security";
 
     if (SOCIAL_DOMAINS.some((one) => domain === one || domain.endsWith(`.${one}`))) return "social";
 

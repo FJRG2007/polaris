@@ -89,6 +89,12 @@ export async function backfillCategories(): Promise<number> {
  * It goes through the ordinary trash action rather than deleting rows, so the
  * message lands in the trash on the mail server exactly as it would have if
  * somebody had pressed the button, and it can be taken back out of it.
+ *
+ * **Only the disposable half of Security.** That tab also holds alerts about an
+ * account - a leaked credential, a suspicious sign-in - and those are the
+ * opposite kind of message: they do not expire, and they are the most important
+ * mail somebody got that week. Sweeping by category would delete them, so each
+ * candidate is asked rather than assumed.
  */
 export async function sweepExpiredCodes(): Promise<number> {
     const accounts = await prisma.mailAccount.findMany({
@@ -107,14 +113,26 @@ export async function sweepExpiredCodes(): Promise<number> {
                 receivedAt: { lt: before },
                 folder: { role: "inbox" }
             },
-            select: { id: true },
+            select: { id: true, subject: true, snippet: true },
             take: 200
         });
-        if (stale.length === 0) continue;
+        // The codes, not the alerts. Read from what the message says rather than
+        // from a second column, so a mailbox categorised before this existed is
+        // swept correctly without a backfill.
+        const disposable = stale.filter((one) =>
+            core.isDisposableSecurityMail({
+                subject: one.subject,
+                snippet: one.snippet,
+                fromAddress: "",
+                fromName: "",
+                headers: null
+            })
+        );
+        if (disposable.length === 0) continue;
         try {
             done += await actOnMessages(
                 account.userId,
-                stale.map((one) => one.id),
+                disposable.map((one) => one.id),
                 "trash"
             );
             publishMail({ accountId: account.id, kind: "messages", actorId: account.userId });

@@ -51,6 +51,9 @@ export interface MailDiscovery {
     readonly oauth: "google" | "microsoft" | null;
     /** Said next to the password box, when the sign-in password will not work. */
     readonly passwordHelp: string;
+    /** Said under the address, before anything is typed, when there is something
+     *  the person has to know for the settings below to mean what they say. */
+    readonly note: string;
     readonly passwordUrl: string;
     /** Which of the five questions answered, so the form can say how sure it is
      *  and a support conversation has somewhere to start. */
@@ -74,6 +77,7 @@ function fromService(address: string, service: core.MailService, source: MailDis
         smtp: service.smtp,
         oauth: service.oauth ?? null,
         passwordHelp: service.passwordHelp ?? "",
+        note: service.note ?? "",
         passwordUrl: service.passwordUrl ?? "",
         source
     };
@@ -122,6 +126,7 @@ function unknown(address: string, domain: string): MailDiscovery {
         smtp: { host: domain ? `smtp.${domain}` : "", port: 465, security: "tls" },
         oauth: null,
         passwordHelp: "",
+        note: "",
         passwordUrl: "",
         source: "none"
     };
@@ -193,6 +198,7 @@ export function parseAutoconfig(xml: string, address: string): PartialDiscovery 
         smtp: fillLogin(smtp, address),
         oauth: null,
         passwordHelp: "",
+        note: "",
         passwordUrl: ""
     };
 }

@@ -53,6 +53,17 @@ export interface MailService {
     readonly oauth?: "google" | "microsoft";
     /** Said next to the password box when the sign-in password will not work. */
     readonly passwordHelp?: string;
+    /**
+     * Something the person has to know before they type anything, shown under
+     * the address rather than beside the password.
+     *
+     * One service needs it: Proton publishes autoconfig pointing at 127.0.0.1,
+     * which is its Bridge - correct, and useless to a Polaris that is not
+     * running on the same machine. Filling the form in with those settings and
+     * saying "the domain publishes its own settings, and these are them" is
+     * true and reads as everything being fine.
+     */
+    readonly note?: string;
     /** Where to go and make one. */
     readonly passwordUrl?: string;
     /**
@@ -300,15 +311,22 @@ export const MAIL_SERVICES: readonly MailService[] = [
     },
     {
         slug: "proton-bridge",
-        name: "Proton Mail Bridge",
-        // Never matched by domain. Proton's own servers speak no IMAP at all: the
-        // Bridge does, on the machine the person is sitting at, which is not the
-        // machine Polaris runs on. Offered as a choice, never guessed.
-        domains: [],
+        name: "Proton Mail",
+        // Matched by domain, and the note is the reason why. Proton's own
+        // servers speak no IMAP: the Bridge does, on the machine its owner is
+        // sitting at, which is not the machine Polaris runs on. Leaving these
+        // domains out meant the address fell through to autoconfig, which
+        // returns exactly these settings with "the domain publishes its own
+        // settings, and these are them" - true, and read by everybody as
+        // everything being fine. Recognised here so the sentence can be the
+        // honest one.
+        domains: ["proton.me", "protonmail.com", "protonmail.ch", "pm.me", "passinbox.com"],
         imap: { host: "127.0.0.1", port: 1143, security: "starttls" },
         smtp: { host: "127.0.0.1", port: 1025, security: "starttls" },
+        note:
+            "Proton's servers do not speak IMAP. Reaching this mailbox needs Proton Mail Bridge running on a machine Polaris can connect to, and the address below is that machine - 127.0.0.1 only works if the Bridge is on this server.",
         passwordHelp:
-            "The Bridge prints its own password, which is not your Proton one, and it has to be running on a machine Polaris can reach."
+            "The Bridge prints its own password, which is not your Proton one."
     }
 ];
 
