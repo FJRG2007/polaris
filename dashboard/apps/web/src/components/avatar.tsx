@@ -468,20 +468,51 @@ export function OrgAvatar({
 }
 
 /** Up to three faces and a "+n", which is as many as a row can carry legibly. */
-export function AvatarStack({ people, size = 24 }: { people: readonly AvatarPerson[]; size?: number }) {
+export function AvatarStack({
+    people,
+    size = 24,
+    max = 3,
+    total,
+    className
+}: {
+    people: readonly AvatarPerson[];
+    size?: number;
+    /** How many faces before the rest become a number. Three is what a table
+     *  cell holds; a row with space of its own can take more. */
+    max?: number;
+    /**
+     * How many there really are, when the caller was handed only the first few.
+     *
+     * Without it the "+n" counts what was fetched rather than what exists, so a
+     * panel showing three of forty says "+0" and quietly claims there are three.
+     */
+    total?: number;
+    className?: string;
+}) {
     if (people.length === 0) return null;
-    const shown = people.slice(0, 3);
+    const shown = people.slice(0, Math.max(1, max));
+    const rest = Math.max(0, (total ?? people.length) - shown.length);
     return (
-        <span className="flex items-center -space-x-1.5">
+        // The overlap is the point: a row of faces that touch reads as a group,
+        // and a row of faces that do not reads as a list. The ring is what keeps
+        // it legible - without a stroke in the page's own colour between them,
+        // three overlapping circles are one shape.
+        <span className={cn("flex items-center -space-x-2", className)}>
             {shown.map((person) => (
-                <Avatar key={person.id} person={person} size={size} />
-            ))}
-            {people.length > shown.length && (
                 <span
-                    className="inline-flex items-center justify-center rounded-full bg-muted text-[0.625rem] font-medium text-muted-foreground ring-1 ring-border"
+                    key={person.id}
+                    className="rounded-full ring-2 ring-background"
+                    title={person.name}
+                >
+                    <Avatar person={person} size={size} status={false} />
+                </span>
+            ))}
+            {rest > 0 && (
+                <span
+                    className="inline-flex items-center justify-center rounded-full bg-muted text-[0.625rem] font-medium text-muted-foreground ring-2 ring-background"
                     style={{ width: size, height: size }}
                 >
-                    +{people.length - shown.length}
+                    +{rest}
                 </span>
             )}
         </span>

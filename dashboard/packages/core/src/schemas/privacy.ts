@@ -311,17 +311,21 @@ export const privacySettingsSchema = z.object({
      * Who may read the two lists on somebody's profile: who follows them, and
      * who they follow.
      *
-     * Shut in this file, and that is not the answer people get. What a new
-     * account starts on is the operator's - an instance meant as a company
-     * directory and one meant as a place people follow each other want opposite
-     * defaults, and neither is a decision this file can make. The stored column
-     * is left unset until somebody chooses, and the service fills it in from the
-     * instance setting; this is the floor for a deployment that has none.
+     * Open, which is what following is for. Every place people follow each other
+     * publishes both lists and lets somebody close them - it is how a follow is
+     * discovered at all, and a graph nobody can see is a graph nobody joins.
+     *
+     * What a new account actually starts on is still the operator's: an instance
+     * meant as a company directory and one meant as a place people follow each
+     * other want opposite answers, and neither is a decision this file can make.
+     * The stored column is left unset until somebody chooses and the service
+     * fills it in from the instance setting; this is only the floor for a
+     * deployment that has never set one.
      *
      * Both lists under one setting, because they are one disclosure: who you
      * follow is exactly as much about you as who follows you.
      */
-    followers: closed,
+    followers: open,
     /**
      * Who may ask to be your friend.
      *

@@ -9,8 +9,15 @@
  *
  * The count is the point and the faces are the illustration. "Three friends in
  * common" is what turns a name into somebody you have simply not met yet; the
- * three faces underneath are what makes it worth reading, and a list of forty
- * would be neither.
+ * faces beside it are what make it worth reading, and a list of forty would be
+ * neither.
+ *
+ * Faces overlapping in a row rather than stacked down one, which is what every
+ * client that shows this does and is not decoration: a column of rows reads as a
+ * directory to be gone through, and this is a fact about the person whose
+ * profile it is. It is one line, so it can sit under a name without pushing
+ * everything else off the panel, and the names are still there - under the
+ * pointer, and read out to anybody who is not using one.
  *
  * Nothing is drawn when there is nothing in common. A heading over "none" is a
  * line that tells the reader something they did not ask and cannot act on.
@@ -18,7 +25,7 @@
 
 import Link from "next/link";
 import { Hash, Users } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarStack } from "@/components/avatar";
 import { PersonName, PersonRow } from "@/components/person-name";
 
 export interface MutualPanelProps {
@@ -45,28 +52,32 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                         <Users className="size-3.5 shrink-0" />
                         {friends.total === 1 ? "1 friend in common" : `${friends.total} friends in common`}
                     </p>
-                    <ul className="flex flex-col gap-0.5">
-                        {friends.people.map((person) => (
-                            <li key={person.id}>
-                                <PersonRow
-                                    as={Link}
-                                    personId={person.id}
-                                    href={`/u/${person.username}`}
-                                    className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm transition-colors hover:bg-muted"
-                                >
-                                    <Avatar person={person} size={compact ? 18 : 22} status={false} />
-                                    <span className="min-w-0 flex-1 truncate" title={person.name}>
-                                        <PersonName id={person.id} name={person.name} />
-                                    </span>
-                                </PersonRow>
-                            </li>
-                        ))}
-                    </ul>
-                    {friends.total > friends.people.length ? (
-                        <p className="text-muted-foreground px-1.5 text-xs">
-                            and {friends.total - friends.people.length} more
+                    <div className="flex items-center gap-2 px-1.5">
+                        {/* The faces, and then the names in writing. The stack
+                            carries the count itself, so nothing here says "and 3
+                            more" underneath a row that already said "+3". */}
+                        <AvatarStack
+                            size={compact ? 20 : 24}
+                            max={compact ? 3 : 5}
+                            total={friends.total}
+                            people={friends.people}
+                        />
+                        <p className="min-w-0 flex-1 truncate text-sm">
+                            {friends.people.map((person, index) => (
+                                <span key={person.id}>
+                                    {index > 0 ? <span className="text-muted-foreground">, </span> : null}
+                                    <Link
+                                        href={`/u/${person.username}`}
+                                        className="transition-colors hover:text-foreground"
+                                    >
+                                        <PersonRow personId={person.id} as="span">
+                                            <PersonName id={person.id} name={person.name} />
+                                        </PersonRow>
+                                    </Link>
+                                </span>
+                            ))}
                         </p>
-                    ) : null}
+                    </div>
                 </div>
             ) : null}
 
