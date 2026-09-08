@@ -79,14 +79,19 @@ apart from `@polaris/ui`, which is Polaris' own design system.
 which is React and Konva, together with the `shared` IPC contract, which is
 types only and describes the bridge each one expects.
 
-They compile and they are not wired to a route. The bridge they talk to
-(`window.slidesApi`, `window.docsApi` and so on) is an Electron channel injected
-by a preload script; Polaris' equivalent is server actions, and writing that
-adapter is a separate piece of work from carrying the code across. Polaris' own
-Office apps are unaffected and remain what `/office` serves: these are here as
-the repository asked, not as a replacement, and they have no real-time
-collaboration in them - which is the first thing Polaris' own editors were built
-to do.
+The bridge each of them talks to (`window.markdownApi`, `window.slidesApi` and
+so on) is an Electron channel injected by a preload script. **The markdown one
+is implemented**: opening a `.md` in Drive offers "Full editor" beside Pretty,
+Raw and the plain textarea, and that runs GenOffice's editor against a bridge
+answered by Drive - reading the file the viewer already read, writing through
+the same toolbar every other editor in Drive saves with. The other three
+compile and are not yet reachable; their bridges are larger and each needs the
+same treatment.
+
+Polaris' own Office apps are unaffected and remain what `/office` serves. These
+are an alternative rather than a replacement, and they have no real-time
+collaboration in them - which is the first thing Polaris' own editors were
+built to do.
 
 What could NOT be taken, and why:
 

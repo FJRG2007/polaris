@@ -6,11 +6,13 @@
     "description": "GenOffice's pdf editor, its renderer half. Ported from GenOffice (Apache-2.0) - see NOTICE. Not wired to a route: the bridge it talks to is an Electron channel, and Polaris' equivalent is server actions.",
     "exports": {
         ".": {
-            "types": "./src/renderer/App.tsx",
-            "import": "./src/renderer/App.tsx"
+            "types": "./dist/App.d.ts",
+            "import": "./dist/App.js",
+            "default": "./dist/App.js"
         }
     },
     "scripts": {
+        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
@@ -24,5 +26,7 @@
         "pdfjs-dist": "6.1.200",
         "react": "19.0.0",
         "react-dom": "19.0.0"
-    }
+    },
+    "main": "./dist/App.js",
+    "types": "./dist/App.d.ts"
 }

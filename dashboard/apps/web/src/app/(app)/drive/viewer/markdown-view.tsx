@@ -14,6 +14,7 @@ import { MarkdownContent } from "./markdown-content";
 import { renderMarkdown } from "./markdown-render";
 import { Loading, ViewerError } from "./status";
 import { readOnlyReason, useTextFile } from "./text-file";
+import { RichMarkdownEditor } from "./rich-markdown";
 import type { ViewerTarget } from "./types";
 
 /**
@@ -50,6 +51,17 @@ export function MarkdownView({
 }) {
     const { file, error, setText } = useTextFile(src);
     const [mode, setMode] = useState<"pretty" | "raw">("pretty");
+    /** Whether the editing pane is the plain textarea or the full editor. The
+     *  textarea stays the default: most Markdown in a Drive is a README. */
+    const [rich, setRich] = useState(false);
+    /** The theme the editor is told, so it does not paint a white page under a
+     *  dark one. Read from the document rather than from a preference: what
+     *  matters is what is on screen. */
+    const theme =
+        typeof document !== "undefined" &&
+        document.documentElement.getAttribute("data-theme") === "dark"
+            ? ("dark" as const)
+            : ("light" as const);
     const [html, setHtml] = useState("");
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState("");
@@ -95,6 +107,13 @@ export function MarkdownView({
                             <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                                 Cancel
                             </Button>
+                            <button
+                                type="button"
+                                onClick={() => setRich((held) => !held)}
+                                className="rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
+                            >
+                                {rich ? "Plain text" : "Full editor"}
+                            </button>
                             <EditorActions
                                 target={target}
                                 dirty={draft !== file.text}
@@ -151,7 +170,16 @@ export function MarkdownView({
                 )}
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
-                {editing ? (
+                {editing && rich ? (
+                    // GenOffice's own editor, over the same draft the textarea
+                    // holds and saved by the same toolbar - see `rich-markdown`.
+                    <RichMarkdownEditor
+                        text={file.text}
+                        name={target.name}
+                        theme={theme}
+                        onChange={setDraft}
+                    />
+                ) : editing ? (
                     <textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}

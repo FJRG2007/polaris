@@ -2,6 +2,7 @@
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
  * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
  */
+/// <reference path="./env.d.ts" />
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'

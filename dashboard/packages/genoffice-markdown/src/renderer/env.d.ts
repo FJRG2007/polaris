@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 
 import type { ProjectApi } from '@polaris/project-store'
 import type { MarkdownApi } from '../shared/ipc'

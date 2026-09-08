@@ -2,6 +2,7 @@
  * Ported from GenOffice (github.com/genspark-ai/genoffice), Apache-2.0.
  * Copyright 2026 Mainfunc, Inc. See NOTICE at the root of this repository.
  */
+/// <reference path="./env.d.ts" />
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
