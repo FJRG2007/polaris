@@ -52,6 +52,7 @@ import type {
 import type {
     ChatCategoryView,
     ChatChannelView,
+    ChatElsewhere,
     ChatMemberView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
@@ -98,6 +99,13 @@ export async function listSpacesAction(): Promise<{ spaces: ChatSpaceView[] }> {
 export async function listChannelsAction(): Promise<{ channels: ChatChannelView[] }> {
     const me = await actor();
     return { channels: await chat.listChannels(me) };
+}
+
+/** The conversations this reader has in a chat that is not the one open. Empty
+ *  for everybody but a member of an organization that keeps its own. */
+export async function conversationsElsewhereAction(): Promise<{ chats: ChatElsewhere[] }> {
+    const me = await actor();
+    return { chats: await chat.conversationsElsewhere(me) };
 }
 
 export async function listCategoriesAction(): Promise<{ categories: ChatCategoryView[] }> {

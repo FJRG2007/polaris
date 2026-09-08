@@ -24,6 +24,7 @@
 import Link from "next/link";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
+import { Elsewhere } from "./elsewhere";
 import { usePresence } from "@/components/presence-store";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
@@ -390,6 +391,10 @@ export function ChatSidebar() {
                                 />
                             ))
                         )}
+                        {/* Under the list rather than above it: it is an
+                            account of what the badge counts and this list does
+                            not, and nobody comes to the rail looking for it. */}
+                        <Elsewhere revision={channels} />
                     </Section>
                 ) : (
                     <>

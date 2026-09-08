@@ -28,6 +28,7 @@ import { OrgSuccessorCard, type OrgSuccessorPerson } from "./successor-card";
 import {
     changeOrgSlugAction,
     deleteOrgAction,
+    setOrgChatAction,
     transferOrgAction,
     updateOrgAction
 } from "@/app/(app)/account/organizations/actions";
@@ -40,6 +41,7 @@ import {
     ConfirmDeleteDialog,
     Input,
     Select,
+    Switch,
     Textarea
 } from "@polaris/ui";
 
@@ -50,7 +52,9 @@ export function SettingsView({
     canDelete,
     candidates,
     successor,
-    impact
+    impact,
+    chatIsolated,
+    chatOffered
 }: {
     org: OrgDetail;
     isOwner: boolean;
@@ -66,6 +70,11 @@ export function SettingsView({
      *  who is the only person shown or asked. */
     successor: OrgSuccessorPerson | null;
     impact: OrgDeletionImpact;
+    /** Whether this organization keeps its own chat today. */
+    chatIsolated: boolean;
+    /** Whether this Polaris offers the choice at all. False hides nothing that
+     *  was said - it only takes the switch away. */
+    chatOffered: boolean;
 }) {
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -100,6 +109,12 @@ export function SettingsView({
                     />
                     <ProfileCard org={org} onRun={run} />
                     <HandleCard org={org} confirm={confirm} onError={setError} />
+                    {/* Under the handle because it is the one setting here that
+                        changes what people see rather than what the
+                        organization is called. */}
+                    {chatOffered && (
+                        <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />
+                    )}
                 </>
             )}
 
@@ -115,6 +130,65 @@ export function SettingsView({
             {canDelete && <DangerCard org={org} impact={impact} />}
             {confirmElement}
         </div>
+    );
+}
+
+/**
+ * Its own chat, or the one everybody shares.
+ *
+ * Written as what it does to the people in it rather than as a feature, because
+ * that is the decision: turning it on gives everybody here a second place their
+ * messages can be, reached from the shelf switch in the header. Turning it back
+ * off does not lose any of them.
+ */
+function ChatCard({
+    orgId,
+    isolated,
+    onRun
+}: {
+    orgId: string;
+    isolated: boolean;
+    onRun: Runner;
+}) {
+    const [on, setOn] = useState(isolated);
+    const [saving, setSaving] = useState(false);
+
+    const change = async (next: boolean) => {
+        if (saving) return;
+        setSaving(true);
+        // Moved first and put back if the write is refused: a switch that waits
+        // for a round trip reads as a switch that did not take.
+        setOn(next);
+        const ok = await onRun(() => setOrgChatAction(orgId, next));
+        setSaving(false);
+        if (!ok) setOn(!next);
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Chat</CardTitle>
+            </CardHeader>
+            <CardBody>
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">A chat of its own</p>
+                        <p className="text-muted-foreground text-xs">
+                            Conversations between the people here stay here, apart from the ones
+                            they have with everybody else. They switch between the two the way
+                            they switch shelves, in the header. Turning this off later puts the
+                            conversations back rather than hiding them.
+                        </p>
+                    </div>
+                    <Switch
+                        checked={on}
+                        onChange={change}
+                        disabled={saving}
+                        aria-label="A chat of its own"
+                    />
+                </div>
+            </CardBody>
+        </Card>
     );
 }
 

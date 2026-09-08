@@ -11,6 +11,7 @@
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
+import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
@@ -185,7 +186,12 @@ export async function listSpaces(actor: ChatActor): Promise<ChatSpaceView[]> {
 
     const roles = new Map(memberships.map((row) => [row.spaceId, row.role]));
     const levels = new Map(preferences.map((row) => [row.spaceId, row.notifyLevel]));
-    return spaces.map((space) => ({
+    // An organization keeping its own chat keeps its spaces there too. Listing
+    // only - what somebody may open is still what they may open, and a link to
+    // one of these opens it whichever shelf they are on.
+    const scopes = await readableChatScopes(actor.id);
+    const shown = spaces.filter((space) => scopes.has(space.orgId));
+    return shown.map((space) => ({
         id: space.id,
         name: space.name,
         description: space.description,
@@ -587,6 +593,20 @@ export async function timeOutMember(
  * in the rail, and the caller groups them by `kind` and `spaceId` rather than
  * asking twice for two halves of the same answer.
  */
+/** Which organization each of these spaces belongs to, for deciding which chat
+ *  the rooms inside them are part of. One query, nulls dropped. */
+async function spaceOrgIds(
+    spaceIds: readonly (string | null)[]
+): Promise<Map<string, string | null>> {
+    const ids = [...new Set(spaceIds.filter((id): id is string => id !== null))];
+    if (ids.length === 0) return new Map();
+    const spaces = await prisma.chatSpace.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, orgId: true }
+    });
+    return new Map(spaces.map((space) => [space.id, space.orgId]));
+}
+
 export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]> {
     const spaces = await reachableSpaceIds(actor);
     const [memberships, administered] = await Promise.all([
@@ -606,7 +626,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
     ]);
     const mine = new Map(memberships.map((row) => [row.channelId, row]));
 
-    const channels = await prisma.chatChannel.findMany({
+    const found = await prisma.chatChannel.findMany({
         where: {
             OR: [
                 { id: { in: memberships.map((row) => row.channelId) } },
@@ -617,6 +637,7 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
         select: {
             id: true,
             spaceId: true,
+            orgId: true,
             categoryId: true,
             kind: true,
             name: true,
@@ -631,6 +652,21 @@ export async function listChannels(actor: ChatActor): Promise<ChatChannelView[]>
             members: { select: { userId: true, user: { select: { name: true } } } }
         }
     });
+    // Which chat this shelf is: an organization keeping its own shows that one
+    // and nothing else, and everywhere else shows the shared chat plus anything
+    // an organization filed while it was keeping its own and no longer is.
+    //
+    // Applied to the rows rather than in the query because a room in a space is
+    // filed by its space, so its chat is the space's - and a space somebody is
+    // in but can no longer reach still has to be answered for, which a query
+    // over reachable spaces would not do.
+    const [scopes, spaceOrgs] = await Promise.all([
+        readableChatScopes(actor.id),
+        spaceOrgIds(found.map((channel) => channel.spaceId))
+    ]);
+    const channels = found.filter((channel) =>
+        scopes.has(channel.spaceId ? (spaceOrgs.get(channel.spaceId) ?? null) : channel.orgId)
+    );
     if (channels.length === 0) return [];
 
     const unread = await unreadCounts(actor, channels, mine);
@@ -1323,6 +1359,13 @@ export async function directCounterpart(
  * the same moment end up in the same room rather than in two rooms with half the
  * history each. A group has no such key - three people can genuinely want two
  * different group conversations - so asking twice makes two.
+ *
+ * Which chat it lands in is the shelf: an organization keeping its own gets a
+ * conversation filed under it, and the key carries the organization too, so the
+ * same two people hold one conversation in each without either being able to
+ * collide with the other. In an organization's own chat the people have to be
+ * on its roster - a conversation with somebody outside it filed under it would
+ * be the isolation not holding.
  */
 export async function openDirect(
     actor: ChatActor,
@@ -1361,9 +1404,17 @@ export async function openDirect(
         throw new ChatAccessError("You are not allowed to start group conversations");
     }
 
+    // The chat this is being started in, which is also what it is filed under.
+    const orgId = await currentChatOrgId(actor.id);
+    if (orgId) {
+        const roster = await orgChatPeople(orgId);
+        if (others.some((id) => !roster.has(id)))
+            throw new ChatAccessError("They are not in this organization");
+    }
+
     const everyone = [actor.id, ...others];
     if (others.length === 1) {
-        const key = [...everyone].sort().join(":");
+        const key = core.dmKeyFor(everyone, orgId);
         const existing = await prisma.chatChannel.findUnique({
             where: { dmKey: key },
             select: { id: true }
@@ -1376,6 +1427,7 @@ export async function openDirect(
                     kind: "dm",
                     name: "",
                     private: true,
+                    orgId,
                     dmKey: key,
                     createdById: actor.id,
                     members: { createMany: { data: everyone.map((userId) => ({ userId })) } }
@@ -1407,6 +1459,7 @@ export async function openDirect(
             kind: "group",
             name: name.trim().slice(0, core.MAX_CHAT_CHANNEL_NAME),
             private: true,
+            orgId,
             createdById: actor.id,
             // Whoever starts a group runs it. Left unset, a group had no owner at
             // all: its creator was told they were not the owner when they tried to
@@ -1479,6 +1532,11 @@ async function isPrivate(channelId: string): Promise<boolean> {
  * anywhere told them a message had arrived - the count lived inside the app
  * that already had their attention.
  *
+ * Counts every chat, not the one open. An organization keeping its own is a
+ * second place a message can arrive, and a badge that went quiet because
+ * somebody was on the other shelf would be Polaris deciding they did not need to
+ * know - `conversationsElsewhere` is how the rail accounts for the difference.
+ *
  * Counts only conversations they are a MEMBER of, which is narrower than the
  * rail: a public channel in a space they can reach but never joined has no
  * membership row, so every message in it would read as unread and the tab icon
@@ -1492,6 +1550,75 @@ export interface ChatUnread {
     /** How many conversations they are in, for a screen that would rather say
      *  "two conversations" than "seventeen messages". */
     readonly conversations: number;
+}
+
+/**
+ * The conversations this reader has in a chat that is not the one open.
+ *
+ * The badge counts every message waiting anywhere, because a message that
+ * arrives and says nothing is worse than one in the wrong place. So the rail has
+ * to be able to account for a number that is larger than what it is showing, and
+ * this is what it accounts for it with: one line per other chat, named, with
+ * what is waiting in it, and switching shelf when it is pressed.
+ *
+ * Empty for almost everybody. Only an account in an organization that keeps its
+ * own chat has a second one at all.
+ */
+export interface ChatElsewhere {
+    /** The organization whose chat it is, or null for the one everybody shares. */
+    readonly orgId: string | null;
+    readonly name: string;
+    /** Conversations there, however quiet. */
+    readonly conversations: number;
+    /** Messages waiting in them, mutes and archived rooms left out exactly as
+     *  the badge leaves them out. */
+    readonly unread: number;
+}
+
+export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElsewhere[]> {
+    const scopes = await readableChatScopes(actor.id);
+    const memberships = await prisma.chatChannelMember.findMany({
+        where: { userId: actor.id },
+        select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
+    });
+    if (memberships.length === 0) return [];
+
+    const channels = await prisma.chatChannel.findMany({
+        where: {
+            id: { in: memberships.map((row) => row.channelId) },
+            spaceId: null,
+            archived: false
+        },
+        select: { id: true, orgId: true, org: { select: { name: true } } }
+    });
+    const away = channels.filter((channel) => !scopes.has(channel.orgId));
+    if (away.length === 0) return [];
+
+    const heard = memberships.filter((row) => !core.muteInForce(row));
+    const counts = await unreadCounts(
+        actor,
+        away.filter((channel) => heard.some((row) => row.channelId === channel.id)),
+        new Map(heard.map((row) => [row.channelId, row]))
+    );
+
+    const grouped = new Map<string | null, { name: string; conversations: number; unread: number }>();
+    for (const channel of away) {
+        const entry = grouped.get(channel.orgId) ?? {
+            // A conversation filed under an organization that is gone cannot
+            // happen - the row goes with it - so the only nameless chat is the
+            // shared one.
+            name: channel.org?.name ?? "Everyone",
+            conversations: 0,
+            unread: 0
+        };
+        entry.conversations += 1;
+        entry.unread += Math.max(0, counts.get(channel.id) ?? 0);
+        grouped.set(channel.orgId, entry);
+    }
+
+    return [...grouped.entries()]
+        .map(([orgId, entry]) => ({ orgId, ...entry }))
+        .sort((left, right) => right.unread - left.unread || left.name.localeCompare(right.name));
 }
 
 export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {

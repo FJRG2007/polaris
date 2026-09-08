@@ -4529,6 +4529,14 @@ model Organization {
     // member cannot leave an organization nobody can administer. Ownership moves
     // by writing this column, which is what a transfer does.
     ownerId     String   @db.Uuid
+    // Whether this organization keeps its own chat: its people's conversations
+    // with each other filed under it and kept off the chat they share with
+    // everybody else. Off by default, and off for every organization that
+    // already exists - a chat that splits in two without being asked is a
+    // history somebody has to go looking for. An instance may withdraw the
+    // choice entirely (`chat.orgIsolation`), and when it does, what was already
+    // said here is folded back into the shared chat rather than hidden.
+    chatIsolated Boolean @default(false)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4543,6 +4551,7 @@ model Organization {
     mailAccounts MailAccount[]
     telemetryProjects TelemetryProject[]
     chatSpaces ChatSpace[]
+    chatChannels ChatChannel[]
     projects Project[]
     projectGrants ProjectMember[]
     domains  OwnerDomain[]
@@ -7052,6 +7061,12 @@ model ChatChannel {
     // A channel only its members see. Always true for dm and group, and the
     // reason the flag exists rather than being read off `kind`.
     private       Boolean   @default(false)
+    // The organization whose own chat this conversation belongs to, or null for
+    // the chat everybody shares. Only ever set on a `dm` or a `group`: a channel
+    // is filed under its space, and the space already carries the organization.
+    // It is part of `dmKey` as well as a column of its own - the key is what
+    // makes the conversation unique, and the column is what a list filters on.
+    orgId         String?   @db.Uuid
     dmKey         String?   @unique
     createdById   String?   @db.Uuid
     // Who runs a group. The creator to begin with, and transferable - a group
@@ -7077,6 +7092,7 @@ model ChatChannel {
     updatedAt     DateTime  @updatedAt
 
     space    ChatSpace?          @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    org      Organization?       @relation(fields: [orgId], references: [id], onDelete: Cascade)
     category ChatCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
     avatar   ChatChannelAvatar?
     members  ChatChannelMember[]
@@ -7086,6 +7102,7 @@ model ChatChannel {
 
     @@index([spaceId, order])
     @@index([categoryId, order])
+    @@index([orgId])
     @@index([lastMessageAt])
 }
 

@@ -19,6 +19,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { proveStepUp } from "@/lib/step-up";
 import * as orgs from "@/lib/orgs/org-service";
+import { orgChatOffered } from "@/lib/chat/isolation";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
 import { canCreateOrganization } from "@/lib/orgs/policy";
@@ -104,6 +105,37 @@ export async function updateOrgAction(orgId: string, input: unknown): Promise<{ 
         return {};
     } catch (caught) {
         return failure(caught, "Could not save the organization");
+    }
+}
+
+/**
+ * Whether this organization keeps its own chat.
+ *
+ * A setting like any other, so whoever holds the organization's settings may
+ * change it - and refused outright when the instance has withdrawn the choice,
+ * because a screen that cannot show the switch must not be reachable by sending
+ * the write anyway.
+ *
+ * Turning it off hides nothing: what was said in the organization's chat is
+ * folded back into the shared one, which is the whole reason it is safe to
+ * change your mind about.
+ */
+export async function setOrgChatAction(
+    orgId: string,
+    isolated: unknown
+): Promise<{ error?: string }> {
+    const caller = await actor();
+    const wanted = isolated === true;
+    try {
+        await orgs.requireOrgPermission(caller, orgId, "settings.manage");
+        if (wanted && !(await orgChatOffered()))
+            return { error: "This Polaris does not offer separate chats" };
+        await orgs.setOrgChat(orgId, wanted);
+        await record(caller.id, orgId, "org.chat", { isolated: wanted });
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "Could not save that");
     }
 }
 

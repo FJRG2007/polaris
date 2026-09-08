@@ -33,6 +33,7 @@ import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
+import { currentChatOrgId, orgChatPeople } from "./isolation";
 import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
@@ -353,13 +354,25 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
  * Everything else about who may be found - that nothing is listed, and that
  * somebody who has hidden themselves is not there at all - is `findPeople`,
  * because it is a privacy rule and must not have a second copy here.
+ *
+ * In an organization that keeps its own chat, its people and nobody else. That
+ * is what makes it the organization's chat rather than the same directory with
+ * a different name on it, and the write refuses the same set.
  */
 export async function searchForConversation(
     actor: ChatActor,
     query: string,
     limit = 8
 ): Promise<FoundPeople> {
-    return findPeople(actor, query, { reachableOnly: true, reachable: messageable, limit });
+    const orgId = await currentChatOrgId(actor.id);
+    const roster = orgId ? await orgChatPeople(orgId) : null;
+    const reachable = roster
+        ? async (userIds: readonly string[]) => {
+              const allowed = await messageable(userIds);
+              return new Set([...allowed].filter((id) => roster.has(id)));
+          }
+        : messageable;
+    return findPeople(actor, query, { reachableOnly: true, reachable, limit });
 }
 
 /**

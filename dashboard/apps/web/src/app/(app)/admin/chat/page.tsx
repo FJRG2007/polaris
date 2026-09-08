@@ -7,12 +7,14 @@ import { requireAdmin } from "@/lib/session";
 import { allChatRules } from "@/lib/chat/rules";
 import { ChatRulesView } from "./chat-rules-view";
 import { CallServerView } from "./call-server-view";
+import { OrgChatView } from "./org-chat-view";
+import { orgChatOffered } from "@/lib/chat/isolation";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatRulesPage() {
     await requireAdmin();
-    const rules = await allChatRules();
+    const [rules, offered] = await Promise.all([allChatRules(), orgChatOffered()]);
 
     return (
         // A column of settings and nothing wide, centred the way the rest of the
@@ -24,6 +26,12 @@ export default async function ChatRulesPage() {
                 description="How long a message may be, what it may carry, how long it stays editable, and what a deleted one leaves behind. Answered separately for spaces, group chats and direct messages."
             />
             <ChatRulesView initial={rules} />
+            {/* Under the rules and above the call server: it is a house rule
+                like the ones over it, and it is asked about far more often than
+                where calls run. */}
+            <div className="mt-8">
+                <OrgChatView offered={offered} />
+            </div>
             {/* Under the rules rather than above them: the rules are what an
                 administrator comes here to change, and this is set once and then
                 never again. */}

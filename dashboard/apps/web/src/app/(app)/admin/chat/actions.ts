@@ -12,6 +12,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { setChatRules } from "@/lib/chat/rules";
+import { setOrgChatOffered } from "@/lib/chat/isolation";
 import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
@@ -37,6 +38,27 @@ export async function setChatRulesAction(
         targetType: "setting",
         targetId: `chat.rules.${chosen}`,
         metadata: { ...parsed.data }
+    });
+    revalidatePath("/admin/chat");
+    return {};
+}
+
+/**
+ * Withdraw or restore the choice of a chat of an organization's own.
+ *
+ * Only the offer moves. What every organization has already chosen stays
+ * written, so restoring it later restores their chats exactly as they were.
+ */
+export async function setOrgChatOfferedAction(offered: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const wanted = offered === true;
+    await setOrgChatOffered(wanted);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.orgs.offer",
+        targetType: "setting",
+        targetId: "chat.orgIsolation",
+        metadata: { offered: wanted }
     });
     revalidatePath("/admin/chat");
     return {};

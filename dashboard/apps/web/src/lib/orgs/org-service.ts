@@ -425,6 +425,12 @@ export async function orgIdForSlug(slug: string): Promise<string | null> {
     return org?.id ?? null;
 }
 
+/** Whether this organization keeps its own chat. The switch alone: whether it
+ *  is in force is `chat/isolation`, which also asks the instance. */
+export async function setOrgChat(orgId: string, isolated: boolean): Promise<void> {
+    await prisma.organization.update({ where: { id: orgId }, data: { chatIsolated: isolated } });
+}
+
 export interface OrgDetail {
     readonly id: string;
     readonly slug: string;

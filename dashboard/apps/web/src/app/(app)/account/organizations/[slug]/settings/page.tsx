@@ -20,6 +20,8 @@ import { hasOrgPermission } from "@polaris/core";
 import { requireOrgFrame } from "@/lib/orgs/page-access";
 import { canDeleteOrg, listOrgMembers, orgDeletionImpact } from "@/lib/orgs/org-service";
 import { effectiveOrgSuccessor } from "@/lib/successor-service";
+import { orgChatOffered } from "@/lib/chat/isolation";
+import { prisma } from "@polaris/db";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +42,7 @@ export default async function OrganizationSettingsPage({
     if (!canManage && !canDelete) notFound();
 
     // Each half's inputs are only fetched for somebody who will be shown it.
-    const [members, impact, successor] = await Promise.all([
+    const [members, impact, successor, chatOffered, chat] = await Promise.all([
         access.isOwner
             ? listOrgMembers(org.id, { id: user.id, isAdmin: user.isAdmin })
             : Promise.resolve([]),
@@ -50,7 +52,12 @@ export default async function OrganizationSettingsPage({
         // The owner alone. Who answers for an organization when its owner is gone
         // is the owner's decision and nobody else's business - a member holding
         // `settings.manage` is not shown the name, let alone offered the field.
-        access.isOwner ? effectiveOrgSuccessor(org.id) : Promise.resolve(null)
+        access.isOwner ? effectiveOrgSuccessor(org.id) : Promise.resolve(null),
+        orgChatOffered(),
+        prisma.organization.findUnique({
+            where: { id: org.id },
+            select: { chatIsolated: true }
+        })
     ]);
 
     return (
@@ -64,6 +71,8 @@ export default async function OrganizationSettingsPage({
                 .map((member) => ({ userId: member.userId, name: member.name }))}
             successor={successor}
             impact={impact}
+            chatIsolated={chat?.chatIsolated === true}
+            chatOffered={chatOffered}
         />
     );
 }
