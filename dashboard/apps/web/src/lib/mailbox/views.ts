@@ -37,13 +37,23 @@ export interface MailFolderView {
     readonly depth: number;
 }
 
-/** Every folder worth drawing, ordered the way the rail reads them: the roles
- *  first, in their conventional order, then everything else alphabetically
- *  under its own parent. */
-export async function listFolders(userId: string, accountId?: string): Promise<MailFolderView[]> {
+/**
+ * Every folder worth drawing, ordered the way the rail reads them: the roles
+ * first, in their conventional order, then everything else alphabetically under
+ * its own parent.
+ *
+ * Narrowed to the shelf being worked from, like every other lister here: Mail
+ * draws somebody's own mailboxes or an organization's, never the two in one
+ * rail, and a screen handed both silently shows the wrong working life.
+ */
+export async function listFolders(
+    userId: string,
+    shelfOrgId: string | null,
+    accountId?: string
+): Promise<MailFolderView[]> {
     const rows = await prisma.mailFolder.findMany({
         where: {
-            account: { userId },
+            account: { userId, orgId: shelfOrgId },
             ...(accountId ? { accountId } : {}),
             hidden: false,
             OR: [{ subscribed: true }, { role: { not: "none" } }]
@@ -566,15 +576,27 @@ export async function readThreadView(
     };
 }
 
-/** How many unread messages are waiting, per mailbox and in total, for the badge
- *  on the app switcher and the number beside each account. */
+/** Every shelf at once, for the badges outside Mail: a message arriving in a
+ *  company mailbox is one somebody wants to be told about whichever shelf they
+ *  happen to be looking at. Named so that asking for it is a decision. */
+export const EVERY_SHELF = "every" as const;
+
+/**
+ * How many unread messages are waiting, per mailbox and in total, for the badge
+ * on the app switcher and the number beside each account.
+ *
+ * The shelf has to be written down. Mail's own rail asks for the one it is
+ * drawing, or its total counts mailboxes that are not on the screen and quietly
+ * disagrees with the numbers beside them.
+ */
 export async function unreadCounts(
-    userId: string
+    userId: string,
+    shelfOrgId: string | null | typeof EVERY_SHELF
 ): Promise<{ total: number; byAccount: Record<string, number> }> {
     const rows = await prisma.mailMessage.groupBy({
         by: ["accountId"],
         where: {
-            account: { userId },
+            account: { userId, ...(shelfOrgId === EVERY_SHELF ? {} : { orgId: shelfOrgId }) },
             folder: { role: "inbox" },
             seen: false,
             OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: new Date() } }]

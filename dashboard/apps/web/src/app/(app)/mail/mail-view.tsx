@@ -199,12 +199,20 @@ export function MailView({
         [folders, page.folderId, page.role]
     );
 
-    /** What a set of conversations leaving unread behind means for the rail. */
+    /**
+     * What a set of conversations leaving unread behind means for the rail.
+     *
+     * A count either way: unread mail leaving a folder takes off it, and mail
+     * marked unread again is handed in negative and puts the same number back.
+     * Filtering on "more than nothing" here is what left marking a conversation
+     * unread with a bold row and a count that disagreed with it until the server
+     * answered.
+     */
     const unreadNudges = useCallback(
         (rows: readonly { accountId: string; unreadCount: number }[]) =>
             rows.flatMap((row) => {
                 const folderId = listedFolder(row.accountId);
-                return folderId && row.unreadCount > 0
+                return folderId && row.unreadCount !== 0
                     ? [{ folderId, by: -row.unreadCount }]
                     : [];
             }),

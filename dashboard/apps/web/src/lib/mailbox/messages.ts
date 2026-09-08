@@ -170,6 +170,28 @@ function byFolder<T extends { folderId: string }>(rows: readonly T[]): Map<strin
     return out;
 }
 
+/** What a caller can vary about an action. */
+export interface MailActionOptions {
+    /**
+     * Whether Junk and Not junk also teach the filter. True everywhere a person
+     * pressed the button, and false for the filter's own verdict: a classifier
+     * trained on its own output converges on believing whatever it happened to
+     * think first.
+     */
+    readonly teach?: boolean;
+    /**
+     * Whether the tidying that follows a move is done here: reading the folder
+     * the messages landed in, and rebuilding this mailbox's conversations.
+     *
+     * True for anything somebody is watching, because they will look there.
+     * False for the junk filter, which runs inside a sync that does both itself
+     * once the folder is through - a connection per arriving message is how an
+     * account reaches its server's concurrent-connection limit, and rebuilding
+     * five hundred conversations per message is the sync taking minutes.
+     */
+    readonly settle?: boolean;
+}
+
 /**
  * Do one thing to a set of messages.
  *
@@ -180,7 +202,8 @@ function byFolder<T extends { folderId: string }>(rows: readonly T[]): Map<strin
 export async function actOnMessages(
     userId: string,
     messageIds: readonly string[],
-    action: MailAction
+    action: MailAction,
+    options: MailActionOptions = {}
 ): Promise<number> {
     const messages = await ownedMessages(userId, messageIds);
     if (messages.length === 0) return 0;
@@ -195,12 +218,21 @@ export async function actOnMessages(
     // the destination on the next pass - so the words and the sender have to be
     // read while they are still here. Only these two actions teach anything: the
     // filter's own verdicts teach it nothing, or it would converge on believing
-    // whatever it happened to think first.
-    if (action === "junk" || action === "not-junk") {
+    // whatever it happened to think first - which is what `teach: false` is for.
+    if ((action === "junk" || action === "not-junk") && options.teach !== false) {
         const verdict = action === "junk" ? "junk" : "good";
-        for (const message of messages) {
-            await teachSpam(message.accountId, message.id, verdict);
-        }
+        // Concurrently, and once per message rather than once per row: teaching
+        // is keyed on the Message-Id, so the same message selected in two
+        // folders of one mailbox must not be counted twice - which is what
+        // running them one after another used to prevent by accident.
+        const taught = new Set<string>();
+        const once = messages.filter((message) => {
+            const key = `${message.accountId}:${message.messageId.trim()}`;
+            if (taught.has(key)) return false;
+            taught.add(key);
+            return true;
+        });
+        await Promise.all(once.map((message) => teachSpam(message.accountId, message.id, verdict)));
     }
 
     let done = 0;
@@ -252,9 +284,11 @@ export async function actOnMessages(
         // It is not skipped, only moved: the stream frame that follows is what
         // redraws the screen once the new home is readable, and until then the
         // list somebody is looking at is already right.
-        settle(account, [...landed], userId);
+        if (options.settle !== false) settle(account, [...landed], userId);
     }
-    await refreshThreadsFor(messages.map((message) => message.accountId));
+    if (options.settle !== false) {
+        await refreshThreadsFor(messages.map((message) => message.accountId));
+    }
     return done;
 }
 

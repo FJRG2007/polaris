@@ -14,14 +14,19 @@
  * immediately instead of appearing to hang while a file is built.
  */
 
+import * as core from "@polaris/core";
 import { Download, Upload } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailFolderView } from "@/lib/mailbox/views";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, EmptyState, Select, useToast } from "@polaris/ui";
-import { importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
+import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
+
+/** The archive ceiling as the screen says it, from the number the server
+ *  enforces. */
+const ARCHIVE_LIMIT_MB = Math.round(core.MAIL_MAX_ARCHIVE_BYTES / (1024 * 1024));
 
 /** Where an import has got to. Null is one that has not started. */
 interface Progress {
@@ -51,6 +56,25 @@ export function ArchiveView({
     );
     const [folderId, setFolderId] = useState("");
     const target = folderId || mine.find((one) => one.role === "archive")?.id || mine[0]?.id || "";
+    /** How many messages the download would carry. Null until it is known, so
+     *  the line under the button appears rather than flickering through nought. */
+    const [exportCount, setExportCount] = useState<number | null>(null);
+
+    // Asked whenever the scope changes, because a download of a whole mailbox is
+    // the one on this screen somebody should be able to size up before starting.
+    useEffect(() => {
+        if (!account) return;
+        let current = true;
+        setExportCount(null);
+        void exportSizeAction({ accountId: account.id, folderId: folderId || null }).then(
+            (answer) => {
+                if (current && "count" in answer) setExportCount(answer.count);
+            }
+        );
+        return () => {
+            current = false;
+        };
+    }, [account, folderId]);
 
     if (!account) {
         return (
@@ -64,6 +88,15 @@ export function ArchiveView({
 
     async function bringIn(file: File): Promise<void> {
         if (!account || !target) return;
+        // Said here as well as by the server, so a three-hundred-megabyte file is
+        // refused before it is uploaded rather than after.
+        if (file.size > core.MAIL_MAX_ARCHIVE_BYTES) {
+            toast.show({
+                title: `${ARCHIVE_LIMIT_MB} MB is the most Polaris can read in one file. Split the archive and bring the parts in one after another.`
+            });
+            if (picker.current) picker.current.value = "";
+            return;
+        }
         setBusy(true);
         setProgress(null);
         try {
@@ -72,7 +105,10 @@ export function ArchiveView({
             // than on whichever disk happens to be under the web server.
             const form = new FormData();
             form.set("file", file);
-            const sent = await fetch("/api/mail/uploads", { method: "POST", body: form });
+            const sent = await fetch("/api/mail/uploads?kind=archive", {
+                method: "POST",
+                body: form
+            });
             const stored = (await sent.json()) as { upload?: { id: string }; error?: string };
             if (!sent.ok || !stored.upload) {
                 toast.show({ title: stored.error ?? "That file could not be read." });
@@ -142,11 +178,12 @@ export function ArchiveView({
                 <div className="px-3 py-2.5">
                     <h2 className="text-[13px] font-medium">Bring an archive in</h2>
                     <p className="mt-1 text-[12px] text-muted-foreground">
-                        An <code>.mbox</code> file, or a single <code>.eml</code>. Every message is
-                        put on your mail server in the folder above, so it is there on your phone
-                        and in everything else you read this mailbox with - not only here. They
-                        arrive already read, because an archive that lands as four thousand unread
-                        messages is an inbox nobody opens again.
+                        An <code>.mbox</code> file, or a single <code>.eml</code>, up to{" "}
+                        {ARCHIVE_LIMIT_MB} MB. Every message is put on your mail server in the
+                        folder above, so it is there on your phone and in everything else you read
+                        this mailbox with - not only here. They arrive already read, because an
+                        archive that lands as four thousand unread messages is an inbox nobody
+                        opens again.
                     </p>
                     <input
                         ref={picker}
@@ -222,6 +259,13 @@ export function ArchiveView({
                             Download {folderId ? "this folder" : "this mailbox"}
                         </a>
                     </Button>
+                    {exportCount !== null ? (
+                        <p className="mt-1 text-[12px] text-foreground-subtle">
+                            {exportCount === 0
+                                ? "There is nothing here to download yet."
+                                : `${exportCount.toLocaleString()} message${exportCount === 1 ? "" : "s"} in the file.`}
+                        </p>
+                    ) : null}
                 </div>
             </section>
         </div>

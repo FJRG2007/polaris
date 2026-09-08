@@ -53,7 +53,7 @@ import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
 import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
 import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
-import { unreadCounts } from "@/lib/mailbox/views";
+import { EVERY_SHELF, unreadCounts } from "@/lib/mailbox/views";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
 import { buildStamp } from "@/lib/build-stamp";
 import { NewBuildBanner } from "@/components/new-build-banner";
@@ -115,7 +115,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     // The same, for mail. A person who spends the day in Deploy is told a
     // message arrived by the same badge that tells them about a chat.
     const mailUnread = apps.ids.includes("mail")
-        ? await unreadCounts(user.id)
+        ? await unreadCounts(user.id, EVERY_SHELF)
               .then((counts) => ({
                   messages: counts.total,
                   mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length

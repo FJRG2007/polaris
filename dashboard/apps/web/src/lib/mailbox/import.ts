@@ -36,6 +36,53 @@ import { ownedAccount, ownedFolder } from "./access";
  *  rather than minutes, big enough that the connection is worth opening. */
 export const IMPORT_BATCH = 25;
 
+/**
+ * The archives currently being read, parsed once each.
+ *
+ * An import is one open and then a batch per twenty-five messages, and every one
+ * of those used to read the whole file back out of storage, decode it and split
+ * it again to take the next slice - four thousand messages meant a hundred and
+ * sixty passes over the same megabytes, which is quadratic in the size of the
+ * archive somebody is waiting on.
+ *
+ * So it is parsed on the open and kept until the last batch lands. Held per
+ * reader as well as per upload, because the read it replaces was narrowed by the
+ * owner and this must be too.
+ */
+const ARCHIVES = new Map<string, { messages: string[]; at: number }>();
+
+/** How long a parsed archive outlives its last batch. Long enough for a slow
+ *  import to finish, short enough that an abandoned one is not held for the life
+ *  of the process. */
+const ARCHIVE_TTL_MS = 30 * 60 * 1000;
+
+/** How many are held at once. An archive is megabytes; two people importing at
+ *  the same time is ordinary, ten is somebody filling the memory. */
+const ARCHIVES_HELD = 4;
+
+function archiveKey(userId: string, uploadId: string): string {
+    return `${userId}:${uploadId}`;
+}
+
+/** Anything expired, and the oldest beyond what is held. Swept on the way in
+ *  rather than on a timer: nothing here is worth a process-wide interval. */
+function sweepArchives(): void {
+    const now = Date.now();
+    for (const [key, held] of ARCHIVES) {
+        if (now - held.at > ARCHIVE_TTL_MS) ARCHIVES.delete(key);
+    }
+    while (ARCHIVES.size > ARCHIVES_HELD) {
+        const oldest = [...ARCHIVES.entries()].sort((left, right) => left[1].at - right[1].at)[0];
+        if (!oldest) break;
+        ARCHIVES.delete(oldest[0]);
+    }
+}
+
+/** Let one go, once its import has finished or failed. */
+function forgetArchive(userId: string, uploadId: string): void {
+    ARCHIVES.delete(archiveKey(userId, uploadId));
+}
+
 /** What an import is aimed at. */
 export interface ImportTarget {
     readonly accountId: string;
@@ -44,14 +91,24 @@ export interface ImportTarget {
     readonly uploadId: string;
 }
 
-/** Read the archive and say what is in it. */
+/** Read the archive and say what is in it, once per import. */
 async function messagesIn(userId: string, uploadId: string): Promise<string[]> {
+    sweepArchives();
+    const key = archiveKey(userId, uploadId);
+    const held = ARCHIVES.get(key);
+    if (held) {
+        held.at = Date.now();
+        return held.messages;
+    }
+
     const file = await readUpload(userId, uploadId);
     if (!file) return [];
     // Both shapes go through the same reader: an `.eml` is a file with no
     // separator in it, which `readMbox` answers with the one message it plainly
     // contains rather than with nothing.
-    return core.readMbox(file.bytes.toString("utf8"));
+    const messages = core.readMbox(file.bytes.toString("utf8"));
+    ARCHIVES.set(key, { messages, at: Date.now() });
+    return messages;
 }
 
 /**
@@ -96,8 +153,12 @@ export async function importBatch(
     }
 
     const all = await messagesIn(userId, target.uploadId);
-    const slice = all.slice(Math.max(0, from), Math.max(0, from) + IMPORT_BATCH);
+    // Floored here as well as validated at the edge: a slice taken from `NaN` is
+    // empty, and an empty slice reports the import as finished.
+    const at = Number.isFinite(from) ? Math.max(0, Math.floor(from)) : 0;
+    const slice = all.slice(at, at + IMPORT_BATCH);
     if (slice.length === 0) {
+        forgetArchive(userId, target.uploadId);
         return { done: 0, failed: 0, next: all.length, total: all.length };
     }
 
@@ -116,5 +177,9 @@ export async function importBatch(
         }
     });
 
-    return { done, failed, next: Math.max(0, from) + slice.length, total: all.length };
+    const next = at + slice.length;
+    // The last slice, so the parsed archive is let go rather than waiting for
+    // its half hour.
+    if (next >= all.length) forgetArchive(userId, target.uploadId);
+    return { done, failed, next, total: all.length };
 }

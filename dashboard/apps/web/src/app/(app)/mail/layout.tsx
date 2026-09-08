@@ -32,9 +32,9 @@ export default async function MailLayout({ children }: { children: React.ReactNo
     const shelfOrgId = await scopeOrgIdFor(user.id);
     const [accounts, folders, labels, unread] = await Promise.all([
         listAccountViews(user.id, shelfOrgId),
-        listFolders(user.id),
+        listFolders(user.id, shelfOrgId),
         listLabels(user.id),
-        unreadCounts(user.id)
+        unreadCounts(user.id, shelfOrgId)
     ]);
 
     // The addresses each mailbox may send as, so the composer can offer them

@@ -19,6 +19,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
+import { addressState } from "@/app/(app)/mail/address-state";
 import type { MailRuleView } from "@/lib/mailbox/rules";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
@@ -229,6 +230,13 @@ function RuleForm({
         { value: "forward", label: "send it on to somebody" }
     ];
 
+    /** The forward address as the form reads it. Answered while it is typed
+     *  against the same schema the action is refused by, because this is the one
+     *  filter that sends mail off the machine and a round trip is a poor way to
+     *  find out an address was mistyped. */
+    const forwardAddress = addressState(forwardTo, []);
+    const forwarding = actionKind === "forward";
+
     function action(): core.MailRuleAction {
         if (actionKind === "move") return { kind: "move", folder: folderId };
         if (actionKind === "label") return { kind: "label", label: labelId };
@@ -301,15 +309,25 @@ function RuleForm({
                         className="w-48"
                     />
                 ) : null}
-                {actionKind === "forward" ? (
-                    <Input
-                        value={forwardTo}
-                        inputMode="email"
-                        placeholder="them@example.com"
-                        aria-label="Where to send it"
-                        className="w-56"
-                        onChange={(event) => setForwardTo(event.target.value)}
-                    />
+                {forwarding ? (
+                    <div className="w-56">
+                        <Input
+                            value={forwardTo}
+                            inputMode="email"
+                            placeholder="them@example.com"
+                            aria-label="Where to send it"
+                            aria-invalid={forwardAddress === "invalid" ? true : undefined}
+                            aria-describedby="forward-address"
+                            onChange={(event) => setForwardTo(event.target.value)}
+                        />
+                        <span
+                            id="forward-address"
+                            className="mt-1 block text-[12px] text-danger"
+                            role={forwardAddress === "invalid" ? "alert" : undefined}
+                        >
+                            {forwardAddress === "invalid" ? "That is not an email address." : ""}
+                        </span>
+                    </div>
                 ) : null}
             </div>
 
@@ -338,7 +356,12 @@ function RuleForm({
 
             <div className="flex gap-2">
                 <Button
-                    disabled={saving || !name.trim() || !value.trim()}
+                    disabled={
+                        saving ||
+                        !name.trim() ||
+                        !value.trim() ||
+                        (forwarding && forwardAddress !== "ok")
+                    }
                     onClick={() =>
                         startSaving(async () => {
                             setProblem("");

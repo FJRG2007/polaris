@@ -283,6 +283,12 @@ const QUERY = {
         "authentication-results",
         "auto-submitted",
         "precedence",
+        // What a forward stamps on its copy. Fetched because it is the only way
+        // a message that has been round once can be recognised on the way back
+        // in - without it the loop guard in `rules.ts` reads a header nothing
+        // ever stored, and two mailboxes pointed at each other fill both
+        // servers overnight.
+        "x-polaris-forwarded",
         "x-mailer",
         "user-agent"
     ]

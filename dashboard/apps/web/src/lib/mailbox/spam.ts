@@ -224,10 +224,23 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
         // message rather than to invent a folder or to throw the message away.
         const junk = await findFolderForRole(accountId, "junk");
         if (!junk || junk.id === row.folderId) return;
-        await prisma.mailMessage.update({
-            where: { id: row.id },
-            data: { folderId: junk.id }
-        });
+
+        // Through the ordinary action, so the mail server is told and the row is
+        // dropped for the next pass to pick up under the uid the destination
+        // gave it. Rewriting `folderId` here instead left the message in the
+        // inbox on every other client, and left a row filed under Junk carrying
+        // the inbox's uid - which is a Not junk that moves somebody else's
+        // message. Imported at the call site because that module reads this one
+        // back for its teaching, and a cycle resolved at module load is a cycle
+        // that breaks on the day somebody reorders an import.
+        const { actOnMessages } = await import("./messages");
+        // Nothing is taught: this is the filter's own verdict, and a classifier
+        // trained on its own output converges on believing whatever it happened
+        // to think first. And nothing settles: this runs inside a sync that reads
+        // Junk later in the same pass and rebuilds the conversations when the
+        // folder is through, so doing either here would be a second connection
+        // and five hundred rebuilt conversations for every arriving message.
+        await actOnMessages(account.userId, [row.id], "junk", { teach: false, settle: false });
     } catch (caught) {
         // A message nobody judged is a message that arrived, which is the
         // failure this is allowed to have.
@@ -307,49 +320,73 @@ export async function teachSpam(
         });
         if (previous?.verdict === verdict) return;
 
+        // Taking the previous answer back, and putting this one on, in a handful
+        // of statements rather than one per word. A message carries up to four
+        // hundred words and a bulk Junk carries a screenful of messages: written
+        // one at a time this was thousands of round trips before the mail server
+        // was told anything, inside the action the screen is waiting on.
         if (previous) {
             const held = readCounted(previous.counted);
             const was = previous.verdict === "junk" ? "junkCount" : "goodCount";
             await Promise.all([
-                ...held.tokens.map((token) =>
-                    prisma.mailSpamToken
-                        .updateMany({
-                            where: { accountId, token, [was]: { gt: 0 } },
-                            data: { [was]: { decrement: 1 } }
-                        })
-                        .catch(() => undefined)
-                ),
-                ...held.identities.map((identity) =>
-                    prisma.mailSpamReputation
-                        .updateMany({
-                            where: {
-                                accountId,
-                                kind: identity.kind,
-                                key: identity.key,
-                                [was]: { gt: 0 }
-                            },
-                            data: { [was]: { decrement: 1 } }
-                        })
-                        .catch(() => undefined)
-                )
+                held.tokens.length > 0
+                    ? prisma.mailSpamToken
+                          .updateMany({
+                              where: { accountId, token: { in: held.tokens }, [was]: { gt: 0 } },
+                              data: { [was]: { decrement: 1 } }
+                          })
+                          .catch(() => undefined)
+                    : Promise.resolve(undefined),
+                held.identities.length > 0
+                    ? prisma.mailSpamReputation
+                          .updateMany({
+                              where: {
+                                  accountId,
+                                  [was]: { gt: 0 },
+                                  OR: held.identities.map((identity) => ({
+                                      kind: identity.kind,
+                                      key: identity.key
+                                  }))
+                              },
+                              data: { [was]: { decrement: 1 } }
+                          })
+                          .catch(() => undefined)
+                    : Promise.resolve(undefined)
             ]);
         }
 
         const column = verdict === "junk" ? "junkCount" : "goodCount";
-        for (const token of tokens) {
-            await prisma.mailSpamToken.upsert({
-                where: { accountId_token: { accountId, token } },
-                update: { [column]: { increment: 1 } },
-                create: { accountId, token, [column]: 1 }
+        // Created first at nought and counted after, rather than upserted one by
+        // one: `skipDuplicates` makes the create a no-op for the words this
+        // mailbox already knows, and the increment that follows then covers both
+        // in one statement. Two people teaching the same word at once is safe
+        // for the same reason - the create is skipped and the increment is the
+        // database's.
+        if (tokens.length > 0) {
+            await prisma.mailSpamToken.createMany({
+                data: tokens.map((token) => ({ accountId, token })),
+                skipDuplicates: true
+            });
+            await prisma.mailSpamToken.updateMany({
+                where: { accountId, token: { in: tokens } },
+                data: { [column]: { increment: 1 } }
             });
         }
-        for (const identity of identities) {
-            await prisma.mailSpamReputation.upsert({
+        if (identities.length > 0) {
+            await prisma.mailSpamReputation.createMany({
+                data: identities.map((identity) => ({
+                    accountId,
+                    kind: identity.kind,
+                    key: identity.key
+                })),
+                skipDuplicates: true
+            });
+            await prisma.mailSpamReputation.updateMany({
                 where: {
-                    accountId_kind_key: { accountId, kind: identity.kind, key: identity.key }
+                    accountId,
+                    OR: identities.map((identity) => ({ kind: identity.kind, key: identity.key }))
                 },
-                update: { [column]: { increment: 1 } },
-                create: { accountId, kind: identity.kind, key: identity.key, [column]: 1 }
+                data: { [column]: { increment: 1 } }
             });
         }
 

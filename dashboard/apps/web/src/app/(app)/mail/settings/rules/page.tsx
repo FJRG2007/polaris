@@ -17,10 +17,14 @@ export const dynamic = "force-dynamic";
 
 export default async function MailRulesPage() {
     const user = await requirePermission("mail.use");
-    const accounts = await listAccountViews(user.id, await scopeOrgIdFor(user.id));
+    const shelfOrgId = await scopeOrgIdFor(user.id);
+    const accounts = await listAccountViews(user.id, shelfOrgId);
     if (accounts.length === 0) return <NoMailboxes what="A filter" />;
 
-    const [folders, labels] = await Promise.all([listFolders(user.id), listLabels(user.id)]);
+    const [folders, labels] = await Promise.all([
+        listFolders(user.id, shelfOrgId),
+        listLabels(user.id)
+    ]);
     const rules: Record<string, Awaited<ReturnType<typeof listRules>>> = {};
     for (const account of accounts) rules[account.id] = await listRules(user.id, account.id);
 

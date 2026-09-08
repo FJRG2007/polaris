@@ -14,13 +14,13 @@
  * row says whether it is connecting, in the same words the mail server used.
  */
 
-import { useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Mail, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { OrgMailboxView } from "@/lib/mailbox/org-mailboxes";
+import { ConnectMailboxDialog } from "@/app/(app)/mail/connect-dialog";
 import { handOutMailboxAction, takeBackMailboxAction } from "./actions";
-import { ConnectMailboxDialog, type LinkedAccount } from "@/app/(app)/mail/connect-dialog";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Select, useToast } from "@polaris/ui";
 
 /** What each state means, said as the reader would say it rather than as the
@@ -36,28 +36,24 @@ export function MailboxesView({
     orgId,
     orgSlug,
     mailboxes,
-    members,
-    links,
-    googleReady,
-    microsoftReady,
-    publicAddress,
-    canSetDomain
+    members
 }: {
     orgId: string;
     orgSlug: string;
     mailboxes: OrgMailboxView[];
     members: readonly { id: string; name: string }[];
-    links: readonly LinkedAccount[];
-    googleReady: boolean;
-    microsoftReady: boolean;
-    publicAddress: boolean;
-    canSetDomain: boolean;
 }) {
     const toast = useToast();
     const [confirm, confirmDialog] = useConfirm();
     const [rows, setRows] = useState(mailboxes);
     const [adding, setAdding] = useState(false);
     const [holderId, setHolderId] = useState(members[0]?.id ?? "");
+
+    // The register as the server last drew it. Held in state so taking one back
+    // redraws the list at once, and re-seeded whenever the server sends a new
+    // one - without this a mailbox just handed out was missing from the screen
+    // that handed it out, because the state was seeded once and never again.
+    useEffect(() => setRows(mailboxes), [mailboxes]);
 
     /** Addresses already handed out, so the dialog can say so before somebody
      *  fills in a password for one that is already here. */
@@ -152,11 +148,15 @@ export function MailboxesView({
                     title="Hand out a mailbox"
                     done={`${holderName} has it. Its mail is on its way.`}
                     taken={taken}
-                    links={links}
-                    googleReady={googleReady}
-                    microsoftReady={microsoftReady}
-                    publicAddress={publicAddress}
-                    canSetDomain={canSetDomain}
+                    // A mailbox handed out belongs to its holder, and so would
+                    // the authorization that connected it - which is theirs to
+                    // grant and not this screen's to offer.
+                    links={[]}
+                    allowOauth={false}
+                    googleReady={false}
+                    microsoftReady={false}
+                    publicAddress={false}
+                    canSetDomain={false}
                     lead={
                         <label className="block">
                             <span className="mb-1 block text-[12px] text-muted-foreground">

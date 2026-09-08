@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { unreadCounts } from "@/lib/mailbox/views";
+import { EVERY_SHELF, unreadCounts } from "@/lib/mailbox/views";
 import { resolveSession, sessionCan } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -22,7 +22,10 @@ export async function GET(): Promise<Response> {
     if (!(await sessionCan(session, "mail.use"))) {
         return NextResponse.json({ messages: 0, mailboxes: 0 });
     }
-    const counts = await unreadCounts(session.id);
+    // Every shelf: the badge is read from outside Mail, and mail waiting in a
+    // company mailbox is exactly the mail somebody wants to be told about while
+    // they are looking at something else.
+    const counts = await unreadCounts(session.id, EVERY_SHELF);
     return NextResponse.json({
         messages: counts.total,
         mailboxes: Object.values(counts.byAccount).filter((one) => one > 0).length

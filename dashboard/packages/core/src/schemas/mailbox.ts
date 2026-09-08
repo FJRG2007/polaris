@@ -237,6 +237,17 @@ export const mailIdentitySchema = z.object({
  */
 export const MAIL_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
+/**
+ * The most one archive being imported may be.
+ *
+ * Nothing to do with what a mail server accepts: an archive is read here and
+ * appended message by message, so the only ceiling that matters is what this
+ * server can hold in memory while it reads one. Far above the attachment limit,
+ * which an mbox of a few thousand messages passes without being unusual, and
+ * still a number rather than none.
+ */
+export const MAIL_MAX_ARCHIVE_BYTES = 200 * 1024 * 1024;
+
 /** A file already uploaded and waiting to be attached, by its id. */
 const attachmentIds = z.array(z.string().uuid()).max(50);
 
@@ -535,4 +546,23 @@ export const mailAttachFromAddressSchema = z.object({
 export const mailBlockSenderSchema = z.object({
     address: mailAddress,
     as: z.enum(["trash", "junk"]).default("trash")
+});
+
+/** An archive being read into a mailbox: which mailbox, which folder, and the
+ *  upload holding it. Every id is resolved against its owner afterwards - this
+ *  only says the request is shaped like one. */
+export const mailImportSchema = z.object({
+    accountId: z.string().uuid(),
+    folderId: z.string().uuid(),
+    uploadId: z.string().uuid()
+});
+
+/** Where the next slice starts. Coerced and floored, because a batch that
+ *  started at `NaN` appended nothing and reported that it was finished. */
+export const mailImportFromSchema = z.coerce.number().int().min(0).default(0);
+
+/** What an export covers: one mailbox, and one of its folders or all of them. */
+export const mailExportScopeSchema = z.object({
+    accountId: z.string().uuid(),
+    folderId: z.string().uuid().nullable().default(null)
 });

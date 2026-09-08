@@ -13,7 +13,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { MAIL_MAX_ATTACHMENT_BYTES } from "@polaris/core";
+import { MAIL_MAX_ARCHIVE_BYTES, MAIL_MAX_ATTACHMENT_BYTES } from "@polaris/core";
 import { LOCAL_TARGET, placeFile, driverForTarget, resolveStorageTarget } from "@/lib/storage-target";
 
 /** Where an operator points mail attachments. Absent is "work it out". */
@@ -28,6 +28,11 @@ const UPLOAD_ROOT = "polaris/mail";
 /** The ceiling, from the shared schema, so the composer states the same number
  *  this enforces. */
 export const MAX_ATTACHMENT_BYTES = MAIL_MAX_ATTACHMENT_BYTES;
+
+/** The other ceiling: an archive being imported is not going anywhere near a
+ *  mail server as one file, so what an attachment may be says nothing about it.
+ *  See `MAIL_MAX_ARCHIVE_BYTES`. */
+export const MAX_ARCHIVE_BYTES = MAIL_MAX_ARCHIVE_BYTES;
 
 /** How long an upload nobody attached to a draft is kept before it is swept. */
 const ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
@@ -57,9 +62,9 @@ function safeName(name: string): string {
 export async function storeUpload(
     userId: string,
     file: { name: string; type: string; bytes: Uint8Array },
-    options: { inline?: boolean } = {}
+    options: { inline?: boolean; maxBytes?: number } = {}
 ): Promise<StoredUpload> {
-    if (file.bytes.length > MAX_ATTACHMENT_BYTES) {
+    if (file.bytes.length > (options.maxBytes ?? MAX_ATTACHMENT_BYTES)) {
         throw new Error("That file is bigger than most mail servers will accept.");
     }
     const folder = `${UPLOAD_ROOT}/${userId}`;
@@ -115,9 +120,9 @@ export async function readUpload(
     };
 }
 
-/** A storage stream, read whole. An attachment is capped at twenty-five
- *  megabytes on the way in, so holding one in memory is bounded by the same
- *  ceiling that let it be uploaded. */
+/** A storage stream, read whole. Bounded by whichever ceiling let the file be
+ *  uploaded - twenty-five megabytes for an attachment, the archive ceiling for
+ *  an import - rather than by anything read here. */
 async function drain(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];

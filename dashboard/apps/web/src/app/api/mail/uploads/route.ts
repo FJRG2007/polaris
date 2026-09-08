@@ -9,21 +9,45 @@
  * The size ceiling is enforced twice - by the declared length before anything is
  * read, and by what actually arrived - because the first is what the sender
  * claimed and the second is what they sent.
+ *
+ * Which ceiling depends on what the file is for. An attachment is bounded by
+ * what a mail server will take; an archive being imported is read here and
+ * appended message by message, never sent anywhere as one file, so holding it to
+ * the attachment limit refused every real export with a sentence about mail
+ * servers that had nothing to do with it.
  */
 
 import { apiPermission } from "@/lib/api-session";
-import { MAX_ATTACHMENT_BYTES, removeUpload, storeUpload } from "@/lib/mailbox/uploads";
+import {
+    MAX_ARCHIVE_BYTES,
+    MAX_ATTACHMENT_BYTES,
+    removeUpload,
+    storeUpload
+} from "@/lib/mailbox/uploads";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** How big a file of this kind may be, and what to say when it is not. */
+function ceilingFor(kind: string): { max: number; refusal: string } {
+    return kind === "archive"
+        ? {
+              max: MAX_ARCHIVE_BYTES,
+              refusal: `That archive is larger than ${Math.round(MAX_ARCHIVE_BYTES / (1024 * 1024))} MB, which is more than Polaris can read in one go. Split it and bring the parts in one after another.`
+          }
+        : { max: MAX_ATTACHMENT_BYTES, refusal: "That file is bigger than most mail servers will accept." };
+}
 
 export async function POST(request: Request): Promise<Response> {
     const user = await apiPermission("mail.use");
     if (user instanceof Response) return user;
 
+    // Said in the query rather than the form, because the declared length is
+    // refused before a byte of the body is read.
+    const ceiling = ceilingFor(new URL(request.url).searchParams.get("kind") ?? "");
     const declared = Number(request.headers.get("content-length") ?? 0);
-    if (declared > MAX_ATTACHMENT_BYTES * 1.1) {
-        return Response.json({ error: "That file is bigger than most mail servers will accept." }, { status: 413 });
+    if (declared > ceiling.max * 1.1) {
+        return Response.json({ error: ceiling.refusal }, { status: 413 });
     }
 
     let form: FormData;
@@ -37,8 +61,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length === 0) return Response.json({ error: "That file is empty." }, { status: 400 });
-    if (bytes.length > MAX_ATTACHMENT_BYTES) {
-        return Response.json({ error: "That file is bigger than most mail servers will accept." }, { status: 413 });
+    if (bytes.length > ceiling.max) {
+        return Response.json({ error: ceiling.refusal }, { status: 413 });
     }
 
     try {
@@ -46,7 +70,7 @@ export async function POST(request: Request): Promise<Response> {
             name: file.name,
             type: file.type,
             bytes
-        }, { inline: form.get("inline") === "1" });
+        }, { inline: form.get("inline") === "1", maxBytes: ceiling.max });
         return Response.json({ upload: stored });
     } catch (caught) {
         console.error("polaris: a mail attachment could not be stored:", caught);

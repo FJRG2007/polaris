@@ -34,6 +34,7 @@ import { requirePermission } from "@/lib/session";
 import * as accounts from "@/lib/mailbox/accounts";
 import * as spam from "@/lib/mailbox/spam";
 import * as mailImport from "@/lib/mailbox/import";
+import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
 import { MailFolderRoleMissing } from "@/lib/mailbox/messages";
 import * as contacts from "@/lib/mailbox/contacts";
@@ -125,14 +126,12 @@ export async function addAccountAction(input: unknown) {
 /* -------------------------------------------------------------------------- */
 
 /** How many messages are in an uploaded archive, and where they would go. */
-export async function openImportAction(input: {
-    accountId: string;
-    folderId: string;
-    uploadId: string;
-}) {
+export async function openImportAction(input: unknown) {
     const userId = await actorId();
+    const parsed = core.mailImportSchema.safeParse(input);
+    if (!parsed.success) return { error: "That file could not be read." };
     try {
-        return await mailImport.openImport(userId, input);
+        return await mailImport.openImport(userId, parsed.data);
     } catch (caught) {
         return failure(caught, "That file could not be read.");
     }
@@ -146,22 +145,38 @@ export async function openImportAction(input: {
  * a request should live and exactly the shape of thing that fails near the end
  * with nothing to show for it.
  */
-export async function importBatchAction(
-    input: { accountId: string; folderId: string; uploadId: string },
-    from: number
-) {
+export async function importBatchAction(input: unknown, from: unknown) {
     const userId = await actorId();
+    const parsed = core.mailImportSchema.safeParse(input);
+    // Where the slice starts is as much a request as the ids beside it: a batch
+    // that started at `NaN` appended nothing and answered that the import had
+    // finished, which is the one failure an import must not have.
+    const at = core.mailImportFromSchema.safeParse(from);
+    if (!parsed.success || !at.success) return { error: "That batch could not be imported." };
     try {
-        const answer = await mailImport.importBatch(userId, input, from);
+        const answer = await mailImport.importBatch(userId, parsed.data, at.data);
         // The folder is only re-read when the last batch lands: a sync between
         // every twenty-five messages would cost more than the import.
         if (answer.next >= answer.total) {
-            await syncAccount(input.accountId).catch(() => undefined);
+            await syncAccount(parsed.data.accountId).catch(() => undefined);
             refresh();
         }
         return answer;
     } catch (caught) {
         return failure(caught, "That batch could not be imported.");
+    }
+}
+
+/** How many messages an export would carry, so the screen can say so before
+ *  somebody starts a download of a mailbox that takes a while. */
+export async function exportSizeAction(input: unknown) {
+    const userId = await actorId();
+    const parsed = core.mailExportScopeSchema.safeParse(input);
+    if (!parsed.success) return { error: "That mailbox could not be counted." };
+    try {
+        return { count: await mailExport.exportSize(userId, parsed.data) };
+    } catch (caught) {
+        return failure(caught, "That mailbox could not be counted.");
     }
 }
 

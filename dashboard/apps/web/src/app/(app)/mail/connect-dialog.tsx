@@ -70,6 +70,7 @@ export function ConnectMailboxDialog({
     publicAddress,
     canSetDomain,
     microsoftReady,
+    allowOauth = true,
     taken = [],
     title = "Add a mailbox",
     done = "",
@@ -95,6 +96,16 @@ export function ConnectMailboxDialog({
     /** Whether the person looking can go and set that address themself. */
     canSetDomain: boolean;
     microsoftReady: boolean;
+    /**
+     * Whether this dialog may connect a mailbox by authorizing an outside
+     * account.
+     *
+     * False where the mailbox is not being added by the person who will hold it:
+     * an authorization belongs to the account that granted it, so the one the
+     * person filling this in has is of no use to the holder. Offering it there
+     * was a button that could only ever come back refused.
+     */
+    allowOauth?: boolean;
     /** What the dialog is called. The other caller is an organization handing a
      *  mailbox to somebody, which is not "adding" one. */
     title?: string;
@@ -191,11 +202,13 @@ export function ConnectMailboxDialog({
     }, [address, valid, already]);
 
     const oauthReady =
-        discovery?.oauth === "google"
-            ? googleReady
-            : discovery?.oauth === "microsoft"
-              ? microsoftReady
-              : false;
+        !allowOauth
+            ? false
+            : discovery?.oauth === "google"
+              ? googleReady
+              : discovery?.oauth === "microsoft"
+                ? microsoftReady
+                : false;
     const authorizable = Boolean(discovery?.oauth) && oauthReady && !usePassword;
     const usable = links.filter((link) => link.provider === discovery?.oauth && link.readyForMail);
     const chosenConnection = connectionId || usable[0]?.id || "";
@@ -349,7 +362,15 @@ export function ConnectMailboxDialog({
                                         this the screen simply asks for a password and
                                         somebody spends an afternoon working out that
                                         Polaris cannot be returned to. */}
-                                    {discovery.oauth && !publicAddress ? (
+                                    {discovery.oauth && !allowOauth ? (
+                                        <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
+                                            {discovery.serviceName} can connect this without a
+                                            password, but only its holder can authorize that from
+                                            their own account. Hand it out with a password, or ask
+                                            them to add it themselves.
+                                        </span>
+                                    ) : null}
+                                    {allowOauth && discovery.oauth && !publicAddress ? (
                                         <span className="mb-2 block rounded-md border border-border bg-card px-3 py-2 text-[12px] text-muted-foreground">
                                             {discovery.serviceName} could connect this without a
                                             password, but it has nowhere to send you back to:
