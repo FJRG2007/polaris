@@ -75,6 +75,7 @@ export type CallSound =
     | "shareOn"
     | "shareOff"
     | "hangUp"
+    | "handUp"
     | "ring"
     | "ringBack";
 
@@ -123,6 +124,19 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
     shareOff: [
         { from: 880.0, at: 0, seconds: 0.07 },
         { from: 587.33, at: 0.06, seconds: 0.1 }
+    ],
+    /**
+     * Somebody put a hand up, played to whoever is chairing.
+     *
+     * Two notes upwards and quiet with it, close to the message sound on
+     * purpose: it is a request for attention rather than an event in the call,
+     * and it lands on somebody who is already listening to people talk. Only the
+     * host hears it - see `use-sfu-call` - because a room where everybody chimed
+     * at everybody is a room that learns to ignore the chime.
+     */
+    handUp: [
+        { from: 587.33, at: 0, seconds: 0.06, gain: 0.06 },
+        { from: 880.0, at: 0.055, seconds: 0.11, gain: 0.06 }
     ],
     /** You hung up, or the call ended under you. */
     hangUp: [
@@ -194,7 +208,9 @@ let context: AudioContext | null = null;
 /** The one audio context, made the first time something is played. */
 function audio(): AudioContext | null {
     if (typeof window === "undefined") return null;
-    const Ctor = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Ctor =
+        window.AudioContext ??
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     context ??= new Ctor();
     // Suspended is the ordinary state for a context made before the reader

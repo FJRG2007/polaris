@@ -42,6 +42,7 @@ import {
     blockSenderAction,
     moreThreadsAction,
     openMessageAction,
+    warmMessageAction,
     snoozeAction,
     syncAllAction
 } from "./actions";
@@ -91,6 +92,15 @@ import {
     Star,
     Trash2
 } from "lucide-react";
+
+/**
+ * How long the pointer rests on a conversation before its body is fetched.
+ *
+ * Long enough that running down a list of fifty asks for nothing, short enough
+ * that it is already on its way by the time somebody has decided to click. A
+ * quarter of a second is roughly how long a person takes to stop moving.
+ */
+const WARM_AFTER_MS = 250;
 
 /** What list this is, as the scroll asks the server for more of it. The shape
  *  the page schema validates on the way in. */
@@ -156,7 +166,8 @@ export function MailView({
     fixedFilter: core.MailFilter | "";
 }) {
     const router = useRouter();
-    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } = useMail();
+    const { accounts, accountColor, askFolderRole, composing, identities, openComposer, refresh } =
+        useMail();
     const toast = useToast();
     const [selected, setSelected] = useState<string[]>([]);
     const [busy, startBusy] = useTransition();
@@ -189,7 +200,10 @@ export function MailView({
      *
      * Cleared whenever the server's own answer arrives, which is what
      * `threads` becoming a new array means. Keeping a patch past that would
-     * mean the screen quietly disagreeing with the server for ever.
+     * mean the screen quietly disagreeing with the server for ever - except
+     * for the one an action is still waiting on, which is held in `inFlight`
+     * and laid back over the new list, because a list that arrived is not
+     * necessarily the answer to what was asked.
      */
     /**
      * The pages fetched below the first one.
@@ -211,8 +225,27 @@ export function MailView({
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
 
     const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
-    useEffect(() => {
+    /**
+     * The overlay belonging to an action the mail server has not answered yet.
+     *
+     * Held apart from `patched` because a new `threads` is not always the
+     * server's answer to what was just done. Filing the conversation that is
+     * open closes the reading pane first, and closing it is a navigation: these
+     * routes are dynamic, so the list comes back in a few tens of milliseconds
+     * with the row still in it, seconds before the mail server has moved
+     * anything. Clearing everything on that would put the row somebody just
+     * archived back on screen until the action landed, which is the one moment
+     * the overlay exists for.
+     */
+    const inFlight = useRef<Record<string, ThreadPatch>>({});
+    /** Both together, always: an overlay that outlives the array under it has to
+     *  be dropped from both or it comes back on the next list. */
+    const clearPatches = useCallback(() => {
+        inFlight.current = {};
         setPatched({});
+    }, []);
+    useEffect(() => {
+        setPatched(inFlight.current);
     }, [threads]);
 
     /**
@@ -252,6 +285,20 @@ export function MailView({
         });
     }, []);
 
+    /** The same, for a change the mail server has been asked for and has not
+     *  answered yet, so it survives a list arriving in between - see
+     *  `inFlight`. Only an action uses this: a read mark is the server catching
+     *  up with a screen rather than something being waited on. */
+    const patchUntilAnswered = useCallback(
+        (ids: readonly string[], change: ThreadPatch) => {
+            const held = { ...inFlight.current };
+            for (const id of ids) held[id] = { ...held[id], ...change };
+            inFlight.current = held;
+            patch(ids, change);
+        },
+        [patch]
+    );
+
     /** The row as the reader should see it: what the server sent, with anything
      *  they have just done laid over it. */
     const shown = useCallback(
@@ -284,10 +331,103 @@ export function MailView({
         router.replace(`${path}${url.search}`, { scroll: false });
     }, [router]);
 
+    /**
+     * Go and get a conversation's body before anybody asks for it.
+     *
+     * Opening a message that has never been opened is a round trip to somebody
+     * else's IMAP server, and that is the whole of why Polaris felt slower to
+     * open mail than a webmail holding everything itself. It is also avoidable:
+     * by the time somebody clicks a row they have been pointing at it for a
+     * moment, and that moment is enough.
+     *
+     * Once per message and never again - the answer is kept on the row, so a
+     * second ask would be a database read for nothing. Fired on a rest rather
+     * than on every crossing, so running the pointer down a list of fifty does
+     * not ask for fifty bodies.
+     *
+     * And one at a time. A body that is not held yet is a whole IMAP session -
+     * connect, authenticate, fetch, log out - and nothing about a pointer moving
+     * down a list bounds how many of those start at once: a rest every second on
+     * cold mail opens one a second, each of which takes several, and the large
+     * mail hosts answer a dozen simultaneous logins by locking the account out
+     * of its own mailbox. So one runs, and what is waiting is a single slot
+     * holding the latest - which is the only one worth having, because whatever
+     * the pointer is on now is what is about to be opened.
+     */
+    const warmed = useRef(new Set<string>());
+    const warming = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const wanted = useRef("");
+    const fetching = useRef(false);
+    const onScreen = useRef(true);
+    const warmSoon = useCallback((messageId: string) => {
+        wanted.current = messageId;
+        if (fetching.current) return;
+        fetching.current = true;
+        void (async () => {
+            try {
+                while (onScreen.current && wanted.current) {
+                    const next = wanted.current;
+                    wanted.current = "";
+                    if (warmed.current.has(next)) continue;
+                    // Marked here rather than where it was asked for, so a row
+                    // the pointer passed over and left behind is not remembered
+                    // as fetched when it never was.
+                    warmed.current.add(next);
+                    await warmMessageAction(next).catch(() => undefined);
+                }
+            } finally {
+                fetching.current = false;
+            }
+        })();
+    }, []);
+    const warm = useCallback(
+        (messageId: string) => {
+            if (!messageId || warmed.current.has(messageId)) return;
+            if (warming.current) clearTimeout(warming.current);
+            warming.current = setTimeout(() => {
+                warming.current = null;
+                warmSoon(messageId);
+            }, WARM_AFTER_MS);
+        },
+        [warmSoon]
+    );
+
+    // Nothing outlives the screen: a timer that fires after this list is gone,
+    // or a slot drained after it, asks for a body nobody is waiting for.
+    useEffect(() => {
+        // Set on the way in as well as cleared on the way out: development
+        // mounts every screen twice, and a flag only ever cleared would leave
+        // the second mount unable to fetch anything.
+        onScreen.current = true;
+        return () => {
+            onScreen.current = false;
+            wanted.current = "";
+            if (warming.current) clearTimeout(warming.current);
+        };
+    }, []);
+
+    /**
+     * Put the conversation back on screen after the server refused to move it.
+     *
+     * The other half of leaving before the answer arrives. Replaced rather than
+     * pushed, like the close it undoes: a Back that walks through a conversation
+     * closing and reopening is a Back nobody meant.
+     */
+    const openAgain = useCallback(
+        (threadId: string) => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("open", threadId);
+            router.replace(`${url.pathname}${url.search}`, { scroll: false });
+        },
+        [router]
+    );
+
     /** The conversations an action was aimed at, from the messages it named. */
     const threadsOf = useCallback(
         (messageIds: readonly string[]) =>
-            threads.filter((thread) => messageIds.includes(thread.leadMessageId)).map((thread) => thread.id),
+            threads
+                .filter((thread) => messageIds.includes(thread.leadMessageId))
+                .map((thread) => thread.id),
         [threads]
     );
 
@@ -311,7 +451,16 @@ export function MailView({
             const ahead = optimistically(action);
             // The row moves now. A mail server is slow enough that waiting for it
             // reads as the screen having ignored the click.
-            if (ahead) patch(aimed, ahead);
+            if (ahead) patchUntilAnswered(aimed, ahead);
+            // And the conversation being read closes now, for the same reason and
+            // more so: the row it came from is already gone from the list behind
+            // it, so waiting left somebody looking at a message that had been
+            // filed, in a list that no longer had it, for as long as their mail
+            // server took to answer.
+            const leaving =
+                leavesTheView(action) && openThread !== null && aimed.includes(openThread.id);
+            const reopen = leaving ? openThread.id : "";
+            if (leaving) closeOpen();
 
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds: [...messageIds], action });
@@ -320,18 +469,27 @@ export function MailView({
                 // costs one question rather than the action being lost.
                 const missing = missingFolderRole(outcome);
                 if (missing) {
-                    setPatched({});
+                    clearPatches();
+                    if (reopen) openAgain(reopen);
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
-                    // Put it back. A screen that kept showing the change after
-                    // the server refused it would be lying about somebody's mail.
-                    setPatched({});
+                    // Put it back, both halves of it. A screen that kept showing
+                    // the change after the server refused it would be lying about
+                    // somebody's mail - and a reader taken out of a conversation
+                    // that was never filed has to be put back in it.
+                    clearPatches();
+                    if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
                 }
+                // Done. The overlay stops being something to carry across the
+                // next list: what comes back now is the server agreeing with it,
+                // and holding it past that is the screen disagreeing with the
+                // mailbox for ever.
+                inFlight.current = {};
                 setSelected([]);
                 toast.show({ title: announce });
                 // Done from the list, but it may have been aimed at whatever is
@@ -345,14 +503,21 @@ export function MailView({
                 // loses is the navigation - which left the address still naming a
                 // conversation that had been deleted, and the next click on
                 // another one apparently doing nothing at all.
-                if (leavesTheView(action) && openThread && aimed.includes(openThread.id)) {
-                    closeOpen();
-                    return;
-                }
+                if (leaving) return;
                 refresh();
             });
         },
-        [askFolderRole, closeOpen, openThread, patch, refresh, threadsOf, toast]
+        [
+            askFolderRole,
+            clearPatches,
+            closeOpen,
+            openAgain,
+            openThread,
+            patchUntilAnswered,
+            refresh,
+            threadsOf,
+            toast
+        ]
     );
 
     const snooze = useCallback(
@@ -372,6 +537,13 @@ export function MailView({
     );
 
     const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
+
+    // The keyboard's own pointer. Somebody arrowing down a list is deciding what
+    // to open exactly as somebody hovering is, and the wait afterwards is the
+    // same wait.
+    useEffect(() => {
+        if (onRow?.leadMessageId) warm(onRow.leadMessageId);
+    }, [onRow?.leadMessageId, warm]);
     const rowMessageIds = onRow ? [onRow.leadMessageId].filter(Boolean) : [];
 
     /**
@@ -383,57 +555,62 @@ export function MailView({
      * from the recipient box opened whichever conversation the list's cursor
      * happened to be on, in the middle of somebody typing an address.
      */
-    useMailKeys(composing ? {} : {
-        compose: () => openComposer({}),
-        next: () => setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
-        previous: () => setOnIndex((held) => Math.max(0, held - 1)),
-        open: () => {
-            if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
-        },
-        back: () => {
-            if (openThread) router.push(window.location.pathname, { scroll: false });
-        },
-        archive: () => {
-            if (context.canArchive) act("archive", rowMessageIds, "Archived.");
-        },
-        trash: () =>
-            act(
-                context.permanentDelete ? "delete" : "trash",
-                rowMessageIds,
-                context.permanentDelete ? "Deleted." : "Moved to the trash."
-            ),
-        junk: () => act("junk", rowMessageIds, "Moved to spam."),
-        star: () => {
-            if (!onRow) return;
-            act(
-                onRow.starred ? "unstar" : "star",
-                rowMessageIds,
-                onRow.starred ? "Unstarred." : "Starred."
-            );
-        },
-        markUnread: () => act("unread", rowMessageIds, "Marked as unread."),
-        search: () => {
-            const box = document.querySelector<HTMLInputElement>(SEARCH_BOX);
-            box?.focus();
-        },
-        refresh: () =>
-            startBusy(async () => {
-                await syncAllAction();
-                refresh();
-            }),
-        selectAll: () => {
-            setSelected(threads.map((thread) => thread.id));
-            setAnchor(threads[0]?.id ?? "");
-        },
-        // Answers whether it had anything to let go of, so Escape falls through
-        // to closing the conversation when nothing is picked.
-        clearSelection: () => {
-            if (selected.length === 0) return false;
-            setSelected([]);
-            setAnchor("");
-            return true;
-        }
-    });
+    useMailKeys(
+        composing
+            ? {}
+            : {
+                  compose: () => openComposer({}),
+                  next: () =>
+                      setOnIndex((held) => Math.min(held + 1, Math.max(0, threads.length - 1))),
+                  previous: () => setOnIndex((held) => Math.max(0, held - 1)),
+                  open: () => {
+                      if (onRow) router.push(`?open=${onRow.id}`, { scroll: false });
+                  },
+                  back: () => {
+                      if (openThread) router.push(window.location.pathname, { scroll: false });
+                  },
+                  archive: () => {
+                      if (context.canArchive) act("archive", rowMessageIds, "Archived.");
+                  },
+                  trash: () =>
+                      act(
+                          context.permanentDelete ? "delete" : "trash",
+                          rowMessageIds,
+                          context.permanentDelete ? "Deleted." : "Moved to the trash."
+                      ),
+                  junk: () => act("junk", rowMessageIds, "Moved to spam."),
+                  star: () => {
+                      if (!onRow) return;
+                      act(
+                          onRow.starred ? "unstar" : "star",
+                          rowMessageIds,
+                          onRow.starred ? "Unstarred." : "Starred."
+                      );
+                  },
+                  markUnread: () => act("unread", rowMessageIds, "Marked as unread."),
+                  search: () => {
+                      const box = document.querySelector<HTMLInputElement>(SEARCH_BOX);
+                      box?.focus();
+                  },
+                  refresh: () =>
+                      startBusy(async () => {
+                          await syncAllAction();
+                          refresh();
+                      }),
+                  selectAll: () => {
+                      setSelected(threads.map((thread) => thread.id));
+                      setAnchor(threads[0]?.id ?? "");
+                  },
+                  // Answers whether it had anything to let go of, so Escape falls through
+                  // to closing the conversation when nothing is picked.
+                  clearSelection: () => {
+                      if (selected.length === 0) return false;
+                      setSelected([]);
+                      setAnchor("");
+                      return true;
+                  }
+              }
+    );
 
     // `?` is bound here rather than in the hook: it is about this screen's own
     // help sheet, and a hook that owned it would have to know the sheet exists.
@@ -510,11 +687,17 @@ export function MailView({
             if (!run || !anchor) {
                 setAnchor(threadId);
                 setSelected((held) =>
-                    wanted ? [...new Set([...held, threadId])] : held.filter((id) => id !== threadId)
+                    wanted
+                        ? [...new Set([...held, threadId])]
+                        : held.filter((id) => id !== threadId)
                 );
                 return;
             }
-            const between = runBetween(threads.map((thread) => thread.id), anchor, threadId);
+            const between = runBetween(
+                threads.map((thread) => thread.id),
+                anchor,
+                threadId
+            );
             setSelected((held) => [...new Set([...held, ...between])]);
         },
         [anchor, threads]
@@ -565,13 +748,10 @@ export function MailView({
      * message somebody will ever get from an address rather than on the one in
      * front of them - and because what it does is throw mail away.
      */
-    const block = useCallback(
-        (accountId: string, address: string) => {
-            if (!address) return;
-            setBlocking({ accountId, address });
-        },
-        []
-    );
+    const block = useCallback((accountId: string, address: string) => {
+        if (!address) return;
+        setBlocking({ accountId, address });
+    }, []);
 
     /**
      * What a drag is carrying.
@@ -584,7 +764,8 @@ export function MailView({
      */
     const dragging = useCallback(
         (thread: MailThreadView): string[] => {
-            if (selected.includes(thread.id) && selectedMessageIds.length > 0) return selectedMessageIds;
+            if (selected.includes(thread.id) && selectedMessageIds.length > 0)
+                return selectedMessageIds;
             return [thread.leadMessageId].filter(Boolean);
         },
         [selected, selectedMessageIds]
@@ -632,9 +813,13 @@ export function MailView({
                     <div className="flex items-center gap-2">
                         <Checkbox
                             checked={allPicked}
-                            aria-label={allPicked ? "Clear the selection" : "Select everything shown"}
+                            aria-label={
+                                allPicked ? "Clear the selection" : "Select everything shown"
+                            }
                             onChange={(event) =>
-                                setSelected(event.target.checked ? threads.map((thread) => thread.id) : [])
+                                setSelected(
+                                    event.target.checked ? threads.map((thread) => thread.id) : []
+                                )
                             }
                         />
                         {selected.length === 0 ? (
@@ -677,7 +862,10 @@ export function MailView({
                                         })
                                     }
                                 >
-                                    <RefreshCw className={cn("size-4 shrink-0", busy && "animate-spin")} aria-hidden />
+                                    <RefreshCw
+                                        className={cn("size-4 shrink-0", busy && "animate-spin")}
+                                        aria-hidden
+                                    />
                                 </Button>
                             </>
                         ) : (
@@ -692,7 +880,9 @@ export function MailView({
                                         aria-label="Archive"
                                         title="Archive"
                                         disabled={busy}
-                                        onClick={() => act("archive", selectedMessageIds, "Archived.")}
+                                        onClick={() =>
+                                            act("archive", selectedMessageIds, "Archived.")
+                                        }
                                     >
                                         <Archive className="size-4 shrink-0" aria-hidden />
                                     </Button>
@@ -703,7 +893,9 @@ export function MailView({
                                     aria-label="Mark as read"
                                     title="Mark as read"
                                     disabled={busy}
-                                    onClick={() => act("read", selectedMessageIds, "Marked as read.")}
+                                    onClick={() =>
+                                        act("read", selectedMessageIds, "Marked as read.")
+                                    }
                                 >
                                     <MailOpen className="size-4 shrink-0" aria-hidden />
                                 </Button>
@@ -713,7 +905,9 @@ export function MailView({
                                     aria-label="Mark as unread"
                                     title="Mark as unread"
                                     disabled={busy}
-                                    onClick={() => act("unread", selectedMessageIds, "Marked as unread.")}
+                                    onClick={() =>
+                                        act("unread", selectedMessageIds, "Marked as unread.")
+                                    }
                                 >
                                     <Mail className="size-4 shrink-0" aria-hidden />
                                 </Button>
@@ -733,21 +927,33 @@ export function MailView({
                                     aria-label="Report as spam"
                                     title="Report as spam"
                                     disabled={busy}
-                                    onClick={() => act("junk", selectedMessageIds, "Moved to spam.")}
+                                    onClick={() =>
+                                        act("junk", selectedMessageIds, "Moved to spam.")
+                                    }
                                 >
                                     <Bug className="size-4 shrink-0" aria-hidden />
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    aria-label={context.permanentDelete ? "Delete for ever" : "Move to trash"}
-                                    title={context.permanentDelete ? "Delete for ever" : "Move to trash"}
+                                    aria-label={
+                                        context.permanentDelete
+                                            ? "Delete for ever"
+                                            : "Move to trash"
+                                    }
+                                    title={
+                                        context.permanentDelete
+                                            ? "Delete for ever"
+                                            : "Move to trash"
+                                    }
                                     disabled={busy}
                                     onClick={() =>
                                         act(
                                             context.permanentDelete ? "delete" : "trash",
                                             selectedMessageIds,
-                                            context.permanentDelete ? "Deleted." : "Moved to the trash."
+                                            context.permanentDelete
+                                                ? "Deleted."
+                                                : "Moved to the trash."
                                         )
                                     }
                                 >
@@ -774,46 +980,49 @@ export function MailView({
                             {threads
                                 .filter((thread) => !patched[thread.id]?.gone)
                                 .map((thread) => (
-                                <ThreadContextMenu
-                                    key={thread.id}
-                                    thread={shown(thread)}
-                                    canArchive={context.canArchive}
-                                    permanentDelete={context.permanentDelete}
-                                    onAct={act}
-                                    onSnooze={snooze}
-                                    onLabel={label}
-                                    onAnswer={answer}
-                                    onBlock={block}
-                                >
-                                    <ThreadRow
+                                    <ThreadContextMenu
+                                        key={thread.id}
                                         thread={shown(thread)}
-                                        onCursor={onRow?.id === thread.id}
-                                        open={openThread?.id === thread.id}
-                                        picked={selected.includes(thread.id)}
-                                        color={accountColor(thread.accountId)}
-                                        showColor={accounts.length > 1}
-                                        wide={layout === "full" && !openThread}
-                                        mine={mine}
-                                        sort={sort}
-                                        onPick={(next, run) => pick(thread.id, next, run)}
-                                        dragging={() => dragging(thread)}
                                         canArchive={context.canArchive}
                                         permanentDelete={context.permanentDelete}
-                                        onAct={(action, announce) =>
-                                            act(action, [thread.leadMessageId], announce)
-                                        }
-                                        onSnooze={() =>
-                                            snooze([thread.leadMessageId], tomorrowMorning())
-                                        }
-                                        onStar={() =>
-                                            act(
-                                                shown(thread).starred ? "unstar" : "star",
-                                                [thread.leadMessageId],
-                                                shown(thread).starred ? "Unstarred." : "Starred."
-                                            )
-                                        }
-                                    />
-                                </ThreadContextMenu>
+                                        onAct={act}
+                                        onSnooze={snooze}
+                                        onLabel={label}
+                                        onAnswer={answer}
+                                        onBlock={block}
+                                    >
+                                        <ThreadRow
+                                            thread={shown(thread)}
+                                            onCursor={onRow?.id === thread.id}
+                                            onPeek={() => warm(thread.leadMessageId)}
+                                            open={openThread?.id === thread.id}
+                                            picked={selected.includes(thread.id)}
+                                            color={accountColor(thread.accountId)}
+                                            showColor={accounts.length > 1}
+                                            wide={layout === "full" && !openThread}
+                                            mine={mine}
+                                            sort={sort}
+                                            onPick={(next, run) => pick(thread.id, next, run)}
+                                            dragging={() => dragging(thread)}
+                                            canArchive={context.canArchive}
+                                            permanentDelete={context.permanentDelete}
+                                            onAct={(action, announce) =>
+                                                act(action, [thread.leadMessageId], announce)
+                                            }
+                                            onSnooze={() =>
+                                                snooze([thread.leadMessageId], tomorrowMorning())
+                                            }
+                                            onStar={() =>
+                                                act(
+                                                    shown(thread).starred ? "unstar" : "star",
+                                                    [thread.leadMessageId],
+                                                    shown(thread).starred
+                                                        ? "Unstarred."
+                                                        : "Starred."
+                                                )
+                                            }
+                                        />
+                                    </ThreadContextMenu>
                                 ))}
                         </ul>
                     )}
@@ -878,6 +1087,7 @@ export function MailView({
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
                         onGone={closeOpen}
+                        onStayed={() => openAgain(openThread.id)}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         onBack={
@@ -888,7 +1098,9 @@ export function MailView({
                     />
                 ) : (
                     <div className="flex flex-1 items-center justify-center p-8">
-                        <p className="text-[13px] text-foreground-subtle">Pick a conversation to read it.</p>
+                        <p className="text-[13px] text-foreground-subtle">
+                            Pick a conversation to read it.
+                        </p>
                     </div>
                 )}
             </section>
@@ -939,7 +1151,6 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
         </div>
     );
 }
-
 
 /**
  * The tabs above the inbox.
@@ -1009,7 +1220,9 @@ function ListFilters({
     function settled(option: core.MailFilter): boolean {
         if (!fixed) return false;
         if (option === fixed) return true;
-        return (fixed === "unread" && option === "read") || (fixed === "read" && option === "unread");
+        return (
+            (fixed === "unread" && option === "read") || (fixed === "read" && option === "unread")
+        );
     }
 
     const offered = core.MAIL_FILTERS.filter((option) => !settled(option));
@@ -1022,7 +1235,9 @@ function ListFilters({
                     variant="ghost"
                     size="icon"
                     aria-pressed={filter === "unread"}
-                    aria-label={filter === "unread" ? "Show everything" : "Show only what is unread"}
+                    aria-label={
+                        filter === "unread" ? "Show everything" : "Show only what is unread"
+                    }
                     title={filter === "unread" ? "Show everything" : "Show only what is unread"}
                     className={cn(filter === "unread" && "bg-muted text-foreground")}
                     onClick={() => go({ filter: filter === "unread" ? "" : "unread" })}
@@ -1046,7 +1261,11 @@ function ListFilters({
                     {offered.length > 0 ? (
                         <>
                             <DropdownMenuLabel>Show</DropdownMenuLabel>
-                            <Choice label="Everything" chosen={!filter} onChoose={() => go({ filter: "" })} />
+                            <Choice
+                                label="Everything"
+                                chosen={!filter}
+                                onChoose={() => go({ filter: "" })}
+                            />
                             {offered.map((option) => (
                                 <Choice
                                     key={option}
@@ -1075,10 +1294,21 @@ function ListFilters({
 
 /** One option in that menu. A tick rather than a radio, because the menu closes
  *  on the choice and what it is showing is where the ticks are. */
-function Choice({ label, chosen, onChoose }: { label: string; chosen: boolean; onChoose: () => void }) {
+function Choice({
+    label,
+    chosen,
+    onChoose
+}: {
+    label: string;
+    chosen: boolean;
+    onChoose: () => void;
+}) {
     return (
         <DropdownMenuItem onSelect={onChoose}>
-            <Check className={cn("size-3.5 shrink-0", chosen ? "opacity-100" : "opacity-0")} aria-hidden />
+            <Check
+                className={cn("size-3.5 shrink-0", chosen ? "opacity-100" : "opacity-0")}
+                aria-hidden
+            />
             {label}
         </DropdownMenuItem>
     );
@@ -1102,7 +1332,11 @@ function CategoryTabs({ current }: { current: string }) {
     }
 
     return (
-        <ScrollRow className="-mb-2 flex items-center gap-1" role="tablist" aria-label="Sort the inbox">
+        <ScrollRow
+            className="-mb-2 flex items-center gap-1"
+            role="tablist"
+            aria-label="Sort the inbox"
+        >
             <TabButton label="All" active={!current} onClick={() => go("")} />
             {core.MAIL_CATEGORIES.map((one) => (
                 <TabButton
@@ -1234,6 +1468,7 @@ function tomorrowMorning(): Date {
 function ThreadRow({
     thread,
     onCursor,
+    onPeek,
     open,
     picked,
     color,
@@ -1254,6 +1489,9 @@ function ThreadRow({
     /** Whether the keyboard is on this row. Drawn as an edge rather than a fill,
      *  so it stays legible over the fill an open or picked row already has. */
     onCursor: boolean;
+    /** Somebody is looking at this row. Fetching its body now is what makes
+     *  opening it feel instant - see `WARM_AFTER_MS`. */
+    onPeek: () => void;
     open: boolean;
     picked: boolean;
     color: string;
@@ -1290,6 +1528,21 @@ function ThreadRow({
     return (
         <li
             {...rest}
+            // A pointer resting here, or focus landing on it, is enough to go
+            // and fetch what is in it - so opening it is a screen drawing rather
+            // than a wait on somebody else's mail server.
+            //
+            // Both call on through: this row is a context-menu trigger and it is
+            // handed handlers by it, so replacing one rather than adding to it
+            // would cost the right-click menu to save a fetch.
+            onPointerEnter={(event) => {
+                rest.onPointerEnter?.(event);
+                onPeek();
+            }}
+            onFocus={(event) => {
+                rest.onFocus?.(event);
+                onPeek();
+            }}
             // Dragged onto a folder in the rail to file it there. The payload is
             // ids and nothing else: what is dropped is looked up and authorized
             // on the server, so a drag cannot become a way of naming somebody
@@ -1354,7 +1607,10 @@ function ThreadRow({
                     onClick={onStar}
                 >
                     <Star
-                        className={cn("size-4 shrink-0", thread.starred && "fill-current text-warning")}
+                        className={cn(
+                            "size-4 shrink-0",
+                            thread.starred && "fill-current text-warning"
+                        )}
                         aria-hidden
                     />
                 </button>
@@ -1423,7 +1679,10 @@ function ThreadRow({
                                 <span
                                     key={label.id}
                                     className="rounded px-1 text-[10px] font-medium"
-                                    style={{ backgroundColor: `${label.color}22`, color: label.color }}
+                                    style={{
+                                        backgroundColor: `${label.color}22`,
+                                        color: label.color
+                                    }}
                                 >
                                     {label.name}
                                 </span>
@@ -1465,7 +1724,11 @@ function ThreadRow({
                                 )
                             }
                         />
-                        <RowAction icon={Clock} label="Snooze until tomorrow morning" onClick={onSnooze} />
+                        <RowAction
+                            icon={Clock}
+                            label="Snooze until tomorrow morning"
+                            onClick={onSnooze}
+                        />
                         <RowAction
                             icon={Trash2}
                             danger
@@ -1544,7 +1807,10 @@ function RowAction({
 
 /** Whose face a row wears: the first participant who is not the reader, so an
  *  inbox shows the sender and Sent shows who it went to. */
-function faceOf(thread: MailThreadView, mine: ReadonlySet<string>): { name: string; address: string } {
+function faceOf(
+    thread: MailThreadView,
+    mine: ReadonlySet<string>
+): { name: string; address: string } {
     const other = thread.participants.find((one) => !mine.has(one.address.trim().toLowerCase()));
     const chosen = other ?? thread.participants[0];
     return { name: chosen?.name ?? "", address: chosen?.address ?? "" };
@@ -1564,7 +1830,9 @@ function people(thread: MailThreadView, mine: ReadonlySet<string>): string {
         (entry) => !mine.has(entry.address.trim().toLowerCase())
     );
     const shown = others.length > 0 ? others : thread.participants;
-    const names = shown.map((entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address);
+    const names = shown.map(
+        (entry) => entry.name.trim() || entry.address.split("@")[0] || entry.address
+    );
     if (names.length === 0) return "(nobody)";
     if (names.length <= 3) return names.join(", ");
     return `${names.slice(0, 2).join(", ")} and ${names.length - 2} others`;

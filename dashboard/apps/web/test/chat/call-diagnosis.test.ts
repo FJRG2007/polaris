@@ -11,7 +11,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { diagnoseCall, type CallAudioFacts, type HeardFrom } from "@/app/(app)/chat/call-diagnosis";
+import {
+    diagnoseCall,
+    settlingFor,
+    type CallAudioFacts,
+    type HeardFrom
+} from "@/app/(app)/chat/call-diagnosis";
 
 /** A call in which everything works, as the starting point for changing exactly
  *  one thing about it. */
@@ -380,6 +385,38 @@ describe("what is happening at the other end", () => {
         expect(row(mixed, "What you are being sent")).toBe("Nothing is being sent");
     });
 
+    it("says so when one has gone and another never shared a microphone", () => {
+        // Two other people's browsers, one of each, and neither "everybody" held
+        // - so this fell through to the yellow panel sending somebody to an
+        // administrator about Call ports over a closed tab and a permission
+        // dialog dismissed on somebody else's machine.
+        const mixed = working({
+            others: [
+                heard({
+                    id: "p2",
+                    name: "Ana",
+                    reachable: false,
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                }),
+                heard({
+                    id: "p3",
+                    name: "Bea",
+                    sharing: false,
+                    subscribed: false,
+                    arriving: false,
+                    carrying: false
+                })
+            ]
+        });
+        const report = diagnoseCall(mixed);
+        expect(report.blame).toBe("theirs");
+        expect(report.fix).not.toContain("Call ports");
+        expect(report.fix).not.toMatch(/leave the call/i);
+        expect(row(mixed, "What you are being sent")).toBe("Nobody is sending one");
+    });
+
     it("still blames the call when they are here and sharing", () => {
         // The case this must not swallow: somebody present, publishing, and none
         // of it arriving is a fault worth the yellow.
@@ -389,5 +426,38 @@ describe("what is happening at the other end", () => {
         const report = diagnoseCall(broken);
         expect(report.blame).toBe("fault");
         expect(report.fix).not.toBe("");
+    });
+});
+
+describe("how long a call is left alone", () => {
+    it("gives a call that has never carried a byte much longer", () => {
+        // The reported case: a Polaris update restarts the call server, this page
+        // reloads and rejoins, and for as long as that takes there is a call that
+        // has honestly never heard anything and is honestly fine. Ten seconds of
+        // patience turned that into an instruction to go and ask an administrator
+        // about ports.
+        expect(settlingFor(false, true)).toBeGreaterThan(settlingFor(true, true) * 3);
+    });
+
+    it("still judges a call that had sound and lost it, quickly", () => {
+        // That one has something to diagnose, and waiting is the wrong answer.
+        expect(settlingFor(true, true)).toBeLessThanOrEqual(10_000);
+    });
+
+    it("does not make a verdict about this browser wait on the far end", () => {
+        // A headset switched off at the cable is decided here, from this
+        // machine, and owes nothing to a packet that has not arrived. Waiting
+        // three quarters of a minute for one - and starting that wait again
+        // every time somebody joins - is a blank panel over the one fault the
+        // reader could have fixed themselves.
+        expect(settlingFor(false, false)).toBeLessThanOrEqual(10_000);
+    });
+
+    it("marks which verdicts were reached from the other end and which were not", () => {
+        expect(diagnoseCall(working({ mic: "no-input" })).farEnd).toBe(false);
+        expect(diagnoseCall(working({ deafened: true })).farEnd).toBe(false);
+        expect(diagnoseCall(working({ link: "lost" })).farEnd).toBe(false);
+        const nothing = working({ others: [heard({ subscribed: false, arriving: false })] });
+        expect(diagnoseCall(nothing).farEnd).toBe(true);
     });
 });

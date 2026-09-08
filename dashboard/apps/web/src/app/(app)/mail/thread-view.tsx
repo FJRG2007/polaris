@@ -25,7 +25,26 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
-import { FileViewer, isViewable, type ViewerTarget } from "@/app/(app)/drive/file-viewer";
+import dynamic from "next/dynamic";
+import { isViewable } from "@/app/(app)/drive/viewer/kind";
+import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
+
+/**
+ * The viewer, fetched when a file is actually opened.
+ *
+ * Never statically, and this is not a nicety: it carries a PDF engine, a
+ * spreadsheet parser, a document converter and a slide renderer, and importing
+ * it from a screen means all of that is in the bundle for every reader who never
+ * opens an attachment. It also reaches `node:crypto` somewhere down that chain,
+ * which a client bundle cannot resolve at all - so a static import does not make
+ * the page heavy, it makes the build fail. The chat message list learned this
+ * first; `viewer/kind` exists so that asking whether a file is openable costs
+ * nothing.
+ */
+const FileViewer = dynamic(
+    () => import("@/app/(app)/drive/file-viewer").then((module) => module.FileViewer),
+    { ssr: false }
+);
 import {
     Button,
     DropdownMenu,
@@ -65,7 +84,8 @@ export function ThreadView({
     context,
     onBack,
     onRead,
-    onGone
+    onGone,
+    onStayed
 }: {
     thread: MailThreadView;
     messages: MailMessageView[];
@@ -79,6 +99,9 @@ export function ThreadView({
     /** Told when this conversation has been filed or thrown away from here, so
      *  the address stops naming something the server no longer has. */
     onGone?: () => void;
+    /** Put the reader back, for a filing the server refused after this pane had
+     *  already stepped out of the way. */
+    onStayed?: () => void;
 }) {
     const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
     const toast = useToast();
@@ -120,33 +143,43 @@ export function ThreadView({
     const act = useCallback(
         (action: MailAction) => {
             const messageIds = messages.map((message) => message.id);
+            // Out of the conversation now, before the mail server is asked.
+            // Filing a message is a round trip to somebody else's IMAP server,
+            // and waiting for it read as a button that had not been pressed -
+            // the reader sat inside a message they had just deleted, watching
+            // nothing happen. If it is refused, they are put back and told.
+            const leaving = leavesTheView(action);
+            if (leaving) onGone?.();
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds, action });
                 const missing = missingFolderRole(outcome);
                 if (missing) {
+                    // Back where they were, so the question is answered with the
+                    // conversation in front of them rather than about a message
+                    // they can no longer see.
+                    if (leaving) onStayed?.();
                     askFolderRole(missing, () => act(action));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
+                    if (leaving) onStayed?.();
                     toast.show({ title: said });
                     return;
                 }
-                // Archived, trashed or deleted: this pane is now looking at
-                // messages the server has moved out from under it. Closing it is
-                // a navigation and these routes are dynamic, so it comes back
-                // with a fresh list on its own - refreshing as well would be a
-                // second fetch racing the navigation, and the navigation is the
-                // one that loses. That race is why deleting from inside a
-                // conversation left the reader inside it.
-                if (leavesTheView(action)) {
-                    onGone?.();
-                    return;
-                }
+                // Archived, trashed or deleted: this pane was looking at messages
+                // the server has now moved out from under it, and it closed
+                // before the round trip. Closing is a navigation and these routes
+                // are dynamic, so it comes back with a fresh list on its own -
+                // refreshing as well would be a second fetch racing the
+                // navigation, and the navigation is the one that loses. That race
+                // is why deleting from inside a conversation left the reader
+                // inside it.
+                if (leaving) return;
                 refresh();
             });
         },
-        [askFolderRole, messages, onGone, refresh, toast]
+        [askFolderRole, messages, onGone, onStayed, refresh, toast]
     );
 
     /**
@@ -194,7 +227,9 @@ export function ThreadView({
     if (!newest) {
         return (
             <div className="flex flex-1 items-center justify-center p-8">
-                <p className="text-[13px] text-foreground-subtle">This conversation is no longer here.</p>
+                <p className="text-[13px] text-foreground-subtle">
+                    This conversation is no longer here.
+                </p>
             </div>
         );
     }
@@ -280,7 +315,13 @@ export function ThreadView({
                         disabled={busy}
                         onClick={() => act(thread.starred ? "unstar" : "star")}
                     >
-                        <Star className={cn("size-4 shrink-0", thread.starred && "fill-current text-warning")} aria-hidden />
+                        <Star
+                            className={cn(
+                                "size-4 shrink-0",
+                                thread.starred && "fill-current text-warning"
+                            )}
+                            aria-hidden
+                        />
                     </Button>
                     <Button
                         variant="ghost"
@@ -329,7 +370,8 @@ export function ThreadView({
                                     onClick={() => setExpandAll(true)}
                                 >
                                     <MoreHorizontal className="size-3.5 shrink-0" aria-hidden />
-                                    {entry.count} earlier {entry.count === 1 ? "message" : "messages"}
+                                    {entry.count} earlier{" "}
+                                    {entry.count === 1 ? "message" : "messages"}
                                 </button>
                             </li>
                         ) : (
@@ -351,12 +393,20 @@ export function ThreadView({
                 </ul>
 
                 <div className="mt-4 flex flex-wrap gap-2">
-                    <Button variant="secondary" disabled={answering} onClick={() => answer("reply")}>
+                    <Button
+                        variant="secondary"
+                        disabled={answering}
+                        onClick={() => answer("reply")}
+                    >
                         <CornerUpLeft className="size-4 shrink-0" aria-hidden />
                         Reply
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
-                        <Button variant="secondary" disabled={answering} onClick={() => answer("reply-all")}>
+                        <Button
+                            variant="secondary"
+                            disabled={answering}
+                            onClick={() => answer("reply-all")}
+                        >
                             <CornerUpRight className="size-4 shrink-0" aria-hidden />
                             Reply to all
                         </Button>
@@ -386,7 +436,12 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Label this conversation" title="Label this conversation">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Label this conversation"
+                    title="Label this conversation"
+                >
                     <Tag className="size-4 shrink-0" aria-hidden />
                 </Button>
             </DropdownMenuTrigger>
@@ -416,7 +471,11 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
                                 })()
                             }
                         >
-                            <Tag className="size-3.5 shrink-0" style={{ color: label.color }} aria-hidden />
+                            <Tag
+                                className="size-3.5 shrink-0"
+                                style={{ color: label.color }}
+                                aria-hidden
+                            />
                             {label.name}
                         </DropdownMenuItem>
                     ))
@@ -529,7 +588,9 @@ function MessageCard({
                             </span>
                         </div>
                         <p className="mt-0.5 truncate text-[12px] text-foreground-subtle">
-                            to {message.to.map((entry) => core.addressLabel(entry)).join(", ") || "nobody"}
+                            to{" "}
+                            {message.to.map((entry) => core.addressLabel(entry)).join(", ") ||
+                                "nobody"}
                             {message.cc.length > 0
                                 ? `, copy to ${message.cc.map((entry) => core.addressLabel(entry)).join(", ")}`
                                 : ""}
@@ -540,7 +601,9 @@ function MessageCard({
                         <span
                             className={cn(
                                 "w-40 shrink-0 truncate text-[13px]",
-                                message.seen ? "text-muted-foreground" : "font-semibold text-foreground"
+                                message.seen
+                                    ? "text-muted-foreground"
+                                    : "font-semibold text-foreground"
                             )}
                         >
                             {sender ? core.addressLabel(sender) : "(nobody)"}
@@ -551,7 +614,9 @@ function MessageCard({
                     </>
                 )}
                 <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
-                    {open ? format.dateTime(new Date(message.sentAt)) : shortWhen(message.sentAt, format)}
+                    {open
+                        ? format.dateTime(new Date(message.sentAt))
+                        : shortWhen(message.sentAt, format)}
                 </span>
                 <ChevronDown
                     className={cn("size-4 shrink-0 text-foreground-subtle", open && "rotate-180")}
@@ -568,7 +633,8 @@ function MessageCard({
                             {readable.wantsReceipt ? (
                                 <p className="mb-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
                                     <UserRoundX className="size-3.5 shrink-0" aria-hidden />
-                                    The sender asked to be told when this was opened. Polaris did not tell them.
+                                    The sender asked to be told when this was opened. Polaris did
+                                    not tell them.
                                 </p>
                             ) : null}
                             <MessageBody
@@ -605,8 +671,14 @@ function MessageCard({
                                                             })
                                                         }
                                                     >
-                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                        <Paperclip
+                                                            className="size-3.5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                        <span
+                                                            className="max-w-[16rem] truncate"
+                                                            title={file.name}
+                                                        >
                                                             {file.name}
                                                         </span>
                                                         <span className="shrink-0 text-foreground-subtle">
@@ -615,8 +687,14 @@ function MessageCard({
                                                     </button>
                                                 ) : (
                                                     <span className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground">
-                                                        <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                                        <span className="max-w-[16rem] truncate" title={file.name}>
+                                                        <Paperclip
+                                                            className="size-3.5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                        <span
+                                                            className="max-w-[16rem] truncate"
+                                                            title={file.name}
+                                                        >
                                                             {file.name}
                                                         </span>
                                                         <span className="shrink-0 text-foreground-subtle">
@@ -631,7 +709,10 @@ function MessageCard({
                                                     title={`Save ${file.name}`}
                                                     download
                                                 >
-                                                    <Download className="size-3.5 shrink-0" aria-hidden />
+                                                    <Download
+                                                        className="size-3.5 shrink-0"
+                                                        aria-hidden
+                                                    />
                                                 </a>
                                             </li>
                                         ))}
@@ -652,7 +733,10 @@ function MessageCard({
                             ) : null}
                         </>
                     ) : (
-                        <div className="h-24 animate-pulse rounded-md bg-surface" aria-label="Opening the message" />
+                        <div
+                            className="h-24 animate-pulse rounded-md bg-surface"
+                            aria-label="Opening the message"
+                        />
                     )}
                 </div>
             ) : null}
@@ -677,7 +761,9 @@ function MessageCard({
  *  otherwise. Short, because it sits at the end of a one-line row. */
 function shortWhen(iso: string, format: ReturnType<typeof useDisplayFormat>): string {
     const when = new Date(iso);
-    return when.toDateString() === new Date().toDateString() ? format.time(when) : format.date(when);
+    return when.toDateString() === new Date().toDateString()
+        ? format.time(when)
+        : format.date(when);
 }
 
 /** A file size somebody can read. Not a locale format: the units are the same

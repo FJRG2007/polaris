@@ -29,9 +29,10 @@ import { usePresenceRefresh } from "@/components/presence-store";
 import { playCallSound } from "@/lib/call-sounds";
 import { useCall } from "./use-call";
 import { takeRememberedCall } from "./call-resume";
+import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
-import { AlertTriangle, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
+import { AlertTriangle, Hand, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
 
 // The context and the two hooks that read it live in `call-hold`, which has no
 // runtime dependency of its own - see the note there. Passed on from here so
@@ -197,6 +198,28 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
      * forget by walking to another screen.
      */
     const recorded = call.recording || [...call.states.values()].some((state) => state.recording);
+    /**
+     * What the bar says about the hands that are up, in one sentence.
+     *
+     * The bar is where somebody is standing when a hand goes up: the whole point
+     * of keeping the call while you look something up is that you are looking at
+     * something else, and a gesture that only exists on the screen you walked
+     * away from is a gesture nobody answers. The chair hears the chime; this is
+     * what they see when they look up.
+     *
+     * Written by `call-signals` rather than here, from a name and whether it is
+     * the reader's own, because a pronoun dropped into a sentence built for a
+     * name is how a bar came to read "You has a hand up" to the one person it
+     * was about.
+     */
+    const hands: HandInQueue[] = call.hands.map((id) => ({
+        id,
+        name:
+            (call.meeting?.participants ?? []).find((person) => person.id === id)?.name ??
+            "Somebody",
+        own: id === call.participantId
+    }));
+    const waiting = handsQueueSummary(hands);
 
     return (
         <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-2">
@@ -238,6 +261,15 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     >
                         <AlertTriangle className="size-2.5 shrink-0" />
                         No sound
+                    </span>
+                )}
+                {hands.length > 0 && (
+                    <span
+                        title={waiting}
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-warning px-1.5 py-0.5 text-[0.625rem] font-semibold text-warning-foreground"
+                    >
+                        <Hand className="size-2.5 shrink-0" />
+                        {call.hands.length}
                     </span>
                 )}
                 {recorded && (

@@ -177,6 +177,19 @@ export interface CallState {
     /** Who has a hand up, oldest first - a hand is a queue, and knowing who to
      *  go to next is the reason anybody puts one up. */
     readonly hands: readonly string[];
+    /**
+     * Put a hand down: your own, or - for whoever is chairing - somebody else's.
+     *
+     * Somebody else's is a request rather than an instruction, because a hand
+     * rides in an attribute and a browser may only write its own. Theirs hears
+     * it, checks it came from the host, and lowers. Offer it to nobody else: the
+     * refusal is on their side, but a button that does nothing is worse than no
+     * button.
+     */
+    lowerHand: (participantId: string) => void;
+    /** Whether the reader is chairing this call. What the queue is for, and who
+     *  the sound of a hand going up is played to. */
+    readonly hosting: boolean;
 
     /** Reactions on screen right now, each for a few seconds. Ephemeral by
      *  design: see `call-signals`. */

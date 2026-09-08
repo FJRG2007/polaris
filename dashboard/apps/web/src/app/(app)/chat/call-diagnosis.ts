@@ -147,6 +147,17 @@ export interface CallAudioReport {
     readonly ok: boolean;
     /** Whether what is being reported is this call's problem or the other end's. */
     readonly blame: CallAudioBlame;
+    /**
+     * Whether this verdict was reached from what the other end is sending.
+     *
+     * The two silences are only worth different amounts of patience where the
+     * evidence has to travel: a call that has never carried a byte is given a
+     * long moment before anything about the far end is believed, and reading
+     * that as "say nothing at all" holds back the verdicts that were settled
+     * here, from this browser's own microphone and its own controls, before a
+     * packet was ever needed - see `settlingFor`.
+     */
+    readonly farEnd: boolean;
     /** The first thing that is wrong, in the reader's own terms. Empty while
      *  nothing is. */
     readonly headline: string;
@@ -156,11 +167,38 @@ export interface CallAudioReport {
     readonly lines: readonly CallAudioLine[];
 }
 
+/**
+ * How long a call is left alone before anything is said about it.
+ *
+ * Two windows, because the two silences are not equally worth accusing. A call
+ * that has carried sound and gone quiet has something to diagnose, and ten
+ * seconds is long enough to be sure. A call that has never carried a byte is
+ * usually one that is still starting - and during a Polaris update it is a call
+ * whose server is restarting under it, this page reloading and rejoining - and
+ * the verdict waiting for it sends somebody to an administrator about ports on a
+ * machine where the ports are fine.
+ *
+ * So the second one waits, and it waits much longer. Patience costs nothing while
+ * there is nothing to say; the rows underneath still show every check.
+ *
+ * Only for a verdict that needed the far end, though - which is what `farEnd`
+ * carries. A microphone that was never opened, one that stopped, and a pair of
+ * ears switched off here are settled from this browser alone, before any packet
+ * was owed: holding those back for three quarters of a minute leaves somebody
+ * whose headset is off at the cable staring at a call that says nothing is
+ * wrong, and the clock restarts every time anybody joins or leaves.
+ */
+export function settlingFor(everHeard: boolean, farEnd: boolean): number {
+    if (!farEnd) return 10_000;
+    return everHeard ? 10_000 : 45_000;
+}
+
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
 export const UNKNOWN_AUDIO: CallAudioReport = {
     ok: true,
     blame: "fault",
+    farEnd: false,
     headline: "",
     fix: "",
     lines: []
@@ -246,6 +284,11 @@ function heardLine(others: readonly HeardFrom[]): CallAudioLine {
     if (audible.every((person) => !person.sharing)) {
         return { label, value: "No microphone shared", state: "idle" };
     }
+    // One of each, which neither of the two above catches and which is not a
+    // third thing: it is those two, in one call.
+    if (audible.every((person) => !person.reachable || !person.sharing)) {
+        return { label, value: "Nobody is sending one", state: "idle" };
+    }
     const carrying = audible.filter((person) => person.carrying).length;
     if (carrying > 0) {
         return { label, value: `Sound from ${carrying} of ${audible.length}`, state: "good" };
@@ -292,9 +335,12 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         heardLine(facts.others),
         playbackLine(facts)
     ];
-    const said = (headline: string, fix: string): CallAudioReport => ({
+    /** `farEnd` where the verdict rests on what somebody else is sending, so
+     *  only those wait out the long settling window - see `settlingFor`. */
+    const said = (headline: string, fix: string, farEnd = false): CallAudioReport => ({
         ok: false,
         blame: "fault",
+        farEnd,
         headline,
         fix,
         lines
@@ -304,6 +350,7 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
     const theirs = (headline: string, fix: string): CallAudioReport => ({
         ok: false,
         blame: "theirs",
+        farEnd: true,
         headline,
         fix,
         lines
@@ -389,6 +436,19 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         );
     }
 
+    // One of each: somebody closed their tab and somebody else never let their
+    // browser share a microphone. Neither `every` above holds, so what used to
+    // be reached instead was the yellow panel sending somebody to an
+    // administrator about Call ports over two other people's browsers - the
+    // exact accusation the two branches above exist to stop making. Both halves
+    // are the far end's, and together they are still the far end's.
+    if (audible.every((person) => !person.reachable || !person.sharing)) {
+        return theirs(
+            "Nobody else in this call is sending a microphone. Some have stopped answering, and the rest have not shared one.",
+            "The ones who are still here have to allow it beside their own address bar. Nothing here needs changing."
+        );
+    }
+
     if (audible.every((person) => !person.subscribed)) {
         return said(
             audible.length === 1
@@ -397,7 +457,8 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
             // Never once, on a link that is up, is the media path - see
             // MEDIA_PATH. Rejoining is the answer to a call that had sound and
             // lost it, and it is the wrong one here.
-            facts.everHeard ? REJOIN : MEDIA_PATH
+            facts.everHeard ? REJOIN : MEDIA_PATH,
+            true
         );
     }
     if (audible.every((person) => !person.arriving)) {
@@ -405,7 +466,8 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
             "Their audio is not reaching this device.",
             facts.everHeard
                 ? "Sound is not getting through between here and the call server. Leave the call and join it again, and try a different network if it happens twice."
-                : MEDIA_PATH
+                : MEDIA_PATH,
+            true
         );
     }
     if (audible.every((person) => !person.carrying)) {
@@ -413,7 +475,8 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
             audible.length === 1
                 ? `${audible[0]?.name} is being sent, and what arrives carries no sound.`
                 : "What arrives from the others carries no sound.",
-            "Their microphone is picking nothing up. They can check it is not muted on their machine, and pick a different one from the microphone button."
+            "Their microphone is picking nothing up. They can check it is not muted on their machine, and pick a different one from the microphone button.",
+            true
         );
     }
     if (audible.every((person) => person.turnedDown)) {
@@ -423,5 +486,5 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         );
     }
 
-    return { ok: true, blame: "fault", headline: "", fix: "", lines };
+    return { ok: true, blame: "fault", farEnd: false, headline: "", fix: "", lines };
 }
