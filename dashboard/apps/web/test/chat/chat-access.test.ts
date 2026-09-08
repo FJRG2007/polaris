@@ -13,6 +13,7 @@
  * administrator override.
  */
 
+import * as core from "@polaris/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface SpaceRow {
@@ -36,13 +37,65 @@ let spaceMembers: { spaceId: string; userId: string; role: string }[] = [];
 let channels: ChannelRow[] = [];
 let channelMembers: { channelId: string; userId: string; role: string }[] = [];
 let orgIds: string[] = [];
+/** Which teams this reader is on, and which grants exist. Empty in every case
+ *  but the two that are about being handed a space or a room. */
+let teams: string[] = [];
+let grants: Record<string, unknown>[] = [];
+
+/** One grant row as the reader selects it. The schedule columns are spelled out
+ *  because a real row always has them: leaving them off would send the resolver
+ *  looking for a wall clock that nothing in these cases needs. */
+function handedTo(
+    subjectType: string,
+    subjectId: string,
+    principalType: string,
+    principalId: string,
+    capability: string
+) {
+    return {
+        id: `${subjectType}:${subjectId}:${principalId}`,
+        subjectType,
+        subjectId,
+        principalType,
+        principalId,
+        capability,
+        startsAt: null,
+        endsAt: null,
+        days: core.EVERY_DAY,
+        startMinute: null,
+        endMinute: null,
+        timeZone: "UTC",
+        maxUses: null,
+        uses: 0
+    };
+}
 
 vi.mock("@/lib/orgs/org-service", () => ({
-    memberOrgIds: async () => orgIds
+    memberOrgIds: async () => orgIds,
+    // Read by the grant resolver, which is the fourth way into a space.
+    teamIdsFor: async () => teams
 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // A grant is the last way in, asked about only when every other has
+        // said no. Empty in every case but the two about being handed a space
+        // or a room.
+        accessGrant: {
+            findMany: async ({
+                where
+            }: {
+                where: { subjectType: string; subjectId?: string };
+            }) =>
+                grants.filter(
+                    (row) =>
+                        row.subjectType === where.subjectType &&
+                        (where.subjectId === undefined || row.subjectId === where.subjectId)
+                )
+        },
+        teamMember: { findMany: async () => [] },
+        organizationMember: { findMany: async () => [] },
+        orgRole: { findMany: async () => [] },
         chatSpace: {
             findUnique: async ({ where }: { where: { id: string } }) =>
                 spaces.find((space) => space.id === where.id) ?? null,
@@ -126,6 +179,8 @@ beforeEach(() => {
     channels = [];
     channelMembers = [];
     orgIds = [];
+    teams = [];
+    grants = [];
 });
 
 describe("reaching a space", () => {
@@ -138,6 +193,22 @@ describe("reaching a space", () => {
         spaces = [{ id: "s1", ownerId: "other", orgId: null, visibility: "private" }];
         spaceMembers = [{ spaceId: "s1", userId: "me", role: "admin" }];
         expect(await access.spaceAccess(me, "s1")).toBe("admin");
+    });
+
+    it("lets in a team the space was handed to, without a row per person", async () => {
+        // The whole reason grants exist here: an organization gives a space to
+        // its support team, and whoever joins that team later is in it.
+        spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "private" }];
+        teams = ["team-support"];
+        grants = [handedTo("chat.space", "s1", "team", "team-support", "member")];
+        expect(await access.spaceAccess(me, "s1")).toBe("member");
+    });
+
+    it("stops letting them in the moment they leave that team", async () => {
+        spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "private" }];
+        teams = [];
+        grants = [handedTo("chat.space", "s1", "team", "team-support", "member")];
+        expect(await access.spaceAccess(me, "s1")).toBeNull();
     });
 
     it("keeps a stranger out of a private space", async () => {
@@ -176,6 +247,21 @@ describe("reaching a channel", () => {
         // Reached through the space, so there is no row and nothing to mark read
         // until they say something.
         expect(resolved?.member).toBe(false);
+    });
+
+    it("opens one private room to a team without opening the space", async () => {
+        // One room of a space handed to one team, which is what a grant on the
+        // channel itself means - and a grant on the SPACE deliberately does not
+        // do this: private means chosen.
+        spaces = [{ id: "s1", ownerId: "other", orgId: "o1", visibility: "internal" }];
+        orgIds = ["o1"];
+        channels = [{ id: "c1", spaceId: "s1", kind: "text", private: true, archived: false }];
+        teams = ["team-support"];
+        grants = [handedTo("chat.channel", "c1", "team", "team-support", "member")];
+        const reach = await access.channelAccess(me, "c1");
+        expect(reach?.channelId).toBe("c1");
+        // Reached without a membership row, so nothing here writes a read mark.
+        expect(reach?.member).toBe(false);
     });
 
     it("keeps a private channel shut to somebody who is in the space", async () => {

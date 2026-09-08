@@ -16,6 +16,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { nicknamesFor } from "@/lib/contact-names";
 import { discardAvatars } from "@/lib/avatar-service";
+import { dropGrantsFor } from "@/lib/access/grants";
 import { discardChannelFiles } from "./attachments";
 import { postNotice, postSpaceNotice } from "./notices";
 import {
@@ -283,6 +284,11 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
     // cascade with the space, and a cascade takes rows, not bytes.
     for (const channel of channels) await discardAvatars("channel", channel.id);
     await discardAvatars("space", spaceId);
+    // And the shares, for the same reason as the bytes: a grant addresses its
+    // subject by kind and id rather than by foreign key, so nothing takes them
+    // away on the space's behalf.
+    for (const channel of channels) await dropGrantsFor("chat.channel", channel.id);
+    await dropGrantsFor("chat.space", spaceId);
     await prisma.chatSpace.delete({ where: { id: spaceId } });
 }
 
@@ -1032,6 +1038,7 @@ export async function deleteChannel(actor: ChatActor, channelId: string): Promis
     // the life of the instance.
     await discardChannelFiles([channelId]);
     await discardAvatars("channel", channelId);
+    await dropGrantsFor("chat.channel", channelId);
     await prisma.chatChannel.delete({ where: { id: channelId } });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id });
 }

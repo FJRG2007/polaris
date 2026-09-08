@@ -17,6 +17,7 @@
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
+import { ShareDialog } from "@/components/access/share-dialog";
 import { useRouter } from "next/navigation";
 import { Hash, Loader2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
@@ -52,6 +53,8 @@ export function ChannelSettingsDialog({
     const [busy, setBusy] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState("");
+    /** Whether the sharing dialog is up over this one. */
+    const [sharing, setSharing] = useState(false);
 
     // Reset each time a different channel is opened, so the dialog never shows
     // the last one's name for a frame.
@@ -144,6 +147,31 @@ export function ChannelSettingsDialog({
                             />
                         </label>
 
+                        {/* A private room handed to a team or a role rather than
+                            a person at a time - which is the whole of "the
+                            support team sees the support channel". An open
+                            channel needs none of it: everybody in the space is
+                            already in it, and offering it would read as a way of
+                            narrowing something that is not narrowed. */}
+                        {channel?.private ? (
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+                                <div className="min-w-0">
+                                    <p className="text-[13px] text-foreground">Teams and roles</p>
+                                    <p className="text-[12px] text-muted-foreground">
+                                        Let a group reach this room without adding them one at a
+                                        time.
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setSharing(true)}
+                                >
+                                    Manage
+                                </Button>
+                            </div>
+                        ) : null}
+
                         {error && (
                             <p role="alert" className="text-sm text-danger">
                                 {error}
@@ -201,6 +229,16 @@ export function ChannelSettingsDialog({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {channel && sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={setSharing}
+                    subject="chat.channel"
+                    subjectId={channel.id}
+                    name={channel.name}
+                />
+            ) : null}
 
             <ConfirmDeleteDialog
                 open={confirmDelete}

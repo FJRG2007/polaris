@@ -14,6 +14,14 @@
  * organization's space that means the roster; on somebody's own space it means
  * anybody signed in holding `chat.use`.
  *
+ * The other way in is a **grant**, and it is still the same rule rather than an
+ * exception to it: a grant is a membership written once for a group instead of a
+ * row per person, so an organization can hand a space to its support team or to
+ * everybody holding a role and have that stay true as people join and leave. It
+ * is consulted last, after every ordinary standing has come back with nothing,
+ * which is what keeps it from quietly becoming how anybody reaches anything. See
+ * `lib/access/grants.ts`.
+ *
  * The instance permission (`chat.use`) says whether the app exists for this
  * account at all and is checked by the action layer. Everything below assumes it
  * passed and answers the narrower question.
@@ -24,6 +32,7 @@ import * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
+import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
 
 /** The caller, as the action layer resolved them. */
@@ -80,10 +89,18 @@ export async function spaceAccess(
     });
     if (membership) return membership.role === "admin" ? "admin" : "member";
 
-    if (space.visibility !== "internal") return null;
-    if (!space.orgId) return "member";
-    const orgs = await memberOrgIds(actor.id);
-    return orgs.includes(space.orgId) ? "member" : null;
+    if (space.visibility === "internal") {
+        if (!space.orgId) return "member";
+        const orgs = await memberOrgIds(actor.id);
+        if (orgs.includes(space.orgId)) return "member";
+    }
+
+    // Handed to a team or to a role rather than to a person. Asked last: it is
+    // one more query, and everybody who reaches a space the ordinary way has
+    // already been answered above.
+    const granted = await grantedCapability(actor.id, "chat.space", spaceId);
+    if (granted === "admin") return "admin";
+    return granted === "member" ? "member" : null;
 }
 
 /** The same, refused loudly. */
@@ -208,9 +225,22 @@ export async function channelAccess(
 
     const space = await spaceAccess(actor, channel.spaceId);
     if (!space) return null;
-    if (channel.private && !membership) return null;
+    // A private channel is reached by a row in it, or by a grant naming the
+    // channel itself - which is how one room of a space goes to one team without
+    // the rest of the space going with it. A grant on the space does not open
+    // its private rooms: private means chosen, and a grant is not a choice about
+    // this room.
+    const granted =
+        channel.private && !membership
+            ? await grantedCapability(actor.id, "chat.channel", channel.id)
+            : "";
+    if (channel.private && !membership && !granted) return null;
 
-    const admin = space === "owner" || space === "admin" || membership?.role === "admin";
+    const admin =
+        space === "owner" ||
+        space === "admin" ||
+        membership?.role === "admin" ||
+        granted === "admin";
     return {
         channelId: channel.id,
         spaceId: channel.spaceId,
@@ -268,12 +298,14 @@ export async function requirePostable(actor: ChatActor, channelId: string): Prom
  * query would make unreadable without making it faster.
  */
 export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>> {
-    const [direct, spaces] = await Promise.all([
+    const [direct, spaces, granted] = await Promise.all([
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id },
             select: { channelId: true }
         }),
-        reachableSpaceIds(actor)
+        reachableSpaceIds(actor),
+        // One room handed to a team, without the space it is in going with it.
+        grantedSubjects(actor.id, "chat.channel")
     ]);
 
     const open = spaces.size
@@ -283,7 +315,11 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
           })
         : [];
 
-    return new Set([...direct.map((row) => row.channelId), ...open.map((row) => row.id)]);
+    return new Set([
+        ...direct.map((row) => row.channelId),
+        ...open.map((row) => row.id),
+        ...granted.keys()
+    ]);
 }
 
 /**
@@ -423,16 +459,23 @@ export async function messageable(userIds: readonly string[]): Promise<Set<strin
     return new Set(verdicts.filter(([, allowed]) => allowed).map(([userId]) => userId));
 }
 
-/** Every space this actor can reach, by the three ways in. */
+/** Every space this actor can reach, by the four ways in. */
 export async function reachableSpaceIds(actor: ChatActor): Promise<Set<string>> {
-    const orgs = await memberOrgIds(actor.id);
+    const [orgs, granted] = await Promise.all([
+        memberOrgIds(actor.id),
+        grantedSubjects(actor.id, "chat.space")
+    ]);
     const spaces = await prisma.chatSpace.findMany({
         where: {
             OR: [
                 { ownerId: actor.id },
                 { members: { some: { userId: actor.id } } },
                 { visibility: "internal", orgId: null },
-                ...(orgs.length ? [{ visibility: "internal", orgId: { in: orgs } }] : [])
+                ...(orgs.length ? [{ visibility: "internal", orgId: { in: orgs } }] : []),
+                // Handed to a team or a role. The ids are resolved rather than
+                // joined, because a grant names its principal by kind and id and
+                // there is no relation for the database to walk.
+                ...(granted.size ? [{ id: { in: [...granted.keys()] } }] : [])
             ]
         },
         select: { id: true }

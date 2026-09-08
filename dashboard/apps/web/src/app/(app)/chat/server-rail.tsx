@@ -43,7 +43,17 @@ import { NewChannelDialog } from "./new-channel-dialog";
 import { NotifyOptions } from "./notify-menu";
 import type { MenuParts } from "./mute-menu";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Ban, Hash, Image as ImageIcon, LogOut, MessageSquare, Plus, UserPlus } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
+import {
+    Ban,
+    Hash,
+    Image as ImageIcon,
+    LogOut,
+    MessageSquare,
+    Plus,
+    UserPlus,
+    Users
+} from "lucide-react";
 import {
     cn,
     useToast,
@@ -84,6 +94,8 @@ export function ServerRail() {
     const [newChannelIn, setNewChannelIn] = useState<ChatSpaceView | null>(null);
     const [inviting, setInviting] = useState<ChatSpaceView | null>(null);
     const [showingBans, setShowingBans] = useState<ChatSpaceView | null>(null);
+    /** Which space is being handed to a team or a role. */
+    const [sharing, setSharing] = useState<ChatSpaceView | null>(null);
     const [picturing, setPicturing] = useState<ChatSpaceView | null>(null);
     const [leaving, setLeaving] = useState<ChatSpaceView | null>(null);
     const [error, setError] = useState("");
@@ -186,6 +198,7 @@ export function ServerRail() {
                         }}
                         onInvite={() => setInviting(space)}
                         onBans={() => setShowingBans(space)}
+                        onShare={() => setSharing(space)}
                         onPicture={() => setPicturing(space)}
                         onLeave={() => setLeaving(space)}
                         onNotify={(level) => void setNotify(space.id, level)}
@@ -229,6 +242,15 @@ export function ServerRail() {
                 space={showingBans}
                 onOpenChange={(open) => !open && setShowingBans(null)}
             />
+            {sharing ? (
+                <ShareDialog
+                    open
+                    onOpenChange={(open) => !open && setSharing(null)}
+                    subject="chat.space"
+                    subjectId={sharing.id}
+                    name={sharing.name}
+                />
+            ) : null}
 
             <InviteDialog
                 space={inviting}
@@ -396,6 +418,7 @@ function SpaceMenu({
     onInvite,
     onPicture,
     onBans,
+    onShare,
     onLeave,
     onNotify,
     children
@@ -405,6 +428,8 @@ function SpaceMenu({
     onInvite: () => void;
     onPicture: () => void;
     onBans: () => void;
+    /** Hand the whole space to a team or a role. */
+    onShare: () => void;
     onLeave: () => void;
     onNotify: (level: core.ChatChannelNotifyLevel) => void;
     children: React.ReactNode;
@@ -455,6 +480,15 @@ function SpaceMenu({
                     reminds nobody it was made. Without a list, letting somebody
                     back in means remembering a name nobody has seen for six
                     months. */}
+                {/* A team or a role of the organization that owns this, rather
+                    than a person at a time. Whoever joins the team later is in
+                    the space; whoever leaves it is not. */}
+                {administers && (
+                    <ContextMenuItem onSelect={onShare}>
+                        <Users className="size-3.5" />
+                        Teams and roles
+                    </ContextMenuItem>
+                )}
                 {administers && (
                     <ContextMenuItem onSelect={onBans}>
                         <Ban className="size-3.5" />
