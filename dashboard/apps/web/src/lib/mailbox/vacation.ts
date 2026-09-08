@@ -39,7 +39,11 @@ const NEVER_ANSWERED =
 
 /** Whether the responder is on right now, dates included. */
 export function vacationInForce(
-    account: { vacationEnabled: boolean; vacationStartsAt: Date | null; vacationEndsAt: Date | null },
+    account: {
+        vacationEnabled: boolean;
+        vacationStartsAt: Date | null;
+        vacationEndsAt: Date | null;
+    },
     now = new Date()
 ): boolean {
     if (!account.vacationEnabled) return false;

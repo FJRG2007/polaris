@@ -74,7 +74,10 @@ describe("every subject with its own rail", () => {
                 const lit = subapp.sections.filter((entry) =>
                     isSectionActive(section.href, entry.href, subapp.sections)
                 );
-                expect(lit.map((entry) => entry.href), `${subapp.id} at ${section.href}`).toEqual([section.href]);
+                expect(
+                    lit.map((entry) => entry.href),
+                    `${subapp.id} at ${section.href}`
+                ).toEqual([section.href]);
             }
         }
     });
@@ -132,19 +135,29 @@ describe("one organization's own rail", () => {
 
     it("leaves at most one of its sections lit on any of its own paths", () => {
         for (const section of subapp.sections) {
-            const lit = subapp.sections.filter((entry) => isSectionActive(section.href, entry.href, subapp.sections));
-            expect(lit.map((entry) => entry.href), `at ${section.href}`).toEqual([section.href]);
+            const lit = subapp.sections.filter((entry) =>
+                isSectionActive(section.href, entry.href, subapp.sections)
+            );
+            expect(
+                lit.map((entry) => entry.href),
+                `at ${section.href}`
+            ).toEqual([section.href]);
         }
     });
 
     it("gates exactly the screens that turn a plain member away", () => {
-        const gated = subapp.sections.filter((section) => section.permission).map((section) => section.label);
+        const gated = subapp.sections
+            .filter((section) => section.permission)
+            .map((section) => section.label);
         expect(gated).toEqual(["Roles", "Mailboxes", "Domains", "Activity", "Settings"]);
     });
 });
 
 describe("what search can find", () => {
-    const hrefs = navigationEntries(true, POLARIS_APPS.map((app) => app.id)).map((entry) => entry.href);
+    const hrefs = navigationEntries(
+        true,
+        POLARIS_APPS.map((app) => app.id)
+    ).map((entry) => entry.href);
 
     it("indexes every screen of a subject, not just its front page", () => {
         for (const subapp of APP_SUBAPPS) {

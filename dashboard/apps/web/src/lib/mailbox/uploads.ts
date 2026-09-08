@@ -14,7 +14,12 @@
 
 import { prisma } from "@polaris/db";
 import { MAIL_MAX_ARCHIVE_BYTES, MAIL_MAX_ATTACHMENT_BYTES } from "@polaris/core";
-import { LOCAL_TARGET, placeFile, driverForTarget, resolveStorageTarget } from "@/lib/storage-target";
+import {
+    LOCAL_TARGET,
+    placeFile,
+    driverForTarget,
+    resolveStorageTarget
+} from "@/lib/storage-target";
 
 /** Where an operator points mail attachments. Absent is "work it out". */
 export const MAIL_TARGET_KEY = "mail.attachments.target";
@@ -48,7 +53,12 @@ export interface StoredUpload {
 }
 
 function safeName(name: string): string {
-    return name.replace(/[\r\n\t]/g, " ").slice(0, 200).trim() || "file";
+    return (
+        name
+            .replace(/[\r\n\t]/g, " ")
+            .slice(0, 200)
+            .trim() || "file"
+    );
 }
 
 /**
@@ -94,7 +104,14 @@ export async function storeUpload(
             // id on the part are the same by construction.
             contentId: inline ? `${crypto.randomUUID()}@polaris` : ""
         },
-        select: { id: true, name: true, size: true, contentType: true, inline: true, contentId: true }
+        select: {
+            id: true,
+            name: true,
+            size: true,
+            contentType: true,
+            inline: true,
+            contentId: true
+        }
     });
     return { ...row, size: Number(row.size) };
 }
@@ -103,10 +120,23 @@ export async function storeUpload(
 export async function readUpload(
     userId: string,
     uploadId: string
-): Promise<{ name: string; contentType: string; contentId: string; inline: boolean; bytes: Buffer } | null> {
+): Promise<{
+    name: string;
+    contentType: string;
+    contentId: string;
+    inline: boolean;
+    bytes: Buffer;
+} | null> {
     const row = await prisma.mailUpload.findFirst({
         where: { id: uploadId, userId },
-        select: { name: true, contentType: true, contentId: true, inline: true, connectionId: true, path: true }
+        select: {
+            name: true,
+            contentType: true,
+            contentId: true,
+            inline: true,
+            connectionId: true,
+            path: true
+        }
     });
     if (!row) return null;
     const driver = await driverForTarget(row.connectionId ?? LOCAL_TARGET, LOCAL_FOLDER);

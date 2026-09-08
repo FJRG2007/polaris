@@ -109,11 +109,7 @@ export async function addAccountAction(input: unknown) {
         // On whichever shelf they are working from: connecting a mailbox while
         // the header says a company is connecting it for that company's work,
         // and it appears there rather than beside their own.
-        const account = await accounts.addAccount(
-            userId,
-            parsed.data,
-            await scopeOrgIdFor(userId)
-        );
+        const account = await accounts.addAccount(userId, parsed.data, await scopeOrgIdFor(userId));
         refresh();
         return { account };
     } catch (caught) {

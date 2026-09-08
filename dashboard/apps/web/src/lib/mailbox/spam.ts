@@ -156,9 +156,7 @@ async function knowledgeFor(
         })
     ]);
 
-    const counts = new Map<string, core.TokenCounts>(
-        tokenRows.map((row) => [row.token, row])
-    );
+    const counts = new Map<string, core.TokenCounts>(tokenRows.map((row) => [row.token, row]));
     const taught = {
         junkMessages: totals.find((row) => row.verdict === "junk")?._count._all ?? 0,
         goodMessages: totals.find((row) => row.verdict === "good")?._count._all ?? 0
@@ -208,10 +206,7 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
 
         const message = judgeable(row);
         const fingerprint = core.spamFingerprint(message);
-        const judged = core.judgeSpam(
-            message,
-            await knowledgeFor(accountId, message, fingerprint)
-        );
+        const judged = core.judgeSpam(message, await knowledgeFor(accountId, message, fingerprint));
 
         await prisma.mailMessage.update({
             where: { id: row.id },

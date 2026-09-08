@@ -46,7 +46,9 @@ export type MailAction =
     | "inbox";
 
 /** The flag an action sets, for the four that are flags rather than moves. */
-const FLAG_ACTIONS: Partial<Record<MailAction, { flag: string; add: boolean; column: "seen" | "flagged" }>> = {
+const FLAG_ACTIONS: Partial<
+    Record<MailAction, { flag: string; add: boolean; column: "seen" | "flagged" }>
+> = {
     read: { flag: "\\Seen", add: true, column: "seen" },
     unread: { flag: "\\Seen", add: false, column: "seen" },
     star: { flag: "\\Flagged", add: true, column: "flagged" },
@@ -143,7 +145,14 @@ export async function createFolderForRole(
     role: core.MailFolderRole
 ): Promise<string> {
     const account = await ownedAccount(userId, accountId);
-    const name = role === "archive" ? "Archive" : role === "junk" ? "Junk" : role === "trash" ? "Trash" : "Archive";
+    const name =
+        role === "archive"
+            ? "Archive"
+            : role === "junk"
+              ? "Junk"
+              : role === "trash"
+                ? "Trash"
+                : "Archive";
     await withImap(account, async (client) => {
         await client.mailboxCreate(name).catch(() => undefined);
         await client.mailboxSubscribe(name).catch(() => undefined);
@@ -255,7 +264,14 @@ export async function actOnMessages(
                 const lock = await client.getMailboxLock(folder.path);
                 let target = "";
                 try {
-                    const outcome = await applyOne(client, account.id, folderId, uids, rows, action);
+                    const outcome = await applyOne(
+                        client,
+                        account.id,
+                        folderId,
+                        uids,
+                        rows,
+                        action
+                    );
                     done += outcome.done;
                     target = outcome.movedTo;
                     // Unread mail leaving is unread mail the folder no longer
@@ -267,7 +283,6 @@ export async function actOnMessages(
                 }
                 if (target) landed.add(target);
             }
-
         });
         await nudgeFolderUnread(deltas);
         publishMail({ accountId, kind: "messages", actorId: userId });
@@ -535,7 +550,9 @@ export async function moveMessages(
                     { uid: true }
                 );
                 if (!ok) continue;
-                await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+                await prisma.mailMessage.deleteMany({
+                    where: { id: { in: rows.map((row) => row.id) } }
+                });
                 moved += rows.length;
                 for (const [source, by] of unseenByFolder(rows, -1)) addDelta(deltas, source, by);
                 addDelta(deltas, destination.id, rows.filter((row) => !row.seen).length);
@@ -628,8 +645,12 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
             if (!one) return { text: "", html: "" };
             const shape = readShape(one.bodyStructure);
             const [text, html] = await Promise.all([
-                shape.textPart ? downloadPart(client, Number(message.uid), shape.textPart) : Promise.resolve(""),
-                shape.htmlPart ? downloadPart(client, Number(message.uid), shape.htmlPart) : Promise.resolve("")
+                shape.textPart
+                    ? downloadPart(client, Number(message.uid), shape.textPart)
+                    : Promise.resolve(""),
+                shape.htmlPart
+                    ? downloadPart(client, Number(message.uid), shape.htmlPart)
+                    : Promise.resolve("")
             ]);
             return { text, html };
         } finally {
@@ -701,11 +722,17 @@ export async function readAttachment(
     if (!account) throw new MailAccessError();
 
     const bytes = await withImap(account, async (client) => {
-        const lock = await client.getMailboxLock(attachment.message.folder.path, { readOnly: true });
+        const lock = await client.getMailboxLock(attachment.message.folder.path, {
+            readOnly: true
+        });
         try {
-            const download = await client.download(String(attachment.message.uid), attachment.part, {
-                uid: true
-            });
+            const download = await client.download(
+                String(attachment.message.uid),
+                attachment.part,
+                {
+                    uid: true
+                }
+            );
             if (!download?.content) return Buffer.alloc(0);
             const chunks: Buffer[] = [];
             for await (const chunk of download.content) chunks.push(chunk as Buffer);
@@ -736,7 +763,11 @@ export async function wakeSnoozed(): Promise<number> {
         data: { snoozedUntil: null }
     });
     for (const message of due) {
-        publishMail({ accountId: message.accountId, kind: "messages", actorId: message.account.userId });
+        publishMail({
+            accountId: message.accountId,
+            kind: "messages",
+            actorId: message.account.userId
+        });
     }
     return due.length;
 }

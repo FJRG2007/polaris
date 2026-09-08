@@ -20,7 +20,8 @@ export default async function MailBlockedPage() {
     const blocked = Object.fromEntries(
         await Promise.all(
             accounts.map(
-                async (account) => [account.id, await listBlockedSenders(user.id, account.id)] as const
+                async (account) =>
+                    [account.id, await listBlockedSenders(user.id, account.id)] as const
             )
         )
     );

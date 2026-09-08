@@ -164,7 +164,12 @@ export const REPUTATION_FLOOR = 3;
 /** The domain of an address, lowercased, or "". */
 export function domainOf(address: string): string {
     const at = address.lastIndexOf("@");
-    return at < 0 ? "" : address.slice(at + 1).trim().toLowerCase();
+    return at < 0
+        ? ""
+        : address
+              .slice(at + 1)
+              .trim()
+              .toLowerCase();
 }
 
 /** Every link in the message, as hosts. Read from the HTML when there is any,
@@ -235,9 +240,7 @@ export function authenticationSignals(
     const line = (headers?.["authentication-results"] ?? "").toLowerCase();
     if (!line) return [];
     const signals: SpamSignal[] = [];
-    const read = (
-        method: "dmarc" | "dkim" | "spf"
-    ): "pass" | "fail" | "" => {
+    const read = (method: "dmarc" | "dkim" | "spf"): "pass" | "fail" | "" => {
         const found = new RegExp(`\\b${method}\\s*=\\s*([a-z]+)`).exec(line);
         const outcome = found?.[1] ?? "";
         if (outcome === "pass") return "pass";

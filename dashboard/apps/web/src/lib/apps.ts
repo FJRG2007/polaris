@@ -1262,10 +1262,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     admin: [
-        { label: "Overview", href: "/admin",
-            adminOnly: true, icon: LayoutDashboard },
-        { label: "Activity", href: "/admin/activity",
-            adminOnly: true, icon: Activity, keywords: ["audit", "logs"] },
+        { label: "Overview", href: "/admin", adminOnly: true, icon: LayoutDashboard },
+        {
+            label: "Activity",
+            href: "/admin/activity",
+            adminOnly: true,
+            icon: Activity,
+            keywords: ["audit", "logs"]
+        },
         {
             label: "Users",
             href: "/admin/users",
@@ -1615,7 +1619,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Repositories",
                 href: "/apps/agents/repos",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: FolderGit2,
                 keywords: [
                     "repos",
@@ -1630,7 +1634,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Automations",
                 href: "/apps/agents/automations",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: Workflow,
                 keywords: [
                     "triggers",
@@ -1644,7 +1648,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Sessions",
                 href: "/apps/agents/sessions",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: MessagesSquare,
                 keywords: [
                     "live",
@@ -1660,14 +1664,14 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Runs",
                 href: "/apps/agents/runs",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: History,
                 keywords: ["history", "logs", "failed", "what happened"]
             },
             {
                 label: "Settings",
                 href: "/apps/agents/settings",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: SlidersHorizontal,
                 keywords: [
                     "defaults",
@@ -1683,7 +1687,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Set up",
                 href: "/apps/agents/setup",
-            needs: "agents.read",
+                needs: "agents.read",
                 icon: BookOpen,
                 hidden: true,
                 keywords: ["wizard", "getting started", "connect", "install"]
@@ -1706,7 +1710,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Repositories",
                 href: "/apps/runners/repos",
-            needs: "system.manage",
+                needs: "system.manage",
                 icon: FolderGit2,
                 keywords: [
                     "repos",
@@ -1721,21 +1725,21 @@ export const APP_SUBAPPS: AppSubapp[] = [
             {
                 label: "Runs",
                 href: "/apps/runners/runs",
-            needs: "system.manage",
+                needs: "system.manage",
                 icon: History,
                 keywords: ["history", "jobs", "workflow runs", "builds", "logs", "failed"]
             },
             {
                 label: "Secrets",
                 href: "/apps/runners/secrets",
-            needs: "system.manage",
+                needs: "system.manage",
                 icon: KeyRound,
                 keywords: ["variables", "env", "credentials", "tokens", "passwords"]
             },
             {
                 label: "How it works",
                 href: "/apps/runners/guide",
-            needs: "system.manage",
+                needs: "system.manage",
                 icon: BookOpen,
                 keywords: ["help", "setup", "runs-on", "getting started", "guide", "docs"]
             }

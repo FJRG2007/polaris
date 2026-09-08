@@ -106,11 +106,19 @@ async function onePass(accountId: string): Promise<void> {
         await recordAccountState(accountId, "ok");
     } catch (caught) {
         const auth = caught instanceof MailAuthError;
-        await recordAccountState(accountId, auth ? "auth" : "unreachable", auth ? caught.message : "");
+        await recordAccountState(
+            accountId,
+            auth ? "auth" : "unreachable",
+            auth ? caught.message : ""
+        );
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.
-            console.warn("mail sync failed", accountId, caught instanceof Error ? caught.message : caught);
+            console.warn(
+                "mail sync failed",
+                accountId,
+                caught instanceof Error ? caught.message : caught
+            );
         }
     }
     publishMail({ accountId, kind: "folders", actorId: account.userId });
@@ -203,7 +211,11 @@ type FolderRow = {
  * all. Archiving something and not finding it in Archive is not a delay anybody
  * reads as a delay: it reads as the message having been lost.
  */
-export async function catchUpFolder(client: ImapFlow, accountId: string, folderId: string): Promise<void> {
+export async function catchUpFolder(
+    client: ImapFlow,
+    accountId: string,
+    folderId: string
+): Promise<void> {
     const [account, folder] = await Promise.all([
         prisma.mailAccount.findUnique({ where: { id: accountId }, select: ACCOUNT_COLUMNS }),
         prisma.mailFolder.findUnique({ where: { id: folderId } })
@@ -294,7 +306,11 @@ const QUERY = {
     ]
 };
 
-async function collect(client: ImapFlow, range: string, options: { uid: boolean }): Promise<Fetched[]> {
+async function collect(
+    client: ImapFlow,
+    range: string,
+    options: { uid: boolean }
+): Promise<Fetched[]> {
     const out: Fetched[] = [];
     for await (const message of client.fetch(range, QUERY, options)) {
         out.push({
@@ -448,7 +464,8 @@ async function storeMessages(
                 deleted: message.flags.has("\\Deleted"),
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
-                    message.headers["disposition-notification-to"] ?? message.headers["return-receipt-to"]
+                    message.headers["disposition-notification-to"] ??
+                        message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {
@@ -486,7 +503,12 @@ async function storeMessages(
     }
 
     await refreshThreads(account.id);
-    publishMail({ accountId: account.id, kind: "messages", actorId: account.userId, folderId: folder.id });
+    publishMail({
+        accountId: account.id,
+        kind: "messages",
+        actorId: account.userId,
+        folderId: folder.id
+    });
 }
 
 /** The first few kilobytes of each message's text part, for the line under the
@@ -527,7 +549,10 @@ async function readParts(
 ): Promise<void> {
     const byPart = new Map<string, number[]>();
     for (const message of fetched) {
-        const key = half === "text" ? message.structure.textPart || message.structure.htmlPart : message.structure.htmlPart;
+        const key =
+            half === "text"
+                ? message.structure.textPart || message.structure.htmlPart
+                : message.structure.htmlPart;
         if (!key) continue;
         const held = byPart.get(key);
         if (held) held.push(message.uid);
@@ -541,7 +566,8 @@ async function readParts(
                 { uid: true, bodyParts: [{ key, maxLength: 4096 }] },
                 { uid: true }
             )) {
-                const bytes = message.bodyParts?.get(key.toLowerCase()) ?? message.bodyParts?.get(key);
+                const bytes =
+                    message.bodyParts?.get(key.toLowerCase()) ?? message.bodyParts?.get(key);
                 if (!bytes) continue;
                 const shape = fetched.find((one) => one.uid === message.uid)?.structure;
                 const html = shape?.htmlPart === key;
@@ -722,12 +748,18 @@ async function reconcileFlags(
 
     const changed = new Map<number, Set<string>>();
     const uids = held.map((row) => Number(row.uid));
-    const useModseq = folder.highestModseq !== null && highestModseq !== null && highestModseq > folder.highestModseq;
+    const useModseq =
+        folder.highestModseq !== null &&
+        highestModseq !== null &&
+        highestModseq > folder.highestModseq;
     try {
         for await (const message of client.fetch(
             useModseq ? { uid: `${Math.min(...uids)}:*` } : uids,
             { uid: true, flags: true },
-            { uid: true, ...(useModseq && folder.highestModseq ? { changedSince: folder.highestModseq } : {}) }
+            {
+                uid: true,
+                ...(useModseq && folder.highestModseq ? { changedSince: folder.highestModseq } : {})
+            }
         )) {
             changed.set(message.uid, message.flags ?? new Set<string>());
         }
@@ -742,7 +774,10 @@ async function reconcileFlags(
         const flagged = flags.has("\\Flagged");
         const answered = flags.has("\\Answered");
         if (seen === row.seen && flagged === row.flagged && answered === row.answered) continue;
-        await prisma.mailMessage.update({ where: { id: row.id }, data: { seen, flagged, answered } });
+        await prisma.mailMessage.update({
+            where: { id: row.id },
+            data: { seen, flagged, answered }
+        });
     }
 }
 

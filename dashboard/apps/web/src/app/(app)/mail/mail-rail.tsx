@@ -265,14 +265,19 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                                 title={swatch.name}
                                                                 aria-label={swatch.name}
                                                                 onClick={() =>
-                                                                    void colour(folder.id, swatch.hex)
+                                                                    void colour(
+                                                                        folder.id,
+                                                                        swatch.hex
+                                                                    )
                                                                 }
                                                                 className={cn(
                                                                     "size-4 shrink-0 rounded-full ring-offset-1 ring-offset-popover transition-shadow",
                                                                     folder.color === swatch.hex &&
                                                                         "ring-2 ring-foreground"
                                                                 )}
-                                                                style={{ backgroundColor: swatch.hex }}
+                                                                style={{
+                                                                    backgroundColor: swatch.hex
+                                                                }}
                                                             />
                                                         ))}
                                                     </div>
@@ -410,11 +415,7 @@ function RailLink({
                 over && "ring-1 ring-inset ring-primary"
             )}
         >
-            <Icon
-                className="size-4 shrink-0"
-                style={color ? { color } : undefined}
-                aria-hidden
-            />
+            <Icon className="size-4 shrink-0" style={color ? { color } : undefined} aria-hidden />
             <span className="min-w-0 flex-1 truncate" title={label}>
                 {label}
             </span>

@@ -182,8 +182,8 @@ export function ArchiveView({
                         {ARCHIVE_LIMIT_MB} MB. Every message is put on your mail server in the
                         folder above, so it is there on your phone and in everything else you read
                         this mailbox with - not only here. They arrive already read, because an
-                        archive that lands as four thousand unread messages is an inbox nobody
-                        opens again.
+                        archive that lands as four thousand unread messages is an inbox nobody opens
+                        again.
                     </p>
                     <input
                         ref={picker}

@@ -239,7 +239,9 @@ export function MailShell({
                 ? folders
                 : folders.map((folder) => {
                       const by = drift[`f:${folder.id}`] ?? 0;
-                      return by === 0 ? folder : { ...folder, unread: Math.max(0, folder.unread + by) };
+                      return by === 0
+                          ? folder
+                          : { ...folder, unread: Math.max(0, folder.unread + by) };
                   }),
         [folders, drift]
     );
@@ -248,7 +250,10 @@ export function MailShell({
         const byAccount: Record<string, number> = {};
         let total = 0;
         for (const account of accounts) {
-            const count = Math.max(0, (unread.byAccount[account.id] ?? 0) + (drift[`a:${account.id}`] ?? 0));
+            const count = Math.max(
+                0,
+                (unread.byAccount[account.id] ?? 0) + (drift[`a:${account.id}`] ?? 0)
+            );
             if (count > 0) byAccount[account.id] = count;
             total += count;
         }

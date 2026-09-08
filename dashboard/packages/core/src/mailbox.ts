@@ -406,9 +406,16 @@ function stripMarkup(html: string): string {
             // past the last and swallowed the sentence after it, which is how
             // one message's preview came out empty.
             .replace(/[\s\S]*/, (found) => stripCssBlocks(found))
-            .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => codePoint(Number.parseInt(hex, 16)))
-            .replace(/&#(\d+);/g, (_match, digits: string) => codePoint(Number.parseInt(digits, 10)))
-            .replace(/&([a-z]+);/gi, (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match)
+            .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) =>
+                codePoint(Number.parseInt(hex, 16))
+            )
+            .replace(/&#(\d+);/g, (_match, digits: string) =>
+                codePoint(Number.parseInt(digits, 10))
+            )
+            .replace(
+                /&([a-z]+);/gi,
+                (match, name: string) => NAMED_ENTITIES[name.toLowerCase()] ?? match
+            )
     );
 }
 
@@ -465,7 +472,10 @@ function codePoint(value: number): string {
 export function quoteForReply(body: string, from: MailAddress, sentAt: Date): string {
     const who = from.name.trim() ? `${from.name.trim()} <${from.address}>` : from.address;
     const when = sentAt.toISOString().slice(0, 16).replace("T", " ");
-    const quoted = body.split(/\r?\n/).map((line) => (line ? `> ${line}` : ">")).join("\n");
+    const quoted = body
+        .split(/\r?\n/)
+        .map((line) => (line ? `> ${line}` : ">"))
+        .join("\n");
     return `On ${when} UTC, ${who} wrote:\n${quoted}`;
 }
 
@@ -507,7 +517,8 @@ export function dedupeAddresses(entries: readonly MailAddress[]): readonly MailA
         // conversation, or a reply-all that writes to somebody twice.
         const held = seen.get(key);
         // A later copy that carries a name beats an earlier one that does not.
-        if (!held || (!held.name.trim() && entry.name.trim())) seen.set(key, { name: entry.name, address: key });
+        if (!held || (!held.name.trim() && entry.name.trim()))
+            seen.set(key, { name: entry.name, address: key });
     }
     return [...seen.values()];
 }
@@ -525,7 +536,15 @@ export function dedupeAddresses(entries: readonly MailAddress[]): readonly MailA
  * it in whatever this server calls Archive", and a mailbox whose Sent folder is
  * called `Gesendete Objekte` has to work the same as one whose is not.
  */
-export type MailFolderRole = "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive" | "all" | "none";
+export type MailFolderRole =
+    | "inbox"
+    | "sent"
+    | "drafts"
+    | "trash"
+    | "junk"
+    | "archive"
+    | "all"
+    | "none";
 
 /**
  * The roles a person may point a folder at.
@@ -535,7 +554,13 @@ export type MailFolderRole = "inbox" | "sent" | "drafts" | "trash" | "junk" | "a
  * are the ones an action needs and a mailbox can plausibly have under a name
  * nobody recognised.
  */
-export const MAIL_FOLDER_ROLES = ["trash", "junk", "archive", "sent", "drafts"] as const satisfies readonly MailFolderRole[];
+export const MAIL_FOLDER_ROLES = [
+    "trash",
+    "junk",
+    "archive",
+    "sent",
+    "drafts"
+] as const satisfies readonly MailFolderRole[];
 
 /** What a role is called on screen. */
 export const MAIL_FOLDER_ROLE_LABELS: Readonly<Record<string, string>> = {
@@ -592,7 +617,7 @@ const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
     gesendet: "sent",
     "gesendete objekte": "sent",
     "gesendete elemente": "sent",
-    "envoyés": "sent",
+    envoyés: "sent",
     "éléments envoyés": "sent",
     "messages envoyés": "sent",
     "posta inviata": "sent",
@@ -605,7 +630,7 @@ const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
     drafts: "drafts",
     draft: "drafts",
     borradores: "drafts",
-    "entwürfe": "drafts",
+    entwürfe: "drafts",
     brouillons: "drafts",
     bozze: "drafts",
     rascunhos: "drafts",
@@ -637,9 +662,9 @@ const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
     "junk email": "junk",
     "bulk mail": "junk",
     "correo no deseado": "junk",
-    "correo_no_deseado": "junk",
+    correo_no_deseado: "junk",
     "no deseado": "junk",
-    "unerwünscht": "junk",
+    unerwünscht: "junk",
     werbung: "junk",
     "courrier indésirable": "junk",
     indésirables: "junk",
@@ -666,7 +691,11 @@ const ROLE_BY_NAME: Readonly<Record<string, MailFolderRole>> = {
 };
 
 /** The role of a folder, from what the server flagged it and then from its name. */
-export function folderRole(path: string, flags: readonly string[], delimiter: string): MailFolderRole {
+export function folderRole(
+    path: string,
+    flags: readonly string[],
+    delimiter: string
+): MailFolderRole {
     for (const flag of flags) {
         const role = ROLE_BY_FLAG[flag];
         if (role) return role;
@@ -774,7 +803,9 @@ function fieldText(field: MailRuleField, message: MailRuleSubject): string {
         case "to":
             return message.to.map((entry) => `${entry.name} ${entry.address}`).join(" ");
         case "recipient":
-            return [...message.to, ...message.cc].map((entry) => `${entry.name} ${entry.address}`).join(" ");
+            return [...message.to, ...message.cc]
+                .map((entry) => `${entry.name} ${entry.address}`)
+                .join(" ");
         case "subject":
             return message.subject;
         case "body":
@@ -796,7 +827,10 @@ function fieldText(field: MailRuleField, message: MailRuleSubject): string {
  * rule in the list. A rule that never fires is a bad rule; a rule that breaks
  * filing is a lost message.
  */
-export function mailConditionHolds(condition: MailRuleCondition, message: MailRuleSubject): boolean {
+export function mailConditionHolds(
+    condition: MailRuleCondition,
+    message: MailRuleSubject
+): boolean {
     if (condition.operator === "greater-than" || condition.operator === "less-than") {
         const left = Number(fieldText(condition.field, message));
         const right = Number(condition.value);
@@ -964,7 +998,8 @@ export interface TrackerFinding {
 function hostSuffixes(host: string): readonly string[] {
     const parts = host.trim().toLowerCase().split(".");
     const out: string[] = [];
-    for (let index = 0; index < parts.length - 1; index += 1) out.push(parts.slice(index).join("."));
+    for (let index = 0; index < parts.length - 1; index += 1)
+        out.push(parts.slice(index).join("."));
     return out;
 }
 
@@ -982,7 +1017,8 @@ export function trackerFor(resource: RemoteResource): TrackerFinding | null {
     }
     // An image nobody could see is an image nobody was meant to see.
     const tiny = (value: number | undefined) => value !== undefined && value <= 2;
-    if (tiny(resource.width) && tiny(resource.height)) return { url: resource.url, vendor: "", host };
+    if (tiny(resource.width) && tiny(resource.height))
+        return { url: resource.url, vendor: "", host };
     return null;
 }
 
@@ -1083,7 +1119,11 @@ export function remoteResourcesIn(html: string): readonly RemoteResource[] {
         const address = url.trim();
         if (!/^https?:\/\//i.test(address) || seen.has(address)) return;
         seen.add(address);
-        found.push({ url: address, ...(width !== undefined ? { width } : {}), ...(height !== undefined ? { height } : {}) });
+        found.push({
+            url: address,
+            ...(width !== undefined ? { width } : {}),
+            ...(height !== undefined ? { height } : {})
+        });
     };
 
     // Images, with whatever size the markup declared - a one-pixel image is a
@@ -1093,12 +1133,17 @@ export function remoteResourcesIn(html: string): readonly RemoteResource[] {
         if (!src) continue;
         const width = Number(/\bwidth\s*=\s*["']?(\d+)/i.exec(tag)?.[1]);
         const height = Number(/\bheight\s*=\s*["']?(\d+)/i.exec(tag)?.[1]);
-        push(src, Number.isFinite(width) ? width : undefined, Number.isFinite(height) ? height : undefined);
+        push(
+            src,
+            Number.isFinite(width) ? width : undefined,
+            Number.isFinite(height) ? height : undefined
+        );
     }
     // Backgrounds, in an attribute or in a style, which is how the same pixel is
     // hidden from a client that only looks at img tags.
     for (const match of html.matchAll(/url\(\s*["']?([^"')]+)/gi)) push(match[1] ?? "");
-    for (const match of html.matchAll(/\bbackground\s*=\s*["']?([^"'\s>]+)/gi)) push(match[1] ?? "");
+    for (const match of html.matchAll(/\bbackground\s*=\s*["']?([^"'\s>]+)/gi))
+        push(match[1] ?? "");
     return found;
 }
 
@@ -1162,13 +1207,16 @@ export function textToHtml(text: string): string {
             return `${before}<a href="https://${trimmed}">${trimmed}</a>${tail}`;
         })
         // An address somebody can write to.
-        .replace(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g, (found) => `<a href="mailto:${found}">${found}</a>`);
+        .replace(
+            /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g,
+            (found) => `<a href="mailto:${found}">${found}</a>`
+        );
 
     // Quoted history is dimmed rather than dropped: it is what a reply is
     // answering, and hiding it entirely is how people lose the thread.
-    const lines = linked.split(/\r?\n/).map((line) =>
-        line.startsWith("&gt;") ? `<span class="quoted">${line}</span>` : line
-    );
+    const lines = linked
+        .split(/\r?\n/)
+        .map((line) => (line.startsWith("&gt;") ? `<span class="quoted">${line}</span>` : line));
     return `<div class="plain">${lines.join("\n")}</div>`;
 }
 
@@ -1226,13 +1274,10 @@ export function proxyRemoteContent(
             // pictures to draw one. One with nothing outside in it is left alone
             // rather than numbered, or the count would move for a rewrite that
             // never happened.
-            .replace(
-                /\bsrcset\s*=\s*(["'])([^"']*)\1/gi,
-                (match, quote: string, list: string) => {
-                    const first = firstRemoteCandidate(list);
-                    return first ? `srcset=${quote}${next(first)}${quote}` : match;
-                }
-            )
+            .replace(/\bsrcset\s*=\s*(["'])([^"']*)\1/gi, (match, quote: string, list: string) => {
+                const first = firstRemoteCandidate(list);
+                return first ? `srcset=${quote}${next(first)}${quote}` : match;
+            })
             .replace(
                 /url\(\s*(["']?)(https?:\/\/[^"')]+)\1\s*\)/gi,
                 (_match, _quote: string, url: string) => `url(${next(url)})`

@@ -63,10 +63,7 @@ export interface OrgMailboxView {
 }
 
 /** Every mailbox this organization has handed out, newest last. */
-export async function listOrgMailboxes(
-    actorId: string,
-    orgId: string
-): Promise<OrgMailboxView[]> {
+export async function listOrgMailboxes(actorId: string, orgId: string): Promise<OrgMailboxView[]> {
     await requireMailManager(actorId, orgId);
     const rows = await prisma.mailAccount.findMany({
         where: { orgId },
