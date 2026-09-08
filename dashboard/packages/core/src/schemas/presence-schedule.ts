@@ -248,14 +248,36 @@ export function openWindow(
     return best;
 }
 
-/** The window one rule opens on the day `startedDaysAgo` back from this moment,
- *  or null when it does not run that day. */
-function windowAround(
-    rule: PresenceScheduleRule,
+/** The two ends of one weekly window, as instants. */
+export interface WeeklyWindow {
+    readonly openedAt: Date;
+    readonly closesAt: Date;
+}
+
+/** A rule stated as a part of the week, which is all this needs to know about
+ *  it: the presence, the id and the switch are the caller's business. */
+export interface WeeklyRule {
+    readonly days: number;
+    readonly startMinute: number;
+    readonly endMinute: number;
+}
+
+/**
+ * The window one weekly rule opens on the day `startedDaysAgo` back from this
+ * moment, or null when it does not run that day.
+ *
+ * Exported because standing hours are not the only thing made of them: a grant
+ * that lets somebody open a door between nine and eleven on a Tuesday is the
+ * same arithmetic, and the parts that are easy to get wrong - the day before
+ * being the one that matters at one in the morning, and reading the end as a
+ * wall clock rather than as a length - should be got right once.
+ */
+export function weeklyWindow(
+    rule: WeeklyRule,
     timeZone: string,
     now: Date,
     startedDaysAgo: number
-): OpenWindow | null {
+): WeeklyWindow | null {
     const wall = wallClock(now, timeZone);
     // Calendar arithmetic on a UTC date, which is only ever a carrier for the
     // three numbers: building it in the zone would be circular, and a UTC date
@@ -270,7 +292,19 @@ function windowAround(
     const closesOn = new Date(opensOn);
     if (rule.endMinute <= rule.startMinute) closesOn.setUTCDate(closesOn.getUTCDate() + 1);
     const closesAt = zonedInstant(readingOf(closesOn, rule.endMinute), timeZone);
-    return { rule, openedAt, closesAt };
+    return { openedAt, closesAt };
+}
+
+/** The same, carrying the rule it came from, which is what a presence window
+ *  is. */
+function windowAround(
+    rule: PresenceScheduleRule,
+    timeZone: string,
+    now: Date,
+    startedDaysAgo: number
+): OpenWindow | null {
+    const window = weeklyWindow(rule, timeZone, now, startedDaysAgo);
+    return window ? { rule, ...window } : null;
 }
 
 function readingOf(date: Date, minute: number) {

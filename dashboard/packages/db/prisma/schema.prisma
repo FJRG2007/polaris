@@ -4821,6 +4821,81 @@ model TaskFolderTeam {
     @@index([teamId])
 }
 
+// Handing one thing to somebody who is not on its roster.
+//
+// Polaris already knows how to say "these people own this": a space has members,
+// a Place answers to an instance permission. What it had no way to say was the
+// security team gets that camera and nothing else here, or that the cleaner can
+// open the front door on Tuesdays between nine and eleven, four more times,
+// until the end of March. Those are the same sentence with different nouns,
+// which is why they are one table.
+//
+// **Nothing here is a foreign key, and that is the design.** A grant addresses
+// its subject and its principal by kind and id, the way Activity and Comment
+// already do, because it spans six kinds of subject across four apps and one
+// column per kind would be six mostly-null columns and a check nobody writes.
+// The price is the cascade that does not happen: a row can outlive the team,
+// role or device it names. It is paid deliberately and it is safe, because
+// resolution never trusts a row on its own - the principals are computed from
+// live memberships and the subject is looked up before this table is consulted,
+// so a grant to a deleted team matches nobody and a grant to a deleted door is
+// never asked about. The listing screens drop what no longer resolves.
+//
+// The vocabulary - which subjects exist, which capabilities each of them has,
+// and how the hours are read - is `access-grants.ts` in @polaris/core, and the
+// window arithmetic is shared with standing hours.
+model AccessGrant {
+    id            String @id @default(uuid(7)) @db.Uuid
+    /// chat.space | chat.channel | task.space | task.folder | note.space |
+    /// place.device | place.camera - see GRANT_SUBJECTS.
+    subjectType   String
+    subjectId     String @db.Uuid
+    /// user | team | role. A person, or one of the two ways an organization
+    /// already groups people - both, because a team is who somebody works with
+    /// and a role is what they are trusted with, and a grant to "whoever is on
+    /// security" must not need rewriting when somebody joins.
+    principalType String
+    principalId   String @db.Uuid
+    /// What they may do there, in that subject's own words: member or admin in a
+    /// conversation, guest/member/admin in a space, view or control over a door.
+    capability    String
+
+    /// Not before this moment, and not after that one. Both null is the ordinary
+    /// grant, which has no dates at all.
+    startsAt    DateTime?
+    endsAt      DateTime?
+    /// Which days of the week it opens on, as the same bitmask standing hours
+    /// use - bit 0 Sunday. 127 is every day, which is the default.
+    days        Int       @default(127)
+    /// Minutes past midnight in `timeZone`. Both null is "at any hour"; an end
+    /// at or before the start crosses midnight, which is what a night shift is.
+    startMinute Int?
+    endMinute   Int?
+    /// Whose midnight. Empty falls back to the instance's own clock - a
+    /// wall-clock rule has to be somebody's wall.
+    timeZone    String    @default("")
+    /// How many times it may be spent, or null for as often as they like. Only
+    /// an act counts: looking at a door is not using it.
+    maxUses     Int?
+    uses        Int       @default(0)
+    lastUsedAt  DateTime?
+
+    /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
+    note        String  @default("")
+    /// Who handed it over. A bare id rather than a relation, like the columns
+    /// above it: it is an attribution, and an account being deleted must not
+    /// take the grant with it - the door is still shared.
+    grantedById String? @db.Uuid
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Both directions are read constantly: "what does this thing hand out" draws
+    // a screen, and "what does this person reach" runs on the way into one.
+    @@index([subjectType, subjectId])
+    @@index([principalType, principalId])
+}
+
 // ---------------------------------------------------------------------------
 // Tasks (work management)
 // ---------------------------------------------------------------------------
@@ -9067,7 +9142,6 @@ model MailAccount {
 
     signature           String  @default("")
     signatureAboveQuote Boolean @default(true)
-
     // Privacy, per account rather than per person: a work mailbox and a personal
     // one are not the same decision.
     remoteContent  String  @default("always")

@@ -908,6 +908,14 @@ export const SPACE_ROLE_HINTS: Record<SpaceRole, string> = {
     admin: "Everything a member can do, plus statuses, fields, automations and deletion."
 };
 
+/** Whether a word off a stored row is one of these three. What an access grant
+ *  answers with is a string in the subject's own vocabulary, and this is the
+ *  space's - a grant carrying anything else reaches nothing, which is the safe
+ *  way to be wrong. */
+export function isSpaceRole(value: unknown): value is SpaceRole {
+    return (SPACE_ROLES as readonly unknown[]).includes(value);
+}
+
 export function spaceRoleAtLeast(role: SpaceRole, minimum: SpaceRole): boolean {
     return SPACE_ROLES.indexOf(role) >= SPACE_ROLES.indexOf(minimum);
 }
