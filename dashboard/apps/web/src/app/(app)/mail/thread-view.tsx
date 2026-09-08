@@ -109,7 +109,8 @@ export function ThreadView({
      *  already stepped out of the way. */
     onStayed?: () => void;
 }) {
-    const { refresh, openComposer, accounts, accountColor, askFolderRole } = useMail();
+    const { refresh, reloadLists, openComposer, accounts, accountColor, askFolderRole } =
+        useMail();
     const toast = useToast();
     const [busy, startBusy] = useTransition();
     const [answering, startAnswering] = useTransition();
@@ -175,17 +176,24 @@ export function ThreadView({
                 }
                 // Archived, trashed or deleted: this pane was looking at messages
                 // the server has now moved out from under it, and it closed
-                // before the round trip. Closing is a navigation and these routes
-                // are dynamic, so it comes back with a fresh list on its own -
-                // refreshing as well would be a second fetch racing the
-                // navigation, and the navigation is the one that loses. That race
-                // is why deleting from inside a conversation left the reader
-                // inside it.
-                if (leaving) return;
+                // before the round trip.
+                //
+                // The router is left alone here, because closing is already a
+                // navigation and a refresh in the same breath is a second fetch
+                // racing it - the navigation loses, which is why deleting from
+                // inside a conversation used to leave the reader inside it. But
+                // the LIST still has to be pulled again: it is fetched by the
+                // browser against the narrowing, and dropping `?open=` does not
+                // change the narrowing, so without this the message somebody just
+                // deleted stayed in the list until they reloaded the page.
+                if (leaving) {
+                    reloadLists();
+                    return;
+                }
                 refresh();
             });
         },
-        [askFolderRole, messages, onGone, onStayed, refresh, toast]
+        [askFolderRole, messages, onGone, onStayed, refresh, reloadLists, toast]
     );
 
     /**

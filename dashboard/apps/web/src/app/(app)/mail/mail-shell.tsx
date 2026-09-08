@@ -52,6 +52,17 @@ export interface MailContextValue {
      *  change to a shape the server already knows how to build. */
     readonly refresh: () => void;
     /**
+     * Pull the lists again without touching the router.
+     *
+     * The other half of `refresh`, on its own, and it exists for one moment:
+     * filing the conversation that is open. Closing the pane is a navigation,
+     * and asking the router to refresh in the same breath is a second fetch
+     * racing it - the navigation is the one that loses, which used to leave the
+     * address still naming a conversation that had been deleted. So that path
+     * reloads the data and lets the navigation be the navigation.
+     */
+    readonly reloadLists: () => void;
+    /**
      * How many times that has been asked for.
      *
      * The rail and the counts are the server's and come back with
@@ -155,11 +166,12 @@ export function MailShell({
     );
 
     const [revision, setRevision] = useState(0);
+    const reloadLists = useCallback(() => setRevision((count) => count + 1), []);
     const refresh = useCallback(() => {
         // Both halves of the screen, which no longer come from the same place.
-        setRevision((count) => count + 1);
+        reloadLists();
         router.refresh();
-    }, [router]);
+    }, [reloadLists, router]);
 
     /**
      * The live channel's own refreshes, coalesced.
@@ -213,6 +225,7 @@ export function MailShell({
             unread,
             viewerName,
             refresh,
+            reloadLists,
             revision,
             accountColor,
             composing,
@@ -227,6 +240,7 @@ export function MailShell({
             unread,
             viewerName,
             refresh,
+            reloadLists,
             revision,
             accountColor,
             composing,

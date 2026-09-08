@@ -167,6 +167,7 @@ export function MailView({
         identities,
         openComposer,
         refresh,
+        reloadLists,
         revision
     } = useMail();
 
@@ -593,14 +594,25 @@ export function MailView({
                 // open beside it - the conversation's own row, or the whole
                 // selection with it in.
                 //
-                // One of the two, never both. Closing the pane is a navigation,
-                // and these routes are dynamic, so arriving is already a fresh
-                // read of the list; asking the router to refresh in the same
-                // breath is a second fetch racing the first, and the one that
-                // loses is the navigation - which left the address still naming a
-                // conversation that had been deleted, and the next click on
-                // another one apparently doing nothing at all.
-                if (leaving) return;
+                // One of the two, never both, and which one changed when the
+                // list stopped being the server's.
+                //
+                // Closing the pane is a navigation, and asking the router to
+                // refresh in the same breath is a second fetch racing it - the
+                // navigation is the one that loses, which left the address still
+                // naming a conversation that had been deleted. That is still
+                // true. What is no longer true is that the navigation re-reads
+                // the list: the list is fetched by the browser against the
+                // narrowing, and dropping `?open=` does not change the
+                // narrowing, so nothing was re-read at all and the row somebody
+                // had just deleted sat there until they reloaded the page.
+                //
+                // So the data is pulled either way; only the router is left
+                // alone on the path that is already navigating.
+                if (leaving) {
+                    reloadLists();
+                    return;
+                }
                 refresh();
             });
         },
@@ -614,6 +626,7 @@ export function MailView({
             patchUntilAnswered,
             preferences.afterFiling,
             refresh,
+            reloadLists,
             threadsOf,
             toast
         ]
@@ -1217,12 +1230,23 @@ export function MailView({
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
                         markRead={preferences.markRead}
-                        onGone={
-                            preferences.afterFiling === "next"
-                                ? () => openNext([openThread.id])
-                                : closeOpen
-                        }
-                        onStayed={() => openAgain(openThread.id)}
+                        // Filed from its own header. The row goes from the list
+                        // in the same breath as the pane closes, held until the
+                        // mail server answers: without it the conversation
+                        // somebody just deleted was still sitting in the list
+                        // beside the empty space where they had been reading it,
+                        // which reads as the delete not having happened.
+                        onGone={() => {
+                            patchUntilAnswered([openThread.id], { gone: true });
+                            if (preferences.afterFiling === "next") openNext([openThread.id]);
+                            else closeOpen();
+                        }}
+                        // Refused. Both halves go back: the row returns to the
+                        // list and the reader returns to the conversation.
+                        onStayed={() => {
+                            clearPatches();
+                            openAgain(openThread.id);
+                        }}
                         // Reading one message at a time needs a way back, because
                         // the list it came from is not on screen.
                         onBack={

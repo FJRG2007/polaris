@@ -136,7 +136,7 @@ describe("the list route", () => {
         // conversation are the browser's and would not notice. So a refresh is
         // also a number, and these watch it.
         const shell = await readFile(`${SCREENS}mail-shell.tsx`, "utf8");
-        expect(shell).toContain("setRevision((count) => count + 1);");
+        expect(shell).toContain("setRevision((count) => count + 1)");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         expect(view).toContain("useMailList(page, revision)");
         expect(view).toContain("useMailThread(openThreadId, revision)");
