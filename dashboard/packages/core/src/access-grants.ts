@@ -69,6 +69,7 @@ export const GRANT_SUBJECTS = [
     "task.space",
     "task.folder",
     "note.space",
+    "office.document",
     "place.device",
     "place.camera"
 ] as const;
@@ -108,6 +109,10 @@ export const GRANT_CAPABILITIES = {
     "task.space": ["guest", "member", "admin"],
     "task.folder": ["guest", "member", "admin"],
     "note.space": ["guest", "member", "admin"],
+    // A document's own three, and the middle one earns its place: commenting
+    // without editing is how a draft gets read by the people it is for, and
+    // collapsing it into "edit" makes everybody either a spectator or a risk.
+    "office.document": ["viewer", "commenter", "editor"],
     // A lock, an opener, a switch. Seeing that a door is shut and opening it are
     // genuinely different things to be given, which is the whole of what
     // somebody sharing a door with a visitor is deciding.

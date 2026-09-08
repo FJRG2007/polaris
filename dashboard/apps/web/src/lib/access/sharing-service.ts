@@ -23,6 +23,7 @@ import type { SessionUser } from "@/lib/session";
 import { GrantError } from "@/lib/access/grants";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
+import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
 import { requireSpace as requireTaskSpace, requireFolder } from "@/lib/tasks/access";
 
@@ -57,6 +58,12 @@ export async function requireMayShare(
             return;
         case "note.space":
             await requireNoteSpace(actor, subjectId, "admin");
+            return;
+        case "office.document":
+            // Editing is not enough to hand it on, exactly as opening a door is
+            // not enough to lend it: sharing takes the standing of the people it
+            // belongs to.
+            await requireOfficeShareable(user, subjectId);
             return;
         case "place.device":
         case "place.camera":
@@ -154,6 +161,13 @@ async function owningOrgIds(
 
 async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promise<string | null> {
     switch (subject) {
+        case "office.document":
+            return orgOf(
+                await prisma.officeDocument.findUnique({
+                    where: { id: subjectId },
+                    select: { orgId: true }
+                })
+            );
         case "chat.space":
             return orgOf(await prisma.chatSpace.findUnique({ where: { id: subjectId }, select: { orgId: true } }));
         case "chat.channel": {

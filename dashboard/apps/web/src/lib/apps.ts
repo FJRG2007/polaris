@@ -28,6 +28,10 @@ import {
     Database,
     EyeOff,
     FileText,
+    Columns3,
+    Presentation,
+    Table2,
+    FileStack,
     FolderGit2,
     FolderOpen,
     Gamepad2,
@@ -253,6 +257,26 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: NotebookPen,
         href: "/notes",
         permission: "notes.use"
+    },
+    {
+        /**
+         * Documents, spreadsheets, presentations and diagrams - the office
+         * suite, in the browser and edited by several people at once.
+         *
+         * Its own app rather than a corner of Notes, and the two are not the
+         * same thing however similar they sound. Notes is a notebook: Markdown,
+         * nested, one person's, portable out of Polaris in the form it went in.
+         * This is a word processor and the three things beside it - page layout,
+         * formulas, slides, a canvas - opened and saved as the formats the rest
+         * of the world sends. Google keeps Keep and Docs apart for the same
+         * reason.
+         */
+        id: "office",
+        label: "Office",
+        description: "Documents, spreadsheets, slides and diagrams, written together",
+        icon: FileStack,
+        href: "/office",
+        permission: "office.use"
     },
     {
         id: "watch",
@@ -1171,6 +1195,70 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: KeyRound,
             keywords: ["tokens"],
             group: "Security"
+        }
+    ],
+    office: [
+        {
+            label: "Recent",
+            href: "/office",
+            icon: Clock,
+            keywords: ["all", "documents", "files", "everything"]
+        },
+        { label: "Starred", href: "/office/starred", icon: Star, keywords: ["favourites"] },
+        {
+            label: "Shared with me",
+            href: "/office/shared",
+            icon: Users,
+            keywords: ["gave me", "sent me", "access"]
+        },
+        {
+            label: "Documents",
+            href: "/office/kind/doc",
+            icon: FileText,
+            group: "Kinds",
+            keywords: ["docs", "word", "docx", "writing"]
+        },
+        {
+            label: "Spreadsheets",
+            href: "/office/kind/sheet",
+            icon: Table2,
+            group: "Kinds",
+            keywords: ["sheets", "excel", "xlsx", "formulas", "numbers"]
+        },
+        {
+            label: "Presentations",
+            href: "/office/kind/slides",
+            icon: Presentation,
+            group: "Kinds",
+            keywords: ["slides", "powerpoint", "pptx", "deck"]
+        },
+        {
+            label: "Diagrams",
+            href: "/office/kind/diagram",
+            icon: Workflow,
+            group: "Kinds",
+            keywords: ["draw", "whiteboard", "flowchart", "architecture"]
+        },
+        {
+            label: "Comparisons",
+            href: "/office/kind/comparison",
+            icon: Columns3,
+            group: "Kinds",
+            keywords: ["competitors", "battlecard", "matrix", "vendors", "alternatives"]
+        },
+        {
+            label: "Archive",
+            href: "/office/archive",
+            icon: Archive,
+            group: "Filed",
+            keywords: ["archived", "put away"]
+        },
+        {
+            label: "Trash",
+            href: "/office/trash",
+            icon: Trash2,
+            group: "Filed",
+            keywords: ["bin", "deleted", "removed"]
         }
     ],
     admin: [
