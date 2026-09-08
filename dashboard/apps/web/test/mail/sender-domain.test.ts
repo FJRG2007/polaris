@@ -36,15 +36,33 @@ describe("the domain a sending host belongs to", () => {
     it("never offers a registry as a sender's own site", () => {
         // The one wrong answer that would show somebody else's logo rather than
         // no logo.
-        expect(markDomains("bbc.co.uk")).toEqual(["bbc.co.uk"]);
-        expect(markDomains("mail.bbc.co.uk")).toEqual(["mail.bbc.co.uk", "bbc.co.uk"]);
+        expect(markDomains("bbc.co.uk")).toEqual(["bbc.co.uk", "www.bbc.co.uk"]);
+        expect(markDomains("mail.bbc.co.uk")).toEqual([
+            "mail.bbc.co.uk",
+            "bbc.co.uk",
+            "www.bbc.co.uk"
+        ]);
     });
 
-    it("asks at most twice, whatever the host", () => {
+    it("asks the www of the domain itself", () => {
+        // A site whose real one is on `www` commonly answers its bare form with
+        // a marketing page and no 404 at all, so the exact host looks like it
+        // has a mark and the mark is a web page.
+        expect(markDomains("linkedin.com")).toEqual(["linkedin.com", "www.linkedin.com"]);
+    });
+
+    it("does not ask the same host twice", () => {
+        expect(markDomains("www.example.com")).toEqual(["www.example.com", "example.com"]);
+    });
+
+    it("asks at most three times, whatever the host", () => {
         // Each one is a request to somebody else's server, made while a mailbox
         // is being scrolled.
-        expect(markDomains("a.b.c.d.example.com")).toHaveLength(2);
-        expect(markDomains("a.b.c.d.example.com")[1]).toBe("example.com");
+        expect(markDomains("a.b.c.d.example.com")).toEqual([
+            "a.b.c.d.example.com",
+            "example.com",
+            "www.example.com"
+        ]);
     });
 
     it("has nothing to ask about something that is not a domain", () => {

@@ -23,8 +23,9 @@
 
 import { prisma } from "@polaris/db";
 import { apiPermission } from "@/lib/api-session";
-import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
 import { markDomains } from "@/lib/mailbox/sender-domain";
+import { iconLinks, MAX_HTML_BYTES } from "@/lib/mailbox/site-icon";
+import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,23 @@ const MAX_BYTES = 512 * 1024;
 const REMEMBER_MS = 6 * 60 * 60 * 1000;
 
 const IMAGE_TYPES = /^image\/(?:png|jpeg|gif|webp|avif|x-icon|vnd\.microsoft\.icon|svg\+xml)$/i;
+
+/**
+ * How long the whole hunt may take.
+ *
+ * Up to three hosts are asked for two paths each and then for their front page,
+ * and every one of those has its own five-second ceiling. Without a budget over
+ * the lot, one domain that accepts connections and never answers holds a request
+ * open for the sum of them - so the search gives up here and the reader gets
+ * initials, which is what they would have got anyway.
+ */
+const BUDGET_MS = 10_000;
+
+/** A mark, as it will be handed to the browser. */
+interface Found {
+    readonly bytes: Uint8Array;
+    readonly type: string;
+}
 
 interface Remembered {
     readonly at: number;
@@ -90,40 +108,104 @@ export async function GET(
 }
 
 /**
- * The site's own mark, at the two addresses every site puts one.
+ * The site's own mark.
  *
- * Asked of the sending host first and then of the domain it belongs to, because
- * almost nobody sends from the site their logo is on: Apple's receipts come from
- * `email.apple.com`, which serves nothing at all, and asking only that is why a
- * mailbox full of household names showed initials. Which domain a host belongs
- * to is `markDomains`, along with the reason it never walks further than one
- * step.
+ * Asked of the sending host first and then of the domain it belongs to and that
+ * domain's `www`, because almost nobody sends from the site their logo is on:
+ * Apple's receipts come from `email.apple.com`, which serves nothing at all, and
+ * asking only that is why a mailbox full of household names showed initials.
+ * Which hosts a sender belongs to is `markDomains`, along with the reason it
+ * never walks further.
  *
- * Nothing clever beyond that: a site that hides its mark behind a parsed page is
- * a site whose senders get initials, which is a fine outcome.
+ * Two passes over those hosts, because they cost differently. The well-known
+ * paths first, which is one request and answers for most senders. Then the front
+ * page, read for the icon it declares in its head - a site built as a single page
+ * application commonly serves its own 404 at both well-known paths and names its
+ * logo in the markup instead, which is npm, and which used to be initials.
  */
-async function fetchMark(domain: string): Promise<{ bytes: Uint8Array; type: string } | null> {
-    for (const host of markDomains(domain)) {
+async function fetchMark(domain: string): Promise<Found | null> {
+    const deadline = Date.now() + BUDGET_MS;
+    const hosts = markDomains(domain);
+
+    for (const host of hosts) {
         for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
-            const target = safeUrl(`https://${host}${path}`);
-            if (!target) continue;
-            const response = await follow(target, "image/*").catch(() => null);
-            if (!response || response.status !== 200) continue;
-            const type = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
-            if (!IMAGE_TYPES.test(type)) continue;
-            const bytes = await readCapped(response, MAX_BYTES);
-            if (bytes && bytes.length > 0) return { bytes, type };
+            if (Date.now() > deadline) return null;
+            const found = await pictureAt(`https://${host}${path}`);
+            if (found) return found;
         }
+    }
+
+    for (const host of hosts) {
+        if (Date.now() > deadline) return null;
+        const found = await declaredMark(host, deadline);
+        if (found) return found;
     }
     return null;
 }
 
+/** Whatever is at one address, if it is a picture and small enough to be a
+ *  mark. */
+async function pictureAt(address: string): Promise<Found | null> {
+    const target = safeUrl(address);
+    if (!target) return null;
+    const response = await follow(target, "image/*").catch(() => null);
+    if (!response || response.status !== 200) return null;
+    const type = contentType(response);
+    // A site with no 404 answers a missing favicon with its home page, so this
+    // is the check that keeps a web page out of the picture column.
+    if (!IMAGE_TYPES.test(type)) return null;
+    const bytes = await readCapped(response, MAX_BYTES);
+    return bytes && bytes.length > 0 ? { bytes, type } : null;
+}
+
+/** The mark a site names in its own head, for the sites that serve none at the
+ *  addresses above. */
+async function declaredMark(host: string, deadline: number): Promise<Found | null> {
+    const target = safeUrl(`https://${host}/`);
+    if (!target) return null;
+    const response = await follow(target).catch(() => null);
+    if (!response || response.status !== 200) return null;
+    if (!/^(?:text\/html|application\/xhtml)/i.test(contentType(response))) return null;
+
+    const bytes = await readAtMost(response, MAX_HTML_BYTES);
+    if (!bytes) return null;
+    // Cut off mid-character rather than refused, so a long head is still read.
+    // The icon is named in an attribute, and an attribute is ASCII either way.
+    const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+
+    // Against where the page ended up, not where it was asked for: a bare domain
+    // that redirects to its `www` publishes relative hrefs that only resolve
+    // against the destination.
+    for (const link of iconLinks(html, response.url || target.href)) {
+        if (Date.now() > deadline) return null;
+        const found = await pictureAt(link.href);
+        if (found) return found;
+    }
+    return null;
+}
+
+function contentType(response: { headers: Headers }): string {
+    return (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
+}
+
+/**
+ * The mark, handed to the browser.
+ *
+ * An SVG is served as one, which needs saying because the obvious defensive
+ * move - hand it over as opaque bytes - does not work: `nosniff` is set, so a
+ * picture typed `application/octet-stream` is a picture the `<img>` refuses, and
+ * every sender whose only mark is a vector one silently fell back to initials.
+ *
+ * It is safe as an image, twice over. An SVG inside an `<img>` is drawn in the
+ * spec's secure static mode, where script and external references do not run at
+ * all; and somebody who opens this address in a tab of its own lands in a
+ * document that `sandbox` has put in an opaque origin and `default-src 'none'`
+ * has left nothing to execute with.
+ */
 function picture(bytes: Uint8Array, type: string): Response {
     return new Response(new Uint8Array(bytes), {
         headers: {
-            // A mark served as markup on this origin is script waiting to happen,
-            // so an SVG is handed over as bytes for an <img> and nothing else.
-            "content-type": type === "image/svg+xml" ? "application/octet-stream" : type,
+            "content-type": type,
             "content-length": String(bytes.length),
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; sandbox",

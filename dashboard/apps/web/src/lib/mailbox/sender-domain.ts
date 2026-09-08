@@ -7,18 +7,24 @@
  * because nothing is served from them at all. Asking only the exact host is why
  * a mailbox full of household names showed initials.
  *
- * So the host is tried and then what it belongs to. What it belongs to is the
- * awkward part: `apple.com` from `email.apple.com` is two labels, and `bbc.co.uk`
- * from `mail.bbc.co.uk` is three - the answer depends on a list of public
- * suffixes that is thousands of entries long and changes every month, and
- * shipping a copy of it here to fetch a favicon would be absurd.
+ * So the host is tried, then what it belongs to, then that domain's `www`. What
+ * it belongs to is the awkward part: `apple.com` from `email.apple.com` is two
+ * labels, and `bbc.co.uk` from `mail.bbc.co.uk` is three - the answer depends on
+ * a list of public suffixes that is thousands of entries long and changes every
+ * month, and shipping a copy of it here to fetch a favicon would be absurd.
  *
  * The compromise is stated rather than hidden: the well-known two-part suffixes
  * are listed, and everything else is treated as one label. Getting it wrong
  * costs one request that answers 404 or a mark that belongs to somebody else's
- * site - so the walk stops at two candidates, and never asks a bare public
+ * site - so the walk stops at three candidates, and never asks a bare public
  * suffix like `co.uk`, which is the one wrong answer that would be somebody
  * else's logo on every British sender in the list.
+ *
+ * The `www` is not redundant. A domain whose real site lives on `www` commonly
+ * answers its bare form with a marketing page that has no 404 at all: LinkedIn
+ * serves `linkedin.com/favicon.ico` as HTML with a 200, so the exact host looked
+ * like it had a mark and the mark was a web page. Asking `www.linkedin.com`
+ * afterwards is what puts their logo in the list.
  */
 
 /**
@@ -71,11 +77,16 @@ export function baseDomain(host: string): string | null {
 }
 
 /** Every site worth asking for one sender's mark, best first and never more than
- *  two: each one is a request to somebody else's server, and a third would be
+ *  three: each one is a request to somebody else's server, and a fourth would be
  *  asking a registry for a logo. */
 export function markDomains(host: string): string[] {
     const cleaned = host.trim().toLowerCase();
     if (!cleaned.includes(".")) return [];
     const base = baseDomain(cleaned);
-    return base && base !== cleaned ? [cleaned, base] : [cleaned];
+    const canonical = base ?? cleaned;
+    // A Set because the two rules meet on a host that is already a `www`:
+    // `www.example.com` belongs to `example.com`, whose `www` is where it
+    // started.
+    const hosts = new Set([cleaned, canonical, `www.${canonical}`]);
+    return [...hosts];
 }
