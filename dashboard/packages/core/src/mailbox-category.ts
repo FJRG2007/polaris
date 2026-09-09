@@ -539,15 +539,12 @@ const PURCHASE_WORDS: readonly string[] = [
     "commande",
     "votre achat",
     "merci pour votre commande",
-    "paiement recu",
     // German
     "bestellung",
     "ihr einkauf",
-    "zahlung erhalten",
     // Italian
     "ordine",
-    "il tuo acquisto",
-    "pagamento ricevuto"
+    "il tuo acquisto"
 ];
 
 /**
@@ -566,14 +563,18 @@ const PURCHASE_WORDS: readonly string[] = [
  * A refusal - "tu pago NO ha sido aceptado" - matches these too, and that is
  * right: it is still money news, it still belongs in this tab, and the billing
  * words above it catch it first anyway.
+ *
+ * Four languages rather than six. Portuguese and Italian both say "pagamento",
+ * which is already a purchase word on its own, so a pair for either of them is
+ * a pattern nothing can reach: the bare word has answered before it is asked.
+ * The phrases these DO subsume came out of the list above - "paiement recu" and
+ * "zahlung erhalten" are the zero-gap case of the two below them.
  */
 const PAYMENT_SETTLED: readonly RegExp[] = [
     /\bpayment\b.{0,60}?\b(?:accepted|approved|confirmed|successful|complete|completed|processed)\b/,
     /\bpago\b.{0,60}?\b(?:aceptado|aprobado|confirmado|realizado|completado|procesado)\b/,
-    /\bpagamento\b.{0,60}?\b(?:aceito|aprovado|confirmado|aceitado)\b/,
     /\bpaiement\b.{0,60}?\b(?:accepte|approuve|confirme|recu)\b/,
-    /\bzahlung\b.{0,60}?\b(?:bestatigt|erfolgreich|erhalten)\b/,
-    /\bpagamento\b.{0,60}?\b(?:accettato|confermato)\b/
+    /\bzahlung\b.{0,60}?\b(?:bestatigt|erfolgreich|erhalten)\b/
 ];
 
 /**

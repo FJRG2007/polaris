@@ -287,14 +287,25 @@ function undoBase64(text: string): string {
     }
 }
 
-/** Whether what came out of a decode is something a person could read. Guards
- *  every decode here: a wrong guess must leave the line as it found it rather
- *  than replace it with worse. */
+/**
+ * Whether what came out of a decode is something a person could read. Guards
+ * every decode here: a wrong guess must leave the line as it found it rather
+ * than replace it with worse.
+ *
+ * `U+FFFD` counts against it rather than for it, which is the whole difference
+ * between this and a printable-character count. A decoder asked for UTF-8 and
+ * given bytes that are not it does not fail - `fatal` is off, because half a
+ * character at the end of a slice is normal here - it emits a replacement
+ * character per bad byte. So mojibake is made almost entirely of code points
+ * above 32, and a rule that only asked "is it printable" said yes to a wall of
+ * `���` and put it in somebody's list where a readable line had been.
+ */
 function readsAsText(value: string): boolean {
     if (!value) return false;
     let readable = 0;
     for (const char of value) {
         const code = char.codePointAt(0) ?? 0;
+        if (code === 0xfffd) continue;
         if (code === 9 || code === 10 || code === 13 || code >= 32) readable += 1;
     }
     return readable / [...value].length > 0.9;
@@ -405,19 +416,24 @@ function stripMarkup(html: string, options: { keepUnclosed?: boolean } = {}): st
     return (
         html
             .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
-            // Whole elements whose contents are not the message. The closing tag
-            // is optional in these: a preview is cut off after four kilobytes and
-            // a stylesheet is easily longer than that, so demanding `</style>`
-            // meant the stylesheet WAS the preview.
-            //
-            // `keepUnclosed` is the second attempt, for the slice where that
-            // rule leaves nothing at all: a `<head>` whose end is past the cut
-            // takes the whole message with it, and the words in it are the only
-            // ones there are.
+            // A stylesheet and a script are never words, whether or not the
+            // slice reached the end of them. The closing tag is optional here
+            // and stays optional in both passes: a preview is cut off after
+            // four kilobytes and a stylesheet is easily longer than that, so
+            // demanding `</style>` meant the stylesheet WAS the preview.
+            .replace(/<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+            // The containers that merely hold the message rather than replace
+            // it. Same rule by default, because a `<head>` runs to the body and
+            // nothing in it is prose - but `keepUnclosed` is the second attempt,
+            // for the slice where that leaves nothing at all: a `<head>` whose
+            // end is past the cut takes the whole message with it, and the words
+            // inside it are then the only ones there are. Relaxing it can put a
+            // `<title>` in the line; it cannot put a stylesheet there, because
+            // that one came out above.
             .replace(
                 options.keepUnclosed
-                    ? /<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
-                    : /<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,
+                    ? /<(head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
+                    : /<(head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,
                 " "
             )
             // Anything that ends a line becomes one, so two sentences do not run

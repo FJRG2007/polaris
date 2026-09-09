@@ -156,3 +156,43 @@ describe("a preview stored before any of this existed", () => {
         expect(snippetFrom("Te escribo por lo de ayer…")).toBe("Te escribo por lo de ayer…");
     });
 });
+
+describe("the second attempt at a slice that stripped to nothing", () => {
+    it("still refuses a stylesheet that never closes", () => {
+        // The fallback exists because an unclosed `<head>` takes the message
+        // with it. It must not become a way back in for the thing the first
+        // pass was written to remove: an unclosed `<style>` holds no words at
+        // all, so keeping it puts `@import url(...)` under somebody's subject
+        // and calls it a preview.
+        const cut =
+            '<html><head><style>@import url("https://example.test/e.css");' +
+            "@font-face{font-family:X;src:url(y)}";
+        const line = snippetFrom(cut);
+        expect(line).not.toContain("@import");
+        expect(line).not.toContain("example.test");
+    });
+
+    it("still refuses a script that never closes", () => {
+        const cut = "<html><head><script>var track='https://example.test/p';window.x=1";
+        expect(snippetFrom(cut)).not.toContain("example.test");
+    });
+
+    it("keeps the words an unclosed head was holding", () => {
+        const cut = "<html><head><body><p>Tu pago ha sido aceptado.</p>";
+        expect(snippetFrom(cut)).toContain("Tu pago ha sido aceptado.");
+    });
+});
+
+describe("a run that looks like base64 and is not", () => {
+    it("leaves an opaque token alone rather than decoding it to nonsense", () => {
+        // A long identifier is spelt out of the same alphabet base64 is, so it
+        // passes every test up to the decode - and what comes back is one
+        // replacement character per byte that was not UTF-8. Counting those as
+        // readable is how a line somebody could read became a wall of `<?>`.
+        const token =
+            "kvD8ndPS210vk6Knis48hyZy9WxFZvGydbd8heUzZg5xevjWUUO7XaabTbM5" +
+            "ZHonPbyi8T3hAXrfwRbE3lP3qPmdfmblyfcagoTm";
+        expect(snippetFrom(token)).toBe(token);
+        expect(snippetFrom(`${token}…`)).toBe(`${token}…`);
+    });
+});
