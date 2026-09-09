@@ -462,3 +462,71 @@ describe("the verdict", () => {
         expect(kept.verdict).toBe("clean");
     });
 });
+
+describe("a message wearing somebody else's name", () => {
+    /** The one that arrived, near enough word for word. Nothing in it shouts,
+     *  promises money or links to a known-bad host: what is wrong with it is the
+     *  name at the top. */
+    const netflix = message({
+        subject: "Your Net-flix account needs a quick review",
+        fromName: "NETFLIX",
+        fromAddress: "services@nflx-account-review.example",
+        snippet: "We recently detected some irregular activity associated with your account",
+        bodyText: [
+            "NETFLIX - account services - urgent notice",
+            "Dear Business,",
+            "We recently detected some irregular activity associated with your account.",
+            "To ensure uninterrupted streaming and protect your preferences, we kindly",
+            "ask you to review and update your account information.",
+            "update account information",
+            "this link expires in 48 hours"
+        ].join("\n"),
+        bodyHtml: [
+            "<p>We recently detected some irregular activity associated with your account.</p>",
+            '<a href="https://nflx-account-review.example/verify">update account information</a>'
+        ].join("")
+    });
+
+    it("is junk, on what it says it is rather than on how it is worded", () => {
+        const judged = spam.judgeSpam(netflix, knows());
+        expect(judged.verdict).toBe("junk");
+        expect(judged.signals.map((signal) => signal.id)).toContain("brand_credential_phish");
+    });
+
+    it("says which name it wore, because that is the sentence a reader can act on", () => {
+        expect(spam.judgeSpam(netflix, knows()).reason).toContain("Netflix");
+    });
+
+    it("leaves the real one alone", () => {
+        const real = message({
+            subject: "Your Netflix bill",
+            fromName: "Netflix",
+            fromAddress: "info@mailer.netflix.com",
+            snippet: "Your payment went through",
+            bodyText: "Your payment went through. Update your account information any time.",
+            bodyHtml: '<a href="https://www.netflix.com/account">Your account</a>'
+        });
+        expect(spam.judgeSpam(real, knows()).verdict).toBe("clean");
+    });
+});
+
+describe("a brand's own mail from a domain the table does not hold", () => {
+    it("is left alone when the message sends the reader to the brand", () => {
+        // The rule that keeps a real receipt out of Junk: the table of domains
+        // is hand-written and no hand-written table is complete, so a message
+        // that links to the brand it names is that brand's message. It is only
+        // worth anything if the judgement can see a body - which is why the sync
+        // now hands over the part it has already read.
+        const bill = message({
+            subject: "Tu factura de Endesa",
+            fromName: "Endesa",
+            fromAddress: "facturas@clientes-endesa.example",
+            snippet: "Ya puedes consultar tus datos de facturacion",
+            bodyText: "Ya puedes consultar tus datos de facturacion en tu area privada.",
+            bodyHtml: '<a href="https://www.endesa.es/area-privada">Area privada</a>'
+        });
+        const judged = spam.judgeSpam(bill, knows());
+        expect(judged.signals.map((signal) => signal.id)).not.toContain("brand_credential_phish");
+        expect(judged.verdict).toBe("clean");
+    });
+});

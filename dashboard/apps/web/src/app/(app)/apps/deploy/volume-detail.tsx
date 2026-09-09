@@ -28,7 +28,12 @@ import { VolumeForm, type EditVolume } from "./volume-form";
 import type { VolumeDetail } from "@/lib/deploy-volume-service";
 import { MetricsHistory, type MetricSpec } from "@/components/metrics-history";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
-import { stageVolumeDeleteAction, volumeDetailAction, volumeUsageAction, wipeVolumeAction } from "./project-actions";
+import {
+    stageVolumeDeleteAction,
+    volumeDetailAction,
+    volumeUsageAction,
+    wipeVolumeAction
+} from "./project-actions";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -171,7 +176,8 @@ export function VolumeDetailDialog({
         dropSnapshots(usageKey(volumeId));
         setUsage({ state: "measuring", bytes: null });
         void volumeDetailAction(volumeId).then((result) => {
-            if (result.volume) setData({ volume: result.volume, canManage: result.canManage ?? false });
+            if (result.volume)
+                setData({ volume: result.volume, canManage: result.canManage ?? false });
         });
         void volumeUsageAction(volumeId).then((result) => {
             const bytes = result.usedBytes ?? null;
@@ -185,11 +191,15 @@ export function VolumeDetailDialog({
             <DialogContent
                 className={cn(
                     "left-auto right-0 top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
-                    full ? "w-full max-w-none" : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
+                    full
+                        ? "w-full max-w-none"
+                        : "w-full max-w-none sm:w-[820px] sm:max-w-[calc(100vw-2rem)]"
                 )}
             >
                 <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-                    <HardDrive className={cn("size-5 shrink-0", volume?.kind === "nas" && "text-sky-400")} />
+                    <HardDrive
+                        className={cn("size-5 shrink-0", volume?.kind === "nas" && "text-sky-400")}
+                    />
                     <div className="min-w-0 flex-1">
                         <DialogTitle className="truncate text-base font-semibold">
                             {volume?.name ?? "Volume"}
@@ -232,7 +242,7 @@ export function VolumeDetailDialog({
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-5 py-4">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     {!volume && !error && (
@@ -345,14 +355,22 @@ function MetricsTab({ volume, usage }: { volume: VolumeDetail; usage: Usage }) {
                     }
                 />
                 <Stat label="Kind" value={kindLabel(volume)} hint={volume.source} />
-                <Stat label="Server" value={volume.serverName} hint={volume.serverKind === "local" ? "This host" : "Remote"} />
+                <Stat
+                    label="Server"
+                    value={volume.serverName}
+                    hint={volume.serverKind === "local" ? "This host" : "Remote"}
+                />
             </div>
 
             <div>
                 <h3 className="mb-1 text-sm font-medium">History</h3>
-                <MetricsHistory endpoint={`/api/deploy/volumes/${volume.id}/metrics/history`} metrics={VOLUME_METRICS} />
+                <MetricsHistory
+                    endpoint={`/api/deploy/volumes/${volume.id}/metrics/history`}
+                    metrics={VOLUME_METRICS}
+                />
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Usage is measured from inside the service that mounts the volume, so a stopped service leaves gaps.
+                    Usage is measured from inside the service that mounts the volume, so a stopped
+                    service leaves gaps.
                 </p>
             </div>
         </div>
@@ -379,8 +397,13 @@ function Stat({
     return (
         <div className="rounded-lg border border-border/60 p-3">
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-medium" title={value}>
-                {pending && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
+            <p
+                className="mt-0.5 flex items-center gap-1.5 truncate text-sm font-medium"
+                title={value}
+            >
+                {pending && (
+                    <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                )}
                 {value}
             </p>
             {hint && (
@@ -437,7 +460,10 @@ function SettingsTab({
     function remove() {
         setError(null);
         startTransition(async () => {
-            const result = await stageVolumeDeleteAction({ volumeId: volume.id, wipe: wipeOnDelete });
+            const result = await stageVolumeDeleteAction({
+                volumeId: volume.id,
+                wipe: wipeOnDelete
+            });
             if (result.error) {
                 setError(result.error);
                 return;
@@ -455,23 +481,48 @@ function SettingsTab({
                 hint="Where this volume comes from and where the service sees it. Changes apply the next time the service is recreated."
             >
                 {editable ? (
-                    <VolumeForm applicationId={volume.applicationId ?? ""} volume={toEditVolume(volume)} onSaved={onChanged} />
+                    <VolumeForm
+                        applicationId={volume.applicationId ?? ""}
+                        volume={toEditVolume(volume)}
+                        onSaved={onChanged}
+                    />
                 ) : (
                     <Rows>
-                        <Row label="Mount path" value={volume.mountPath} icon={<HardDrive className="size-4" />} />
+                        <Row
+                            label="Mount path"
+                            value={volume.mountPath}
+                            icon={<HardDrive className="size-4" />}
+                        />
                         <Row
                             label="Source"
                             value={volume.source}
-                            icon={volume.kind === "nas" ? <Database className="size-4" /> : <Server className="size-4" />}
+                            icon={
+                                volume.kind === "nas" ? (
+                                    <Database className="size-4" />
+                                ) : (
+                                    <Server className="size-4" />
+                                )
+                            }
                         />
-                        <Row label="Size limit" value={volume.sizeLimit ?? "No limit"} icon={<HardDrive className="size-4" />} />
+                        <Row
+                            label="Size limit"
+                            value={volume.sizeLimit ?? "No limit"}
+                            icon={<HardDrive className="size-4" />}
+                        />
                     </Rows>
                 )}
             </Section>
 
-            <Section title="Region" hint="Volumes live on the same server as the service that mounts them.">
+            <Section
+                title="Region"
+                hint="Volumes live on the same server as the service that mounts them."
+            >
                 <Rows>
-                    <Row label="Server" value={volume.serverName} icon={<Server className="size-4" />} />
+                    <Row
+                        label="Server"
+                        value={volume.serverName}
+                        icon={<Server className="size-4" />}
+                    />
                 </Rows>
             </Section>
 
@@ -493,7 +544,11 @@ function SettingsTab({
                                 variant="danger"
                                 size="sm"
                                 disabled={!volume.serviceRunning}
-                                title={volume.serviceRunning ? undefined : "The service has to be running to reach the data"}
+                                title={
+                                    volume.serviceRunning
+                                        ? undefined
+                                        : "The service has to be running to reach the data"
+                                }
                                 onClick={() => setWiping(true)}
                             >
                                 <Eraser className="size-4" /> Wipe
@@ -504,7 +559,8 @@ function SettingsTab({
                             <div className="min-w-0">
                                 <p className="text-sm">Delete volume</p>
                                 <p className="text-xs text-muted-foreground">
-                                    Detaches the mount from the service. The next deploy starts without it.
+                                    Detaches the mount from the service. The next deploy starts
+                                    without it.
                                 </p>
                             </div>
                             <Button variant="danger" size="sm" onClick={() => setDeleting(true)}>
@@ -545,18 +601,30 @@ function SettingsTab({
                     <span className="min-w-0">
                         <span className="block text-sm">Also destroy the data</span>
                         <span className="block text-xs text-muted-foreground">
-                            Off by default. Detaching a volume and destroying what is in it are two different
-                            intentions, and only one of them can be taken back.
+                            Off by default. Detaching a volume and destroying what is in it are two
+                            different intentions, and only one of them can be taken back.
                         </span>
                     </span>
-                    <Switch checked={wipeOnDelete} onChange={setWipeOnDelete} aria-label="Also destroy the data" />
+                    <Switch
+                        checked={wipeOnDelete}
+                        onChange={setWipeOnDelete}
+                        aria-label="Also destroy the data"
+                    />
                 </label>
             </ConfirmDeleteDialog>
         </div>
     );
 }
 
-function Section({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function Section({
+    title,
+    hint,
+    children
+}: {
+    title: string;
+    hint: string;
+    children: React.ReactNode;
+}) {
     return (
         <section className="flex flex-col gap-2">
             <div>

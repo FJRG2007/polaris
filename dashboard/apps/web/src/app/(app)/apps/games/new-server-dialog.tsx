@@ -45,7 +45,18 @@ import {
     listServerTemplatesAction,
     type GameSetup
 } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select,
+    Skeleton,
+    Switch,
+    cn
+} from "@polaris/ui";
 import {
     BlueprintFields,
     Choice,
@@ -129,7 +140,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 setSetup(loaded);
                 // Whatever this Polaris actually has. A picker that offered a game
                 // whose manager is not installed would fail at the action.
-                if (loaded.games.length > 0 && !loaded.games.includes("minecraft")) setGame(loaded.games[0]!);
+                if (loaded.games.length > 0 && !loaded.games.includes("minecraft"))
+                    setGame(loaded.games[0]!);
             })
             .catch(() => active && setError("Could not read your machines"));
         return () => {
@@ -145,7 +157,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     useEffect(() => {
         let active = true;
         void gameMachinesAction()
-            .then((machines) => active && setSetup((current) => (current ? { ...current, machines } : current)))
+            .then(
+                (machines) =>
+                    active && setSetup((current) => (current ? { ...current, machines } : current))
+            )
             .catch(() => undefined);
         return () => {
             active = false;
@@ -153,7 +168,10 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
     }, []);
 
     const blueprint = findBlueprint(shape.blueprintId);
-    const offered = useMemo(() => GAMES.filter((entry) => setup?.games.includes(entry.id) ?? false), [setup]);
+    const offered = useMemo(
+        () => GAMES.filter((entry) => setup?.games.includes(entry.id) ?? false),
+        [setup]
+    );
 
     const memory =
         game === "ark"
@@ -178,28 +196,40 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
               ? "That is not an Xbox gamertag"
               : "3 to 16 letters, digits or underscores";
     const addressError =
-        ownerAddress.trim().length === 0 || isAddressRule(ownerAddress) ? null : "That is not an address or a range";
+        ownerAddress.trim().length === 0 || isAddressRule(ownerAddress)
+            ? null
+            : "That is not an address or a range";
     const seedError = shapeError(shape);
     const steamIdError =
         ownerSteamId.trim().length === 0 || arkAccess.isSteamId(ownerSteamId)
             ? null
             : "17 digits, starting 7656119";
-    const passwordError = arkAccess.isJoinPassword(joinPassword) ? null : arkAccess.JOIN_PASSWORD_HINT;
-    const modsError = mods.trim().length === 0 || isModIdList(mods) ? null : "Workshop ids are numbers, comma separated";
-    const licenseError = licenseKey.trim().length === 0 || isLicenseKey(licenseKey) ? null : LICENSE_KEY_HINT;
+    const passwordError = arkAccess.isJoinPassword(joinPassword)
+        ? null
+        : arkAccess.JOIN_PASSWORD_HINT;
+    const modsError =
+        mods.trim().length === 0 || isModIdList(mods)
+            ? null
+            : "Workshop ids are numbers, comma separated";
+    const licenseError =
+        licenseKey.trim().length === 0 || isLicenseKey(licenseKey) ? null : LICENSE_KEY_HINT;
     const identifierError =
         ownerIdentifier.trim().length === 0 || isIdentifier(ownerIdentifier)
             ? null
             : "Paste it whole, as the game gives it: license:... or discord:...";
     const onesyncError =
-        game === "fivem" && maxPlayers > 32 && onesync === "off" ? "More than 32 slots needs OneSync on" : null;
+        game === "fivem" && maxPlayers > 32 && onesync === "off"
+            ? "More than 32 slots needs OneSync on"
+            : null;
     const ready =
         name.trim().length > 0 &&
         (game === "ark"
             ? arkAccess.isSteamId(ownerSteamId) && passwordError === null && modsError === null
             : game === "fivem"
               ? isLicenseKey(licenseKey) && identifierError === null && onesyncError === null
-              : isPlayerName(edition, ownerPlayer) && isAddressRule(ownerAddress) && seedError === null);
+              : isPlayerName(edition, ownerPlayer) &&
+                isAddressRule(ownerAddress) &&
+                seedError === null);
 
     const label = (subdomain.trim() || name.trim() || "server")
         .toLowerCase()
@@ -230,33 +260,36 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                       onesync
                   }
                 : game === "ark"
-                ? {
-                      game: "ark" as const,
-                      ...common,
-                      map,
-                      sessionName: sessionName.trim() || name.trim(),
-                      joinPassword: joinPassword.trim(),
-                      ownerSteamId: ownerSteamId.trim(),
-                      ownerLabel: ownerPlayer.trim() || undefined,
-                      exclusiveJoin,
-                      mods: mods.trim() || undefined
-                  }
-                : {
-                      game: "minecraft" as const,
-                      ...common,
-                      ownerPlayer: ownerPlayer.trim(),
-                      ownerAddress: ownerAddress.trim(),
-                      edition,
-                      crossplay,
-                      templateId: templateId || undefined,
-                      blueprintId: shape.blueprintId,
-                      mapId: shape.mapId || undefined,
-                      software: edition === "java" ? shape.software : undefined,
-                      version: shape.version.trim() || LATEST,
-                      seed: shape.seed.trim() || undefined,
-                      levelType: edition === "java" ? shape.levelType : undefined,
-                      biome: edition === "java" && world.usesBiome(shape.levelType) ? shape.biome : undefined
-                  }
+                  ? {
+                        game: "ark" as const,
+                        ...common,
+                        map,
+                        sessionName: sessionName.trim() || name.trim(),
+                        joinPassword: joinPassword.trim(),
+                        ownerSteamId: ownerSteamId.trim(),
+                        ownerLabel: ownerPlayer.trim() || undefined,
+                        exclusiveJoin,
+                        mods: mods.trim() || undefined
+                    }
+                  : {
+                        game: "minecraft" as const,
+                        ...common,
+                        ownerPlayer: ownerPlayer.trim(),
+                        ownerAddress: ownerAddress.trim(),
+                        edition,
+                        crossplay,
+                        templateId: templateId || undefined,
+                        blueprintId: shape.blueprintId,
+                        mapId: shape.mapId || undefined,
+                        software: edition === "java" ? shape.software : undefined,
+                        version: shape.version.trim() || LATEST,
+                        seed: shape.seed.trim() || undefined,
+                        levelType: edition === "java" ? shape.levelType : undefined,
+                        biome:
+                            edition === "java" && world.usesBiome(shape.levelType)
+                                ? shape.biome
+                                : undefined
+                    }
         );
         if (!parsed.success) {
             setError(parsed.error.issues[0]?.message ?? "Check the details and try again");
@@ -274,7 +307,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Gamepad2 className="size-5" /> New server
@@ -300,7 +333,13 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                         <Input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder={game === "ark" ? "The Island" : game === "fivem" ? "Los Santos" : "Survival"}
+                            placeholder={
+                                game === "ark"
+                                    ? "The Island"
+                                    : game === "fivem"
+                                      ? "Los Santos"
+                                      : "Survival"
+                            }
                         />
                     </label>
 
@@ -347,14 +386,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         value={templateId}
                                         onValueChange={(id) => {
                                             setTemplateId(id);
-                                            const picked = templates.find((entry) => entry.id === id);
+                                            const picked = templates.find(
+                                                (entry) => entry.id === id
+                                            );
                                             if (!picked) return;
-                                            setEdition(picked.edition === "bedrock" ? "bedrock" : "java");
+                                            setEdition(
+                                                picked.edition === "bedrock" ? "bedrock" : "java"
+                                            );
                                             setCrossplay(picked.crossplay);
                                             setConcurrentPlayers(picked.concurrentPlayers);
                                             setShape({
                                                 ...shape,
-                                                blueprintId: picked.blueprintId || shape.blueprintId,
+                                                blueprintId:
+                                                    picked.blueprintId || shape.blueprintId,
                                                 mapId: picked.mapId,
                                                 version: picked.version || shape.version
                                             });
@@ -369,7 +413,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         aria-label="A server you saved to build again"
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        {templates.find((entry) => entry.id === templateId)?.summary ||
+                                        {templates.find((entry) => entry.id === templateId)
+                                            ?.summary ||
                                             "Its settings are applied on top of the blueprint. The address, the players and the ports are this server's own."}
                                     </span>
                                 </label>
@@ -394,7 +439,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     autoComplete="off"
                                     spellCheck={false}
                                 />
-                                <span className={cn("text-xs", licenseError ? "text-danger" : "text-muted-foreground")}>
+                                <span
+                                    className={cn(
+                                        "text-xs",
+                                        licenseError ? "text-danger" : "text-muted-foreground"
+                                    )}
+                                >
                                     {licenseError ?? (
                                         <>
                                             FiveM will not start without one. They are free:{" "}
@@ -421,14 +471,17 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         placeholder={name.trim() || "Los Santos"}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Blank uses the name above. This is what players search for in game.
+                                        Blank uses the name above. This is what players search for
+                                        in game.
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">OneSync</span>
                                     <Select
                                         value={onesync}
-                                        onValueChange={(value) => setOnesync(value as "on" | "legacy" | "off")}
+                                        onValueChange={(value) =>
+                                            setOnesync(value as "on" | "legacy" | "off")
+                                        }
                                         options={[
                                             { value: "on", label: "On" },
                                             { value: "legacy", label: "Legacy" },
@@ -436,7 +489,12 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         ]}
                                         aria-label="OneSync"
                                     />
-                                    <span className={cn("text-xs", onesyncError ? "text-danger" : "text-muted-foreground")}>
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            onesyncError ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
                                         {onesyncError ??
                                             "What everything above 32 slots and most roleplay resources need. Leave it on unless something asks otherwise."}
                                     </span>
@@ -457,7 +515,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         }))}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        {mapRequirementHint(ARK_MAPS.find((entry) => entry.value === map))}
+                                        {mapRequirementHint(
+                                            ARK_MAPS.find((entry) => entry.value === map)
+                                        )}
                                     </span>
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
@@ -468,7 +528,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         placeholder={name.trim() || "The Island"}
                                     />
                                     <span className="text-xs text-muted-foreground">
-                                        Blank uses the name above. This is what players search for in game.
+                                        Blank uses the name above. This is what players search for
+                                        in game.
                                     </span>
                                 </label>
                             </div>
@@ -480,8 +541,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     onChange={(event) => setMods(event.target.value)}
                                     placeholder="Steam Workshop ids, comma separated"
                                 />
-                                <span className={cn("text-xs", modsError ? "text-danger" : "text-muted-foreground")}>
-                                    {modsError ?? "Optional. Every player needs the same mods to join."}
+                                <span
+                                    className={cn(
+                                        "text-xs",
+                                        modsError ? "text-danger" : "text-muted-foreground"
+                                    )}
+                                >
+                                    {modsError ??
+                                        "Optional. Every player needs the same mods to join."}
                                 </span>
                             </label>
                         </>
@@ -503,7 +570,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 type="number"
                                 min={1}
                                 value={concurrentPlayers}
-                                onChange={(event) => setConcurrentPlayers(Number(event.target.value))}
+                                onChange={(event) =>
+                                    setConcurrentPlayers(Number(event.target.value))
+                                }
                             />
                         </label>
                     </div>
@@ -514,21 +583,24 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             {game === "ark" ? (
                                 <>
                                     An ARK server for {concurrentPlayers}{" "}
-                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses around{" "}
-                                    <strong className="text-foreground">{memory}</strong> of memory and about 30 GB of
-                                    disk, downloaded the first time it starts.
+                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses
+                                    around <strong className="text-foreground">{memory}</strong> of
+                                    memory and about 30 GB of disk, downloaded the first time it
+                                    starts.
                                 </>
                             ) : game === "fivem" ? (
                                 <>
                                     A FiveM server for {concurrentPlayers}{" "}
-                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses around{" "}
-                                    <strong className="text-foreground">{memory}</strong> of memory, plus whatever the
-                                    resources you install weigh.
+                                    {concurrentPlayers === 1 ? "player" : "players"} at once uses
+                                    around <strong className="text-foreground">{memory}</strong> of
+                                    memory, plus whatever the resources you install weigh.
                                 </>
                             ) : (
                                 <>
-                                    Polaris will give it <strong className="text-foreground">{memory}</strong> of memory
-                                    for {concurrentPlayers} {concurrentPlayers === 1 ? "player" : "players"} at once. You
+                                    Polaris will give it{" "}
+                                    <strong className="text-foreground">{memory}</strong> of memory
+                                    for {concurrentPlayers}{" "}
+                                    {concurrentPlayers === 1 ? "player" : "players"} at once. You
                                     can change it later under Settings.
                                 </>
                             )}
@@ -569,7 +641,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     placeholder={label || "survival"}
                                 />
                                 <span className="text-xs text-muted-foreground">
-                                    Players will connect to <code className="font-mono">{address}</code>
+                                    Players will connect to{" "}
+                                    <code className="font-mono">{address}</code>
                                     {game === "ark" || game === "fivem" || edition === "bedrock"
                                         ? " and its port."
                                         : "."}
@@ -577,8 +650,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             </>
                         ) : (
                             <span className="text-xs text-muted-foreground">
-                                No domain is configured, so players connect to this machine&apos;s address and port. Add
-                                a domain under Settings to give servers names.
+                                No domain is configured, so players connect to this machine&apos;s
+                                address and port. Add a domain under Settings to give servers names.
                             </span>
                         )}
                     </label>
@@ -589,10 +662,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="text-muted-foreground">Your player identifier</span>
+                                        <span className="text-muted-foreground">
+                                            Your player identifier
+                                        </span>
                                         <Input
                                             value={ownerIdentifier}
-                                            onChange={(event) => setOwnerIdentifier(event.target.value)}
+                                            onChange={(event) =>
+                                                setOwnerIdentifier(event.target.value)
+                                            }
                                             placeholder="discord:123456789012345678"
                                             className="font-mono"
                                             autoComplete="off"
@@ -601,7 +678,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         <span
                                             className={cn(
                                                 "text-xs",
-                                                identifierError ? "text-danger" : "text-muted-foreground"
+                                                identifierError
+                                                    ? "text-danger"
+                                                    : "text-muted-foreground"
                                             )}
                                         >
                                             {identifierError ??
@@ -609,7 +688,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="text-muted-foreground">Your name on the list</span>
+                                        <span className="text-muted-foreground">
+                                            Your name on the list
+                                        </span>
                                         <Input
                                             value={ownerPlayer}
                                             onChange={(event) => setOwnerPlayer(event.target.value)}
@@ -622,7 +703,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                 </div>
                                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                                     <span className="flex flex-col gap-0.5 text-sm">
-                                        <span className="font-medium">Only players you add can join</span>
+                                        <span className="font-medium">
+                                            Only players you add can join
+                                        </span>
                                         <span className="text-xs text-muted-foreground">
                                             {ownerIdentifier.trim().length > 0
                                                 ? "Everyone else is turned away at the door until you add them."
@@ -644,7 +727,9 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                     <div className="flex items-center gap-1">
                                         <Input
                                             value={joinPassword}
-                                            onChange={(event) => setJoinPassword(event.target.value)}
+                                            onChange={(event) =>
+                                                setJoinPassword(event.target.value)
+                                            }
                                             className="font-mono"
                                         />
                                         <Button
@@ -656,10 +741,19 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         >
                                             <RefreshCw className="size-4" />
                                         </Button>
-                                        <CopyButton value={joinPassword} label="the join password" />
+                                        <CopyButton
+                                            value={joinPassword}
+                                            label="the join password"
+                                        />
                                     </div>
-                                    <span className={cn("text-xs", passwordError ? "text-danger" : "text-muted-foreground")}>
-                                        {passwordError ?? "Everyone who joins types this. Copy it before you create."}
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            passwordError ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {passwordError ??
+                                            "Everyone who joins types this. Copy it before you create."}
                                     </span>
                                 </label>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -667,31 +761,47 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         <span className="text-muted-foreground">Your Steam id</span>
                                         <Input
                                             value={ownerSteamId}
-                                            onChange={(event) => setOwnerSteamId(event.target.value)}
+                                            onChange={(event) =>
+                                                setOwnerSteamId(event.target.value)
+                                            }
                                             placeholder="76561198000000000"
                                             inputMode="numeric"
                                         />
-                                        <span className={cn("text-xs", steamIdError ? "text-danger" : "text-muted-foreground")}>
-                                            {steamIdError ?? "The 17-digit number on your Steam profile."}
+                                        <span
+                                            className={cn(
+                                                "text-xs",
+                                                steamIdError
+                                                    ? "text-danger"
+                                                    : "text-muted-foreground"
+                                            )}
+                                        >
+                                            {steamIdError ??
+                                                "The 17-digit number on your Steam profile."}
                                         </span>
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="text-muted-foreground">Your name on the list</span>
+                                        <span className="text-muted-foreground">
+                                            Your name on the list
+                                        </span>
                                         <Input
                                             value={ownerPlayer}
                                             onChange={(event) => setOwnerPlayer(event.target.value)}
                                             placeholder="You"
                                         />
                                         <span className="text-xs text-muted-foreground">
-                                            Optional. A 17-digit number identifies nobody at a glance.
+                                            Optional. A 17-digit number identifies nobody at a
+                                            glance.
                                         </span>
                                     </label>
                                 </div>
                                 <label className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2">
                                     <span className="flex flex-col gap-0.5 text-sm">
-                                        <span className="font-medium">Only players you add can join</span>
+                                        <span className="font-medium">
+                                            Only players you add can join
+                                        </span>
                                         <span className="text-xs text-muted-foreground">
-                                            On top of the password. Off leaves the password as the only lock.
+                                            On top of the password. Off leaves the password as the
+                                            only lock.
                                         </span>
                                     </span>
                                     <Switch
@@ -705,14 +815,18 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="text-muted-foreground">
-                                        {edition === "bedrock" ? "Your gamertag" : "Your Minecraft username"}
+                                        {edition === "bedrock"
+                                            ? "Your gamertag"
+                                            : "Your Minecraft username"}
                                     </span>
                                     <Input
                                         value={ownerPlayer}
                                         onChange={(event) => setOwnerPlayer(event.target.value)}
                                         placeholder={edition === "bedrock" ? "Gamertag" : "Steve"}
                                     />
-                                    {playerError && <span className="text-xs text-danger">{playerError}</span>}
+                                    {playerError && (
+                                        <span className="text-xs text-danger">{playerError}</span>
+                                    )}
                                 </label>
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="text-muted-foreground">Connecting from</span>
@@ -721,8 +835,14 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                                         onChange={(event) => setOwnerAddress(event.target.value)}
                                         placeholder="203.0.113.9"
                                     />
-                                    <span className={cn("text-xs", addressError ? "text-danger" : "text-muted-foreground")}>
-                                        {addressError ?? 'One address, a range like 203.0.113.0/24, or "any".'}
+                                    <span
+                                        className={cn(
+                                            "text-xs",
+                                            addressError ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {addressError ??
+                                            'One address, a range like 203.0.113.0/24, or "any".'}
                                     </span>
                                 </label>
                             </div>
@@ -757,7 +877,11 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 }
 
 /** A machine with what it has left, so the choice is made on the figures. */
-function machineLabel(machine: { name: string; memoryFreeBytes: number | null; memoryTotalBytes: number | null }): string {
+function machineLabel(machine: {
+    name: string;
+    memoryFreeBytes: number | null;
+    memoryTotalBytes: number | null;
+}): string {
     if (machine.memoryFreeBytes === null || machine.memoryTotalBytes === null) return machine.name;
     const free = Math.round(machine.memoryFreeBytes / (1024 * 1024 * 1024));
     const total = Math.round(machine.memoryTotalBytes / (1024 * 1024 * 1024));

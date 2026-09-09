@@ -37,14 +37,7 @@ import { Crown, Users, X } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    Skeleton,
-    cn
-} from "@polaris/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, Skeleton, cn } from "@polaris/ui";
 
 /** Where the choice to hide it is kept. Per browser and nothing else: it is a
  *  preference about a screen, not a fact about an account. */
@@ -265,72 +258,71 @@ function MemberRow({
     // panel rather than one per member.
     const plate = usePersonNameplate(member.userId);
     return (
-                        <li key={member.userId}>
-                            <MemberMenu
-                                member={member}
-                                channel={channel}
-                                viewerId={viewerId}
-                                onMention={onMention}
-                                onNickname={onNickname}
-                                onChanged={onChanged}
-                                onError={onError}
+        <li key={member.userId}>
+            <MemberMenu
+                member={member}
+                channel={channel}
+                viewerId={viewerId}
+                onMention={onMention}
+                onNickname={onNickname}
+                onChanged={onChanged}
+                onError={onError}
+            >
+                <button
+                    type="button"
+                    disabled={you || busy}
+                    title={you ? member.name : `Message ${member.name}`}
+                    onClick={onOpen}
+                    className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+                        you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                        // A plate replaces the row's own hover tint
+                        // rather than being tinted by it.
+                        plate && platedRow(plate, "hover:bg-transparent")
+                    )}
+                    // The plate somebody chose, drawn behind their
+                    // whole row - which is where a nameplate goes,
+                    // and the only place in a list narrow enough for
+                    // a pill around a name to look like a mistake.
+                    style={plate ? nameplateCss(plate) : undefined}
+                >
+                    <Avatar person={{ id: member.userId, name: member.name }} size={28} />
+                    <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1">
+                            <PersonName
+                                id={member.userId}
+                                name={member.name}
+                                className="truncate text-sm"
                             >
-                            <button
-                                type="button"
-                                disabled={you || busy}
-                                title={you ? member.name : `Message ${member.name}`}
-                                onClick={onOpen}
-                                className={cn(
-                                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                                    you ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
-                                    // A plate replaces the row's own hover tint
-                                    // rather than being tinted by it.
-                                    plate && platedRow(plate, "hover:bg-transparent")
-                                )}
-                                // The plate somebody chose, drawn behind their
-                                // whole row - which is where a nameplate goes,
-                                // and the only place in a list narrow enough for
-                                // a pill around a name to look like a mistake.
-                                style={plate ? nameplateCss(plate) : undefined}
-                            >
-                                <Avatar
-                                    person={{ id: member.userId, name: member.name }}
-                                    size={28}
-                                />
-                                <span className="min-w-0 flex-1">
-                                    <span className="flex items-center gap-1">
-                                        <PersonName
-                                            id={member.userId}
-                                            name={member.name}
-                                            className="truncate text-sm"
-                                        >
-                                            {you && (
-                                                <span className={plate ? "opacity-80" : "text-muted-foreground"}>
-                                                    {" "}
-                                                    (you)
-                                                </span>
-                                            )}
-                                        </PersonName>
-                                        {member.role === "owner" && (
-                                            <Crown
-                                                role="img"
-                                                aria-label="Owner"
-                                                className="size-3.5 text-warning"
-                                            />
-                                        )}
+                                {you && (
+                                    <span
+                                        className={plate ? "opacity-80" : "text-muted-foreground"}
+                                    >
+                                        {" "}
+                                        (you)
                                     </span>
-                                    {under && (
-                                        <span
-                                            className="block truncate text-[0.6875rem] text-muted-foreground"
-                                            title={under}
-                                        >
-                                            {under}
-                                        </span>
-                                    )}
-                                </span>
-                            </button>
-                            </MemberMenu>
-                        </li>
+                                )}
+                            </PersonName>
+                            {member.role === "owner" && (
+                                <Crown
+                                    role="img"
+                                    aria-label="Owner"
+                                    className="size-3.5 text-warning"
+                                />
+                            )}
+                        </span>
+                        {under && (
+                            <span
+                                className="block truncate text-[0.6875rem] text-muted-foreground"
+                                title={under}
+                            >
+                                {under}
+                            </span>
+                        )}
+                    </span>
+                </button>
+            </MemberMenu>
+        </li>
     );
 }
 
@@ -372,7 +364,7 @@ export function ChannelMembers({
                             {heading}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="max-h-[60vh] overflow-y-auto">
+                    <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
                         <MemberRows
                             members={members}
                             loading={loading}
@@ -405,7 +397,7 @@ export function ChannelMembers({
                     <X className="size-4" />
                 </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <MemberRows
                     members={members}
                     loading={loading}

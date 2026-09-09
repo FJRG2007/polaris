@@ -64,7 +64,9 @@ export function EdgePanel({ hostId }: { hostId: string }) {
             <h2 className="text-sm font-medium">Serving its own domains</h2>
 
             {state === null ? (
-                <p className="text-sm text-muted-foreground">Asking this server what it is running...</p>
+                <p className="text-sm text-muted-foreground">
+                    Asking this server what it is running...
+                </p>
             ) : state.error ? (
                 <p className="text-sm text-muted-foreground">
                     Polaris could not ask it: {state.error}
@@ -96,14 +98,23 @@ export function EdgePanel({ hostId }: { hostId: string }) {
             )}
 
             {log && (
-                <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
+                <pre className="max-h-40 overflow-auto overscroll-contain rounded-md bg-muted/50 px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
                     {log.trim()}
                 </pre>
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant={ready ? "outline" : "primary"} disabled={busy} onClick={() => void prepare()}>
-                    {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <RefreshCw className="size-4 shrink-0" />}
+                <Button
+                    size="sm"
+                    variant={ready ? "outline" : "primary"}
+                    disabled={busy}
+                    onClick={() => void prepare()}
+                >
+                    {busy ? (
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4 shrink-0" />
+                    )}
                     {busy ? "Setting it up" : ready ? "Set it up again" : "Set this server up"}
                 </Button>
                 <span className="text-xs text-muted-foreground">
@@ -122,8 +133,13 @@ function Line({ good, yes, no }: { good: boolean; yes: string; no: string }) {
     const Icon = good ? CircleCheck : CircleAlert;
     return (
         <p className="flex items-start gap-2 text-xs">
-            <Icon className={cn("mt-0.5 size-3.5 shrink-0", good ? "text-success" : "text-warning")} aria-hidden />
-            <span className={good ? "text-muted-foreground" : "text-foreground"}>{good ? yes : no}</span>
+            <Icon
+                className={cn("mt-0.5 size-3.5 shrink-0", good ? "text-success" : "text-warning")}
+                aria-hidden
+            />
+            <span className={good ? "text-muted-foreground" : "text-foreground"}>
+                {good ? yes : no}
+            </span>
         </p>
     );
 }

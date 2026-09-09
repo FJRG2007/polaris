@@ -101,9 +101,7 @@ export function NoteMoveDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Move this note</DialogTitle>
-                    <DialogDescription>
-                        Anything under it moves with it.
-                    </DialogDescription>
+                    <DialogDescription>Anything under it moves with it.</DialogDescription>
                 </DialogHeader>
 
                 {shelves.length > 1 && (
@@ -120,14 +118,16 @@ export function NoteMoveDialog({
                     </label>
                 )}
 
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto overscroll-contain">
                     <ul className="flex flex-col gap-0.5">
                         <li>
                             <Destination
                                 label="Top level"
                                 busy={busy}
                                 here={here({ spaceId, folderId: null, parentId: null })}
-                                onSelect={() => void move({ spaceId, folderId: null, parentId: null })}
+                                onSelect={() =>
+                                    void move({ spaceId, folderId: null, parentId: null })
+                                }
                             />
                         </li>
                         {shelf?.folders.map((folder) => (
@@ -143,7 +143,9 @@ export function NoteMoveDialog({
                                             ? folderPath(shelf.folders, folder.id)
                                             : undefined
                                     }
-                                    icon={<Folder className="size-3.5 shrink-0 text-muted-foreground" />}
+                                    icon={
+                                        <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+                                    }
                                     busy={busy}
                                     here={here({ spaceId, folderId: folder.id, parentId: null })}
                                     onSelect={() =>

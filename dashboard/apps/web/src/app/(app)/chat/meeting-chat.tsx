@@ -202,7 +202,7 @@ export function MeetingChat({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className="min-h-0 flex-1 overflow-y-auto px-3 py-2"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2"
             >
                 {lines === null ? (
                     <div className="flex flex-col gap-2">
@@ -264,10 +264,7 @@ export function MeetingChat({
                                     )}
 
                                     {line.files.length > 0 && (
-                                        <Files
-                                            meetingId={meetingId}
-                                            files={line.files}
-                                        />
+                                        <Files meetingId={meetingId} files={line.files} />
                                     )}
 
                                     {line.poll && (
@@ -335,13 +332,7 @@ function saidSize(bytes: number): string {
  * that nobody has to open it, and the point of sending a spreadsheet is that
  * they do.
  */
-function Files({
-    meetingId,
-    files
-}: {
-    meetingId: string;
-    files: readonly MeetingFileView[];
-}) {
+function Files({ meetingId, files }: { meetingId: string; files: readonly MeetingFileView[] }) {
     return (
         <div className="mt-1 flex flex-col gap-1">
             {files.map((file) => {
@@ -368,7 +359,9 @@ function Files({
                         className="flex items-center gap-2 rounded border border-border px-2 py-1.5 text-xs no-underline transition-colors hover:bg-muted"
                     >
                         <Download className="size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate" title={file.name}>{file.name}</span>
+                        <span className="min-w-0 flex-1 truncate" title={file.name}>
+                            {file.name}
+                        </span>
                         <span className="shrink-0 text-foreground-subtle">
                             {saidSize(file.size)}
                         </span>
@@ -448,7 +441,9 @@ function Poll({
                             />
                         )}
                         <span className="relative flex items-center gap-2">
-                            <span className="min-w-0 flex-1 truncate" title={option.text}>{option.text}</span>
+                            <span className="min-w-0 flex-1 truncate" title={option.text}>
+                                {option.text}
+                            </span>
                             {!poll.hidden && (
                                 <span className="shrink-0 tabular-nums text-foreground-subtle">
                                     {option.votes}

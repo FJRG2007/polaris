@@ -30,7 +30,7 @@ const MARKDOWN_PROSE = cn(
     "[&_p]:leading-relaxed [&_a]:text-primary [&_a]:underline",
     "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-0.5",
     "[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs",
-    "[&_pre]:overflow-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
+    "[&_pre]:overflow-auto overscroll-contain [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0",
     "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground",
     "[&_hr]:my-4 [&_hr]:border-border [&_img]:max-w-full [&_img]:rounded",
     "[&_table]:w-full [&_table]:text-left [&_th]:border-b [&_th]:border-border [&_th]:p-2 [&_td]:border-b [&_td]:border-border [&_td]:p-2",
@@ -171,7 +171,7 @@ export function MarkdownView({
                     </>
                 )}
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
                 {editing && rich ? (
                     // GenOffice's own editor, over the same draft the textarea
                     // holds and saved by the same toolbar - see `rich-markdown`.
@@ -189,7 +189,9 @@ export function MarkdownView({
                         className="h-full min-h-[50vh] w-full resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
                     />
                 ) : mode === "raw" ? (
-                    <pre className="overflow-auto p-4 text-xs leading-relaxed">{file.text}</pre>
+                    <pre className="overflow-auto overscroll-contain p-4 text-xs leading-relaxed">
+                        {file.text}
+                    </pre>
                 ) : (
                     <MarkdownContent html={html} className={MARKDOWN_PROSE} />
                 )}

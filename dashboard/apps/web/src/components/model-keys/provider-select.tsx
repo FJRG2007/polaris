@@ -102,7 +102,12 @@ export function ProviderSelect({
                             className="h-7"
                         />
                     </div>
-                    <div className="max-h-64 overflow-y-auto p-1" role="listbox">
+                    {/* enigma:allow-hand-rolled-select - this is a combobox,
+                        not a select: it filters as you type and each row carries
+                        a mark, a name and a badge. The Select primitive this
+                        project standardises on has no filter and one line per
+                        row, so the panel is its own here. */}
+                    <div className="max-h-64 overflow-y-auto overscroll-contain p-1" role="listbox">
                         {results.map((option) => (
                             <Button
                                 key={option.slug}
@@ -126,7 +131,9 @@ export function ProviderSelect({
                                 </span>
                                 {option.freeTier ? (
                                     <Badge
-                                        variant={option.freeTier.kind === "free" ? "success" : "neutral"}
+                                        variant={
+                                            option.freeTier.kind === "free" ? "success" : "neutral"
+                                        }
                                         title={option.freeTier.note}
                                     >
                                         {FREE_LABEL[option.freeTier.kind]}

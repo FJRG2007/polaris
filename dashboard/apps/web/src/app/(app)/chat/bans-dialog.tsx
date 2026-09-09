@@ -59,10 +59,7 @@ export function BansDialog({
     const lift = async (userId: string) => {
         if (!spaceId) return;
         setBusy(userId);
-        const result = await runAction(
-            () => actions.liftSpaceBanAction(spaceId, userId),
-            setError
-        );
+        const result = await runAction(() => actions.liftSpaceBanAction(spaceId, userId), setError);
         setBusy(null);
         if (result?.error) return;
         // Taken off the list here rather than fetched again: one row changed,
@@ -76,8 +73,8 @@ export function BansDialog({
                 <DialogHeader>
                     <DialogTitle>Kept out of {space?.name}</DialogTitle>
                     <DialogDescription>
-                        Letting somebody back in allows them to return. It does not put them back
-                        in - that is theirs to decide.
+                        Letting somebody back in allows them to return. It does not put them back in
+                        - that is theirs to decide.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -96,7 +93,7 @@ export function BansDialog({
                         description="Banning somebody from this space puts them here, so they can be let back in."
                     />
                 ) : (
-                    <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+                    <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto overscroll-contain">
                         {bans.map((ban) => (
                             <PersonRow
                                 as="li"

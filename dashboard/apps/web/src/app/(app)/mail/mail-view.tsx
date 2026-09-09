@@ -1201,7 +1201,7 @@ export function MailView({
                     {categorised ? <CategoryTabs current={category} /> : null}
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {list.loading ? (
                         // Nothing kept for this list and nothing arrived yet,
                         // which is a first visit rather than the ordinary case.

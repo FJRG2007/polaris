@@ -53,7 +53,12 @@ function TreeBranch({
                         </span>
                     </button>
                     {node.children.length > 0 && (
-                        <TreeBranch nodes={node.children} activeId={activeId} depth={depth + 1} onOpen={onOpen} />
+                        <TreeBranch
+                            nodes={node.children}
+                            activeId={activeId}
+                            depth={depth + 1}
+                            onOpen={onOpen}
+                        />
                     )}
                 </li>
             ))}
@@ -116,7 +121,9 @@ export function DocsView({
         <div className="flex w-full flex-col gap-6 md:flex-row">
             <aside className="flex w-full flex-col gap-2 md:w-60 md:shrink-0">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pages</h2>
+                    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Pages
+                    </h2>
                     {canEdit && (
                         <button
                             type="button"
@@ -155,13 +162,21 @@ export function DocsView({
                 {matches.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No pages yet.</p>
                 ) : (
-                    <TreeBranch nodes={matches} activeId={doc?.id ?? null} depth={0} onOpen={open} />
+                    <TreeBranch
+                        nodes={matches}
+                        activeId={doc?.id ?? null}
+                        depth={0}
+                        onOpen={open}
+                    />
                 )}
             </aside>
 
             <div className="flex min-w-0 flex-1 flex-col gap-3">
                 {!doc && (
-                    <EmptyState title="Pick a page, or write a new one." description="Docs live beside the work rather than in another tool." />
+                    <EmptyState
+                        title="Pick a page, or write a new one."
+                        description="Docs live beside the work rather than in another tool."
+                    />
                 )}
 
                 {doc && (
@@ -170,7 +185,11 @@ export function DocsView({
                             <nav className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                                 {doc.breadcrumb.map((crumb) => (
                                     <span key={crumb.id} className="flex items-center gap-1">
-                                        <button type="button" onClick={() => open(crumb.id)} className="hover:underline">
+                                        <button
+                                            type="button"
+                                            onClick={() => open(crumb.id)}
+                                            className="hover:underline"
+                                        >
                                             {crumb.title}
                                         </button>
                                         <ChevronRight className="size-3" />
@@ -195,7 +214,11 @@ export function DocsView({
                             <span className="flex-1" />
                             {canEdit && (
                                 <>
-                                    <Button size="sm" disabled={!dirty || saving} onClick={() => void save()}>
+                                    <Button
+                                        size="sm"
+                                        disabled={!dirty || saving}
+                                        onClick={() => void save()}
+                                    >
                                         {saving ? "Saving" : dirty ? "Save" : "Saved"}
                                     </Button>
                                     <button
@@ -203,7 +226,10 @@ export function DocsView({
                                         aria-label="Delete this page"
                                         title="Delete page"
                                         onClick={async () => {
-                                            await runAction(() => actions.deleteDocAction(doc.id), setError);
+                                            await runAction(
+                                                () => actions.deleteDocAction(doc.id),
+                                                setError
+                                            );
                                             router.push("/tasks/docs");
                                         }}
                                         className="rounded p-1 transition-colors hover:bg-muted hover:text-danger"
@@ -215,7 +241,10 @@ export function DocsView({
                         </div>
 
                         {error && (
-                            <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                            <p
+                                role="alert"
+                                className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                            >
                                 {error}
                             </p>
                         )}
@@ -232,7 +261,7 @@ export function DocsView({
                             // A page earns a taller ceiling than a form field,
                             // but still a ceiling: a surface that grows past the
                             // viewport takes its own save button with it.
-                            className="min-h-[24rem] max-h-[70vh] flex-1 overflow-y-auto"
+                            className="min-h-[24rem] max-h-[70vh] flex-1 overflow-y-auto overscroll-contain"
                         />
                     </>
                 )}

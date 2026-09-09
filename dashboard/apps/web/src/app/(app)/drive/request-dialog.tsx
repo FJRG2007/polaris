@@ -265,7 +265,7 @@ export function RequestDialog({
 
     return (
         <Dialog open={target !== null} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>Request files</DialogTitle>
                     <DialogDescription className="truncate">

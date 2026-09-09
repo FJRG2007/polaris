@@ -784,7 +784,9 @@ function JailsPanel({
                             {jail.enabled ? (
                                 <div className="flex flex-wrap gap-3">
                                     <NumberField
-                                        label={jail.counts === "hostnames" ? "Hostnames" : "Requests"}
+                                        label={
+                                            jail.counts === "hostnames" ? "Hostnames" : "Requests"
+                                        }
                                         value={jail.maxRetry}
                                         min={1}
                                         max={1000}
@@ -1193,7 +1195,7 @@ function AddressDialog({
                             ) : null}
                         </div>
 
-                        <div className="max-h-80 overflow-auto rounded-md border border-border">
+                        <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border">
                             <table className="w-full min-w-[34rem] text-xs">
                                 <thead className="sticky top-0 bg-card">
                                     <tr className="text-left text-muted-foreground">

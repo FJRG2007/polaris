@@ -163,7 +163,7 @@ export function SendReader({ accessId }: { accessId: string }) {
                         <CardTitle>{state.name || "A secret"}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-3">
-                        <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-surface p-3 font-mono text-xs">
+                        <pre className="max-h-[50vh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md border border-border bg-surface p-3 font-mono text-xs">
                             {state.text}
                         </pre>
                         <div className="flex justify-end">

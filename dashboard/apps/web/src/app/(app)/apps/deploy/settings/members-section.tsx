@@ -483,7 +483,7 @@ function AccessDialog({
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogTitle>{draft.entryId ? "Change access" : "Give access"}</DialogTitle>
                 <div className="flex flex-col gap-4 pt-2">
                     {!draft.entryId && (

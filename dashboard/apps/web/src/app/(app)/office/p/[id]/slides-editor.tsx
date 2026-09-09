@@ -87,7 +87,7 @@ export function SlidesEditor({
         <div className="flex min-h-0 flex-1">
             {/* The slides. A column of them rather than a strip: a deck is read
                 top to bottom in every tool that makes one. */}
-            <aside className="hidden w-44 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border p-2 sm:flex">
+            <aside className="hidden w-44 shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain border-r border-border p-2 sm:flex">
                 {deckSlides.map((one, index) => (
                     <button
                         key={one.id}
@@ -168,7 +168,7 @@ export function SlidesEditor({
                     </Button>
                 </div>
 
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/30 p-4">
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto overscroll-contain bg-muted/30 p-4">
                     <div className="w-full max-w-4xl">
                         <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-background shadow-sm">
                             <Canvas
@@ -176,9 +176,7 @@ export function SlidesEditor({
                                 chosen={chosen}
                                 editable={editable}
                                 onChoose={setChosen}
-                                onMove={(box, frame) =>
-                                    slide && moveBox(doc, slide.id, box, frame)
-                                }
+                                onMove={(box, frame) => slide && moveBox(doc, slide.id, box, frame)}
                                 onText={(box, text) => slide && setText(doc, slide.id, box, text)}
                             />
                         </div>
@@ -362,16 +360,20 @@ function moveBox(doc: Y.Doc, slideId: string, box: deck.Box, frame: deck.BoxFram
     // Clamped rather than refused: dragging a box off the edge is something
     // people do constantly, and "it stopped at the edge" is the useful answer.
     const kept = deck.clampFrame(frame);
-    doc
-        .getMap<deck.Box>(BOXES)
-        .set(deck.boxKey(slideId, box.id), { ...box, ...kept, version: box.version + 1 });
+    doc.getMap<deck.Box>(BOXES).set(deck.boxKey(slideId, box.id), {
+        ...box,
+        ...kept,
+        version: box.version + 1
+    });
 }
 
 function setText(doc: Y.Doc, slideId: string, box: deck.Box, text: string): void {
     if (text === box.text) return;
-    doc
-        .getMap<deck.Box>(BOXES)
-        .set(deck.boxKey(slideId, box.id), { ...box, text, version: box.version + 1 });
+    doc.getMap<deck.Box>(BOXES).set(deck.boxKey(slideId, box.id), {
+        ...box,
+        text,
+        version: box.version + 1
+    });
 }
 
 function duplicateSlide(doc: Y.Doc, slideId: string, index: number): void {

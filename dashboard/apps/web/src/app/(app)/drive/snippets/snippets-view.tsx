@@ -349,7 +349,7 @@ function SnippetLogsDialog({
                         Nobody has opened this link yet.
                     </p>
                 ) : (
-                    <div className="max-h-80 overflow-auto">
+                    <div className="max-h-80 overflow-auto overscroll-contain">
                         <table className="w-full text-left text-xs">
                             <thead className="text-muted-foreground">
                                 <tr>

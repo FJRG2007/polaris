@@ -35,15 +35,7 @@ import { Avatar, AvatarStack } from "@/components/avatar";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { listedTargets, type Target } from "./forward-targets";
 import { PersonName, PersonRow } from "@/components/person-name";
-import {
-    ChevronLeft,
-    ChevronRight,
-    Forward,
-    Hash,
-    Loader2,
-    Server,
-    Volume2
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Forward, Hash, Loader2, Server, Volume2 } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -222,7 +214,7 @@ export function ForwardDialog({
                         </button>
                     )}
 
-                    <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
+                    <ul className="max-h-64 overflow-y-auto overscroll-contain rounded-md border border-border">
                         {openServers &&
                             spaces
                                 .filter((space) => !space.archived)
@@ -259,9 +251,7 @@ export function ForwardDialog({
 
                         {listed.length === 0 && !openServers ? (
                             <li className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                {searching
-                                    ? "Nothing matches that."
-                                    : "Nothing to forward to yet."}
+                                {searching ? "Nothing matches that." : "Nothing to forward to yet."}
                             </li>
                         ) : (
                             listed.map((target) => {
@@ -288,10 +278,7 @@ export function ForwardDialog({
                                             <Face target={target} />
                                             <span className="flex min-w-0 flex-1 flex-col">
                                                 <span className="truncate" title={target.name}>
-                                                    <PersonName
-                                                        id={personId}
-                                                        name={target.name}
-                                                    />
+                                                    <PersonName id={personId} name={target.name} />
                                                 </span>
                                                 {/* Only while searching: inside a
                                                 server every row is in it, and

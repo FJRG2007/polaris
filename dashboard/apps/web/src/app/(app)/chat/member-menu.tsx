@@ -352,9 +352,7 @@ export function MemberMenu({
                                     Call
                                 </menu.Item>
                                 {onMention && (
-                                    <menu.Item
-                                        onSelect={() => onMention(mentionOf(member))}
-                                    >
+                                    <menu.Item onSelect={() => onMention(mentionOf(member))}>
                                         <AtSign className="size-3.5" />
                                         Mention
                                     </menu.Item>
@@ -396,7 +394,7 @@ export function MemberMenu({
                                     <UserPlus className="size-3.5" />
                                     Invite to a server
                                 </menu.SubTrigger>
-                                <menu.SubContent className="max-h-72 overflow-y-auto">
+                                <menu.SubContent className="max-h-72 overflow-y-auto overscroll-contain">
                                     {invitable.map((entry) => (
                                         <menu.Item
                                             key={entry.id}
@@ -410,7 +408,9 @@ export function MemberMenu({
                                                 )
                                             }
                                         >
-                                            <span className="truncate" title={entry.name}>{entry.name}</span>
+                                            <span className="truncate" title={entry.name}>
+                                                {entry.name}
+                                            </span>
                                         </menu.Item>
                                     ))}
                                 </menu.SubContent>
@@ -517,7 +517,9 @@ export function MemberMenu({
                                     onSelect={() =>
                                         void run(() =>
                                             actions.timeOutMemberAction(
-                                                space ? { spaceId: space } : { channelId: channel.id },
+                                                space
+                                                    ? { spaceId: space }
+                                                    : { channelId: channel.id },
                                                 member.userId,
                                                 0
                                             )
@@ -553,9 +555,7 @@ export function MemberMenu({
                                 disabled={working}
                                 variant="danger"
                                 onSelect={() =>
-                                    void run(() =>
-                                        actions.banFromSpaceAction(space, member.userId)
-                                    )
+                                    void run(() => actions.banFromSpaceAction(space, member.userId))
                                 }
                             >
                                 <Ban className="size-3.5" />

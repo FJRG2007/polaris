@@ -18,9 +18,34 @@ import { useRouter } from "next/navigation";
 import { STAGED_CHANGE_LABELS } from "@polaris/core";
 import type { ShellEnvironment } from "./project-shell";
 import type { StagedChangeView } from "@/lib/deploy-staged-changes";
-import { Database, HardDrive, Layers, Loader2, Rocket, Trash2, TriangleAlert, X } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import {
+    Database,
+    HardDrive,
+    Layers,
+    Loader2,
+    Rocket,
+    Trash2,
+    TriangleAlert,
+    X
+} from "lucide-react";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    useTransition,
+    type ReactNode
+} from "react";
 import {
     applyStagedChangesAction,
     discardAllStagedChangesAction,
@@ -74,8 +99,10 @@ export function StagedChangesProvider({
 }
 
 function ChangeIcon({ targetType }: { targetType: string }) {
-    if (targetType === "volume") return <HardDrive className="size-4 shrink-0 text-muted-foreground" />;
-    if (targetType === "database") return <Database className="size-4 shrink-0 text-muted-foreground" />;
+    if (targetType === "volume")
+        return <HardDrive className="size-4 shrink-0 text-muted-foreground" />;
+    if (targetType === "database")
+        return <Database className="size-4 shrink-0 text-muted-foreground" />;
     return <Layers className="size-4 shrink-0 text-muted-foreground" />;
 }
 
@@ -169,7 +196,11 @@ export function StagedChangesBanner({
                         Details
                     </Button>
                     <Button size="sm" disabled={pending || count === 0} onClick={apply}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Rocket className="size-4" />
+                        )}
                         Deploy
                     </Button>
                 </div>
@@ -185,9 +216,11 @@ export function StagedChangesBanner({
                     </DialogHeader>
 
                     <div className="flex flex-col gap-3">
-                        <ul className="max-h-72 overflow-y-auto rounded-md border border-border/60">
+                        <ul className="max-h-72 overflow-y-auto overscroll-contain rounded-md border border-border/60">
                             {changes.map((change) => {
-                                const environment = environments.find((entry) => entry.id === change.environmentId);
+                                const environment = environments.find(
+                                    (entry) => entry.id === change.environmentId
+                                );
                                 const foreign = change.environmentId !== environmentId;
                                 return (
                                     <li
@@ -199,12 +232,17 @@ export function StagedChangesBanner({
                                             <div className="min-w-0">
                                                 <p className="truncate text-sm">
                                                     <span className="text-danger">
-                                                        {STAGED_CHANGE_LABELS[change.kind] ?? change.kind}
+                                                        {STAGED_CHANGE_LABELS[change.kind] ??
+                                                            change.kind}
                                                     </span>{" "}
-                                                    <span className="font-medium">{change.targetName}</span>
+                                                    <span className="font-medium">
+                                                        {change.targetName}
+                                                    </span>
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    {[environment?.name, change.detail].filter(Boolean).join(" - ")}
+                                                    {[environment?.name, change.detail]
+                                                        .filter(Boolean)
+                                                        .join(" - ")}
                                                 </p>
                                             </div>
                                         </div>
@@ -238,9 +276,14 @@ export function StagedChangesBanner({
                                 </p>
                                 <ul className="mt-1 flex flex-col gap-0.5">
                                     {failures.map((failure) => (
-                                        <li key={failure.targetName} className="text-xs text-muted-foreground">
-                                            <span className="text-foreground">{failure.targetName}</span>:{" "}
-                                            {failure.error}
+                                        <li
+                                            key={failure.targetName}
+                                            className="text-xs text-muted-foreground"
+                                        >
+                                            <span className="text-foreground">
+                                                {failure.targetName}
+                                            </span>
+                                            : {failure.error}
                                         </li>
                                     ))}
                                 </ul>
@@ -253,11 +296,24 @@ export function StagedChangesBanner({
                         {error && <p className="text-sm text-danger">{error}</p>}
 
                         <div className="flex flex-wrap justify-end gap-2">
-                            <Button variant="ghost" size="sm" disabled={pending || here.length === 0} onClick={discardAll}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={pending || here.length === 0}
+                                onClick={discardAll}
+                            >
                                 <Trash2 className="size-4" /> Discard all here
                             </Button>
-                            <Button size="sm" disabled={pending || here.length === 0} onClick={apply}>
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                            <Button
+                                size="sm"
+                                disabled={pending || here.length === 0}
+                                onClick={apply}
+                            >
+                                {pending ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                    <Rocket className="size-4" />
+                                )}
                                 Deploy {here.length > 0 ? here.length : ""}
                             </Button>
                         </div>

@@ -1316,53 +1316,55 @@ export function FilesView({
                     </>
                 )}
                 {abilities.remove ? (
-                <>
-                <ContextMenuSeparator />
-                <ContextMenuSub>
-                    <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
-                        <Trash2 className="size-4" />
-                        Delete
-                    </ContextMenuSubTrigger>
-                    <ContextMenuSubContent>
-                        <ContextMenuItem onSelect={() => onDelete(targets)}>
-                            <Trash2 className="size-4" />
-                            Move to Trash
-                            <MenuShortcut>Del</MenuShortcut>
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                            variant="danger"
-                            onSelect={() => onDeletePermanent(targets)}
-                        >
-                            <Trash2 className="size-4" />
-                            Delete permanently
-                        </ContextMenuItem>
-                        {!many && entry.kind === "dir" ? (
-                            <>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem onSelect={() => onEmptyFolder(entry, false)}>
-                                    <Eraser className="size-4" />
-                                    Empty folder to Trash
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuSub>
+                            <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
+                                <Trash2 className="size-4" />
+                                Delete
+                            </ContextMenuSubTrigger>
+                            <ContextMenuSubContent>
+                                <ContextMenuItem onSelect={() => onDelete(targets)}>
+                                    <Trash2 className="size-4" />
+                                    Move to Trash
+                                    <MenuShortcut>Del</MenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuItem
                                     variant="danger"
-                                    onSelect={() => onEmptyFolder(entry, true)}
+                                    onSelect={() => onDeletePermanent(targets)}
                                 >
-                                    <Eraser className="size-4" />
-                                    Empty folder permanently
+                                    <Trash2 className="size-4" />
+                                    Delete permanently
                                 </ContextMenuItem>
-                            </>
-                        ) : null}
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                            variant="danger"
-                            onSelect={() => onScheduleDelete(targets)}
-                        >
-                            <CalendarClock className="size-4" />
-                            Delete later...
-                        </ContextMenuItem>
-                    </ContextMenuSubContent>
-                </ContextMenuSub>
-                </>
+                                {!many && entry.kind === "dir" ? (
+                                    <>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuItem
+                                            onSelect={() => onEmptyFolder(entry, false)}
+                                        >
+                                            <Eraser className="size-4" />
+                                            Empty folder to Trash
+                                        </ContextMenuItem>
+                                        <ContextMenuItem
+                                            variant="danger"
+                                            onSelect={() => onEmptyFolder(entry, true)}
+                                        >
+                                            <Eraser className="size-4" />
+                                            Empty folder permanently
+                                        </ContextMenuItem>
+                                    </>
+                                ) : null}
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                    variant="danger"
+                                    onSelect={() => onScheduleDelete(targets)}
+                                >
+                                    <CalendarClock className="size-4" />
+                                    Delete later...
+                                </ContextMenuItem>
+                            </ContextMenuSubContent>
+                        </ContextMenuSub>
+                    </>
                 ) : null}
             </ContextMenuContent>
         );
@@ -1740,7 +1742,7 @@ export function FilesView({
                             </Button>
                         </div>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-surface/40">
+                    <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border bg-surface/40">
                         <FilePreview target={viewerTarget} onSaved={onSaved} />
                     </div>
                 </div>
@@ -1850,17 +1852,17 @@ export function FilesView({
                             </Button>
                         ) : null}
                         {abilities.write ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={onNewFolder}
-                            disabled={pending}
-                            title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
-                            aria-label="New folder"
-                        >
-                            <FolderPlus className="size-4" />
-                            <span className="hidden sm:inline">New folder</span>
-                        </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={onNewFolder}
+                                disabled={pending}
+                                title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
+                                aria-label="New folder"
+                            >
+                                <FolderPlus className="size-4" />
+                                <span className="hidden sm:inline">New folder</span>
+                            </Button>
                         ) : null}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1868,7 +1870,11 @@ export function FilesView({
                                     size="sm"
                                     variant="secondary"
                                     disabled={uploading || !abilities.write}
-                                    title={abilities.write ? "Upload" : "You can read this, not change it"}
+                                    title={
+                                        abilities.write
+                                            ? "Upload"
+                                            : "You can read this, not change it"
+                                    }
                                     aria-label="Upload"
                                 >
                                     <Upload className="size-4" />
@@ -2308,7 +2314,7 @@ export function FilesView({
                                                   : "Nothing matches your search or filters."}
                                         </p>
                                     ) : viewMode === "grid" ? (
-                                        <div className="max-h-[65vh] overflow-auto p-1">
+                                        <div className="max-h-[65vh] overflow-auto overscroll-contain p-1">
                                             <div
                                                 ref={gridRef}
                                                 className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6"
@@ -2444,7 +2450,7 @@ export function FilesView({
                                     ) : (
                                         <div
                                             ref={scrollRef}
-                                            className="max-h-[65vh] overflow-auto"
+                                            className="max-h-[65vh] overflow-auto overscroll-contain"
                                             onMouseDown={onMarqueeDown}
                                         >
                                             <div
@@ -2512,7 +2518,9 @@ export function FilesView({
                                                                                 : "hover:bg-card-hover",
                                                                             entry.hidden &&
                                                                                 "opacity-50",
-                                                                            leaving.has(entry.path) &&
+                                                                            leaving.has(
+                                                                                entry.path
+                                                                            ) &&
                                                                                 "pointer-events-none opacity-40",
                                                                             cutPaths?.has(
                                                                                 entry.path
@@ -2826,7 +2834,7 @@ export function FilesView({
                 </ContextMenu>
             </div>
             {selectedEntries.length === 1 && selectedEntries[0] ? (
-                <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto border-l border-border bg-surface/40 p-4 lg:flex">
+                <aside className="fixed right-0 top-14 bottom-0 z-30 hidden w-72 flex-col gap-4 overflow-auto overscroll-contain border-l border-border bg-surface/40 p-4 lg:flex">
                     <div className="flex flex-col items-center gap-2 text-center">
                         {/* The file, not a mark standing for its type. This panel
                             exists to answer "which one is this", and for a

@@ -136,7 +136,7 @@ export function SendDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>Send {name}</DialogTitle>
                 </DialogHeader>
@@ -180,7 +180,7 @@ export function SendDialog({
                         </ul>
                     ) : null}
 
-                    <div className="max-h-56 space-y-1 overflow-y-auto">
+                    <div className="max-h-56 space-y-1 overflow-y-auto overscroll-contain">
                         {rows.map((candidate) => {
                             const picked = chosen.some((one) => one.id === candidate.id);
                             return (

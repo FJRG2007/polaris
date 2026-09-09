@@ -302,7 +302,7 @@ export function ChatSidebar() {
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
                 {/* In every rail rather than only above the direct messages.
                     What somebody kept is theirs, not a space's, and a list that
                     disappears when you walk into a server is a list people
@@ -361,7 +361,7 @@ export function ChatSidebar() {
                                     label={channel.name}
                                     personId={
                                         channel.others.length === 1
-                                            ? channel.others[0]?.id ?? null
+                                            ? (channel.others[0]?.id ?? null)
                                             : null
                                     }
                                     icon={

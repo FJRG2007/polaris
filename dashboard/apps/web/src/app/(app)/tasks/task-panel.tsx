@@ -547,8 +547,8 @@ export function TaskPanel({
 
                         {/* Each column scrolls on its own so a long thread cannot
                             carry the properties off the screen. */}
-                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
-                            <div className="flex flex-col gap-6 p-5 md:overflow-y-auto">
+                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
+                            <div className="flex flex-col gap-6 p-5 md:overflow-y-auto overscroll-contain">
                                 <DialogTitle asChild>
                                     <TaskNameField
                                         defaultValue={task.name}

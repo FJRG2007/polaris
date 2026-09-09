@@ -84,7 +84,9 @@ function readHistory(installedAppId: string): string[] {
     try {
         const raw = window.localStorage.getItem(historyKey(installedAppId));
         const parsed: unknown = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -141,7 +143,9 @@ export function GameConsole({
     const [choice, setChoice] = useState<number | null>(null);
     const [saved, setSaved] = useState<readonly SavedCommand[]>([]);
     /** The kept command being written, or null while the dialog is shut. */
-    const [keeping, setKeeping] = useState<{ id?: string; label: string; command: string } | null>(null);
+    const [keeping, setKeeping] = useState<{ id?: string; label: string; command: string } | null>(
+        null
+    );
     const [keepError, setKeepError] = useState("");
 
     useEffect(() => {
@@ -171,7 +175,10 @@ export function GameConsole({
     /** Only worth drawing when it would say something the typist does not already
      *  know: a single option identical to what is typed is not a suggestion. */
     const suggestions = useMemo(
-        () => (completion.options.length === 1 && completion.options[0] === completion.token ? [] : completion.options),
+        () =>
+            completion.options.length === 1 && completion.options[0] === completion.token
+                ? []
+                : completion.options,
         [completion]
     );
 
@@ -210,7 +217,10 @@ export function GameConsole({
         (raw: string) => {
             const command = raw.trim();
             if (command.length === 0) return;
-            history.current = [...history.current.filter((item) => item !== command), command].slice(-KEPT_HISTORY);
+            history.current = [
+                ...history.current.filter((item) => item !== command),
+                command
+            ].slice(-KEPT_HISTORY);
             setPast(history.current);
             cursor.current = null;
             setChoice(null);
@@ -221,7 +231,9 @@ export function GameConsole({
                 const result = await sendConsoleCommandAction(installedAppId, command);
                 const output = result.error ?? (result.output || "Done");
                 setReplies((current) =>
-                    [...current, { command, output, failed: Boolean(result.error) }].slice(-KEPT_REPLIES)
+                    [...current, { command, output, failed: Boolean(result.error) }].slice(
+                        -KEPT_REPLIES
+                    )
                 );
                 // The command usually produced log output too; show it without
                 // waiting for the next poll.
@@ -308,7 +320,8 @@ export function GameConsole({
         if (open) {
             event.preventDefault();
             const last = suggestions.length - 1;
-            if (event.key === "ArrowDown") setChoice(choice === null ? 0 : Math.min(last, choice + 1));
+            if (event.key === "ArrowDown")
+                setChoice(choice === null ? 0 : Math.min(last, choice + 1));
             else setChoice(choice === null ? last : choice === 0 ? null : choice - 1);
             return;
         }
@@ -334,7 +347,13 @@ export function GameConsole({
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium">Console</p>
-                    <Button size="sm" variant="ghost" onClick={() => void refresh()} aria-label="Refresh the console" title="Refresh the console">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void refresh()}
+                        aria-label="Refresh the console"
+                        title="Refresh the console"
+                    >
                         <RefreshCw className="size-4" />
                     </Button>
                 </div>
@@ -348,11 +367,13 @@ export function GameConsole({
                 />
 
                 {replies.length > 0 && (
-                    <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-surface p-2 font-mono text-xs">
+                    <div className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface p-2 font-mono text-xs">
                         {replies.map((reply, index) => (
                             <div key={`${reply.command}-${index}`} className="flex flex-col">
                                 <span className="text-muted-foreground">&gt; {reply.command}</span>
-                                <span className={reply.failed ? "text-danger" : ""}>{reply.output}</span>
+                                <span className={reply.failed ? "text-danger" : ""}>
+                                    {reply.output}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -434,7 +455,7 @@ export function GameConsole({
                         // the caret has to measure text in a font it does not own,
                         // and being a few pixels wrong there is worse than being
                         // deliberately left-aligned here.
-                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option, index) => (
                                 <li key={option}>
                                     <button
@@ -485,7 +506,10 @@ export function GameConsole({
                                 <History className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                        <DropdownMenuContent
+                            align="end"
+                            className="max-h-80 overflow-y-auto overscroll-contain"
+                        >
                             <DropdownMenuLabel>Commands you have run</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {past.length === 0 ? (
@@ -497,21 +521,29 @@ export function GameConsole({
                                         className="font-mono text-xs"
                                         onSelect={() => load(command)}
                                     >
-                                        <span className="max-w-72 truncate" title={command}>{command}</span>
+                                        <span className="max-w-72 truncate" title={command}>
+                                            {command}
+                                        </span>
                                     </DropdownMenuItem>
                                 ))
                             )}
                             {past.length > 0 && (
                                 <>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-danger" onSelect={clearHistory}>
+                                    <DropdownMenuItem
+                                        className="text-danger"
+                                        onSelect={clearHistory}
+                                    >
                                         <Trash2 className="size-4" /> Clear the history
                                     </DropdownMenuItem>
                                 </>
                             )}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button onClick={() => submit(line)} disabled={!running || pending || line.trim().length === 0}>
+                    <Button
+                        onClick={() => submit(line)}
+                        disabled={!running || pending || line.trim().length === 0}
+                    >
                         <CornerDownLeft className="size-4" /> Send
                     </Button>
                 </div>
@@ -520,11 +552,14 @@ export function GameConsole({
                     <Dialog open onOpenChange={(open: boolean) => !open && setKeeping(null)}>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>{keeping.id ? "Edit the command" : "Keep a command"}</DialogTitle>
+                                <DialogTitle>
+                                    {keeping.id ? "Edit the command" : "Keep a command"}
+                                </DialogTitle>
                                 <DialogDescription>
-                                    It sits above the console for everybody who runs this server. Put
-                                    a blank in angle brackets - <code>Broadcast &lt;message&gt;</code>{" "}
-                                    - and pressing it fills the box instead of sending.
+                                    It sits above the console for everybody who runs this server.
+                                    Put a blank in angle brackets -{" "}
+                                    <code>Broadcast &lt;message&gt;</code> - and pressing it fills
+                                    the box instead of sending.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="flex flex-col gap-3">

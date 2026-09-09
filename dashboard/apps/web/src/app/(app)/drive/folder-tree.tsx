@@ -226,7 +226,7 @@ export function FolderTree({
     return (
         <div
             className={cn(
-                "overflow-auto rounded-md border border-border bg-surface/40 p-1",
+                "overflow-auto overscroll-contain rounded-md border border-border bg-surface/40 p-1",
                 className
             )}
         >

@@ -1120,7 +1120,10 @@ export function ShareExplorer({
                             <span className="w-20 text-right">Size</span>
                             <span className="w-16" />
                         </div>
-                        <div ref={scrollRef} className="max-h-[60vh] overflow-auto">
+                        <div
+                            ref={scrollRef}
+                            className="max-h-[60vh] overflow-auto overscroll-contain"
+                        >
                             <div
                                 style={{
                                     height: rowVirtualizer.getTotalSize(),

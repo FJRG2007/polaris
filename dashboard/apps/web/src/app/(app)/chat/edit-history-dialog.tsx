@@ -25,13 +25,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatEditHistory } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function EditHistoryDialog({
     message,
@@ -86,7 +80,7 @@ export function EditHistoryDialog({
                         Reading it back
                     </p>
                 ) : (
-                    <ol className="flex max-h-80 flex-col gap-3 overflow-y-auto">
+                    <ol className="flex max-h-80 flex-col gap-3 overflow-y-auto overscroll-contain">
                         <li className="rounded-md border border-border-strong bg-card p-3">
                             <p className="mb-1 text-[0.6875rem] font-medium uppercase tracking-wide text-muted-foreground">
                                 Now

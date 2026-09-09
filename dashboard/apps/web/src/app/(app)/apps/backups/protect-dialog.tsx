@@ -48,13 +48,15 @@ export function ProtectDialog({
 
     useEffect(() => {
         let live = true;
-        void readJson<{ candidates: DiscoveredCandidate[] }>("/api/backups/discover").then((data) => {
-            if (!live) return;
-            // "Everything is already protected" is a claim, and a read that failed
-            // cannot make it - so the reason goes where the list would have been.
-            setCandidates(data.ok ? data.value.candidates : []);
-            if (!data.ok) setError(data.reason);
-        });
+        void readJson<{ candidates: DiscoveredCandidate[] }>("/api/backups/discover").then(
+            (data) => {
+                if (!live) return;
+                // "Everything is already protected" is a claim, and a read that failed
+                // cannot make it - so the reason goes where the list would have been.
+                setCandidates(data.ok ? data.value.candidates : []);
+                if (!data.ok) setError(data.reason);
+            }
+        );
         return () => {
             live = false;
         };
@@ -63,7 +65,9 @@ export function ProtectDialog({
     async function onSave() {
         setPending(true);
         setError(null);
-        const picked = (candidates ?? []).filter((candidate) => chosen.includes(candidate.selector));
+        const picked = (candidates ?? []).filter((candidate) =>
+            chosen.includes(candidate.selector)
+        );
         for (const candidate of picked) {
             const result = await protectAction({
                 target: candidate.target,
@@ -90,8 +94,8 @@ export function ProtectDialog({
                         Add resource
                     </DialogTitle>
                     <DialogDescription>
-                        Everything here that is not being backed up yet. Pick what matters and give it a plan, or
-                        leave it on demand and back it up by hand.
+                        Everything here that is not being backed up yet. Pick what matters and give
+                        it a plan, or leave it on demand and back it up by hand.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -102,7 +106,7 @@ export function ProtectDialog({
                         </p>
                     ) : null}
 
-                    <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+                    <div className="max-h-72 overflow-y-auto overscroll-contain rounded-md border border-border">
                         {candidates === null ? (
                             <div className="flex flex-col gap-2 p-3">
                                 {Array.from({ length: 3 }, (_, index) => (
@@ -126,7 +130,10 @@ export function ProtectDialog({
                                                     setChosen((current) =>
                                                         event.target.checked
                                                             ? [...current, candidate.selector]
-                                                            : current.filter((entry) => entry !== candidate.selector)
+                                                            : current.filter(
+                                                                  (entry) =>
+                                                                      entry !== candidate.selector
+                                                              )
                                                     )
                                                 }
                                             />
@@ -160,8 +167,8 @@ export function ProtectDialog({
                             ]}
                         />
                         <span className="text-xs text-muted-foreground">
-                            A plan decides how often a copy is taken, how many are kept, and where they go. Without
-                            one, copies are only taken when you ask.
+                            A plan decides how often a copy is taken, how many are kept, and where
+                            they go. Without one, copies are only taken when you ask.
                         </span>
                     </label>
 
@@ -171,7 +178,10 @@ export function ProtectDialog({
                         <DialogClose asChild>
                             <Button variant="ghost">Cancel</Button>
                         </DialogClose>
-                        <Button onClick={() => void onSave()} disabled={pending || chosen.length === 0}>
+                        <Button
+                            onClick={() => void onSave()}
+                            disabled={pending || chosen.length === 0}
+                        >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                             {chosen.length > 1 ? `Protect ${chosen.length} things` : "Protect"}
                         </Button>

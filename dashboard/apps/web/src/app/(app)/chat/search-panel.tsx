@@ -177,7 +177,7 @@ export function SearchPanel({
                 </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {hits === null ? (
                     <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                         {empty
@@ -216,9 +216,7 @@ export function SearchPanel({
                                     >
                                         <PersonName
                                             id={hit.message.authorId}
-                                            name={
-                                                hit.message.authorName ?? "Somebody who has left"
-                                            }
+                                            name={hit.message.authorName ?? "Somebody who has left"}
                                         />
                                     </span>
                                     {/* Clamped rather than truncated: a hit is

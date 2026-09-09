@@ -215,7 +215,7 @@ export function SheetEditor({
                     original is left untouched.
                 </p>
             ) : null}
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto overscroll-contain">
                 <div style={{ width: gridWidth }}>
                     <div className="sticky top-0 z-10 flex bg-surface text-xs text-muted-foreground">
                         <div

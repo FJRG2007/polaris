@@ -43,12 +43,18 @@ import {
     updateEmailChannelAction
 } from "./email-actions";
 
-const PROVIDER_OPTIONS = MAIL_PROVIDERS.map((id) => ({ value: id, label: MAIL_PROVIDER_INFO[id].label }));
+const PROVIDER_OPTIONS = MAIL_PROVIDERS.map((id) => ({
+    value: id,
+    label: MAIL_PROVIDER_INFO[id].label
+}));
 
 /** Sensible starting values so a new channel is mostly filled in already. */
 const DEFAULTS: Partial<Record<string, string>> = { port: "587", fromName: "Polaris" };
 
-function initialSettings(provider: MailProvider, existing?: Record<string, string>): Record<string, string> {
+function initialSettings(
+    provider: MailProvider,
+    existing?: Record<string, string>
+): Record<string, string> {
     return Object.fromEntries(
         MAIL_PROVIDER_INFO[provider].fields.map((field) => [
             field.name,
@@ -170,11 +176,13 @@ export function EmailChannelDialog({
         <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{editing ? `Manage ${channel.name}` : "Add an email sender"}</DialogTitle>
+                    <DialogTitle>
+                        {editing ? `Manage ${channel.name}` : "Add an email sender"}
+                    </DialogTitle>
                     <DialogDescription>{info.summary}</DialogDescription>
                 </DialogHeader>
 
-                <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
+                <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Provider</span>
                         <Select
@@ -209,7 +217,9 @@ export function EmailChannelDialog({
                             key={field.name}
                             field={field}
                             value={settings[field.name] ?? ""}
-                            onChange={(value) => setSettings((prev) => ({ ...prev, [field.name]: value }))}
+                            onChange={(value) =>
+                                setSettings((prev) => ({ ...prev, [field.name]: value }))
+                            }
                         />
                     ))}
 
@@ -242,12 +252,17 @@ export function EmailChannelDialog({
                                     onClick={sendTest}
                                     disabled={busy || !testTo.trim()}
                                 >
-                                    {testing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                                    {testing ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Send className="size-4" />
+                                    )}
                                     Send
                                 </Button>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                                The only check that proves the From address is one the provider will send as.
+                                The only check that proves the From address is one the provider will
+                                send as.
                             </span>
                         </div>
                     )}
@@ -304,12 +319,20 @@ function SettingField({
                 {field.optional ? <span className="text-muted-foreground"> (optional)</span> : null}
             </span>
             <Input
-                type={field.type === "number" ? "number" : field.type === "password" ? "password" : "text"}
+                type={
+                    field.type === "number"
+                        ? "number"
+                        : field.type === "password"
+                          ? "password"
+                          : "text"
+                }
                 value={value}
                 placeholder={field.placeholder}
                 onChange={(event) => onChange(event.target.value)}
             />
-            {field.hint ? <span className="text-xs text-muted-foreground">{field.hint}</span> : null}
+            {field.hint ? (
+                <span className="text-xs text-muted-foreground">{field.hint}</span>
+            ) : null}
         </label>
     );
 }

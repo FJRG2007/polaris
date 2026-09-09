@@ -41,19 +41,27 @@ export function GeoPicker({
         const needle = query.trim().toLowerCase();
         if (!needle) return [];
         return options
-            .filter((option) => !countries.includes(option.code) && option.name.toLowerCase().includes(needle))
+            .filter(
+                (option) =>
+                    !countries.includes(option.code) && option.name.toLowerCase().includes(needle)
+            )
             .slice(0, 8);
     }, [options, countries, query]);
 
     function toggleContinent(code: string) {
-        onContinents(continents.includes(code) ? continents.filter((c) => c !== code) : [...continents, code]);
+        onContinents(
+            continents.includes(code) ? continents.filter((c) => c !== code) : [...continents, code]
+        );
     }
 
     function addCountry(value: string) {
         // Accept a display name or a raw 2-letter code.
-        const byName = options.find((option) => option.name.toLowerCase() === value.trim().toLowerCase());
+        const byName = options.find(
+            (option) => option.name.toLowerCase() === value.trim().toLowerCase()
+        );
         const code = (byName?.code ?? value.trim().toUpperCase()).toUpperCase();
-        if (COUNTRY_CODES.includes(code) && !countries.includes(code)) onCountries([...countries, code]);
+        if (COUNTRY_CODES.includes(code) && !countries.includes(code))
+            onCountries([...countries, code]);
         setQuery("");
     }
 
@@ -104,7 +112,7 @@ export function GeoPicker({
                         }}
                     />
                     {open && suggestions.length > 0 ? (
-                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option) => (
                                 <li key={option.code}>
                                     <button
@@ -144,8 +152,8 @@ export function GeoPicker({
                 ) : null}
             </div>
             <span className="text-xs text-muted-foreground">
-                Leave both empty to allow every location. Otherwise, only the selected countries and continents are
-                allowed.
+                Leave both empty to allow every location. Otherwise, only the selected countries and
+                continents are allowed.
             </span>
         </div>
     );

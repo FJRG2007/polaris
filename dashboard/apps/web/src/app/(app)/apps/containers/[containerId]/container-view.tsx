@@ -727,7 +727,7 @@ function LogsTab({ query }: { query: string }) {
             {logs === null && !error ? (
                 <Skeleton className="h-64 w-full" />
             ) : (
-                <pre className="min-h-0 flex-1 overflow-auto rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-[#c9d1d9]">
+                <pre className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] p-3 text-xs leading-relaxed text-[#c9d1d9]">
                     {logs?.trim() ? logs : "This container has printed nothing."}
                 </pre>
             )}
@@ -794,7 +794,7 @@ function FilesTab({ query }: { query: string }) {
                     This directory is empty.
                 </p>
             ) : (
-                <ul className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
+                <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border border-border">
                     {entries.map((entry) => {
                         const full = path === "/" ? `/${entry.name}` : `${path}/${entry.name}`;
                         return (

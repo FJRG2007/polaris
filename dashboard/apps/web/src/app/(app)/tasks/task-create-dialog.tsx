@@ -148,7 +148,11 @@ function toDraft(row: TaskRow): Omit<TaskDraft, "at"> {
 function fromDraft(
     draft: TaskDraft,
     base: TaskRow,
-    book: { statuses: readonly StatusView[]; tags: readonly TagView[]; people: readonly PersonRef[] }
+    book: {
+        statuses: readonly StatusView[];
+        tags: readonly TagView[];
+        people: readonly PersonRef[];
+    }
 ): TaskRow {
     const status = book.statuses.find((entry) => entry.id === draft.statusId) ?? null;
     return {
@@ -209,7 +213,8 @@ export function TaskCreateDialog({
     onClose: () => void;
     onCreated: (taskId: string) => void;
 }) {
-    const firstStatusId = defaultStatusId === undefined ? (statuses[0]?.id ?? null) : defaultStatusId;
+    const firstStatusId =
+        defaultStatusId === undefined ? (statuses[0]?.id ?? null) : defaultStatusId;
     const firstStatus = statuses.find((status) => status.id === firstStatusId) ?? null;
     const [draft, setDraft] = useState<TaskRow>(() =>
         blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate })
@@ -231,7 +236,10 @@ export function TaskCreateDialog({
     // over.
     useEffect(() => {
         if (!open) return;
-        const fresh = blank(defaultListId, firstStatus, { name: defaultName, dueDate: defaultDueDate });
+        const fresh = blank(defaultListId, firstStatus, {
+            name: defaultName,
+            dueDate: defaultDueDate
+        });
         const kept = readTaskDraft(defaultListId);
         // Against the picker's list rather than the server's, so a tag made
         // seconds ago is still a tag when the draft comes back.
@@ -266,7 +274,10 @@ export function TaskCreateDialog({
 
     /** The same input the panel sends the server, applied to the draft instead. */
     const patch = (input: Record<string, unknown>) =>
-        setDraft((current) => ({ ...current, ...taskOverlay(input, withCreatedTags(directory.current)) }));
+        setDraft((current) => ({
+            ...current,
+            ...taskOverlay(input, withCreatedTags(directory.current))
+        }));
 
     /**
      * The draft as it is drawn. A tag whose creation was refused comes back off
@@ -307,7 +318,10 @@ export function TaskCreateDialog({
      */
     useEffect(() => {
         if (!open || !worthKeeping) return;
-        const timer = setTimeout(() => writeTaskDraft({ ...toDraft(shown), at: Date.now() }), SAVE_AFTER_MS);
+        const timer = setTimeout(
+            () => writeTaskDraft({ ...toDraft(shown), at: Date.now() }),
+            SAVE_AFTER_MS
+        );
         return () => clearTimeout(timer);
     }, [open, shown, worthKeeping]);
 
@@ -333,8 +347,11 @@ export function TaskCreateDialog({
         onClose();
     };
 
-    const nameIssue = draft.name.trim() ? core.taskName.safeParse(draft.name).error?.issues[0]?.message : null;
-    const canSubmit = draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
+    const nameIssue = draft.name.trim()
+        ? core.taskName.safeParse(draft.name).error?.issues[0]?.message
+        : null;
+    const canSubmit =
+        draft.name.trim().length > 0 && !nameIssue && Boolean(draft.listId) && !saving;
 
     const submit = async () => {
         if (!canSubmit) return;
@@ -375,133 +392,147 @@ export function TaskCreateDialog({
 
     return (
         <>
-        <Dialog open={open} onOpenChange={(next) => (next ? undefined : dismiss())}>
-            {/* Both widths are set: DialogContent's own max-w-lg would otherwise
+            <Dialog open={open} onOpenChange={(next) => (next ? undefined : dismiss())}>
+                {/* Both widths are set: DialogContent's own max-w-lg would otherwise
                 cap this at a third of what the rows were laid out for. */}
-            <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
-                <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
-                    <DialogTitle className="text-sm font-medium">New task</DialogTitle>
-                    <span className="text-xs text-muted-foreground">in</span>
-                    <Select
-                        value={draft.listId}
-                        // The draft is filed under the list it is going into, so
-                        // moving it leaves nothing behind to be offered back in
-                        // the list it came from.
-                        onValueChange={(listId) => {
-                            clearTaskDraft(draft.listId);
-                            setDraft((current) => ({ ...current, listId }));
-                        }}
-                        options={lists.map((list) => ({ value: list.id, label: list.name }))}
-                        aria-label="List"
-                        className="h-7 w-48 text-xs"
-                    />
-                </header>
-
-                <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
-                    <div className="flex flex-col gap-1">
-                        <TaskNameField
-                            autoFocus
-                            value={draft.name}
-                            aria-label="Task name"
-                            placeholder="What needs doing?"
-                            onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                            // Enter finishes from the name box, which is where most
-                            // of these are done.
-                            onEnter={() => void submit()}
-                            className="placeholder:text-muted-foreground"
+                <DialogContent className="flex max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] flex-col gap-0 overflow-hidden p-0">
+                    <header className="flex flex-wrap items-center gap-2 border-b border-border py-3 pl-5 pr-14">
+                        <DialogTitle className="text-sm font-medium">New task</DialogTitle>
+                        <span className="text-xs text-muted-foreground">in</span>
+                        <Select
+                            value={draft.listId}
+                            // The draft is filed under the list it is going into, so
+                            // moving it leaves nothing behind to be offered back in
+                            // the list it came from.
+                            onValueChange={(listId) => {
+                                clearTaskDraft(draft.listId);
+                                setDraft((current) => ({ ...current, listId }));
+                            }}
+                            options={lists.map((list) => ({ value: list.id, label: list.name }))}
+                            aria-label="List"
+                            className="h-7 w-48 text-xs"
                         />
-                        {nameIssue && <p className="text-xs text-danger">{nameIssue}</p>}
+                    </header>
+
+                    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-5">
+                        <div className="flex flex-col gap-1">
+                            <TaskNameField
+                                autoFocus
+                                value={draft.name}
+                                aria-label="Task name"
+                                placeholder="What needs doing?"
+                                onChange={(event) =>
+                                    setDraft((current) => ({
+                                        ...current,
+                                        name: event.target.value
+                                    }))
+                                }
+                                // Enter finishes from the name box, which is where most
+                                // of these are done.
+                                onEnter={() => void submit()}
+                                className="placeholder:text-muted-foreground"
+                            />
+                            {nameIssue && <p className="text-xs text-danger">{nameIssue}</p>}
+                        </div>
+
+                        <PropertyRows
+                            task={shown}
+                            context={context}
+                            running={false}
+                            waitingOn={0}
+                            // Nothing has been tracked against a task that does not
+                            // exist, and offering to start a timer on one is a button
+                            // that cannot do what it says.
+                            timer={false}
+                            patch={patch}
+                            onChanged={() => undefined}
+                            onError={setError}
+                            // A tag belongs to one space, so a screen that spans them
+                            // all offers finding rather than creating.
+                            onCreateTag={(name) =>
+                                spaceId
+                                    ? tagBook.create(name, tagColorFor(name))
+                                    : Promise.resolve(null)
+                            }
+                        />
+
+                        <section className="flex flex-col gap-1 border-t border-border pt-4">
+                            <h3 className="text-sm font-medium">Description</h3>
+                            <RichTextEditor
+                                value={draft.description}
+                                placeholder="What does done look like? Type / for a block, @ for somebody, # for a task."
+                                onChange={(description) =>
+                                    setDraft((current) => ({ ...current, description }))
+                                }
+                            />
+                        </section>
+
+                        {error && (
+                            <p
+                                role="alert"
+                                className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                            >
+                                {error}
+                            </p>
+                        )}
                     </div>
 
-                    <PropertyRows
-                        task={shown}
-                        context={context}
-                        running={false}
-                        waitingOn={0}
-                        // Nothing has been tracked against a task that does not
-                        // exist, and offering to start a timer on one is a button
-                        // that cannot do what it says.
-                        timer={false}
-                        patch={patch}
-                        onChanged={() => undefined}
-                        onError={setError}
-                        // A tag belongs to one space, so a screen that spans them
-                        // all offers finding rather than creating.
-                        onCreateTag={(name) => (spaceId ? tagBook.create(name, tagColorFor(name)) : Promise.resolve(null))}
-                    />
+                    <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+                        {restored && (
+                            <span className="mr-auto text-xs text-muted-foreground">
+                                Picked up where you left off.{" "}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        clearTaskDraft(defaultListId);
+                                        setRestored(false);
+                                        setDraft(
+                                            blank(defaultListId, firstStatus, {
+                                                name: defaultName,
+                                                dueDate: defaultDueDate
+                                            })
+                                        );
+                                    }}
+                                    className="underline hover:text-foreground"
+                                >
+                                    Start again
+                                </button>
+                            </span>
+                        )}
+                        <Button variant="ghost" onClick={dismiss} disabled={saving}>
+                            Cancel
+                        </Button>
+                        <Button onClick={() => void submit()} disabled={!canSubmit}>
+                            {saving ? "Creating" : "Create task"}
+                        </Button>
+                    </footer>
+                </DialogContent>
+            </Dialog>
 
-                    <section className="flex flex-col gap-1 border-t border-border pt-4">
-                        <h3 className="text-sm font-medium">Description</h3>
-                        <RichTextEditor
-                            value={draft.description}
-                            placeholder="What does done look like? Type / for a block, @ for somebody, # for a task."
-                            onChange={(description) => setDraft((current) => ({ ...current, description }))}
-                        />
-                    </section>
-
-                    {error && (
-                        <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
-                            {error}
-                        </p>
-                    )}
-                </div>
-
-                <footer className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
-                    {restored && (
-                        <span className="mr-auto text-xs text-muted-foreground">
-                            Picked up where you left off.{" "}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    clearTaskDraft(defaultListId);
-                                    setRestored(false);
-                                    setDraft(
-                                        blank(defaultListId, firstStatus, {
-                                            name: defaultName,
-                                            dueDate: defaultDueDate
-                                        })
-                                    );
-                                }}
-                                className="underline hover:text-foreground"
-                            >
-                                Start again
-                            </button>
-                        </span>
-                    )}
-                    <Button variant="ghost" onClick={dismiss} disabled={saving}>
-                        Cancel
-                    </Button>
-                    <Button onClick={() => void submit()} disabled={!canSubmit}>
-                        {saving ? "Creating" : "Create task"}
-                    </Button>
-                </footer>
-            </DialogContent>
-        </Dialog>
-
-        {/* Three answers, because there are three. Keeping the draft is the
+            {/* Three answers, because there are three. Keeping the draft is the
             middle one and the one most people want; throwing it away is
             deliberately the plain button rather than the loud one, since a
             dismissed dialog is usually a misclick and not a decision. */}
-        <Dialog open={asking} onOpenChange={(next) => (next ? undefined : setAsking(false))}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>Keep this draft?</DialogTitle>
-                    <DialogDescription>
-                        It stays in this browser and is offered back the next time you write a task
-                        in this list.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogFooter className="gap-2">
-                    <Button variant="ghost" onClick={throwAway}>
-                        Discard it
-                    </Button>
-                    <Button variant="outline" onClick={() => setAsking(false)}>
-                        Keep writing
-                    </Button>
-                    <Button onClick={keepDraft}>Save draft</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            <Dialog open={asking} onOpenChange={(next) => (next ? undefined : setAsking(false))}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Keep this draft?</DialogTitle>
+                        <DialogDescription>
+                            It stays in this browser and is offered back the next time you write a
+                            task in this list.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button variant="ghost" onClick={throwAway}>
+                            Discard it
+                        </Button>
+                        <Button variant="outline" onClick={() => setAsking(false)}>
+                            Keep writing
+                        </Button>
+                        <Button onClick={keepDraft}>Save draft</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

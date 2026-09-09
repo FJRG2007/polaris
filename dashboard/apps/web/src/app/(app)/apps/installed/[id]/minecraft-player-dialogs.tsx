@@ -89,7 +89,9 @@ export function ExperienceDialog({
         <PlayerFormDialog
             title={`${player}'s experience`}
             description="Applied to the player standing on the server, so they see it happen."
-            confirmLabel={mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"}
+            confirmLabel={
+                mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"
+            }
             ready={amount >= 0}
             pending={pending}
             error={error}
@@ -128,7 +130,12 @@ export function ExperienceDialog({
                         aria-label="How much"
                         className="w-28"
                         onChange={(event) =>
-                            setAmount(Math.max(0, Math.min(MAX_EXPERIENCE, Number(event.target.value) || 0)))
+                            setAmount(
+                                Math.max(
+                                    0,
+                                    Math.min(MAX_EXPERIENCE, Number(event.target.value) || 0)
+                                )
+                            )
                         }
                     />
                     <Select
@@ -246,7 +253,7 @@ export function InventoryDialog({
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+            <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{player}&apos;s inventory</DialogTitle>
                     <DialogDescription>
@@ -530,7 +537,7 @@ export function HistoryDialog({
                         Nothing in the log this far back.
                     </p>
                 ) : (
-                    <ul className="max-h-80 divide-y divide-border overflow-y-auto text-sm">
+                    <ul className="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain text-sm">
                         {newestFirst.map((event, index) => (
                             <li
                                 key={`${event.at ?? "unknown"}-${event.kind}-${index}`}

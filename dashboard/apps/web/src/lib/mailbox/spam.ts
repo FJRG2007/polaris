@@ -27,11 +27,12 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
-import { senderReputation } from "./sender-reputation";
 import { findFolderForRole } from "./folder-roles";
+import { senderReputation } from "./sender-reputation";
 
 /** What a message needs to say about itself to be judged. Everything is already
- *  on the row: no body is fetched, so this costs one read. */
+ *  on the row: nothing is fetched from the mail server here, so this costs one
+ *  read. */
 const JUDGE_SELECT = {
     id: true,
     accountId: true,
@@ -68,10 +69,41 @@ type JudgeRow = {
     attachments: { name: string }[];
 };
 
-/** The row, in the shape the pure judge reads. */
-function judgeable(row: JudgeRow): core.JudgeableMessage {
+/** How much of an arriving message the judge is given. The same window the pure
+ *  judge reads for the wording that asks for an account, so the two agree on how
+ *  far into a message the evidence can be. */
+const JUDGE_BODY = 4000;
+
+/**
+ * The first kilobytes of an arriving message, in the two halves the judge reads.
+ *
+ * A message being judged has no body on its row yet - bodies are stored the
+ * first time somebody opens the message - and half of what the judge is written
+ * to read lives in one: the links, and the paragraph that asks the reader to go
+ * and confirm their account. Without them the rule that keeps real brand mail
+ * out of Junk - a message that links to the brand is that brand's message -
+ * could never fire, and the filter was reading a subject and a preview line
+ * while its own reasons said it had read more.
+ *
+ * So the part the sync already fetched for the preview is handed straight over.
+ * It costs nothing: it is in memory, it is the same four kilobytes, and no extra
+ * command goes to the mail server for it.
+ */
+function arrivingBody(part: string): { text: string; html: string } {
+    if (!part.trim()) return { text: "", html: "" };
+    // Markup is kept as markup for the link reader, which needs the `href` a
+    // preview would have stripped out, and undressed into words for everything
+    // that reads sentences.
+    const markup = /<[a-z][\s\S]*>/i.test(part);
+    return { text: core.snippetFrom(part, JUDGE_BODY), html: markup ? part : "" };
+}
+
+/** The row, in the shape the pure judge reads. The part is what a message that
+ *  is arriving right now says, for the row that does not carry a body yet. */
+function judgeable(row: JudgeRow, part = ""): core.JudgeableMessage {
     const from = addressesFrom(row.fromJson)[0];
     const replyTo = addressesFrom(row.replyToJson)[0];
+    const arriving = arrivingBody(part);
     return {
         subject: row.subject,
         fromAddress: from?.address ?? "",
@@ -79,8 +111,8 @@ function judgeable(row: JudgeRow): core.JudgeableMessage {
         replyToAddress: replyTo?.address ?? "",
         toAddresses: addressesFrom(row.toJson).map((one) => one.address),
         snippet: row.snippet,
-        bodyText: row.bodyText ?? "",
-        bodyHtml: row.bodyHtml ?? "",
+        bodyText: row.bodyText ?? arriving.text,
+        bodyHtml: row.bodyHtml ?? arriving.html,
         listId: row.listId,
         hasAttachments: row.hasAttachments,
         attachmentNames: row.attachments.map((one) => one.name),
@@ -212,8 +244,17 @@ async function knowledgeFor(
  *
  * Never throws, and answers false when it fails. A filter that breaks has to
  * break as a message nobody judged, not as a folder that stopped syncing.
+ *
+ * `part` is what the sync has just read off the server for this message's
+ * preview, passed on so the judge sees the links and the paragraph it is written
+ * to read. Optional, and an empty one is a judgement on the subject and the
+ * preview alone - which is what this was before it was passed.
  */
-export async function judgeArrival(accountId: string, messageId: string): Promise<boolean> {
+export async function judgeArrival(
+    accountId: string,
+    messageId: string,
+    part = ""
+): Promise<boolean> {
     try {
         const account = await prisma.mailAccount.findUnique({
             where: { id: accountId },
@@ -227,7 +268,7 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
         })) as JudgeRow | null;
         if (!row) return false;
 
-        const message = judgeable(row);
+        const message = judgeable(row, part);
         const fingerprint = core.spamFingerprint(message);
         const judged = core.judgeSpam(message, await knowledgeFor(accountId, message, fingerprint));
 

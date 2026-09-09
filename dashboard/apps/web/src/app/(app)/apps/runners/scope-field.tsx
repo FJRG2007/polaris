@@ -19,7 +19,12 @@ import type { RunnerScopeInput } from "@polaris/core";
 import { RepoPicker } from "@/components/repo-picker";
 import { Badge, Checkbox, Input, Select } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { githubReposAction, previewScopeAction, runnerPrincipalsAction, searchGithubReposAction } from "./actions";
+import {
+    githubReposAction,
+    previewScopeAction,
+    runnerPrincipalsAction,
+    searchGithubReposAction
+} from "./actions";
 
 const SCOPE_OPTIONS = [
     { value: "repo", label: "One repository" },
@@ -46,7 +51,13 @@ export interface ScopeState {
     groupId: string;
 }
 
-export const EMPTY_SCOPE: ScopeState = { kind: "repo", repos: [], owner: "", userIds: [], groupId: "" };
+export const EMPTY_SCOPE: ScopeState = {
+    kind: "repo",
+    repos: [],
+    owner: "",
+    userIds: [],
+    groupId: ""
+};
 
 /** The scope as the schema wants it, or null when it is not answerable yet. */
 export function toScope(state: ScopeState): RunnerScopeInput | null {
@@ -60,7 +71,9 @@ export function toScope(state: ScopeState): RunnerScopeInput | null {
             return first ? { kind: "repo", ...first } : null;
         }
         case "repos": {
-            const repos = state.repos.map(split).filter((entry): entry is { owner: string; repo: string } => entry !== null);
+            const repos = state.repos
+                .map(split)
+                .filter((entry): entry is { owner: string; repo: string } => entry !== null);
             return repos.length > 0 ? { kind: "repos", repos } : null;
         }
         case "account":
@@ -103,7 +116,9 @@ export function ScopeField({
 
     useEffect(() => {
         if (!needsPeople) return;
-        void runnerPrincipalsAction().then(setPrincipals).catch(() => undefined);
+        void runnerPrincipalsAction()
+            .then(setPrincipals)
+            .catch(() => undefined);
     }, [needsPeople]);
 
     // What it comes to, asked for whenever the answer would change. Debounced,
@@ -123,7 +138,10 @@ export function ScopeField({
             void previewScopeAction(JSON.parse(serialized))
                 .then((result) => {
                     if (!live) return;
-                    const next = { count: result.targets?.length ?? 0, note: result.note ?? result.error ?? null };
+                    const next = {
+                        count: result.targets?.length ?? 0,
+                        note: result.note ?? result.error ?? null
+                    };
                     setPreview(next);
                     onPreview(next);
                 })
@@ -178,7 +196,10 @@ export function ScopeField({
                                         aria-label={`Remove ${full}`}
                                         title="Remove"
                                         onClick={() =>
-                                            onChange({ ...state, repos: state.repos.filter((entry) => entry !== full) })
+                                            onChange({
+                                                ...state,
+                                                repos: state.repos.filter((entry) => entry !== full)
+                                            })
                                         }
                                     >
                                         <X className="size-3" />
@@ -201,8 +222,8 @@ export function ScopeField({
                             />
                             {!connected ? (
                                 <Hint>
-                                    GitHub is not connected, so only public repositories can be found. Connect it under
-                                    Integrations.
+                                    GitHub is not connected, so only public repositories can be
+                                    found. Connect it under Integrations.
                                 </Hint>
                             ) : null}
                         </>
@@ -235,11 +256,17 @@ export function ScopeField({
                     {principals === null ? (
                         <Hint>Looking up who has linked a GitHub account...</Hint>
                     ) : principals.people.length === 0 ? (
-                        <Hint>Nobody has linked a GitHub account yet. They do it from their own profile.</Hint>
+                        <Hint>
+                            Nobody has linked a GitHub account yet. They do it from their own
+                            profile.
+                        </Hint>
                     ) : (
-                        <ul className="max-h-40 overflow-y-auto rounded-md border border-border/60">
+                        <ul className="max-h-40 overflow-y-auto overscroll-contain rounded-md border border-border/60">
                             {principals.people.map((person) => (
-                                <li key={person.userId} className="flex items-center gap-2 px-3 py-1.5">
+                                <li
+                                    key={person.userId}
+                                    className="flex items-center gap-2 px-3 py-1.5"
+                                >
                                     <Checkbox
                                         checked={state.userIds.includes(person.userId)}
                                         onChange={(event) =>
@@ -247,12 +274,16 @@ export function ScopeField({
                                                 ...state,
                                                 userIds: event.target.checked
                                                     ? [...state.userIds, person.userId]
-                                                    : state.userIds.filter((id) => id !== person.userId)
+                                                    : state.userIds.filter(
+                                                          (id) => id !== person.userId
+                                                      )
                                             })
                                         }
                                     />
                                     <span className="min-w-0 flex-1 truncate">{person.name}</span>
-                                    <span className="shrink-0 text-xs text-muted-foreground">{person.login}</span>
+                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                        {person.login}
+                                    </span>
                                 </li>
                             ))}
                         </ul>
@@ -276,7 +307,10 @@ export function ScopeField({
                             }))}
                         />
                     )}
-                    <Hint>Membership is read every time, so somebody added to the group is served without editing this.</Hint>
+                    <Hint>
+                        Membership is read every time, so somebody added to the group is served
+                        without editing this.
+                    </Hint>
                 </label>
             ) : null}
 

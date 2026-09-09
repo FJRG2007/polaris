@@ -35,12 +35,13 @@ export default function NotFound() {
                     <p className="font-mono text-xs text-muted-foreground">404</p>
                     <h1 className="text-sm font-medium">There is nothing at this address</h1>
                     <p className="text-sm text-muted-foreground">
-                        The link may be out of date, or the thing it pointed at may have been removed.
+                        The link may be out of date, or the thing it pointed at may have been
+                        removed.
                     </p>
                 </div>
 
                 {pathname ? (
-                    <p className="overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
+                    <p className="overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                         {pathname}
                     </p>
                 ) : null}

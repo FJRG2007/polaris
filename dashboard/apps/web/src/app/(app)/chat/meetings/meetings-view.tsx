@@ -64,7 +64,7 @@ export function MeetingsView() {
     }, [load]);
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
             <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
                 <Video className="size-4 shrink-0 text-muted-foreground" />
                 <h1 className="min-w-0 flex-1 truncate text-sm font-medium">Meetings</h1>
@@ -78,8 +78,8 @@ export function MeetingsView() {
 
             <div className="flex flex-col gap-3 p-4">
                 <p className="text-xs text-muted-foreground">
-                    A room with a link anybody can open, whether or not they have a Polaris
-                    account. Whoever creates one hosts it.
+                    A room with a link anybody can open, whether or not they have a Polaris account.
+                    Whoever creates one hosts it.
                 </p>
 
                 {error && (
@@ -309,7 +309,11 @@ function NewMeetingDialog({
                     <Button variant="secondary" size="sm" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={busy || !title.trim()} onClick={() => void create()}>
+                    <Button
+                        size="sm"
+                        disabled={busy || !title.trim()}
+                        onClick={() => void create()}
+                    >
                         {busy && <Loader2 className="size-4 animate-spin" />}
                         Create
                     </Button>

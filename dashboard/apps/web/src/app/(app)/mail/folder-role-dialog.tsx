@@ -22,7 +22,15 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FolderPlus, Loader2 } from "lucide-react";
 import { createFolderForRoleAction, setFolderRoleAction } from "./actions";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    cn,
+    useToast
+} from "@polaris/ui";
 
 /** What an action asked for and could not find. */
 export interface MissingFolderRole {
@@ -51,7 +59,9 @@ export function FolderRoleDialog({
     // The account's own folders, minus the ones already spoken for, so the list
     // is the plausible answers rather than everything.
     const candidates = folders.filter(
-        (folder) => folder.accountId === missing.accountId && (folder.role === "none" || folder.role === missing.role)
+        (folder) =>
+            folder.accountId === missing.accountId &&
+            (folder.role === "none" || folder.role === missing.role)
     );
 
     function settle(run: () => Promise<unknown>): void {
@@ -76,13 +86,13 @@ export function FolderRoleDialog({
                 </DialogHeader>
 
                 <p className="text-[13px] text-muted-foreground">
-                    {account?.address ?? "This mailbox"} does not have a folder Polaris recognises as its{" "}
-                    {label.toLowerCase()}. Point at the one you already use and it will remember, on this mailbox
-                    and through every later check.
+                    {account?.address ?? "This mailbox"} does not have a folder Polaris recognises
+                    as its {label.toLowerCase()}. Point at the one you already use and it will
+                    remember, on this mailbox and through every later check.
                 </p>
 
                 {candidates.length > 0 ? (
-                    <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                    <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto overscroll-contain">
                         {candidates.map((folder) => (
                             <li key={folder.id}>
                                 <button
@@ -112,13 +122,17 @@ export function FolderRoleDialog({
                         disabled={!chosen || working}
                         onClick={() => settle(() => setFolderRoleAction(chosen, missing.role))}
                     >
-                        {working ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                        {working ? (
+                            <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                        ) : null}
                         Use this one
                     </Button>
                     <Button
                         variant="secondary"
                         disabled={working}
-                        onClick={() => settle(() => createFolderForRoleAction(missing.accountId, missing.role))}
+                        onClick={() =>
+                            settle(() => createFolderForRoleAction(missing.accountId, missing.role))
+                        }
                     >
                         <FolderPlus className="size-4 shrink-0" aria-hidden />
                         Make one on the mail server
@@ -128,8 +142,8 @@ export function FolderRoleDialog({
                     </Button>
                 </div>
                 <p className="mt-2 text-[12px] text-foreground-subtle">
-                    Making one adds a folder to your mail server, which you will see in every other mail client
-                    you use.
+                    Making one adds a folder to your mail server, which you will see in every other
+                    mail client you use.
                 </p>
             </DialogContent>
         </Dialog>

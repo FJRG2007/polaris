@@ -111,7 +111,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
     };
     const checked = createRunnerPoolSchema.safeParse(draft);
     const issue = (field: string): string | null =>
-        checked.success ? null : (checked.error.issues.find((entry) => entry.path[0] === field)?.message ?? null);
+        checked.success
+            ? null
+            : (checked.error.issues.find((entry) => entry.path[0] === field)?.message ?? null);
 
     // Ask the machine what it can offer as soon as one is picked. A stale answer is
     // worse than none, so it is cleared while the next one is being fetched.
@@ -149,13 +151,18 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
 
     const onPreview = useCallback((result: { count: number }) => setScopeCount(result.count), []);
 
-    const containersAvailable = readiness !== null && readiness.platform === "linux" && readiness.containerEngine;
+    const containersAvailable =
+        readiness !== null && readiness.platform === "linux" && readiness.containerEngine;
     // The local box has no login to give a job a directory under, so a clean
     // workspace is not one of its options rather than a worse one.
     const workspaceAvailable = readiness === null || readiness.reach === "login";
     const isolationOptions = [
         { value: "container", label: "Its own container", disabled: !containersAvailable },
-        { value: "workspace", label: "A clean directory on the machine", disabled: !workspaceAvailable }
+        {
+            value: "workspace",
+            label: "A clean directory on the machine",
+            disabled: !workspaceAvailable
+        }
     ];
     const ceiling = readiness?.recommended ?? MAX_RUNNER_CONCURRENCY;
     const overCapacity = readiness !== null && Number(maxConcurrent) > readiness.recommended;
@@ -229,11 +236,12 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <Plus className="size-4" /> Add a pool
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>New runner pool</DialogTitle>
                     <DialogDescription>
-                        Polaris keeps runners waiting on one of your servers. Workflows reach them with
+                        Polaris keeps runners waiting on one of your servers. Workflows reach them
+                        with
                         <code className="mx-1 font-mono text-xs">runs-on</code>.
                     </DialogDescription>
                 </DialogHeader>
@@ -249,7 +257,11 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                                 label: entry.local ? `${entry.name} (this machine)` : entry.name
                             }))}
                         />
-                        <MachineNote probing={probing} readiness={readiness} local={server?.local ?? false} />
+                        <MachineNote
+                            probing={probing}
+                            readiness={readiness}
+                            local={server?.local ?? false}
+                        />
                     </Field>
 
                     <ScopeField state={scope} onChange={setScope} onPreview={onPreview} />
@@ -257,8 +269,8 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     {spread ? (
                         <Hint>
                             {scopeCount} repositories share {maxConcurrent}{" "}
-                            {Number(maxConcurrent) === 1 ? "runner" : "runners"}. Whoever has a job queued gets them
-                            first; the rest wait.
+                            {Number(maxConcurrent) === 1 ? "runner" : "runners"}. Whoever has a job
+                            queued gets them first; the rest wait.
                         </Hint>
                     ) : null}
 
@@ -273,7 +285,9 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                             aria-expanded={advanced}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40"
                         >
-                            <ChevronRight className={`size-4 shrink-0 transition-transform ${advanced ? "rotate-90" : ""}`} />
+                            <ChevronRight
+                                className={`size-4 shrink-0 transition-transform ${advanced ? "rotate-90" : ""}`}
+                            />
                             <span className="font-medium">Advanced</span>
                             {advanced ? null : (
                                 <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
@@ -284,117 +298,144 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
 
                         {advanced ? (
                             <div className="flex flex-col gap-3 border-t border-border/60 p-3">
-                    <Field label="Name" error={name ? issue("name") : null}>
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder={proposedName}
-                        />
-                    </Field>
+                                <Field label="Name" error={name ? issue("name") : null}>
+                                    <Input
+                                        value={name}
+                                        onChange={(event) => setName(event.target.value)}
+                                        placeholder={proposedName}
+                                    />
+                                </Field>
 
-                    <Field label="Labels" error={issue("labels")}>
-                        <Input value={labels} onChange={(event) => setLabels(event.target.value)} />
-                        <Hint>
-                            Comma separated. A workflow lands here when its{" "}
-                            <code className="font-mono text-xs">runs-on</code> asks for these.
-                        </Hint>
-                    </Field>
+                                <Field label="Labels" error={issue("labels")}>
+                                    <Input
+                                        value={labels}
+                                        onChange={(event) => setLabels(event.target.value)}
+                                    />
+                                    <Hint>
+                                        Comma separated. A workflow lands here when its{" "}
+                                        <code className="font-mono text-xs">runs-on</code> asks for
+                                        these.
+                                    </Hint>
+                                </Field>
 
-                    <div className="flex gap-2">
-                        <Field
-                            label="Jobs at once"
-                            error={
-                                overCapacity
-                                    ? `This machine is worth about ${readiness?.recommended}`
-                                    : issue("maxConcurrent")
-                            }
-                            className="w-32"
-                        >
-                            <Input
-                                type="number"
-                                min={1}
-                                max={Math.min(ceiling, MAX_RUNNER_CONCURRENCY)}
-                                inputMode="numeric"
-                                value={maxConcurrent}
-                                onChange={(event) => {
-                                    setTouchedConcurrency(true);
-                                    setMaxConcurrent(event.target.value);
-                                }}
-                            />
-                        </Field>
-                        <Field label="Each job runs in" className="flex-1">
-                            <Select
-                                value={isolation}
-                                onValueChange={(value) => setIsolation(value as RunnerIsolation)}
-                                options={isolationOptions}
-                                disabled={readiness === null}
-                            />
-                            <IsolationNote
-                                isolation={isolation}
-                                available={containersAvailable}
-                                local={server?.local ?? false}
-                            />
-                        </Field>
-                    </div>
+                                <div className="flex gap-2">
+                                    <Field
+                                        label="Jobs at once"
+                                        error={
+                                            overCapacity
+                                                ? `This machine is worth about ${readiness?.recommended}`
+                                                : issue("maxConcurrent")
+                                        }
+                                        className="w-32"
+                                    >
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={Math.min(ceiling, MAX_RUNNER_CONCURRENCY)}
+                                            inputMode="numeric"
+                                            value={maxConcurrent}
+                                            onChange={(event) => {
+                                                setTouchedConcurrency(true);
+                                                setMaxConcurrent(event.target.value);
+                                            }}
+                                        />
+                                    </Field>
+                                    <Field label="Each job runs in" className="flex-1">
+                                        <Select
+                                            value={isolation}
+                                            onValueChange={(value) =>
+                                                setIsolation(value as RunnerIsolation)
+                                            }
+                                            options={isolationOptions}
+                                            disabled={readiness === null}
+                                        />
+                                        <IsolationNote
+                                            isolation={isolation}
+                                            available={containersAvailable}
+                                            local={server?.local ?? false}
+                                        />
+                                    </Field>
+                                </div>
 
-                    <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">Limits</span>
-                        <Hint>Per repository. Leave a field empty for no limit of that kind.</Hint>
+                                <div className="flex flex-col gap-2">
+                                    <span className="text-sm font-medium">Limits</span>
+                                    <Hint>
+                                        Per repository. Leave a field empty for no limit of that
+                                        kind.
+                                    </Hint>
 
-                        <div className="flex gap-2">
-                            <Field label="At once" className="w-24" error={issue("limits")}>
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    max={MAX_RUNNER_CONCURRENCY}
-                                    inputMode="numeric"
-                                    value={perTarget}
-                                    placeholder="Any"
-                                    onChange={(event) => setPerTarget(event.target.value)}
-                                />
-                            </Field>
-                            <Field label="Minutes" className="w-28">
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    inputMode="numeric"
-                                    value={minutes}
-                                    placeholder="Any"
-                                    onChange={(event) => setMinutes(event.target.value)}
-                                />
-                            </Field>
-                            <Field label="Per" className="w-28">
-                                <Select
-                                    value={window}
-                                    onValueChange={(value) => setWindow(value as RunnerWindow)}
-                                    options={[
-                                        { value: "day", label: "Day" },
-                                        { value: "month", label: "Month" }
-                                    ]}
-                                />
-                            </Field>
-                            <Field label="Jobs a day" className="flex-1">
-                                <Input
-                                    type="number"
-                                    min={1}
-                                    inputMode="numeric"
-                                    value={jobsPerDay}
-                                    placeholder="Any"
-                                    onChange={(event) => setJobsPerDay(event.target.value)}
-                                />
-                            </Field>
-                        </div>
+                                    <div className="flex gap-2">
+                                        <Field
+                                            label="At once"
+                                            className="w-24"
+                                            error={issue("limits")}
+                                        >
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={MAX_RUNNER_CONCURRENCY}
+                                                inputMode="numeric"
+                                                value={perTarget}
+                                                placeholder="Any"
+                                                onChange={(event) =>
+                                                    setPerTarget(event.target.value)
+                                                }
+                                            />
+                                        </Field>
+                                        <Field label="Minutes" className="w-28">
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                inputMode="numeric"
+                                                value={minutes}
+                                                placeholder="Any"
+                                                onChange={(event) => setMinutes(event.target.value)}
+                                            />
+                                        </Field>
+                                        <Field label="Per" className="w-28">
+                                            <Select
+                                                value={window}
+                                                onValueChange={(value) =>
+                                                    setWindow(value as RunnerWindow)
+                                                }
+                                                options={[
+                                                    { value: "day", label: "Day" },
+                                                    { value: "month", label: "Month" }
+                                                ]}
+                                            />
+                                        </Field>
+                                        <Field label="Jobs a day" className="flex-1">
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                inputMode="numeric"
+                                                value={jobsPerDay}
+                                                placeholder="Any"
+                                                onChange={(event) =>
+                                                    setJobsPerDay(event.target.value)
+                                                }
+                                            />
+                                        </Field>
+                                    </div>
 
-                        <Field label="When a repository runs out">
-                            <Select
-                                value={onExhausted}
-                                onValueChange={(value) => setOnExhausted(value as RunnerExhaustedAction)}
-                                options={[
-                                    { value: "pause", label: "Stop serving it until the window turns over" },
-                                    { value: "warn", label: "Keep serving it, and say so on the pool" }
-                                ]}
-                            />
-                        </Field>
+                                    <Field label="When a repository runs out">
+                                        <Select
+                                            value={onExhausted}
+                                            onValueChange={(value) =>
+                                                setOnExhausted(value as RunnerExhaustedAction)
+                                            }
+                                            options={[
+                                                {
+                                                    value: "pause",
+                                                    label: "Stop serving it until the window turns over"
+                                                },
+                                                {
+                                                    value: "warn",
+                                                    label: "Keep serving it, and say so on the pool"
+                                                }
+                                            ]}
+                                        />
+                                    </Field>
                                 </div>
                             </div>
                         ) : null}
@@ -407,7 +448,13 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <div className="mt-1 flex justify-end">
                         <Button
                             onClick={() => void submit()}
-                            disabled={pending || !checked.success || probing || overCapacity || scopeCount === 0}
+                            disabled={
+                                pending ||
+                                !checked.success ||
+                                probing ||
+                                overCapacity ||
+                                scopeCount === 0
+                            }
                         >
                             {pending ? "Creating..." : "Create the pool"}
                         </Button>
@@ -456,7 +503,8 @@ function MachineNote({
 }) {
     if (probing) return <Hint>Asking the server what it can run...</Hint>;
     if (!readiness) return null;
-    if (readiness.unsupported) return <span className="text-xs text-danger">{readiness.unsupported}</span>;
+    if (readiness.unsupported)
+        return <span className="text-xs text-danger">{readiness.unsupported}</span>;
     return (
         <Hint>
             {readiness.platform} on {readiness.arch}
@@ -480,15 +528,26 @@ function IsolationNote({
     local: boolean;
 }) {
     if (isolation === "container") {
-        return <Hint>Nothing survives the job. Steps that need a container engine of their own will not work.</Hint>;
+        return (
+            <Hint>
+                Nothing survives the job. Steps that need a container engine of their own will not
+                work.
+            </Hint>
+        );
     }
     if (local) {
-        return <Hint>Not available here: Polaris reaches this machine through its container engine only.</Hint>;
+        return (
+            <Hint>
+                Not available here: Polaris reaches this machine through its container engine only.
+            </Hint>
+        );
     }
     return (
         <Hint>
             An empty directory, not a boundary: a job can reach whatever the Polaris login can.
-            {available ? "" : " Add the container engine to this machine's Polaris login to isolate jobs properly."}
+            {available
+                ? ""
+                : " Add the container engine to this machine's Polaris login to isolate jobs properly."}
         </Hint>
     );
 }

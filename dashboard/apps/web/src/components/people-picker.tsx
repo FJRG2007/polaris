@@ -166,7 +166,7 @@ export function PeoplePicker({
                     </p>
                 )}
 
-                <ul className="max-h-48 overflow-y-auto">
+                <ul className="max-h-48 overflow-y-auto overscroll-contain">
                     {offered.length === 0 ? (
                         <li className="px-2 py-2 text-xs text-muted-foreground">
                             {query.trim().length < SHORTEST
