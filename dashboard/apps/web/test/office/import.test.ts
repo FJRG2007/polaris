@@ -15,6 +15,7 @@ import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 import { OFFICE_FIELDS } from "@/lib/office/content";
 import { exportDocument } from "@/lib/office/export";
+import { readSheetCellKey } from "@/lib/office/sheet";
 import { importFile, importableKind, OfficeImportError } from "@/lib/office/import";
 
 const utf8 = new TextEncoder();
@@ -105,6 +106,23 @@ async function wordDocument(body: string): Promise<Uint8Array> {
 /** One numbered paragraph, under the numbering `numId` names. */
 function numbered(numId: string, text: string): string {
     return `<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="${numId}"/></w:numPr></w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`;
+}
+
+/** A package that arrives small and unpacks to more memory than there is. One
+ *  entry of nothing at all, which deflates to a few kilobytes and declares the
+ *  size it becomes in the directory every zip carries. */
+async function zipBomb(): Promise<Uint8Array> {
+    const zip = new JSZip();
+    zip.file("word/document.xml", new Uint8Array(96 * 1024 * 1024));
+    return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+
+/** The workbook shape the importer wrote, as the browser would read it back -
+ *  through the same encoding, because that is where a key can still be lost. */
+function shapeOf(update: Uint8Array): { sheets: Record<string, { name?: string }> } {
+    return opened(update)
+        .getMap<{ sheets: Record<string, { name?: string }> }>(OFFICE_FIELDS.sheet.shape)
+        .get("workbook")!;
 }
 
 /** What the exporter makes of what the importer wrote. */
@@ -202,6 +220,70 @@ describe("a spreadsheet", () => {
             OfficeImportError
         );
     });
+
+    it("refuses a package by what it unpacks to rather than by what arrived", async () => {
+        // A few kilobytes on the wire and a hundred megabytes once opened. The
+        // refusal has to come out of the size the package declares: a check
+        // that runs after the reader has built the thing runs after the memory
+        // is already gone.
+        const bytes = await zipBomb();
+        expect(bytes.length).toBeLessThan(1024 * 1024);
+        // By that sentence and not another: every reader here refuses an
+        // unreadable file too, and a refusal that arrives after the hundred
+        // megabytes were allocated is the bug rather than the fix.
+        const unpacked = /unpacks to more than Polaris opens/;
+        await expect(importFile("Bomb.xlsx", bytes)).rejects.toThrow(unpacked);
+        await expect(importFile("Bomb.docx", bytes)).rejects.toThrow(unpacked);
+    });
+
+    it("keeps a sheet whose name is a key no plain object can hold", async () => {
+        // Excel allows "__proto__" as a sheet name, and assigning it as a key
+        // sets an object's prototype instead of giving it that key - so the
+        // sheet disappears and the shape reaches every reader's browser as
+        // something that writes onto Object.prototype.
+        const book = {
+            SheetNames: ["__proto__"],
+            Sheets: Object.fromEntries([["__proto__", XLSX.utils.aoa_to_sheet([["hi"]])]])
+        } as XLSX.WorkBook;
+        const bytes = new Uint8Array(XLSX.write(book, { type: "array", bookType: "xlsx" }));
+
+        const imported = await importFile("Odd.xlsx", bytes);
+        const shape = shapeOf(imported.update);
+        const ids = Object.keys(shape.sheets);
+        expect(ids).toHaveLength(1);
+        expect(Object.getPrototypeOf(shape.sheets)).toBe(Object.prototype);
+        expect(({} as { cellData?: unknown }).cellData).toBeUndefined();
+
+        // And the cells went in under the same id the shape declares, which is
+        // the whole of what makes the sheet open with anything in it.
+        const keys = [...opened(imported.update).getMap(OFFICE_FIELDS.sheet.cells).keys()];
+        expect(keys.map((key) => readSheetCellKey(key)?.sheetId)).toEqual([ids[0]]);
+    });
+
+    it("brings a formula in as a formula rather than as the number it last was", async () => {
+        const sheet = {
+            "!ref": "A1:A3",
+            A1: { t: "n", v: 2 },
+            A2: { t: "n", v: 3 },
+            A3: { t: "n", v: 5, f: "SUM(A1:A2)" }
+        };
+        const book = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(book, sheet as XLSX.WorkSheet, "S");
+        const bytes = new Uint8Array(XLSX.write(book, { type: "array", bookType: "xlsx" }));
+
+        const imported = await importFile("Budget.xlsx", bytes);
+        const cells = opened(imported.update).getMap<{ v?: unknown; f?: string }>(
+            OFFICE_FIELDS.sheet.cells
+        );
+        expect(cells.get("S:2:0")).toEqual({ v: 5, f: "=SUM(A1:A2)" });
+        // The value is still beside it, because that is what every exporter
+        // reads and nothing here recalculates.
+        expect((await roundTrip("Budget.xlsx", bytes, "csv")).trim().split(/\r?\n/)).toEqual([
+            "2",
+            "3",
+            "5"
+        ]);
+    });
 });
 
 describe("a document", () => {
@@ -282,6 +364,45 @@ describe("a document", () => {
             .filter((node): node is Y.XmlElement => node instanceof Y.XmlElement)
             .map((node) => node.nodeName);
         expect(lists).toEqual(["orderedList", "bulletList"]);
+    });
+
+    it("keeps a numbered list numbered all the way back out of the exporter", async () => {
+        const steps = "1. First\n2. Second\n3. Third\n";
+        const markdownOut = await roundTrip("Steps.md", utf8.encode(steps), "md");
+        expect(markdownOut).toContain("1. First");
+        expect(markdownOut).toContain("2. Second");
+        expect(markdownOut).toContain("3. Third");
+        expect(markdownOut).not.toContain("- First");
+
+        const htmlOut = await roundTrip("Steps.md", utf8.encode(steps), "html");
+        expect(htmlOut).toContain("<ol>");
+        expect(htmlOut).not.toContain("<ul>");
+    });
+
+    it("keeps it numbered through Word as well, which is where the markers live", async () => {
+        // Out through the real OOXML engine and back in through the numbering
+        // part: the only check that the order survives leaving Polaris.
+        const imported = await importFile("Steps.md", utf8.encode("1. First\n2. Second\n"));
+        const docx = await exportDocument("doc", "Steps", imported.update, "docx");
+        const back = await importFile("Steps.docx", docx?.bytes ?? new Uint8Array());
+        const out = await exportDocument("doc", "Steps", back.update, "md");
+        const text = new TextDecoder().decode(out?.bytes);
+        expect(text).toContain("1. First");
+        expect(text).toContain("2. Second");
+    });
+
+    it("reads a wrapped file as the paragraphs it has, not one per line", async () => {
+        // A soft line break inside a block is not a paragraph break - in
+        // Markdown by the specification, and in a hard-wrapped text file by
+        // what whoever wrapped it meant.
+        const wrapped =
+            "A paragraph that somebody\nwrapped at the width of\ntheir terminal.\n\nThe next one.\n";
+        const out = await roundTrip("Readme.md", utf8.encode(wrapped), "md");
+        const body = out.split(/\r?\n/).filter((line) => line.trim() && !line.startsWith("# "));
+        expect(body).toEqual([
+            "A paragraph that somebody wrapped at the width of their terminal.",
+            "The next one."
+        ]);
     });
 
     it("takes its name from the file, without the extension", async () => {

@@ -32,6 +32,7 @@ import * as Y from "yjs";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import * as core from "@polaris/core";
+import { sheetCellKey } from "./sheet";
 import { OFFICE_FIELDS } from "./content";
 
 /** What came out of a file, ready to become a document. */
@@ -64,6 +65,23 @@ export class OfficeImportError extends Error {
 const MAX_CELLS = 200_000;
 const MAX_ROWS = 100_000;
 const MAX_COLUMNS = 1_024;
+
+/**
+ * How much a packaged file is allowed to become once it is unpacked.
+ *
+ * The ceiling on the way in is on the bytes that ARRIVED, and the whole point
+ * of a zip is that those are the small ones: a sheet of cells deflates about
+ * twentyfold, so a file well inside the upload limit still carries a workbook
+ * with more in it than this machine has the memory to build. A cap checked
+ * after the reader has already built it is not a cap - the process is gone
+ * before it runs.
+ *
+ * So the size is read from the package's own directory, which says what each
+ * entry becomes without inflating any of it, and a package past this is refused
+ * in a sentence.
+ */
+const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+const MAX_ZIP_ENTRIES = 4_096;
 
 /** The levels the editor's own schema knows. A heading deeper than this is not
  *  a heading it can draw: it falls back to the first level, so a document of
@@ -102,7 +120,7 @@ export async function importFile(filename: string, bytes: Uint8Array): Promise<I
     if (bytes.length === 0) throw new OfficeImportError("That file is empty.");
 
     const title = titleOf(filename);
-    if (kind === "sheet") return { kind, title, update: sheetUpdate(title, bytes, filename) };
+    if (kind === "sheet") return { kind, title, update: await sheetUpdate(title, bytes, filename) };
     return { kind, title, update: await docUpdate(filename, bytes) };
 }
 
@@ -122,7 +140,11 @@ export async function importFile(filename: string, bytes: Uint8Array): Promise<I
  * The sheet's own name is its id, which is what `export.ts` reads back when it
  * writes the file out again - so a round trip keeps the tabs somebody named.
  */
-function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8Array {
+async function sheetUpdate(
+    title: string,
+    bytes: Uint8Array,
+    filename: string
+): Promise<Uint8Array> {
     // A modern workbook is a zip, and the reader below is lenient enough to make
     // a one-cell sheet out of anything at all - so a `.xlsx` that is not a zip
     // would open as a spreadsheet containing the first line of whatever it
@@ -132,6 +154,9 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
     if (zipped && !isZip) {
         throw new OfficeImportError(`${filename} is not a spreadsheet Polaris can read.`);
     }
+    // Before the reader is handed the bytes, not after: what it builds out of
+    // them is what there would be no memory left to refuse.
+    if (isZip) await guardPackage(bytes, filename);
 
     let book: XLSX.WorkBook;
     try {
@@ -146,13 +171,14 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
     if (book.SheetNames.length === 0) throw new OfficeImportError("That workbook has no sheets.");
 
     const doc = new Y.Doc();
-    const cells = doc.getMap<{ v: unknown }>(OFFICE_FIELDS.sheet.cells);
-    const sheets: Record<string, unknown> = {};
+    const cells = doc.getMap<SheetCellValue>(OFFICE_FIELDS.sheet.cells);
+    const sheets = new Map<string, unknown>();
     let written = 0;
 
     for (const name of book.SheetNames) {
         const sheet = book.Sheets[name];
         if (!sheet) continue;
+        const id = sheetId(name, sheets);
 
         // The cells the sheet actually carries, which are its own keys - never
         // the range it declares. `!ref` is written as the whole grid,
@@ -162,40 +188,115 @@ function sheetUpdate(title: string, bytes: Uint8Array, filename: string): Uint8A
         let widest = 0;
         for (const address of Object.keys(sheet)) {
             if (!CELL_ADDRESS.test(address)) continue;
-            const value = cellValue(sheet[address] as XLSX.CellObject | undefined);
-            if (value === null) continue;
+            const held = cellContent(sheet[address] as XLSX.CellObject | undefined);
+            if (!held) continue;
             const at = XLSX.utils.decode_cell(address);
             if (at.r >= MAX_ROWS || at.c >= MAX_COLUMNS) throw tooMuch(filename);
             written += 1;
             if (written > MAX_CELLS) throw tooMuch(filename);
-            cells.set(`${name}:${at.r}:${at.c}`, { v: value });
+            cells.set(sheetCellKey(id, at.r, at.c), held);
             tallest = Math.max(tallest, at.r + 1);
             widest = Math.max(widest, at.c + 1);
         }
 
-        sheets[name] = {
-            id: name,
+        sheets.set(id, {
+            id,
             name,
             // The grid the engine draws, not the grid that has something in it:
             // a sheet has to have room under its last row to type in.
             rowCount: Math.max(tallest + 20, 100),
             columnCount: Math.max(widest + 5, 26),
             cellData: {}
-        };
+        });
     }
 
     doc.getMap<unknown>(OFFICE_FIELDS.sheet.shape).set("workbook", {
         id: `import-${Date.now()}`,
         name: title,
-        sheetOrder: book.SheetNames.filter((name) => name in sheets),
-        sheets
+        sheetOrder: [...sheets.keys()],
+        // Built as entries rather than by assignment, because assigning a key
+        // is not the same thing as having one: `sheets["__proto__"] = x` sets
+        // the object's prototype and leaves it with no such key at all.
+        sheets: Object.fromEntries(sheets)
     });
     return Y.encodeStateAsUpdate(doc);
+}
+
+/**
+ * The id a sheet is stored under: its own name, so a round trip keeps the tab
+ * somebody named - except for the one name that cannot be a key.
+ *
+ * `__proto__` is an accessor on every plain object, so a sheet stored under it
+ * is a sheet that vanishes on the way in and, on the way back out, a workbook
+ * whose shape writes onto `Object.prototype` in the browser of everybody who
+ * opens the document. Excel allows the name; this does not, and says so by
+ * numbering it instead of dropping it.
+ */
+function sheetId(name: string, taken: ReadonlyMap<string, unknown>): string {
+    const safe = name === "__proto__" || !name ? `Sheet ${taken.size + 1}` : name;
+    if (!taken.has(safe)) return safe;
+    let at = taken.size + 1;
+    while (taken.has(`${safe} (${at})`)) at += 1;
+    return `${safe} (${at})`;
 }
 
 /** A cell's own key, as a workbook writes one. Everything else in the object is
  *  the sheet's metadata, which is named with a leading `!`. */
 const CELL_ADDRESS = /^[A-Z]+[1-9][0-9]*$/;
+
+/**
+ * A package, bounded by what it says it becomes rather than by what arrived.
+ *
+ * Read from the entries JSZip has already listed, which is the package's own
+ * directory - no entry is inflated to ask it. An entry that does not say what it
+ * becomes counts as the whole ceiling, because an unknown size is not a small
+ * one.
+ */
+function boundPackage(zip: JSZip, filename: string): void {
+    let total = 0;
+    let entries = 0;
+    for (const entry of Object.values(zip.files)) {
+        // A folder is a name and nothing else - there is nothing in one to
+        // inflate, and it carries no size to read.
+        if (entry.dir) continue;
+        entries += 1;
+        total += inflatedSize(entry);
+        if (entries > MAX_ZIP_ENTRIES) {
+            throw tooBig(filename, `more than ${MAX_ZIP_ENTRIES.toLocaleString("en-US")} parts`);
+        }
+        if (total > MAX_INFLATED_BYTES) {
+            throw tooBig(filename, `past ${MAX_INFLATED_BYTES / (1024 * 1024)} MB of content`);
+        }
+    }
+}
+
+/** The same bound, for a reader that is handed the bytes rather than the
+ *  package. Bytes that are not a package at all are left to the reader that
+ *  follows, which is the one that can say what they were. */
+async function guardPackage(bytes: Uint8Array, filename: string): Promise<void> {
+    let zip: JSZip;
+    try {
+        zip = await JSZip.loadAsync(bytes);
+    } catch {
+        return;
+    }
+    boundPackage(zip, filename);
+}
+
+/** What one entry says it becomes, from the size JSZip kept beside the
+ *  compressed bytes when it read the package's directory. */
+function inflatedSize(entry: JSZip.JSZipObject): number {
+    const held = (entry as { _data?: { uncompressedSize?: unknown } })._data;
+    const size = held?.uncompressedSize;
+    return typeof size === "number" && size >= 0 ? size : MAX_INFLATED_BYTES + 1;
+}
+
+/** The refusal for a file that unpacks to more than there is room for, said in
+ *  the terms it was refused on rather than in the size it arrived at - the whole
+ *  point is that the one somebody can see is the small one. */
+function tooBig(filename: string, why: string): OfficeImportError {
+    return new OfficeImportError(`${filename} unpacks to more than Polaris opens: ${why}.`);
+}
 
 /** The refusal for a workbook past what Polaris opens, said by name so nobody
  *  tries the same file twice. */
@@ -204,6 +305,31 @@ function tooMuch(filename: string): OfficeImportError {
     return new OfficeImportError(
         `${filename} reaches further than Polaris opens as a spreadsheet: past ${size(MAX_ROWS)} rows, ${size(MAX_COLUMNS)} columns or ${size(MAX_CELLS)} cells.`
     );
+}
+
+/** What the editor keeps for one cell: its value, and the formula that produced
+ *  it when there was one. The engine reads both, so a total that was a sum
+ *  arrives as a sum rather than as the number it happened to be that day. */
+interface SheetCellValue {
+    readonly v: string | number | boolean | null;
+    readonly f?: string;
+}
+
+/**
+ * One cell, as the editor keeps one - or nothing, for a cell with nothing in it.
+ *
+ * A formula is kept beside the value rather than instead of it: the value is
+ * what the workbook last computed and what every exporter reads, and the formula
+ * is what makes the cell follow the ones above it once somebody edits them. A
+ * cell that is only a formula, with no result cached beside it, is still a cell.
+ */
+function cellContent(cell: XLSX.CellObject | undefined): SheetCellValue | null {
+    const value = cellValue(cell);
+    // SheetJS keeps the formula without its leading "=", and the engine wants
+    // one - the same expression, written the way a spreadsheet writes it.
+    const formula = typeof cell?.f === "string" && cell.f.trim() ? `=${cell.f}` : "";
+    if (value === null && !formula) return null;
+    return formula ? { v: value, f: formula } : { v: value };
 }
 
 /**
@@ -272,10 +398,21 @@ async function docUpdate(filename: string, bytes: Uint8Array): Promise<Uint8Arra
  * styles anyway.
  */
 async function docxBlocks(bytes: Uint8Array, filename: string): Promise<core.DocBlock[]> {
+    let zip: JSZip;
+    try {
+        zip = await JSZip.loadAsync(bytes);
+    } catch {
+        throw new OfficeImportError(`${filename} is not a Word document Polaris can read.`);
+    }
+    // Before either part is inflated. A document part is one deflate stream and
+    // reading it is one string as long as it turns out to be: a package inside
+    // the upload limit can carry one no machine here can hold, and the refusal
+    // has to come out before the allocation rather than after it.
+    boundPackage(zip, filename);
+
     let xml: string;
     let numbering: string;
     try {
-        const zip = await JSZip.loadAsync(bytes);
         xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
         numbering = (await zip.file("word/numbering.xml")?.async("string")) ?? "";
     } catch {
@@ -387,15 +524,29 @@ function decodeXml(value: string): string {
  * The same reader for both, because the difference is only whether the marks
  * mean anything - and a plain-text file that happens to start a line with `-` is
  * a list to every reader who looks at it, which is the answer somebody wants.
+ *
+ * **A line ending is not a paragraph ending.** A file wrapped at 72 columns is
+ * one paragraph per blank line, not one per line - which is what Markdown says a
+ * soft break means, and what somebody who wrapped their README meant by it. So
+ * plain lines are gathered and let go at a blank line or at a line that is
+ * something else: a heading, an item, a quotation, a fence.
  */
 function textBlocks(text: string): core.DocBlock[] {
     const blocks: core.DocBlock[] = [];
     let fenced = false;
     let code: string[] = [];
+    let prose: string[] = [];
+
+    const paragraph = (): void => {
+        if (prose.length === 0) return;
+        blocks.push({ kind: "p", text: prose.join(" ") });
+        prose = [];
+    };
 
     for (const raw of text.split(/\r?\n/)) {
         const line = raw.replace(/\s+$/, "");
         if (/^\s*```/.test(line)) {
+            paragraph();
             if (fenced) {
                 blocks.push({ kind: "code", text: code.join("\n") });
                 code = [];
@@ -407,30 +558,38 @@ function textBlocks(text: string): core.DocBlock[] {
             code.push(raw);
             continue;
         }
-        if (!line.trim()) continue;
+        if (!line.trim()) {
+            paragraph();
+            continue;
+        }
 
         const heading = /^(#{1,6})\s+(.*)$/.exec(line);
         if (heading) {
+            paragraph();
             blocks.push({ kind: `h${heading[1]?.length ?? 1}`, text: heading[2] ?? "" });
             continue;
         }
         const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
         if (bullet) {
+            paragraph();
             blocks.push({ kind: "li", text: bullet[1] ?? "" });
             continue;
         }
         const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
         if (numbered) {
+            paragraph();
             blocks.push({ kind: "oli", text: numbered[1] ?? "" });
             continue;
         }
         const quote = /^\s*>\s?(.*)$/.exec(line);
         if (quote) {
+            paragraph();
             blocks.push({ kind: "quote", text: quote[1] ?? "" });
             continue;
         }
-        blocks.push({ kind: "p", text: line.trim() });
+        prose.push(line.trim());
     }
+    paragraph();
     if (fenced && code.length > 0) blocks.push({ kind: "code", text: code.join("\n") });
     return blocks;
 }

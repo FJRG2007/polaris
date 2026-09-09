@@ -31,8 +31,8 @@ import * as Y from "yjs";
 import * as XLSX from "xlsx";
 import * as deck from "./deck";
 import * as core from "@polaris/core";
-import { OFFICE_FIELDS, openDocument } from "./content";
 import { writeDocx, writePptx } from "./ooxml";
+import { OFFICE_FIELDS, openDocument } from "./content";
 
 /** A finished export, ready to be a response. */
 export interface ExportedFile {
@@ -70,9 +70,16 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
 
         const name = node.nodeName;
         // A container: its children are the blocks, and they carry its kind when
-        // they have none of their own.
-        if (name === "bulletList" || name === "orderedList" || name === "listItem") {
-            for (const child of node.toArray()) walk(child, "li");
+        // they have none of their own. Which list it is has to travel with them:
+        // an item that reaches a writer as "li" is written with a bullet, and a
+        // procedure whose steps arrive as bullets stops saying they are in an
+        // order.
+        if (name === "bulletList" || name === "orderedList") {
+            for (const child of node.toArray()) walk(child, name === "bulletList" ? "li" : "oli");
+            return;
+        }
+        if (name === "listItem") {
+            for (const child of node.toArray()) walk(child, inherited || "li");
             return;
         }
         if (name === "blockquote") {
