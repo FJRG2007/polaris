@@ -215,7 +215,8 @@ export function snippetFrom(text: string, limit = 200): string {
     // that reads oddly beats a row with nothing under its subject, so the
     // second attempt keeps everything but the parts that are genuinely not
     // words.
-    const collapsed = readable || (markup ? tidy(stripMarkup(decoded, { keepUnclosed: true })) : "");
+    const collapsed =
+        readable || (markup ? tidy(stripMarkup(decoded, { keepUnclosed: true })) : "");
     return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
 }
 

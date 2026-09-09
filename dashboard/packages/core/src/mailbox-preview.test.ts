@@ -58,13 +58,17 @@ describe("mail that came out unreadable", () => {
         // The two commonest escapes there are, and both stand for a perfectly
         // printable byte - so a decoder looking only for accents left these.
         expect(snippetFrom("=20 =20 =20 Paquete en aduanas")).toBe("Paquete en aduanas");
-        expect(snippetFrom("Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=3Dfed_yo_default")).toBe(
-            "Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=fed_yo_default"
-        );
+        expect(
+            snippetFrom(
+                "Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=3Dfed_yo_default"
+            )
+        ).toBe("Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=fed_yo_default");
     });
 
     it("still leaves prose with one equals sign in it alone", () => {
-        expect(snippetFrom("la mesa mide width=50cm de ancho")).toBe("la mesa mide width=50cm de ancho");
+        expect(snippetFrom("la mesa mide width=50cm de ancho")).toBe(
+            "la mesa mide width=50cm de ancho"
+        );
     });
 
     it("drops a stylesheet the preview begins in the middle of", () => {
@@ -89,7 +93,9 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom("Informacion sobre tu proxima cuota <meta http-")).toBe(
             "Informacion sobre tu proxima cuota"
         );
-        expect(snippetFrom("Cofidis, cuenta con nosotros <div sty")).toBe("Cofidis, cuenta con nosotros");
+        expect(snippetFrom("Cofidis, cuenta con nosotros <div sty")).toBe(
+            "Cofidis, cuenta con nosotros"
+        );
     });
 
     it("reads a message that is markup with no closed tag in it", () => {
@@ -99,7 +105,8 @@ describe("mail that came out unreadable", () => {
     });
 
     it("leaves a plain sentence exactly as it is", () => {
-        const plain = "Tal y como nos comenta Albert, reenviamos el email de nuevo reajustando el hilo.";
+        const plain =
+            "Tal y como nos comenta Albert, reenviamos el email de nuevo reajustando el hilo.";
         expect(snippetFrom(plain)).toBe(plain);
     });
 
