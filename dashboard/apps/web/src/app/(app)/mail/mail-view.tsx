@@ -21,26 +21,36 @@
  */
 
 import Link from "next/link";
-import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
-import { missingFolderRole, refusalOf } from "./refusal";
-import { forwardSeed, replySeed } from "./answering";
-import { useMailLayout } from "./use-mail-layout";
-import { ThreadContextMenu } from "./thread-menu";
-import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
+import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
 import { SenderFace } from "./sender-face";
-import { UnsubscribeButton } from "./unsubscribe-button";
 import { MailSearch } from "./mail-search";
-import * as core from "@polaris/core";
-import { useRouter, useSearchParams } from "next/navigation";
-import { goShallow, mailAddress, plainClick } from "./address";
+import { useMailLayout } from "./use-mail-layout";
+import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
+import { forwardSeed, replySeed } from "./answering";
+import { missingFolderRole, refusalOf } from "./refusal";
+import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
+import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
-import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
+import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
+import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ComponentPropsWithRef
+} from "react";
 import {
     actOnAction,
     applyLabelAction,
@@ -51,14 +61,21 @@ import {
     syncAllAction
 } from "./actions";
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    useTransition,
-    type ComponentPropsWithRef
-} from "react";
+    Archive,
+    Bug,
+    Check,
+    Clock,
+    Columns2,
+    Inbox,
+    ListFilter,
+    Mail,
+    MailOpen,
+    Paperclip,
+    RefreshCw,
+    Rows3,
+    Star,
+    Trash2
+} from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -79,23 +96,6 @@ import {
     Skeleton,
     useToast
 } from "@polaris/ui";
-import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import {
-    Archive,
-    Bug,
-    Check,
-    Clock,
-    Columns2,
-    Inbox,
-    ListFilter,
-    Mail,
-    MailOpen,
-    Paperclip,
-    RefreshCw,
-    Rows3,
-    Star,
-    Trash2
-} from "lucide-react";
 
 /**
  * How long the pointer rests on a conversation before its body is fetched.
@@ -1428,13 +1428,25 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
     }, []);
 
     return (
-        <div ref={mark} className="p-3">
-            {/* Shaped like the rows it is about to become, so the list does not
-                jump when they land. */}
-            <div className="space-y-2" aria-hidden={!busy}>
-                <div className="h-3 w-1/3 animate-pulse rounded bg-card" />
-                <div className="h-3 w-2/3 animate-pulse rounded bg-card" />
-            </div>
+        // A marker while it is only watching, and a row's worth of space only
+        // while a page is actually on its way.
+        //
+        // It used to be the second of those the whole time: forty-odd pixels of
+        // shimmering bars sitting under the last conversation of every list that
+        // has another page, which reads as a row that never finishes loading and
+        // adds height to a screen whose whole layout is "exactly the viewport,
+        // nothing scrolls but the panes". The observer does not need the space -
+        // it fires 600px before this comes into view, on an element that is one
+        // pixel tall.
+        <div ref={mark} className={busy ? "p-3" : "h-px"}>
+            {busy ? (
+                // Shaped like the rows it is about to become, so the list does
+                // not jump when they land.
+                <div className="space-y-2" aria-hidden>
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-card" />
+                    <div className="h-3 w-2/3 animate-pulse rounded bg-card" />
+                </div>
+            ) : null}
             <span className="sr-only" role="status">
                 {busy ? "Loading older conversations" : ""}
             </span>
