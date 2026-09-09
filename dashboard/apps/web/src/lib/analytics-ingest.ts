@@ -17,14 +17,13 @@
  */
 
 import { prisma } from "@polaris/db";
-import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { readEdgeLogTail } from "@/lib/edge-access-log";
 import { dashboardHosts } from "@/lib/domain-edge";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { visitDay, type VisitDimension } from "@polaris/core";
 import { ensureAnalyticsSite, getAnalyticsSettings, recordVisit, type AnalyticsScopeType } from "@/lib/analytics-service";
 
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 const CURSOR_KEY = "analytics.edgeCursor";
 const TAIL_BYTES = 16 * 1024 * 1024;
 
@@ -57,7 +56,7 @@ export async function ingestEdgeVisits(now = Date.now()): Promise<{ recorded: nu
     const settings = await getAnalyticsSettings();
     if (!settings.ingestEdgeLog) return { recorded: 0 };
 
-    const raw = await readLogTail();
+    const raw = await readEdgeLogTail(TAIL_BYTES);
     if (!raw) return { recorded: 0 };
 
     const routes = await hostRoutes();
@@ -173,18 +172,6 @@ async function readCursor(): Promise<EdgeCursor> {
 
 async function writeCursor(cursor: EdgeCursor): Promise<void> {
     await setSetting(CURSOR_KEY, JSON.stringify(cursor));
-}
-
-async function readLogTail(): Promise<string> {
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return "";
-    }
-    if (raw.length <= TAIL_BYTES) return raw;
-    const cut = raw.slice(raw.length - TAIL_BYTES);
-    return cut.slice(cut.indexOf("\n") + 1);
 }
 
 // --- rollup and retention ---------------------------------------------------

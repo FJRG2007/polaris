@@ -136,9 +136,12 @@ services:
       - polaris-data:/var/lib/polaris
       # Traefik dynamic-config dir the dashboard writes deployed-app routes into.
       - polaris-traefik-dynamic:/dynamic
-      # Traefik's per-request access log, read by the HTTP Logs view and by the
-      # firewall's jails (read-only).
-      - polaris-traefik-log:/traefik-log:ro
+      # Traefik's per-request access log, read by the HTTP Logs view, by the
+      # firewall's jails and by the analytics every deployed service gets.
+      # Writable, and only so it can be kept from filling the disk: Traefik does
+      # not rotate its own log, so the dashboard trims it in place on its hourly
+      # pass (see lib/edge-access-log). Nothing here ever writes a request line.
+      - polaris-traefik-log:/traefik-log
       # The firewall's address snapshot - bans, Tor exits, flagged addresses - which
       # the dashboard writes and the edge guard reads. Its own volume rather than the
       # dynamic dir: Traefik parses every .json it finds there as a route config.

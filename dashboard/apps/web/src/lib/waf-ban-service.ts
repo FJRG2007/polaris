@@ -13,8 +13,8 @@
  * republish.
  */
 
-import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { readEdgeLogTail } from "@/lib/edge-access-log";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { DEFAULT_WAF_JAILS, detectWafBans, jailBansSignedIn, type WafJail } from "@polaris/core";
 import { addressesSignedIn } from "@/lib/address-accounts";
@@ -27,7 +27,6 @@ import {
 } from "@/lib/waf-intel-service";
 
 /** The edge's per-request access log, the same file the HTTP Logs view reads. */
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 
 const JAILS_KEY = "waf.jails";
 
@@ -87,7 +86,7 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         const [jails, ignore] = await Promise.all([getWafJails(), wafTrustedAddresses()]);
         if (!jails.some((jail) => jail.enabled)) return { scanned: 0, banned: 0 };
 
-        const entries = parseHttpLogs(await readLogTail());
+        const entries = parseHttpLogs(await readEdgeLogTail(TAIL_BYTES));
         if (entries.length === 0) return { scanned: 0, banned: 0 };
 
         const seen = entries.map((entry) => entry.ip).filter((ip) => ip && ip !== "-");
@@ -145,21 +144,6 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         console.error("polaris: the firewall jail pass failed:", caught instanceof Error ? caught.message : caught);
         return { scanned: 0, banned: 0 };
     }
-}
-
-/** The last few megabytes of the access log. Reading the whole file would grow
- *  without bound with the log; the window a jail looks at never does. */
-async function readLogTail(): Promise<string> {
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return "";
-    }
-    if (raw.length <= TAIL_BYTES) return raw;
-    const cut = raw.slice(raw.length - TAIL_BYTES);
-    // Drop the partial first line so the parser is never handed half a JSON object.
-    return cut.slice(cut.indexOf("\n") + 1);
 }
 
 function parseJson<T>(raw: string | null): T | null {

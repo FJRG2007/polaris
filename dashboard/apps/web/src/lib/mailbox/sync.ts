@@ -24,7 +24,7 @@
  * because a mailbox is mostly messages nobody will ever open again.
  */
 
-import { withImap } from "./imap";
+import { MailUnreachableError, withImap } from "./imap";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import { fileJudgedJunk, judgeArrival } from "./spam";
@@ -115,10 +115,21 @@ async function onePass(accountId: string): Promise<void> {
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.
+            //
+            // `detail` rather than `message`, and the difference is the whole
+            // value of the line: an unreachable failure's `message` is Polaris'
+            // own generic sentence, so logging it wrote "Polaris could not reach
+            // this mail server" into the log - the thing the reader had already
+            // been told, in the one place that exists to say what actually
+            // happened. What the server said is on `detail`.
             console.warn(
                 "mail sync failed",
                 accountId,
-                caught instanceof Error ? caught.message : caught
+                caught instanceof MailUnreachableError
+                    ? caught.detail || caught.message
+                    : caught instanceof Error
+                      ? caught.message
+                      : caught
             );
         }
     }
