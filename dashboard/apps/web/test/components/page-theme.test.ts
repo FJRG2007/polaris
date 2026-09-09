@@ -94,7 +94,9 @@ describe("watching the theme", () => {
             }
         };
         vi.stubGlobal("document", { documentElement: { classList } });
-        vi.stubGlobal("window", { matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
+        vi.stubGlobal("window", {
+            matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} })
+        });
         vi.stubGlobal(
             "MutationObserver",
             class {
