@@ -80,8 +80,9 @@ export function MinecraftReset({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
-                    Build this server again as another blueprint, or as an ordinary one, on a fresh map. It keeps its
-                    address, its players, the access other people hold on it and its port - only the game changes.
+                    Build this server again as another blueprint, or as an ordinary one, on a fresh
+                    map. It keeps its address, its players, the access other people hold on it and
+                    its port - only the game changes.
                 </p>
                 <p className="text-xs text-muted-foreground">
                     {currentMap
@@ -156,7 +157,9 @@ function ResetDialog({
 
     const blueprint = findBlueprint(shape.blueprintId);
     const seedError = shapeError(shape);
-    const memory = formatMemory(recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal"));
+    const memory = formatMemory(
+        recommendedMemoryMb(concurrentPlayers, blueprint?.weight ?? "normal")
+    );
     // Bedrock keeps player data inside the level database, where it cannot be
     // separated from the terrain, so there it is not offered.
     // Not onto a map, and not as a preference: carrying players means creating the
@@ -203,7 +206,12 @@ function ResetDialog({
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
-                    <BlueprintFields edition={edition} crossplay={crossplay} value={shape} onChange={setShape} />
+                    <BlueprintFields
+                        edition={edition}
+                        crossplay={crossplay}
+                        value={shape}
+                        onChange={setShape}
+                    />
 
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Playing at once, usually</span>
@@ -211,11 +219,14 @@ function ResetDialog({
                             type="number"
                             min={1}
                             value={concurrentPlayers}
-                            onChange={(event) => setConcurrentPlayers(Math.max(1, Number(event.target.value) || 1))}
+                            onChange={(event) =>
+                                setConcurrentPlayers(Math.max(1, Number(event.target.value) || 1))
+                            }
                         />
                         <span className="text-xs text-muted-foreground">
-                            The rebuilt server is given <strong className="text-foreground">{memory}</strong> of memory.
-                            Player slots and everything else on Settings are left as they are.
+                            The rebuilt server is given{" "}
+                            <strong className="text-foreground">{memory}</strong> of memory. Player
+                            slots and everything else on Settings are left as they are.
                         </span>
                     </label>
 
@@ -244,19 +255,35 @@ function ResetDialog({
                             onClick={() => {
                                 setSavingTemplate(true);
                                 setTemplateNote(null);
-                                void saveServerAsTemplateAction(installedAppId, templateName, "").then((answer) => {
+                                void saveServerAsTemplateAction(
+                                    installedAppId,
+                                    templateName,
+                                    ""
+                                ).then((answer) => {
                                     setSavingTemplate(false);
-                                    setTemplateNote(answer.error ?? "Saved. It is offered when you create a server.");
+                                    setTemplateNote(
+                                        answer.error ??
+                                            "Saved. It is offered when you create a server."
+                                    );
                                     if (!answer.error) setTemplateName("");
                                 });
                             }}
                         >
-                            {savingTemplate ? <Loader2 className="size-4 animate-spin" /> : <BookmarkPlus className="size-4" />}
+                            {savingTemplate ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <BookmarkPlus className="size-4" />
+                            )}
                             Save
                         </Button>
                     </div>
 
-                    <label className={cn("flex items-start gap-2 text-sm", carriesPlayers ? "cursor-pointer" : "opacity-60")}>
+                    <label
+                        className={cn(
+                            "flex items-start gap-2 text-sm",
+                            carriesPlayers ? "cursor-pointer" : "opacity-60"
+                        )}
+                    >
                         <Checkbox
                             checked={keepPlayers && carriesPlayers}
                             disabled={!carriesPlayers}
@@ -282,7 +309,8 @@ function ResetDialog({
                             {playersOnline > 0
                                 ? ` - ${playersOnline} ${playersOnline === 1 ? "is" : "are"} on it right now`
                                 : ""}
-                            . The map it is on now is kept and you can switch back to it under World.
+                            . The map it is on now is kept and you can switch back to it under
+                            World.
                         </span>
                     </p>
 
@@ -292,7 +320,10 @@ function ResetDialog({
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             Cancel
                         </Button>
-                        <Button onClick={() => void submit()} disabled={pending || seedError !== null}>
+                        <Button
+                            onClick={() => void submit()}
+                            disabled={pending || seedError !== null}
+                        >
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             Start over
                         </Button>

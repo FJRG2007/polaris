@@ -60,14 +60,17 @@ export function MailOnboarding({
                 </div>
                 <h1 className="text-[17px] font-semibold tracking-tight">Read your mail here</h1>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                    Connect the address you already use. Polaris works out the rest from it, so for most
-                    services there is nothing else to fill in.
+                    Connect the address you already use. Polaris works out the rest from it, so for
+                    most services there is nothing else to fill in.
                 </p>
 
                 <ul className="mt-5 space-y-3">
                     {PROMISES.map((promise) => (
                         <li key={promise.title} className="flex gap-3">
-                            <promise.icon className="mt-0.5 size-4 shrink-0 text-foreground-subtle" aria-hidden />
+                            <promise.icon
+                                className="mt-0.5 size-4 shrink-0 text-foreground-subtle"
+                                aria-hidden
+                            />
                             <div className="min-w-0">
                                 <p className="text-[13px] font-medium">{promise.title}</p>
                                 <p className="text-[12px] text-muted-foreground">{promise.body}</p>
@@ -80,8 +83,8 @@ export function MailOnboarding({
                     Connect a mailbox
                 </Button>
                 <p className="mt-2 text-[12px] text-foreground-subtle">
-                    Gmail and Outlook connect by authorizing the account. Anything else takes the password for
-                    that mailbox.
+                    Gmail and Outlook connect by authorizing the account. Anything else takes the
+                    password for that mailbox.
                 </p>
 
                 {connecting ? (

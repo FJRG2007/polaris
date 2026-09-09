@@ -784,7 +784,9 @@ function JailsPanel({
                             {jail.enabled ? (
                                 <div className="flex flex-wrap gap-3">
                                     <NumberField
-                                        label={jail.counts === "hostnames" ? "Hostnames" : "Requests"}
+                                        label={
+                                            jail.counts === "hostnames" ? "Hostnames" : "Requests"
+                                        }
                                         value={jail.maxRetry}
                                         min={1}
                                         max={1000}

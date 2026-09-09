@@ -160,7 +160,7 @@ export function DocView({
                 </div>
             ) : (
                 <div className="mx-auto max-w-3xl overflow-auto overscroll-contain p-6">
-            <style>{`
+                    <style>{`
                 .doc-preview { line-height: 1.6; }
                 .doc-preview h1 { font-size: 1.5rem; font-weight: 600; margin: 1rem 0 0.5rem; }
                 .doc-preview h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; }

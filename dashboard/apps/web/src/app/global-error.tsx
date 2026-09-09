@@ -12,7 +12,13 @@ import "@polaris/ui/styles.css";
 import { useEffect } from "react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({
+    error,
+    reset
+}: {
+    error: Error & { digest?: string };
+    reset: () => void;
+}) {
     const staleBuild = isStaleBuildError(error);
 
     useEffect(() => {
@@ -33,7 +39,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                     <div className="flex max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">
-                                {staleBuild ? "Polaris was updated while this page was open" : "Polaris could not start this page"}
+                                {staleBuild
+                                    ? "Polaris was updated while this page was open"
+                                    : "Polaris could not start this page"}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {staleBuild
@@ -47,7 +55,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                             </p>
                         ) : null}
                         {error.digest && !staleBuild ? (
-                            <p className="font-mono text-xs text-muted-foreground">Reference: {error.digest}</p>
+                            <p className="font-mono text-xs text-muted-foreground">
+                                Reference: {error.digest}
+                            </p>
                         ) : null}
                         <div className="flex gap-2">
                             <button

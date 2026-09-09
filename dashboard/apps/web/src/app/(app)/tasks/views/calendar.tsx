@@ -29,7 +29,10 @@ import { commandsFor, TaskMenu } from "./task-actions";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useGoogleCalendarEvents, type GoogleCalendarState } from "@/lib/google-calendar/events-client";
+import {
+    useGoogleCalendarEvents,
+    type GoogleCalendarState
+} from "@/lib/google-calendar/events-client";
 
 type CalendarScope = layout.CalendarScope;
 type CalendarEntry = layout.CalendarEntry;
@@ -126,7 +129,9 @@ export function CalendarView(props: ViewProps) {
                         <ChevronRight className="size-4" />
                     </button>
                 </div>
-                <h3 className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">{label}</h3>
+                <h3 className="min-w-0 flex-1 truncate text-sm font-medium sm:text-base">
+                    {label}
+                </h3>
 
                 {offset !== 0 && (
                     <Button size="sm" variant="ghost" onClick={() => setOffset(0)}>
@@ -153,7 +158,11 @@ export function CalendarView(props: ViewProps) {
                     ))}
                 </div>
 
-                <GoogleControl state={google} showing={showGoogle} onToggle={() => setShowGoogle(!showGoogle)} />
+                <GoogleControl
+                    state={google}
+                    showing={showGoogle}
+                    onToggle={() => setShowGoogle(!showGoogle)}
+                />
             </header>
 
             {scope === "month" ? (
@@ -195,11 +204,15 @@ export function CalendarView(props: ViewProps) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {undated.length > 0 && (
                     <span>
-                        {undated.length} {undated.length === 1 ? "task has" : "tasks have"} no dates and are not shown
-                        here.
+                        {undated.length} {undated.length === 1 ? "task has" : "tasks have"} no dates
+                        and are not shown here.
                     </span>
                 )}
-                {canEdit && <span>Double-click {scope === "month" ? "a day" : "an hour"} to add a task there.</span>}
+                {canEdit && (
+                    <span>
+                        Double-click {scope === "month" ? "a day" : "an hour"} to add a task there.
+                    </span>
+                )}
                 {google.error ? <span className="text-danger">{google.error}</span> : null}
             </div>
         </div>
@@ -241,9 +254,14 @@ function MonthGrid({
         <div className="flex h-[calc(100dvh-19rem)] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
             <div className="grid grid-cols-7 border-b border-border bg-muted/40">
                 {headings.map((index) => (
-                    <div key={index} className="px-2 py-1.5 text-center text-[0.6875rem] text-muted-foreground">
+                    <div
+                        key={index}
+                        className="px-2 py-1.5 text-center text-[0.6875rem] text-muted-foreground"
+                    >
                         <span className="hidden sm:inline">{core.WEEKDAY_SHORT_NAMES[index]}</span>
-                        <span className="sm:hidden">{(core.WEEKDAY_SHORT_NAMES[index] as string).slice(0, 1)}</span>
+                        <span className="sm:hidden">
+                            {(core.WEEKDAY_SHORT_NAMES[index] as string).slice(0, 1)}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -374,14 +392,18 @@ function TimeGrid({
                     <div className="flex border-b border-border bg-muted/40">
                         <div className="w-12 shrink-0 sm:w-14" />
                         {columns.map((column) => (
-                            <div key={column.day.toISOString()} className="min-w-0 flex-1 px-1 py-1.5 text-center">
+                            <div
+                                key={column.day.toISOString()}
+                                className="min-w-0 flex-1 px-1 py-1.5 text-center"
+                            >
                                 <div className="text-[0.6875rem] text-muted-foreground">
                                     {core.WEEKDAY_SHORT_NAMES[column.day.getDay()]}
                                 </div>
                                 <div
                                     className={cn(
                                         "text-sm",
-                                        core.isSameDay(column.day, today) && "font-semibold text-primary"
+                                        core.isSameDay(column.day, today) &&
+                                            "font-semibold text-primary"
                                     )}
                                 >
                                     {column.day.getDate()}
@@ -410,7 +432,13 @@ function TimeGrid({
                 </div>
             </div>
 
-            <div ref={scroller} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", scope === "week" && "overflow-x-auto")}>
+            <div
+                ref={scroller}
+                className={cn(
+                    "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                    scope === "week" && "overflow-x-auto"
+                )}
+            >
                 <div className={cn("flex", scope === "week" && "min-w-[42rem]")}>
                     <div className="w-12 shrink-0 sm:w-14">
                         {HOURS.map((hour) => (
@@ -419,12 +447,17 @@ function TimeGrid({
                                 style={{ height: HOUR_HEIGHT }}
                                 className="relative pr-1 text-right text-[0.625rem] text-muted-foreground"
                             >
-                                <span className="absolute -top-1.5 right-1">{hourLabel(hour, format)}</span>
+                                <span className="absolute -top-1.5 right-1">
+                                    {hourLabel(hour, format)}
+                                </span>
                             </div>
                         ))}
                     </div>
                     {columns.map((column) => (
-                        <div key={column.day.toISOString()} className="relative min-w-0 flex-1 border-l border-border">
+                        <div
+                            key={column.day.toISOString()}
+                            className="relative min-w-0 flex-1 border-l border-border"
+                        >
                             {HOURS.map((hour) => (
                                 <div
                                     key={hour}
@@ -490,7 +523,9 @@ function TimedEntry({
     const top = (layout.minutesInto(entry.start) / 60) * HOUR_HEIGHT;
     // A task is an instant, so it is drawn half an hour tall: a hairline block is
     // one nobody can hit with a pointer.
-    const minutes = entry.end ? Math.max(20, (entry.end.getTime() - entry.start.getTime()) / 60_000) : 30;
+    const minutes = entry.end
+        ? Math.max(20, (entry.end.getTime() - entry.start.getTime()) / 60_000)
+        : 30;
     const style: CSSProperties = {
         top,
         height: (minutes / 60) * HOUR_HEIGHT - 2,
@@ -501,7 +536,9 @@ function TimedEntry({
 
     const body = (
         <span className="flex flex-col overflow-hidden text-left">
-            <span className="truncate text-[0.6875rem] font-medium leading-tight">{entry.title}</span>
+            <span className="truncate text-[0.6875rem] font-medium leading-tight">
+                {entry.title}
+            </span>
             <span className="truncate text-[0.625rem] leading-tight text-muted-foreground">
                 {format.time(entry.start)}
                 {entry.location ? ` - ${entry.location}` : ""}
@@ -555,7 +592,10 @@ function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps })
                     title={`${entry.title} (Google Calendar)`}
                     className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-[0.6875rem] transition-colors hover:bg-muted"
                 >
-                    <span className="size-2 shrink-0 rounded-[2px]" style={{ backgroundColor: entry.color }} />
+                    <span
+                        className="size-2 shrink-0 rounded-[2px]"
+                        style={{ backgroundColor: entry.color }}
+                    />
                     <span className="truncate">{entry.title}</span>
                 </a>
             </li>
@@ -643,7 +683,9 @@ function GoogleControl({
             <Button size="sm" variant="secondary" asChild>
                 <a href="/api/connections/google/link">
                     <GoogleMark className="size-4" />
-                    {state.status === "expired" ? "Reconnect Google Calendar" : "Connect Google Calendar"}
+                    {state.status === "expired"
+                        ? "Reconnect Google Calendar"
+                        : "Connect Google Calendar"}
                 </a>
             </Button>
         );

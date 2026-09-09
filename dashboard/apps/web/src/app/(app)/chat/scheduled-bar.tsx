@@ -69,7 +69,9 @@ export function ScheduledBar({
                 onClick={() => setOpen(true)}
                 className="flex w-full items-center gap-2 border-t border-border bg-muted/30 px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             >
-                <CalendarClock className={failed.length > 0 ? "size-3.5 text-danger" : "size-3.5"} />
+                <CalendarClock
+                    className={failed.length > 0 ? "size-3.5 text-danger" : "size-3.5"}
+                />
                 {failed.length > 0 ? (
                     <span className="text-danger">
                         {failed.length === 1
@@ -118,7 +120,9 @@ export function ScheduledBar({
                                             size="xs"
                                             variant="ghost"
                                             disabled={busy === entry.id}
-                                            onClick={() => void run(entry.id, () => onSendNow(entry.id))}
+                                            onClick={() =>
+                                                void run(entry.id, () => onSendNow(entry.id))
+                                            }
                                         >
                                             <SendHorizontal className="size-3.5" />
                                             Send now
@@ -127,7 +131,9 @@ export function ScheduledBar({
                                             size="xs"
                                             variant="ghost"
                                             disabled={busy === entry.id}
-                                            onClick={() => void run(entry.id, () => onCancel(entry.id))}
+                                            onClick={() =>
+                                                void run(entry.id, () => onCancel(entry.id))
+                                            }
                                         >
                                             <Trash2 className="size-3.5" />
                                             Delete

@@ -672,7 +672,7 @@ function SaveTemplateDialog({
             allowedCountries: config.allowedCountries,
             allowedContinents: config.allowedContinents,
             allowUploaderDelete: config.allowUploaderDelete,
-        allowOverwrite: config.allowOverwrite,
+            allowOverwrite: config.allowOverwrite,
             uploaderDeleteWindowSeconds: config.uploaderDeleteWindowSeconds
         });
         setPending(false);

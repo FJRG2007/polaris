@@ -135,7 +135,10 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                     {/* Left, like every line under it. The name was centred while
                         the rest of the panel was not, which read as a mistake
                         rather than as emphasis. */}
-                    <p className="flex items-baseline gap-1.5 truncate text-sm font-medium" title={name}>
+                    <p
+                        className="flex items-baseline gap-1.5 truncate text-sm font-medium"
+                        title={name}
+                    >
                         <PersonName id={person.id} name={name} />
                         {/* Beside the name, because that is what it is about -
                             and only when they have said. */}
@@ -166,12 +169,17 @@ function Body({ person, channelId }: { person: DirectPerson; channelId: string }
                         here. Two lines saying "Rahma Fellah" one under the other
                         is not more information about anybody. */}
                     {profile?.fullName && profile.fullName !== name && (
-                        <p className="truncate text-xs text-muted-foreground" title={profile.fullName}>
+                        <p
+                            className="truncate text-xs text-muted-foreground"
+                            title={profile.fullName}
+                        >
                             {profile.fullName}
                         </p>
                     )}
                     {profile?.headline ? (
-                        <p className="mt-1 break-words text-xs text-foreground/90">{profile.headline}</p>
+                        <p className="mt-1 break-words text-xs text-foreground/90">
+                            {profile.headline}
+                        </p>
                     ) : null}
                 </div>
 

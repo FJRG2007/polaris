@@ -661,12 +661,7 @@ const BAIT_WINDOW = 4000;
 /** Accents off, one space between words, lower case - the form the phrases above
  *  are written in. */
 function flatten(value: string): string {
-    return value
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .trim();
+    return value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /**

@@ -89,7 +89,9 @@ export function ExperienceDialog({
         <PlayerFormDialog
             title={`${player}'s experience`}
             description="Applied to the player standing on the server, so they see it happen."
-            confirmLabel={mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"}
+            confirmLabel={
+                mode === "set" ? "Set it" : mode === "remove" ? "Take it away" : "Give it"
+            }
             ready={amount >= 0}
             pending={pending}
             error={error}
@@ -128,7 +130,12 @@ export function ExperienceDialog({
                         aria-label="How much"
                         className="w-28"
                         onChange={(event) =>
-                            setAmount(Math.max(0, Math.min(MAX_EXPERIENCE, Number(event.target.value) || 0)))
+                            setAmount(
+                                Math.max(
+                                    0,
+                                    Math.min(MAX_EXPERIENCE, Number(event.target.value) || 0)
+                                )
+                            )
                         }
                     />
                     <Select

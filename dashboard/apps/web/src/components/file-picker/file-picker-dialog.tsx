@@ -66,7 +66,11 @@ const KINDS: readonly { id: string; label: string; matches: RegExp }[] = [
     { id: "image", label: "Images", matches: /\.(?:png|jpe?g|gif|webp|avif|bmp|svg|heic)$/i },
     { id: "document", label: "Documents", matches: /\.(?:pdf|docx?|odt|rtf|txt|md|pages)$/i },
     { id: "sheet", label: "Spreadsheets", matches: /\.(?:xlsx?|ods|csv|numbers)$/i },
-    { id: "media", label: "Audio and video", matches: /\.(?:mp3|wav|flac|m4a|ogg|mp4|mov|mkv|webm|avi)$/i },
+    {
+        id: "media",
+        label: "Audio and video",
+        matches: /\.(?:mp3|wav|flac|m4a|ogg|mp4|mov|mkv|webm|avi)$/i
+    },
     { id: "archive", label: "Archives", matches: /\.(?:zip|tar|gz|bz2|xz|7z|rar)$/i }
 ];
 
@@ -129,31 +133,35 @@ export function FilePickerDialog({
         wanted.current = asked;
         setLoading(true);
         setProblem("");
-        const timer = setTimeout(() => {
-            void (async () => {
-                try {
-                    const url = query.trim()
-                        ? `/api/drive/search?c=${encodeURIComponent(active)}&q=${encodeURIComponent(query.trim())}`
-                        : tab === "recent"
-                          ? `/api/drive/recent?c=${encodeURIComponent(active)}`
-                          : `/api/drive/list?c=${encodeURIComponent(active)}&p=${encodeURIComponent(path)}`;
-                    const answer = await fetch(url, { cache: "no-store" });
-                    const body = (await answer.json()) as { entries?: Entry[]; error?: string };
-                    if (wanted.current !== asked) return;
-                    if (body.error) {
-                        setProblem("That folder could not be opened.");
-                        setEntries([]);
-                        return;
+        const timer = setTimeout(
+            () => {
+                void (async () => {
+                    try {
+                        const url = query.trim()
+                            ? `/api/drive/search?c=${encodeURIComponent(active)}&q=${encodeURIComponent(query.trim())}`
+                            : tab === "recent"
+                              ? `/api/drive/recent?c=${encodeURIComponent(active)}`
+                              : `/api/drive/list?c=${encodeURIComponent(active)}&p=${encodeURIComponent(path)}`;
+                        const answer = await fetch(url, { cache: "no-store" });
+                        const body = (await answer.json()) as { entries?: Entry[]; error?: string };
+                        if (wanted.current !== asked) return;
+                        if (body.error) {
+                            setProblem("That folder could not be opened.");
+                            setEntries([]);
+                            return;
+                        }
+                        setEntries(body.entries ?? []);
+                    } catch {
+                        if (wanted.current === asked)
+                            setProblem("That folder could not be opened.");
+                    } finally {
+                        if (wanted.current === asked) setLoading(false);
                     }
-                    setEntries(body.entries ?? []);
-                } catch {
-                    if (wanted.current === asked) setProblem("That folder could not be opened.");
-                } finally {
-                    if (wanted.current === asked) setLoading(false);
-                }
-            })();
-            // Typed searches settle; opening a folder does not wait.
-        }, query.trim() ? 250 : 0);
+                })();
+                // Typed searches settle; opening a folder does not wait.
+            },
+            query.trim() ? 250 : 0
+        );
         return () => clearTimeout(timer);
     }, [browsing, tab, active, path, query]);
 
@@ -195,7 +203,9 @@ export function FilePickerDialog({
     function fromComputer(list: FileList | null): void {
         const files = [...(list ?? [])];
         if (files.length === 0) return;
-        onPick((multiple ? files : files.slice(0, 1)).map((one) => ({ kind: "upload", file: one })));
+        onPick(
+            (multiple ? files : files.slice(0, 1)).map((one) => ({ kind: "upload", file: one }))
+        );
         onClose();
     }
 
@@ -205,7 +215,9 @@ export function FilePickerDialog({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-3xl">
                 <div className="flex h-[30rem] min-h-0 flex-col">
-                    <h2 className="mb-3 shrink-0 pr-8 text-[15px] font-semibold tracking-tight">{title}</h2>
+                    <h2 className="mb-3 shrink-0 pr-8 text-[15px] font-semibold tracking-tight">
+                        {title}
+                    </h2>
 
                     <div className="flex min-h-0 flex-1 gap-3">
                         <nav className="w-40 shrink-0 space-y-0.5" aria-label="Where to look">
@@ -271,7 +283,10 @@ export function FilePickerDialog({
                                             className="h-7 w-36 shrink-0 text-[12px]"
                                             options={[
                                                 { value: "", label: "Everything" },
-                                                ...KINDS.map((one) => ({ value: one.id, label: one.label }))
+                                                ...KINDS.map((one) => ({
+                                                    value: one.id,
+                                                    label: one.label
+                                                }))
                                             ]}
                                             onValueChange={setKind}
                                         />
@@ -281,7 +296,9 @@ export function FilePickerDialog({
                                         <button
                                             type="button"
                                             className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5 text-left text-[12px] text-muted-foreground hover:text-foreground"
-                                            onClick={() => setPath(path.split("/").slice(0, -1).join("/"))}
+                                            onClick={() =>
+                                                setPath(path.split("/").slice(0, -1).join("/"))
+                                            }
                                         >
                                             <ArrowLeft className="size-3.5 shrink-0" aria-hidden />
                                             {path}
@@ -291,12 +308,20 @@ export function FilePickerDialog({
                                     <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
                                         {loading ? (
                                             <li className="flex items-center justify-center py-8 text-muted-foreground">
-                                                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                                <Loader2
+                                                    className="size-4 shrink-0 animate-spin"
+                                                    aria-hidden
+                                                />
                                             </li>
                                         ) : shown.length === 0 ? (
                                             <li className="p-6">
                                                 <EmptyState
-                                                    icon={<Folder className="size-5 shrink-0" aria-hidden />}
+                                                    icon={
+                                                        <Folder
+                                                            className="size-5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                    }
                                                     title={problem || "Nothing here"}
                                                     description={
                                                         problem
@@ -347,7 +372,9 @@ export function FilePickerDialog({
                                                             </span>
                                                             {isDir ? null : (
                                                                 <span className="shrink-0 text-[11px] text-foreground-subtle">
-                                                                    {readableSize(Number(entry.size) || 0)}
+                                                                    {readableSize(
+                                                                        Number(entry.size) || 0
+                                                                    )}
                                                                 </span>
                                                             )}
                                                             {chosen[key] ? (
@@ -380,7 +407,10 @@ export function FilePickerDialog({
                                         fromComputer(event.dataTransfer.files);
                                     }}
                                 >
-                                    <Upload className="size-6 shrink-0 text-foreground-subtle" aria-hidden />
+                                    <Upload
+                                        className="size-6 shrink-0 text-foreground-subtle"
+                                        aria-hidden
+                                    />
                                     <p className="mt-2 text-[13px] text-muted-foreground">
                                         Drop files here, or choose them from this machine.
                                     </p>
@@ -409,8 +439,8 @@ export function FilePickerDialog({
                                         />
                                     </label>
                                     <p className="mt-1 text-[12px] text-foreground-subtle">
-                                        Polaris fetches it, not your browser, so the site it comes from learns
-                                        nothing about you.
+                                        Polaris fetches it, not your browser, so the site it comes
+                                        from learns nothing about you.
                                     </p>
                                     <Button
                                         className="mt-3"

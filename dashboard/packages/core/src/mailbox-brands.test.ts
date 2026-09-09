@@ -63,9 +63,9 @@ describe("a name on a message that is not that name's", () => {
     });
 
     it("reads the sender's display name as well as the subject", () => {
-        expect(claim({ subject: "A quick review of your account", fromName: "Netflix" })?.brand.id).toBe(
-            "netflix"
-        );
+        expect(
+            claim({ subject: "A quick review of your account", fromName: "Netflix" })?.brand.id
+        ).toBe("netflix");
     });
 });
 

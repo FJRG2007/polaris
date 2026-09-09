@@ -283,9 +283,7 @@ export function VaultApp() {
 
     /** The recovery codes on the open item, which are stored as a hidden custom
      *  field so every other Bitwarden client can read them. */
-    const recoveryCodes = current
-        ? core.fieldValue(current.fields, core.RECOVERY_CODES_FIELD)
-        : "";
+    const recoveryCodes = current ? core.fieldValue(current.fields, core.RECOVERY_CODES_FIELD) : "";
 
     /**
      * The custom fields nothing else on this screen has already drawn.
@@ -589,7 +587,10 @@ export function VaultApp() {
                                                         }`}
                                                     >
                                                         {item.type === core.CIPHER_LOGIN ? (
-                                                            <ItemIcon item={item} favicons={favicons} />
+                                                            <ItemIcon
+                                                                item={item}
+                                                                favicons={favicons}
+                                                            />
                                                         ) : (
                                                             <Icon className="size-4 shrink-0 text-muted-foreground" />
                                                         )}
@@ -610,7 +611,9 @@ export function VaultApp() {
                                                     </button>
                                                 </ContextMenuTrigger>
                                                 <ContextMenuContent>
-                                                    <ContextMenuLabel title={item.name || "Untitled"}>
+                                                    <ContextMenuLabel
+                                                        title={item.name || "Untitled"}
+                                                    >
                                                         {item.name || "Untitled"}
                                                     </ContextMenuLabel>
                                                     {item.type === core.CIPHER_LOGIN ? (
@@ -626,7 +629,9 @@ export function VaultApp() {
                                                             >
                                                                 <Copy className="size-4" />
                                                                 Copy{" "}
-                                                                {core.looksLikeEmail(item.login.username)
+                                                                {core.looksLikeEmail(
+                                                                    item.login.username
+                                                                )
                                                                     ? "email"
                                                                     : "username"}
                                                                 <MenuShortcut keys="Mod+Shift+C" />
@@ -647,19 +652,23 @@ export function VaultApp() {
                                                             </ContextMenuItem>
                                                             {item.login.totp ? (
                                                                 <ContextMenuItem
-                                                                    onSelect={() => void copyTotp(item)}
+                                                                    onSelect={() =>
+                                                                        void copyTotp(item)
+                                                                    }
                                                                 >
                                                                     <Copy className="size-4" />
                                                                     Copy the six digits
                                                                 </ContextMenuItem>
                                                             ) : null}
-                                                            {openableUri(item.login.uris[0]?.uri ?? "") ? (
+                                                            {openableUri(
+                                                                item.login.uris[0]?.uri ?? ""
+                                                            ) ? (
                                                                 <ContextMenuItem asChild>
                                                                     <a
                                                                         href={
                                                                             openableUri(
-                                                                                item.login.uris[0]?.uri ??
-                                                                                    ""
+                                                                                item.login.uris[0]
+                                                                                    ?.uri ?? ""
                                                                             ) ?? "#"
                                                                         }
                                                                         target="_blank"
@@ -673,7 +682,9 @@ export function VaultApp() {
                                                             <ContextMenuSeparator />
                                                         </>
                                                     ) : null}
-                                                    <ContextMenuItem onSelect={() => setEditing(item)}>
+                                                    <ContextMenuItem
+                                                        onSelect={() => setEditing(item)}
+                                                    >
                                                         <Pencil className="size-4" />
                                                         Edit
                                                         <MenuShortcut keys="F2" />
@@ -681,7 +692,10 @@ export function VaultApp() {
                                                     <ContextMenuItem
                                                         onSelect={() =>
                                                             void onSave(
-                                                                { ...item, favorite: !item.favorite },
+                                                                {
+                                                                    ...item,
+                                                                    favorite: !item.favorite
+                                                                },
                                                                 []
                                                             )
                                                         }
@@ -691,11 +705,15 @@ export function VaultApp() {
                                                             ? "Remove from favourites"
                                                             : "Favourite"}
                                                     </ContextMenuItem>
-                                                    <ContextMenuItem onSelect={() => setMoving(item)}>
+                                                    <ContextMenuItem
+                                                        onSelect={() => setMoving(item)}
+                                                    >
                                                         <FolderInput className="size-4" />
                                                         Move
                                                     </ContextMenuItem>
-                                                    <ContextMenuItem onSelect={() => setSharing(item)}>
+                                                    <ContextMenuItem
+                                                        onSelect={() => setSharing(item)}
+                                                    >
                                                         <Share2 className="size-4" />
                                                         Share by link
                                                     </ContextMenuItem>
@@ -705,7 +723,9 @@ export function VaultApp() {
                                                         onSelect={() => void onDelete(item)}
                                                     >
                                                         <Trash2 className="size-4" />
-                                                        {item.deleted ? "Delete for good" : "Move to trash"}
+                                                        {item.deleted
+                                                            ? "Delete for good"
+                                                            : "Move to trash"}
                                                         <MenuShortcut keys="Delete" />
                                                     </ContextMenuItem>
                                                 </ContextMenuContent>
@@ -733,7 +753,9 @@ export function VaultApp() {
                                         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted">
                                             {(() => {
                                                 const Icon = TYPE_ICON[current.type] ?? KeyRound;
-                                                return <Icon className="size-5 text-muted-foreground" />;
+                                                return (
+                                                    <Icon className="size-5 text-muted-foreground" />
+                                                );
                                             })()}
                                         </span>
                                     )}
@@ -743,7 +765,9 @@ export function VaultApp() {
                                         </h2>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {current.login.username ||
-                                                core.CIPHER_TYPE_LABEL[current.type as core.CipherType]}
+                                                core.CIPHER_TYPE_LABEL[
+                                                    current.type as core.CipherType
+                                                ]}
                                         </p>
                                     </div>
                                 </div>
@@ -767,7 +791,10 @@ export function VaultApp() {
                                                 : `Star ${current.name}`
                                         }
                                         onClick={async () => {
-                                            await setItemFavoriteAction(current.id, !current.favorite);
+                                            await setItemFavoriteAction(
+                                                current.id,
+                                                !current.favorite
+                                            );
                                             if (key) await load(key);
                                         }}
                                     >
@@ -844,7 +871,9 @@ export function VaultApp() {
                                 <>
                                     <Section
                                         title="Sign in"
-                                        when={Boolean(current.login.username || current.login.password)}
+                                        when={Boolean(
+                                            current.login.username || current.login.password
+                                        )}
                                     >
                                         <Row
                                             label={

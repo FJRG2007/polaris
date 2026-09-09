@@ -41,9 +41,21 @@ import {
 
 /** How an invite can travel, in the order an operator is likely to want them. */
 const METHODS: { value: InviteMethod; label: string; hint: string }[] = [
-    { value: "link", label: "Invite link", hint: "You copy the link and send it however you like." },
-    { value: "magic", label: "Magic link by email", hint: "Polaris emails the link to the address you invited." },
-    { value: "code", label: "Invitation code", hint: "A short code they type in at the sign-in page." }
+    {
+        value: "link",
+        label: "Invite link",
+        hint: "You copy the link and send it however you like."
+    },
+    {
+        value: "magic",
+        label: "Magic link by email",
+        hint: "Polaris emails the link to the address you invited."
+    },
+    {
+        value: "code",
+        label: "Invitation code",
+        hint: "A short code they type in at the sign-in page."
+    }
 ];
 
 /** What was created, held only until the dialog closes. */
@@ -115,7 +127,8 @@ export function InviteDialog({
                 <DialogHeader>
                     <DialogTitle>Invite someone</DialogTitle>
                     <DialogDescription>
-                        They set their own name and password when they join. The invite is good for 7 days.
+                        They set their own name and password when they join. The invite is good for
+                        7 days.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -144,7 +157,10 @@ export function InviteDialog({
                                     aria-label="Role"
                                     value={values.role}
                                     onValueChange={(value) => update("role", value)}
-                                    options={roles.map((role) => ({ value: role.name, label: role.name }))}
+                                    options={roles.map((role) => ({
+                                        value: role.name,
+                                        label: role.name
+                                    }))}
                                 />
                                 <p className="text-xs text-muted-foreground">
                                     {roles.find((role) => role.name === values.role)?.grants === 0
@@ -197,7 +213,12 @@ export function InviteDialog({
                                 aria-expanded={advanced}
                                 className="flex items-center gap-1 text-left text-sm text-muted-foreground hover:text-foreground"
                             >
-                                <ChevronDown className={cn("size-4 transition-transform", advanced && "rotate-180")} />
+                                <ChevronDown
+                                    className={cn(
+                                        "size-4 transition-transform",
+                                        advanced && "rotate-180"
+                                    )}
+                                />
                                 Advanced options
                             </button>
 
@@ -208,8 +229,9 @@ export function InviteDialog({
                                             <div className="min-w-0">
                                                 <p className="text-sm">One-time password</p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    Asked for on top of the link or code. Send it another way, so a
-                                                    misdelivered invite is not enough on its own.
+                                                    Asked for on top of the link or code. Send it
+                                                    another way, so a misdelivered invite is not
+                                                    enough on its own.
                                                 </p>
                                             </div>
                                             <Switch
@@ -224,7 +246,9 @@ export function InviteDialog({
                                                 autoComplete="off"
                                                 placeholder="At least 6 characters"
                                                 value={oneTimePassword}
-                                                onChange={(event) => setOneTimePassword(event.target.value)}
+                                                onChange={(event) =>
+                                                    setOneTimePassword(event.target.value)
+                                                }
                                             />
                                         ) : null}
                                     </div>
@@ -233,11 +257,16 @@ export function InviteDialog({
                                         <div>
                                             <p className="text-sm">Where they may connect from</p>
                                             <p className="text-xs text-muted-foreground">
-                                                Bounds the invite and stays on the account afterwards, as a limit they
-                                                cannot lift themselves. Leave empty for no restriction.
+                                                Bounds the invite and stays on the account
+                                                afterwards, as a limit they cannot lift themselves.
+                                                Leave empty for no restriction.
                                             </p>
                                         </div>
-                                        <AccessRulesEditor value={rules} groups={groups} onChange={setRules} />
+                                        <AccessRulesEditor
+                                            value={rules}
+                                            groups={groups}
+                                            onChange={setRules}
+                                        />
                                     </div>
                                 </div>
                             ) : (
@@ -251,12 +280,18 @@ export function InviteDialog({
 
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => onOpenChange(false)}
+                            >
                                 Cancel
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={pending || (usePassword && oneTimePassword.trim().length < 6)}
+                                disabled={
+                                    pending || (usePassword && oneTimePassword.trim().length < 6)
+                                }
                             >
                                 {pending ? "Creating..." : "Create invite"}
                             </Button>
@@ -274,9 +309,13 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
         <div className="flex flex-col gap-3">
             {issued.code ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3">
-                    <p className="mb-1 text-xs text-muted-foreground">Read this code out to them:</p>
+                    <p className="mb-1 text-xs text-muted-foreground">
+                        Read this code out to them:
+                    </p>
                     <div className="flex items-center gap-2">
-                        <code className="flex-1 font-mono text-lg tracking-widest">{issued.code}</code>
+                        <code className="flex-1 font-mono text-lg tracking-widest">
+                            {issued.code}
+                        </code>
                         <CopyButton value={issued.code} label="invitation code" />
                     </div>
                 </div>
@@ -284,7 +323,11 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
             {issued.url ? (
                 <div className="rounded-md border border-border bg-muted/40 p-3">
                     <p className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        {issued.sendError ? <Mail className="size-3.5" /> : <Wand2 className="size-3.5" />}
+                        {issued.sendError ? (
+                            <Mail className="size-3.5" />
+                        ) : (
+                            <Wand2 className="size-3.5" />
+                        )}
                         {issued.sendError ? "Send it yourself:" : "The invite link:"}
                     </p>
                     <div className="flex items-center gap-2">
@@ -299,7 +342,8 @@ function IssuedInvite({ issued, onDone }: { issued: Issued; onDone: () => void }
                 </p>
             ) : null}
             <p className="text-xs text-muted-foreground">
-                This is shown once. Polaris keeps only a hash of it, so it cannot be looked up again.
+                This is shown once. Polaris keeps only a hash of it, so it cannot be looked up
+                again.
             </p>
             <div className="flex justify-end">
                 <Button onClick={onDone}>Done</Button>

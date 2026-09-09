@@ -98,7 +98,12 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
         names: ["amazon"],
         domains: ["amazon.com", "amazon.es", "amazon.co.uk", "amazon.de"]
     },
-    { id: "google", label: "Google", names: ["google", "gmail"], domains: ["google.com", "gmail.com"] },
+    {
+        id: "google",
+        label: "Google",
+        names: ["google", "gmail"],
+        domains: ["google.com", "gmail.com"]
+    },
     {
         id: "meta",
         label: "Meta",
@@ -107,10 +112,25 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
     },
     { id: "linkedin", label: "LinkedIn", names: ["linkedin"], domains: ["linkedin.com"] },
     { id: "telegram", label: "Telegram", names: ["telegram"], domains: ["telegram.org"] },
-    { id: "steam", label: "Steam", names: ["steam", "steampowered"], domains: ["steampowered.com", "valvesoftware.com"] },
+    {
+        id: "steam",
+        label: "Steam",
+        names: ["steam", "steampowered"],
+        domains: ["steampowered.com", "valvesoftware.com"]
+    },
     { id: "spotify", label: "Spotify", names: ["spotify"], domains: ["spotify.com"] },
-    { id: "disney", label: "Disney+", names: ["disney plus", "disney"], domains: ["disneyplus.com", "disney.com"] },
-    { id: "hbo", label: "HBO Max", names: ["hbo max", "hbo"], domains: ["hbomax.com", "max.com", "hbo.com"] },
+    {
+        id: "disney",
+        label: "Disney+",
+        names: ["disney plus", "disney"],
+        domains: ["disneyplus.com", "disney.com"]
+    },
+    {
+        id: "hbo",
+        label: "HBO Max",
+        names: ["hbo max", "hbo"],
+        domains: ["hbomax.com", "max.com", "hbo.com"]
+    },
     { id: "dropbox", label: "Dropbox", names: ["dropbox"], domains: ["dropbox.com"] },
     { id: "adobe", label: "Adobe", names: ["adobe"], domains: ["adobe.com"] },
     { id: "binance", label: "Binance", names: ["binance"], domains: ["binance.com"] },
@@ -132,16 +152,42 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
     { id: "seur", label: "SEUR", names: ["seur"], domains: ["seur.com", "seur.es"] },
     { id: "mrw", label: "MRW", names: ["mrw"], domains: ["mrw.es"] },
     { id: "glovo", label: "Glovo", names: ["glovo"], domains: ["glovoapp.com"] },
-    { id: "santander", label: "Santander", names: ["santander"], domains: ["santander.es", "santander.com"] },
+    {
+        id: "santander",
+        label: "Santander",
+        names: ["santander"],
+        domains: ["santander.es", "santander.com"]
+    },
     { id: "bbva", label: "BBVA", names: ["bbva"], domains: ["bbva.es", "bbva.com"] },
-    { id: "caixabank", label: "CaixaBank", names: ["caixabank", "la caixa"], domains: ["caixabank.es", "caixabank.com"] },
-    { id: "sabadell", label: "Banco Sabadell", names: ["banco sabadell", "sabadell"], domains: ["bancsabadell.com", "bancosabadell.com"] },
+    {
+        id: "caixabank",
+        label: "CaixaBank",
+        names: ["caixabank", "la caixa"],
+        domains: ["caixabank.es", "caixabank.com"]
+    },
+    {
+        id: "sabadell",
+        label: "Banco Sabadell",
+        names: ["banco sabadell", "sabadell"],
+        domains: ["bancsabadell.com", "bancosabadell.com"]
+    },
     { id: "bankinter", label: "Bankinter", names: ["bankinter"], domains: ["bankinter.com"] },
     { id: "openbank", label: "Openbank", names: ["openbank"], domains: ["openbank.es"] },
     { id: "revolut", label: "Revolut", names: ["revolut"], domains: ["revolut.com"] },
     { id: "n26", label: "N26", names: ["n26"], domains: ["n26.com"] },
-    { id: "visa", label: "Visa", names: ["visa"], domains: ["visa.com", "visa.es"], common: ["visa"] },
-    { id: "mastercard", label: "Mastercard", names: ["mastercard"], domains: ["mastercard.com", "mastercard.es"] },
+    {
+        id: "visa",
+        label: "Visa",
+        names: ["visa"],
+        domains: ["visa.com", "visa.es"],
+        common: ["visa"]
+    },
+    {
+        id: "mastercard",
+        label: "Mastercard",
+        names: ["mastercard"],
+        domains: ["mastercard.com", "mastercard.es"]
+    },
     {
         id: "aeat",
         label: "the Agencia Tributaria",
@@ -157,11 +203,32 @@ export const IMPERSONATED_BRANDS: readonly ImpersonatedBrand[] = [
         domains: ["seg-social.es", "seg-social.gob.es"]
     },
     { id: "endesa", label: "Endesa", names: ["endesa"], domains: ["endesa.com", "endesa.es"] },
-    { id: "iberdrola", label: "Iberdrola", names: ["iberdrola"], domains: ["iberdrola.es", "iberdrola.com"] },
+    {
+        id: "iberdrola",
+        label: "Iberdrola",
+        names: ["iberdrola"],
+        domains: ["iberdrola.es", "iberdrola.com"]
+    },
     { id: "naturgy", label: "Naturgy", names: ["naturgy"], domains: ["naturgy.es", "naturgy.com"] },
-    { id: "movistar", label: "Movistar", names: ["movistar", "telefonica"], domains: ["movistar.es", "telefonica.com"] },
-    { id: "vodafone", label: "Vodafone", names: ["vodafone"], domains: ["vodafone.es", "vodafone.com"] },
-    { id: "orange", label: "Orange", names: ["orange"], domains: ["orange.es", "orange.com"], common: ["orange"] }
+    {
+        id: "movistar",
+        label: "Movistar",
+        names: ["movistar", "telefonica"],
+        domains: ["movistar.es", "telefonica.com"]
+    },
+    {
+        id: "vodafone",
+        label: "Vodafone",
+        names: ["vodafone"],
+        domains: ["vodafone.es", "vodafone.com"]
+    },
+    {
+        id: "orange",
+        label: "Orange",
+        names: ["orange"],
+        domains: ["orange.es", "orange.com"],
+        common: ["orange"]
+    }
 ];
 
 /**

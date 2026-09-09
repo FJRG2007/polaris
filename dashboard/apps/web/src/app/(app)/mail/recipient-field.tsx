@@ -54,7 +54,11 @@ export function RecipientField({
         const timer = setTimeout(() => {
             void (async () => {
                 const outcome = await suggestContactsAction(needle);
-                setSuggestions(outcome.suggestions.filter((one) => !value.some((held) => core.sameAddress(held.address, one.address))));
+                setSuggestions(
+                    outcome.suggestions.filter(
+                        (one) => !value.some((held) => core.sameAddress(held.address, one.address))
+                    )
+                );
                 setHighlight(0);
             })();
         }, SETTLE_MS);
@@ -102,7 +106,9 @@ export function RecipientField({
                                 aria-label={`Remove ${entry.address}`}
                                 title={`Remove ${entry.address}`}
                                 className="text-foreground-subtle hover:text-foreground"
-                                onClick={() => onChange(value.filter((held) => held.address !== entry.address))}
+                                onClick={() =>
+                                    onChange(value.filter((held) => held.address !== entry.address))
+                                }
                             >
                                 <X className="size-3 shrink-0" aria-hidden />
                             </button>
@@ -130,10 +136,17 @@ export function RecipientField({
                             }
                             if (event.key === "ArrowUp" && suggestions.length > 0) {
                                 event.preventDefault();
-                                setHighlight((held) => (held - 1 + suggestions.length) % suggestions.length);
+                                setHighlight(
+                                    (held) => (held - 1 + suggestions.length) % suggestions.length
+                                );
                                 return;
                             }
-                            if (event.key === "Enter" || event.key === "Tab" || event.key === "," || event.key === ";") {
+                            if (
+                                event.key === "Enter" ||
+                                event.key === "Tab" ||
+                                event.key === "," ||
+                                event.key === ";"
+                            ) {
                                 const chosen = suggestions[highlight];
                                 if (event.key === "Enter" && chosen) {
                                     event.preventDefault();
@@ -171,7 +184,9 @@ export function RecipientField({
                                     type="button"
                                     className={cn(
                                         "flex w-full items-baseline gap-2 px-2 py-1.5 text-left text-[13px]",
-                                        index === highlight ? "bg-card text-foreground" : "text-muted-foreground"
+                                        index === highlight
+                                            ? "bg-card text-foreground"
+                                            : "text-muted-foreground"
                                     )}
                                     // Pressing a suggestion must not blur the box
                                     // first, or the half-typed address commits and

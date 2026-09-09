@@ -176,9 +176,7 @@ export function SlidesEditor({
                                 chosen={chosen}
                                 editable={editable}
                                 onChoose={setChosen}
-                                onMove={(box, frame) =>
-                                    slide && moveBox(doc, slide.id, box, frame)
-                                }
+                                onMove={(box, frame) => slide && moveBox(doc, slide.id, box, frame)}
                                 onText={(box, text) => slide && setText(doc, slide.id, box, text)}
                             />
                         </div>
@@ -362,16 +360,20 @@ function moveBox(doc: Y.Doc, slideId: string, box: deck.Box, frame: deck.BoxFram
     // Clamped rather than refused: dragging a box off the edge is something
     // people do constantly, and "it stopped at the edge" is the useful answer.
     const kept = deck.clampFrame(frame);
-    doc
-        .getMap<deck.Box>(BOXES)
-        .set(deck.boxKey(slideId, box.id), { ...box, ...kept, version: box.version + 1 });
+    doc.getMap<deck.Box>(BOXES).set(deck.boxKey(slideId, box.id), {
+        ...box,
+        ...kept,
+        version: box.version + 1
+    });
 }
 
 function setText(doc: Y.Doc, slideId: string, box: deck.Box, text: string): void {
     if (text === box.text) return;
-    doc
-        .getMap<deck.Box>(BOXES)
-        .set(deck.boxKey(slideId, box.id), { ...box, text, version: box.version + 1 });
+    doc.getMap<deck.Box>(BOXES).set(deck.boxKey(slideId, box.id), {
+        ...box,
+        text,
+        version: box.version + 1
+    });
 }
 
 function duplicateSlide(doc: Y.Doc, slideId: string, index: number): void {

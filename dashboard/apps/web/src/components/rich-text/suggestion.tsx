@@ -113,8 +113,7 @@ function roomMatches(query: string): RoomSuggestion[] {
     const needle = query.trim().toLowerCase();
     if (needle.length === 0) return [...ROOM_MENTIONS];
     return ROOM_MENTIONS.filter(
-        (room) =>
-            room.id.startsWith(needle) || (room.id === "everyone" && "all".startsWith(needle))
+        (room) => room.id.startsWith(needle) || (room.id === "everyone" && "all".startsWith(needle))
     );
 }
 
@@ -333,11 +332,7 @@ function mentionSuggestion(
             // The room mentions are words rather than references: what makes them
             // work is the text itself, read again when the message lands.
             if (item.kind === "room") {
-                editor
-                    .chain()
-                    .focus()
-                    .insertContentAt(range, `${item.label} `)
-                    .run();
+                editor.chain().focus().insertContentAt(range, `${item.label} `).run();
                 return;
             }
             editor

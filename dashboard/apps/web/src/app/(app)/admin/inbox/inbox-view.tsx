@@ -309,7 +309,6 @@ function Thread({
         return () => clearInterval(timer);
     }, [load]);
 
-
     function send() {
         setError(null);
         const options = optionsMode
@@ -395,7 +394,10 @@ function Thread({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     <Select
-                        value={(assignedTo === undefined ? conversation.assigneeId : assignedTo) ?? "none"}
+                        value={
+                            (assignedTo === undefined ? conversation.assigneeId : assignedTo) ??
+                            "none"
+                        }
                         onValueChange={(value) => {
                             const assigneeId = value === "none" ? null : value;
                             setAssignedTo(assigneeId);

@@ -94,7 +94,9 @@ export function PlainTextEditor({
                         className="h-full min-h-[50vh] w-full resize-none border-0 bg-transparent p-4 font-mono text-xs leading-relaxed outline-none"
                     />
                 ) : (
-                    <pre className="overflow-auto overscroll-contain p-4 text-xs leading-relaxed">{file.text}</pre>
+                    <pre className="overflow-auto overscroll-contain p-4 text-xs leading-relaxed">
+                        {file.text}
+                    </pre>
                 )}
             </div>
         </div>

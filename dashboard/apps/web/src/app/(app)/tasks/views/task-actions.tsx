@@ -94,7 +94,11 @@ export interface TaskCommands {
     /** Creating a tag from the picker, when the screen offers that. */
     readonly onCreateTag?: (name: string, color: string) => Promise<string | null>;
     /** Creating a status, when the reader may change the space's own. */
-    readonly onCreateStatus?: (name: string, type: core.TaskStatusType, color: string) => Promise<string | null>;
+    readonly onCreateStatus?: (
+        name: string,
+        type: core.TaskStatusType,
+        color: string
+    ) => Promise<string | null>;
 }
 
 /** Bind one task to what a view can do with it. Every view builds its commands
@@ -102,7 +106,8 @@ export interface TaskCommands {
 export function commandsFor(props: ViewProps, task: TaskRow): TaskCommands {
     // A right-click inside the selection means the selection; outside it means
     // that one task, and leaves the selection alone.
-    const targets = props.selection.has(task.id) && props.selected.length > 0 ? props.selected : [task];
+    const targets =
+        props.selection.has(task.id) && props.selected.length > 0 ? props.selected : [task];
 
     return {
         task,
@@ -144,7 +149,9 @@ async function copy(value: string): Promise<void> {
  */
 export function TaskControls({ commands }: { commands: TaskCommands }) {
     const { task, context, canEdit } = commands;
-    const assigned = context.people.filter((person) => task.assignees.some((entry) => entry.id === person.id));
+    const assigned = context.people.filter((person) =>
+        task.assignees.some((entry) => entry.id === person.id)
+    );
 
     return (
         <>
@@ -176,7 +183,8 @@ export function TaskControls({ commands }: { commands: TaskCommands }) {
                     // that for a tag that already existed too. Doing it here as
                     // well sent the same list twice, as two saves.
                     commands.onCreateTag
-                        ? async (name) => (await commands.onCreateTag?.(name, tagColorFor(name))) ?? null
+                        ? async (name) =>
+                              (await commands.onCreateTag?.(name, tagColorFor(name))) ?? null
                         : undefined
                 }
             />
@@ -220,7 +228,11 @@ function CreateStatusDialog({
     onCreate
 }: {
     onClose: () => void;
-    onCreate: (draft: { name: string; type: core.TaskStatusType; color: string }) => Promise<string | null>;
+    onCreate: (draft: {
+        name: string;
+        type: core.TaskStatusType;
+        color: string;
+    }) => Promise<string | null>;
 }) {
     const [name, setName] = useState("");
     const [type, setType] = useState<core.TaskStatusType>("open");
@@ -262,26 +274,28 @@ function CreateStatusDialog({
                     </label>
 
                     <div className="flex flex-col gap-1 text-sm">
-                            Kind
-                            <div className="flex flex-wrap gap-1">
-                                {core.TASK_STATUS_TYPES.map((entry) => (
-                                    <button
-                                        key={entry}
-                                        type="button"
-                                        onClick={() => setType(entry)}
-                                        aria-pressed={type === entry}
-                                        className={cn(
-                                            "rounded-md border px-2 py-1 text-xs transition-colors",
-                                            type === entry
-                                                ? "border-primary bg-primary/10 text-foreground"
-                                                : "border-border text-muted-foreground hover:text-foreground"
-                                        )}
-                                    >
-                                        {core.TASK_STATUS_TYPE_LABELS[entry]}
-                                    </button>
-                                ))}
-                            </div>
-                        <p className="text-xs text-muted-foreground">{core.TASK_STATUS_TYPE_HINTS[type]}</p>
+                        Kind
+                        <div className="flex flex-wrap gap-1">
+                            {core.TASK_STATUS_TYPES.map((entry) => (
+                                <button
+                                    key={entry}
+                                    type="button"
+                                    onClick={() => setType(entry)}
+                                    aria-pressed={type === entry}
+                                    className={cn(
+                                        "rounded-md border px-2 py-1 text-xs transition-colors",
+                                        type === entry
+                                            ? "border-primary bg-primary/10 text-foreground"
+                                            : "border-border text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    {core.TASK_STATUS_TYPE_LABELS[entry]}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {core.TASK_STATUS_TYPE_HINTS[type]}
+                        </p>
                     </div>
 
                     <label className="flex items-center gap-2 text-sm">
@@ -313,7 +327,10 @@ function CreateStatusDialog({
  *  means once the menu is acting on more than one. Half the selection having a
  *  label is not the label being on, and offering it as "on" would turn the next
  *  click into a removal nobody asked for. */
-function sharedBy(tasks: readonly TaskRow[], idsOf: (task: TaskRow) => readonly string[]): Set<string> {
+function sharedBy(
+    tasks: readonly TaskRow[],
+    idsOf: (task: TaskRow) => readonly string[]
+): Set<string> {
     const [first, ...rest] = tasks;
     if (!first) return new Set();
     const shared = new Set(idsOf(first));
@@ -325,7 +342,13 @@ function sharedBy(tasks: readonly TaskRow[], idsOf: (task: TaskRow) => readonly 
 }
 
 /** Right-click anywhere on a task. */
-export function TaskMenu({ commands, children }: { commands: TaskCommands; children: React.ReactNode }) {
+export function TaskMenu({
+    commands,
+    children
+}: {
+    commands: TaskCommands;
+    children: React.ReactNode;
+}) {
     const { task, targets, context, canEdit } = commands;
     const baseUrl = useAppUrl();
     const [drafting, setDrafting] = useState(false);
@@ -360,13 +383,26 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
      * row, which stays put, so they survive the menu itself opening and closing.
      * The faces are warmed the same way one level up - see the open handler.
      */
-    const assigned = useMemo(() => sharedBy(targets, (entry) => entry.assignees.map((person) => person.id)), [targets]);
-    const tagged = useMemo(() => sharedBy(targets, (entry) => entry.tags.map((tag) => tag.id)), [targets]);
-    const priorities = useMemo(() => core.TASK_PRIORITIES.filter((priority) => priority !== "none"), []);
+    const assigned = useMemo(
+        () => sharedBy(targets, (entry) => entry.assignees.map((person) => person.id)),
+        [targets]
+    );
+    const tagged = useMemo(
+        () => sharedBy(targets, (entry) => entry.tags.map((tag) => tag.id)),
+        [targets]
+    );
+    const priorities = useMemo(
+        () => core.TASK_PRIORITIES.filter((priority) => priority !== "none"),
+        []
+    );
     // Ticked only where the whole set already agrees, for the same reason a tag
     // half the selection carries is not shown as on.
-    const sharedStatusId = targets.every((entry) => entry.statusId === task.statusId) ? task.statusId : null;
-    const sharedPriority = targets.every((entry) => entry.priority === task.priority) ? task.priority : null;
+    const sharedStatusId = targets.every((entry) => entry.statusId === task.statusId)
+        ? task.statusId
+        : null;
+    const sharedPriority = targets.every((entry) => entry.priority === task.priority)
+        ? task.priority
+        : null;
 
     /**
      * Where this work can be moved to.
@@ -381,14 +417,20 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
         const spaceId = spaces.size === 1 ? [...spaces][0] : null;
         if (!spaceId) return [];
         const held = new Set(targets.map((entry) => entry.listId));
-        return commands.lists.filter((list) => list.spaceId === spaceId && !(held.size === 1 && held.has(list.id)));
+        return commands.lists.filter(
+            (list) => list.spaceId === spaceId && !(held.size === 1 && held.has(list.id))
+        );
     }, [targets, commands.lists]);
 
     // What each search has left on screen. A space keeps adding states, tags and
     // lists, and the people on it only ever grow, so every one of these is a
     // list somebody eventually has to look through rather than read.
-    const matchingStatuses = context.statuses.filter((status) => menuSearchMatches(status.name, statusQuery));
-    const matchingPeople = context.people.filter((person) => menuSearchMatches(person.name, peopleQuery));
+    const matchingStatuses = context.statuses.filter((status) =>
+        menuSearchMatches(status.name, statusQuery)
+    );
+    const matchingPeople = context.people.filter((person) =>
+        menuSearchMatches(person.name, peopleQuery)
+    );
     const matchingTags = context.tags.filter((tag) => menuSearchMatches(tag.name, tagQuery));
     // Whether what has been typed is a tag that does not exist yet, which is the
     // only state in which making one is on offer.
@@ -446,11 +488,15 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
 
     return (
         <>
-            {drafting && <CreateStatusDialog onClose={() => setDrafting(false)} onCreate={create} />}
+            {drafting && (
+                <CreateStatusDialog onClose={() => setDrafting(false)} onCreate={create} />
+            )}
             {/* The people this space can assign are fetched the moment the menu
                 opens rather than when the Assign submenu does, so their faces are
                 already in the browser by the time anybody reaches them. */}
-            <ContextMenu onOpenChange={(open) => (open ? preloadAvatars(context.people) : undefined)}>
+            <ContextMenu
+                onOpenChange={(open) => (open ? preloadAvatars(context.people) : undefined)}
+            >
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent className="w-56">
                     {many ? (
@@ -495,11 +541,19 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         {matchingStatuses.map((status) => (
                                             <ContextMenuItem
                                                 key={status.id}
-                                                onSelect={() => commands.onApply({ statusId: status.id })}
+                                                onSelect={() =>
+                                                    commands.onApply({ statusId: status.id })
+                                                }
                                                 className="gap-2"
                                             >
-                                                <StatusIcon color={status.color} type={status.type} size={16} />
-                                                <span className="flex-1 truncate">{status.name}</span>
+                                                <StatusIcon
+                                                    color={status.color}
+                                                    type={status.type}
+                                                    size={16}
+                                                />
+                                                <span className="flex-1 truncate">
+                                                    {status.name}
+                                                </span>
                                                 {status.id === sharedStatusId && (
                                                     <Check className="size-3.5 text-primary" />
                                                 )}
@@ -536,10 +590,16 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                             <Flag
                                                 className="size-3.5"
                                                 fill={core.TASK_PRIORITY_COLORS[priority]}
-                                                style={{ color: core.TASK_PRIORITY_COLORS[priority] }}
+                                                style={{
+                                                    color: core.TASK_PRIORITY_COLORS[priority]
+                                                }}
                                             />
-                                            <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
-                                            {sharedPriority === priority && <Check className="size-3.5 text-primary" />}
+                                            <span className="flex-1">
+                                                {core.TASK_PRIORITY_LABELS[priority]}
+                                            </span>
+                                            {sharedPriority === priority && (
+                                                <Check className="size-3.5 text-primary" />
+                                            )}
                                         </ContextMenuItem>
                                     ))}
                                     <ContextMenuItem
@@ -571,11 +631,12 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 Nobody is on this space yet.
                                             </p>
                                         )}
-                                        {context.people.length > 0 && matchingPeople.length === 0 && (
-                                            <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                Nobody matches that.
-                                            </p>
-                                        )}
+                                        {context.people.length > 0 &&
+                                            matchingPeople.length === 0 && (
+                                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                    Nobody matches that.
+                                                </p>
+                                            )}
                                         {matchingPeople.map((person) => {
                                             const on = assigned.has(person.id);
                                             return (
@@ -604,7 +665,9 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                             name={person.name}
                                                         />
                                                     </span>
-                                                    {on && <Check className="size-3.5 text-primary" />}
+                                                    {on && (
+                                                        <Check className="size-3.5 text-primary" />
+                                                    )}
                                                 </PersonRow>
                                             );
                                         })}
@@ -666,8 +729,12 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                             className="inline-block size-2.5 shrink-0 rounded-full"
                                                             style={{ backgroundColor: tag.color }}
                                                         />
-                                                        <span className="flex-1 truncate">{tag.name}</span>
-                                                        {on && <Check className="size-3.5 text-primary" />}
+                                                        <span className="flex-1 truncate">
+                                                            {tag.name}
+                                                        </span>
+                                                        {on && (
+                                                            <Check className="size-3.5 text-primary" />
+                                                        )}
                                                     </ContextMenuItem>
                                                 );
                                             })}
@@ -727,16 +794,19 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                         : "This space has nowhere else to put it."}
                                                 </p>
                                             )}
-                                            {destinations.length > 0 && matchingLists.length === 0 && (
-                                                <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                                    No list matches that.
-                                                </p>
-                                            )}
+                                            {destinations.length > 0 &&
+                                                matchingLists.length === 0 && (
+                                                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                                                        No list matches that.
+                                                    </p>
+                                                )}
                                             {matchingLists.map((list) => (
                                                 <ContextMenuItem
                                                     key={list.id}
                                                     className="gap-2"
-                                                    onSelect={() => commands.onApply({ listId: list.id })}
+                                                    onSelect={() =>
+                                                        commands.onApply({ listId: list.id })
+                                                    }
                                                 >
                                                     {/* Both lines carry their own
                                                         text: a long list name is
@@ -745,11 +815,17 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                         second line is telling two
                                                         of them apart. */}
                                                     <span className="flex min-w-0 flex-1 flex-col">
-                                                        <span className="truncate" title={list.name}>
+                                                        <span
+                                                            className="truncate"
+                                                            title={list.name}
+                                                        >
                                                             {list.name}
                                                         </span>
                                                         {list.where &&
-                                                            core.needsQualifying(list.name, sharedNames) && (
+                                                            core.needsQualifying(
+                                                                list.name,
+                                                                sharedNames
+                                                            ) && (
                                                                 <span
                                                                     className="truncate text-xs text-muted-foreground"
                                                                     title={list.where}

@@ -216,9 +216,7 @@ export function SearchPanel({
                                     >
                                         <PersonName
                                             id={hit.message.authorId}
-                                            name={
-                                                hit.message.authorName ?? "Somebody who has left"
-                                            }
+                                            name={hit.message.authorName ?? "Somebody who has left"}
                                         />
                                     </span>
                                     {/* Clamped rather than truncated: a hit is

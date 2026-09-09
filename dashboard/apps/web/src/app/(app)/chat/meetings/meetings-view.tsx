@@ -78,8 +78,8 @@ export function MeetingsView() {
 
             <div className="flex flex-col gap-3 p-4">
                 <p className="text-xs text-muted-foreground">
-                    A room with a link anybody can open, whether or not they have a Polaris
-                    account. Whoever creates one hosts it.
+                    A room with a link anybody can open, whether or not they have a Polaris account.
+                    Whoever creates one hosts it.
                 </p>
 
                 {error && (
@@ -309,7 +309,11 @@ function NewMeetingDialog({
                     <Button variant="secondary" size="sm" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button size="sm" disabled={busy || !title.trim()} onClick={() => void create()}>
+                    <Button
+                        size="sm"
+                        disabled={busy || !title.trim()}
+                        onClick={() => void create()}
+                    >
                         {busy && <Loader2 className="size-4 animate-spin" />}
                         Create
                     </Button>

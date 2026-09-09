@@ -361,7 +361,7 @@ export function ChatSidebar() {
                                     label={channel.name}
                                     personId={
                                         channel.others.length === 1
-                                            ? channel.others[0]?.id ?? null
+                                            ? (channel.others[0]?.id ?? null)
                                             : null
                                     }
                                     icon={

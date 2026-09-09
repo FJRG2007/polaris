@@ -1316,53 +1316,55 @@ export function FilesView({
                     </>
                 )}
                 {abilities.remove ? (
-                <>
-                <ContextMenuSeparator />
-                <ContextMenuSub>
-                    <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
-                        <Trash2 className="size-4" />
-                        Delete
-                    </ContextMenuSubTrigger>
-                    <ContextMenuSubContent>
-                        <ContextMenuItem onSelect={() => onDelete(targets)}>
-                            <Trash2 className="size-4" />
-                            Move to Trash
-                            <MenuShortcut>Del</MenuShortcut>
-                        </ContextMenuItem>
-                        <ContextMenuItem
-                            variant="danger"
-                            onSelect={() => onDeletePermanent(targets)}
-                        >
-                            <Trash2 className="size-4" />
-                            Delete permanently
-                        </ContextMenuItem>
-                        {!many && entry.kind === "dir" ? (
-                            <>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem onSelect={() => onEmptyFolder(entry, false)}>
-                                    <Eraser className="size-4" />
-                                    Empty folder to Trash
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuSub>
+                            <ContextMenuSubTrigger className="text-danger data-[state=open]:bg-danger/10 focus:bg-danger/10">
+                                <Trash2 className="size-4" />
+                                Delete
+                            </ContextMenuSubTrigger>
+                            <ContextMenuSubContent>
+                                <ContextMenuItem onSelect={() => onDelete(targets)}>
+                                    <Trash2 className="size-4" />
+                                    Move to Trash
+                                    <MenuShortcut>Del</MenuShortcut>
                                 </ContextMenuItem>
                                 <ContextMenuItem
                                     variant="danger"
-                                    onSelect={() => onEmptyFolder(entry, true)}
+                                    onSelect={() => onDeletePermanent(targets)}
                                 >
-                                    <Eraser className="size-4" />
-                                    Empty folder permanently
+                                    <Trash2 className="size-4" />
+                                    Delete permanently
                                 </ContextMenuItem>
-                            </>
-                        ) : null}
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                            variant="danger"
-                            onSelect={() => onScheduleDelete(targets)}
-                        >
-                            <CalendarClock className="size-4" />
-                            Delete later...
-                        </ContextMenuItem>
-                    </ContextMenuSubContent>
-                </ContextMenuSub>
-                </>
+                                {!many && entry.kind === "dir" ? (
+                                    <>
+                                        <ContextMenuSeparator />
+                                        <ContextMenuItem
+                                            onSelect={() => onEmptyFolder(entry, false)}
+                                        >
+                                            <Eraser className="size-4" />
+                                            Empty folder to Trash
+                                        </ContextMenuItem>
+                                        <ContextMenuItem
+                                            variant="danger"
+                                            onSelect={() => onEmptyFolder(entry, true)}
+                                        >
+                                            <Eraser className="size-4" />
+                                            Empty folder permanently
+                                        </ContextMenuItem>
+                                    </>
+                                ) : null}
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                    variant="danger"
+                                    onSelect={() => onScheduleDelete(targets)}
+                                >
+                                    <CalendarClock className="size-4" />
+                                    Delete later...
+                                </ContextMenuItem>
+                            </ContextMenuSubContent>
+                        </ContextMenuSub>
+                    </>
                 ) : null}
             </ContextMenuContent>
         );
@@ -1850,17 +1852,17 @@ export function FilesView({
                             </Button>
                         ) : null}
                         {abilities.write ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={onNewFolder}
-                            disabled={pending}
-                            title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
-                            aria-label="New folder"
-                        >
-                            <FolderPlus className="size-4" />
-                            <span className="hidden sm:inline">New folder</span>
-                        </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={onNewFolder}
+                                disabled={pending}
+                                title={`New folder (${SHORTCUT_HINTS["new-folder"]})`}
+                                aria-label="New folder"
+                            >
+                                <FolderPlus className="size-4" />
+                                <span className="hidden sm:inline">New folder</span>
+                            </Button>
                         ) : null}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1868,7 +1870,11 @@ export function FilesView({
                                     size="sm"
                                     variant="secondary"
                                     disabled={uploading || !abilities.write}
-                                    title={abilities.write ? "Upload" : "You can read this, not change it"}
+                                    title={
+                                        abilities.write
+                                            ? "Upload"
+                                            : "You can read this, not change it"
+                                    }
                                     aria-label="Upload"
                                 >
                                     <Upload className="size-4" />
@@ -2512,7 +2518,9 @@ export function FilesView({
                                                                                 : "hover:bg-card-hover",
                                                                             entry.hidden &&
                                                                                 "opacity-50",
-                                                                            leaving.has(entry.path) &&
+                                                                            leaving.has(
+                                                                                entry.path
+                                                                            ) &&
                                                                                 "pointer-events-none opacity-40",
                                                                             cutPaths?.has(
                                                                                 entry.path

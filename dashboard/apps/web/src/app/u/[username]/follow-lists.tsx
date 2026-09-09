@@ -77,7 +77,12 @@ export function FollowLists({
                 />
             </div>
             {open ? (
-                <PeopleDialog which={open} personId={personId} name={name} onClose={() => setOpen(null)} />
+                <PeopleDialog
+                    which={open}
+                    personId={personId}
+                    name={name}
+                    onClose={() => setOpen(null)}
+                />
             ) : null}
         </>
     );
@@ -92,7 +97,15 @@ export function FollowLists({
  * refuses is an invitation to work out why, and the answer here is somebody's
  * privacy setting, which is not this reader's business either.
  */
-function Count({ label, value, onOpen }: { label: string; value: number; onOpen: (() => void) | null }) {
+function Count({
+    label,
+    value,
+    onOpen
+}: {
+    label: string;
+    value: number;
+    onOpen: (() => void) | null;
+}) {
     const text = (
         <>
             <span className="font-medium tabular-nums text-foreground">{value}</span>{" "}
@@ -249,7 +262,10 @@ function PeopleDialog({
                     />
                 </div>
 
-                <ul ref={listBox} className="flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain">
+                <ul
+                    ref={listBox}
+                    className="flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain"
+                >
                     {shown.map((person) => (
                         <li key={person.id}>
                             <PersonRow
@@ -279,7 +295,9 @@ function PeopleDialog({
                 </ul>
 
                 {error ? <p className="text-danger text-sm">{error}</p> : null}
-                {busy ? <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" /> : null}
+                {busy ? (
+                    <Loader2 className="mx-auto size-4 animate-spin text-muted-foreground" />
+                ) : null}
                 {/* The way down for anybody the observer cannot serve - a browser
                     with it switched off, and a keyboard, which never scrolls a
                     box it has not been given a reason to enter. */}

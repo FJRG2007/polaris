@@ -23,7 +23,13 @@ interface Entry {
     isDir: boolean;
 }
 
-export function FilesPanel({ applicationId, root = "/" }: { applicationId: string; root?: string }) {
+export function FilesPanel({
+    applicationId,
+    root = "/"
+}: {
+    applicationId: string;
+    root?: string;
+}) {
     const base = asDirectory(root);
     const [path, setPath] = useState(base);
     const [entries, setEntries] = useState<Entry[]>([]);
@@ -35,9 +41,12 @@ export function FilesPanel({ applicationId, root = "/" }: { applicationId: strin
         async (next: string) => {
             setBusy(true);
             setError(null);
-            const res = await fetch(`/api/deploy/apps/${applicationId}/files?path=${encodeURIComponent(next)}`, {
-                cache: "no-store"
-            });
+            const res = await fetch(
+                `/api/deploy/apps/${applicationId}/files?path=${encodeURIComponent(next)}`,
+                {
+                    cache: "no-store"
+                }
+            );
             const data = (await res.json()) as { entries?: Entry[]; error?: string };
             if (!res.ok) setError(data.error ?? "Could not list files");
             else {
@@ -80,17 +89,29 @@ export function FilesPanel({ applicationId, root = "/" }: { applicationId: strin
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={goUp} disabled={busy || path === base} title="Up" aria-label="Up">
+                <Button
+                    variant="ghost"
+                    onClick={goUp}
+                    disabled={busy || path === base}
+                    title="Up"
+                    aria-label="Up"
+                >
                     <ArrowUp className="size-4" />
                 </Button>
                 <span className="truncate text-xs text-muted-foreground">{path}</span>
                 <div className="ml-auto flex items-center gap-2">
                     <Button asChild variant="ghost" title="Open this container in Drive">
-                        <Link href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}>
+                        <Link
+                            href={`/drive?c=container:${applicationId}&p=${encodeURIComponent(path.replace(/^\/+|\/+$/g, ""))}`}
+                        >
                             <HardDrive className="size-4" /> View in Drive
                         </Link>
                     </Button>
-                    <Button variant="outline" onClick={() => fileInput.current?.click()} disabled={busy}>
+                    <Button
+                        variant="outline"
+                        onClick={() => fileInput.current?.click()}
+                        disabled={busy}
+                    >
                         <Upload className="size-4" /> Upload
                     </Button>
                     <input
@@ -107,7 +128,9 @@ export function FilesPanel({ applicationId, root = "/" }: { applicationId: strin
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border/60">
-                {entries.length === 0 && !busy && <p className="p-3 text-xs text-muted-foreground">Empty.</p>}
+                {entries.length === 0 && !busy && (
+                    <p className="p-3 text-xs text-muted-foreground">Empty.</p>
+                )}
                 {entries.map((entry) => (
                     <div
                         key={entry.name}

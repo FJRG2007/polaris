@@ -1563,66 +1563,66 @@ export function ChannelView({
                         // tomorrow, whether it is a channel, a group or one
                         // person - see `drafts`.
                         draftKey={channelDraftKey(channelId)}
-                    rules={rules}
-                    disabled={!canPost}
-                    attachable={may.attach}
-                    placeholder={
-                        canPost
-                            ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
-                            : "This conversation is archived."
-                    }
-                    editing={editing}
-                    replyingTo={replyingTo ?? carried?.message ?? null}
-                    replyingFrom={
-                        carried?.from ? { name: carried.from, channel: carried.channel } : null
-                    }
-                    insert={inserting}
-                    onCancelReply={() => {
-                        setReplyingTo(null);
-                        setCarried(null);
-                    }}
-                    onCancelEdit={() => setEditing(null)}
-                    onSend={send}
-                    onSchedule={scheduleMessage}
-                    onPoll={createPoll}
-                    onMedia={async (address) => {
-                        following.current = true;
-                        // The picture answers whatever the bar was pointing at, and
-                        // the bar comes down as it is sent - the same two halves a
-                        // typed reply gets. Without them a GIF chosen with a reply
-                        // open landed as an unrelated message and left the bar up,
-                        // so the next thing typed answered something the reader had
-                        // already replied to.
-                        const answering = takeReply();
-                        const result = await runAction(
-                            () => actions.sendMediaAction(channelId, address, null, answering),
-                            setError
-                        );
-                        if (!result?.error) {
-                            await load();
-                            refresh();
+                        rules={rules}
+                        disabled={!canPost}
+                        attachable={may.attach}
+                        placeholder={
+                            canPost
+                                ? `Message ${channel.kind === "text" ? `#${channel.name}` : channel.name}`
+                                : "This conversation is archived."
                         }
-                    }}
-                    onSaved={async (savedId) => {
-                        following.current = true;
-                        const answering = takeReply();
-                        const result = await runAction(
-                            () => actions.sendSavedMediaAction(channelId, savedId, answering),
-                            setError
-                        );
-                        if (!result?.error) {
-                            await load();
-                            refresh();
+                        editing={editing}
+                        replyingTo={replyingTo ?? carried?.message ?? null}
+                        replyingFrom={
+                            carried?.from ? { name: carried.from, channel: carried.channel } : null
                         }
-                    }}
-                    onSaveEdit={async (messageId, body) => {
-                        const result = await runAction(
-                            () => actions.editAction({ messageId, body }),
-                            setError
-                        );
-                        setEditing(null);
-                        if (!result?.error) patchMessage(messageId, { body, edited: true });
-                    }}
+                        insert={inserting}
+                        onCancelReply={() => {
+                            setReplyingTo(null);
+                            setCarried(null);
+                        }}
+                        onCancelEdit={() => setEditing(null)}
+                        onSend={send}
+                        onSchedule={scheduleMessage}
+                        onPoll={createPoll}
+                        onMedia={async (address) => {
+                            following.current = true;
+                            // The picture answers whatever the bar was pointing at, and
+                            // the bar comes down as it is sent - the same two halves a
+                            // typed reply gets. Without them a GIF chosen with a reply
+                            // open landed as an unrelated message and left the bar up,
+                            // so the next thing typed answered something the reader had
+                            // already replied to.
+                            const answering = takeReply();
+                            const result = await runAction(
+                                () => actions.sendMediaAction(channelId, address, null, answering),
+                                setError
+                            );
+                            if (!result?.error) {
+                                await load();
+                                refresh();
+                            }
+                        }}
+                        onSaved={async (savedId) => {
+                            following.current = true;
+                            const answering = takeReply();
+                            const result = await runAction(
+                                () => actions.sendSavedMediaAction(channelId, savedId, answering),
+                                setError
+                            );
+                            if (!result?.error) {
+                                await load();
+                                refresh();
+                            }
+                        }}
+                        onSaveEdit={async (messageId, body) => {
+                            const result = await runAction(
+                                () => actions.editAction({ messageId, body }),
+                                setError
+                            );
+                            setEditing(null);
+                            if (!result?.error) patchMessage(messageId, { body, edited: true });
+                        }}
                     />
                 </>
             )}

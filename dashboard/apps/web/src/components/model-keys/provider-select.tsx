@@ -131,7 +131,9 @@ export function ProviderSelect({
                                 </span>
                                 {option.freeTier ? (
                                     <Badge
-                                        variant={option.freeTier.kind === "free" ? "success" : "neutral"}
+                                        variant={
+                                            option.freeTier.kind === "free" ? "success" : "neutral"
+                                        }
                                         title={option.freeTier.note}
                                     >
                                         {FREE_LABEL[option.freeTier.kind]}

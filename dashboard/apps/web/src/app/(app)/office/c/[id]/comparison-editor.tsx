@@ -160,9 +160,13 @@ export function ComparisonEditor({
                                                         {subject.name}
                                                     </a>
                                                 ) : (
-                                                    <span className="truncate" title={subject.name}>{subject.name}</span>
+                                                    <span className="truncate" title={subject.name}>
+                                                        {subject.name}
+                                                    </span>
                                                 )}
-                                                {subject.us ? <Badge variant="primary">Us</Badge> : null}
+                                                {subject.us ? (
+                                                    <Badge variant="primary">Us</Badge>
+                                                ) : null}
                                                 {editable ? (
                                                     <>
                                                         <Button
@@ -171,18 +175,28 @@ export function ComparisonEditor({
                                                             className="ml-auto"
                                                             aria-label={`Describe ${subject.name}`}
                                                             title="What they do"
-                                                            onClick={() => setDescribing(subject.id)}
+                                                            onClick={() =>
+                                                                setDescribing(subject.id)
+                                                            }
                                                         >
-                                                            <Pencil className="size-3.5 shrink-0" aria-hidden />
+                                                            <Pencil
+                                                                className="size-3.5 shrink-0"
+                                                                aria-hidden
+                                                            />
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
                                                             aria-label={`Remove ${subject.name}`}
                                                             title="Remove"
-                                                            onClick={() => removeSubject(doc, subject.id)}
+                                                            onClick={() =>
+                                                                removeSubject(doc, subject.id)
+                                                            }
                                                         >
-                                                            <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                                            <Trash2
+                                                                className="size-3.5 shrink-0"
+                                                                aria-hidden
+                                                            />
                                                         </Button>
                                                     </>
                                                 ) : null}
@@ -240,9 +254,14 @@ export function ComparisonEditor({
                                                     size="icon"
                                                     aria-label={`Remove ${criterion.name}`}
                                                     title="Remove"
-                                                    onClick={() => removeCriterion(doc, criterion.id)}
+                                                    onClick={() =>
+                                                        removeCriterion(doc, criterion.id)
+                                                    }
                                                 >
-                                                    <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                                    <Trash2
+                                                        className="size-3.5 shrink-0"
+                                                        aria-hidden
+                                                    />
                                                 </Button>
                                             </td>
                                         ) : null}
@@ -271,20 +290,20 @@ export function ComparisonEditor({
                 />
             ) : null}
 
-            {describing ? (
-                (() => {
-                    const subject = columns.find((one) => one.id === describing);
-                    // Removed while the form was open, which is ordinary in a
-                    // shared document rather than an error.
-                    return subject ? (
-                        <SubjectDialog
-                            doc={doc}
-                            subject={subject}
-                            onClose={() => setDescribing(null)}
-                        />
-                    ) : null;
-                })()
-            ) : null}
+            {describing
+                ? (() => {
+                      const subject = columns.find((one) => one.id === describing);
+                      // Removed while the form was open, which is ordinary in a
+                      // shared document rather than an error.
+                      return subject ? (
+                          <SubjectDialog
+                              doc={doc}
+                              subject={subject}
+                              onClose={() => setDescribing(null)}
+                          />
+                      ) : null;
+                  })()
+                : null}
         </div>
     );
 }
@@ -317,7 +336,9 @@ function CellBox({
                 )}
             >
                 {read ? (
-                    <span className="block truncate" title={read}>{read}</span>
+                    <span className="block truncate" title={read}>
+                        {read}
+                    </span>
                 ) : (
                     <span className="block text-muted-foreground">Not answered</span>
                 )}
@@ -507,13 +528,15 @@ function CellDialog({
                                 });
                                 if (!parsed.success) {
                                     toast.show({
-                                        title: parsed.error.issues[0]?.message ?? "That did not save"
+                                        title:
+                                            parsed.error.issues[0]?.message ?? "That did not save"
                                     });
                                     return;
                                 }
-                                doc
-                                    .getMap<core.Cell>(CELLS)
-                                    .set(core.cellKey(subject.id, criterion.id), parsed.data);
+                                doc.getMap<core.Cell>(CELLS).set(
+                                    core.cellKey(subject.id, criterion.id),
+                                    parsed.data
+                                );
                                 onClose();
                             }}
                         >

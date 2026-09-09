@@ -70,7 +70,9 @@ export function AssigneePicker({
      *  second name is typed straight after the first instead of the menu having
      *  to be re-aimed by hand between the two. */
     const toggle = (id: string, from: EventTarget | null) => {
-        onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+        onChange(
+            selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]
+        );
         setQuery("");
         refocusMenuSearch(from);
     };
@@ -95,11 +97,15 @@ export function AssigneePicker({
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                {people.length > 0 && <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />}
+                {people.length > 0 && (
+                    <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />
+                )}
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {people.length === 0 ? "Nobody is on this space yet." : "Nobody matches that."}
+                            {people.length === 0
+                                ? "Nobody is on this space yet."
+                                : "Nobody matches that."}
                         </p>
                     )}
                     {matches.map((person) => (
@@ -117,7 +123,9 @@ export function AssigneePicker({
                             <span className="flex-1 truncate">
                                 <PersonName id={person.id} name={person.name} />
                             </span>
-                            {selected.includes(person.id) && <Check className="size-3.5 text-primary" />}
+                            {selected.includes(person.id) && (
+                                <Check className="size-3.5 text-primary" />
+                            )}
                         </PersonRow>
                     ))}
                 </div>
@@ -148,7 +156,10 @@ export function TaskLocation({
     return (
         <span
             title={trail}
-            className={cn("flex min-w-0 items-center gap-1 text-[0.6875rem] text-muted-foreground", className)}
+            className={cn(
+                "flex min-w-0 items-center gap-1 text-[0.6875rem] text-muted-foreground",
+                className
+            )}
         >
             <Link
                 href={`/tasks/s/${task.spaceId}`}
@@ -278,7 +289,11 @@ export function StatusIcon({
                 <>
                     <circle cx="10" cy="10" r="9" fill="currentColor" />
                     <path
-                        d={done ? "M5.8 10.3l2.7 2.7 5.7-5.7" : "M6.9 6.9l6.2 6.2M13.1 6.9l-6.2 6.2"}
+                        d={
+                            done
+                                ? "M5.8 10.3l2.7 2.7 5.7-5.7"
+                                : "M6.9 6.9l6.2 6.2M13.1 6.9l-6.2 6.2"
+                        }
                         fill="none"
                         stroke="#fff"
                         strokeWidth="2"
@@ -374,10 +389,16 @@ export function StatusPicker({
                 <MenuSearch value={query} onChange={setQuery} placeholder="Find a status" />
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">No status matches that.</p>
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            No status matches that.
+                        </p>
                     )}
                     {matches.map((status) => (
-                        <DropdownMenuItem key={status.id} onSelect={() => onChange(status.id)} className="gap-2">
+                        <DropdownMenuItem
+                            key={status.id}
+                            onSelect={() => onChange(status.id)}
+                            className="gap-2"
+                        >
                             <StatusIcon
                                 color={status.color}
                                 type={status.type}
@@ -496,14 +517,20 @@ export function PriorityPicker({
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
-                <p className="px-2 pb-1 text-[0.625rem] uppercase tracking-wide text-muted-foreground">Priority</p>
+                <p className="px-2 pb-1 text-[0.625rem] uppercase tracking-wide text-muted-foreground">
+                    Priority
+                </p>
                 {/* Every priority, "none" included and in its own place at the
                     bottom of the scale. It used to be a "Clear" row with a
                     crossed-out circle on it, which reads as an action rather
                     than as the answer it is - and left the menu unable to show
                     that no priority is what this task currently has. */}
                 {core.TASK_PRIORITIES.map((priority) => (
-                    <DropdownMenuItem key={priority} onSelect={() => onChange(priority)} className="gap-2">
+                    <DropdownMenuItem
+                        key={priority}
+                        onSelect={() => onChange(priority)}
+                        className="gap-2"
+                    >
                         <PriorityMark priority={priority} />
                         <span className="flex-1">{core.TASK_PRIORITY_LABELS[priority]}</span>
                         {value === priority && <Check className="size-3.5 text-primary" />}
@@ -525,11 +552,21 @@ export function PriorityPicker({
  * colour, and a workspace does not end up with six tags in the same blue because
  * they were all created first. Any of them can be recoloured afterwards.
  */
-const TAG_PALETTE = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#64748b"] as const;
+const TAG_PALETTE = [
+    "#3b82f6",
+    "#8b5cf6",
+    "#ec4899",
+    "#f97316",
+    "#eab308",
+    "#22c55e",
+    "#14b8a6",
+    "#64748b"
+] as const;
 
 export function tagColorFor(name: string): string {
     let hash = 0;
-    for (let index = 0; index < name.length; index += 1) hash = (hash * 31 + name.charCodeAt(index)) % 997;
+    for (let index = 0; index < name.length; index += 1)
+        hash = (hash * 31 + name.charCodeAt(index)) % 997;
     return TAG_PALETTE[hash % TAG_PALETTE.length] as string;
 }
 
@@ -543,9 +580,16 @@ export function TagChip({ tag, onRemove }: { tag: TagRef | TagView; onRemove?: (
             className="max-w-full gap-1 border-transparent text-[0.6875rem]"
             style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
         >
-            <span className="truncate" title={tag.name}>{tag.name}</span>
+            <span className="truncate" title={tag.name}>
+                {tag.name}
+            </span>
             {onRemove && (
-                <button type="button" onClick={onRemove} aria-label={`Remove ${tag.name}`} className="opacity-70 hover:opacity-100">
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    aria-label={`Remove ${tag.name}`}
+                    className="opacity-70 hover:opacity-100"
+                >
                     <X className="size-3" />
                 </button>
             )}
@@ -594,7 +638,9 @@ export function TagPicker({
     /** As the assignee picker does: the field is emptied and handed the keyboard
      *  back, so the tag after this one is typed rather than aimed at. */
     const toggle = (id: string, from: EventTarget | null) => {
-        onChange(selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]);
+        onChange(
+            selected.includes(id) ? selected.filter((entry) => entry !== id) : [...selected, id]
+        );
         setQuery("");
         refocusMenuSearch(from);
     };
@@ -653,7 +699,9 @@ export function TagPicker({
                 )}
                 <div className="max-h-56 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && !onCreate && (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">No tag matches that.</p>
+                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                            No tag matches that.
+                        </p>
                     )}
                     {matches.map((tag) => (
                         <DropdownMenuItem
@@ -666,7 +714,9 @@ export function TagPicker({
                         >
                             <StatusDot color={tag.color} />
                             <span className="flex-1 truncate">{tag.name}</span>
-                            {selected.includes(tag.id) && <Check className="size-3.5 text-primary" />}
+                            {selected.includes(tag.id) && (
+                                <Check className="size-3.5 text-primary" />
+                            )}
                         </DropdownMenuItem>
                     ))}
                     {onCreate && needle.length > 0 && !existing && (
@@ -679,7 +729,9 @@ export function TagPicker({
                             className="gap-2"
                         >
                             <Plus className="size-3.5" />
-                            <span className="flex-1 truncate">Create &ldquo;{query.trim()}&rdquo;</span>
+                            <span className="flex-1 truncate">
+                                Create &ldquo;{query.trim()}&rdquo;
+                            </span>
                             <span className="text-[0.625rem] text-muted-foreground">Enter</span>
                         </DropdownMenuItem>
                     )}
@@ -734,7 +786,10 @@ export function fromDateInput(value: string): string | null {
     // Built from parts rather than parsed, so a day the calendar does not have is
     // read back rather than trusted: the thirty-first of February rolls forward
     // into March instead of failing the way a parse would.
-    const real = parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === date;
+    const real =
+        parsed.getFullYear() === year &&
+        parsed.getMonth() === month - 1 &&
+        parsed.getDate() === date;
     return real ? parsed.toISOString() : null;
 }
 
@@ -756,7 +811,9 @@ export function DateField({
             {/* Two date boxes stack on a phone, and stacked they are two identical
                 boxes: which is the start and which is the due date is only in the
                 label a mouse never reaches on one. */}
-            <span className="w-16 shrink-0 text-[0.6875rem] text-muted-foreground sm:hidden">{label}</span>
+            <span className="w-16 shrink-0 text-[0.6875rem] text-muted-foreground sm:hidden">
+                {label}
+            </span>
             <input
                 type={timed ? "datetime-local" : "date"}
                 aria-label={label}
@@ -863,10 +920,7 @@ export function DueBadge({
     format: (iso: string) => string;
 }) {
     if (!dueDate) return null;
-    const bucket = core.dueBucket(
-        { dueDate: new Date(dueDate), statusType, timed },
-        new Date()
-    );
+    const bucket = core.dueBucket({ dueDate: new Date(dueDate), statusType, timed }, new Date());
     const tone =
         bucket === "overdue"
             ? "text-danger"
@@ -874,7 +928,10 @@ export function DueBadge({
               ? "text-amber-500"
               : "text-muted-foreground";
     return (
-        <span className={cn("whitespace-nowrap text-xs", tone)} title={core.DUE_BUCKET_LABELS[bucket]}>
+        <span
+            className={cn("whitespace-nowrap text-xs", tone)}
+            title={core.DUE_BUCKET_LABELS[bucket]}
+        >
             {format(dueDate)}
         </span>
     );
@@ -902,7 +959,8 @@ export function BlockedMarker({
     ].filter((reason): reason is string => reason !== null);
     // Nothing written down and no date means the block is an unfinished task,
     // which the panel lists and a row has no room for.
-    const label = reasons.length > 0 ? `Blocked ${reasons.join(" - ")}` : "Blocked by unfinished work";
+    const label =
+        reasons.length > 0 ? `Blocked ${reasons.join(" - ")}` : "Blocked by unfinished work";
 
     return (
         <span className="inline-flex shrink-0" title={label} aria-label={label} role="img">

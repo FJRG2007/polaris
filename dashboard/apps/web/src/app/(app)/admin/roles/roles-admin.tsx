@@ -175,8 +175,8 @@ function RoleCard({ role }: { role: RoleView }) {
             <CardBody className="flex flex-col gap-4">
                 {locked ? (
                     <p className="text-sm text-muted-foreground">
-                        Holds everything, including permissions added in future versions. This is the role that
-                        keeps the instance reachable, so it cannot be narrowed.
+                        Holds everything, including permissions added in future versions. This is
+                        the role that keeps the instance reachable, so it cannot be narrowed.
                     </p>
                 ) : (
                     <>
@@ -191,7 +191,11 @@ function RoleCard({ role }: { role: RoleView }) {
                                 size="sm"
                                 disabled={busy || !dirty}
                                 onClick={() =>
-                                    void run(() => setRolePermissionsAction(role.id, { permissions: [...held] }))
+                                    void run(() =>
+                                        setRolePermissionsAction(role.id, {
+                                            permissions: [...held]
+                                        })
+                                    )
                                 }
                             >
                                 Save
@@ -221,13 +225,18 @@ function PermissionGrid({
                 <div key={area} className="flex flex-col gap-1.5">
                     <p className="text-xs font-medium text-muted-foreground">{area}</p>
                     {permissions.map((permission) => (
-                        <label key={permission} className="flex cursor-pointer items-start gap-2 text-sm">
+                        <label
+                            key={permission}
+                            className="flex cursor-pointer items-start gap-2 text-sm"
+                        >
                             <Checkbox
                                 className="mt-0.5"
                                 checked={held.has(permission)}
                                 disabled={disabled}
                                 aria-label={PERMISSION_META[permission].label}
-                                onChange={(event) => onChange(toggle(held, permission, event.target.checked))}
+                                onChange={(event) =>
+                                    onChange(toggle(held, permission, event.target.checked))
+                                }
                             />
                             <span className="min-w-0">{PERMISSION_META[permission].label}</span>
                         </label>
@@ -264,8 +273,8 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
                 <DialogHeader>
                     <DialogTitle>New role</DialogTitle>
                     <DialogDescription>
-                        A role with nothing ticked is still useful: the account exists and can sign in, but reaches
-                        no app.
+                        A role with nothing ticked is still useful: the account exists and can sign
+                        in, but reaches no app.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
@@ -286,7 +295,10 @@ function NewRoleDialog({ onOpenChange }: { onOpenChange: (open: boolean) => void
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button disabled={busy || name.trim().length === 0} onClick={() => void create()}>
+                        <Button
+                            disabled={busy || name.trim().length === 0}
+                            onClick={() => void create()}
+                        >
                             {busy ? "Creating..." : "Create role"}
                         </Button>
                     </div>

@@ -150,7 +150,9 @@ export function SigninDialog({
         // there is nothing left to ask. A tool that will not answer costs a
         // label on a row, never the credential.
         void (async () => {
-            const identity = id ? await actions.identity({ id, env: signin.env }).catch(() => ({})) : {};
+            const identity = id
+                ? await actions.identity({ id, env: signin.env }).catch(() => ({}))
+                : {};
             const result = await runAction(
                 () => actions.save(secret.trim(), identity, name.trim() || defaultName(identity)),
                 setError
@@ -177,8 +179,9 @@ export function SigninDialog({
 
                 <div className="space-y-3">
                     <p className="text-muted-foreground text-xs">
-                        Polaris is running the sign-in on a machine of its own. Open the page it asks for, authorise
-                        it in your browser, and paste the code it gives you into the line below the terminal.
+                        Polaris is running the sign-in on a machine of its own. Open the page it
+                        asks for, authorise it in your browser, and paste the code it gives you into
+                        the line below the terminal.
                     </p>
                     {/* Worth saying before rather than after. This is a login on
                         a machine with nothing signed in to it, so it cannot
@@ -188,9 +191,9 @@ export function SigninDialog({
                         in the worst place. */}
                     {signin.subscription ? (
                         <p className="text-muted-foreground text-xs">
-                            This runs on a machine with nothing signed in to it, so it leaves the tool on your own
-                            computer alone. It may retire a credential you linked here before, though - some vendors
-                            allow one at a time.
+                            This runs on a machine with nothing signed in to it, so it leaves the
+                            tool on your own computer alone. It may retire a credential you linked
+                            here before, though - some vendors allow one at a time.
                         </p>
                     ) : null}
 
@@ -228,7 +231,9 @@ export function SigninDialog({
                             <p className="text-muted-foreground text-xs">
                                 {id ? "Installing the tool on it." : "Starting a machine."}
                             </p>
-                            <p className="text-muted-foreground text-xs">This takes a minute the first time.</p>
+                            <p className="text-muted-foreground text-xs">
+                                This takes a minute the first time.
+                            </p>
                         </div>
                     )}
 
@@ -247,15 +252,20 @@ export function SigninDialog({
                             className="min-w-0 flex-1"
                             disabled={!ready || busy}
                         />
-                        <Button size="sm" variant="ghost" onClick={send} disabled={!ready || busy || !line.trim()}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={send}
+                            disabled={!ready || busy || !line.trim()}
+                        >
                             <CornerDownLeft className="size-4 shrink-0" />
                         </Button>
                     </div>
 
                     <label className="block space-y-1 border-t border-border pt-3">
                         <span className="text-xs text-muted-foreground">
-                            What to call this account here. Leave it empty and Polaris names it after whoever it
-                            turns out to belong to.
+                            What to call this account here. Leave it empty and Polaris names it
+                            after whoever it turns out to belong to.
                         </span>
                         <Input
                             value={name}
@@ -266,9 +276,9 @@ export function SigninDialog({
 
                     <label className="block space-y-1">
                         <span className="text-xs text-muted-foreground">
-                            When it prints the {signin.label.toLowerCase()}, copy it in here. Polaris does not read
-                            it off the screen for you - storing the wrong line would not show up until a session
-                            failed to sign in.
+                            When it prints the {signin.label.toLowerCase()}, copy it in here.
+                            Polaris does not read it off the screen for you - storing the wrong line
+                            would not show up until a session failed to sign in.
                         </span>
                         <Input
                             type="password"

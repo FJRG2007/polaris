@@ -95,30 +95,36 @@ interface Layout {
 }
 
 function nodesFromEnvironment(environment: ProjectSummary["environments"][number]): CanvasNode[] {
-    const apps = environment.applications.map((app): CanvasNode => ({
-        id: app.id,
-        name: app.name,
-        kind: serviceKindOf(app.sourceType),
-        subtitle: primaryDomain(app.domains)?.hostname ?? (app.sourceType === "image" ? "Docker image" : "Git repository"),
-        tone: dbTone(app.deployStatus ?? ""),
-        statusLabel: app.deployStatus ?? "Not deployed",
-        volumes: app.volumes
-    }));
-    const databases = environment.databases.map((database): CanvasNode => ({
-        id: database.id,
-        name: database.name,
-        kind: "database",
-        engine: database.engine,
-        subtitle: dbEngineLabel(database.engine),
-        tone: dbTone(database.status),
-        statusLabel: database.status,
-        hostedCount: database.hostedCount ?? 0,
-        // A database living inside another instance has no volume of its own; the
-        // strip under the card would name one that does not exist.
-        volume: database.hostedOnInstance
-            ? undefined
-            : `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
-    }));
+    const apps = environment.applications.map(
+        (app): CanvasNode => ({
+            id: app.id,
+            name: app.name,
+            kind: serviceKindOf(app.sourceType),
+            subtitle:
+                primaryDomain(app.domains)?.hostname ??
+                (app.sourceType === "image" ? "Docker image" : "Git repository"),
+            tone: dbTone(app.deployStatus ?? ""),
+            statusLabel: app.deployStatus ?? "Not deployed",
+            volumes: app.volumes
+        })
+    );
+    const databases = environment.databases.map(
+        (database): CanvasNode => ({
+            id: database.id,
+            name: database.name,
+            kind: "database",
+            engine: database.engine,
+            subtitle: dbEngineLabel(database.engine),
+            tone: dbTone(database.status),
+            statusLabel: database.status,
+            hostedCount: database.hostedCount ?? 0,
+            // A database living inside another instance has no volume of its own; the
+            // strip under the card would name one that does not exist.
+            volume: database.hostedOnInstance
+                ? undefined
+                : `${database.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-volume`
+        })
+    );
     return [...apps, ...databases];
 }
 
@@ -137,7 +143,10 @@ function parseLayout(raw: string): Layout {
 /** Seed a position for any node missing one, placed near the centre of the
  *  existing cluster (or the board centre when empty) and spiralled out to the
  *  nearest free slot so a new service never lands on top of another. */
-function withSeededPositions(nodes: CanvasNode[], pos: Record<string, Point>): Record<string, Point> {
+function withSeededPositions(
+    nodes: CanvasNode[],
+    pos: Record<string, Point>
+): Record<string, Point> {
     const next = { ...pos };
     const stepX = NODE_W + 48;
     const stepY = NODE_H + 64;
@@ -174,7 +183,8 @@ function withSeededPositions(nodes: CanvasNode[], pos: Record<string, Point>): R
 }
 
 const DOT_BG: React.CSSProperties = {
-    backgroundImage: "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
+    backgroundImage:
+        "radial-gradient(circle, hsl(var(--muted-foreground) / 0.15) 1px, transparent 1px)",
     backgroundSize: `${GRID}px ${GRID}px`
 };
 
@@ -203,7 +213,8 @@ const TONE_BORDER: Record<Tone, string> = {
 
 /** A soft edge vignette so the board reads as a lit surface, not a flat panel. */
 const VIGNETTE: React.CSSProperties = {
-    background: "radial-gradient(120% 90% at 50% 30%, transparent 55%, hsl(var(--background) / 0.55) 100%)"
+    background:
+        "radial-gradient(120% 90% at 50% 30%, transparent 55%, hsl(var(--background) / 0.55) 100%)"
 };
 
 export function DeployCanvas({
@@ -227,7 +238,9 @@ export function DeployCanvas({
         const parsed = parseLayout(environment.layout);
         return {
             pos: withSeededPositions(nodes, parsed.pos),
-            links: parsed.links.filter((link) => nodeIds.has(link.source) && nodeIds.has(link.target))
+            links: parsed.links.filter(
+                (link) => nodeIds.has(link.source) && nodeIds.has(link.target)
+            )
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [environment.id]);
@@ -244,12 +257,13 @@ export function DeployCanvas({
         name: string;
         kind: "service" | "database";
         hostedCount?: number;
-    } | null>(
-        null
-    );
+    } | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [acting, setActing] = useState(false);
-    const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({ open: false, view: "list" });
+    const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
+        open: false,
+        view: "list"
+    });
     const [newVolumeOpen, setNewVolumeOpen] = useState(false);
     // The volume panel and the tab it opens on: "Volume settings" lands on its
     // figures, "Edit mount" on the fields that change it.
@@ -347,14 +361,22 @@ export function DeployCanvas({
     useEffect(() => {
         const container = containerRef.current;
         if (!container || framedFor.current === environment.id) return;
-        const points = nodes.map((node) => pos[node.id]).filter((point): point is Point => Boolean(point));
+        const points = nodes
+            .map((node) => pos[node.id])
+            .filter((point): point is Point => Boolean(point));
         if (points.length === 0) return;
         framedFor.current = environment.id;
         // Centred on the services, unless they spread wider than the frame - then the
         // first one is put against the edge, so a phone opens on a whole card instead
         // of on the gap between two halves.
         const offset = (low: number, high: number, frame: number, extentOf: number): number =>
-            Math.max(0, Math.min(high - low > frame ? low - 24 : (low + high) / 2 - frame / 2, extentOf - frame));
+            Math.max(
+                0,
+                Math.min(
+                    high - low > frame ? low - 24 : (low + high) / 2 - frame / 2,
+                    extentOf - frame
+                )
+            );
         container.scrollLeft = offset(
             Math.min(...points.map((point) => point.x)),
             Math.max(...points.map((point) => point.x + NODE_W)),
@@ -385,7 +407,10 @@ export function DeployCanvas({
             const spawn = pendingSpawnRef.current;
             if (spawn) {
                 pendingSpawnRef.current = null;
-                next[node.id] = { x: Math.max(0, Math.round(spawn.x / 8) * 8), y: Math.max(0, Math.round(spawn.y / 8) * 8) };
+                next[node.id] = {
+                    x: Math.max(0, Math.round(spawn.x / 8) * 8),
+                    y: Math.max(0, Math.round(spawn.y / 8) * 8)
+                };
             } else {
                 next = withSeededPositions([node], next);
             }
@@ -418,7 +443,8 @@ export function DeployCanvas({
         if (canManage) setDragId(id);
 
         function move(moveEvent: PointerEvent) {
-            if (Math.abs(moveEvent.clientX - start.x) + Math.abs(moveEvent.clientY - start.y) > 4) moved = true;
+            if (Math.abs(moveEvent.clientX - start.x) + Math.abs(moveEvent.clientY - start.y) > 4)
+                moved = true;
             if (!canManage || !moved) return;
             const nx = Math.round((origin.x + moveEvent.clientX - start.x) / 8) * 8;
             const ny = Math.round((origin.y + moveEvent.clientY - start.y) / 8) * 8;
@@ -450,7 +476,9 @@ export function DeployCanvas({
         setPending({ source, cursor: toBoard(event.clientX, event.clientY) });
 
         function move(moveEvent: PointerEvent) {
-            setPending((prev) => (prev ? { ...prev, cursor: toBoard(moveEvent.clientX, moveEvent.clientY) } : prev));
+            setPending((prev) =>
+                prev ? { ...prev, cursor: toBoard(moveEvent.clientX, moveEvent.clientY) } : prev
+            );
         }
         function up(upEvent: PointerEvent) {
             window.removeEventListener("pointermove", move);
@@ -458,12 +486,24 @@ export function DeployCanvas({
             const cursor = toBoard(upEvent.clientX, upEvent.clientY);
             const target = nodes.find((node) => {
                 const p = posRef.current[node.id];
-                return p && cursor.x >= p.x && cursor.x <= p.x + NODE_W && cursor.y >= p.y && cursor.y <= p.y + NODE_H;
+                return (
+                    p &&
+                    cursor.x >= p.x &&
+                    cursor.x <= p.x + NODE_W &&
+                    cursor.y >= p.y &&
+                    cursor.y <= p.y + NODE_H
+                );
             });
             setPending(null);
             if (target && target.id !== source) {
                 setLinks((prev) => {
-                    if (prev.some((l) => (l.source === source && l.target === target.id) || (l.source === target.id && l.target === source))) {
+                    if (
+                        prev.some(
+                            (l) =>
+                                (l.source === source && l.target === target.id) ||
+                                (l.source === target.id && l.target === source)
+                        )
+                    ) {
                         return prev;
                     }
                     const next = [...prev, { source, target: target.id }];
@@ -519,7 +559,9 @@ export function DeployCanvas({
                     onContextMenu={(event) => {
                         // Only meaningful once the board exists; the empty state has no
                         // coordinate space, so a new service falls back to auto-placement.
-                        menuSpawnRef.current = boardRef.current ? toBoard(event.clientX, event.clientY) : null;
+                        menuSpawnRef.current = boardRef.current
+                            ? toBoard(event.clientX, event.clientY)
+                            : null;
                     }}
                 >
                     {board}
@@ -531,8 +573,13 @@ export function DeployCanvas({
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {SERVICE_TYPES.map((type) => (
-                                <ContextMenuItem key={type.id} onSelect={() => openNewService(type.id)}>
-                                    <span className="flex size-4 items-center justify-center [&_svg]:size-4">{type.icon}</span>
+                                <ContextMenuItem
+                                    key={type.id}
+                                    onSelect={() => openNewService(type.id)}
+                                >
+                                    <span className="flex size-4 items-center justify-center [&_svg]:size-4">
+                                        {type.icon}
+                                    </span>
                                     {type.label}
                                 </ContextMenuItem>
                             ))}
@@ -608,201 +655,312 @@ export function DeployCanvas({
             )}
             {boardMenu(
                 <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
-                <div ref={containerRef} className="absolute inset-0 overflow-auto overscroll-contain" style={DOT_BG}>
-                    <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
-                    <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
-                        {links.map((link, index) => {
-                            const a = center(link.source);
-                            const b = center(link.target);
-                            const midX = (a.x + b.x) / 2;
-                            return (
-                                <g key={`${link.source}-${link.target}-${index}`} className="pointer-events-auto">
+                    <div
+                        ref={containerRef}
+                        className="absolute inset-0 overflow-auto overscroll-contain"
+                        style={DOT_BG}
+                    >
+                        <div
+                            ref={boardRef}
+                            className="relative"
+                            style={{ width: extent.w, height: extent.h }}
+                        >
+                            <svg
+                                className="pointer-events-none absolute inset-0"
+                                width={extent.w}
+                                height={extent.h}
+                            >
+                                {links.map((link, index) => {
+                                    const a = center(link.source);
+                                    const b = center(link.target);
+                                    const midX = (a.x + b.x) / 2;
+                                    return (
+                                        <g
+                                            key={`${link.source}-${link.target}-${index}`}
+                                            className="pointer-events-auto"
+                                        >
+                                            <path
+                                                d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
+                                                fill="none"
+                                                stroke="hsl(var(--muted-foreground) / 0.45)"
+                                                strokeWidth={2}
+                                                strokeLinecap="round"
+                                            />
+                                            {canManage && (
+                                                <circle
+                                                    cx={midX}
+                                                    cy={(a.y + b.y) / 2}
+                                                    r={7}
+                                                    className="cursor-pointer fill-card stroke-border"
+                                                    onClick={() => removeLink(index)}
+                                                >
+                                                    <title>Remove link</title>
+                                                </circle>
+                                            )}
+                                        </g>
+                                    );
+                                })}
+                                {pending && (
                                     <path
-                                        d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
+                                        d={`M ${handlePoint(pending.source).x} ${handlePoint(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
                                         fill="none"
-                                        stroke="hsl(var(--muted-foreground) / 0.45)"
+                                        stroke="hsl(var(--primary))"
                                         strokeWidth={2}
                                         strokeLinecap="round"
+                                        strokeDasharray="5 5"
                                     />
-                                    {canManage && (
-                                        <circle
-                                            cx={midX}
-                                            cy={(a.y + b.y) / 2}
-                                            r={7}
-                                            className="cursor-pointer fill-card stroke-border"
-                                            onClick={() => removeLink(index)}
-                                        >
-                                            <title>Remove link</title>
-                                        </circle>
-                                    )}
-                                </g>
-                            );
-                        })}
-                        {pending && (
-                            <path
-                                d={`M ${handlePoint(pending.source).x} ${handlePoint(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
-                                fill="none"
-                                stroke="hsl(var(--primary))"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeDasharray="5 5"
-                            />
-                        )}
-                    </svg>
+                                )}
+                            </svg>
 
-                    {nodes.map((node) => {
-                        const p = pos[node.id] ?? { x: 0, y: 0 };
-                        const label = node.tone === "success" ? "Online" : node.statusLabel;
-                        const pulsing = node.tone === "warning";
-                        const app = environment.applications.find((item) => item.id === node.id);
-                        const removing = staged.has(node.id);
-                        const card = (
-                            <div
-                                className={`group absolute flex select-none flex-col border bg-elevated transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/25 ${
-                                    node.volume || node.volumes?.length ? "rounded-t-2xl" : "rounded-2xl"
-                                } ${
-                                    removing
-                                        ? "border-primary/60 ring-1 ring-primary/30"
-                                        : dragId === node.id
-                                          ? "border-primary ring-1 ring-primary/40"
-                                          : TONE_BORDER[node.tone]
-                                } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
-                                style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
-                                onPointerDown={(event) => onNodePointerDown(event, node.id)}
-                                onContextMenu={(event) => event.stopPropagation()}
-                            >
-                                <div className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}>
-                                    <div className="flex items-center gap-3">
-                                        {node.engine ? (
-                                            <DbEngineIcon engine={node.engine} className="size-10 rounded-xl" />
-                                        ) : (
-                                            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
-                                                <ServiceIcon kind={node.kind} className="size-5" />
-                                            </span>
-                                        )}
-                                        <span className="min-w-0 flex-1 truncate text-base font-semibold">{node.name}</span>
-                                    </div>
-                                    <p className="mt-1 truncate text-sm text-muted-foreground">{node.subtitle}</p>
-                                    <div className="mt-auto flex items-center gap-2 text-sm">
-                                        {removing ? (
-                                            <>
-                                                <span className="size-2 rounded-full bg-primary" />
-                                                <span className="text-primary">Removal pending</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span
-                                                    className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`}
-                                                />
-                                                <span className={`capitalize ${TONE_TEXT[node.tone]}`}>{label}</span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                {canManage && (
-                                    <button
-                                        type="button"
-                                        title="Drag to another service to link"
-                                        onPointerDown={(event) => onHandlePointerDown(event, node.id)}
-                                        className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
-                                    />
-                                )}
-                            </div>
-                        );
-                        return (
-                            <Fragment key={node.id}>
-                                {canManage ? (
-                                    <ContextMenu>
-                                        <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
-                                        <ContextMenuContent>
-                                            {app && (
-                                                <>
-                                                    <ContextMenuItem onSelect={() => onOpenService?.(app)}>
-                                                        <ScrollText className="size-4" /> Open service
-                                                    </ContextMenuItem>
-                                                    <ContextMenuItem onSelect={() => duplicate(app)}>
-                                                        <Copy className="size-4" /> Duplicate
-                                                    </ContextMenuItem>
-                                                </>
-                                            )}
-                                            <ContextMenuSeparator />
-                                            <ContextMenuItem
-                                                variant="danger"
-                                                disabled={removing}
-                                                onSelect={() =>
-                                                    setDeleteTarget({
-                                                        id: node.id,
-                                                        name: node.name,
-                                                        kind: app ? "service" : "database",
-                                                        hostedCount: node.hostedCount ?? 0
-                                                    })
-                                                }
-                                            >
-                                                <Trash2 className="size-4" />
-                                                {removing ? "Removal pending" : "Delete"}
-                                            </ContextMenuItem>
-                                        </ContextMenuContent>
-                                    </ContextMenu>
-                                ) : (
-                                    card
-                                )}
-                                {node.volume && (
+                            {nodes.map((node) => {
+                                const p = pos[node.id] ?? { x: 0, y: 0 };
+                                const label = node.tone === "success" ? "Online" : node.statusLabel;
+                                const pulsing = node.tone === "warning";
+                                const app = environment.applications.find(
+                                    (item) => item.id === node.id
+                                );
+                                const removing = staged.has(node.id);
+                                const card = (
                                     <div
-                                        className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
-                                        style={{ left: p.x, top: p.y + NODE_H, width: NODE_W }}
+                                        className={`group absolute flex select-none flex-col border bg-elevated transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/25 ${
+                                            node.volume || node.volumes?.length
+                                                ? "rounded-t-2xl"
+                                                : "rounded-2xl"
+                                        } ${
+                                            removing
+                                                ? "border-primary/60 ring-1 ring-primary/30"
+                                                : dragId === node.id
+                                                  ? "border-primary ring-1 ring-primary/40"
+                                                  : TONE_BORDER[node.tone]
+                                        } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
+                                        style={{
+                                            left: p.x,
+                                            top: p.y,
+                                            width: NODE_W,
+                                            height: NODE_H
+                                        }}
+                                        onPointerDown={(event) => onNodePointerDown(event, node.id)}
+                                        onContextMenu={(event) => event.stopPropagation()}
                                     >
-                                        <HardDrive className="size-3.5 shrink-0" /> {node.volume}
-                                    </div>
-                                )}
-                                {node.volumes?.map((vol, vi) => (
-                                    <ContextMenu key={vol.id}>
-                                        <ContextMenuTrigger asChild>
+                                        <div
+                                            className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                {node.engine ? (
+                                                    <DbEngineIcon
+                                                        engine={node.engine}
+                                                        className="size-10 rounded-xl"
+                                                    />
+                                                ) : (
+                                                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
+                                                        <ServiceIcon
+                                                            kind={node.kind}
+                                                            className="size-5"
+                                                        />
+                                                    </span>
+                                                )}
+                                                <span className="min-w-0 flex-1 truncate text-base font-semibold">
+                                                    {node.name}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 truncate text-sm text-muted-foreground">
+                                                {node.subtitle}
+                                            </p>
+                                            <div className="mt-auto flex items-center gap-2 text-sm">
+                                                {removing ? (
+                                                    <>
+                                                        <span className="size-2 rounded-full bg-primary" />
+                                                        <span className="text-primary">
+                                                            Removal pending
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span
+                                                            className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`}
+                                                        />
+                                                        <span
+                                                            className={`capitalize ${TONE_TEXT[node.tone]}`}
+                                                        >
+                                                            {label}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {canManage && (
                                             <button
                                                 type="button"
-                                                onClick={() => setOpenVolume({ id: vol.id, tab: "Metrics" })}
-                                                onContextMenu={(event) => event.stopPropagation()}
-                                                className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
-                                                    vi === (node.volumes?.length ?? 0) - 1 ? "rounded-b-2xl" : ""
-                                                }`}
-                                                style={{ left: p.x, top: p.y + NODE_H + vi * VOL_STRIP_H, width: NODE_W }}
+                                                title="Drag to another service to link"
+                                                onPointerDown={(event) =>
+                                                    onHandlePointerDown(event, node.id)
+                                                }
+                                                className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
+                                            />
+                                        )}
+                                    </div>
+                                );
+                                return (
+                                    <Fragment key={node.id}>
+                                        {canManage ? (
+                                            <ContextMenu>
+                                                <ContextMenuTrigger asChild>
+                                                    {card}
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent>
+                                                    {app && (
+                                                        <>
+                                                            <ContextMenuItem
+                                                                onSelect={() =>
+                                                                    onOpenService?.(app)
+                                                                }
+                                                            >
+                                                                <ScrollText className="size-4" />{" "}
+                                                                Open service
+                                                            </ContextMenuItem>
+                                                            <ContextMenuItem
+                                                                onSelect={() => duplicate(app)}
+                                                            >
+                                                                <Copy className="size-4" />{" "}
+                                                                Duplicate
+                                                            </ContextMenuItem>
+                                                        </>
+                                                    )}
+                                                    <ContextMenuSeparator />
+                                                    <ContextMenuItem
+                                                        variant="danger"
+                                                        disabled={removing}
+                                                        onSelect={() =>
+                                                            setDeleteTarget({
+                                                                id: node.id,
+                                                                name: node.name,
+                                                                kind: app ? "service" : "database",
+                                                                hostedCount: node.hostedCount ?? 0
+                                                            })
+                                                        }
+                                                    >
+                                                        <Trash2 className="size-4" />
+                                                        {removing ? "Removal pending" : "Delete"}
+                                                    </ContextMenuItem>
+                                                </ContextMenuContent>
+                                            </ContextMenu>
+                                        ) : (
+                                            card
+                                        )}
+                                        {node.volume && (
+                                            <div
+                                                className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
+                                                style={{
+                                                    left: p.x,
+                                                    top: p.y + NODE_H,
+                                                    width: NODE_W
+                                                }}
                                             >
-                                                <HardDrive className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`} />
-                                                <span className="truncate">{vol.name}</span>
-                                                <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
-                                                    {vol.kind === "nas" ? (vol.connectionName ?? "NAS") : vol.kind === "bind" ? "Server" : "Volume"}
-                                                </span>
-                                            </button>
-                                        </ContextMenuTrigger>
-                                        <ContextMenuContent>
-                                            <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Metrics" })}>
-                                                <Settings2 className="size-4" /> Volume settings
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Files" })}>
-                                                <Files className="size-4" /> Browse files
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onSelect={() => router.push(volumeDriveHref(node.id, vol))}>
-                                                <HardDrive className="size-4" /> View in Drive
-                                            </ContextMenuItem>
-                                            {canManage && (
-                                                <ContextMenuItem onSelect={() => setOpenVolume({ id: vol.id, tab: "Settings" })}>
-                                                    <ScrollText className="size-4" /> Edit mount
-                                                </ContextMenuItem>
-                                            )}
-                                        </ContextMenuContent>
-                                    </ContextMenu>
-                                ))}
-                            </Fragment>
-                        );
-                    })}
+                                                <HardDrive className="size-3.5 shrink-0" />{" "}
+                                                {node.volume}
+                                            </div>
+                                        )}
+                                        {node.volumes?.map((vol, vi) => (
+                                            <ContextMenu key={vol.id}>
+                                                <ContextMenuTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setOpenVolume({
+                                                                id: vol.id,
+                                                                tab: "Metrics"
+                                                            })
+                                                        }
+                                                        onContextMenu={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                        className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
+                                                            vi === (node.volumes?.length ?? 0) - 1
+                                                                ? "rounded-b-2xl"
+                                                                : ""
+                                                        }`}
+                                                        style={{
+                                                            left: p.x,
+                                                            top: p.y + NODE_H + vi * VOL_STRIP_H,
+                                                            width: NODE_W
+                                                        }}
+                                                    >
+                                                        <HardDrive
+                                                            className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`}
+                                                        />
+                                                        <span className="truncate">{vol.name}</span>
+                                                        <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
+                                                            {vol.kind === "nas"
+                                                                ? (vol.connectionName ?? "NAS")
+                                                                : vol.kind === "bind"
+                                                                  ? "Server"
+                                                                  : "Volume"}
+                                                        </span>
+                                                    </button>
+                                                </ContextMenuTrigger>
+                                                <ContextMenuContent>
+                                                    <ContextMenuItem
+                                                        onSelect={() =>
+                                                            setOpenVolume({
+                                                                id: vol.id,
+                                                                tab: "Metrics"
+                                                            })
+                                                        }
+                                                    >
+                                                        <Settings2 className="size-4" /> Volume
+                                                        settings
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem
+                                                        onSelect={() =>
+                                                            setOpenVolume({
+                                                                id: vol.id,
+                                                                tab: "Files"
+                                                            })
+                                                        }
+                                                    >
+                                                        <Files className="size-4" /> Browse files
+                                                    </ContextMenuItem>
+                                                    <ContextMenuItem
+                                                        onSelect={() =>
+                                                            router.push(
+                                                                volumeDriveHref(node.id, vol)
+                                                            )
+                                                        }
+                                                    >
+                                                        <HardDrive className="size-4" /> View in
+                                                        Drive
+                                                    </ContextMenuItem>
+                                                    {canManage && (
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                setOpenVolume({
+                                                                    id: vol.id,
+                                                                    tab: "Settings"
+                                                                })
+                                                            }
+                                                        >
+                                                            <ScrollText className="size-4" /> Edit
+                                                            mount
+                                                        </ContextMenuItem>
+                                                    )}
+                                                </ContextMenuContent>
+                                            </ContextMenu>
+                                        ))}
+                                    </Fragment>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-                <div className="pointer-events-none absolute inset-0 rounded-lg" style={VIGNETTE} />
+                    <div
+                        className="pointer-events-none absolute inset-0 rounded-lg"
+                        style={VIGNETTE}
+                    />
                 </div>
             )}
             {canManage && (
                 <p className="mt-2 text-xs text-muted-foreground/70">
-                    Drag nodes to arrange them. Drag from a node's right handle onto another service to link them.
-                    Right-click the board to add a service, or a service for more.
+                    Drag nodes to arrange them. Drag from a node's right handle onto another service
+                    to link them. Right-click the board to add a service, or a service for more.
                 </p>
             )}
 

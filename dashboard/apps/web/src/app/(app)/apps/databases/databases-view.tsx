@@ -71,14 +71,22 @@ export function DatabasesView() {
         return (
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => router.push("/apps/databases")}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push("/apps/databases")}
+                    >
                         <ArrowLeft className="size-4" />
                         Connections
                     </Button>
                     <DbEngineIcon engine={open.engine} className="size-4 shrink-0" />
-                    <span className="min-w-0 truncate text-sm font-medium" title={open.name}>{open.name}</span>
+                    <span className="min-w-0 truncate text-sm font-medium" title={open.name}>
+                        {open.name}
+                    </span>
                     {open.readOnly && <Badge>read-only</Badge>}
-                    <span className="truncate text-xs text-muted-foreground" title={open.where}>{open.where}</span>
+                    <span className="truncate text-xs text-muted-foreground" title={open.where}>
+                        {open.where}
+                    </span>
                 </div>
                 <Workbench connectionId={open.id} readOnly={open.readOnly} />
             </div>
@@ -144,14 +152,19 @@ export function DatabasesView() {
                                     }
                                     className="flex min-w-0 items-center gap-3 text-left"
                                 >
-                                    <DbEngineIcon engine={connection.engine} className="size-8 shrink-0" />
+                                    <DbEngineIcon
+                                        engine={connection.engine}
+                                        className="size-8 shrink-0"
+                                    />
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-1.5">
                                             <span className="truncate text-sm font-medium">
                                                 {connection.name}
                                             </span>
                                             {(connection.managedDatabaseId ||
-                                                connection.origin === "polaris") && <Badge>Polaris</Badge>}
+                                                connection.origin === "polaris") && (
+                                                <Badge>Polaris</Badge>
+                                            )}
                                             {connection.readOnly && <Badge>read-only</Badge>}
                                         </span>
                                         <span className="block truncate text-xs text-muted-foreground">
@@ -171,7 +184,8 @@ export function DatabasesView() {
                                                 ""
                                             ) : connection.lastUsedAt ? (
                                                 <>
-                                                    opened <RelativeTime iso={connection.lastUsedAt} />
+                                                    opened{" "}
+                                                    <RelativeTime iso={connection.lastUsedAt} />
                                                 </>
                                             ) : (
                                                 "never opened"
@@ -191,7 +205,8 @@ export function DatabasesView() {
                                             setTesting(null);
                                             setTested((current) => ({
                                                 ...current,
-                                                [connection.id]: result.error ?? result.version ?? ""
+                                                [connection.id]:
+                                                    result.error ?? result.version ?? ""
                                             }));
                                         }}
                                     >
@@ -227,7 +242,9 @@ export function DatabasesView() {
                                                         confirmLabel: "Remove"
                                                     });
                                                     if (!sure) return;
-                                                    await actions.deleteConnectionAction(connection.id);
+                                                    await actions.deleteConnectionAction(
+                                                        connection.id
+                                                    );
                                                     await load();
                                                 }}
                                             >

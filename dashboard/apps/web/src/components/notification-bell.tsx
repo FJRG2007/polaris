@@ -88,7 +88,9 @@ export function NotificationBell() {
                 </div>
                 <DropdownMenuSeparator />
                 {items.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
+                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                        You&apos;re all caught up.
+                    </p>
                 ) : (
                     <div className="max-h-80 overflow-auto overscroll-contain">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
@@ -113,12 +115,22 @@ export function NotificationBell() {
                                                     {!item.read ? (
                                                         <span className="size-1.5 shrink-0 rounded-full bg-primary" />
                                                     ) : null}
-                                                    <span className="truncate text-[0.8125rem]" title={item.title}>{item.title}</span>
+                                                    <span
+                                                        className="truncate text-[0.8125rem]"
+                                                        title={item.title}
+                                                    >
+                                                        {item.title}
+                                                    </span>
                                                 </span>
                                                 <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                                     <RelativeTime iso={item.createdAt} />
                                                     <span aria-hidden="true">-</span>
-                                                    <span className="truncate" title={audience.text}>{audience.text}</span>
+                                                    <span
+                                                        className="truncate"
+                                                        title={audience.text}
+                                                    >
+                                                        {audience.text}
+                                                    </span>
                                                     {item.actionRequired ? (
                                                         <span className="shrink-0 text-warning">
                                                             Action needed
@@ -157,7 +169,10 @@ export function NotificationBell() {
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                    <Link href="/account/notifications" className="justify-center text-sm text-muted-foreground">
+                    <Link
+                        href="/account/notifications"
+                        className="justify-center text-sm text-muted-foreground"
+                    >
                         View all
                     </Link>
                 </DropdownMenuItem>

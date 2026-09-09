@@ -35,7 +35,8 @@ export default function NotFound() {
                     <p className="font-mono text-xs text-muted-foreground">404</p>
                     <h1 className="text-sm font-medium">There is nothing at this address</h1>
                     <p className="text-sm text-muted-foreground">
-                        The link may be out of date, or the thing it pointed at may have been removed.
+                        The link may be out of date, or the thing it pointed at may have been
+                        removed.
                     </p>
                 </div>
 

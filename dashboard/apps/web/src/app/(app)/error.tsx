@@ -29,7 +29,13 @@ import { useEffect, useState, useTransition } from "react";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 import { checkForNewBuild } from "@/lib/new-build";
 
-export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function AppError({
+    error,
+    reset
+}: {
+    error: Error & { digest?: string };
+    reset: () => void;
+}) {
     const router = useRouter();
     const [retrying, startRetry] = useTransition();
     const [attempts, setAttempts] = useState(1);
@@ -67,7 +73,9 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
                         <TriangleAlert className="mt-0.5 size-5 shrink-0 text-danger" />
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">
-                                {staleBuild ? "Polaris was updated while this page was open" : "This page stopped working"}
+                                {staleBuild
+                                    ? "Polaris was updated while this page was open"
+                                    : "This page stopped working"}
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 {staleBuild
@@ -87,7 +95,9 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
                         </p>
                     ) : null}
                     {error.digest && !staleBuild ? (
-                        <p className="font-mono text-xs text-muted-foreground">Reference: {error.digest}</p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                            Reference: {error.digest}
+                        </p>
                     ) : null}
                     <div className="flex justify-end gap-2">
                         {staleBuild ? (
@@ -125,6 +135,9 @@ function countFailure(error: Error & { digest?: string }): number {
     if (counted === error) return streak.count;
     counted = error;
     const signature = error.digest ?? error.message;
-    streak = signature === streak.signature ? { signature, count: streak.count + 1 } : { signature, count: 1 };
+    streak =
+        signature === streak.signature
+            ? { signature, count: streak.count + 1 }
+            : { signature, count: 1 };
     return streak.count;
 }

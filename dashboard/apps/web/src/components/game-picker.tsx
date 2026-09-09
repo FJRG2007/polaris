@@ -33,13 +33,22 @@ const SEARCHABLE_FROM = 4;
 function matches(game: GameDefinition, query: string): boolean {
     const needle = query.trim().toLowerCase();
     if (needle.length === 0) return true;
-    return [game.name, game.summary, game.demands, game.id].some((value) => value.toLowerCase().includes(needle));
+    return [game.name, game.summary, game.demands, game.id].some((value) =>
+        value.toLowerCase().includes(needle)
+    );
 }
 
 /** A game's own mark, from its publisher. Decoration beside a name that is already
  *  written out, so it is hidden from a screen reader rather than described twice. */
 export function GameLogo({ game, className }: { game: GameDefinition; className?: string }) {
-    return <img src={game.logo} alt="" aria-hidden className={cn("shrink-0 object-contain", className)} />;
+    return (
+        <img
+            src={game.logo}
+            alt=""
+            aria-hidden
+            className={cn("shrink-0 object-contain", className)}
+        />
+    );
 }
 
 export function GamePicker({
@@ -103,8 +112,15 @@ export function GamePicker({
                     <>
                         <GameLogo game={selected} className="size-8" />
                         <span className="flex min-w-0 flex-col">
-                            <span className="truncate font-medium" title={selected.name}>{selected.name}</span>
-                            <span className="truncate text-xs text-muted-foreground" title={selected.summary}>{selected.summary}</span>
+                            <span className="truncate font-medium" title={selected.name}>
+                                {selected.name}
+                            </span>
+                            <span
+                                className="truncate text-xs text-muted-foreground"
+                                title={selected.summary}
+                            >
+                                {selected.summary}
+                            </span>
                         </span>
                     </>
                 ) : (
@@ -133,7 +149,10 @@ export function GamePicker({
                             />
                         </div>
                     )}
-                    <div role="listbox" className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain p-1">
+                    <div
+                        role="listbox"
+                        className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain p-1"
+                    >
                         {shown.length === 0 ? (
                             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                                 No game here matches that.
@@ -153,8 +172,15 @@ export function GamePicker({
                                 >
                                     <GameLogo game={game} className="size-8" />
                                     <span className="flex min-w-0 flex-col">
-                                        <span className="truncate font-medium" title={game.name}>{game.name}</span>
-                                        <span className="truncate text-xs text-muted-foreground" title={game.summary}>{game.summary}</span>
+                                        <span className="truncate font-medium" title={game.name}>
+                                            {game.name}
+                                        </span>
+                                        <span
+                                            className="truncate text-xs text-muted-foreground"
+                                            title={game.summary}
+                                        >
+                                            {game.summary}
+                                        </span>
                                         {/* What a server of it actually costs. The
                                             two differ by an order of magnitude, and
                                             it is the one thing nobody finds out
@@ -163,7 +189,9 @@ export function GamePicker({
                                             {game.demands}
                                         </span>
                                     </span>
-                                    {game.id === value && <Check className="ml-auto size-4 shrink-0 text-primary" />}
+                                    {game.id === value && (
+                                        <Check className="ml-auto size-4 shrink-0 text-primary" />
+                                    )}
                                 </button>
                             ))
                         )}

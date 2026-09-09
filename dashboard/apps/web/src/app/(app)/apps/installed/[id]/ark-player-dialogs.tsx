@@ -324,14 +324,19 @@ export function ArkGiveDialog({
      *  it. Falls back to the class the catalogue keys it by, which is at least
      *  recognisable, for a line whose item the catalogue has since dropped. */
     function describe(line: ArkGiveLine): string {
-        return describeArkGive(items.find((entry) => entry.id === line.key)?.label ?? line.key, line);
+        return describeArkGive(
+            items.find((entry) => entry.id === line.key)?.label ?? line.key,
+            line
+        );
     }
 
     return (
         <PlayerFormDialog
             title={`Give ${name} something`}
             description="Goes straight into their inventory. They have to have played on this server before."
-            confirmLabel={sending.length > 1 ? `Give them ${sending.length} things` : "Give it to them"}
+            confirmLabel={
+                sending.length > 1 ? `Give them ${sending.length} things` : "Give it to them"
+            }
             ready={sending.length > 0}
             pending={pending}
             error={error}
@@ -361,7 +366,9 @@ export function ArkGiveDialog({
                     aria-label="How many"
                     className="w-24"
                     onChange={(event) =>
-                        setQuantity(Math.max(1, Math.min(MAX_ARK_GIVE, Number(event.target.value) || 1)))
+                        setQuantity(
+                            Math.max(1, Math.min(MAX_ARK_GIVE, Number(event.target.value) || 1))
+                        )
                     }
                 />
             </PlayerFormField>
@@ -381,7 +388,10 @@ export function ArkGiveDialog({
                             className="w-24"
                             onChange={(event) =>
                                 setQuality(
-                                    Math.max(0, Math.min(MAX_ARK_QUALITY, Number(event.target.value) || 0))
+                                    Math.max(
+                                        0,
+                                        Math.min(MAX_ARK_QUALITY, Number(event.target.value) || 0)
+                                    )
                                 )
                             }
                         />
@@ -393,7 +403,11 @@ export function ArkGiveDialog({
                                 They craft it themselves, with the materials it costs.
                             </span>
                         </span>
-                        <Switch checked={blueprint} onChange={setBlueprint} aria-label="The blueprint instead" />
+                        <Switch
+                            checked={blueprint}
+                            onChange={setBlueprint}
+                            aria-label="The blueprint instead"
+                        />
                     </label>
                 </>
             )}
@@ -414,7 +428,8 @@ export function ArkGiveDialog({
                 </Button>
                 {full && (
                     <p className="text-xs text-muted-foreground">
-                        {MAX_ARK_GIVE_ITEMS} things is as much as one give carries. Send these and open it again.
+                        {MAX_ARK_GIVE_ITEMS} things is as much as one give carries. Send these and
+                        open it again.
                     </p>
                 )}
                 {queued.length > 0 && (
@@ -433,7 +448,9 @@ export function ArkGiveDialog({
                                     title={`Take ${describe(line)} off the list`}
                                     aria-label={`Take ${describe(line)} off the list`}
                                     className="shrink-0 text-muted-foreground transition-colors hover:text-danger"
-                                    onClick={() => setQueued((was) => was.filter((_, at) => at !== index))}
+                                    onClick={() =>
+                                        setQueued((was) => was.filter((_, at) => at !== index))
+                                    }
                                 >
                                     <X className="size-3.5" />
                                 </button>
@@ -493,7 +510,12 @@ export function ArkExperienceDialog({
                     aria-label="How much"
                     className="w-32"
                     onChange={(event) =>
-                        setAmount(Math.max(1, Math.min(MAX_ARK_EXPERIENCE, Number(event.target.value) || 1)))
+                        setAmount(
+                            Math.max(
+                                1,
+                                Math.min(MAX_ARK_EXPERIENCE, Number(event.target.value) || 1)
+                            )
+                        )
                     }
                 />
             </PlayerFormField>

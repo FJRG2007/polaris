@@ -10,7 +10,17 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { Ban, Check, Copy, FileText, FolderClosed, FolderOpen, Link2, Pencil, ScrollText } from "lucide-react";
+import {
+    Ban,
+    Check,
+    Copy,
+    FileText,
+    FolderClosed,
+    FolderOpen,
+    Link2,
+    Pencil,
+    ScrollText
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -79,11 +89,23 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
     const [confirm, confirmDialog] = useConfirm();
 
     async function onRevoke(id: string) {
-        if (!(await confirm({ title: "Revoke this link?", description: "It will stop working immediately.", confirmLabel: "Revoke", danger: true }))) return;
+        if (
+            !(await confirm({
+                title: "Revoke this link?",
+                description: "It will stop working immediately.",
+                confirmLabel: "Revoke",
+                danger: true
+            }))
+        )
+            return;
         setBusy(id);
         startTransition(async () => {
             await revokeShareAction(id);
-            setRows((prev) => prev.map((row) => (row.id === id ? { ...row, revokedAt: new Date().toISOString() } : row)));
+            setRows((prev) =>
+                prev.map((row) =>
+                    row.id === id ? { ...row, revokedAt: new Date().toISOString() } : row
+                )
+            );
             setBusy(null);
         });
     }
@@ -93,7 +115,11 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         const result = await revealShareLinkAction(row.id);
         setBusy(null);
         if (result.error) {
-            await confirm({ title: "Could not reveal the link", description: result.error, alert: true });
+            await confirm({
+                title: "Could not reveal the link",
+                description: result.error,
+                alert: true
+            });
             return;
         }
         setRevealed({ id: row.id, url: result.url ?? "" });
@@ -104,7 +130,8 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
         return (
             <Card>
                 <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                    You have not shared anything yet. Use the share action on a file or folder in Drive.
+                    You have not shared anything yet. Use the share action on a file or folder in
+                    Drive.
                 </CardBody>
             </Card>
         );
@@ -127,7 +154,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                             <FileText className="size-4 shrink-0 text-muted-foreground" />
                                         )}
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">{share.path || "(root)"}</p>
+                                            <p className="truncate text-sm font-medium">
+                                                {share.path || "(root)"}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {share.connectionName}
                                                 {share.maxDownloads !== null
@@ -136,7 +165,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 {share.expiresAt
                                                     ? ` - expires ${format.date(share.expiresAt)}`
                                                     : ""}
-                                                {share.allowedCidrs.length > 0 ? ` - IP-restricted` : ""}
+                                                {share.allowedCidrs.length > 0
+                                                    ? ` - IP-restricted`
+                                                    : ""}
                                             </p>
                                         </div>
                                     </div>
@@ -145,7 +176,12 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                         <Button size="sm" variant="ghost" asChild>
                                             <Link
                                                 href={`/drive?c=${share.connectionId}&p=${encodeURIComponent(
-                                                    isDir ? share.path : share.path.split("/").slice(0, -1).join("/")
+                                                    isDir
+                                                        ? share.path
+                                                        : share.path
+                                                              .split("/")
+                                                              .slice(0, -1)
+                                                              .join("/")
                                                 )}`}
                                             >
                                                 <FolderOpen className="size-4" />
@@ -163,12 +199,20 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                                 Link
                                             </Button>
                                         ) : null}
-                                        <Button size="sm" variant="ghost" onClick={() => setLogsFor(share)}>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setLogsFor(share)}
+                                        >
                                             <ScrollText className="size-4" />
                                             Logs
                                         </Button>
                                         {!share.revokedAt ? (
-                                            <Button size="sm" variant="ghost" onClick={() => setEditing(share)}>
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setEditing(share)}
+                                            >
                                                 <Pencil className="size-4" />
                                                 Edit
                                             </Button>
@@ -188,7 +232,11 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                 </div>
                                 {revealed?.id === share.id ? (
                                     <div className="flex items-center gap-2">
-                                        <Input readOnly value={revealed.url} className="font-mono text-xs" />
+                                        <Input
+                                            readOnly
+                                            value={revealed.url}
+                                            className="font-mono text-xs"
+                                        />
                                         <Button
                                             type="button"
                                             size="icon"
@@ -292,13 +340,20 @@ function EditShareDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Edit link</DialogTitle>
-                    <DialogDescription className="truncate">{share?.path || "(root)"}</DialogDescription>
+                    <DialogDescription className="truncate">
+                        {share?.path || "(root)"}
+                    </DialogDescription>
                 </DialogHeader>
                 {share ? (
                     <form onSubmit={onSubmit} className="flex flex-col gap-3" {...formProps}>
                         <label className="flex flex-col gap-1 text-sm">
                             Password
-                            <Input name="password" type="password" placeholder="Leave blank to keep" autoComplete="off" />
+                            <Input
+                                name="password"
+                                type="password"
+                                placeholder="Leave blank to keep"
+                                autoComplete="off"
+                            />
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                             <input type="checkbox" name="removePassword" className="size-4" />
@@ -320,7 +375,9 @@ function EditShareDialog({
                                 <Input
                                     name="expiresAt"
                                     type="date"
-                                    defaultValue={share.expiresAt ? share.expiresAt.slice(0, 10) : ""}
+                                    defaultValue={
+                                        share.expiresAt ? share.expiresAt.slice(0, 10) : ""
+                                    }
                                 />
                             </label>
                         </div>
@@ -411,7 +468,13 @@ function EditShareDialog({
     );
 }
 
-function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOpenChange: (open: boolean) => void }) {
+function ShareLogsDialog({
+    share,
+    onOpenChange
+}: {
+    share: ShareRow | null;
+    onOpenChange: (open: boolean) => void;
+}) {
     const format = useDisplayFormat();
     const [logs, setLogs] = useState<ShareLogRow[] | null>(null);
     const shareId = share?.id ?? null;
@@ -438,7 +501,9 @@ function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOp
             <DialogContent className="max-h-[85vh] overflow-hidden">
                 <DialogHeader>
                     <DialogTitle>Access log</DialogTitle>
-                    <DialogDescription className="truncate">{share?.path || "(root)"}</DialogDescription>
+                    <DialogDescription className="truncate">
+                        {share?.path || "(root)"}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="mb-2 flex flex-wrap gap-2 text-xs">
                     <Badge variant="neutral">{views} views</Badge>
@@ -450,7 +515,9 @@ function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOp
                     {logs === null ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">Loading...</p>
                     ) : logs.length === 0 ? (
-                        <p className="p-6 text-center text-sm text-muted-foreground">No access yet.</p>
+                        <p className="p-6 text-center text-sm text-muted-foreground">
+                            No access yet.
+                        </p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
@@ -466,7 +533,9 @@ function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOp
                                         <td className="py-1 pr-3 text-muted-foreground">
                                             {format.dateTime(row.at)}
                                         </td>
-                                        <td className="py-1 pr-3 font-mono text-xs">{row.ip ?? "-"}</td>
+                                        <td className="py-1 pr-3 font-mono text-xs">
+                                            {row.ip ?? "-"}
+                                        </td>
                                         <td className="py-1">
                                             {row.reason ? (
                                                 <span className="text-danger">

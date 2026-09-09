@@ -80,7 +80,12 @@ export function JsonView({
     const code = prettyJson(value);
 
     return (
-        <div className={cn("group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40", className)}>
+        <div
+            className={cn(
+                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
+                className
+            )}
+        >
             {copyable ? (
                 <CopyButton
                     value={code}

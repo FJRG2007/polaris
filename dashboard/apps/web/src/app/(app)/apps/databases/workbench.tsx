@@ -34,7 +34,13 @@ import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DataColumn, DataNamespace, DataPage, DataRelation, QueryResult } from "@/lib/data/driver";
+import type {
+    DataColumn,
+    DataNamespace,
+    DataPage,
+    DataRelation,
+    QueryResult
+} from "@/lib/data/driver";
 import {
     Check,
     ChevronLeft,
@@ -114,14 +120,14 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
     });
     const tabs = bench.state.tabs;
     const activeId = bench.state.activeId;
-    const active = useMemo(() => tabs.find((entry) => entry.id === activeId) ?? null, [tabs, activeId]);
-
-    const change = useCallback(
-        (next: (was: openTabs.TabState) => openTabs.TabState) => {
-            setBench((was) => ({ id: was.id, state: next(was.state) }));
-        },
-        []
+    const active = useMemo(
+        () => tabs.find((entry) => entry.id === activeId) ?? null,
+        [tabs, activeId]
     );
+
+    const change = useCallback((next: (was: openTabs.TabState) => openTabs.TabState) => {
+        setBench((was) => ({ id: was.id, state: next(was.state) }));
+    }, []);
 
     useEffect(() => {
         setBench({ id: connectionId, state: openTabs.readTabState(connectionId) });
@@ -184,12 +190,15 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
             // than offered as a list of one - unless something is already open,
             // because then the bench somebody left behind is the answer to what
             // they want to see and this would put a tab in front of it.
-            const only = result.relations?.length === 1 && result.shape === "keyvalue"
-                ? result.relations[0]?.name ?? null
-                : null;
+            const only =
+                result.relations?.length === 1 && result.shape === "keyvalue"
+                    ? (result.relations[0]?.name ?? null)
+                    : null;
             if (only) {
                 change((was) =>
-                    was.tabs.length === 0 ? openTabs.openTable(was, result.namespace ?? null, only) : was
+                    was.tabs.length === 0
+                        ? openTabs.openTable(was, result.namespace ?? null, only)
+                        : was
                 );
             }
         },
@@ -303,7 +312,11 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                 <li key={`${entry.namespace}.${entry.name}`}>
                                     <button
                                         type="button"
-                                        onClick={() => change((was) => openTabs.openTable(was, namespace, entry.name))}
+                                        onClick={() =>
+                                            change((was) =>
+                                                openTabs.openTable(was, namespace, entry.name)
+                                            )
+                                        }
                                         className={cn(
                                             "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-card-hover",
                                             // What is in front, rather than
@@ -317,7 +330,12 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                         )}
                                     >
                                         <Table2 className="size-3.5 shrink-0 text-muted-foreground" />
-                                        <span className="min-w-0 flex-1 truncate" title={entry.name}>{entry.name}</span>
+                                        <span
+                                            className="min-w-0 flex-1 truncate"
+                                            title={entry.name}
+                                        >
+                                            {entry.name}
+                                        </span>
                                         {entry.rows !== null && (
                                             <span className="shrink-0 text-xs text-muted-foreground">
                                                 {entry.rows}
@@ -351,7 +369,10 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                 )}
 
                 {error && (
-                    <p role="alert" className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <p
+                        role="alert"
+                        className="rounded-md bg-danger/10 px-3 py-2 text-sm text-danger"
+                    >
                         {error}
                     </p>
                 )}
@@ -373,7 +394,9 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                         return (
                             <div
                                 key={entry.id}
-                                className={front ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}
+                                className={
+                                    front ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"
+                                }
                             >
                                 {entry.kind === "table" ? (
                                     <RowsPanel
@@ -393,7 +416,9 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                         shape={shape}
                                         statement={entry.statement}
                                         onStatement={(text) =>
-                                            change((was) => openTabs.writeStatement(was, entry.id, text))
+                                            change((was) =>
+                                                openTabs.writeStatement(was, entry.id, text)
+                                            )
                                         }
                                     />
                                 )}
@@ -490,7 +515,11 @@ function CellEditor({
                 }}
                 className="text-success shrink-0 rounded p-0.5 hover:bg-muted"
             >
-                {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                {saving ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                    <Check className="size-3.5" />
+                )}
             </button>
             <button
                 type="button"
@@ -601,7 +630,10 @@ function RowsPanel({
     const editable = !readOnly && !cursorPaged && keyColumns.length > 0;
 
     /** What a click on a row means, read the way every list in Polaris reads it. */
-    const pick = (index: number, event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
+    const pick = (
+        index: number,
+        event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }
+    ) => {
         if (event.shiftKey && anchor !== null) {
             const [from, to] = anchor <= index ? [anchor, index] : [index, anchor];
             const range = new Set(picked);
@@ -735,8 +767,18 @@ function RowsPanel({
                         onChange={(event) => setFilter(event.target.value)}
                     />
                 </form>
-                <Button size="icon" variant="ghost" title="Refresh" aria-label="Refresh" onClick={() => void read()}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Refresh"
+                    aria-label="Refresh"
+                    onClick={() => void read()}
+                >
+                    {busy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4" />
+                    )}
                 </Button>
                 <span className="text-xs text-muted-foreground">
                     {picked.size > 0
@@ -763,11 +805,7 @@ function RowsPanel({
                         variant="ghost"
                         title="Next page"
                         aria-label="Next page"
-                        disabled={
-                            cursorPaged
-                                ? !page?.cursor
-                                : (page?.rows.length ?? 0) < PAGE
-                        }
+                        disabled={cursorPaged ? !page?.cursor : (page?.rows.length ?? 0) < PAGE}
                         onClick={() => {
                             if (cursorPaged) setCursor(page?.cursor ?? null);
                             else setOffset(offset + PAGE);
@@ -832,7 +870,8 @@ function RowsPanel({
                                                 className={cn(
                                                     "border-t border-border",
                                                     "cursor-default hover:bg-card-hover",
-                                                    picked.has(index) && "bg-primary/10 hover:bg-primary/15"
+                                                    picked.has(index) &&
+                                                        "bg-primary/10 hover:bg-primary/15"
                                                 )}
                                                 onContextMenu={() => adoptForMenu(index)}
                                                 onClick={(event) => {
@@ -846,7 +885,8 @@ function RowsPanel({
                                                             .then((result) => {
                                                                 if (result.error)
                                                                     setError(result.error);
-                                                                else setOpened(result.value ?? null);
+                                                                else
+                                                                    setOpened(result.value ?? null);
                                                             });
                                                         return;
                                                     }
@@ -864,19 +904,32 @@ function RowsPanel({
                                                                 "max-w-xs px-3 py-1.5 align-top font-mono text-xs",
                                                                 !open && "truncate"
                                                             )}
-                                                            title={open ? undefined : cellText(row[column.name])}
-                                                            onContextMenu={() =>
-                                                                setMenuCell({ row: index, column: column.name })
+                                                            title={
+                                                                open
+                                                                    ? undefined
+                                                                    : cellText(row[column.name])
                                                             }
-                                                            onDoubleClick={() => beginEdit(index, column)}
+                                                            onContextMenu={() =>
+                                                                setMenuCell({
+                                                                    row: index,
+                                                                    column: column.name
+                                                                })
+                                                            }
+                                                            onDoubleClick={() =>
+                                                                beginEdit(index, column)
+                                                            }
                                                         >
                                                             {open ? (
                                                                 <CellEditor
                                                                     value={draft}
                                                                     saving={saving}
                                                                     onChange={setDraft}
-                                                                    onCommit={() => void commitEdit()}
-                                                                    onCancel={() => setEditing(null)}
+                                                                    onCommit={() =>
+                                                                        void commitEdit()
+                                                                    }
+                                                                    onCancel={() =>
+                                                                        setEditing(null)
+                                                                    }
                                                                 />
                                                             ) : (
                                                                 cell(row[column.name])
@@ -895,14 +948,17 @@ function RowsPanel({
                                                 const on =
                                                     menuCell?.row === index
                                                         ? columns.find(
-                                                              (column) => column.name === menuCell.column
+                                                              (column) =>
+                                                                  column.name === menuCell.column
                                                           )
                                                         : undefined;
                                                 if (!on) return null;
                                                 const value = row[on.name];
                                                 return (
                                                     <>
-                                                        <ContextMenuLabel>{on.name}</ContextMenuLabel>
+                                                        <ContextMenuLabel>
+                                                            {on.name}
+                                                        </ContextMenuLabel>
                                                         <ContextMenuItem
                                                             onSelect={() => copy(cellText(value))}
                                                         >
@@ -910,18 +966,24 @@ function RowsPanel({
                                                             Copy this value
                                                         </ContextMenuItem>
                                                         <ContextMenuItem
-                                                            onSelect={() => setFilter(cellText(value))}
+                                                            onSelect={() =>
+                                                                setFilter(cellText(value))
+                                                            }
                                                         >
                                                             <Search className="size-3.5" />
                                                             Find rows like it
                                                         </ContextMenuItem>
                                                         {editable && !on.primaryKey ? (
                                                             <ContextMenuItem
-                                                                onSelect={() => beginEdit(index, on)}
+                                                                onSelect={() =>
+                                                                    beginEdit(index, on)
+                                                                }
                                                             >
                                                                 <Pencil className="size-3.5" />
                                                                 Edit this value
-                                                                <MenuShortcut>Double-click</MenuShortcut>
+                                                                <MenuShortcut>
+                                                                    Double-click
+                                                                </MenuShortcut>
                                                             </ContextMenuItem>
                                                         ) : null}
                                                         <ContextMenuSeparator />
@@ -937,7 +999,9 @@ function RowsPanel({
                                                     : "Copy row as JSON"}
                                             </ContextMenuItem>
                                             <ContextMenuItem
-                                                onSelect={() => copy(rowsAsText(pickedRows, columns))}
+                                                onSelect={() =>
+                                                    copy(rowsAsText(pickedRows, columns))
+                                                }
                                             >
                                                 <Copy className="size-3.5" />
                                                 Copy as text
@@ -996,7 +1060,9 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
         <Card>
             <CardBody className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate font-mono text-sm" title={value.key}>{value.key}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-sm" title={value.key}>
+                        {value.key}
+                    </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                         {value.type}
                         {value.ttl === null ? "" : ` - expires in ${Math.round(value.ttl / 1000)}s`}
@@ -1014,7 +1080,10 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                         <table className="w-full text-xs">
                             <tbody>
                                 {value.entries.map((entry, index) => (
-                                    <tr key={index} className="border-t border-border first:border-t-0">
+                                    <tr
+                                        key={index}
+                                        className="border-t border-border first:border-t-0"
+                                    >
                                         {entry.field !== "" && (
                                             <td className="w-40 truncate px-2 py-1 font-mono text-muted-foreground">
                                                 {entry.field}
@@ -1119,7 +1188,11 @@ function QueryPanel({
             </div>
             <div className="flex items-center gap-2">
                 <Button onClick={() => void run()} disabled={!statement.trim() || running}>
-                    {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+                    {running ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Play className="size-4" />
+                    )}
                     Run
                 </Button>
                 <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
@@ -1135,7 +1208,12 @@ function QueryPanel({
                 {results?.map((result, index) => (
                     <div key={index} className="rounded-lg border border-border">
                         <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
-                            <span className="min-w-0 flex-1 truncate font-mono" title={result.statement}>{result.statement}</span>
+                            <span
+                                className="min-w-0 flex-1 truncate font-mono"
+                                title={result.statement}
+                            >
+                                {result.statement}
+                            </span>
                             <span className="shrink-0">
                                 {result.affected === null
                                     ? `${result.rows.length} rows`
@@ -1149,7 +1227,10 @@ function QueryPanel({
                                     <thead className="bg-surface/60 text-left text-muted-foreground">
                                         <tr>
                                             {result.columns.map((column) => (
-                                                <th key={column} className="px-3 py-1.5 font-medium">
+                                                <th
+                                                    key={column}
+                                                    className="px-3 py-1.5 font-medium"
+                                                >
                                                     {column}
                                                 </th>
                                             ))}

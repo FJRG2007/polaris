@@ -25,13 +25,7 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatEditHistory } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useDisplayFormat } from "@/components/display-format";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function EditHistoryDialog({
     message,

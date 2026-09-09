@@ -28,7 +28,17 @@ import {
     VisaMark
 } from "@/components/brand-icons";
 import { parseTotp } from "@/lib/vault/totp-browser";
-import { FolderPlus, Loader2, Lock, LockOpen, Plus, QrCode, RefreshCw, Trash2, X } from "lucide-react";
+import {
+    FolderPlus,
+    Loader2,
+    Lock,
+    LockOpen,
+    Plus,
+    QrCode,
+    RefreshCw,
+    Trash2,
+    X
+} from "lucide-react";
 import { emptyItem, type VaultFolder, type VaultItem } from "./vault-model";
 import { humanize, IDENTITY_GROUPS, IDENTITY_HINTS, IDENTITY_LABELS } from "./identity-fields";
 import {
@@ -511,25 +521,22 @@ export function ItemDialog({
                                     // that cannot be read is a two-factor login
                                     // somebody thinks they have saved.
                                     <span className="text-xs text-danger">
-                                        That is not a key this can read. It should be an
-                                        otpauth:// link, or the base32 secret on its own.
+                                        That is not a key this can read. It should be an otpauth://
+                                        link, or the base32 secret on its own.
                                     </span>
                                 ) : null}
                             </div>
                             <div className="flex flex-col gap-1 text-sm">
                                 <span>Recovery codes (optional)</span>
                                 <span className="text-xs text-muted-foreground">
-                                    The ones a site gives you for the day the authenticator is
-                                    gone. Paste them however they were printed, or hand over the
-                                    file the site offered.
+                                    The ones a site gives you for the day the authenticator is gone.
+                                    Paste them however they were printed, or hand over the file the
+                                    site offered.
                                 </span>
                                 {/* Encrypted exactly like the password and the
                                     authenticator key: it is a hidden field, which
                                     is what a recovery code is. */}
-                                <RecoveryCodes
-                                    value={codes}
-                                    onChange={setCodes}
-                                />
+                                <RecoveryCodes value={codes} onChange={setCodes} />
                             </div>
 
                             {/* Several, because one login is rarely one URL: the
@@ -553,10 +560,14 @@ export function ItemDialog({
                                                         patch({
                                                             login: {
                                                                 ...draft.login,
-                                                                uris: replaceUri(draft.login.uris, index, {
-                                                                    ...entry,
-                                                                    uri: event.target.value
-                                                                })
+                                                                uris: replaceUri(
+                                                                    draft.login.uris,
+                                                                    index,
+                                                                    {
+                                                                        ...entry,
+                                                                        uri: event.target.value
+                                                                    }
+                                                                )
                                                             }
                                                         })
                                                     }
@@ -603,15 +614,23 @@ export function ItemDialog({
                                                 <Select
                                                     className="h-7 text-xs"
                                                     aria-label="When this login is offered here"
-                                                    value={String(entry.match ?? core.DEFAULT_URI_MATCH)}
+                                                    value={String(
+                                                        entry.match ?? core.DEFAULT_URI_MATCH
+                                                    )}
                                                     onValueChange={(next) =>
                                                         patch({
                                                             login: {
                                                                 ...draft.login,
-                                                                uris: replaceUri(draft.login.uris, index, {
-                                                                    ...entry,
-                                                                    match: core.readUriMatch(Number(next))
-                                                                })
+                                                                uris: replaceUri(
+                                                                    draft.login.uris,
+                                                                    index,
+                                                                    {
+                                                                        ...entry,
+                                                                        match: core.readUriMatch(
+                                                                            Number(next)
+                                                                        )
+                                                                    }
+                                                                )
                                                             }
                                                         })
                                                     }
@@ -633,7 +652,10 @@ export function ItemDialog({
                                         patch({
                                             login: {
                                                 ...draft.login,
-                                                uris: [...draft.login.uris, { uri: "", match: null }]
+                                                uris: [
+                                                    ...draft.login.uris,
+                                                    { uri: "", match: null }
+                                                ]
                                             }
                                         })
                                     }
@@ -895,88 +917,93 @@ export function ItemDialog({
                             .map((field, index) => ({ field, index }))
                             .filter(({ field }) => !MANAGED_FIELDS.has(field.name))
                             .map(({ field, index }) => (
-                            <div key={index} className="flex items-center gap-2">
-                                <Input
-                                    value={field.name}
-                                    placeholder="Name"
-                                    onChange={(event) =>
-                                        patch({
-                                            fields: draft.fields.map((entry, at) =>
-                                                at === index
-                                                    ? { ...entry, name: event.target.value }
-                                                    : entry
-                                            )
-                                        })
-                                    }
-                                />
-                                {/* A hidden field masks itself and carries the eye
-                                    that shows it; the button beside it is the
-                                    stored kind, not a second reveal. */}
-                                <div className="flex-1">
+                                <div key={index} className="flex items-center gap-2">
                                     <Input
-                                        value={field.value}
-                                        placeholder="Value"
-                                        type={
-                                            field.type === core.FIELD_HIDDEN ? "password" : "text"
-                                        }
+                                        value={field.name}
+                                        placeholder="Name"
                                         onChange={(event) =>
                                             patch({
                                                 fields: draft.fields.map((entry, at) =>
                                                     at === index
-                                                        ? { ...entry, value: event.target.value }
+                                                        ? { ...entry, name: event.target.value }
                                                         : entry
                                                 )
                                             })
                                         }
                                     />
+                                    {/* A hidden field masks itself and carries the eye
+                                    that shows it; the button beside it is the
+                                    stored kind, not a second reveal. */}
+                                    <div className="flex-1">
+                                        <Input
+                                            value={field.value}
+                                            placeholder="Value"
+                                            type={
+                                                field.type === core.FIELD_HIDDEN
+                                                    ? "password"
+                                                    : "text"
+                                            }
+                                            onChange={(event) =>
+                                                patch({
+                                                    fields: draft.fields.map((entry, at) =>
+                                                        at === index
+                                                            ? {
+                                                                  ...entry,
+                                                                  value: event.target.value
+                                                              }
+                                                            : entry
+                                                    )
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        title={
+                                            field.type === core.FIELD_HIDDEN
+                                                ? "Keep as plain text"
+                                                : "Keep hidden"
+                                        }
+                                        aria-label="Toggle whether this field is stored hidden"
+                                        onClick={() =>
+                                            patch({
+                                                fields: draft.fields.map((entry, at) =>
+                                                    at === index
+                                                        ? {
+                                                              ...entry,
+                                                              type:
+                                                                  entry.type === core.FIELD_HIDDEN
+                                                                      ? core.FIELD_TEXT
+                                                                      : core.FIELD_HIDDEN
+                                                          }
+                                                        : entry
+                                                )
+                                            })
+                                        }
+                                    >
+                                        {field.type === core.FIELD_HIDDEN ? (
+                                            <Lock className="size-4" />
+                                        ) : (
+                                            <LockOpen className="size-4" />
+                                        )}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        title="Remove this field"
+                                        aria-label="Remove this field"
+                                        onClick={() =>
+                                            patch({
+                                                fields: draft.fields.filter((_, at) => at !== index)
+                                            })
+                                        }
+                                    >
+                                        <X className="size-4" />
+                                    </Button>
                                 </div>
-                                <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    title={
-                                        field.type === core.FIELD_HIDDEN
-                                            ? "Keep as plain text"
-                                            : "Keep hidden"
-                                    }
-                                    aria-label="Toggle whether this field is stored hidden"
-                                    onClick={() =>
-                                        patch({
-                                            fields: draft.fields.map((entry, at) =>
-                                                at === index
-                                                    ? {
-                                                          ...entry,
-                                                          type:
-                                                              entry.type === core.FIELD_HIDDEN
-                                                                  ? core.FIELD_TEXT
-                                                                  : core.FIELD_HIDDEN
-                                                      }
-                                                    : entry
-                                            )
-                                        })
-                                    }
-                                >
-                                    {field.type === core.FIELD_HIDDEN ? (
-                                        <Lock className="size-4" />
-                                    ) : (
-                                        <LockOpen className="size-4" />
-                                    )}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="ghost"
-                                    title="Remove this field"
-                                    aria-label="Remove this field"
-                                    onClick={() =>
-                                        patch({
-                                            fields: draft.fields.filter((_, at) => at !== index)
-                                        })
-                                    }
-                                >
-                                    <X className="size-4" />
-                                </Button>
-                            </div>
                             ))}
                     </div>
                 </div>

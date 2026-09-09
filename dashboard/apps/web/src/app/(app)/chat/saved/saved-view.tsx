@@ -86,9 +86,7 @@ export function SavedView() {
                                         <span className="font-medium text-foreground">
                                             <PersonName
                                                 id={message.authorId}
-                                                name={
-                                                    message.authorName ?? "Somebody who has left"
-                                                }
+                                                name={message.authorName ?? "Somebody who has left"}
                                             />
                                         </span>
                                         <RelativeTime iso={message.createdAt} />

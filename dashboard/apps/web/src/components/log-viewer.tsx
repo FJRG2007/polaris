@@ -55,7 +55,9 @@ export function LogViewer({
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
     const query = search.trim().toLowerCase();
-    const matched = query ? entries.filter((entry) => entry.text.toLowerCase().includes(query)) : entries;
+    const matched = query
+        ? entries.filter((entry) => entry.text.toLowerCase().includes(query))
+        : entries;
     // Logs are read tail-first, so cap the rendered rows to the most recent slice -
     // this keeps the DOM light on a huge stream without losing what matters.
     const filtered = matched.length > MAX_LOG_ROWS ? matched.slice(-MAX_LOG_ROWS) : matched;
@@ -107,10 +109,21 @@ export function LogViewer({
                     disabled={!log}
                     className="ml-auto shrink-0"
                 >
-                    {copiedAll ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
+                    {copiedAll ? (
+                        <Check className="size-4 text-emerald-400" />
+                    ) : (
+                        <Copy className="size-4" />
+                    )}
                     {copiedAll ? "Copied" : "Copy all"}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={exportLog} disabled={!log} className="shrink-0">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={exportLog}
+                    disabled={!log}
+                    className="shrink-0"
+                >
                     <Download className="size-4" />
                     Export
                 </Button>
@@ -119,15 +132,21 @@ export function LogViewer({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className={cn("h-80 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed", className)}
+                className={cn(
+                    "h-80 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed",
+                    className
+                )}
             >
                 {filtered.length === 0 ? (
-                    <p className="px-3 py-2 text-muted-foreground">{log ? "No matching lines." : emptyText}</p>
+                    <p className="px-3 py-2 text-muted-foreground">
+                        {log ? "No matching lines." : emptyText}
+                    </p>
                 ) : (
                     <>
                         {hiddenCount > 0 && (
                             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
-                                {hiddenCount.toLocaleString()} earlier lines hidden - showing the latest {MAX_LOG_ROWS.toLocaleString()}.
+                                {hiddenCount.toLocaleString()} earlier lines hidden - showing the
+                                latest {MAX_LOG_ROWS.toLocaleString()}.
                             </p>
                         )}
                         {filtered.map((entry, index) => (
@@ -162,7 +181,12 @@ function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
                     {time ?? ""}
                 </span>
             )}
-            <span className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words", LEVEL_CLASS[entry.level])}>
+            <span
+                className={cn(
+                    "min-w-0 flex-1 whitespace-pre-wrap break-words",
+                    LEVEL_CLASS[entry.level]
+                )}
+            >
                 {entry.text || " "}
             </span>
             <button
@@ -171,7 +195,11 @@ function LogRow({ entry, gutter }: { entry: LogEntry; gutter: boolean }) {
                 aria-label="Copy log entry"
                 className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
-                {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                {copied ? (
+                    <Check className="size-3.5 text-emerald-400" />
+                ) : (
+                    <Copy className="size-3.5" />
+                )}
             </button>
         </div>
     );

@@ -79,7 +79,10 @@ export function ActivityStream({
     const [busy, setBusy] = useState(false);
     const [filter, setFilter] = useState<ConversationFilter>("all");
     const [replyTo, setReplyTo] = useState<string | null>(null);
-    const stream = useMemo(() => mergeConversation(comments, activity, filter), [comments, activity, filter]);
+    const stream = useMemo(
+        () => mergeConversation(comments, activity, filter),
+        [comments, activity, filter]
+    );
 
     // The newest line is the one worth reading, and it is at the bottom - so this
     // follows it, and stops following while somebody is reading back through what
@@ -100,11 +103,7 @@ export function ActivityStream({
      * so what is dropped in the conversation is on the task as well, which is
      * where somebody looks for it a month later.
      */
-    const post = async (
-        body: string,
-        parentId: string | null,
-        files: readonly File[] = []
-    ) => {
+    const post = async (body: string, parentId: string | null, files: readonly File[] = []) => {
         setBusy(true);
         onError("");
         const result = await runAction(
@@ -156,7 +155,9 @@ export function ActivityStream({
             )}
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">{comment.author?.name ?? "Automation"}</span>
+                    <span className="text-sm font-medium">
+                        {comment.author?.name ?? "Automation"}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                         <RelativeTime iso={comment.createdAt} />
                     </span>
@@ -210,7 +211,11 @@ export function ActivityStream({
                 )}
                 <div className="mt-1 flex items-center gap-3 text-[0.6875rem] text-muted-foreground">
                     {!nested && (
-                        <button type="button" onClick={() => setReplyTo(comment.id)} className="hover:text-foreground">
+                        <button
+                            type="button"
+                            onClick={() => setReplyTo(comment.id)}
+                            className="hover:text-foreground"
+                        >
                             Reply
                         </button>
                     )}
@@ -218,7 +223,12 @@ export function ActivityStream({
                         type="button"
                         onClick={async () => {
                             await runAction(
-                                () => actions.resolveCommentAction(taskId, comment.id, !comment.resolvedAt),
+                                () =>
+                                    actions.resolveCommentAction(
+                                        taskId,
+                                        comment.id,
+                                        !comment.resolvedAt
+                                    ),
                                 onError
                             );
                             onChanged();
@@ -231,7 +241,10 @@ export function ActivityStream({
                         <button
                             type="button"
                             onClick={async () => {
-                                await runAction(() => actions.deleteCommentAction(taskId, comment.id), onError);
+                                await runAction(
+                                    () => actions.deleteCommentAction(taskId, comment.id),
+                                    onError
+                                );
                                 onChanged();
                             }}
                             className="hover:text-danger"
@@ -298,8 +311,14 @@ export function ActivityStream({
                             {repliesOf(item.comment.id).map((reply) => bubble(reply, true))}
                         </div>
                     ) : (
-                        <div key={item.line.id} className="flex items-start gap-2 text-xs text-muted-foreground">
-                            <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border" />
+                        <div
+                            key={item.line.id}
+                            className="flex items-start gap-2 text-xs text-muted-foreground"
+                        >
+                            <span
+                                aria-hidden
+                                className="mt-1.5 size-1.5 shrink-0 rounded-full bg-border"
+                            />
                             <span className="flex-1">{describeActivity(item.line)}</span>
                             <RelativeTime iso={item.line.createdAt} />
                         </div>
@@ -352,7 +371,8 @@ export function TimerControl({
                 onClick={async () => {
                     onError("");
                     await runAction(
-                        () => (running ? actions.stopTimerAction() : actions.startTimerAction(taskId)),
+                        () =>
+                            running ? actions.stopTimerAction() : actions.startTimerAction(taskId),
                         onError
                     );
                     onChanged();
@@ -362,7 +382,9 @@ export function TimerControl({
                 {running ? "Stop" : "Start"}
             </Button>
             {trackedSeconds > 0 && (
-                <span className="text-xs text-muted-foreground">{core.formatTrackedSeconds(trackedSeconds)} logged</span>
+                <span className="text-xs text-muted-foreground">
+                    {core.formatTrackedSeconds(trackedSeconds)} logged
+                </span>
             )}
         </div>
     );
@@ -400,7 +422,9 @@ export function TimeSection({
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{core.formatTrackedSeconds(tracked)} tracked</span>
                     {estimate ? <span>of {core.formatDurationMinutes(estimate)}</span> : null}
-                    {used !== null && <span className={cn(used > 100 && "text-amber-500")}>({used}%)</span>}
+                    {used !== null && (
+                        <span className={cn(used > 100 && "text-amber-500")}>({used}%)</span>
+                    )}
                 </div>
             </header>
 
@@ -420,7 +444,11 @@ export function TimeSection({
                     className="h-8 w-44 text-xs"
                 />
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={billable} onChange={(event) => setBillable(event.target.checked)} />
+                    <input
+                        type="checkbox"
+                        checked={billable}
+                        onChange={(event) => setBillable(event.target.checked)}
+                    />
                     Billable
                 </label>
                 <Button
@@ -450,20 +478,27 @@ export function TimeSection({
                     {entries.map((entry) => (
                         <li key={entry.id} className="flex items-center gap-2 px-3 py-2">
                             <span className="w-16 font-mono text-xs">
-                                {entry.running ? "running" : core.formatTrackedSeconds(entry.seconds)}
+                                {entry.running
+                                    ? "running"
+                                    : core.formatTrackedSeconds(entry.seconds)}
                             </span>
                             <span className="flex-1 truncate text-xs text-muted-foreground">
                                 {entry.userName}
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
-                            {entry.billable && <span className="text-[0.6875rem] text-emerald-500">billable</span>}
+                            {entry.billable && (
+                                <span className="text-[0.6875rem] text-emerald-500">billable</span>
+                            )}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button
                                     type="button"
                                     aria-label="Remove entry"
                                     title="Remove entry"
                                     onClick={async () => {
-                                        await runAction(() => actions.deleteTimeEntryAction(taskId, entry.id), onError);
+                                        await runAction(
+                                            () => actions.deleteTimeEntryAction(taskId, entry.id),
+                                            onError
+                                        );
                                         onChanged();
                                     }}
                                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-danger"

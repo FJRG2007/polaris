@@ -143,9 +143,7 @@ export function ShareDialog({
                             : `Share ${items[0]?.isDir ? "folder" : "file"}`}
                     </DialogTitle>
                     <DialogDescription className="truncate">
-                        {many
-                            ? items.map((target) => target.name).join(", ")
-                            : items[0]?.name}
+                        {many ? items.map((target) => target.name).join(", ") : items[0]?.name}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -201,10 +199,7 @@ export function ShareDialog({
                                     type="button"
                                     variant="secondary"
                                     onClick={() =>
-                                        onCopy(
-                                            "all",
-                                            links.map((result) => result.url).join("\n")
-                                        )
+                                        onCopy("all", links.map((result) => result.url).join("\n"))
                                     }
                                 >
                                     {copied === "all" ? (
@@ -229,12 +224,22 @@ export function ShareDialog({
                         ) : null}
                         <label className="flex flex-col gap-1 text-sm">
                             Password (optional)
-                            <Input name="password" type="password" placeholder="No password" autoComplete="off" />
+                            <Input
+                                name="password"
+                                type="password"
+                                placeholder="No password"
+                                autoComplete="off"
+                            />
                         </label>
                         <div className="grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1 text-sm">
                                 Max downloads
-                                <Input name="maxDownloads" type="number" min="1" placeholder="Unlimited" />
+                                <Input
+                                    name="maxDownloads"
+                                    type="number"
+                                    min="1"
+                                    placeholder="Unlimited"
+                                />
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 Expires
@@ -243,7 +248,11 @@ export function ShareDialog({
                         </div>
                         <label className="flex flex-col gap-1 text-sm">
                             Restrict to IPs / ranges (optional)
-                            <Input name="allowedCidrs" placeholder="e.g. 203.0.113.4, 10.0.0.0/24" autoComplete="off" />
+                            <Input
+                                name="allowedCidrs"
+                                placeholder="e.g. 203.0.113.4, 10.0.0.0/24"
+                                autoComplete="off"
+                            />
                             <span className="text-xs text-muted-foreground">
                                 Comma or space separated. Empty means anyone with the link.
                             </span>
@@ -259,33 +268,64 @@ export function ShareDialog({
                         </div>
                         <div className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
                             <label className="flex items-center gap-2">
-                                <input type="checkbox" name="allowDownload" defaultChecked className="size-4" />
+                                <input
+                                    type="checkbox"
+                                    name="allowDownload"
+                                    defaultChecked
+                                    className="size-4"
+                                />
                                 Allow downloading
                             </label>
                             <label className="flex items-center gap-2">
-                                <input type="checkbox" name="allowPreview" defaultChecked className="size-4" />
+                                <input
+                                    type="checkbox"
+                                    name="allowPreview"
+                                    defaultChecked
+                                    className="size-4"
+                                />
                                 Allow previewing in the browser
                             </label>
                             {anyDir ? (
                                 <>
                                     <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="allowUpload" className="size-4" />
-                                        Allow uploading into {many ? "the shared folders" : "this folder"} (drop box)
+                                        <input
+                                            type="checkbox"
+                                            name="allowUpload"
+                                            className="size-4"
+                                        />
+                                        Allow uploading into{" "}
+                                        {many ? "the shared folders" : "this folder"} (drop box)
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="allowOverwrite" className="size-4" />
+                                        <input
+                                            type="checkbox"
+                                            name="allowOverwrite"
+                                            className="size-4"
+                                        />
                                         Let an upload replace a file of the same name
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="allowCreateFolder" className="size-4" />
+                                        <input
+                                            type="checkbox"
+                                            name="allowCreateFolder"
+                                            className="size-4"
+                                        />
                                         Allow creating folders
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="allowRename" className="size-4" />
+                                        <input
+                                            type="checkbox"
+                                            name="allowRename"
+                                            className="size-4"
+                                        />
                                         Allow renaming and moving items
                                     </label>
                                     <label className="flex items-center gap-2">
-                                        <input type="checkbox" name="allowDelete" className="size-4" />
+                                        <input
+                                            type="checkbox"
+                                            name="allowDelete"
+                                            className="size-4"
+                                        />
                                         Allow deleting items (permanent)
                                     </label>
                                 </>

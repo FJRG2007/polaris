@@ -188,7 +188,10 @@ export function ModelKeysView({
         setRows(keys);
     }
 
-    const byslug = useMemo(() => new Map(providers.map((provider) => [provider.slug, provider])), [providers]);
+    const byslug = useMemo(
+        () => new Map(providers.map((provider) => [provider.slug, provider])),
+        [providers]
+    );
 
     const persistOrder = (next: ModelKeyView[]) => {
         const previous = rows;
@@ -290,7 +293,10 @@ export function ModelKeysView({
                             <tbody>
                                 {rows.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-muted-foreground px-3 py-8 text-center">
+                                        <td
+                                            colSpan={6}
+                                            className="text-muted-foreground px-3 py-8 text-center"
+                                        >
                                             {copy.empty}
                                         </td>
                                     </tr>
@@ -402,8 +408,13 @@ function KeyRow({
         >
             <td className="px-2 py-2">
                 <div className="flex items-center gap-1">
-                    <GripVertical className="text-muted-foreground size-4 shrink-0 cursor-grab" aria-hidden />
-                    <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">{index + 1}</span>
+                    <GripVertical
+                        className="text-muted-foreground size-4 shrink-0 cursor-grab"
+                        aria-hidden
+                    />
+                    <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">
+                        {index + 1}
+                    </span>
                 </div>
             </td>
             <td className="px-3 py-2">
@@ -549,12 +560,19 @@ function KeyDialog({
             : null;
     // A gateway with no token is a real setup - plenty accept unauthenticated
     // calls from inside the network - so only a provider needs the field filled.
-    const secretReady = secret.trim().length >= 8 || (entry?.isGateway ?? false) || existing !== null;
+    const secretReady =
+        secret.trim().length >= 8 || (entry?.isGateway ?? false) || existing !== null;
     const gatewayReady =
         !entry?.isGateway || (gateway.baseUrl.trim().length > 0 && gateway.model.trim().length > 0);
     const expiresAt = expiry ? endOfDay(expiry) : null;
     const expiryReady = expiry === "" || (expiresAt !== null && expiresAt.getTime() > Date.now());
-    const ready = provider !== "" && nameCheck.success && !taken && secretReady && gatewayReady && expiryReady;
+    const ready =
+        provider !== "" &&
+        nameCheck.success &&
+        !taken &&
+        secretReady &&
+        gatewayReady &&
+        expiryReady;
 
     const submit = async () => {
         setBusy(true);
@@ -615,7 +633,9 @@ function KeyDialog({
                         {existing ? `Edit ${thing(action)}` : (action ?? "Add provider key")}
                     </DialogTitle>
                     <DialogDescription>
-                        {existing ? "Rename it, or paste a new key to replace the stored one." : adding}
+                        {existing
+                            ? "Rename it, or paste a new key to replace the stored one."
+                            : adding}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -624,8 +644,14 @@ function KeyDialog({
                         Provider
                         {existing ? (
                             <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
-                                <IntegrationLogo slug={existing.provider} className="size-4 shrink-0" />
-                                <span className="min-w-0 truncate" title={entry?.name ?? existing.provider}>
+                                <IntegrationLogo
+                                    slug={existing.provider}
+                                    className="size-4 shrink-0"
+                                />
+                                <span
+                                    className="min-w-0 truncate"
+                                    title={entry?.name ?? existing.provider}
+                                >
                                     {entry?.name ?? existing.provider}
                                 </span>
                             </span>
@@ -652,7 +678,9 @@ function KeyDialog({
                             }}
                             onBlur={() => setTouched(true)}
                         />
-                        <span className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}>
+                        <span
+                            className={`text-xs ${nameError ? "text-danger" : "text-muted-foreground"}`}
+                        >
                             {nameError ?? MODEL_KEY_NAME_HINT}
                         </span>
                     </label>
@@ -674,7 +702,9 @@ function KeyDialog({
                                 <Input
                                     value={gateway.model}
                                     placeholder="the id your endpoint serves"
-                                    onChange={(event) => setGateway({ ...gateway, model: event.target.value })}
+                                    onChange={(event) =>
+                                        setGateway({ ...gateway, model: event.target.value })
+                                    }
                                 />
                             </label>
                             <div className="grid gap-2 sm:grid-cols-2">
@@ -696,14 +726,18 @@ function KeyDialog({
                                         inputMode="numeric"
                                         placeholder="32000"
                                         onChange={(event) =>
-                                            setGateway({ ...gateway, maxOutput: event.target.value })
+                                            setGateway({
+                                                ...gateway,
+                                                maxOutput: event.target.value
+                                            })
                                         }
                                     />
                                 </label>
                             </div>
                             <p className="text-muted-foreground -mt-2 text-xs">
-                                An endpoint publishes no catalog, so both numbers are needed: without them a
-                                run answers in 32,000-token slices and never compacts.
+                                An endpoint publishes no catalog, so both numbers are needed:
+                                without them a run answers in 32,000-token slices and never
+                                compacts.
                             </p>
                         </>
                     ) : null}
@@ -717,9 +751,9 @@ function KeyDialog({
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm">Polaris can sign you in</p>
                                 <p className="text-muted-foreground text-xs">
-                                    It runs {signin.serves[0]?.label ?? "the tool"}&apos;s own login on a machine of
-                                    its own. You authorise it in your browser; the credential lands in the field
-                                    below.
+                                    It runs {signin.serves[0]?.label ?? "the tool"}&apos;s own login
+                                    on a machine of its own. You authorise it in your browser; the
+                                    credential lands in the field below.
                                 </p>
                             </div>
                             <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
@@ -751,7 +785,9 @@ function KeyDialog({
                                 : "Proven by the first run."}
                         </span>
                         {entry?.apiKeyHelp ? (
-                            <span className="text-muted-foreground text-xs">{entry.apiKeyHelp}</span>
+                            <span className="text-muted-foreground text-xs">
+                                {entry.apiKeyHelp}
+                            </span>
                         ) : null}
                         {/* Said here rather than only on the row in the picker,
                             because this is the moment somebody is deciding
@@ -773,8 +809,9 @@ function KeyDialog({
                             onChange={(event) => setExpiry(event.target.value)}
                         />
                         <span className="text-muted-foreground text-xs">
-                            Optional. If the key was given an end date at {entry?.name ?? "the provider"},
-                            put it here: Polaris warns a week ahead and stops using the key on the day.
+                            Optional. If the key was given an end date at{" "}
+                            {entry?.name ?? "the provider"}, put it here: Polaris warns a week ahead
+                            and stops using the key on the day.
                         </span>
                         {expiry ? (
                             <button
@@ -850,7 +887,8 @@ function readGateway(key: ModelKeyView | null): GatewayForm {
     if (!key) return EMPTY_GATEWAY;
     const config = key.config;
     const text = (value: unknown) => (typeof value === "string" ? value : "");
-    const number = (value: unknown) => (typeof value === "number" && value > 0 ? String(value) : "");
+    const number = (value: unknown) =>
+        typeof value === "number" && value > 0 ? String(value) : "";
     return {
         baseUrl: text(config.baseUrl),
         model: text(config.model),
