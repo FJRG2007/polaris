@@ -43,6 +43,8 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "home.read": "Watch cameras",
     "home.control": "Move cameras",
     "home.manage": "Manage cameras",
+    "tools.use": "Use the tools",
+    "tools.manage": "Manage short links",
     "tasks.read": "Read tasks",
     "tasks.manage": "Manage tasks",
     "inbox.read": "Read conversations",
@@ -89,6 +91,10 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "home.read": "Open a live view, take a snapshot, and read detections and clips.",
     "home.control": "Pan, tilt and zoom a camera, and dismiss what it reported.",
     "home.manage": "Add and remove cameras, and change how they detect and record.",
+    "tools.use":
+        "Convert, resize, optimize and read files, and translate text. Files sent through a tool are processed and not kept.",
+    "tools.manage":
+        "Create short links this Polaris answers for, and see who followed them.",
     "tasks.read": "Read spaces, lists, and tasks.",
     "tasks.manage": "Create and change tasks, lists, and spaces.",
     "inbox.read": "Read conversations, contacts, and channel activity.",
@@ -133,6 +139,7 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
         scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
     },
     { title: "Home", scopes: ["home.read", "home.control", "home.manage"] },
+    { title: "Tools", scopes: ["tools.use", "tools.manage"] },
     { title: "Tasks", scopes: ["tasks.read", "tasks.manage"] },
     { title: "Inbox", scopes: ["inbox.read", "inbox.manage"] },
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
