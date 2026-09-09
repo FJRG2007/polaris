@@ -112,6 +112,10 @@ export interface MailThreadView {
      *  somebody opens it, so the reading pane finds the ones that only say it in
      *  their footer. */
     readonly unsubscribe: string;
+    /** Which of the three ways out it is, so the row acts rather than only
+     *  linking: a sender publishing RFC 8058 one-click is left without opening
+     *  anything. "" alongside an empty `unsubscribe`. */
+    readonly unsubscribeKind: core.UnsubscribeOffer["kind"] | "";
     readonly labels: readonly { id: string; name: string; color: string }[];
     /** The message to open when the row is clicked: the newest one in the
      *  folder being looked at, so opening a conversation from Sent lands on
@@ -271,41 +275,49 @@ export async function listThreads(
         take: query.limit
     });
 
-    const rows = threads.map((thread) => ({
-        id: thread.id,
-        accountId: thread.accountId,
-        subject: thread.subject,
-        // Tidied on the way out, not only on the way in. A mailbox synced before
-        // the preview function existed holds rows that read `Mar=C3=ADa` and
-        // carry a stylesheet in them, and nobody is going to be told to resync a
-        // mailbox to stop looking at that. Running it again over a line that is
-        // already clean changes nothing.
-        snippet: core.snippetFrom(thread.snippet),
-        participants: addressesFrom(thread.participants),
-        messageCount: thread.messageCount,
-        unreadCount: thread.unreadCount,
-        starred: thread.starred,
-        pinned: thread.pinned,
-        muted: thread.muted,
-        hasAttachments: thread.hasAttachments,
-        size: thread.size,
-        lastMessageAt: thread.lastMessageAt.toISOString(),
-        unsubscribe:
-            core.unsubscribeFromHeaders(
-                (thread.messages[0]?.headers as Record<string, string> | null) ?? null
-            )?.url ?? "",
-        labels: (thread.messages[0]?.labels ?? []).map((applied) => ({
-            id: applied.label.id,
-            name: applied.label.name,
-            color: applied.label.color
-        })),
-        leadMessageId: thread.messages[0]?.id ?? ""
-    }));
+    const rows: MailThreadView[] = threads.map((thread) => {
+        const offer = offerOf(thread.messages[0]?.headers);
+        return {
+            id: thread.id,
+            accountId: thread.accountId,
+            subject: thread.subject,
+            // Tidied on the way out, not only on the way in. A mailbox synced before
+            // the preview function existed holds rows that read `Mar=C3=ADa` and
+            // carry a stylesheet in them, and nobody is going to be told to resync a
+            // mailbox to stop looking at that. Running it again over a line that is
+            // already clean changes nothing.
+            snippet: core.snippetFrom(thread.snippet),
+            participants: addressesFrom(thread.participants),
+            messageCount: thread.messageCount,
+            unreadCount: thread.unreadCount,
+            starred: thread.starred,
+            pinned: thread.pinned,
+            muted: thread.muted,
+            hasAttachments: thread.hasAttachments,
+            size: thread.size,
+            lastMessageAt: thread.lastMessageAt.toISOString(),
+            unsubscribe: offer?.url ?? "",
+            unsubscribeKind: offer?.kind ?? "",
+            labels: (thread.messages[0]?.labels ?? []).map((applied) => ({
+                id: applied.label.id,
+                name: applied.label.name,
+                color: applied.label.color
+            })),
+            leadMessageId: thread.messages[0]?.id ?? ""
+        };
+    });
 
     // Where the next page starts, in whatever shape this order pages by. The
     // reasoning - and the reason it is the page's edge rather than its last row -
     // is in `list-order`, where it can be tested.
     return { threads: rows, cursor: mailCursorOf(query.sort, rows, query.limit) };
+}
+
+/** The way out the newest message in a conversation publishes, read off the
+ *  headers already stored. The body is not read here: it is not held until
+ *  somebody opens the message, and the reading pane looks there itself. */
+function offerOf(headers: unknown): core.UnsubscribeOffer | null {
+    return core.unsubscribeFromHeaders((headers as Record<string, string> | null) ?? null);
 }
 
 /**
@@ -569,6 +581,7 @@ export async function readThreadView(
             size: 0,
             lastMessageAt: newest.sentAt,
             unsubscribe: "",
+            unsubscribeKind: "",
             labels: [],
             leadMessageId: newest.id
         },

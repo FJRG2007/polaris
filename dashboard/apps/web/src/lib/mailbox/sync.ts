@@ -34,6 +34,7 @@ import { decodePart } from "./decode";
 import { addressesFrom, asJson } from "./json";
 import { ACCOUNT_COLUMNS } from "./access";
 import { rememberContacts } from "./contacts";
+import { recordSubscription } from "./subscriptions";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
 import { replyIfAway } from "./vacation";
 import { applyRulesToMessage } from "./rules";
@@ -493,6 +494,19 @@ async function storeMessages(
         const isNew = row.createdAt.getTime() === row.updatedAt.getTime();
         if (isNew) {
             await rememberContacts(account.id, folder.role, { from, to, cc });
+            // What this sender says about getting off their list, noted as the
+            // mail arrives. Not for the folders holding what this person wrote:
+            // the sender there is themselves, and a mailbox is not subscribed to
+            // its own outgoing mail.
+            if (folder.role !== "sent" && folder.role !== "drafts") {
+                await recordSubscription(account.id, {
+                    from,
+                    headers: message.headers,
+                    listId: shape.listId,
+                    at: sentAt,
+                    counts: true
+                });
+            }
             if (folder.role === "inbox") {
                 await applyRulesToMessage(account.id, row.id);
                 // After the rules and before the away reply. After, because a

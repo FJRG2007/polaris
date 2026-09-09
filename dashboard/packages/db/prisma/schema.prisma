@@ -9409,6 +9409,7 @@ model MailAccount {
     spamTokens     MailSpamToken[]
     spamReputation MailSpamReputation[]
     spamFeedback   MailSpamFeedback[]
+    subscriptions  MailSubscription[]
 
     @@unique([userId, address])
     @@index([userId, position])
@@ -9929,6 +9930,58 @@ model MailTrustedSender {
     account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
     @@unique([accountId, address])
+}
+
+// A sender that keeps sending, and the way out it published.
+//
+// One row per sender per mailbox, written as their mail arrives rather than
+// looked for when somebody asks: the offer is in the headers of every message
+// and in the footer of the ones that carry no header, and reading a mailbox's
+// worth of bodies to answer "what am I subscribed to" is a question nobody would
+// wait for. What is stored is what was found, so the screen is a read of one
+// indexed table.
+//
+// Deliberately keyed on the sender rather than on the List-Id: half the mail
+// this is about publishes no List-Id at all, and the address is what somebody
+// recognises anyway.
+model MailSubscription {
+    id        String @id @default(uuid(7)) @db.Uuid
+    accountId String @db.Uuid
+    /// The sender's address, lowercased.
+    sender     String
+    /// What their From line last called them, for a screen that reads as names.
+    senderName String @default("")
+    /// The List-Id where there was one, so two lists from one address are still
+    /// one row but the screen can say which list it is.
+    listId     String @default("")
+
+    /// Where to go or who to write to. Empty means the offer went away, which
+    /// happens when a sender stops publishing one.
+    url    String @default("")
+    /// "one-click" | "link" | "mailto" - what can be done about it from here.
+    kind   String @default("link")
+    /// "header" | "body" - a header is a promise, a link found in a footer is a
+    /// guess, and the screen says which.
+    source String @default("header")
+
+    /// How much of their mail has arrived since this row appeared, and when the
+    /// last of it did. Counted here rather than by asking the messages table,
+    /// which cannot answer it: a sender is inside a JSON column and the window
+    /// this app keeps is the newest few hundred messages of each folder.
+    messageCount  Int      @default(0)
+    lastMessageAt DateTime @default(now())
+    firstSeenAt   DateTime @default(now())
+
+    /// When somebody asked to be taken off, or null. Mail arriving after this
+    /// is the whole point of keeping it: a list still sending a week later is
+    /// one the screen can offer to block instead.
+    unsubscribedAt DateTime?
+
+    account MailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+    @@unique([accountId, sender])
+    // The screen's own order: who has sent most recently, per mailbox.
+    @@index([accountId, lastMessageAt])
 }
 
 // Who the out-of-office reply has already answered, and when.

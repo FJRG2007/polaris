@@ -53,6 +53,9 @@ export interface ReadableMessage {
     /** The one-click unsubscribe address the sender published, where they did.
      *  A mailto or an https link, never anything else. */
     readonly unsubscribe: string;
+    /** Which of the three ways out it is, so the reading pane can do it rather
+     *  than only link to it. "" alongside an empty `unsubscribe`. */
+    readonly unsubscribeKind: core.UnsubscribeOffer["kind"] | "";
 }
 
 /** The account settings this reads. */
@@ -142,6 +145,12 @@ export async function readableMessage(
         : core.holdRemoteContent(original);
     if (policy.cleanLinks) html = cleanLinks(html);
 
+    // Headers first, then the message's own footer. Plenty of mail that is
+    // unmistakably a mailing list publishes no header at all, and its only way
+    // out is a link in a sentence - often one that does not contain the word, in
+    // a language nobody wrote a matcher for.
+    const offer = core.unsubscribeOffer(headers, original, message.bodyText ?? "");
+
     return {
         html,
         text: message.bodyText ?? "",
@@ -150,11 +159,8 @@ export async function readableMessage(
         trackers: policy.nameTrackers ? trackers : [],
         trackerVendors: policy.nameTrackers ? core.trackerVendors(trackers) : [],
         wantsReceipt: message.wantsReceipt,
-        // Headers first, then the message's own footer. Plenty of mail that is
-        // unmistakably a mailing list publishes no header at all, and its only
-        // way out is a link in a sentence - often one that does not contain the
-        // word, in a language nobody wrote a matcher for.
-        unsubscribe: core.unsubscribeOffer(headers, original, message.bodyText ?? "")?.url ?? ""
+        unsubscribe: offer?.url ?? "",
+        unsubscribeKind: offer?.kind ?? ""
     };
 }
 

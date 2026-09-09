@@ -27,6 +27,7 @@ import * as compose from "@/lib/mailbox/compose";
 import * as prefs from "@/lib/mailbox/prefs";
 import * as reading from "@/lib/mailbox/reading";
 import * as blocking from "@/lib/mailbox/blocking";
+import * as subscriptions from "@/lib/mailbox/subscriptions";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { syncAccount } from "@/lib/mailbox/sync";
@@ -69,6 +70,7 @@ function failure(
         return { error: caught.message, field: caught.field };
     if (caught instanceof MailAuthError) return { error: caught.message };
     if (caught instanceof labels.MailLabelNameTaken) return { error: caught.message };
+    if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: caught.message };
     console.error("polaris: a mail action failed:", caught);
     return { error: fallback };
 }
@@ -761,6 +763,43 @@ export async function unblockSenderAction(accountId: string, ruleId: string) {
         return {};
     } catch (caught) {
         return failure(caught, "That block could not be removed.");
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Subscriptions                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Get off a list, from the screen that lists them.
+ *
+ * The outcome is returned rather than swallowed because the three ways out end
+ * differently: a one-click POST and a sent message are done, and a plain link is
+ * a page the browser has to open - so the caller is told which happened and,
+ * where there is one, the address to open.
+ */
+export async function unsubscribeAction(subscriptionId: string) {
+    const userId = await actorId();
+    try {
+        const outcome = await subscriptions.unsubscribeFromSender(userId, subscriptionId);
+        refresh();
+        return { outcome };
+    } catch (caught) {
+        return failure(caught, "That unsubscribe could not be sent.");
+    }
+}
+
+/** The same, from the message somebody is reading. Works on mail that arrived
+ *  before any of this existed: the offer is read off the message rather than
+ *  looked up, and the sender joins the subscriptions screen on the way through. */
+export async function unsubscribeFromMessageAction(messageId: string) {
+    const userId = await actorId();
+    try {
+        const outcome = await subscriptions.unsubscribeFromMessage(userId, messageId);
+        refresh();
+        return { outcome };
+    } catch (caught) {
+        return failure(caught, "That unsubscribe could not be sent.");
     }
 }
 

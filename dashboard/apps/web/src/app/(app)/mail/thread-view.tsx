@@ -25,6 +25,7 @@ import { missingFolderRole, refusalOf } from "./refusal";
 import { forwardSeed, replySeed } from "./answering";
 import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
+import { UnsubscribeButton } from "./unsubscribe-button";
 import dynamic from "next/dynamic";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
 import type { ViewerTarget } from "@/app/(app)/drive/viewer/types";
@@ -64,6 +65,7 @@ import { actOnAction, applyLabelAction, openMessageAction } from "./actions";
 import {
     ArrowLeft,
     Archive,
+    BellOff,
     ChevronDown,
     CornerUpLeft,
     CornerUpRight,
@@ -693,6 +695,33 @@ function MessageCard({
                                     </span>
                                 </p>
                             ) : null}
+                            {/* Gmail's one good idea about mailing lists: the
+                                way out at the top, beside who sent it, rather
+                                than in six-point grey under a footer nobody
+                                scrolls to. What pressing it does depends on
+                                what the sender published - see
+                                `unsubscribe-button`. */}
+                            {readable.unsubscribe && readable.unsubscribeKind ? (
+                                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-[12px] text-muted-foreground">
+                                    <BellOff className="size-3.5 shrink-0" aria-hidden />
+                                    <span className="min-w-0 flex-1">
+                                        {sender
+                                            ? `${core.addressLabel(sender)} sends this as a mailing list.`
+                                            : "This arrived as a mailing list."}
+                                    </span>
+                                    <UnsubscribeButton
+                                        size="xs"
+                                        target={{
+                                            kind: readable.unsubscribeKind,
+                                            url: readable.unsubscribe,
+                                            sender: sender
+                                                ? core.addressLabel(sender)
+                                                : "this sender",
+                                            messageId: message.id
+                                        }}
+                                    />
+                                </div>
+                            ) : null}
                             {readable.wantsReceipt ? (
                                 <p className="mb-3 flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12px] text-muted-foreground">
                                     <UserRoundX className="size-3.5 shrink-0" aria-hidden />
@@ -797,19 +826,6 @@ function MessageCard({
                                     Save this message
                                 </a>
                             </p>
-                            {readable.unsubscribe ? (
-                                <p className="mt-3 text-[12px] text-foreground-subtle">
-                                    This looks like a mailing list.{" "}
-                                    <a
-                                        className="underline"
-                                        href={readable.unsubscribe}
-                                        target="_blank"
-                                        rel="noopener noreferrer nofollow"
-                                    >
-                                        Unsubscribe
-                                    </a>
-                                </p>
-                            ) : null}
                         </>
                     ) : (
                         <div

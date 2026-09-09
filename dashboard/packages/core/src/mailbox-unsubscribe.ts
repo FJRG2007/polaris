@@ -194,6 +194,61 @@ export function unsubscribeOffer(
     return unsubscribeFromHeaders(headers) ?? unsubscribeInBody(html, plain);
 }
 
+/**
+ * The body an RFC 8058 one-click unsubscribe POSTs, exactly.
+ *
+ * Sent as `application/x-www-form-urlencoded`, and it is the whole body: the RFC
+ * says a sender must accept any well-formed POST to that address, and anything
+ * else here would be a field somebody's parser has to ignore.
+ */
+export const ONE_CLICK_BODY = "List-Unsubscribe=One-Click";
+
+/** What a `mailto:` way out asks for. */
+export interface UnsubscribeMail {
+    readonly address: string;
+    readonly subject: string;
+    readonly body: string;
+}
+
+/**
+ * The message a `mailto:` unsubscribe wants sent.
+ *
+ * Nearly all of them name the subject in the address - `?subject=unsubscribe
+ * list-42` - and it is not decoration: it is how the receiving robot knows which
+ * list and which subscriber, so a message sent without it is a message that does
+ * nothing. Where the sender named none, "unsubscribe" is what these robots read,
+ * and the same word goes in the body for the ones that read that instead.
+ *
+ * Parsed by hand rather than with `URL`, which does not break a mailto into its
+ * address and its query - to it the whole thing is one opaque path.
+ */
+export function unsubscribeMailto(url: string): UnsubscribeMail | null {
+    const bare = url.trim();
+    if (!/^mailto:/i.test(bare)) return null;
+
+    const rest = bare.slice("mailto:".length);
+    const split = rest.indexOf("?");
+    // More than one address is legal and means "any of these will do".
+    const address = decodeField((split === -1 ? rest : rest.slice(0, split)).split(",")[0] ?? "");
+    if (!address.includes("@")) return null;
+
+    const query = new URLSearchParams(split === -1 ? "" : rest.slice(split + 1));
+    const subject = decodeField(query.get("subject") ?? "") || "unsubscribe";
+    const body = decodeField(query.get("body") ?? "") || "unsubscribe";
+    return { address: address.toLowerCase(), subject, body };
+}
+
+/** Percent-decoding that survives a malformed escape, which a mailto written by
+ *  hand routinely carries. */
+function decodeField(value: string): string {
+    const plain = value.trim();
+    try {
+        return decodeURIComponent(plain);
+    } catch {
+        return plain;
+    }
+}
+
 /** Accents off, one space between words, lower case - the form everything here
  *  is compared in, so one entry covers every way a word gets typed. */
 function flatten(value: string): string {

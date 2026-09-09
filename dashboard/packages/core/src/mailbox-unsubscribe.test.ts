@@ -122,3 +122,43 @@ describe("both together", () => {
         expect(found?.source).toBe("body");
     });
 });
+
+describe("the message a mailto asks for", () => {
+    it("reads the address, the subject and the body the sender named", () => {
+        expect(
+            unsub.unsubscribeMailto("mailto:leave-42@list.example?subject=unsubscribe%20list-42&body=confirm")
+        ).toEqual({ address: "leave-42@list.example", subject: "unsubscribe list-42", body: "confirm" });
+    });
+
+    it("falls back to the word these robots read", () => {
+        expect(unsub.unsubscribeMailto("mailto:Leave@List.example")).toEqual({
+            address: "leave@list.example",
+            subject: "unsubscribe",
+            body: "unsubscribe"
+        });
+    });
+
+    it("takes the first of several addresses, which all mean the same thing", () => {
+        expect(unsub.unsubscribeMailto("mailto:a@list.example,b@list.example")?.address).toBe(
+            "a@list.example"
+        );
+    });
+
+    it("survives a malformed escape rather than throwing", () => {
+        // A stray per-cent sign is what a sale newsletter puts in its subject,
+        // and it is not a valid escape. The subject arrives as written instead
+        // of the parse failing.
+        expect(unsub.unsubscribeMailto("mailto:leave@list.example?subject=100%%20off")?.subject).toBe(
+            "100% off"
+        );
+    });
+
+    it("is nothing for anything that is not a mailto", () => {
+        expect(unsub.unsubscribeMailto("https://list.example/out")).toBeNull();
+        expect(unsub.unsubscribeMailto("mailto:not-an-address")).toBeNull();
+    });
+
+    it("POSTs exactly what RFC 8058 says", () => {
+        expect(unsub.ONE_CLICK_BODY).toBe("List-Unsubscribe=One-Click");
+    });
+});
