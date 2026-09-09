@@ -27,7 +27,6 @@ COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
-COPY apps/web/package.json ./apps/web/
 COPY services/vision/package.json ./services/vision/
 RUN npm ci --ignore-scripts
 
@@ -76,7 +75,6 @@ COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
-COPY apps/web/package.json ./apps/web/
 COPY services/vision/package.json ./services/vision/
 RUN npm ci --omit=dev --workspace @polaris/vision --include-workspace-root=false --ignore-scripts && \
     npm rebuild onnxruntime-node && \

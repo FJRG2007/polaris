@@ -52,11 +52,16 @@ export function FilePreview({
     target,
     onSaved,
     urlFor,
+    token,
     readOnly = false
 }: {
     target: ViewerTarget;
     onSaved?: (name: string) => void;
     urlFor?: ViewerUrlFor;
+    /** The share this is being viewed through, when it is one. A presentation is
+     *  rendered by the server, and that request needs the same pass the bytes
+     *  came through - a share visitor has no session to authorise it. */
+    token?: string;
     readOnly?: boolean;
 }) {
     const src = (urlFor ?? driveByteUrl)(target, true);
@@ -88,7 +93,7 @@ export function FilePreview({
         return <SheetEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     if (kind === "doc")
         return <DocView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
-    if (kind === "slides") return <PptxView src={src} />;
+    if (kind === "slides") return <PptxView src={src} token={token} />;
     if (kind === "markdown")
         return <MarkdownView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     if (kind === "code")
@@ -102,6 +107,7 @@ export function FileViewer({
     onShare,
     onSaved,
     urlFor,
+    token,
     readOnly = false
 }: {
     target: ViewerTarget | null;
@@ -113,6 +119,8 @@ export function FileViewer({
     urlFor?: ViewerUrlFor;
     /** Read-only viewing: hide inline editing (a share visitor cannot write back). */
     readOnly?: boolean;
+    /** The share token this is opened through, when it is a public link. */
+    token?: string;
 }) {
     const format = useDisplayFormat();
     const byteUrl = urlFor ?? driveByteUrl;
@@ -156,6 +164,7 @@ export function FileViewer({
                             <FilePreview
                                 target={target}
                                 urlFor={urlFor}
+                                token={token}
                                 readOnly={readOnly}
                                 onSaved={onSaved}
                             />

@@ -9,10 +9,20 @@
             "types": "./dist/App.d.ts",
             "import": "./dist/App.js",
             "default": "./dist/App.js"
+        },
+        "./slide": {
+            "types": "./dist/SlideThumb.d.ts",
+            "import": "./dist/SlideThumb.js",
+            "default": "./dist/SlideThumb.js"
+        },
+        "./images": {
+            "types": "./dist/image-loader.d.ts",
+            "import": "./dist/image-loader.js",
+            "default": "./dist/image-loader.js"
         }
     },
     "scripts": {
-        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom --loader .md=text",
+        "build": "tsup src/renderer/App.tsx src/renderer/SlideThumb.tsx src/renderer/image-loader.ts --format esm --dts --clean --external react --external react-dom --loader .md=text",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },

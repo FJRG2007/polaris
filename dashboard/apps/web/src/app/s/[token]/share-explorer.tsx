@@ -118,7 +118,8 @@ function parentOf(path: string): string {
 
 /** A short, non-leaky message for a failed write, from the route's status/reason. */
 function writeErrorMessage(status: number, reason: string): string {
-    if (reason.endsWith("_disabled") || status === 403) return "That action is not allowed on this link.";
+    if (reason.endsWith("_disabled") || status === 403)
+        return "That action is not allowed on this link.";
     if (reason === "cannot_rename_root" || reason === "cannot_delete_root") {
         return "The shared folder itself cannot be changed.";
     }
@@ -195,7 +196,10 @@ export function ShareExplorer({
 
     /** Build the shareable URL for a path within the subtree (root omits `?p`). */
     const urlForPath = useCallback(
-        (target: string) => (target && target !== rootPath ? `/s/${token}?p=${encodeURIComponent(target)}` : `/s/${token}`),
+        (target: string) =>
+            target && target !== rootPath
+                ? `/s/${token}?p=${encodeURIComponent(target)}`
+                : `/s/${token}`,
         [token, rootPath]
     );
 
@@ -275,7 +279,9 @@ export function ShareExplorer({
                 .then((res) => res.json())
                 .then((body) => {
                     if (controller.signal.aborted) return;
-                    setRemoteEntries(Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []);
+                    setRemoteEntries(
+                        Array.isArray(body.entries) ? (body.entries as DriveEntry[]) : []
+                    );
                     setSearchTruncated(Boolean(body.truncated));
                 })
                 .catch(() => {
@@ -346,9 +352,14 @@ export function ShareExplorer({
             if (dirA !== dirB) return dirA - dirB;
             if (sortKey === "size") return (Number(a.size) - Number(b.size)) * direction;
             if (sortKey === "created")
-                return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction;
+                return (
+                    (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * direction
+                );
             if (sortKey === "modified")
-                return (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) * direction;
+                return (
+                    (new Date(a.modifiedAt).getTime() - new Date(b.modifiedAt).getTime()) *
+                    direction
+                );
             return a.name.localeCompare(b.name) * direction;
         });
     }, [source, categories, extFilter, minMb, maxMb, dateFrom, dateTo, query, sortKey, sortDir]);
@@ -372,7 +383,8 @@ export function ShareExplorer({
         // Location shown relative to the shared root (never the connection path above
         // it), mirroring the breadcrumb the visitor can already see.
         const parent = parentOf(entry.path);
-        const parentRel = parent === rootPath ? "" : parent.slice(rootPath ? rootPath.length + 1 : 0);
+        const parentRel =
+            parent === rootPath ? "" : parent.slice(rootPath ? rootPath.length + 1 : 0);
         setViewerTarget({
             path: entry.path,
             name: entry.name,
@@ -399,7 +411,12 @@ export function ShareExplorer({
             openHref(fileUrl(token, items[0].path, false), items[0].name);
             return;
         }
-        openHref(zipUrl(token, items.map((entry) => entry.path)));
+        openHref(
+            zipUrl(
+                token,
+                items.map((entry) => entry.path)
+            )
+        );
     }
 
     /** POST a JSON write to a token route; surface a friendly error, reload on success. */
@@ -453,7 +470,8 @@ export function ShareExplorer({
         }
         setUploading(false);
         if (fileInput.current) fileInput.current.value = "";
-        if (failed > 0) setOpError(`${failed} file${failed === 1 ? "" : "s"} could not be uploaded.`);
+        if (failed > 0)
+            setOpError(`${failed} file${failed === 1 ? "" : "s"} could not be uploaded.`);
         else if (renamed.length > 0) {
             setOpError(
                 renamed.length === 1
@@ -503,7 +521,8 @@ export function ShareExplorer({
             }
         }
         setSelected(new Set());
-        if (failed > 0) setOpError(`${failed} item${failed === 1 ? "" : "s"} could not be deleted.`);
+        if (failed > 0)
+            setOpError(`${failed} item${failed === 1 ? "" : "s"} could not be deleted.`);
         reload();
     }
 
@@ -585,7 +604,12 @@ export function ShareExplorer({
         } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
             event.preventDefault();
             openEntry(selectedEntries[0]);
-        } else if (event.key === "F2" && allowRename && selectedEntries.length === 1 && selectedEntries[0]) {
+        } else if (
+            event.key === "F2" &&
+            allowRename &&
+            selectedEntries.length === 1 &&
+            selectedEntries[0]
+        ) {
             event.preventDefault();
             startRename(selectedEntries[0]);
         } else if (event.key === "Delete" && allowDelete && selectedEntries.length > 0) {
@@ -673,7 +697,9 @@ export function ShareExplorer({
                     <ContextMenuSeparator />
                     <ContextMenuItem
                         variant="danger"
-                        onSelect={() => setDeleteTargets(selected.has(entry.path) ? selectedEntries : [entry])}
+                        onSelect={() =>
+                            setDeleteTargets(selected.has(entry.path) ? selectedEntries : [entry])
+                        }
                     >
                         <Trash2 className="size-4" />
                         Delete
@@ -721,7 +747,12 @@ export function ShareExplorer({
                     ) : null}
                     {allowUpload ? (
                         <>
-                            <Button size="sm" variant="secondary" disabled={uploading} onClick={() => fileInput.current?.click()}>
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={uploading}
+                                onClick={() => fileInput.current?.click()}
+                            >
                                 <Upload className="size-4" />
                                 {uploading ? "Uploading..." : "Upload"}
                             </Button>
@@ -731,14 +762,19 @@ export function ShareExplorer({
                                 multiple
                                 hidden
                                 onChange={(event) => {
-                                    if (event.target.files) void uploadFiles(filesToItems(event.target.files));
+                                    if (event.target.files)
+                                        void uploadFiles(filesToItems(event.target.files));
                                     event.target.value = "";
                                 }}
                             />
                         </>
                     ) : null}
                     {allowDownload && visible.length > 0 && (path || rootPath) ? (
-                        <Button size="sm" variant="ghost" onClick={() => openHref(zipUrl(token, [path || rootPath]))}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openHref(zipUrl(token, [path || rootPath]))}
+                        >
                             <Download className="size-4" />
                             Download all
                         </Button>
@@ -759,7 +795,9 @@ export function ShareExplorer({
                     />
                     <button
                         type="button"
-                        onClick={() => setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))}
+                        onClick={() =>
+                            setSearchScope((prev) => (prev === "current" ? "recursive" : "current"))
+                        }
                         aria-label="Toggle search scope"
                         title={
                             searchScope === "recursive"
@@ -812,7 +850,9 @@ export function ShareExplorer({
                         aria-label="List view"
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "list" ? "bg-muted text-foreground" : "text-muted-foreground"
+                            viewMode === "list"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground"
                         )}
                     >
                         <List className="size-4" />
@@ -823,7 +863,9 @@ export function ShareExplorer({
                         aria-label="Grid view"
                         className={cn(
                             "rounded p-1 transition-colors hover:bg-muted",
-                            viewMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground"
+                            viewMode === "grid"
+                                ? "bg-muted text-foreground"
+                                : "text-muted-foreground"
                         )}
                     >
                         <LayoutGrid className="size-4" />
@@ -874,23 +916,45 @@ export function ShareExplorer({
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Extension
-                            <Input value={extFilter} onChange={(e) => setExtFilter(e.target.value)} placeholder="pdf" />
+                            <Input
+                                value={extFilter}
+                                onChange={(e) => setExtFilter(e.target.value)}
+                                placeholder="pdf"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Min size (MB)
-                            <Input value={minMb} onChange={(e) => setMinMb(e.target.value)} type="number" min="0" />
+                            <Input
+                                value={minMb}
+                                onChange={(e) => setMinMb(e.target.value)}
+                                type="number"
+                                min="0"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Max size (MB)
-                            <Input value={maxMb} onChange={(e) => setMaxMb(e.target.value)} type="number" min="0" />
+                            <Input
+                                value={maxMb}
+                                onChange={(e) => setMaxMb(e.target.value)}
+                                type="number"
+                                min="0"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Modified after
-                            <Input value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} type="date" />
+                            <Input
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                type="date"
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             Modified before
-                            <Input value={dateTo} onChange={(e) => setDateTo(e.target.value)} type="date" />
+                            <Input
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                type="date"
+                            />
                         </label>
                     </div>
                     {hasFilters ? (
@@ -916,7 +980,9 @@ export function ShareExplorer({
             <div
                 className={cn(
                     "mb-3 flex h-10 items-center gap-2 rounded-md border px-3 text-sm transition-colors",
-                    selectedEntries.length > 0 ? "border-primary/40 bg-primary/5" : "border-transparent"
+                    selectedEntries.length > 0
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-transparent"
                 )}
             >
                 {selectedEntries.length > 0 ? (
@@ -924,26 +990,43 @@ export function ShareExplorer({
                         <span className="font-medium">{selectedEntries.length} selected</span>
                         <div className="ml-auto flex items-center gap-1">
                             {allowDownload ? (
-                                <Button size="sm" variant="ghost" onClick={() => downloadSelection(selectedEntries)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => downloadSelection(selectedEntries)}
+                                >
                                     <Download className="size-4" />
-                                    {selectedEntries.length > 1 || selectedEntries.some((entry) => entry.kind === "dir")
+                                    {selectedEntries.length > 1 ||
+                                    selectedEntries.some((entry) => entry.kind === "dir")
                                         ? "Download ZIP"
                                         : "Download"}
                                 </Button>
                             ) : null}
                             {allowRename && selectedEntries.length === 1 && selectedEntries[0] ? (
-                                <Button size="sm" variant="ghost" onClick={() => startRename(selectedEntries[0]!)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => startRename(selectedEntries[0]!)}
+                                >
                                     <Pencil className="size-4" />
                                     Rename
                                 </Button>
                             ) : null}
                             {allowDelete ? (
-                                <Button size="sm" variant="ghost" onClick={() => setDeleteTargets(selectedEntries)}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setDeleteTargets(selectedEntries)}
+                                >
                                     <Trash2 className="size-4" />
                                     Delete
                                 </Button>
                             ) : null}
-                            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSelected(new Set())}
+                            >
                                 <X className="size-4" />
                                 Clear
                             </Button>
@@ -1005,7 +1088,9 @@ export function ShareExplorer({
                                         )}
                                     >
                                         <EntryIcon entry={entry} className="size-10" />
-                                        <span className="line-clamp-2 w-full break-words text-xs">{entry.name}</span>
+                                        <span className="line-clamp-2 w-full break-words text-xs">
+                                            {entry.name}
+                                        </span>
                                         {entry.kind !== "dir" ? (
                                             <span className="text-[0.625rem] text-muted-foreground">
                                                 {formatBytes(BigInt(entry.size))}
@@ -1036,7 +1121,12 @@ export function ShareExplorer({
                             <span className="w-16" />
                         </div>
                         <div ref={scrollRef} className="max-h-[60vh] overflow-auto">
-                            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+                            <div
+                                style={{
+                                    height: rowVirtualizer.getTotalSize(),
+                                    position: "relative"
+                                }}
+                            >
                                 {rowVirtualizer.getVirtualItems().map((row) => {
                                     const entry = visible[row.index];
                                     if (!entry) return null;
@@ -1046,7 +1136,9 @@ export function ShareExplorer({
                                             <ContextMenuTrigger asChild>
                                                 <div
                                                     data-share-row
-                                                    onClick={(event) => rowClick(event, row.index, entry)}
+                                                    onClick={(event) =>
+                                                        rowClick(event, row.index, entry)
+                                                    }
                                                     onDoubleClick={() => openEntry(entry)}
                                                     style={{
                                                         position: "absolute",
@@ -1058,7 +1150,9 @@ export function ShareExplorer({
                                                     }}
                                                     className={cn(
                                                         "group flex cursor-default items-center gap-3 border-b border-border px-3 text-sm transition-colors",
-                                                        isSelected ? "bg-primary/5" : "hover:bg-card-hover"
+                                                        isSelected
+                                                            ? "bg-primary/5"
+                                                            : "hover:bg-card-hover"
                                                     )}
                                                 >
                                                     <Checkbox
@@ -1067,13 +1161,20 @@ export function ShareExplorer({
                                                         onChange={() => toggleOne(entry.path)}
                                                         aria-label={`Select ${entry.name}`}
                                                     />
-                                                    <EntryIcon entry={entry} className="size-4 shrink-0" />
-                                                    <span className="flex-1 truncate">{entry.name}</span>
+                                                    <EntryIcon
+                                                        entry={entry}
+                                                        className="size-4 shrink-0"
+                                                    />
+                                                    <span className="flex-1 truncate">
+                                                        {entry.name}
+                                                    </span>
                                                     <span className="hidden w-40 text-xs text-muted-foreground sm:block">
                                                         <RelativeTime iso={entry.modifiedAt} />
                                                     </span>
                                                     <span className="w-20 text-right text-xs text-muted-foreground">
-                                                        {entry.kind === "dir" ? "-" : formatBytes(BigInt(entry.size))}
+                                                        {entry.kind === "dir"
+                                                            ? "-"
+                                                            : formatBytes(BigInt(entry.size))}
                                                     </span>
                                                     <span className="flex w-16 items-center justify-end gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                                                         {rowActions(entry)}
@@ -1095,7 +1196,9 @@ export function ShareExplorer({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>New folder</DialogTitle>
-                        <DialogDescription>Create a folder in the current location.</DialogDescription>
+                        <DialogDescription>
+                            Create a folder in the current location.
+                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitNewFolder} className="flex flex-col gap-3">
                         <Input
@@ -1119,11 +1222,16 @@ export function ShareExplorer({
             </Dialog>
 
             {/* Rename */}
-            <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
+            <Dialog
+                open={renameTarget !== null}
+                onOpenChange={(open) => !open && setRenameTarget(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Rename</DialogTitle>
-                        <DialogDescription className="truncate">{renameTarget?.name}</DialogDescription>
+                        <DialogDescription className="truncate">
+                            {renameTarget?.name}
+                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submitRename} className="flex flex-col gap-3">
                         <Input
@@ -1147,11 +1255,17 @@ export function ShareExplorer({
             </Dialog>
 
             {/* Delete confirm */}
-            <Dialog open={deleteTargets !== null} onOpenChange={(open) => !open && setDeleteTargets(null)}>
+            <Dialog
+                open={deleteTargets !== null}
+                onOpenChange={(open) => !open && setDeleteTargets(null)}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            Delete {deleteTargets && deleteTargets.length > 1 ? `${deleteTargets.length} items` : "item"}
+                            Delete{" "}
+                            {deleteTargets && deleteTargets.length > 1
+                                ? `${deleteTargets.length} items`
+                                : "item"}
                         </DialogTitle>
                         <DialogDescription className="truncate">
                             {deleteTargets && deleteTargets.length === 1
@@ -1160,7 +1274,11 @@ export function ShareExplorer({
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" onClick={() => setDeleteTargets(null)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setDeleteTargets(null)}
+                        >
                             Cancel
                         </Button>
                         <Button type="button" variant="danger" onClick={confirmDelete}>
@@ -1198,6 +1316,7 @@ export function ShareExplorer({
                 target={viewerTarget}
                 onOpenChange={(open) => !open && setViewerTarget(null)}
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
+                token={token}
                 readOnly
             />
         </div>
@@ -1214,7 +1333,10 @@ function ListingSkeleton({ viewMode }: { viewMode: "list" | "grid" }) {
         return (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {Array.from({ length: 12 }).map((_, index) => (
-                    <div key={index} className="flex flex-col items-center gap-2 rounded-lg border border-border p-3">
+                    <div
+                        key={index}
+                        className="flex flex-col items-center gap-2 rounded-lg border border-border p-3"
+                    >
                         <Skeleton className="size-10 rounded" />
                         <Skeleton className="h-3 w-4/5" />
                     </div>
