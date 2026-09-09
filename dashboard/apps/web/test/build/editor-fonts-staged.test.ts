@@ -1,8 +1,16 @@
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { pointAtAssets } from "../../../../scripts/scope-editor-styles.mjs";
-import { FACE, base, katexSheet, sources } from "../../scripts/copy-office-fonts.mjs";
+import {
+    FACE,
+    NOTICE,
+    base,
+    katexSheet,
+    sources,
+    stageFonts
+} from "../../scripts/copy-office-fonts.mjs";
 
 /**
  * The embedded editors' fonts, and the two halves that have to agree.
@@ -67,7 +75,7 @@ describe("the editors' fonts", () => {
          *  while the build agreed with neither, which is the divergence this
          *  file exists to catch. */
         const staged = new Set(
-            sources.flatMap((source) => readdirSync(source)).filter((name) => FACE.test(name))
+            sources.flatMap(({ dir }) => readdirSync(dir)).filter((name) => FACE.test(name))
         );
 
         /** Every file name a stylesheet asks this origin for. */
@@ -127,6 +135,68 @@ describe("the editors' fonts", () => {
             for (const face of ["Carlito-Regular.ttf", "Caladea-Regular.ttf"]) {
                 expect(staged.has(face), face).toBe(true);
             }
+        });
+    });
+
+    describe("what the step actually writes", () => {
+        /** Stage into a directory of its own, so the assertions are about what
+         *  this run wrote rather than about whatever a previous build left in
+         *  `public/`. */
+        const staging = (): [string, () => void] => {
+            const into = mkdtempSync(join(tmpdir(), "office-fonts-"));
+            return [into, () => rmSync(into, { recursive: true, force: true })];
+        };
+
+        it("puts the licence in the directory the fonts are served from", () => {
+            // Carlito, Liberation and the Noto faces are OFL 1.1, which requires
+            // the licence text to accompany every redistributed copy, and this
+            // directory is where they are redistributed - the runtime image
+            // carries `public/` and nothing else, so a text left in the checkout
+            // ships nowhere near the fonts it covers. The README travels with it
+            // because it is what records the exception: Caladea is Apache-2.0,
+            // and the Carlito build here is a renamed derivative under §2.
+            const [into, clean] = staging();
+            try {
+                const { faces, notices } = stageFonts(into);
+                const written = readdirSync(into);
+                expect(faces).toBe(written.filter((name) => FACE.test(name)).length);
+                expect(notices).toBe(written.filter((name) => !FACE.test(name)).length);
+                expect(written).toContain("genoffice-docs-LICENSE-OFL.txt");
+                // Both packages call theirs README.md, which is why a notice is
+                // staged under the name of the package it came from: flat, one
+                // would answer for the other.
+                expect(written).toContain("genoffice-docs-README.md");
+                expect(written).toContain("genoffice-ui-README.md");
+                expect(readFileSync(join(into, "genoffice-docs-README.md"), "utf8")).toContain(
+                    "Apache"
+                );
+            } finally {
+                clean();
+            }
+        });
+
+        it("refuses two sources that stage the same file name", () => {
+            // The sources are disjoint today. Flattened into one directory they
+            // need not stay that way, and the second copy replaces the first
+            // without a word: a document drawn in a real face that is the wrong
+            // one, off a green build.
+            const [into, clean] = staging();
+            sources.push({ label: "duplicate", dir: sources[1].dir });
+            try {
+                expect(() => stageFonts(into)).toThrow(/stage a file named Carlito-/);
+            } finally {
+                sources.pop();
+                clean();
+            }
+        });
+
+        it("counts a notice as a notice rather than as a face", () => {
+            // The regex decides which pile a file lands in, and a face whose
+            // name happens to start with one of those words is still a face.
+            expect(NOTICE.test("LICENSE-OFL.txt")).toBe(true);
+            expect(NOTICE.test("README.md")).toBe(true);
+            expect(FACE.test("LiberationSans-Regular.ttf")).toBe(true);
+            expect(NOTICE.test("NotoSansArabic-Regular-subset.woff2")).toBe(false);
         });
     });
 });
