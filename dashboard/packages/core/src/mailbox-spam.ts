@@ -357,6 +357,21 @@ export function urlSignals(message: JudgeableMessage): SpamSignal[] {
             reason: "A link hides where it goes behind a shortener"
         });
     }
+    // A link into `/.well-known/`. That directory exists so that machines can
+    // find a site's certificate challenges, its security contact and its app
+    // associations - nobody has ever had a reason to send a person a link into
+    // it. What puts one in an email is a phishing kit dropped on a server
+    // somebody else owns: `.well-known` is writable on a badly configured host,
+    // it is excluded from most site scans, and it survives longer there than
+    // anywhere else on the domain. `/.well-known/css/` and `/.well-known/pki/`
+    // are the two that turn up most.
+    if (/https?:\/\/[^\s"'<>)\]]*\/\.well-known\//i.test(`${message.bodyHtml} ${message.bodyText}`)) {
+        signals.push({
+            id: "url_well_known",
+            score: 20,
+            reason: "A link points into a part of a site that is meant for machines, not people"
+        });
+    }
     if (hosts.length > 25) {
         signals.push({
             id: "url_many",
@@ -387,6 +402,149 @@ export function urlSignals(message: JudgeableMessage): SpamSignal[] {
     return signals;
 }
 
+/* -------------------------------------------------------------------------- */
+/* What the subject line says                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Words that exist to stop somebody thinking.
+ *
+ * Not "important" or "urgent" on their own - a colleague writes those. These are
+ * the constructions that manufacture a deadline or a consequence, which is the
+ * one thing every phishing subject has in common regardless of what it is
+ * pretending to be: a delivery, a bank, a domain registrar, a prize.
+ */
+const URGENCY: readonly string[] = [
+    "action required",
+    "immediate action",
+    "act now",
+    "final notice",
+    "last chance",
+    "expires today",
+    "expiring soon",
+    "within 24 hours",
+    "24h only",
+    "24 hours only",
+    "verify your account",
+    "verify now",
+    "confirm your account",
+    "we need your confirmation",
+    "needs your confirmation",
+    "delivery attempt failed",
+    "failed delivery",
+    "undelivered",
+    "will be suspended",
+    "will be closed",
+    "will be deleted",
+    "unusual activity",
+    "unauthorized access",
+    "limited time",
+    // The same constructions in the languages a Spanish or Portuguese mailbox
+    // actually receives them in.
+    "accion requerida",
+    "acción requerida",
+    "verifica tu cuenta",
+    "verifique su cuenta",
+    "confirma tu cuenta",
+    "ultimo aviso",
+    "último aviso",
+    "su cuenta sera",
+    "su cuenta será",
+    "acao necessaria",
+    "ação necessária"
+];
+
+/**
+ * The marks a subject wears to look like an alert.
+ *
+ * Deliberately narrow. This is not "contains an emoji" - a newsletter puts a sun
+ * in its weather subject and a colleague sends a party hat - it is the small set
+ * that impersonates a system notice, which is a different intent. The warning
+ * triangle is the one that appears most, by a distance.
+ */
+const ALARM_MARKS = /[⚠‼❗❕]|\u{1F514}|\u{1F6A8}|\u{1F534}/u;
+
+/** Anything pictographic, for the weaker "this is decorated" signal. */
+const PICTOGRAPH = /[☀-➿]|[\u{1F300}-\u{1FAFF}]/u;
+
+/** An amount of money, in the currencies these arrive in. */
+const MONEY = /[$£€]\s?\d[\d,.]{2,}|\d[\d,.]{2,}\s?(?:usd|eur|gbp|dollars|euros)/i;
+
+/**
+ * What the subject line is doing.
+ *
+ * Every one of these is deliberately small. A subject is the least reliable
+ * thing in a message - free text a stranger chose - so no combination of them
+ * alone reaches the threshold that files a message away. Together they can reach
+ * the one that shows a warning, which is the honest ceiling for evidence of this
+ * kind: a person can look at a warning and disagree, and cannot look at a
+ * message that was filed while they were not watching.
+ */
+export function subjectSignals(message: JudgeableMessage): SpamSignal[] {
+    const signals: SpamSignal[] = [];
+    const subject = message.subject.trim();
+    if (!subject) return signals;
+    const lower = subject.toLowerCase();
+
+    // An address in the subject. Legitimate mail does this - a receipt naming
+    // the account it belongs to - so it is worth points rather than a verdict.
+    // What makes it suspicious is that it is how a template is made to look
+    // personally addressed, and the address it names is always the reader's own.
+    const address = /[\w.+-]+@[\w-]+\.[\w.-]+/.exec(subject);
+    if (address) {
+        signals.push({
+            id: "subject_address",
+            score: 14,
+            reason: `The subject has an email address in it (${address[0]})`
+        });
+    }
+
+    if (ALARM_MARKS.test(subject)) {
+        signals.push({
+            id: "subject_alarm_mark",
+            score: 8,
+            reason: "The subject is dressed up as an alert"
+        });
+    } else if (PICTOGRAPH.test(subject)) {
+        signals.push({
+            id: "subject_pictures",
+            score: 5,
+            reason: "The subject is decorated with pictures"
+        });
+    }
+
+    const urgent = URGENCY.find((phrase) => lower.includes(phrase));
+    if (urgent) {
+        signals.push({
+            id: "subject_urgency",
+            score: 10,
+            reason: `The subject pushes for a decision ("${urgent}")`
+        });
+    }
+
+    // A bracketed shout - [24H ONLY], [URGENT]. Bracketed tags on their own are
+    // ordinary: mailing lists, ticket systems and build servers all use them, so
+    // only a bracket whose contents are shouting counts.
+    const bracket = /\[([^\]]{2,20})\]/.exec(subject);
+    const inside = bracket?.[1]?.trim() ?? "";
+    if (inside && inside.replace(/[^a-zA-Z]/g, "").length >= 3 && inside === inside.toUpperCase()) {
+        signals.push({
+            id: "subject_bracket_shout",
+            score: 6,
+            reason: `The subject shouts from a bracket ("${inside}")`
+        });
+    }
+
+    if (MONEY.test(subject)) {
+        signals.push({
+            id: "subject_money",
+            score: 8,
+            reason: "The subject promises an amount of money"
+        });
+    }
+
+    return signals;
+}
 /** Attachment types that are executable on arrival, which no ordinary
  *  correspondence carries. */
 const DANGEROUS_ATTACHMENTS: readonly string[] = [
@@ -572,6 +730,7 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
     const signals: SpamSignal[] = [
         ...authenticationSignals(message.headers),
         ...urlSignals(message),
+        ...subjectSignals(message),
         ...structureSignals(message),
         ...relationshipSignals(known)
     ];

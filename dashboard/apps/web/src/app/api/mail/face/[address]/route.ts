@@ -49,7 +49,24 @@ const IMAGE_TYPES = /^image\/(?:png|jpeg|gif|webp|avif|x-icon|vnd\.microsoft\.ic
  * open for the sum of them - so the search gives up here and the reader gets
  * initials, which is what they would have got anyway.
  */
-const BUDGET_MS = 10_000;
+const BUDGET_MS = 12_000;
+
+/**
+ * How long any one host may cost.
+ *
+ * The budget above is not enough on its own, and the reason is the whole shape
+ * of this search: the host a message was SENT from is asked first, and it is the
+ * one least likely to answer - almost nobody serves a website from
+ * `email.clicktopay.visa.com`. A host like that does not refuse the connection,
+ * it drops it, so each of its two paths costs the full five-second ceiling and
+ * the two together spent the entire budget. `visa.com`, which serves the logo in
+ * two hundred milliseconds, was never asked at all.
+ *
+ * So each host gets a share instead. A dead one costs its share and the next one
+ * is still asked, which is the difference between a household name showing its
+ * logo and showing two letters.
+ */
+const PER_HOST_MS = 4_000;
 
 /** A mark, as it will be handed to the browser. */
 interface Found {
@@ -135,16 +152,20 @@ async function fetchMark(domain: string): Promise<Found | null> {
     const hosts = markDomains(domain);
 
     for (const host of hosts) {
+        // Each host's own ceiling as well as the shared one, so a host that
+        // silently drops connections cannot spend what the next one needed.
+        const mine = Math.min(deadline, Date.now() + PER_HOST_MS);
         for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
-            if (Date.now() > deadline) return null;
+            if (Date.now() > mine) break;
             const found = await pictureAt(`https://${host}${path}`);
             if (found) return found;
         }
+        if (Date.now() > deadline) return null;
     }
 
     for (const host of hosts) {
         if (Date.now() > deadline) return null;
-        const found = await declaredMark(host, deadline);
+        const found = await declaredMark(host, Math.min(deadline, Date.now() + PER_HOST_MS));
         if (found) return found;
     }
     return null;
