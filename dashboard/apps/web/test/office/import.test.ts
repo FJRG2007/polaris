@@ -366,6 +366,38 @@ describe("a document", () => {
         expect(lists).toEqual(["orderedList", "bulletList"]);
     });
 
+    it("reads a paragraph whose numbering was taken off it as prose", async () => {
+        // numId 0 is Word saying there is no numbering here, which is what a
+        // paragraph that inherited a list style carries once somebody removed
+        // the numbers. Read as a list, a document's prose comes out bulleted.
+        const bytes = await wordDocument(
+            `<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="0"/></w:numPr></w:pPr><w:r><w:t>Ordinary prose.</w:t></w:r></w:p>${numbered("1", "An item")}`
+        );
+        const imported = await importFile("Notes.docx", bytes);
+        const nodes = opened(imported.update)
+            .getXmlFragment(OFFICE_FIELDS.doc.body)
+            .toArray()
+            .filter((node): node is Y.XmlElement => node instanceof Y.XmlElement)
+            .map((node) => node.nodeName);
+        expect(nodes).toEqual(["paragraph", "bulletList"]);
+
+        const out = await exportDocument("doc", imported.title, imported.update, "md");
+        expect(new TextDecoder().decode(out?.bytes)).toContain("Ordinary prose.");
+    });
+
+    it("reads a tab stop on the ruler as a setting rather than as a tab", async () => {
+        // The stops live in the paragraph's properties and the character lives
+        // in a run - both are `w:tab`, and reading the properties puts one tab
+        // in front of a paragraph nobody indented.
+        const stop = (at: number): string => `<w:tab w:val="left" w:pos="${at}"/>`;
+        const bytes = await wordDocument(
+            `<w:p><w:pPr><w:tabs>${stop(2160)}${stop(9360)}</w:tabs></w:pPr><w:r><w:t>Chapter one</w:t><w:tab/><w:t>3</w:t></w:r></w:p>`
+        );
+        const out = await roundTrip("Contents.docx", bytes, "md");
+        const body = out.split(/\r?\n/).filter((line) => line.trim() && !line.startsWith("# "));
+        expect(body).toEqual(["Chapter one\t3"]);
+    });
+
     it("keeps a numbered list numbered all the way back out of the exporter", async () => {
         const steps = "1. First\n2. Second\n3. Third\n";
         const markdownOut = await roundTrip("Steps.md", utf8.encode(steps), "md");

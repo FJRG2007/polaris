@@ -79,6 +79,12 @@ const MAX_COLUMNS = 1_024;
  * So the size is read from the package's own directory, which says what each
  * entry becomes without inflating any of it, and a package past this is refused
  * in a sentence.
+ *
+ * **It is the archive's own declaration, and an archive can lie.** A zip built
+ * to understate what it becomes is only caught once the bytes are inflated and
+ * the count comes out wrong, which is after the allocation this exists to stop.
+ * The ceiling bounds an ordinary oversized file, which is the one somebody
+ * actually uploads; it is not a defence against a package written to defeat it.
  */
 const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 4_096;
@@ -466,11 +472,19 @@ function countedNumbering(xml: string): ReadonlySet<string> {
     return counted;
 }
 
-/** The words in one paragraph: every run's text, with the tabs and the breaks
- *  the run itself carries. */
+/**
+ * The words in one paragraph: every run's text, with the tabs and the breaks
+ * the run itself carries.
+ *
+ * The properties are dropped before anything is read, because a tab STOP and a
+ * tab CHARACTER are the same element in two places: `<w:pPr><w:tabs><w:tab/>`
+ * is where somebody's ruler put the stops, and reading it as text puts one `\t`
+ * per stop in front of a paragraph nobody indented.
+ */
 function paragraphText(paragraph: string): string {
+    const runs = paragraph.replace(/<w:pPr\b[^>]*(?:\/>|>[\s\S]*?<\/w:pPr>)/g, "");
     let out = "";
-    for (const piece of paragraph.matchAll(/<w:(t|tab|br)\b([^>]*)(?:\/>|>([\s\S]*?)<\/w:\1>)/g)) {
+    for (const piece of runs.matchAll(/<w:(t|tab|br)\b([^>]*)(?:\/>|>([\s\S]*?)<\/w:\1>)/g)) {
         const tag = piece[1];
         if (tag === "tab") {
             out += "\t";
@@ -487,7 +501,7 @@ function paragraphText(paragraph: string): string {
 
 /** What a paragraph is, from the style it names and the numbering it sits in. */
 function paragraphKind(paragraph: string, counted: ReadonlySet<string>): string {
-    const numbered = /<w:numPr\b/.test(paragraph);
+    const numbering = paragraphNumbering(paragraph);
     const style = /<w:pStyle\b[^>]*w:val="([^"]*)"/.exec(paragraph)?.[1] ?? "";
     const flat = style.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -498,14 +512,26 @@ function paragraphKind(paragraph: string, counted: ReadonlySet<string>): string 
     if (flat === "subtitle") return "h2";
     if (flat.includes("quote")) return "quote";
     if (flat.includes("code") || flat === "htmlpreformatted") return "code";
-    // A list is a paragraph with numbering on it. The style is only a hint -
-    // `ListParagraph` is applied to plenty of paragraphs that are not lists, and
-    // a real list item always carries `w:numPr`.
-    if (numbered) {
-        const numId = /<w:numPr\b[\s\S]*?<w:numId\b[^>]*w:val="([^"]*)"/.exec(paragraph)?.[1] ?? "";
-        return counted.has(numId) ? "oli" : "li";
-    }
+    // A list is a paragraph with a numbering id on it. The style is only a hint
+    // - `ListParagraph` is applied to plenty of paragraphs that are not lists,
+    // and a real list item always names a numbering.
+    if (numbering) return counted.has(numbering) ? "oli" : "li";
     return "p";
+}
+
+/**
+ * The numbering a paragraph sits in, or nothing when it sits in none.
+ *
+ * `w:numId` of 0 is not an id, it is Word's way of saying there is no numbering
+ * here - what a paragraph that inherited a list style through `basedOn` carries
+ * once somebody took the numbers off it. Read as a list it turns a document's
+ * ordinary prose into bullets, so it answers the same as no `w:numPr` at all.
+ */
+function paragraphNumbering(paragraph: string): string {
+    const properties = /<w:numPr\b[^>]*>([\s\S]*?)<\/w:numPr>/.exec(paragraph)?.[1];
+    if (!properties) return "";
+    const id = (/<w:numId\b[^>]*w:val="([^"]*)"/.exec(properties)?.[1] ?? "").trim();
+    return !id || Number(id) === 0 ? "" : id;
 }
 
 /** The five entities an OOXML part can carry. */
