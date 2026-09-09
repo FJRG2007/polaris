@@ -67,7 +67,7 @@ export const SelectContent = forwardRef<
             )}
             {...props}
         >
-            <RadixSelect.Viewport className="max-h-72 overflow-y-auto p-1">
+            <RadixSelect.Viewport className="max-h-72 overflow-y-auto overscroll-contain p-1">
                 {children}
             </RadixSelect.Viewport>
         </RadixSelect.Content>

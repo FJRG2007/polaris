@@ -357,3 +357,55 @@ describe("mail about the safety of an account", () => {
         expect(isDisposableSecurityMail(message("Lunch on Thursday"))).toBe(false);
     });
 });
+
+/**
+ * The receipt, and why it was not being recognised.
+ *
+ * A Steam receipt says `Invoice`, `VAT` and `Total` - in its body, which the
+ * categoriser never opens. All it gets is the subject, the snippet, the sender
+ * and the headers, and the line anybody actually sees says "Thank you for your
+ * recent transaction on Steam". Nothing in that is a billing word, so a purchase
+ * landed under Updates beside a parcel and a service notice.
+ *
+ * The lists are written against what a receipt SAYS, not against who sent it -
+ * there is no Steam in here, and adding a shop to Polaris must never mean adding
+ * a line to a list.
+ */
+describe("a purchase, recognised by what it says", () => {
+    const seen = (subject: string, snippet: string, from = "noreply@example.com") =>
+        categoriseMail(message({ subject, snippet, fromAddress: from }));
+
+    it("files the receipt that arrives with nothing but a thank-you", () => {
+        // The real one, from the real address, with the snippet as it arrives.
+        expect(
+            seen(
+                "Thank you for your Steam purchase!",
+                "Hello someone Thank you for your recent transaction on Steam. To view the details, please visit https://store.steampowered.com/email/VATPurchaseReceipt",
+                "noreply@steampowered.com"
+            )
+        ).toBe("billing");
+    });
+
+    it("files one in every language a receipt arrives in", () => {
+        expect(seen("Confirmacion", "Gracias por tu compra")).toBe("billing");
+        expect(seen("Recibo", "Pago recibido")).toBe("billing");
+        expect(seen("Confirmation", "Merci pour votre commande")).toBe("billing");
+        expect(seen("Bestellung", "Zahlung erhalten")).toBe("billing");
+    });
+
+    it("still leaves a parcel where a parcel belongs", () => {
+        // The one place the two lists overlap, and the commonest word in both:
+        // "your order" opens a receipt and a shipping notice alike.
+        expect(seen("Your order has shipped", "It is on its way")).toBe("updates");
+        expect(seen("Tu pedido va en reparto", "Llega hoy")).toBe("updates");
+        expect(seen("Your parcel is out for delivery", "")).toBe("updates");
+    });
+
+    it("keeps a demand ahead of a record", () => {
+        // A bill that has not been paid is still the more urgent of the two, and
+        // it wins even when the message also reads like a receipt.
+        expect(seen("Invoice 2026-114 is due", "Payment received for the previous one")).toBe(
+            "billing"
+        );
+    });
+});

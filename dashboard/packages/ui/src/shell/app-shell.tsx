@@ -55,7 +55,16 @@ export function AppShell({
                     // stays reachable however far down the content the user is. An app
                     // with no sections renders nothing, and `empty:hidden` keeps that
                     // from leaving a bare column beside the content.
-                    <aside className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto border-r border-border bg-surface p-2 empty:hidden md:block">
+                    //
+                    // `overscroll-contain` is what stops the wheel here from moving
+                    // the page. This shell scrolls the DOCUMENT - the header and this
+                    // rail are sticky over it - so a scroll that this element cannot
+                    // use is passed up to the document by default. The rail's entries
+                    // usually fit, so there was nothing here to scroll and every turn
+                    // of the wheel over it scrolled the page instead, while the rail
+                    // itself stayed exactly where it was. It looks like a fixed panel,
+                    // so it has to behave like one.
+                    <aside className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block">
                         {sidebar}
                     </aside>
                 ) : null}

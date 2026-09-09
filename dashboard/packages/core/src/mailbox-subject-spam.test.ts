@@ -27,7 +27,7 @@ describe("what a subject line gives away", () => {
         replyToAddress: "",
         toAddresses: ["me@example.com"],
         listId: "",
-        headers: "",
+        headers: {},
         hasAttachments: false,
         attachmentNames: [],
         ...over
@@ -126,7 +126,7 @@ describe("a link into a part of a site meant for machines", () => {
         replyToAddress: "",
         toAddresses: ["me@example.com"],
         listId: "",
-        headers: "",
+        headers: {},
         hasAttachments: false,
         attachmentNames: []
     });

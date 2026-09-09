@@ -32,7 +32,7 @@ export function MobileNav({ children }: { children: ReactNode }) {
             </button>
             <DialogContent
                 showClose={false}
-                className="left-0 top-0 h-full max-h-none w-64 max-w-[85vw] translate-x-0 translate-y-0 overflow-y-auto rounded-none rounded-r-xl border-y-0 border-l-0 p-3 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-left-4"
+                className="left-0 top-0 h-full max-h-none w-64 max-w-[85vw] translate-x-0 translate-y-0 overflow-y-auto overscroll-contain rounded-none rounded-r-xl border-y-0 border-l-0 p-3 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-left-4"
             >
                 <DialogTitle className="sr-only">Navigation</DialogTitle>
                 <div onClick={onPanelClick}>{children}</div>
