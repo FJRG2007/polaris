@@ -5,8 +5,8 @@
  * never loaded whole.
  */
 
-import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import {
     summarizeWafAddress,
     summarizeWafTraffic,
@@ -14,27 +14,6 @@ import {
     type WafTrafficEntry,
     type WafTrafficSummary
 } from "@polaris/core";
-
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
-
-/** Sized for a day of traffic on a busy instance. Beyond this the window simply
- *  starts later, which the summary reports rather than hides. */
-const TAIL_BYTES = 16 * 1024 * 1024;
-
-/** The last few megabytes of the edge's log, or nothing at all when there is no log
- *  to read - not mounted, or a deployment where the edge is somewhere else. */
-async function readLogTail(): Promise<string> {
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return "";
-    }
-    if (raw.length <= TAIL_BYTES) return raw;
-    const cut = raw.slice(raw.length - TAIL_BYTES);
-    // Drop the partial first line rather than hand the parser half a JSON object.
-    return cut.slice(cut.indexOf("\n") + 1);
-}
 
 /**
  * The parsed log and the window it is being read over.
@@ -47,7 +26,11 @@ export async function wafLogWindow(
     hours = 24,
     now = Date.now()
 ): Promise<{ entries: WafTrafficEntry[]; from: number; to: number }> {
-    return { entries: parseHttpLogs(await readLogTail()), from: now - hours * 3600 * 1000, to: now };
+    return {
+        entries: parseHttpLogs(await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES)),
+        from: now - hours * 3600 * 1000,
+        to: now
+    };
 }
 
 /** Traffic over the last `hours`, split into allowed and blocked, with the
@@ -55,7 +38,11 @@ export async function wafLogWindow(
 export async function wafTraffic(hours = 24, now = Date.now()): Promise<WafTrafficSummary> {
     const from = now - hours * 3600 * 1000;
     // An empty log summarizes to "nothing recorded yet" rather than to zero attacks.
-    return summarizeWafTraffic(parseHttpLogs(await readLogTail()), from, now);
+    return summarizeWafTraffic(
+        parseHttpLogs(await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES)),
+        from,
+        now
+    );
 }
 
 /**
@@ -70,5 +57,10 @@ export async function wafAddressActivity(
     hours = 24,
     now = Date.now()
 ): Promise<WafAddressActivity> {
-    return summarizeWafAddress(parseHttpLogs(await readLogTail()), ip, now - hours * 3600 * 1000, now);
+    return summarizeWafAddress(
+        parseHttpLogs(await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES)),
+        ip,
+        now - hours * 3600 * 1000,
+        now
+    );
 }

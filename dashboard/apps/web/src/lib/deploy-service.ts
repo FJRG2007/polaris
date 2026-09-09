@@ -32,6 +32,7 @@ import { deployLogDir, deployLogPath } from "./deploy/log-file";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
+import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "./edge-access-log";
 import { applicationDefaultWafPresets, isTunnelHostname } from "@polaris/core";
 import { getDriver, getPorts, toTargetInfo, type TargetRow } from "./deploy/runtime";
 import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/status";
@@ -1501,9 +1502,6 @@ function sortLogByTimestamp(raw: string): string {
     return tagged.map((entry) => entry.line).join("\n");
 }
 
-/** The edge's per-request access log (JSON), written by Traefik to a shared volume. */
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
-
 /**
  * HTTP access entries for an app. Primary source is the edge's own access log,
  * which records every proxied request regardless of what the app logs - so it
@@ -1539,19 +1537,17 @@ async function readAppHttpEntries(
     return parseHttpLogs(Buffer.concat(chunks).toString("utf8"));
 }
 
-/** Parse the edge access log, keeping only requests for the given hostnames. */
+/** Parse the edge access log, keeping only requests for the given hostnames.
+ *  Through the shared bounded-tail reader rather than a read of the whole file:
+ *  past Node's maximum string length that read throws, and the caller below
+ *  takes an empty result for "the edge logged nothing" and falls back to the
+ *  container's own stdout - so the HTTP Logs view goes quietly blank for every
+ *  app that does not log its own requests. */
 async function readProxyAccessEntries(hosts: Set<string>, tail: number): Promise<HttpLogEntry[]> {
     if (hosts.size === 0) return [];
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return [];
-    }
-    // Bound the work on a busy proxy: only parse the tail of the file.
-    const lines = raw.split("\n");
-    const recent = lines.length > tail * 20 ? lines.slice(-tail * 20).join("\n") : raw;
-    return parseHttpLogs(recent)
+    const raw = await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES);
+    if (!raw) return [];
+    return parseHttpLogs(raw)
         .filter((entry) => entry.host !== null && hosts.has(entry.host.toLowerCase()))
         .slice(-tail);
 }
@@ -2154,7 +2150,9 @@ async function telemetryEnv(environmentId: string): Promise<Record<string, strin
             where: { id: environmentId },
             select: {
                 name: true,
-                project: { select: { id: true, name: true, slug: true, ownerId: true, orgId: true } }
+                project: {
+                    select: { id: true, name: true, slug: true, ownerId: true, orgId: true }
+                }
             }
         });
         if (!environment) return {};

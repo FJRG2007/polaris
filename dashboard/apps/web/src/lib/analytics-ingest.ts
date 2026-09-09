@@ -17,16 +17,19 @@
  */
 
 import { prisma } from "@polaris/db";
-import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { dashboardHosts } from "@/lib/domain-edge";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { visitDay, type VisitDimension } from "@polaris/core";
-import { ensureAnalyticsSite, getAnalyticsSettings, recordVisit, type AnalyticsScopeType } from "@/lib/analytics-service";
+import {
+    ensureAnalyticsSite,
+    getAnalyticsSettings,
+    recordVisit,
+    type AnalyticsScopeType
+} from "@/lib/analytics-service";
 
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 const CURSOR_KEY = "analytics.edgeCursor";
-const TAIL_BYTES = 16 * 1024 * 1024;
 
 /** Requests that are not somebody reading a page. Counting these is the difference
  *  between "412 visitors" and "412 visitors and 38,000 stylesheet fetches". */
@@ -57,7 +60,7 @@ export async function ingestEdgeVisits(now = Date.now()): Promise<{ recorded: nu
     const settings = await getAnalyticsSettings();
     if (!settings.ingestEdgeLog) return { recorded: 0 };
 
-    const raw = await readLogTail();
+    const raw = await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES);
     if (!raw) return { recorded: 0 };
 
     const routes = await hostRoutes();
@@ -141,9 +144,16 @@ async function hostRoutes(): Promise<Map<string, { siteId: string }>> {
         select: { id: true, name: true, domains: { select: { hostname: true, enabled: true } } }
     });
     for (const application of applications) {
-        const hostnames = application.domains.filter((domain) => domain.enabled).map((domain) => domain.hostname.toLowerCase());
+        const hostnames = application.domains
+            .filter((domain) => domain.enabled)
+            .map((domain) => domain.hostname.toLowerCase());
         if (hostnames.length === 0) continue;
-        const site = await ensureAnalyticsSite("application", application.id, application.name, hostnames);
+        const site = await ensureAnalyticsSite(
+            "application",
+            application.id,
+            application.name,
+            hostnames
+        );
         for (const hostname of hostnames) routes.set(hostname, { siteId: site.id });
     }
 
@@ -151,7 +161,12 @@ async function hostRoutes(): Promise<Map<string, { siteId: string }>> {
     // reaching the dashboard with the same screen they use for everything else.
     const own = await dashboardHosts().catch(() => [] as string[]);
     if (own.length > 0) {
-        const site = await ensureAnalyticsSite("polaris", "", "Polaris", own.map((host) => host.toLowerCase()));
+        const site = await ensureAnalyticsSite(
+            "polaris",
+            "",
+            "Polaris",
+            own.map((host) => host.toLowerCase())
+        );
         for (const host of own) routes.set(host.toLowerCase(), { siteId: site.id });
     }
     return routes;
@@ -164,7 +179,9 @@ async function readCursor(): Promise<EdgeCursor> {
         const saved = JSON.parse(raw) as Partial<EdgeCursor>;
         return {
             at: typeof saved.at === "number" && Number.isFinite(saved.at) ? saved.at : 0,
-            seen: Array.isArray(saved.seen) ? saved.seen.filter((key): key is string => typeof key === "string") : []
+            seen: Array.isArray(saved.seen)
+                ? saved.seen.filter((key): key is string => typeof key === "string")
+                : []
         };
     } catch {
         return { at: 0, seen: [] };
@@ -173,18 +190,6 @@ async function readCursor(): Promise<EdgeCursor> {
 
 async function writeCursor(cursor: EdgeCursor): Promise<void> {
     await setSetting(CURSOR_KEY, JSON.stringify(cursor));
-}
-
-async function readLogTail(): Promise<string> {
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return "";
-    }
-    if (raw.length <= TAIL_BYTES) return raw;
-    const cut = raw.slice(raw.length - TAIL_BYTES);
-    return cut.slice(cut.indexOf("\n") + 1);
 }
 
 // --- rollup and retention ---------------------------------------------------
@@ -254,7 +259,15 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
             const key = `${dimension}\t${value}`;
             let found = cells.get(key);
             if (!found) {
-                found = { dimension, value, visitors: new Set(), views: 0, bounces: 0, durationSec: 0, measured: 0 };
+                found = {
+                    dimension,
+                    value,
+                    visitors: new Set(),
+                    views: 0,
+                    bounces: 0,
+                    durationSec: 0,
+                    measured: 0
+                };
                 cells.set(key, found);
             }
             return found;
@@ -262,7 +275,10 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
 
         for (const session of sessions) {
             const views = viewsPerSession.get(session.id) ?? 0;
-            const length = Math.max(0, Math.round((session.lastSeenAt.getTime() - session.startedAt.getTime()) / 1000));
+            const length = Math.max(
+                0,
+                Math.round((session.lastSeenAt.getTime() - session.startedAt.getTime()) / 1000)
+            );
             const bounced = views <= 1 ? 1 : 0;
 
             const total = cell("total", "");
@@ -306,7 +322,11 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
         // for a value that no longer appears.
         await prisma.analyticsDay.deleteMany({ where: { siteId: site.id, day: new Date(from) } });
         const rows = [...cells.values()]
-            .filter((entry) => entry.dimension === "total" || ROLLUP_DIMENSIONS.includes(entry.dimension as VisitDimension))
+            .filter(
+                (entry) =>
+                    entry.dimension === "total" ||
+                    ROLLUP_DIMENSIONS.includes(entry.dimension as VisitDimension)
+            )
             .map((entry) => ({
                 siteId: site.id,
                 day: new Date(from),
@@ -330,7 +350,9 @@ export async function rollupAnalyticsDay(day: number): Promise<{ sites: number }
  * Order matters and is the reason these are one function: pruning before the rollup
  * would delete the only copy of a day nobody had summarised yet.
  */
-export async function pruneAnalytics(now = Date.now()): Promise<{ days: number; sessions: number }> {
+export async function pruneAnalytics(
+    now = Date.now()
+): Promise<{ days: number; sessions: number }> {
     const settings = await getAnalyticsSettings();
     const cutoff = visitDay(now) - settings.retentionDays * 86_400_000;
 
@@ -345,7 +367,11 @@ export async function pruneAnalytics(now = Date.now()): Promise<{ days: number; 
     if (oldest) {
         // Bounded per pass so a first run against months of history does not hold the
         // process for minutes; the rest is picked up on the following ticks.
-        for (let day = visitDay(oldest.startedAt.getTime()); day < visitDay(now) && days < 7; day += 86_400_000) {
+        for (
+            let day = visitDay(oldest.startedAt.getTime());
+            day < visitDay(now) && days < 7;
+            day += 86_400_000
+        ) {
             const already = await prisma.analyticsDay.findFirst({
                 where: { day: new Date(day), dimension: "total" },
                 select: { id: true }
@@ -356,7 +382,9 @@ export async function pruneAnalytics(now = Date.now()): Promise<{ days: number; 
         }
     }
 
-    const removed = await prisma.analyticsSession.deleteMany({ where: { lastSeenAt: { lt: new Date(cutoff) } } });
+    const removed = await prisma.analyticsSession.deleteMany({
+        where: { lastSeenAt: { lt: new Date(cutoff) } }
+    });
     return { days, sessions: removed.count };
 }
 

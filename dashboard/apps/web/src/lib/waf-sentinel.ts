@@ -12,6 +12,7 @@
  */
 
 import { pruneReputation } from "@/lib/reputation";
+import { trimEdgeLog } from "@/lib/edge-access-log";
 import { runWafJails } from "@/lib/waf-ban-service";
 import { runSshJails } from "@/lib/waf-ssh-service";
 import { armPolarisPresets } from "@/lib/waf-service";
@@ -64,6 +65,17 @@ export function startWafSentinel(): void {
             if (ticks % MAINTENANCE_EVERY_TICKS === 0) {
                 await refreshWafFeeds();
                 await pruneWafBans();
+                // Nothing else bounds the edge's log. Traefik does not rotate
+                // its own, and a machine whose disk it fills cannot pull an
+                // image or start a container - which is how this was found. A
+                // no-op where the log is mounted read-only, which is every
+                // installation that has not been updated since.
+                const freed = await trimEdgeLog();
+                if (freed > 0) {
+                    console.info(
+                        `polaris: trimmed the edge access log, ${Math.round(freed / (1024 * 1024))} MB reclaimed`
+                    );
+                }
                 await pruneAddressReputation();
                 // The platform-wide answer cache is swept here too. It is not the
                 // firewall's, but this is the only hourly pass in the process, and

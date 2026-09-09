@@ -8,15 +8,13 @@
  * only thing that persists is a ban, which is a decision rather than an observation.
  */
 
-import { readFile } from "node:fs/promises";
 import { parseHttpLogs } from "@polaris/deploy";
+import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { detectWafAnomalies, type WafAnomaly, type WafAnomalyOptions } from "@polaris/core";
 import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
 
-const ACCESS_LOG_FILE = process.env.POLARIS_TRAEFIK_ACCESSLOG ?? "/traefik-log/access.log";
 const SETTINGS_KEY = "waf.anomalies";
-const TAIL_BYTES = 4 * 1024 * 1024;
 
 /** The window the detector judges. Long enough that a baseline means something,
  *  short enough that a burst is still visible in it rather than averaged away. */
@@ -77,7 +75,7 @@ export async function setWafAnomalySettings(settings: WafAnomalySettings): Promi
 export async function currentWafAnomalies(now = Date.now()): Promise<WafAnomaly[]> {
     const settings = await getWafAnomalySettings();
     if (!settings.enabled) return [];
-    const raw = await readLogTail();
+    const raw = await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES);
     if (!raw) return [];
     const exempt = await wafTrustedAddresses();
     return detectWafAnomalies(parseHttpLogs(raw), now - WINDOW_MS, now, { ...settings, exempt });
@@ -88,7 +86,9 @@ export async function currentWafAnomalies(now = Date.now()): Promise<WafAnomaly[
  * findings when the operator has asked for that, and reports how many it saw either
  * way so the tick can say something useful.
  */
-export async function runWafAnomalies(now = Date.now()): Promise<{ found: number; banned: number }> {
+export async function runWafAnomalies(
+    now = Date.now()
+): Promise<{ found: number; banned: number }> {
     const settings = await getWafAnomalySettings();
     if (!settings.enabled) return { found: 0, banned: 0 };
     const anomalies = await currentWafAnomalies(now);
@@ -112,18 +112,6 @@ export async function runWafAnomalies(now = Date.now()): Promise<{ found: number
     }
     if (worst.size > 0) await publishWafIntel();
     return { found: anomalies.length, banned: worst.size };
-}
-
-async function readLogTail(): Promise<string> {
-    let raw: string;
-    try {
-        raw = await readFile(ACCESS_LOG_FILE, "utf8");
-    } catch {
-        return "";
-    }
-    if (raw.length <= TAIL_BYTES) return raw;
-    const cut = raw.slice(raw.length - TAIL_BYTES);
-    return cut.slice(cut.indexOf("\n") + 1);
 }
 
 function clamp(value: unknown, min: number, max: number, fallback: number): number {
