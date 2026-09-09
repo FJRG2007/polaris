@@ -41,10 +41,10 @@ export async function writeDocx(
     title: string,
     blocks: readonly core.DocBlock[]
 ): Promise<Uint8Array> {
-    const [{ buildBlankDocx, generateParagraphXml }, JSZipModule] = await Promise.all([
-        import("@polaris/docx"),
-        Promise.resolve(JSZip)
-    ]);
+    const [
+        { buildBlankDocx, generateParagraphXml, BLANK_BULLET_NUM_ID, BLANK_ORDERED_NUM_ID },
+        JSZipModule
+    ] = await Promise.all([import("@polaris/docx"), Promise.resolve(JSZip)]);
 
     const zip = await JSZipModule.loadAsync(await buildBlankDocx());
     const part = zip.file("word/document.xml");
@@ -73,11 +73,19 @@ export async function writeDocx(
         if (heading) {
             return { type: "heading" as const, level: Number(heading[1]), runs };
         }
-        if (kind === "li") {
+        // Both numberings the blank package carries, under the ids it gave
+        // them: a numbered list written against the bullet one is a procedure
+        // whose steps arrive as dashes.
+        if (kind === "li" || kind === "oli") {
+            const bulleted = kind === "li";
             return {
                 type: "listItem" as const,
                 level: 0,
-                list: { kind: "bullet" as const, numId: "1", ilvl: 0 },
+                list: {
+                    kind: bulleted ? ("bullet" as const) : ("ordered" as const),
+                    numId: bulleted ? BLANK_BULLET_NUM_ID : BLANK_ORDERED_NUM_ID,
+                    ilvl: 0
+                },
                 runs
             };
         }
@@ -182,7 +190,10 @@ export async function writePptx(
             /<Relationship[^>]*relationships\/slide"[^>]*\/>/g,
             ""
         );
-        zip.file("ppt/_rels/presentation.xml.rels", relsXml.replace("</Relationships>", `${links}</Relationships>`));
+        zip.file(
+            "ppt/_rels/presentation.xml.rels",
+            relsXml.replace("</Relationships>", `${links}</Relationships>`)
+        );
     }
 
     // Every slide past the first needs its content type declared, or a reader
@@ -196,10 +207,7 @@ export async function writePptx(
                     `<Override PartName='/ppt/slides/slide${index + 2}.xml' ContentType='application/vnd.openxmlformats-officedocument.presentationml.slide+xml'/>`
             )
             .join("");
-        const types = (await typesPart.async("string")).replace(
-            "</Types>",
-            `${overrides}</Types>`
-        );
+        const types = (await typesPart.async("string")).replace("</Types>", `${overrides}</Types>`);
         zip.file("[Content_Types].xml", types);
     }
 

@@ -15,8 +15,13 @@
 
 /** One block of a document, flattened out of the editor's tree. */
 export interface DocBlock {
-    /** "p" for a paragraph, "h1".."h6" for a heading, "li" for a list item,
-     *  "code" for a code block, "quote" for a quotation. */
+    /** "p" for a paragraph, "h1".."h6" for a heading, "li" for a bulleted list
+     *  item, "oli" for a numbered one, "code" for a code block, "quote" for a
+     *  quotation.
+     *
+     *  The two kinds of list item are two kinds because the difference is what
+     *  the document SAYS rather than how it looks: a procedure whose steps
+     *  arrive as bullets stops saying that they are in an order. */
     readonly kind: string;
     readonly text: string;
 }
@@ -73,15 +78,22 @@ function escapeMarkdown(text: string): string {
 export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
     const lines: string[] = [];
     if (title.trim()) lines.push(`# ${title.trim()}`, "");
+    // Where a numbered list has got to. Reset by anything that is not one of
+    // its items, because two procedures separated by a paragraph are two
+    // procedures and the second one starts at 1.
+    let counted = 0;
     for (const block of blocks) {
         const text = block.text.trim();
         if (!text) {
             continue;
         }
+        counted = block.kind === "oli" ? counted + 1 : 0;
         if (/^h[1-6]$/.test(block.kind)) {
             lines.push(`${"#".repeat(Number(block.kind.slice(1)))} ${text}`, "");
         } else if (block.kind === "li") {
             lines.push(`- ${escapeMarkdown(text)}`);
+        } else if (block.kind === "oli") {
+            lines.push(`${counted}. ${escapeMarkdown(text)}`);
         } else if (block.kind === "quote") {
             lines.push(`> ${text}`, "");
         } else if (block.kind === "code") {
@@ -90,7 +102,10 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
             lines.push(escapeMarkdown(text), "");
         }
     }
-    return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
+    return `${lines
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trimEnd()}\n`;
 }
 
 /** A table, as Markdown. The separator row is what makes it a table rather than
@@ -138,16 +153,23 @@ export function escapeHtml(text: string): string {
 export function toHtml(title: string, blocks: readonly DocBlock[]): string {
     const body: string[] = [];
     let list: string[] | null = null;
+    let listTag: "ul" | "ol" = "ul";
     const closeList = (): void => {
         if (!list) return;
-        body.push(`<ul>${list.join("")}</ul>`);
+        body.push(`<${listTag}>${list.join("")}</${listTag}>`);
         list = null;
     };
 
     for (const block of blocks) {
         const text = block.text.trim();
         if (!text) continue;
-        if (block.kind === "li") {
+        if (block.kind === "li" || block.kind === "oli") {
+            const tag = block.kind === "li" ? "ul" : "ol";
+            // A bulleted list running into a numbered one is two lists, and
+            // putting the second one's items inside the first would draw them
+            // with the wrong marker.
+            if (listTag !== tag) closeList();
+            listTag = tag;
             list = list ?? [];
             list.push(`<li>${escapeHtml(text)}</li>`);
             continue;

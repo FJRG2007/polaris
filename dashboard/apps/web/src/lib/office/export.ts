@@ -31,8 +31,8 @@ import * as Y from "yjs";
 import * as XLSX from "xlsx";
 import * as deck from "./deck";
 import * as core from "@polaris/core";
-import { OFFICE_FIELDS, openDocument } from "./content";
 import { writeDocx, writePptx } from "./ooxml";
+import { OFFICE_FIELDS, openDocument } from "./content";
 
 /** A finished export, ready to be a response. */
 export interface ExportedFile {
@@ -70,9 +70,16 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
 
         const name = node.nodeName;
         // A container: its children are the blocks, and they carry its kind when
-        // they have none of their own.
-        if (name === "bulletList" || name === "orderedList" || name === "listItem") {
-            for (const child of node.toArray()) walk(child, "li");
+        // they have none of their own. Which list it is has to travel with them:
+        // an item that reaches a writer as "li" is written with a bullet, and a
+        // procedure whose steps arrive as bullets stops saying they are in an
+        // order.
+        if (name === "bulletList" || name === "orderedList") {
+            for (const child of node.toArray()) walk(child, name === "bulletList" ? "li" : "oli");
+            return;
+        }
+        if (name === "listItem") {
+            for (const child of node.toArray()) walk(child, inherited || "li");
             return;
         }
         if (name === "blockquote") {
@@ -106,7 +113,10 @@ function sheetGrids(doc: Y.Doc): { name: string; rows: string[][] }[] {
         if (!at) continue;
         const held = bySheet.get(at.sheetId) ?? new Map<string, string>();
         const value = cell?.v;
-        held.set(`${at.row}:${at.column}`, value === undefined || value === null ? "" : String(value));
+        held.set(
+            `${at.row}:${at.column}`,
+            value === undefined || value === null ? "" : String(value)
+        );
         bySheet.set(at.sheetId, held);
     }
 
@@ -148,7 +158,10 @@ function readCellKey(key: string): { sheetId: string; row: number; column: numbe
  * Generated ids are unreadable anyway, so they become "Sheet 1".
  */
 function sheetName(sheetId: string, index: number): string {
-    const cleaned = sheetId.replace(/[:\\/?*[\]]/g, " ").trim().slice(0, 31);
+    const cleaned = sheetId
+        .replace(/[:\\/?*[\]]/g, " ")
+        .trim()
+        .slice(0, 31);
     return /^[0-9a-f-]{8,}$/i.test(sheetId) || !cleaned ? `Sheet ${index}` : cleaned;
 }
 
@@ -230,7 +243,11 @@ export async function exportDocument(
         if (format === "md") return text(core.toMarkdown(title, blocks), "md");
         if (format === "html") return text(core.toHtml(title, blocks), "html");
         if (format === "docx") {
-            return { bytes: await writeDocx(title, blocks), filename: named("docx"), contentType: type };
+            return {
+                bytes: await writeDocx(title, blocks),
+                filename: named("docx"),
+                contentType: type
+            };
         }
         return null;
     }

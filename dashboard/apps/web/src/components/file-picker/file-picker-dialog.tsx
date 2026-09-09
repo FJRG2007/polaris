@@ -77,11 +77,16 @@ const KINDS: readonly { id: string; label: string; matches: RegExp }[] = [
 export function FilePickerDialog({
     onPick,
     onClose,
+    accept,
     multiple = true,
     title = "Attach a file"
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
+    /** The extensions the screen can take, written as a file input's `accept`.
+     *  The listing hides everything else, so a file this screen cannot use is
+     *  not chosen and then refused after the round trip that fetched it. */
+    accept?: string;
     multiple?: boolean;
     title?: string;
 }) {
@@ -165,13 +170,25 @@ export function FilePickerDialog({
         return () => clearTimeout(timer);
     }, [browsing, tab, active, path, query]);
 
+    /** Whether one name is something the screen asked for. Nothing when it asked
+     *  for anything, which is most screens. */
+    const takes = useMemo(() => {
+        const extensions = (accept ?? "")
+            .split(",")
+            .map((one) => one.trim().toLowerCase())
+            .filter((one) => one.startsWith("."));
+        if (extensions.length === 0) return null;
+        return (name: string) => extensions.some((one) => name.toLowerCase().endsWith(one));
+    }, [accept]);
+
     const shown = useMemo(() => {
         const filter = KINDS.find((one) => one.id === kind);
         return entries.filter((entry) => {
             if (entry.kind === "dir") return !filter;
+            if (takes && !takes(entry.name)) return false;
             return !filter || filter.matches.test(entry.name);
         });
-    }, [entries, kind]);
+    }, [entries, kind, takes]);
 
     const toggle = useCallback(
         (entry: Entry) => {
@@ -417,6 +434,7 @@ export function FilePickerDialog({
                                     <input
                                         ref={file}
                                         type="file"
+                                        accept={accept}
                                         multiple={multiple}
                                         className="hidden"
                                         onChange={(event) => fromComputer(event.target.files)}
