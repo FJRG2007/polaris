@@ -34,10 +34,35 @@ export function pageIsDark(): boolean {
 
 /** Call `onChange` whenever the page's theme moves, and answer with the way to
  *  stop listening. Both sources: somebody choosing a theme here, which rewrites
- *  the class, and the system changing under a browser set to follow it. */
+ *  the class, and the system changing under a browser set to follow it.
+ *
+ *  **It reports a change, not a mutation, and the difference is the whole
+ *  function.** What is watched is the class attribute of the root, which several
+ *  things write for reasons that have nothing to do with the theme - and one of
+ *  the listeners is an embedded editor whose own dark mode writes a class onto
+ *  that same element. Told about every mutation, that listener answers each one
+ *  with a write, which is another mutation: an unbounded synchronous loop, and a
+ *  browser that stops responding rather than reporting anything. So the last
+ *  answer is kept and `onChange` runs only when this one differs, which is what
+ *  a listener whose own write touches that class attribute needs: the write is
+ *  a mutation, but it is not a change, so it reaches nobody.
+ *
+ *  The boundary is worth knowing before this is relied on. What is ruled out is
+ *  a listener that writes something the theme is not read from - a `univer-dark`,
+ *  a scroll lock, a menu's open class. A listener that wrote `light` or `system`
+ *  onto the root would genuinely flip the answer every time, and each callback
+ *  would then be a real change: that is a listener setting the theme from inside
+ *  the notification that the theme moved, and nothing here can make it terminate.
+ *  There is none, and one would be a bug in the listener. */
 export function watchPageTheme(onChange: (dark: boolean) => void): () => void {
     if (typeof document === "undefined") return () => undefined;
-    const tell = () => onChange(pageIsDark());
+    let last = pageIsDark();
+    const tell = (): void => {
+        const dark = pageIsDark();
+        if (dark === last) return;
+        last = dark;
+        onChange(dark);
+    };
     const observer = new MutationObserver(tell);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
