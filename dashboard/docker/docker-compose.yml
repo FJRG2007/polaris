@@ -141,6 +141,9 @@ services:
       # Writable, and only so it can be kept from filling the disk: Traefik does
       # not rotate its own log, so the dashboard trims it in place on its hourly
       # pass (see lib/edge-access-log). Nothing here ever writes a request line.
+      # Dropping :ro is necessary and not sufficient - the file itself is created
+      # by the edge, which runs as root, and this container runs as node. The
+      # edge's entrypoint below is what makes it writable by node's group.
       - polaris-traefik-log:/traefik-log
       # The firewall's address snapshot - bans, Tor exits, flagged addresses - which
       # the dashboard writes and the edge guard reads. Its own volume rather than the
@@ -431,6 +434,32 @@ services:
       DOCKER_API_VERSION: "1.44"
     depends_on:
       - web
+    # Traefik creates the access log itself, as root, mode 0644 - and the
+    # dashboard, which is the only thing that keeps that file from filling the
+    # disk, runs as the unprivileged `node` user (uid/gid 1000). It would open it
+    # r+ and get EACCES, and the trim would be a silent no-op forever, on a fresh
+    # install as much as on an updated one.
+    #
+    # So the file is created here, before Traefik is, owned by node's group and
+    # group-writable. Traefik opens an existing file for append without touching
+    # its mode, so this holds. It runs on every boot rather than once at install:
+    # a volume that already holds a root-owned log from before this is repaired
+    # by the update that delivers it, with nobody typing anything.
+    #
+    # Nothing in it is allowed to keep the edge down - one bad `chmod` must not
+    # be the whole deployment answering nothing - so it is a best-effort prelude
+    # and the exec happens regardless. `--` becomes $0, so the compose command
+    # below arrives as "$@".
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        mkdir -p /var/log/traefik 2>/dev/null;
+        touch /var/log/traefik/access.log 2>/dev/null;
+        chgrp 1000 /var/log/traefik/access.log 2>/dev/null;
+        chmod 0664 /var/log/traefik/access.log 2>/dev/null;
+        exec /entrypoint.sh "$$@"
+      - --
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"

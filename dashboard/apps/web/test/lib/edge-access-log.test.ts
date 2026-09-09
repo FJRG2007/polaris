@@ -103,6 +103,10 @@ describe("keeping it off the disk", () => {
 
         const after = await readFile(path, "utf8");
         expect(after.length).toBeLessThan(before);
+        // What is kept is bounded by the cap, not only by the file: a trim that
+        // keeps everything it read is a trim that leaves the log over the cap.
+        expect(after.length).toBeLessThanOrEqual(1024);
+        expect(freed).toBe(before - after.length);
         expect(after).toContain(line(4999));
         expect(after).not.toContain(line(0));
         // Whole lines only: what is left has to be parseable from its first byte.
@@ -114,5 +118,17 @@ describe("keeping it off the disk", () => {
     it("says nothing was reclaimed when there is no log to trim", async () => {
         pointAt(join(tmpdir(), "polaris-no-such-log", "access.log"));
         expect(await trimEdgeLog(1)).toBe(0);
+    });
+
+    it("keeps nothing rather than half a line when the window holds no line break", async () => {
+        const dir = await mkdtemp(join(tmpdir(), "polaris-edge-log-"));
+        const path = join(dir, "access.log");
+        // One line far longer than what a trim at this cap would keep, so the
+        // window it reads is that line's middle and holds no whole line at all.
+        await writeFile(path, `{"n":"${"x".repeat(4096)}"}\n`);
+        pointAt(path);
+
+        expect(await trimEdgeLog(64)).toBeGreaterThan(0);
+        expect(await readFile(path, "utf8")).toBe("");
     });
 });

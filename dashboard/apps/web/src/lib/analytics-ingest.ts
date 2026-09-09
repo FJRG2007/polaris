@@ -18,14 +18,13 @@
 
 import { prisma } from "@polaris/db";
 import { parseHttpLogs } from "@polaris/deploy";
-import { readEdgeLogTail } from "@/lib/edge-access-log";
+import { EDGE_LOG_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { dashboardHosts } from "@/lib/domain-edge";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { visitDay, type VisitDimension } from "@polaris/core";
 import { ensureAnalyticsSite, getAnalyticsSettings, recordVisit, type AnalyticsScopeType } from "@/lib/analytics-service";
 
 const CURSOR_KEY = "analytics.edgeCursor";
-const TAIL_BYTES = 16 * 1024 * 1024;
 
 /** Requests that are not somebody reading a page. Counting these is the difference
  *  between "412 visitors" and "412 visitors and 38,000 stylesheet fetches". */
@@ -56,7 +55,7 @@ export async function ingestEdgeVisits(now = Date.now()): Promise<{ recorded: nu
     const settings = await getAnalyticsSettings();
     if (!settings.ingestEdgeLog) return { recorded: 0 };
 
-    const raw = await readEdgeLogTail(TAIL_BYTES);
+    const raw = await readEdgeLogTail(EDGE_LOG_WINDOW_BYTES);
     if (!raw) return { recorded: 0 };
 
     const routes = await hostRoutes();

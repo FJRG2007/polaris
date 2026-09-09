@@ -14,7 +14,7 @@
  */
 
 import { parseHttpLogs } from "@polaris/deploy";
-import { readEdgeLogTail } from "@/lib/edge-access-log";
+import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { DEFAULT_WAF_JAILS, detectWafBans, jailBansSignedIn, type WafJail } from "@polaris/core";
 import { addressesSignedIn } from "@/lib/address-accounts";
@@ -26,16 +26,7 @@ import {
     wafTrustedAddresses
 } from "@/lib/waf-intel-service";
 
-/** The edge's per-request access log, the same file the HTTP Logs view reads. */
-
 const JAILS_KEY = "waf.jails";
-
-/**
- * How much of the log tail to read. The longest default window is ten minutes; this
- * is sized to comfortably cover it on a busy instance without loading a log that has
- * been growing for months into memory.
- */
-const TAIL_BYTES = 4 * 1024 * 1024;
 
 /** The configured jails, falling back to the defaults for anything unsaved. Stored
  *  settings are merged onto the shipped list rather than replacing it, so a jail
@@ -86,7 +77,7 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         const [jails, ignore] = await Promise.all([getWafJails(), wafTrustedAddresses()]);
         if (!jails.some((jail) => jail.enabled)) return { scanned: 0, banned: 0 };
 
-        const entries = parseHttpLogs(await readEdgeLogTail(TAIL_BYTES));
+        const entries = parseHttpLogs(await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES));
         if (entries.length === 0) return { scanned: 0, banned: 0 };
 
         const seen = entries.map((entry) => entry.ip).filter((ip) => ip && ip !== "-");

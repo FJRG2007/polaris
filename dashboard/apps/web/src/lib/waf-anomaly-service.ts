@@ -9,13 +9,12 @@
  */
 
 import { parseHttpLogs } from "@polaris/deploy";
-import { readEdgeLogTail } from "@/lib/edge-access-log";
+import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { detectWafAnomalies, type WafAnomaly, type WafAnomalyOptions } from "@polaris/core";
 import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
 
 const SETTINGS_KEY = "waf.anomalies";
-const TAIL_BYTES = 4 * 1024 * 1024;
 
 /** The window the detector judges. Long enough that a baseline means something,
  *  short enough that a burst is still visible in it rather than averaged away. */
@@ -76,7 +75,7 @@ export async function setWafAnomalySettings(settings: WafAnomalySettings): Promi
 export async function currentWafAnomalies(now = Date.now()): Promise<WafAnomaly[]> {
     const settings = await getWafAnomalySettings();
     if (!settings.enabled) return [];
-    const raw = await readEdgeLogTail(TAIL_BYTES);
+    const raw = await readEdgeLogTail(EDGE_LOG_RECENT_WINDOW_BYTES);
     if (!raw) return [];
     const exempt = await wafTrustedAddresses();
     return detectWafAnomalies(parseHttpLogs(raw), now - WINDOW_MS, now, { ...settings, exempt });
