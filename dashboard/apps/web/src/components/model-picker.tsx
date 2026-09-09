@@ -180,7 +180,7 @@ export function ModelPicker({
                         ) : null}
                     </div>
 
-                    <div className="max-h-72 overflow-y-auto p-1">
+                    <div className="max-h-72 overflow-y-auto overscroll-contain p-1">
                         {inheritLabel !== null ? (
                             <Row
                                 label={inheritLabel}

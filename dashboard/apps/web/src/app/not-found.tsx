@@ -40,7 +40,7 @@ export default function NotFound() {
                 </div>
 
                 {pathname ? (
-                    <p className="overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
+                    <p className="overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                         {pathname}
                     </p>
                 ) : null}

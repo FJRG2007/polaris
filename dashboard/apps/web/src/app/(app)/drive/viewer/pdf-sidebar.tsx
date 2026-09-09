@@ -103,12 +103,12 @@ export function PdfSidebar({
                     </PDFSlickThumbnails>
                 </div>
                 {active === "outline" ? (
-                    <div className="min-h-0 flex-1 overflow-auto p-2">
+                    <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
                         <OutlineTree items={outline ?? []} pdfSlick={pdfSlick} depth={0} />
                     </div>
                 ) : null}
                 {active === "files" ? (
-                    <div className="min-h-0 flex-1 overflow-auto p-2">
+                    <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-2">
                         {[...attachments.values()].map((attachment) => (
                             <Button
                                 key={attachment.filename}

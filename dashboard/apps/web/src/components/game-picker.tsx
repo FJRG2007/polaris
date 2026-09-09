@@ -133,7 +133,7 @@ export function GamePicker({
                             />
                         </div>
                     )}
-                    <div role="listbox" className="flex flex-col gap-0.5 overflow-y-auto p-1">
+                    <div role="listbox" className="flex flex-col gap-0.5 overflow-y-auto overscroll-contain p-1">
                         {shown.length === 0 ? (
                             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                                 No game here matches that.

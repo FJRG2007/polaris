@@ -157,7 +157,7 @@ export function ShareDialog({
                             {many ? "them" : "it"} now - {many ? "they are" : "it is"} shown only
                             once.
                         </p>
-                        <div className="flex max-h-64 flex-col gap-2 overflow-auto">
+                        <div className="flex max-h-64 flex-col gap-2 overflow-auto overscroll-contain">
                             {results.map((result) => (
                                 <div key={result.path} className="flex flex-col gap-1">
                                     {many ? (

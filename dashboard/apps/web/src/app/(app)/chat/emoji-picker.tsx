@@ -463,7 +463,7 @@ export function EmojiPicker({
                         />
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
                         {tab === "emoji" ? (
                             query.trim() ? (
                                 found.length === 0 ? (

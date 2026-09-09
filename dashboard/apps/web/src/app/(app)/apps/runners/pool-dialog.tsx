@@ -229,7 +229,7 @@ export function PoolDialog({ servers }: { servers: ServerOption[] }) {
                     <Plus className="size-4" /> Add a pool
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>New runner pool</DialogTitle>
                     <DialogDescription>

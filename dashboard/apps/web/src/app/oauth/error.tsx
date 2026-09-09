@@ -57,7 +57,7 @@ export default function OauthError({ error }: { error: Error & { digest?: string
                         anything with, under a heading that already says what
                         happened. */}
                     {error.message && !staleBuild ? (
-                        <p className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
+                        <p className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                             {error.message}
                         </p>
                     ) : null}

@@ -362,7 +362,7 @@ export function SessionDetail({ session, events, messages }: Props) {
                     <CardBody>
                         <pre
                             ref={screenRef}
-                            className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
+                            className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
                         >
                             {screen || "Nothing on it yet."}
                         </pre>

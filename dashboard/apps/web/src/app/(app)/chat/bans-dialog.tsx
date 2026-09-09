@@ -96,7 +96,7 @@ export function BansDialog({
                         description="Banning somebody from this space puts them here, so they can be let back in."
                     />
                 ) : (
-                    <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+                    <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto overscroll-contain">
                         {bans.map((ban) => (
                             <PersonRow
                                 as="li"

@@ -111,7 +111,7 @@ export function InviteDialog({
 
     return (
         <Dialog open onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>Invite someone</DialogTitle>
                     <DialogDescription>

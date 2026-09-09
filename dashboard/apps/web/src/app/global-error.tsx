@@ -42,7 +42,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                             </p>
                         </div>
                         {error.message && !staleBuild ? (
-                            <p className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
+                            <p className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs text-muted-foreground">
                                 {error.message}
                             </p>
                         ) : null}

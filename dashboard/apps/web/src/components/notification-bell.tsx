@@ -90,7 +90,7 @@ export function NotificationBell() {
                 {items.length === 0 ? (
                     <p className="px-2 py-6 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
                 ) : (
-                    <div className="max-h-80 overflow-auto">
+                    <div className="max-h-80 overflow-auto overscroll-contain">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
                             const audience = describeAudience(item.audience, item.audienceLabel);
                             return (

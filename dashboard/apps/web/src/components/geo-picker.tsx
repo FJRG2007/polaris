@@ -104,7 +104,7 @@ export function GeoPicker({
                         }}
                     />
                     {open && suggestions.length > 0 ? (
-                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option) => (
                                 <li key={option.code}>
                                     <button

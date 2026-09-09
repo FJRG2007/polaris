@@ -180,7 +180,7 @@ export function ContactsView({ initialContacts }: { initialContacts: ContactView
                             />
                         </div>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                         {filtered.length === 0 ? (
                             <p className="p-4 text-sm text-muted-foreground">
                                 {contacts.length === 0 ? "No contacts yet." : "No matches."}

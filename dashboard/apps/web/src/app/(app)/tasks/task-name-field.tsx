@@ -67,7 +67,7 @@ export const TaskNameField = forwardRef<HTMLTextAreaElement, Props>(function Tas
             // box drops a flex item's automatic minimum size to zero, and inside the
             // panel's own scrolling column this was crushed to nothing.
             className={cn(
-                "w-full max-h-32 shrink-0 resize-none overflow-y-auto bg-transparent text-xl font-semibold leading-tight outline-none",
+                "w-full max-h-32 shrink-0 resize-none overflow-y-auto overscroll-contain bg-transparent text-xl font-semibold leading-tight outline-none",
                 className
             )}
         />

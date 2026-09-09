@@ -1193,7 +1193,7 @@ function AddressDialog({
                             ) : null}
                         </div>
 
-                        <div className="max-h-80 overflow-auto rounded-md border border-border">
+                        <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border">
                             <table className="w-full min-w-[34rem] text-xs">
                                 <thead className="sticky top-0 bg-card">
                                     <tr className="text-left text-muted-foreground">

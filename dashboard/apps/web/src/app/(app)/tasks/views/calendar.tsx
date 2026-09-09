@@ -248,7 +248,7 @@ function MonthGrid({
                 ))}
             </div>
             <div
-                className="grid min-h-0 flex-1 grid-cols-7 gap-px overflow-y-auto bg-border"
+                className="grid min-h-0 flex-1 grid-cols-7 gap-px overflow-y-auto overscroll-contain bg-border"
                 style={{ gridAutoRows: "minmax(4.5rem, 1fr)" }}
             >
                 {days.map((day) => {
@@ -410,7 +410,7 @@ function TimeGrid({
                 </div>
             </div>
 
-            <div ref={scroller} className={cn("min-h-0 flex-1 overflow-y-auto", scope === "week" && "overflow-x-auto")}>
+            <div ref={scroller} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", scope === "week" && "overflow-x-auto")}>
                 <div className={cn("flex", scope === "week" && "min-w-[42rem]")}>
                     <div className="w-12 shrink-0 sm:w-14">
                         {HOURS.map((hour) => (

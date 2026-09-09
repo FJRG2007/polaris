@@ -49,7 +49,7 @@ export function SavedView() {
                 <span className="text-sm font-semibold">Saved</span>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
                 {messages === null ? (
                     <div className="flex flex-col gap-2" aria-hidden="true">
                         {[0, 1, 2].map((row) => (

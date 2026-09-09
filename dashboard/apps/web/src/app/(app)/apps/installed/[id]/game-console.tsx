@@ -348,7 +348,7 @@ export function GameConsole({
                 />
 
                 {replies.length > 0 && (
-                    <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-surface p-2 font-mono text-xs">
+                    <div className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface p-2 font-mono text-xs">
                         {replies.map((reply, index) => (
                             <div key={`${reply.command}-${index}`} className="flex flex-col">
                                 <span className="text-muted-foreground">&gt; {reply.command}</span>
@@ -434,7 +434,7 @@ export function GameConsole({
                         // the caret has to measure text in a font it does not own,
                         // and being a few pixels wrong there is worse than being
                         // deliberately left-aligned here.
-                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto rounded-md border border-border-strong bg-surface py-1 shadow-popover">
+                        <ul className="absolute bottom-full left-0 z-10 mb-1 max-h-48 w-full max-w-md overflow-y-auto overscroll-contain rounded-md border border-border-strong bg-surface py-1 shadow-popover">
                             {suggestions.map((option, index) => (
                                 <li key={option}>
                                     <button
@@ -485,7 +485,7 @@ export function GameConsole({
                                 <History className="size-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                        <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto overscroll-contain">
                             <DropdownMenuLabel>Commands you have run</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {past.length === 0 ? (

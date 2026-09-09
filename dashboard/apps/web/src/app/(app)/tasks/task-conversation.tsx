@@ -286,7 +286,7 @@ export function ActivityStream({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className="flex flex-col gap-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto"
+                className="flex flex-col gap-4 p-4 md:min-h-0 md:flex-1 md:overflow-y-auto overscroll-contain"
             >
                 {stream.length === 0 && (
                     <p className="text-xs text-muted-foreground">Nothing has happened here yet.</p>

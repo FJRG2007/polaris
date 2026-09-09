@@ -174,7 +174,7 @@ export function EmailChannelDialog({
                     <DialogDescription>{info.summary}</DialogDescription>
                 </DialogHeader>
 
-                <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto">
+                <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">Provider</span>
                         <Select

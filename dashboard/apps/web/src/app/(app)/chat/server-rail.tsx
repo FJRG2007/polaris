@@ -187,7 +187,7 @@ export function ServerRail() {
 
             <span className="h-px w-6 shrink-0 bg-border" />
 
-            <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto no-scrollbar">
+            <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain no-scrollbar">
                 {spaces.map((space) => (
                     <SpaceMenu
                         key={space.id}

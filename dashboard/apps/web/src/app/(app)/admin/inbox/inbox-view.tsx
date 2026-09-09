@@ -132,7 +132,7 @@ export function InboxView({
                         active && "hidden md:flex"
                     )}
                 >
-                    <CardBody className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+                    <CardBody className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-2">
                         {conversations.length === 0 ? (
                             <div className="flex flex-col items-start gap-2 p-3">
                                 <p className="text-sm text-muted-foreground">
@@ -437,7 +437,7 @@ function Thread({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3"
+                className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3"
             >
                 {messages.map((message) => (
                     <MessageBubble key={message.id} message={message} />

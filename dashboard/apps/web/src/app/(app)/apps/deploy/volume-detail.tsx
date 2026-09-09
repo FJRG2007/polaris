@@ -232,7 +232,7 @@ export function VolumeDetailDialog({
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-5 py-4">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
                     {error && <p className="text-sm text-danger">{error}</p>}
 
                     {!volume && !error && (

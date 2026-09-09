@@ -195,7 +195,7 @@ function ResetDialog({
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <RotateCcw className="size-4" /> Start this server over

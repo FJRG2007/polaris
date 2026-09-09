@@ -96,7 +96,7 @@ export function EdgePanel({ hostId }: { hostId: string }) {
             )}
 
             {log && (
-                <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
+                <pre className="max-h-40 overflow-auto overscroll-contain rounded-md bg-muted/50 px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
                     {log.trim()}
                 </pre>
             )}

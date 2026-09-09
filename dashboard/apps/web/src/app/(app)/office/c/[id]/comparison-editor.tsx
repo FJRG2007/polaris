@@ -91,7 +91,7 @@ export function ComparisonEditor({
     );
 
     return (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
             <div className="mx-auto w-full max-w-6xl p-4 sm:p-6">
                 {/* Two ways of reading the same answers, and both are the point:
                     the table is where the work is done and the map is what the

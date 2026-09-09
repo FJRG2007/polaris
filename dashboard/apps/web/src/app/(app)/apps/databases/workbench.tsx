@@ -286,7 +286,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                     />
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-border">
                     {relations === null ? (
                         <div className="flex flex-col gap-2 p-3" aria-hidden="true">
                             {[0, 1, 2, 3, 4].map((row) => (
@@ -384,7 +384,7 @@ export function Workbench({ connectionId, readOnly }: { connectionId: string; re
                                         readOnly={readOnly}
                                     />
                                 ) : entry.kind === "stats" ? (
-                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                                         <StatsPanel connectionId={connectionId} />
                                     </div>
                                 ) : (
@@ -784,7 +784,7 @@ function RowsPanel({
                 </p>
             )}
 
-            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border">
                 {page === null ? (
                     <div className="flex flex-col gap-2 p-3" aria-hidden="true">
                         {[0, 1, 2, 3, 4, 5].map((row) => (
@@ -1006,11 +1006,11 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </Button>
                 </div>
                 {value.value !== null ? (
-                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
+                    <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
                         {value.value}
                     </pre>
                 ) : value.entries ? (
-                    <div className="max-h-64 overflow-auto rounded border border-border">
+                    <div className="max-h-64 overflow-auto overscroll-contain rounded border border-border">
                         <table className="w-full text-xs">
                             <tbody>
                                 {value.entries.map((entry, index) => (
@@ -1131,7 +1131,7 @@ function QueryPanel({
                 </p>
             )}
 
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto overscroll-contain">
                 {results?.map((result, index) => (
                     <div key={index} className="rounded-lg border border-border">
                         <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
@@ -1144,7 +1144,7 @@ function QueryPanel({
                             </span>
                         </div>
                         {result.rows.length > 0 && (
-                            <div className="max-h-72 overflow-auto">
+                            <div className="max-h-72 overflow-auto overscroll-contain">
                                 <table className="w-full text-xs">
                                     <thead className="bg-surface/60 text-left text-muted-foreground">
                                         <tr>

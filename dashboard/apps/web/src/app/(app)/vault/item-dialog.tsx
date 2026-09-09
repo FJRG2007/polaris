@@ -265,7 +265,7 @@ export function ItemDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto pr-1">
+                <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
                     <div className="grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1 text-sm">
                             Kind

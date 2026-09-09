@@ -375,7 +375,7 @@ export function ThreadView({
                 </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
                 <ul className="space-y-1.5">
                     {shown.map((entry) =>
                         entry.kind === "gap" ? (

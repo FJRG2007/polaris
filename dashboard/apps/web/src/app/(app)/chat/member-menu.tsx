@@ -396,7 +396,7 @@ export function MemberMenu({
                                     <UserPlus className="size-3.5" />
                                     Invite to a server
                                 </menu.SubTrigger>
-                                <menu.SubContent className="max-h-72 overflow-y-auto">
+                                <menu.SubContent className="max-h-72 overflow-y-auto overscroll-contain">
                                     {invitable.map((entry) => (
                                         <menu.Item
                                             key={entry.id}

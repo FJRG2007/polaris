@@ -288,7 +288,7 @@ export function FilePickerDialog({
                                         </button>
                                     ) : null}
 
-                                    <ul className="min-h-0 flex-1 overflow-y-auto p-1">
+                                    <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
                                         {loading ? (
                                             <li className="flex items-center justify-center py-8 text-muted-foreground">
                                                 <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />

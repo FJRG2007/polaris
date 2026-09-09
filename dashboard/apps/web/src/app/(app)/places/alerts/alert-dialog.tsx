@@ -256,7 +256,7 @@ export function AlertDialog({
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
                             Tell<span className="text-danger"> *</span>
                         </span>
-                        <div className="flex max-h-40 flex-col gap-2 overflow-y-auto rounded-md border border-border p-2">
+                        <div className="flex max-h-40 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                             {people.map((person) => (
                                 <label
                                     key={person.id}

@@ -372,7 +372,7 @@ export function ChannelMembers({
                             {heading}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="max-h-[60vh] overflow-y-auto">
+                    <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
                         <MemberRows
                             members={members}
                             loading={loading}
@@ -405,7 +405,7 @@ export function ChannelMembers({
                     <X className="size-4" />
                 </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <MemberRows
                     members={members}
                     loading={loading}

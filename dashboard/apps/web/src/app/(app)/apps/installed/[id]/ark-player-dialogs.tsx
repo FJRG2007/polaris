@@ -418,7 +418,7 @@ export function ArkGiveDialog({
                     </p>
                 )}
                 {queued.length > 0 && (
-                    <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto">
+                    <ul className="flex max-h-32 flex-col gap-1 overflow-y-auto overscroll-contain">
                         {queued.map((line, index) => (
                             <li
                                 key={`${line.key}-${index}`}

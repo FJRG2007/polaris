@@ -164,7 +164,7 @@ export function RecipientField({
                 ) : null}
 
                 {suggestions.length > 0 ? (
-                    <ul className="absolute left-14 right-0 z-50 mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-elevated py-1 shadow-popover">
+                    <ul className="absolute left-14 right-0 z-50 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-md border border-border bg-elevated py-1 shadow-popover">
                         {suggestions.map((entry, index) => (
                             <li key={entry.address}>
                                 <button

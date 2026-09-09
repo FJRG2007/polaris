@@ -53,7 +53,7 @@ export function MailOnboarding({
     const [connecting, setConnecting] = useState(false);
 
     return (
-        <div className="flex h-full items-center justify-center overflow-y-auto p-6">
+        <div className="flex h-full items-center justify-center overflow-y-auto overscroll-contain p-6">
             <div className="w-full max-w-md">
                 <div className="mb-5 flex size-10 items-center justify-center rounded-lg border border-border bg-card">
                     <Inbox className="size-5 shrink-0 text-foreground" aria-hidden />

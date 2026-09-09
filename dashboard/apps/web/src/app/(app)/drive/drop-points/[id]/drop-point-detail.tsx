@@ -498,7 +498,7 @@ function FilesTab({
     return (
         <Card>
             <CardBody className="p-0">
-                <div className="max-h-[55vh] overflow-auto">
+                <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
@@ -571,7 +571,7 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
     return (
         <Card>
             <CardBody className="p-0">
-                <div className="max-h-[55vh] overflow-auto">
+                <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     <table className="w-full min-w-[42rem] text-sm">
                         <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                             <tr>
@@ -793,7 +793,7 @@ function EditDropPointDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <DialogContent className="max-h-[85vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>Configure drop point</DialogTitle>
                     <DialogDescription className="truncate">

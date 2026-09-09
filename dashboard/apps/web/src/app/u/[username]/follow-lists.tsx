@@ -249,7 +249,7 @@ function PeopleDialog({
                     />
                 </div>
 
-                <ul ref={listBox} className="flex max-h-80 flex-col gap-1 overflow-y-auto">
+                <ul ref={listBox} className="flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain">
                     {shown.map((person) => (
                         <li key={person.id}>
                             <PersonRow

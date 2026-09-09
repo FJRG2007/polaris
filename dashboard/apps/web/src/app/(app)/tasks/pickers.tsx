@@ -96,7 +96,7 @@ export function AssigneePicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
                 {people.length > 0 && <MenuSearch value={query} onChange={setQuery} placeholder="Find someone" />}
-                <div className="max-h-64 overflow-y-auto">
+                <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                             {people.length === 0 ? "Nobody is on this space yet." : "Nobody matches that."}
@@ -372,7 +372,7 @@ export function StatusPicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
                 <MenuSearch value={query} onChange={setQuery} placeholder="Find a status" />
-                <div className="max-h-64 overflow-y-auto">
+                <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">No status matches that.</p>
                     )}
@@ -651,7 +651,7 @@ export function TagPicker({
                         placeholder={onCreate ? "Find or create a tag" : "Find a tag"}
                     />
                 )}
-                <div className="max-h-56 overflow-y-auto">
+                <div className="max-h-56 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && !onCreate && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">No tag matches that.</p>
                     )}

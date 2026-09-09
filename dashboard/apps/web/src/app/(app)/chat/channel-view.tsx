@@ -1375,7 +1375,7 @@ export function ChannelView({
                     if (element.scrollTop < NEAR_EDGE) void loadOlder();
                     else if (below < NEAR_EDGE) void loadNewer();
                 }}
-                className="min-h-0 flex-1 overflow-y-auto py-2 [overflow-anchor:none]"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2 [overflow-anchor:none]"
             >
                 {olderThan && (
                     // A line rather than a button. Scrolling is what loads

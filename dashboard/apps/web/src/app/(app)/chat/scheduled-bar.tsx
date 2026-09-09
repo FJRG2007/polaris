@@ -94,7 +94,7 @@ export function ScheduledBar({
                             Only you can see these. Nothing is in the conversation until it goes.
                         </DialogDescription>
                     </DialogHeader>
-                    <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+                    <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto overscroll-contain">
                         {scheduled.map((entry) => (
                             <li
                                 key={entry.id}

@@ -119,7 +119,7 @@ export function LogViewer({
             <div
                 ref={follow.ref}
                 onScroll={follow.onScroll}
-                className={cn("h-80 overflow-auto rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed", className)}
+                className={cn("h-80 overflow-auto overscroll-contain rounded-md bg-[#0b0e14] py-2 font-mono text-xs leading-relaxed", className)}
             >
                 {filtered.length === 0 ? (
                     <p className="px-3 py-2 text-muted-foreground">{log ? "No matching lines." : emptyText}</p>

@@ -246,7 +246,7 @@ export function InventoryDialog({
 }) {
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto">
+            <DialogContent className="max-h-[88vh] max-w-4xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>{player}&apos;s inventory</DialogTitle>
                     <DialogDescription>
@@ -530,7 +530,7 @@ export function HistoryDialog({
                         Nothing in the log this far back.
                     </p>
                 ) : (
-                    <ul className="max-h-80 divide-y divide-border overflow-y-auto text-sm">
+                    <ul className="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain text-sm">
                         {newestFirst.map((event, index) => (
                             <li
                                 key={`${event.at ?? "unknown"}-${event.kind}-${index}`}

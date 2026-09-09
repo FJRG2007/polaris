@@ -87,7 +87,7 @@ export function SlidesEditor({
         <div className="flex min-h-0 flex-1">
             {/* The slides. A column of them rather than a strip: a deck is read
                 top to bottom in every tool that makes one. */}
-            <aside className="hidden w-44 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border p-2 sm:flex">
+            <aside className="hidden w-44 shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain border-r border-border p-2 sm:flex">
                 {deckSlides.map((one, index) => (
                     <button
                         key={one.id}
@@ -168,7 +168,7 @@ export function SlidesEditor({
                     </Button>
                 </div>
 
-                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/30 p-4">
+                <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto overscroll-contain bg-muted/30 p-4">
                     <div className="w-full max-w-4xl">
                         <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-background shadow-sm">
                             <Canvas

@@ -131,7 +131,7 @@ export function GameItemPicker<T extends SearchableItem>({
                 <>
                     <ul
                         aria-label="Items"
-                        className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto rounded-md border border-border bg-surface/40 p-1"
+                        className="grid max-h-56 grid-cols-8 gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface/40 p-1"
                     >
                         {offerTyped && typed && (
                             <Tile

@@ -608,7 +608,7 @@ export function DeployCanvas({
             )}
             {boardMenu(
                 <div className="relative h-[calc(100vh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
-                <div ref={containerRef} className="absolute inset-0 overflow-auto" style={DOT_BG}>
+                <div ref={containerRef} className="absolute inset-0 overflow-auto overscroll-contain" style={DOT_BG}>
                     <div ref={boardRef} className="relative" style={{ width: extent.w, height: extent.h }}>
                     <svg className="pointer-events-none absolute inset-0" width={extent.w} height={extent.h}>
                         {links.map((link, index) => {

@@ -486,7 +486,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                         onChange={setStatusQuery}
                                         placeholder="Find a status"
                                     />
-                                    <div className="max-h-64 overflow-y-auto">
+                                    <div className="max-h-64 overflow-y-auto overscroll-contain">
                                         {matchingStatuses.length === 0 && (
                                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                                                 No status matches that.
@@ -565,7 +565,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                             placeholder="Find someone"
                                         />
                                     )}
-                                    <div className="max-h-64 overflow-y-auto">
+                                    <div className="max-h-64 overflow-y-auto overscroll-contain">
                                         {context.people.length === 0 && (
                                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                                                 Nobody is on this space yet.
@@ -634,7 +634,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 }
                                             />
                                         )}
-                                        <div className="max-h-64 overflow-y-auto">
+                                        <div className="max-h-64 overflow-y-auto overscroll-contain">
                                             {context.tags.length > 0 &&
                                                 matchingTags.length === 0 &&
                                                 !typedTagIsNew && (
@@ -719,7 +719,7 @@ export function TaskMenu({ commands, children }: { commands: TaskCommands; child
                                                 placeholder="Find a list"
                                             />
                                         )}
-                                        <div className="max-h-64 overflow-y-auto">
+                                        <div className="max-h-64 overflow-y-auto overscroll-contain">
                                             {destinations.length === 0 && (
                                                 <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                                                     {many

@@ -222,7 +222,7 @@ export function ForwardDialog({
                         </button>
                     )}
 
-                    <ul className="max-h-64 overflow-y-auto rounded-md border border-border">
+                    <ul className="max-h-64 overflow-y-auto overscroll-contain rounded-md border border-border">
                         {openServers &&
                             spaces
                                 .filter((space) => !space.archived)

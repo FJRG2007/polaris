@@ -302,7 +302,7 @@ export function DevicePanel({
                             bounded
                         />
 
-                        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
+                        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-5">
                             <section className="flex flex-col gap-3">
                                 <DeviceControls
                                     device={device}

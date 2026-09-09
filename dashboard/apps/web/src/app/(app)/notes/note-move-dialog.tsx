@@ -120,7 +120,7 @@ export function NoteMoveDialog({
                     </label>
                 )}
 
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto overscroll-contain">
                     <ul className="flex flex-col gap-0.5">
                         <li>
                             <Destination

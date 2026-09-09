@@ -215,7 +215,7 @@ export function ArchiveDialog({
                                     </span>
                                 ))}
                             </div>
-                            <div className="max-h-64 overflow-auto">
+                            <div className="max-h-64 overflow-auto overscroll-contain">
                                 {level.folders.length === 0 && level.files.length === 0 ? (
                                     <p className="p-3 text-sm text-muted-foreground">
                                         Empty folder.

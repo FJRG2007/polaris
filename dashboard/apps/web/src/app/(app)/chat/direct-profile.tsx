@@ -376,7 +376,7 @@ export function DirectProfile({
                     </button>
                 </span>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <Body person={person} channelId={channel.id} />
                 {refusal}
             </div>

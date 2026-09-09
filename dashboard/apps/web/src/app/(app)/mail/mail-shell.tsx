@@ -420,7 +420,7 @@ export function MailShell({
                     <div
                         className={cn(
                             "min-h-0 flex-1",
-                            inSettings ? "overflow-y-auto" : "overflow-hidden"
+                            inSettings ? "overflow-y-auto overscroll-contain" : "overflow-hidden"
                         )}
                     >
                         {children}

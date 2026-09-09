@@ -170,7 +170,7 @@ export function SigninDialog({
             {/* Wide enough for the terminal inside it. The default caps at
                 max-w-lg, which put an eighty-column terminal behind a horizontal
                 scrollbar and made every line of the login half-visible. */}
-            <DialogContent className="max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] overflow-y-auto">
+            <DialogContent className="max-h-[92vh] w-[min(56rem,96vw)] max-w-[min(56rem,96vw)] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>Sign in to {signin.serves[0]?.label ?? signin.label}</DialogTitle>
                 </DialogHeader>
@@ -218,7 +218,7 @@ export function SigninDialog({
                     {ready ? (
                         <pre
                             ref={view}
-                            className="bg-elevated h-[26rem] overflow-auto rounded-md border border-border p-3 font-mono text-[0.6875rem] leading-snug"
+                            className="bg-elevated h-[26rem] overflow-auto overscroll-contain rounded-md border border-border p-3 font-mono text-[0.6875rem] leading-snug"
                         >
                             {screen}
                         </pre>

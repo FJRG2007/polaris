@@ -232,7 +232,7 @@ export function DocsView({
                             // A page earns a taller ceiling than a form field,
                             // but still a ceiling: a surface that grows past the
                             // viewport takes its own save button with it.
-                            className="min-h-[24rem] max-h-[70vh] flex-1 overflow-y-auto"
+                            className="min-h-[24rem] max-h-[70vh] flex-1 overflow-y-auto overscroll-contain"
                         />
                     </>
                 )}

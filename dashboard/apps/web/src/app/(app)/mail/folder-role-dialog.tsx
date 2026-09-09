@@ -82,7 +82,7 @@ export function FolderRoleDialog({
                 </p>
 
                 {candidates.length > 0 ? (
-                    <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                    <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto overscroll-contain">
                         {candidates.map((folder) => (
                             <li key={folder.id}>
                                 <button

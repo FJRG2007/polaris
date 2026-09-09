@@ -159,7 +159,7 @@ export function FileViewer({
                     ) : null}
                 </DialogHeader>
                 <div className="flex min-h-0 flex-1">
-                    <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-surface/40">
+                    <div className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-surface/40">
                         {target ? (
                             <FilePreview
                                 target={target}

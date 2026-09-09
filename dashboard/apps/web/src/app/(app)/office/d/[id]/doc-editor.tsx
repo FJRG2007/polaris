@@ -101,7 +101,7 @@ export function DocEditor({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {/* The page. A measure rather than the full width of the window:
                     a line of eighty characters is what anybody can read, and a
                     document set edge to edge on a wide screen is one nobody

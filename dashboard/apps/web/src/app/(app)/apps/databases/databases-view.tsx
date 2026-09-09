@@ -131,7 +131,7 @@ export function DatabasesView() {
                     }
                 />
             ) : (
-                <div className="-mx-1 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto px-1 md:grid-cols-2 xl:grid-cols-3">
+                <div className="-mx-1 grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto overscroll-contain px-1 md:grid-cols-2 xl:grid-cols-3">
                     {connections.map((connection) => (
                         <Card key={connection.id}>
                             <CardBody className="flex flex-col gap-3">

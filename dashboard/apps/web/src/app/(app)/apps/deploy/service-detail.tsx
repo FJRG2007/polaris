@@ -242,7 +242,7 @@ export function ServiceDetail({
                     })}
                 </ScrollRow>
 
-                <div className="flex-1 overflow-y-auto px-5 py-3">
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-3">
                     {tab === "Deployments" && <DeploymentsTab app={app} onChanged={onChanged} />}
                     {tab === "Variables" && <VariablesTab app={app} />}
                     {tab === "Metrics" && <MetricsTab applicationId={app.id} />}
@@ -1571,7 +1571,7 @@ function HttpLogsView({
                     />
                 )
             ) : (
-                <div className="max-h-[26rem] overflow-auto rounded-md border border-border/60">
+                <div className="max-h-[26rem] overflow-auto overscroll-contain rounded-md border border-border/60">
                     <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-card text-muted-foreground">
                             <tr className="border-b border-border/60 text-left">

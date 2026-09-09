@@ -374,7 +374,7 @@ export function Composer() {
                 />
             ) : (
                 <>
-                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
                         <div className="space-y-1.5 border-b border-border px-4 py-3">
                             <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
                                 <span className="w-12 shrink-0">From</span>

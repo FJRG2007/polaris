@@ -102,7 +102,7 @@ export function ProtectDialog({
                         </p>
                     ) : null}
 
-                    <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+                    <div className="max-h-72 overflow-y-auto overscroll-contain rounded-md border border-border">
                         {candidates === null ? (
                             <div className="flex flex-col gap-2 p-3">
                                 {Array.from({ length: 3 }, (_, index) => (

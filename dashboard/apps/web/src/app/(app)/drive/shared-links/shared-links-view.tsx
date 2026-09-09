@@ -446,7 +446,7 @@ function ShareLogsDialog({ share, onOpenChange }: { share: ShareRow | null; onOp
                     <Badge variant="neutral">{uniqueIps} unique IPs</Badge>
                     {denied > 0 ? <Badge variant="warning">{denied} denied</Badge> : null}
                 </div>
-                <div className="max-h-[55vh] overflow-auto">
+                <div className="max-h-[55vh] overflow-auto overscroll-contain">
                     {logs === null ? (
                         <p className="p-6 text-center text-sm text-muted-foreground">Loading...</p>
                     ) : logs.length === 0 ? (

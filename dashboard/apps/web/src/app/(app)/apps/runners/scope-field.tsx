@@ -237,7 +237,7 @@ export function ScopeField({
                     ) : principals.people.length === 0 ? (
                         <Hint>Nobody has linked a GitHub account yet. They do it from their own profile.</Hint>
                     ) : (
-                        <ul className="max-h-40 overflow-y-auto rounded-md border border-border/60">
+                        <ul className="max-h-40 overflow-y-auto overscroll-contain rounded-md border border-border/60">
                             {principals.people.map((person) => (
                                 <li key={person.userId} className="flex items-center gap-2 px-3 py-1.5">
                                     <Checkbox

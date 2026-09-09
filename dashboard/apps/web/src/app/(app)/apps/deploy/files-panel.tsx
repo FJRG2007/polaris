@@ -106,7 +106,7 @@ export function FilesPanel({ applicationId, root = "/" }: { applicationId: strin
                 </div>
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
-            <div className="max-h-80 overflow-auto rounded-md border border-border/60">
+            <div className="max-h-80 overflow-auto overscroll-contain rounded-md border border-border/60">
                 {entries.length === 0 && !busy && <p className="p-3 text-xs text-muted-foreground">Empty.</p>}
                 {entries.map((entry) => (
                     <div

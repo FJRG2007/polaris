@@ -51,7 +51,7 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                 </p>
             </header>
 
-            <ul className="min-h-0 flex-1 overflow-y-auto">
+            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {drafts.map((draft) => {
                     const waiting = Boolean(draft.sendAt);
                     return (

@@ -39,7 +39,7 @@ export function CodeSurface({
     const editing = onChange !== undefined;
 
     return (
-        <div className={cn("min-h-0 flex-1 overflow-auto", className)}>
+        <div className={cn("min-h-0 flex-1 overflow-auto overscroll-contain", className)}>
             <div className="flex min-h-full w-fit min-w-full">
                 <LineNumbers count={code.split("\n").length} />
                 <div className="grid flex-1">

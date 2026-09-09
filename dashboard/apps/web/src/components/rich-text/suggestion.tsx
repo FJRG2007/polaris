@@ -58,7 +58,7 @@ export function popupOpen(state: EditorState): boolean {
 
 /** The popup shell, shared with the block menu so the two match. */
 export const POPUP_CLASS =
-    "max-h-64 w-72 overflow-y-auto rounded-lg border border-border-strong bg-elevated p-1 shadow-popover";
+    "max-h-64 w-72 overflow-y-auto overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 shadow-popover";
 
 /**
  * What the plugin's own element is given once it is mounted.

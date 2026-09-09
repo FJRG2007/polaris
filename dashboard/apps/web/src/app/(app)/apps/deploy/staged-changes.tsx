@@ -185,7 +185,7 @@ export function StagedChangesBanner({
                     </DialogHeader>
 
                     <div className="flex flex-col gap-3">
-                        <ul className="max-h-72 overflow-y-auto rounded-md border border-border/60">
+                        <ul className="max-h-72 overflow-y-auto overscroll-contain rounded-md border border-border/60">
                             {changes.map((change) => {
                                 const environment = environments.find((entry) => entry.id === change.environmentId);
                                 const foreign = change.environmentId !== environmentId;

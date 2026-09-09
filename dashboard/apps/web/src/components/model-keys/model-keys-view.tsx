@@ -609,7 +609,7 @@ function KeyDialog({
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>
                         {existing ? `Edit ${thing(action)}` : (action ?? "Add provider key")}

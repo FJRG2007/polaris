@@ -274,7 +274,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Gamepad2 className="size-5" /> New server
