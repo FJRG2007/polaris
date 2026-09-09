@@ -37,6 +37,7 @@ export * from "./mailbox-providers.js";
 export * from "./mailbox-mbox.js";
 export * from "./mailbox-search.js";
 export * from "./mailbox-spam.js";
+export * from "./mailbox-brands.js";
 export * from "./mailbox-unsubscribe.js";
 export * from "./mailbox.js";
 export * from "./sign-in-methods.js";

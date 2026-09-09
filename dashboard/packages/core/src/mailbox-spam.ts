@@ -35,6 +35,7 @@
  */
 
 import { baseDomain } from "./vault-uris.js";
+import { brandClaim } from "./mailbox-brands.js";
 
 /** What each band means. Two numbers, and the whole of the policy. */
 export const SPAM_THRESHOLDS = { suspicious: 40, junk: 70 } as const;
@@ -574,6 +575,175 @@ export function subjectSignals(message: JudgeableMessage): SpamSignal[] {
 
     return signals;
 }
+/**
+ * Wording that asks the reader to prove who they are.
+ *
+ * The other half of a phishing message, and the half that does not care what
+ * name is on it: an alarm about the account, and a request to go and confirm
+ * something. Written without accents and compared that way, in the languages
+ * mail actually arrives in - the same rule the unsubscribe reader follows.
+ */
+const ACCOUNT_BAIT: readonly string[] = [
+    // English
+    "verify your account",
+    "verify your identity",
+    "confirm your account",
+    "confirm your identity",
+    "validate your account",
+    "update your account",
+    "update your details",
+    "update your information",
+    "account information",
+    "billing information",
+    "payment details",
+    "payment information",
+    "unusual activity",
+    "irregular activity",
+    "suspicious activity",
+    "unusual sign-in",
+    "account has been suspended",
+    "account will be suspended",
+    "account will be closed",
+    "reactivate your account",
+    "sign in to continue",
+    "your account is on hold",
+    // Spanish
+    "verifica tu cuenta",
+    "verificar tu cuenta",
+    "verificar su cuenta",
+    "confirma tu identidad",
+    "confirmar su identidad",
+    "valida tu cuenta",
+    "actualiza tus datos",
+    "actualizar sus datos",
+    "actualiza tu informacion",
+    "datos de facturacion",
+    "datos de pago",
+    "metodo de pago",
+    "actividad inusual",
+    "actividad irregular",
+    "actividad sospechosa",
+    "cuenta ha sido suspendida",
+    "cuenta sera suspendida",
+    "reactivar tu cuenta",
+    "reactiva tu cuenta",
+    // Portuguese
+    "verificar sua conta",
+    "confirmar sua identidade",
+    "atualizar seus dados",
+    "atividade incomum",
+    "conta foi suspensa",
+    // French
+    "verifier votre compte",
+    "confirmer votre identite",
+    "mettre a jour vos informations",
+    "informations de paiement",
+    "activite inhabituelle",
+    "compte a ete suspendu",
+    // German
+    "konto bestatigen",
+    "identitat bestatigen",
+    "zahlungsdaten aktualisieren",
+    "ungewohnliche aktivitat",
+    "konto wurde gesperrt",
+    // Italian
+    "verifica il tuo account",
+    "conferma la tua identita",
+    "aggiorna i tuoi dati",
+    "attivita insolita",
+    "account e stato sospeso"
+];
+
+/** How much of a message is read for the bait. Enough for the paragraph that
+ *  carries it, bounded so a long newsletter is not a long scan. */
+const BAIT_WINDOW = 4000;
+
+/** Accents off, one space between words, lower case - the form the phrases above
+ *  are written in. */
+function flatten(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+/**
+ * Whether the message is asking the reader to go and confirm their account.
+ *
+ * Read from the whole message rather than the subject alone: the alarm is in the
+ * subject about half the time and in the first paragraph the rest of it.
+ */
+export function asksForAccount(message: JudgeableMessage): boolean {
+    const text = flatten(
+        `${message.subject} ${message.snippet} ${message.bodyText.slice(0, BAIT_WINDOW)}`
+    );
+    return ACCOUNT_BAIT.some((phrase) => text.includes(phrase));
+}
+
+/**
+ * Mail that says it is somebody it is not.
+ *
+ * The comparison lives in `mailbox-brands`; what is decided here is what it is
+ * worth. Three things stack, and each is a different claim:
+ *
+ * - the name is on a message that is not from the name's own domain and does not
+ *   link to it;
+ * - the name is written with something inserted into it, which nobody does to
+ *   their own name;
+ * - and the message is asking for the account the name would give it access to.
+ *
+ * All three together is the shape of every credential phish there is, and it is
+ * scored so that all three together is a verdict rather than a hint.
+ */
+export function brandSignals(message: JudgeableMessage): SpamSignal[] {
+    const bait = asksForAccount(message);
+    const claim = brandClaim(
+        {
+            subject: message.subject,
+            fromName: message.fromName,
+            fromDomain: domainOf(message.fromAddress),
+            linkHosts: linkHosts(message)
+        },
+        bait
+    );
+
+    const signals: SpamSignal[] = [];
+    if (bait) {
+        signals.push({
+            id: "account_bait",
+            score: 12,
+            reason: "It asks you to go and confirm your account details"
+        });
+    }
+    if (!claim) return signals;
+
+    const home = claim.brand.domains[0] ?? "";
+    const dressed = claim.obfuscated ? ", written with something inserted into the name" : "";
+
+    // The pair is the whole of what a credential phish is: a name it is not, and
+    // a request for the account that name would open. Scored at the junk line
+    // exactly, so it is a verdict on its own and still loses to the evidence
+    // that argues the other way - a sender this mailbox has written to is worth
+    // more than this, and should be.
+    if (bait) {
+        signals.push({
+            id: "brand_credential_phish",
+            score: SPAM_THRESHOLDS.junk,
+            reason: `It says it is ${claim.brand.label}${dressed}, it did not come from ${home}, and it is asking for your account`
+        });
+        return signals;
+    }
+
+    signals.push({
+        id: "brand_impersonation",
+        score: 24 + (claim.obfuscated ? 14 : 0),
+        reason: `It says it is ${claim.brand.label}${dressed}, and it did not come from ${home}`
+    });
+    return signals;
+}
+
 /** Attachment types that are executable on arrival, which no ordinary
  *  correspondence carries. */
 const DANGEROUS_ATTACHMENTS: readonly string[] = [
@@ -761,6 +931,10 @@ export function judgeSpam(message: JudgeableMessage, known: SpamKnowledge): Spam
         ...urlSignals(message),
         ...subjectSignals(message),
         ...structureSignals(message),
+        // The name on the message against the domain it came from. Nothing else
+        // here reads a message that lies about who sent it: every other signal
+        // is about wording, and this one is about identity.
+        ...brandSignals(message),
         ...relationshipSignals(known),
         // Whatever a provider outside this mailbox said. Added as ordinary
         // signals so an outside opinion is weighed against the rest rather than
