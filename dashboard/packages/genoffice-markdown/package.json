@@ -13,7 +13,7 @@
         "./styles.css": "./dist/styles.css"
     },
     "scripts": {
-        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom && node ../../scripts/scope-editor-styles.mjs genoffice-markdown @ui/tokens.css @ui/screentip.css @ui/dropdown.css @ui/ribbon-collapse.css @ui/markdown.css src/renderer/styles.css",
+        "build": "tsup src/renderer/App.tsx --format esm --dts --clean --external react --external react-dom && node ../../scripts/scope-editor-styles.mjs genoffice-markdown --assets=/office-fonts @ui/tokens.css @ui/screentip.css @ui/dropdown.css @ui/ribbon-collapse.css @ui/markdown.css src/renderer/styles.css ../../node_modules/katex/dist/katex.min.css",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
