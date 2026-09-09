@@ -206,15 +206,30 @@ export function sameAddress(left: string, right: string): boolean {
  */
 export function snippetFrom(text: string, limit = 200): string {
     const decoded = undoTransferEncoding(text);
-    const words = looksLikeMarkup(decoded) ? stripMarkup(decoded) : decoded;
-    const collapsed = words
+    const markup = looksLikeMarkup(decoded);
+    const readable = tidy(markup ? stripMarkup(decoded) : decoded);
+    // Nothing left is not an answer. It happens to one message shape in
+    // particular: the slice is entirely inside a `<head>` whose closing tag is
+    // past the end of it, and a head with no end swallows everything after it -
+    // which is the right rule for a stylesheet and the wrong one here. A line
+    // that reads oddly beats a row with nothing under its subject, so the
+    // second attempt keeps everything but the parts that are genuinely not
+    // words.
+    const collapsed =
+        readable || (markup ? tidy(stripMarkup(decoded, { keepUnclosed: true })) : "");
+    return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
+}
+
+/** One line, without the quoted history, the padding or the run of spaces a
+ *  stripped-out tag leaves behind. */
+function tidy(value: string): string {
+    return value
         .split(/\r?\n/)
         .filter((line) => !line.trimStart().startsWith(">"))
         .join(" ")
         .replace(INVISIBLE, "")
         .replace(/\s+/g, " ")
         .trim();
-    return collapsed.length > limit ? `${collapsed.slice(0, limit - 1).trimEnd()}…` : collapsed;
 }
 
 /** Whatever a part was wrapped in for the journey, undone. Base64 first, because
@@ -247,7 +262,13 @@ function undoBase64(text: string): string {
     // removing the whitespace first makes a sentence look exactly like one long
     // run of base64 characters. Only the last chunk may be short: a preview is a
     // slice, and the slice ends where it ends.
-    const chunks = text.trim().split(/\s+/);
+    // The ellipsis the list itself put there. A preview stored before any of
+    // this existed is a slice of base64 with the truncation mark on the end, and
+    // that one character is not base64 - so the repair refused the whole line
+    // and the reader went on looking at `PGh0bWw+PGhlYWQ+`. It is dropped here
+    // rather than tolerated in the test below, which has to stay strict: what
+    // makes this guess safe is that nothing else looks like it.
+    const chunks = text.trim().replace(/…+$/, "").trim().split(/\s+/);
     const wrapped = chunks.every(
         (chunk, index) => chunk.length >= (index === chunks.length - 1 ? 4 : 16)
     );
@@ -267,14 +288,25 @@ function undoBase64(text: string): string {
     }
 }
 
-/** Whether what came out of a decode is something a person could read. Guards
- *  every decode here: a wrong guess must leave the line as it found it rather
- *  than replace it with worse. */
+/**
+ * Whether what came out of a decode is something a person could read. Guards
+ * every decode here: a wrong guess must leave the line as it found it rather
+ * than replace it with worse.
+ *
+ * `U+FFFD` counts against it rather than for it, which is the whole difference
+ * between this and a printable-character count. A decoder asked for UTF-8 and
+ * given bytes that are not it does not fail - `fatal` is off, because half a
+ * character at the end of a slice is normal here - it emits a replacement
+ * character per bad byte. So mojibake is made almost entirely of code points
+ * above 32, and a rule that only asked "is it printable" said yes to a wall of
+ * `���` and put it in somebody's list where a readable line had been.
+ */
 function readsAsText(value: string): boolean {
     if (!value) return false;
     let readable = 0;
     for (const char of value) {
         const code = char.codePointAt(0) ?? 0;
+        if (code === 0xfffd) continue;
         if (code === 9 || code === 10 || code === 13 || code >= 32) readable += 1;
     }
     return readable / [...value].length > 0.9;
@@ -381,15 +413,30 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
  * `<style>` that never closes, a tag cut in half at the end, a stylesheet with
  * no markup around it at all - each of those was a preview line somebody read.
  */
-function stripMarkup(html: string): string {
+function stripMarkup(html: string, options: { keepUnclosed?: boolean } = {}): string {
     return (
         html
             .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
-            // Whole elements whose contents are not the message. The closing tag
-            // is optional in these: a preview is cut off after four kilobytes and
-            // a stylesheet is easily longer than that, so demanding `</style>`
-            // meant the stylesheet WAS the preview.
-            .replace(/<(script|style|head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+            // A stylesheet and a script are never words, whether or not the
+            // slice reached the end of them. The closing tag is optional here
+            // and stays optional in both passes: a preview is cut off after
+            // four kilobytes and a stylesheet is easily longer than that, so
+            // demanding `</style>` meant the stylesheet WAS the preview.
+            .replace(/<(script|style)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, " ")
+            // The containers that merely hold the message rather than replace
+            // it. Same rule by default, because a `<head>` runs to the body and
+            // nothing in it is prose - but `keepUnclosed` is the second attempt,
+            // for the slice where that leaves nothing at all: a `<head>` whose
+            // end is past the cut takes the whole message with it, and the words
+            // inside it are then the only ones there are. Relaxing it can put a
+            // `<title>` in the line; it cannot put a stylesheet there, because
+            // that one came out above.
+            .replace(
+                options.keepUnclosed
+                    ? /<(head|title|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
+                    : /<(head|title|noscript)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi,
+                " "
+            )
             // Anything that ends a line becomes one, so two sentences do not run
             // together into one word.
             .replace(/<(?:br|\/p|\/div|\/tr|\/li|\/h[1-6]|\/table)\b[^>]*>/gi, " ")

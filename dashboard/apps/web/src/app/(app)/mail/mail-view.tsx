@@ -21,26 +21,37 @@
  */
 
 import Link from "next/link";
-import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
-import { missingFolderRole, refusalOf } from "./refusal";
-import { forwardSeed, replySeed } from "./answering";
-import { useMailLayout } from "./use-mail-layout";
-import { ThreadContextMenu } from "./thread-menu";
-import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
+import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
 import { SenderFace } from "./sender-face";
-import { UnsubscribeButton } from "./unsubscribe-button";
 import { MailSearch } from "./mail-search";
-import * as core from "@polaris/core";
-import { useRouter, useSearchParams } from "next/navigation";
-import { goShallow, mailAddress, plainClick } from "./address";
+import { useMailLayout } from "./use-mail-layout";
+import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
+import { forwardSeed, replySeed } from "./answering";
+import { missingFolderRole, refusalOf } from "./refusal";
+import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
+import { useRouter, useSearchParams } from "next/navigation";
+import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
+import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
-import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import { leavesTheView, runBetween, MAIL_DRAG_TYPE } from "./mail-actions";
+import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
+import { useMailList, useMailThread, type MailListAnswer } from "./use-mail-list";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+    type ComponentPropsWithRef,
+    type RefObject
+} from "react";
 import {
     actOnAction,
     applyLabelAction,
@@ -51,14 +62,21 @@ import {
     syncAllAction
 } from "./actions";
 import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    useTransition,
-    type ComponentPropsWithRef
-} from "react";
+    Archive,
+    Bug,
+    Check,
+    Clock,
+    Columns2,
+    Inbox,
+    ListFilter,
+    Mail,
+    MailOpen,
+    Paperclip,
+    RefreshCw,
+    Rows3,
+    Star,
+    Trash2
+} from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -79,23 +97,6 @@ import {
     Skeleton,
     useToast
 } from "@polaris/ui";
-import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import {
-    Archive,
-    Bug,
-    Check,
-    Clock,
-    Columns2,
-    Inbox,
-    ListFilter,
-    Mail,
-    MailOpen,
-    Paperclip,
-    RefreshCw,
-    Rows3,
-    Star,
-    Trash2
-} from "lucide-react";
 
 /**
  * How long the pointer rests on a conversation before its body is fetched.
@@ -322,6 +323,19 @@ export function MailView({
     const [older, setOlder] = useState<MailThreadView[]>([]);
     const [cursor, setCursor] = useState(firstCursor);
     const [loadingMore, setLoadingMore] = useState(false);
+    /**
+     * The element the list scrolls in, which `MoreRows` watches inside.
+     *
+     * Nothing on this screen scrolls the window - the layout is exactly the
+     * viewport and the panes move under it - so the window is the one root an
+     * observer here must not be given. A margin only ever grows the ROOT's
+     * rectangle; the target's is still clipped by every scrolling ancestor
+     * between them, unexpanded. Left to default, the marker at the bottom of
+     * this pane was therefore reported as in view only once it genuinely was,
+     * and the whole point of the margin - asking for the next page while the
+     * last one is still a screen away - never happened.
+     */
+    const pane = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
         setOlder([]);
         setCursor(firstCursor);
@@ -1201,7 +1215,7 @@ export function MailView({
                     {categorised ? <CategoryTabs current={category} /> : null}
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div ref={pane} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {list.loading ? (
                         // Nothing kept for this list and nothing arrived yet,
                         // which is a first visit rather than the ordinary case.
@@ -1292,7 +1306,7 @@ export function MailView({
                         </ul>
                     )}
 
-                    {cursor ? <MoreRows onReach={loadMore} busy={loadingMore} /> : null}
+                    {cursor ? <MoreRows pane={pane} onReach={loadMore} busy={loadingMore} /> : null}
                 </div>
             </section>
 
@@ -1407,7 +1421,18 @@ export function MailView({
  * page is asked for while the last one is still a screen away, so it has
  * usually arrived by the time anybody reaches it.
  */
-function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
+function MoreRows({
+    pane,
+    onReach,
+    busy
+}: {
+    /** The scrolling element this sits in - see the ref in `MailView`. The
+     *  margin below is measured from its edge, and from the window's if it is
+     *  somehow not mounted, which is a late page rather than no page. */
+    pane: RefObject<HTMLDivElement | null>;
+    onReach: () => void;
+    busy: boolean;
+}) {
     const mark = useRef<HTMLDivElement | null>(null);
     // Held in a ref so the observer is not torn down and rebuilt every time the
     // list grows, which is every time it fires.
@@ -1421,20 +1446,32 @@ function MoreRows({ onReach, busy }: { onReach: () => void; busy: boolean }) {
             (entries) => {
                 if (entries.some((entry) => entry.isIntersecting)) reach.current();
             },
-            { rootMargin: "600px" }
+            { root: pane.current, rootMargin: "600px" }
         );
         watcher.observe(node);
         return () => watcher.disconnect();
-    }, []);
+    }, [pane]);
 
     return (
-        <div ref={mark} className="p-3">
-            {/* Shaped like the rows it is about to become, so the list does not
-                jump when they land. */}
-            <div className="space-y-2" aria-hidden={!busy}>
-                <div className="h-3 w-1/3 animate-pulse rounded bg-card" />
-                <div className="h-3 w-2/3 animate-pulse rounded bg-card" />
-            </div>
+        // A marker while it is only watching, and a row's worth of space only
+        // while a page is actually on its way.
+        //
+        // It used to be the second of those the whole time: forty-odd pixels of
+        // shimmering bars sitting under the last conversation of every list that
+        // has another page, which reads as a row that never finishes loading and
+        // adds height to a screen whose whole layout is "exactly the viewport,
+        // nothing scrolls but the panes". The observer does not need the space -
+        // it fires 600px before this comes into view, on an element that is one
+        // pixel tall.
+        <div ref={mark} className={busy ? "p-3" : "h-px"}>
+            {busy ? (
+                // Shaped like the rows it is about to become, so the list does
+                // not jump when they land.
+                <div className="space-y-2" aria-hidden>
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-card" />
+                    <div className="h-3 w-2/3 animate-pulse rounded bg-card" />
+                </div>
+            ) : null}
             <span className="sr-only" role="status">
                 {busy ? "Loading older conversations" : ""}
             </span>

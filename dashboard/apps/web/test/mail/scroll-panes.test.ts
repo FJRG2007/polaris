@@ -64,3 +64,19 @@ describe("the list and the message own their own scrollbars", () => {
         expect(thread).toMatch(/<header className="flex shrink-0 /);
     });
 });
+
+describe("the list asks for its next page before the bottom", () => {
+    it("watches the marker against the pane rather than the window", async () => {
+        const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
+        // The same invariant from the other side. Nothing here scrolls the
+        // window, so an IntersectionObserver left on the default root measures
+        // its margin against a rectangle the list never moves in - and a margin
+        // never expands the TARGET's rectangle, which the scrolling pane goes on
+        // clipping. The marker is then reported as in view only once it truly
+        // is, the prefetch happens at the bottom instead of a screen early, and
+        // on a one-pixel marker there is nothing on screen to say so.
+        expect(view).toContain("root: pane.current");
+        expect(view).toContain('rootMargin: "600px"');
+        expect(view).toMatch(/<div ref=\{pane\} className="min-h-0 flex-1 overflow-y-auto/);
+    });
+});

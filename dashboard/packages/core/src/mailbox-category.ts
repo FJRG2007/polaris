@@ -52,7 +52,7 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 3;
+export const MAIL_CATEGORY_VERSION = 4;
 
 export const MAIL_CATEGORIES = [
     "primary",
@@ -528,6 +528,7 @@ const PURCHASE_WORDS: readonly string[] = [
     "confirmacion de pedido",
     "confirmacion de compra",
     "pago recibido",
+    "hemos recibido tu pago",
     "reembolso",
     // Portuguese
     "encomenda",
@@ -538,15 +539,42 @@ const PURCHASE_WORDS: readonly string[] = [
     "commande",
     "votre achat",
     "merci pour votre commande",
-    "paiement recu",
     // German
     "bestellung",
     "ihr einkauf",
-    "zahlung erhalten",
     // Italian
     "ordine",
-    "il tuo acquisto",
-    "pagamento ricevuto"
+    "il tuo acquisto"
+];
+
+/**
+ * A payment that went through, said with the sender's own words in the middle.
+ *
+ * The phrases above are contiguous, and a payment confirmation usually is not:
+ *
+ *     Tu pago con Paga en 4 en AMAZON ha sido aceptado
+ *
+ * "pago" and "ha sido aceptado" are eleven words apart, and no list of phrases
+ * was ever going to hold that one - the middle is the shop, the card and the
+ * plan, and it differs per message. What does not differ is the pair, so the
+ * pair is what is matched, with a bounded gap so it cannot reach across a whole
+ * paragraph and pick up two unrelated sentences.
+ *
+ * A refusal - "tu pago NO ha sido aceptado" - matches these too, and that is
+ * right: it is still money news, it still belongs in this tab, and the billing
+ * words above it catch it first anyway.
+ *
+ * Four languages rather than six. Portuguese and Italian both say "pagamento",
+ * which is already a purchase word on its own, so a pair for either of them is
+ * a pattern nothing can reach: the bare word has answered before it is asked.
+ * The phrases these DO subsume came out of the list above - "paiement recu" and
+ * "zahlung erhalten" are the zero-gap case of the two below them.
+ */
+const PAYMENT_SETTLED: readonly RegExp[] = [
+    /\bpayment\b.{0,60}?\b(?:accepted|approved|confirmed|successful|complete|completed|processed)\b/,
+    /\bpago\b.{0,60}?\b(?:aceptado|aprobado|confirmado|realizado|completado|procesado)\b/,
+    /\bpaiement\b.{0,60}?\b(?:accepte|approuve|confirme|recu)\b/,
+    /\bzahlung\b.{0,60}?\b(?:bestatigt|erfolgreich|erhalten)\b/
 ];
 
 /**
@@ -624,7 +652,9 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // overlap on exactly one word and it is the commonest one: "your order" and
     // "tu pedido" open a receipt and a shipping notice alike, and "your order
     // has shipped" is a parcel however it starts.
-    const purchased = PURCHASE_WORDS.some((word) => words.includes(word));
+    const purchased =
+        PURCHASE_WORDS.some((word) => words.includes(word)) ||
+        PAYMENT_SETTLED.some((pattern) => pattern.test(words));
 
     // Money about to move comes before everything except a code, and before the
     // word that is selling something: half of these arrive dressed as an offer -

@@ -58,13 +58,17 @@ describe("mail that came out unreadable", () => {
         // The two commonest escapes there are, and both stand for a perfectly
         // printable byte - so a decoder looking only for accents left these.
         expect(snippetFrom("=20 =20 =20 Paquete en aduanas")).toBe("Paquete en aduanas");
-        expect(snippetFrom("Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=3Dfed_yo_default")).toBe(
-            "Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=fed_yo_default"
-        );
+        expect(
+            snippetFrom(
+                "Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=3Dfed_yo_default"
+            )
+        ).toBe("Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=fed_yo_default");
     });
 
     it("still leaves prose with one equals sign in it alone", () => {
-        expect(snippetFrom("la mesa mide width=50cm de ancho")).toBe("la mesa mide width=50cm de ancho");
+        expect(snippetFrom("la mesa mide width=50cm de ancho")).toBe(
+            "la mesa mide width=50cm de ancho"
+        );
     });
 
     it("drops a stylesheet the preview begins in the middle of", () => {
@@ -89,7 +93,9 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom("Informacion sobre tu proxima cuota <meta http-")).toBe(
             "Informacion sobre tu proxima cuota"
         );
-        expect(snippetFrom("Cofidis, cuenta con nosotros <div sty")).toBe("Cofidis, cuenta con nosotros");
+        expect(snippetFrom("Cofidis, cuenta con nosotros <div sty")).toBe(
+            "Cofidis, cuenta con nosotros"
+        );
     });
 
     it("reads a message that is markup with no closed tag in it", () => {
@@ -99,7 +105,8 @@ describe("mail that came out unreadable", () => {
     });
 
     it("leaves a plain sentence exactly as it is", () => {
-        const plain = "Tal y como nos comenta Albert, reenviamos el email de nuevo reajustando el hilo.";
+        const plain =
+            "Tal y como nos comenta Albert, reenviamos el email de nuevo reajustando el hilo.";
         expect(snippetFrom(plain)).toBe(plain);
     });
 
@@ -125,5 +132,74 @@ describe("mail that came out unreadable", () => {
         const once = snippetFrom("=20 =20 Hola Mar=C3=ADa <b>Jos=C3=A9</b>");
         expect(once).toBe("Hola María José");
         expect(snippetFrom(once)).toBe(once);
+    });
+});
+
+describe("a preview stored before any of this existed", () => {
+    /** A payment confirmation, as one lender's server sends it: the whole
+     *  message is one base64 part, and what the list stored was a slice of it. */
+    const html =
+        '<html><head><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">' +
+        "<body><p>Tu pago con Paga en 4 en AMAZON ha sido aceptado.</p></body></html>";
+    const wrapped = Buffer.from(html, "utf8")
+        .toString("base64")
+        .replace(/(.{72})/g, "$1 ");
+
+    it("is read back when the whole slice was kept", () => {
+        expect(snippetFrom(wrapped)).toContain("Paga en 4");
+    });
+
+    it("is read back when the slice was cut short and ellipsised", () => {
+        // What a row written before the base64 repair existed actually holds:
+        // 200 characters of base64 with the list's own ellipsis on the end. The
+        // ellipsis is not base64, so the repair refused the whole line and the
+        // reader kept looking at `PGh0bWw+PGhlYWQ+`.
+        const stored = `${wrapped.slice(0, 199)}…`;
+        expect(snippetFrom(stored)).toContain("Paga en 4");
+        expect(snippetFrom(stored)).not.toContain("PGh0bWw");
+    });
+
+    it("leaves an ordinary sentence that happens to end in an ellipsis alone", () => {
+        expect(snippetFrom("Te escribo por lo de ayer…")).toBe("Te escribo por lo de ayer…");
+    });
+});
+
+describe("the second attempt at a slice that stripped to nothing", () => {
+    it("still refuses a stylesheet that never closes", () => {
+        // The fallback exists because an unclosed `<head>` takes the message
+        // with it. It must not become a way back in for the thing the first
+        // pass was written to remove: an unclosed `<style>` holds no words at
+        // all, so keeping it puts `@import url(...)` under somebody's subject
+        // and calls it a preview.
+        const cut =
+            '<html><head><style>@import url("https://example.test/e.css");' +
+            "@font-face{font-family:X;src:url(y)}";
+        const line = snippetFrom(cut);
+        expect(line).not.toContain("@import");
+        expect(line).not.toContain("example.test");
+    });
+
+    it("still refuses a script that never closes", () => {
+        const cut = "<html><head><script>var track='https://example.test/p';window.x=1";
+        expect(snippetFrom(cut)).not.toContain("example.test");
+    });
+
+    it("keeps the words an unclosed head was holding", () => {
+        const cut = "<html><head><body><p>Tu pago ha sido aceptado.</p>";
+        expect(snippetFrom(cut)).toContain("Tu pago ha sido aceptado.");
+    });
+});
+
+describe("a run that looks like base64 and is not", () => {
+    it("leaves an opaque token alone rather than decoding it to nonsense", () => {
+        // A long identifier is spelt out of the same alphabet base64 is, so it
+        // passes every test up to the decode - and what comes back is one
+        // replacement character per byte that was not UTF-8. Counting those as
+        // readable is how a line somebody could read became a wall of `<?>`.
+        const token =
+            "kvD8ndPS210vk6Knis48hyZy9WxFZvGydbd8heUzZg5xevjWUUO7XaabTbM5" +
+            "ZHonPbyi8T3hAXrfwRbE3lP3qPmdfmblyfcagoTm";
+        expect(snippetFrom(token)).toBe(token);
+        expect(snippetFrom(`${token}…`)).toBe(`${token}…`);
     });
 });

@@ -13,11 +13,11 @@
  * the full width, so a stream that has no times never pays for a blank gutter.
  */
 
-import { useMemo, useState, type ReactNode } from "react";
-import { Check, Copy, Download, Search } from "lucide-react";
 import { Button, Input, cn } from "@polaris/ui";
 import { useDisplayFormat } from "./display-format";
+import { useMemo, useState, type ReactNode } from "react";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
+import { Check, Copy, Download, Search } from "lucide-react";
 import { formatLogTime, parseLog, type LogEntry, type LogLevel } from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<LogLevel, string> = {
@@ -55,6 +55,13 @@ export function LogViewer({
 
     const entries = useMemo(() => (log ? parseLog(log) : []), [log]);
     const query = search.trim().toLowerCase();
+    // enigma:allow-substring-search - a log filter is grep, not a search box.
+    // What is typed here is a container name, a status code, a path or a word
+    // that appears in the output verbatim, and the reader is looking for the
+    // lines that contain exactly that. Fuzzy matching would answer with lines
+    // that nearly say it, which in a log is a wrong answer that reads like a
+    // right one - and it would rank a stream whose only meaningful order is
+    // time.
     const matched = query
         ? entries.filter((entry) => entry.text.toLowerCase().includes(query))
         : entries;
