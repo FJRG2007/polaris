@@ -253,7 +253,8 @@ function mailtoFields(query: string): Record<string, string> {
         if (!pair) continue;
         const at = pair.indexOf("=");
         const name = decodeField(at === -1 ? pair : pair.slice(0, at)).toLowerCase();
-        if (name && !(name in fields)) fields[name] = decodeField(at === -1 ? "" : pair.slice(at + 1));
+        if (name && !(name in fields))
+            fields[name] = decodeField(at === -1 ? "" : pair.slice(at + 1));
     }
     return fields;
 }
@@ -326,7 +327,9 @@ function fromAnchors(html: string): UnsubscribeOffer | null {
         // What the sentence around it says. This is the case the obvious
         // implementation misses: the link reads "haz clic aqui" and the sentence
         // it sits in is the only thing that says what it does.
-        const around = stripTags(html.slice(Math.max(0, anchor.index - 300), anchor.index + anchor[0].length + 120));
+        const around = stripTags(
+            html.slice(Math.max(0, anchor.index - 300), anchor.index + anchor[0].length + 120)
+        );
         if (saysUnsubscribe(decodeEntities(around))) {
             // Held rather than returned, because an anchor that says so itself
             // is a better answer than one whose neighbourhood does.
@@ -355,25 +358,34 @@ function fromPlainText(plain: string): UnsubscribeOffer | null {
 }
 
 function stripTags(value: string): string {
-    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    return value
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
 }
 
 /** Enough entity handling for the words this reads. A footer written by a
  *  mailing tool is full of `&nbsp;` and `&#39;`. */
 function decodeEntities(value: string): string {
-    return value
-        .replace(/&nbsp;/gi, " ")
-        // An accented letter written as a named entity is the base letter as far
-        // as this is concerned: everything here is compared with the accents
-        // taken off anyway. Two lines instead of a table of two hundred.
-        .replace(/&([a-z])(?:acute|grave|circ|uml|tilde|ring|slash);/gi, "$1")
-        .replace(/&([a-z])cedil;/gi, "$1")
-        .replace(/&amp;/gi, "&")
-        .replace(/&quot;/gi, '"')
-        .replace(/&#0?39;/g, "'")
-        .replace(/&#x27;/gi, "'")
-        .replace(/&#(\d+);/g, (_match, digits: string) => codePoint(Number.parseInt(digits, 10)))
-        .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => codePoint(Number.parseInt(hex, 16)));
+    return (
+        value
+            .replace(/&nbsp;/gi, " ")
+            // An accented letter written as a named entity is the base letter as far
+            // as this is concerned: everything here is compared with the accents
+            // taken off anyway. Two lines instead of a table of two hundred.
+            .replace(/&([a-z])(?:acute|grave|circ|uml|tilde|ring|slash);/gi, "$1")
+            .replace(/&([a-z])cedil;/gi, "$1")
+            .replace(/&amp;/gi, "&")
+            .replace(/&quot;/gi, '"')
+            .replace(/&#0?39;/g, "'")
+            .replace(/&#x27;/gi, "'")
+            .replace(/&#(\d+);/g, (_match, digits: string) =>
+                codePoint(Number.parseInt(digits, 10))
+            )
+            .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) =>
+                codePoint(Number.parseInt(hex, 16))
+            )
+    );
 }
 
 function codePoint(value: number): string {

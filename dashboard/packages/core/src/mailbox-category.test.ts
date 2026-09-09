@@ -71,7 +71,9 @@ describe("codes and sign-ins", () => {
         // rest of what is about to be taken - but it is still not a code, which
         // is what this is checking.
         expect(
-            categoriseMail(message({ subject: "Invoice 4471 is ready", fromAddress: "billing@shop.example" }))
+            categoriseMail(
+                message({ subject: "Invoice 4471 is ready", fromAddress: "billing@shop.example" })
+            )
         ).toBe("billing");
     });
 
@@ -96,18 +98,19 @@ describe("the other three", () => {
             "info@mail.notifications.instagram.com",
             "no-reply@discord.com"
         ]) {
-            expect(categoriseMail(message({ subject: "Somebody replied", fromAddress: from })), from).toBe(
-                "social"
-            );
+            expect(
+                categoriseMail(message({ subject: "Somebody replied", fromAddress: from })),
+                from
+            ).toBe("social");
         }
     });
 
     it("does not mistake a domain that merely ends in one", () => {
         // `notfacebook.com` is not Facebook, and a suffix match without the dot
         // would say it was.
-        expect(
-            categoriseMail(message({ subject: "hola", fromAddress: "a@notfacebook.com" }))
-        ).toBe("primary");
+        expect(categoriseMail(message({ subject: "hola", fromAddress: "a@notfacebook.com" }))).toBe(
+            "primary"
+        );
     });
 
     it("knows somebody selling something", () => {
@@ -181,31 +184,51 @@ describe("money that is about to move", () => {
 
     it("catches a card that is about to fail, which is the one nobody wants to miss", () => {
         expect(
-            categoriseMail(message({ subject: "Your card is expiring", fromAddress: "no-reply@example.com" }))
+            categoriseMail(
+                message({ subject: "Your card is expiring", fromAddress: "no-reply@example.com" })
+            )
         ).toBe("billing");
         expect(
-            categoriseMail(message({ subject: "Payment failed for your plan", fromAddress: "no-reply@example.com" }))
+            categoriseMail(
+                message({
+                    subject: "Payment failed for your plan",
+                    fromAddress: "no-reply@example.com"
+                })
+            )
         ).toBe("billing");
         expect(
-            categoriseMail(message({ subject: "Tu prueba gratuita termina mañana", fromAddress: "hi@example.com" }))
+            categoriseMail(
+                message({
+                    subject: "Tu prueba gratuita termina mañana",
+                    fromAddress: "hi@example.com"
+                })
+            )
         ).toBe("billing");
     });
 
     it("takes an invoice, and leaves a receipt where it was", () => {
         // A demand and a record are not the same mail: one is worth reading
         // before the money moves and the other after.
-        expect(categoriseMail(message({ subject: "Invoice 2026-114 is due", fromAddress: "a@b.example" }))).toBe(
-            "billing"
-        );
-        expect(categoriseMail(message({ subject: "Factura de septiembre", fromAddress: "a@b.example" }))).toBe(
-            "billing"
-        );
         expect(
-            categoriseMail(message({ subject: "Your order has shipped", fromAddress: "shop@example.com" }))
+            categoriseMail(
+                message({ subject: "Invoice 2026-114 is due", fromAddress: "a@b.example" })
+            )
+        ).toBe("billing");
+        expect(
+            categoriseMail(
+                message({ subject: "Factura de septiembre", fromAddress: "a@b.example" })
+            )
+        ).toBe("billing");
+        expect(
+            categoriseMail(
+                message({ subject: "Your order has shipped", fromAddress: "shop@example.com" })
+            )
         ).toBe("updates");
-        expect(categoriseMail(message({ subject: "Tu pedido va en reparto", fromAddress: "shop@example.com" }))).toBe(
-            "updates"
-        );
+        expect(
+            categoriseMail(
+                message({ subject: "Tu pedido va en reparto", fromAddress: "shop@example.com" })
+            )
+        ).toBe("updates");
     });
 
     it("wins over the offer wrapped around it", () => {
@@ -267,7 +290,9 @@ describe("what is left", () => {
     it("is where anything unrecognised lands", () => {
         // Deliberate. A promotion in the main list is an annoyance; a colleague
         // behind a tab nobody opens is the feature doing harm.
-        expect(categoriseMail(message({ subject: "???", fromAddress: "x@y.example" }))).toBe("primary");
+        expect(categoriseMail(message({ subject: "???", fromAddress: "x@y.example" }))).toBe(
+            "primary"
+        );
         expect(categoriseMail(message())).toBe("primary");
     });
 });
@@ -295,7 +320,9 @@ describe("mail about the safety of an account", () => {
         // "Action needed" says nothing on its own. What it is about is in the
         // snippet, which is where these are always written.
         expect(
-            categoriseMail(message("Action needed", "Anyone with read access can view exposed secrets."))
+            categoriseMail(
+                message("Action needed", "Anyone with read access can view exposed secrets.")
+            )
         ).toBe("security");
     });
 

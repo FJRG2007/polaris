@@ -15,7 +15,9 @@ describe("the tools catalogue", () => {
         fileURLToPath(new URL(`../../src/app/(app)${href}/page.tsx`, import.meta.url));
 
     it("only links to screens that exist", () => {
-        const broken = TOOL_GROUPS.filter((group) => !group.soon && !existsSync(routeOf(group.href)));
+        const broken = TOOL_GROUPS.filter(
+            (group) => !group.soon && !existsSync(routeOf(group.href))
+        );
         expect(broken.map((group) => group.href)).toEqual([]);
     });
 

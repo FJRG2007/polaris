@@ -141,7 +141,10 @@ describe("a link into a part of a site meant for machines", () => {
             "https://example.com/.well-known/pki/index.php",
             "http://example.com/.well-known/acme-challenge/x"
         ]) {
-            expect(urlSignals(withLink(href)).map((s) => s.id), href).toContain("url_well_known");
+            expect(
+                urlSignals(withLink(href)).map((s) => s.id),
+                href
+            ).toContain("url_well_known");
         }
     });
 
@@ -151,9 +154,10 @@ describe("a link into a part of a site meant for machines", () => {
             "https://example.com/well-known/page",
             "https://example.com/blog/.well-known-secrets"
         ]) {
-            expect(urlSignals(withLink(href)).map((s) => s.id), href).not.toContain(
-                "url_well_known"
-            );
+            expect(
+                urlSignals(withLink(href)).map((s) => s.id),
+                href
+            ).not.toContain("url_well_known");
         }
     });
 });

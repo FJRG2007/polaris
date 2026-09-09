@@ -956,7 +956,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: "1"
                 }
             ],
-            volumes: [{ name: "config", mountPath: "/config", label: "Server files and resources" }],
+            volumes: [
+                { name: "config", mountPath: "/config", label: "Server files and resources" }
+            ],
             // One number, two transports: a FiveM client speaks both to the same
             // port and an address carries only the one. Published onto the port the
             // image binds inside, which its own config writes before Polaris can

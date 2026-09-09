@@ -264,10 +264,7 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
  * Nothing settles either - the sync that calls this reads Junk later in the same
  * pass and rebuilds the conversations when the folder is through.
  */
-export async function fileJudgedJunk(
-    userId: string,
-    messageIds: readonly string[]
-): Promise<void> {
+export async function fileJudgedJunk(userId: string, messageIds: readonly string[]): Promise<void> {
     if (messageIds.length === 0) return;
     try {
         // Imported here because that module reads this one back for its

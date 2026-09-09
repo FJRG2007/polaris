@@ -42,11 +42,18 @@ export function AppShell({
                     {switcher}
                     {/* Pages portal contextual controls here (e.g. the Deploy project +
                         environment selectors), to the right of the app switcher. */}
-                    <div id="polaris-header-slot" className="flex min-w-0 items-center gap-1 sm:gap-2" />
+                    <div
+                        id="polaris-header-slot"
+                        className="flex min-w-0 items-center gap-1 sm:gap-2"
+                    />
                 </div>
                 {/* The field only earns the middle of the bar once it renders as a
                     field; below that it is an icon and sits with the account controls. */}
-                {search ? <div className="flex min-w-0 shrink-0 justify-end px-0 lg:flex-1 lg:shrink lg:justify-center lg:px-2">{search}</div> : null}
+                {search ? (
+                    <div className="flex min-w-0 shrink-0 justify-end px-0 lg:flex-1 lg:shrink lg:justify-center lg:px-2">
+                        {search}
+                    </div>
+                ) : null}
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">{account}</div>
             </header>
             <div className="flex flex-1">
@@ -134,13 +141,26 @@ export const PAGE_BLEED =
  *  `size-8` - sets the width and height of a box holding both the glyph and the
  *  word, which does not shrink the mark: it prints the name on top of the star.
  *  A caller that wants the glyph alone says `nameClassName="hidden"`. */
-export function PolarisMark({ className, nameClassName }: { className?: string; nameClassName?: string }) {
+export function PolarisMark({
+    className,
+    nameClassName
+}: {
+    className?: string;
+    nameClassName?: string;
+}) {
     return (
         <span className={cn("flex items-center gap-2", className)}>
-            <svg viewBox="0 0 24 24" className="size-[18px] shrink-0 text-primary" fill="currentColor" aria-hidden="true">
+            <svg
+                viewBox="0 0 24 24"
+                className="size-[18px] shrink-0 text-primary"
+                fill="currentColor"
+                aria-hidden="true"
+            >
                 <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
             </svg>
-            <span className={cn("text-[0.8125rem] font-semibold tracking-tight", nameClassName)}>Polaris</span>
+            <span className={cn("text-[0.8125rem] font-semibold tracking-tight", nameClassName)}>
+                Polaris
+            </span>
         </span>
     );
 }
@@ -159,9 +179,13 @@ export function PageHeader({
     return (
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-                <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">{title}</h1>
+                <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">
+                    {title}
+                </h1>
                 {description ? (
-                    <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">{description}</p>
+                    <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">
+                        {description}
+                    </p>
                 ) : null}
             </div>
             {actions ? <div className="flex items-center gap-2">{actions}</div> : null}

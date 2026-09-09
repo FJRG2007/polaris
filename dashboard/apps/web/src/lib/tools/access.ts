@@ -72,8 +72,6 @@ export async function requireToolsReach(): Promise<{
         redirect(`${await homePathForUser(user)}?denied=1`);
     const install = await toolsInstall();
     if (!install)
-        redirect(
-            user.isAdmin ? `/apps/marketplace?app=${TOOLS_APP}` : await homePathForUser(user)
-        );
+        redirect(user.isAdmin ? `/apps/marketplace?app=${TOOLS_APP}` : await homePathForUser(user));
     return { user, install, canManage: await sessionCanAny(user, "tools.manage") };
 }

@@ -98,7 +98,8 @@ export async function remoteAllowedFor(
 function cleanLinks(html: string): string {
     return html.replace(
         /\b(href)\s*=\s*(["'])(https?:\/\/[^"']*)\2/gi,
-        (_match, name: string, quote: string, url: string) => `${name}=${quote}${core.cleanLink(url)}${quote}`
+        (_match, name: string, quote: string, url: string) =>
+            `${name}=${quote}${core.cleanLink(url)}${quote}`
     );
 }
 

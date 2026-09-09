@@ -389,9 +389,11 @@ export function urlSignals(message: JudgeableMessage): SpamSignal[] {
     // survives longer there than anywhere else on the domain.
     // `/.well-known/css/` and `/.well-known/pki/` are the two that turn up most.
     if (
-        [...`${message.bodyHtml} ${message.bodyText}`.matchAll(
-            /https?:\/\/[^\s"'<>)\]]*\/\.well-known\/([^\s"'<>)\]\/?#]*)/gi
-        )].some((match) => !HUMAN_WELL_KNOWN.includes((match[1] ?? "").toLowerCase()))
+        [
+            ...`${message.bodyHtml} ${message.bodyText}`.matchAll(
+                /https?:\/\/[^\s"'<>)\]]*\/\.well-known\/([^\s"'<>)\]\/?#]*)/gi
+            )
+        ].some((match) => !HUMAN_WELL_KNOWN.includes((match[1] ?? "").toLowerCase()))
     ) {
         signals.push({
             id: "url_well_known",

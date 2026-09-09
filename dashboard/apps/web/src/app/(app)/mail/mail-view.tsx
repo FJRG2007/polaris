@@ -1243,8 +1243,7 @@ export function MailView({
                                         // row it was opened on. The same rule a
                                         // drag from a row already follows.
                                         selection={
-                                            selected.length > 1 &&
-                                            selected.includes(thread.id)
+                                            selected.length > 1 && selected.includes(thread.id)
                                                 ? selectedMessageIds
                                                 : null
                                         }

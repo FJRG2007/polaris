@@ -184,7 +184,9 @@ export function UnsubscribeButton({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {fallback ? "Finish this on their page" : `Unsubscribe from ${target.sender}?`}
+                            {fallback
+                                ? "Finish this on their page"
+                                : `Unsubscribe from ${target.sender}?`}
                         </DialogTitle>
                     </DialogHeader>
 
@@ -229,7 +231,10 @@ export function UnsubscribeButton({
                         ) : (
                             <Button size="sm" disabled={working} onClick={run}>
                                 {working ? (
-                                    <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                                    <Loader2
+                                        className="size-3.5 shrink-0 animate-spin"
+                                        aria-hidden
+                                    />
                                 ) : null}
                                 Unsubscribe
                             </Button>

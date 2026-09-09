@@ -50,7 +50,9 @@ export function startWafSentinel(): void {
     // something, so an already-armed instance pays nothing for this.
     void armPolarisPresets()
         .then((changed) => (changed ? syncDashboardRoute() : undefined))
-        .catch((error: unknown) => console.error("polaris: arming the dashboard's firewall scope failed:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: arming the dashboard's firewall scope failed:", error)
+        );
 
     const tick = async () => {
         try {

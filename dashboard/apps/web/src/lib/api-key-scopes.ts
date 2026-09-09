@@ -93,8 +93,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "home.manage": "Add and remove cameras, and change how they detect and record.",
     "tools.use":
         "Convert, resize, optimize and read files, and translate text. Files sent through a tool are processed and not kept.",
-    "tools.manage":
-        "Create short links this Polaris answers for, and see who followed them.",
+    "tools.manage": "Create short links this Polaris answers for, and see who followed them.",
     "tasks.read": "Read spaces, lists, and tasks.",
     "tasks.manage": "Create and change tasks, lists, and spaces.",
     "inbox.read": "Read conversations, contacts, and channel activity.",

@@ -31,7 +31,8 @@ interface AnalysisStats {
 function verdictFromStats(stats: AnalysisStats, permalink?: string): VtVerdict {
     const malicious = Number(stats.malicious ?? 0);
     const suspicious = Number(stats.suspicious ?? 0);
-    const kind: VtVerdictKind = malicious > 0 ? "malicious" : suspicious > 0 ? "suspicious" : "clean";
+    const kind: VtVerdictKind =
+        malicious > 0 ? "malicious" : suspicious > 0 ? "suspicious" : "clean";
     return { kind, malicious, suspicious, permalink };
 }
 
@@ -56,11 +57,16 @@ export async function verifyKey(apiKey: string): Promise<{ ok: boolean; error?: 
             headers: { "x-apikey": apiKey },
             signal: AbortSignal.timeout(15000)
         });
-        if (response.status === 401 || response.status === 403) return { ok: false, error: "Invalid API key" };
-        if (response.status >= 500) return { ok: false, error: `VirusTotal is unavailable (${response.status})` };
+        if (response.status === 401 || response.status === 403)
+            return { ok: false, error: "Invalid API key" };
+        if (response.status >= 500)
+            return { ok: false, error: `VirusTotal is unavailable (${response.status})` };
         return { ok: true };
     } catch (caught) {
-        return { ok: false, error: caught instanceof Error ? caught.message : "Could not reach VirusTotal" };
+        return {
+            ok: false,
+            error: caught instanceof Error ? caught.message : "Could not reach VirusTotal"
+        };
     }
 }
 
@@ -75,9 +81,16 @@ export async function lookupBySha256(apiKey: string, sha256: string): Promise<Vt
     });
     if (response.status === 404) return null;
     if (!response.ok) {
-        return { kind: "error", malicious: 0, suspicious: 0, detail: `VirusTotal responded ${response.status}` };
+        return {
+            kind: "error",
+            malicious: 0,
+            suspicious: 0,
+            detail: `VirusTotal responded ${response.status}`
+        };
     }
-    const body = (await response.json()) as { data?: { attributes?: { last_analysis_stats?: AnalysisStats } } };
+    const body = (await response.json()) as {
+        data?: { attributes?: { last_analysis_stats?: AnalysisStats } };
+    };
     const stats = body.data?.attributes?.last_analysis_stats ?? {};
     return verdictFromStats(stats, fileLink(sha256));
 }
@@ -87,7 +100,11 @@ export async function lookupBySha256(apiKey: string, sha256: string): Promise<Vt
  * "unknown" if the analysis does not finish within the budget, so the caller can
  * fail open. The SHA-256 is only used to build the report permalink.
  */
-export async function uploadAndScan(apiKey: string, bytes: Uint8Array, sha256: string): Promise<VtVerdict> {
+export async function uploadAndScan(
+    apiKey: string,
+    bytes: Uint8Array,
+    sha256: string
+): Promise<VtVerdict> {
     const form = new FormData();
     form.append("file", new Blob([bytes]), "upload.bin");
     const submit = await fetch(`${BASE}/files`, {
@@ -97,11 +114,17 @@ export async function uploadAndScan(apiKey: string, bytes: Uint8Array, sha256: s
         signal: AbortSignal.timeout(60000)
     });
     if (!submit.ok) {
-        return { kind: "error", malicious: 0, suspicious: 0, detail: `VirusTotal upload failed (${submit.status})` };
+        return {
+            kind: "error",
+            malicious: 0,
+            suspicious: 0,
+            detail: `VirusTotal upload failed (${submit.status})`
+        };
     }
     const submitBody = (await submit.json()) as { data?: { id?: string } };
     const analysisId = submitBody.data?.id;
-    if (!analysisId) return { kind: "error", malicious: 0, suspicious: 0, detail: "No analysis id returned" };
+    if (!analysisId)
+        return { kind: "error", malicious: 0, suspicious: 0, detail: "No analysis id returned" };
 
     // Poll the analysis. Public API is rate-limited, so keep the cadence modest.
     for (let attempt = 0; attempt < 15; attempt++) {
@@ -119,7 +142,13 @@ export async function uploadAndScan(apiKey: string, bytes: Uint8Array, sha256: s
             return verdictFromStats(attributes.stats ?? {}, fileLink(sha256));
         }
     }
-    return { kind: "unknown", malicious: 0, suspicious: 0, detail: "Scan did not complete in time", permalink: fileLink(sha256) };
+    return {
+        kind: "unknown",
+        malicious: 0,
+        suspicious: 0,
+        detail: "Scan did not complete in time",
+        permalink: fileLink(sha256)
+    };
 }
 
 /** Where a domain's report is read by a person. */
@@ -163,7 +192,10 @@ export async function lookupDomain(apiKey: string, domain: string): Promise<VtVe
         const body = (await response.json()) as {
             data?: { attributes?: { last_analysis_stats?: AnalysisStats } };
         };
-        return verdictFromStats(body.data?.attributes?.last_analysis_stats ?? {}, domainLink(cleaned));
+        return verdictFromStats(
+            body.data?.attributes?.last_analysis_stats ?? {},
+            domainLink(cleaned)
+        );
     } catch {
         return { kind: "error", malicious: 0, suspicious: 0, detail: "VirusTotal was unreachable" };
     }

@@ -223,5 +223,7 @@ function readable(reasons: readonly string[]): string {
         HIGH_RISK_SCORE: "this address scores as high risk"
     };
     const first = reasons.find((one) => one in said);
-    return first ? said[first] ?? "the sending address is flagged" : "the sending address is flagged";
+    return first
+        ? (said[first] ?? "the sending address is flagged")
+        : "the sending address is flagged";
 }

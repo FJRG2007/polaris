@@ -305,11 +305,7 @@ export async function unsubscribeFromMessage(
     if (!message) throw new MailAccessError("That message is not yours.");
 
     const headers = (message.headers as Record<string, string> | null) ?? null;
-    const offer = core.unsubscribeOffer(
-        headers,
-        message.bodyHtml ?? "",
-        message.bodyText ?? ""
-    );
+    const offer = core.unsubscribeOffer(headers, message.bodyHtml ?? "", message.bodyText ?? "");
     if (!offer) throw new MailSubscriptionMissing();
 
     const from = addressesFrom(message.fromJson);

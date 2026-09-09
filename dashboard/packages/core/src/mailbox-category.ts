@@ -54,7 +54,14 @@
  */
 export const MAIL_CATEGORY_VERSION = 3;
 
-export const MAIL_CATEGORIES = ["primary", "social", "promotions", "billing", "updates", "security"] as const;
+export const MAIL_CATEGORIES = [
+    "primary",
+    "social",
+    "promotions",
+    "billing",
+    "updates",
+    "security"
+] as const;
 
 export type MailCategory = (typeof MAIL_CATEGORIES)[number];
 
@@ -71,9 +78,11 @@ export const MAIL_CATEGORY_NOTES: Readonly<Record<MailCategory, string>> = {
     primary: "People writing to you, and anything Polaris could not place.",
     social: "What the services you use say about other people.",
     promotions: "Offers, newsletters, and anything else selling something.",
-    billing: "What you spent and what is about to be taken - receipts, renewals, charges and invoices.",
+    billing:
+        "What you spent and what is about to be taken - receipts, renewals, charges and invoices.",
     updates: "Deliveries, bookings and statements.",
-    security: "Codes, sign-in links, password notices - and anything else about the safety of an account you have. The codes stop working long before they stop taking up room; the alerts are the ones worth reading first."
+    security:
+        "Codes, sign-in links, password notices - and anything else about the safety of an account you have. The codes stop working long before they stop taking up room; the alerts are the ones worth reading first."
 };
 
 /** What the categoriser reads. Everything is already on the row: no message body
@@ -586,7 +595,8 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // A code in the subject with a word beside it. The subject is where these
     // always are, because the whole point is to be readable without opening it.
     if (SECURITY_WORDS.some((word) => subject.includes(word))) return "security";
-    if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word))) return "security";
+    if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word)))
+        return "security";
     // And anything about the safety of an account rather than a code to type
     // into one: a leaked credential, a suspicious sign-in, a repository with a
     // secret in it. Read from the snippet as well as the subject, because these

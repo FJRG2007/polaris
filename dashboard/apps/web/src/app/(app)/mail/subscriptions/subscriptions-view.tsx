@@ -114,8 +114,9 @@ export function SubscriptionsView({
                                     subscription={one}
                                     mailbox={
                                         accounts.length > 1
-                                            ? (accounts.find((account) => account.id === one.accountId)
-                                                  ?.address ?? "")
+                                            ? (accounts.find(
+                                                  (account) => account.id === one.accountId
+                                              )?.address ?? "")
                                             : ""
                                     }
                                     format={format}
@@ -144,9 +145,7 @@ function Row({
 
     const name = subscription.senderName || subscription.sender;
     const messages =
-        subscription.messageCount === 1
-            ? "1 message"
-            : `${subscription.messageCount} messages`;
+        subscription.messageCount === 1 ? "1 message" : `${subscription.messageCount} messages`;
 
     return (
         <li className="flex flex-wrap items-center gap-3 px-3 py-2.5">
@@ -156,7 +155,10 @@ function Row({
                 className="size-7"
             />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium" title={subscription.sender}>
+                <span
+                    className="block truncate text-[13px] font-medium"
+                    title={subscription.sender}
+                >
                     {name}
                 </span>
                 <span className="block truncate text-[12px] text-foreground-subtle">
