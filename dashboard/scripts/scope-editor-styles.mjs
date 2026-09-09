@@ -77,7 +77,9 @@ function locate(sheet) {
         return join(dashboard, "packages", "genoffice-ui", "src", sheet.slice("@ui/".length));
     }
     if (sheet.startsWith("pkg:")) {
-        return createRequire(join(process.cwd(), "package.json")).resolve(sheet.slice("pkg:".length));
+        return createRequire(join(process.cwd(), "package.json")).resolve(
+            sheet.slice("pkg:".length)
+        );
     }
     return resolve(process.cwd(), sheet);
 }
