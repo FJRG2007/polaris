@@ -18,6 +18,9 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { RelativeTime } from "@/components/relative-time";
 import { useShelfScope } from "@/components/shelf-scope";
+import { asFiles } from "@/components/file-picker/as-files";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
+import type { PickedFile } from "@/components/file-picker/picked-file";
 import type { OfficeDocumentView } from "@/lib/office/documents";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -25,6 +28,7 @@ import {
     FileText,
     Loader2,
     Plus,
+    Upload,
     Presentation,
     Search,
     Star,
@@ -105,6 +109,8 @@ export function OfficeView({
     const [query, setQuery] = useState("");
     const [busy, setBusy] = useState(false);
     const [making, setMaking] = useState<core.OfficeKind | null>(null);
+    const [importing, setImporting] = useState(false);
+    const [reading, setReading] = useState(false);
 
     const load = useCallback(async () => {
         const answer = await listDocumentsAction({ shelf, kind, starredOnly, sort, query });
@@ -139,6 +145,62 @@ export function OfficeView({
         [documents, sharedOnly]
     );
 
+    /**
+     * A file somebody already has, opened as a document.
+     *
+     * The picker is the one every other screen that takes a file uses, so a
+     * spreadsheet sitting in Drive never travels through the browser twice and
+     * "import" means the same thing here as it does in a message.
+     *
+     * One document per file, and a file that cannot be read says so by name
+     * rather than stopping the rest: choosing four and having the third refused
+     * should leave three documents, not none.
+     */
+    const importPicked = useCallback(
+        async (picked: readonly PickedFile[]) => {
+            setImporting(false);
+            if (picked.length === 0) return;
+            setReading(true);
+            try {
+                const { files, failed } = await asFiles(picked);
+                for (const said of failed) toast.show({ title: said });
+
+                let opened: { id: string; kind: core.OfficeKind } | null = null;
+                for (const file of files) {
+                    const form = new FormData();
+                    form.set("file", file);
+                    if (on) form.set("orgId", on);
+                    const answer = await fetch("/api/office/import", { method: "POST", body: form });
+                    const body = (await answer.json().catch(() => null)) as {
+                        id?: string;
+                        kind?: core.OfficeKind;
+                        error?: string;
+                    } | null;
+                    if (!answer.ok || !body?.id || !body.kind) {
+                        toast.show({ title: body?.error ?? `${file.name} could not be opened.` });
+                        continue;
+                    }
+                    opened = { id: body.id, kind: body.kind };
+                }
+
+                if (!opened) return;
+                // Straight into the one that was just made when it is the only
+                // one: somebody importing a file is about to look at it. Several
+                // at once is a list to come back to, so the list is refreshed
+                // and nothing is opened over the top of it.
+                if (files.length === 1) {
+                    router.push(core.officeDocumentPath(opened.kind, opened.id));
+                    return;
+                }
+                toast.show({ title: `${files.length} files opened.` });
+                await load();
+            } finally {
+                setReading(false);
+            }
+        },
+        [load, on, router, toast]
+    );
+
     const act = async (run: () => Promise<{ error?: string }>, said: string): Promise<void> => {
         setBusy(true);
         const answer = await run();
@@ -155,7 +217,9 @@ export function OfficeView({
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader title={title} description={description} />
-                {shelf === "live" ? <NewButton onPick={setMaking} /> : null}
+                {shelf === "live" ? (
+                    <NewButton onPick={setMaking} onImport={() => setImporting(true)} busy={reading} />
+                ) : null}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -207,7 +271,11 @@ export function OfficeView({
                     description={emptyBody(shelf, kind, starredOnly, sharedOnly, query)}
                     action={
                         shelf === "live" && !query && !sharedOnly ? (
-                            <NewButton onPick={setMaking} />
+                            <NewButton
+                                onPick={setMaking}
+                                onImport={() => setImporting(true)}
+                                busy={reading}
+                            />
                         ) : undefined
                     }
                 />
@@ -243,6 +311,14 @@ export function OfficeView({
                     ))}
                 </ul>
             )}
+
+            {importing ? (
+                <FilePickerDialog
+                    title="Open a file as a document"
+                    onPick={(picked) => void importPicked(picked)}
+                    onClose={() => setImporting(false)}
+                />
+            ) : null}
 
             <NewDialog
                 kind={making}
@@ -403,7 +479,17 @@ function Row({
 }
 
 /** The five kinds, offered as one press each rather than a press and a menu. */
-function NewButton({ onPick }: { onPick: (kind: core.OfficeKind) => void }) {
+function NewButton({
+    onPick,
+    onImport,
+    busy
+}: {
+    onPick: (kind: core.OfficeKind) => void;
+    onImport: () => void;
+    /** A file is being read. The row stays put and the one button that started
+     *  it says so, rather than the whole header being replaced by a spinner. */
+    busy: boolean;
+}) {
     return (
         <ScrollRow className="-mx-1 flex items-center gap-2 px-1" aria-label="Make something new">
             {core.OFFICE_KINDS.map((kind) => {
@@ -425,6 +511,16 @@ function NewButton({ onPick }: { onPick: (kind: core.OfficeKind) => void }) {
                     </Button>
                 );
             })}
+            {/* Last, and deliberately: the five above are what somebody makes,
+                this is what they already have. */}
+            <Button size="sm" variant="secondary" disabled={busy} onClick={onImport}>
+                {busy ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                    <Upload className="size-4 shrink-0" aria-hidden />
+                )}
+                Import
+            </Button>
         </ScrollRow>
     );
 }
