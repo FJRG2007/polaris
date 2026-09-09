@@ -9,8 +9,8 @@
  */
 
 import { parseHttpLogs } from "@polaris/deploy";
-import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { EDGE_LOG_RECENT_WINDOW_BYTES, readEdgeLogTail } from "@/lib/edge-access-log";
 import { detectWafAnomalies, type WafAnomaly, type WafAnomalyOptions } from "@polaris/core";
 import { recordWafBan, publishWafIntel, wafTrustedAddresses } from "@/lib/waf-intel-service";
 

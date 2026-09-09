@@ -15,8 +15,8 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, writeFile, stat } from "node:fs/promises";
 import { readEdgeLogTail, trimEdgeLog } from "@/lib/edge-access-log";
+import { mkdtemp, readFile, writeFile, stat } from "node:fs/promises";
 
 /** One log line of a known size, so a fixture's shape is arithmetic rather than
  *  a guess. */
