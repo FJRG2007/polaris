@@ -30,6 +30,38 @@ export interface Relationship {
   targetMode?: string
 }
 
+/**
+ * How much of a package this is willing to unpack.
+ *
+ * `loadAsync` reads the package's index and unpacks nothing; the loop below is
+ * what unpacks it, and what would allocate whatever the index describes. Deflate
+ * reaches roughly a thousand to one, so a file small enough to accept as a
+ * request body can still describe tens of gigabytes of parts - and the process
+ * that dies allocating them is the one serving everybody, not the request that
+ * asked. A real deck at the size limits its callers apply unpacks to a few
+ * hundred megabytes at the very worst, because a deck that size is mostly media
+ * and media does not deflate a second time.
+ *
+ * Both numbers are checked twice over. The declared sizes come first because
+ * they are free and reject the file before a single byte is inflated; the
+ * running total follows because a declared size is only the author's word for
+ * it. An entry that understates itself is caught by JSZip, which compares what
+ * it inflated against what was declared - but only after inflating it, so the
+ * running total is what stops the entry after that one.
+ */
+const MOST_ENTRIES = 8192
+const MOST_UNPACKED_BYTES = 384 * 1024 * 1024
+
+/** The unpacked size an entry declares, off the index JSZip has already read.
+ *  Zero when it is not there: an entry that declares no size is left to the
+ *  running total rather than trusted. */
+function declaredSize(file: JSZip.JSZipObject): number {
+  const held = (file as { _data?: { uncompressedSize?: unknown } })._data
+  return typeof held?.uncompressedSize === 'number' && held.uncompressedSize > 0
+    ? held.uncompressedSize
+    : 0
+}
+
 export class PackageArchive {
   private constructor(
     private readonly zip: JSZip,
@@ -42,11 +74,20 @@ export class PackageArchive {
     const originalHash = createHash('sha256').update(bytes).digest('hex')
     const zip = await JSZip.loadAsync(bytes)
     const entries = new Map<string, Uint8Array>()
-    const names = Object.keys(zip.files)
+    const names = Object.keys(zip.files).filter((name) => !zip.files[name].dir)
+    if (names.length > MOST_ENTRIES)
+      throw new Error(`pptx: package holds more than ${MOST_ENTRIES} parts`)
+    let declared = 0
+    for (const name of names) declared += declaredSize(zip.files[name])
+    if (declared > MOST_UNPACKED_BYTES)
+      throw new Error(`pptx: package declares more than ${MOST_UNPACKED_BYTES} bytes unpacked`)
+    let unpacked = 0
     for (const name of names) {
-      const file = zip.files[name]
-      if (file.dir) continue
-      entries.set(name, await file.async('uint8array'))
+      const part = await zip.files[name].async('uint8array')
+      unpacked += part.byteLength
+      if (unpacked > MOST_UNPACKED_BYTES)
+        throw new Error(`pptx: package unpacks to more than ${MOST_UNPACKED_BYTES} bytes`)
+      entries.set(name, part)
     }
     return new PackageArchive(zip, entries, originalHash)
   }

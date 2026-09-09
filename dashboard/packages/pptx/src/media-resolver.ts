@@ -101,39 +101,73 @@ export function retintThemedSvg(svg: string, opened: OpenedPptx, slidePath?: str
 }
 
 /**
- * A resolver from a slide's media reference to a URL the renderer can draw.
+ * One media cache for a whole package, handing out a resolver per slide.
  *
- * Answers `undefined` for a part that is not in the package, which is a picture
- * the deck references and does not carry - the renderer draws its frame and
- * nothing in it, rather than failing the slide.
+ * A resolver answers `undefined` for a part that is not in the package, which is
+ * a picture the deck references and does not carry - the renderer draws its
+ * frame and nothing in it, rather than failing the slide.
  *
- * Cached per deck: a template's logo is referenced by every page, and decoding
- * it once per reference is the difference between a deck opening and a deck
- * appearing to hang.
+ * **The cache belongs to the package, not to the page.** A template's logo is
+ * referenced by every slide in the deck, and a cache built per slide decodes,
+ * sniffs, scrubs and base64s it again on each one - which on a long deck is the
+ * difference between a deck opening and a deck appearing to hang. Only a themed
+ * SVG depends on which slide asked, because it resolves against that slide's
+ * colour scheme, so only those are keyed by the slide as well; everything else
+ * is the same URL wherever it is referenced and is stored once.
+ */
+export function makeMediaResolvers(
+    opened: OpenedPptx
+): (slidePath?: string) => (mediaRef: string) => string | undefined {
+    /** Media whose URL does not depend on the slide asking for it. */
+    const plain = new Map<string, string | undefined>();
+    /** Themed SVGs, keyed by the slide they were resolved against as well. */
+    const themed = new Map<string, string | undefined>();
+    /** Refs already found to be themed SVGs, so a second reference goes straight
+     *  to `themed` instead of decoding the file again to learn what it is. */
+    const themedRefs = new Set<string>();
+
+    return (slidePath?: string) =>
+        (mediaRef: string): string | undefined => {
+            const themedKey = `${slidePath ?? ""}\u0000${mediaRef}`;
+            if (themedRefs.has(mediaRef)) {
+                if (themed.has(themedKey)) return themed.get(themedKey);
+            } else if (plain.has(mediaRef)) return plain.get(mediaRef);
+
+            const bytes = opened.archive.readBytes(mediaRef);
+            let url: string | undefined;
+            let isThemed = false;
+            if (bytes) {
+                const mime = displayMime(mediaRef, bytes);
+                if (mime === "image/tiff") {
+                    url = undefined;
+                } else if (mime === "image/svg+xml") {
+                    let text = new TextDecoder().decode(bytes);
+                    isThemed = text.includes("MsftOfcThm_");
+                    if (isThemed) text = retintThemedSvg(text, opened, slidePath);
+                    url = `data:${mime};base64,${base64(new TextEncoder().encode(text))}`;
+                } else {
+                    const served = mime === "image/jpeg" ? neutralizeJpegOrientation(bytes) : bytes;
+                    url = `data:${mime};base64,${base64(served)}`;
+                }
+            }
+            if (isThemed) {
+                themedRefs.add(mediaRef);
+                themed.set(themedKey, url);
+            } else plain.set(mediaRef, url);
+            return url;
+        };
+}
+
+/**
+ * A resolver for a single slide.
+ *
+ * Its cache goes no further than the one resolver, so building more than one
+ * slide from the same package must go through `makeMediaResolvers` instead - a
+ * cache per slide is a deck decoding its own logo once per page.
  */
 export function makeMediaResolver(
     opened: OpenedPptx,
     slidePath?: string
 ): (mediaRef: string) => string | undefined {
-    const cache = new Map<string, string | undefined>();
-    return (mediaRef: string): string | undefined => {
-        if (cache.has(mediaRef)) return cache.get(mediaRef);
-        const bytes = opened.archive.readBytes(mediaRef);
-        let url: string | undefined;
-        if (bytes) {
-            const mime = displayMime(mediaRef, bytes);
-            if (mime === "image/tiff") {
-                url = undefined;
-            } else if (mime === "image/svg+xml") {
-                let text = new TextDecoder().decode(bytes);
-                if (text.includes("MsftOfcThm_")) text = retintThemedSvg(text, opened, slidePath);
-                url = `data:${mime};base64,${base64(new TextEncoder().encode(text))}`;
-            } else {
-                const served = mime === "image/jpeg" ? neutralizeJpegOrientation(bytes) : bytes;
-                url = `data:${mime};base64,${base64(served)}`;
-            }
-        }
-        cache.set(mediaRef, url);
-        return url;
-    };
+    return makeMediaResolvers(opened)(slidePath);
 }

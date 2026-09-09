@@ -7,7 +7,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   GroupRenderNode,
-  RenderFill,
   RenderNode,
   RenderSlide,
   ShapeRenderNode,
@@ -51,7 +50,7 @@ import {
   liveRtl,
 } from './TextEditOverlay'
 import { CropOverlay } from './CropOverlay'
-import { createImageLoader } from './image-loader'
+import { collectImageUrls, createImageLoader } from './image-loader'
 import { syncPrivateFonts } from './doc-fonts'
 import { toPickerHex } from './color-input'
 import { InkOverlay } from './InkOverlay'
@@ -2103,25 +2102,7 @@ export function App() {
   // background images/pictures of non-current pages (otherwise unvisited pages' thumbnails are blank).
   useEffect(() => {
     if (slides.length === 0) return
-    const urls = new Set<string>()
-    const addFillUrl = (fill: RenderFill | undefined) => {
-      if (fill && fill.kind === 'image' && fill.dataUrl) urls.add(fill.dataUrl)
-    }
-    const walk = (nodes: readonly RenderNode[]) => {
-      for (const n of nodes) {
-        if (n.type === 'picture' && n.dataUrl) urls.add(n.dataUrl)
-        if ((n.type === 'shape' || n.type === 'text') && n.fill) addFillUrl(n.fill)
-        if (n.type === 'chart') addFillUrl((n as { bgFill?: RenderFill }).bgFill)
-        if (n.type === 'group' && Array.isArray(n.children)) walk(n.children)
-        if (n.type === 'table' && Array.isArray(n.cells)) {
-          for (const c of n.cells) if (c.fill) addFillUrl(c.fill)
-        }
-      }
-    }
-    for (const s of slides) {
-      addFillUrl(s.background)
-      walk(s.nodes)
-    }
+    const urls = collectImageUrls(slides)
     if (!imageLoaderRef.current) {
       imageLoaderRef.current = createImageLoader((entries) => {
         setImages((prev) => {

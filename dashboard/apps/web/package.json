@@ -34,6 +34,7 @@
         "@polaris/hostd-client": "0.1.0",
         "@polaris/messaging": "0.1.0",
         "@polaris/pptx": "*",
+        "@polaris/pptx-render": "*",
         "@polaris/ssh": "0.1.0",
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",

@@ -27,7 +27,7 @@
  * same deck in PowerPoint, and far smaller than the difference this replaces.
  */
 
-import { openPptx, makeMediaResolver } from "@polaris/pptx";
+import { openPptx, makeMediaResolvers } from "@polaris/pptx";
 import { buildRenderSlide, type RenderSlide } from "@polaris/pptx-render";
 
 /** What a deck comes back as: one entry per page, in order. */
@@ -52,15 +52,18 @@ export async function renderPptxDeck(
     fitWidthPx: number = DEFAULT_DECK_WIDTH
 ): Promise<RenderedDeck> {
     const opened = await openPptx(bytes);
+    // One cache for the deck. A template's logo sits on every page, and a cache
+    // built per page decodes, sniffs, scrubs and base64s it again on each one.
+    const media = makeMediaResolvers(opened);
     const slides: RenderSlide[] = [];
     for (const [index, slide] of opened.deck.slides.entries()) {
         slides.push(
             buildRenderSlide(slide, opened.deck.size, {
                 fitWidthPx,
-                // Resolved per page: a themed SVG takes its colours from the
+                // Bound to the page: a themed SVG takes its colours from the
                 // chain of the slide it is on, and two pages can sit on
-                // different layouts.
-                media: makeMediaResolver(opened, slide.path),
+                // different layouts. Everything else the deck carries is shared.
+                media: media(slide.path),
                 // One-based, and it has to be passed: a slide-number field
                 // otherwise draws whatever was cached in the file, which is
                 // stale the moment anybody reorders the deck.

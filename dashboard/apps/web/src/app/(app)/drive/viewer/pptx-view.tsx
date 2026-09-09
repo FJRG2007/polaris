@@ -31,7 +31,7 @@ import { Loading, ViewerError } from "./status";
 import { Button, cn, ScrollRow } from "@polaris/ui";
 import type { RenderSlide } from "@polaris/pptx-render";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** Canvas drawing, so it cannot render on the server and must not be in the
  *  bundle of a screen that never opens a presentation. */
@@ -45,79 +45,84 @@ const SlideThumb = dynamic(
  *  layout: one build serves every size the dialog takes. */
 const BUILD_WIDTH = 1280;
 
+/** What a reader is told when nothing better is known - the bytes never arrived,
+ *  or whatever answered was not this route. */
+const UNREADABLE = "This presentation could not be rendered.";
+
+/** The renderer's own image loader, as the dynamic import below hands it back.
+ *  A type query, so naming it here pulls nothing into this bundle. */
+type ImageLoader = ReturnType<typeof import("@polaris/genoffice-slides/images").createImageLoader>;
+
+/**
+ * Why a build was refused, in the words the route chose.
+ *
+ * The route separates a presentation that is too large from one that could not
+ * be read from a share that is no longer open, and it is the only thing here
+ * that knows which - collapsing all three into one sentence makes an oversized
+ * deck read as a broken viewer. Only a sentence it actually wrote is shown:
+ * anything else answering on that path is not addressed to a reader.
+ */
+async function refusal(answer: Response): Promise<string> {
+    try {
+        const body = (await answer.json()) as { error?: unknown };
+        if (typeof body.error === "string" && body.error.trim() && body.error.length <= 200)
+            return body.error;
+    } catch {
+        // Not JSON, so not this route's answer.
+    }
+    return UNREADABLE;
+}
+
 /**
  * Every image any page refers to, loaded once.
  *
  * The pages arrive with their pictures as `data:` URLs and the canvas needs
- * decoded images, keyed by that same URL. Loaded across the whole deck rather
- * than per page: a template's logo is on every page, and the alternative is
- * decoding it again on each one.
+ * decoded images, keyed by that same URL. Both halves are the renderer's own -
+ * the same walk that finds the URLs and the same loader that decodes them, so a
+ * picture drawn in GenOffice's editor is a picture drawn here. That loader is
+ * what rasterizes an EMF or a WMF, which no browser decodes and which a plain
+ * `Image` would leave as an empty frame, and it is what hands the decoded ones
+ * over in batches rather than leaving a deck blank until the last one settles.
+ *
+ * Loaded across the whole deck rather than per page: a template's logo is on
+ * every page, and the alternative is decoding it again on each one.
  */
 function useDeckImages(slides: readonly RenderSlide[] | null): Map<string, HTMLImageElement> {
     const [images, setImages] = useState<Map<string, HTMLImageElement>>(new Map());
 
-    const wanted = useMemo(() => {
-        const urls = new Set<string>();
-        const fromFill = (fill: unknown): void => {
-            const image = fill as { kind?: string; dataUrl?: string } | undefined;
-            if (image?.kind === "image" && image.dataUrl) urls.add(image.dataUrl);
-        };
-        const walk = (nodes: readonly unknown[]): void => {
-            for (const node of nodes) {
-                const one = node as {
-                    type?: string;
-                    dataUrl?: string;
-                    fill?: unknown;
-                    bgFill?: unknown;
-                    children?: unknown[];
-                    cells?: { fill?: unknown }[];
-                };
-                if (one.type === "picture" && one.dataUrl) urls.add(one.dataUrl);
-                fromFill(one.fill);
-                fromFill(one.bgFill);
-                if (one.children) walk(one.children);
-                for (const cell of one.cells ?? []) fromFill(cell.fill);
-            }
-        };
-        for (const slide of slides ?? []) {
-            fromFill(slide.background);
-            walk(slide.nodes);
-        }
-        return [...urls];
-    }, [slides]);
-
     useEffect(() => {
-        if (wanted.length === 0) return;
-        let alive = true;
-        const loaded = new Map<string, HTMLImageElement>();
-        let waiting = wanted.length;
-        const settle = (): void => {
-            waiting -= 1;
-            if (waiting === 0 && alive) setImages(new Map(loaded));
-        };
-        for (const url of wanted) {
-            const image = new Image();
-            image.onload = () => {
-                loaded.set(url, image);
-                settle();
-            };
-            // A picture the deck names and does not carry, or one in a format
-            // this browser cannot decode. The page draws without it rather than
-            // waiting for it forever.
-            image.onerror = settle;
-            image.src = url;
-        }
+        // A new deck starts with nothing decoded. Without this a deck with no
+        // pictures shows the previous one's, since nothing would replace them.
+        setImages(new Map());
+        let loader: ImageLoader | null = null;
+        let done = false;
+        void (async () => {
+            // Imported here rather than at the top: it carries a metafile
+            // rasterizer, and this module is in the bundle of every file Drive
+            // previews, not only a presentation.
+            const engine = await import("@polaris/genoffice-slides/images");
+            if (done) return;
+            loader = engine.createImageLoader((entries) => {
+                setImages((current) => {
+                    const next = new Map(current);
+                    for (const [url, image] of entries) next.set(url, image);
+                    return next;
+                });
+            });
+            loader.load(engine.collectImageUrls(slides ?? []));
+        })();
         return () => {
-            alive = false;
+            done = true;
+            loader?.dispose();
         };
-    }, [wanted]);
+    }, [slides]);
 
     return images;
 }
 
 export function PptxView({ src, token }: { src: string; token?: string }) {
     const [slides, setSlides] = useState<readonly RenderSlide[] | null>(null);
-    const [failed, setFailed] = useState(false);
+    const [failed, setFailed] = useState<string | null>(null);
     const [index, setIndex] = useState(0);
     const [width, setWidth] = useState(0);
     const frameRef = useRef<HTMLDivElement | null>(null);
@@ -126,9 +131,13 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
     useEffect(() => {
         let alive = true;
         setSlides(null);
-        setFailed(false);
+        setFailed(null);
         setIndex(0);
         void (async () => {
+            // Held aside rather than thrown, so what a reader sees is only ever a
+            // sentence written for them: a dropped connection throws too, and its
+            // message is about sockets.
+            let refused = UNREADABLE;
             try {
                 const file = await fetch(src);
                 if (!file.ok) throw new Error("read failed");
@@ -138,11 +147,14 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
                     method: "POST",
                     body: await file.arrayBuffer()
                 });
-                if (!built.ok) throw new Error("render failed");
+                if (!built.ok) {
+                    refused = await refusal(built);
+                    throw new Error("render failed");
+                }
                 const answer = (await built.json()) as { slides?: RenderSlide[] };
                 if (alive) setSlides(answer.slides ?? []);
             } catch {
-                if (alive) setFailed(true);
+                if (alive) setFailed(refused);
             }
         })();
         return () => {
@@ -175,7 +187,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [slides]);
 
-    if (failed) return <ViewerError>This presentation could not be rendered.</ViewerError>;
+    if (failed) return <ViewerError>{failed}</ViewerError>;
     if (!slides) return <Loading />;
     if (slides.length === 0)
         return <ViewerError>This presentation has no slides.</ViewerError>;
