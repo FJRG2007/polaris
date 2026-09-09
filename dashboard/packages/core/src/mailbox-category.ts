@@ -668,8 +668,6 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // which is where it was before the purchase words were split out, and where
     // somebody looking for what they spent does not want it.
     if (billed) return "billing";
-    if (transactional) return "updates";
-    if (purchased) return "billing";
     if (transactional && !promotional) return "updates";
     if (purchased && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
