@@ -11,6 +11,7 @@
  * be a poor trade.
  */
 
+import { pruneReputation } from "@/lib/reputation";
 import { runWafJails } from "@/lib/waf-ban-service";
 import { runSshJails } from "@/lib/waf-ssh-service";
 import { armPolarisPresets } from "@/lib/waf-service";
@@ -49,7 +50,9 @@ export function startWafSentinel(): void {
     // something, so an already-armed instance pays nothing for this.
     void armPolarisPresets()
         .then((changed) => (changed ? syncDashboardRoute() : undefined))
-        .catch((error: unknown) => console.error("polaris: arming the dashboard's firewall scope failed:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: arming the dashboard's firewall scope failed:", error)
+        );
 
     const tick = async () => {
         try {
@@ -62,6 +65,10 @@ export function startWafSentinel(): void {
                 await refreshWafFeeds();
                 await pruneWafBans();
                 await pruneAddressReputation();
+                // The platform-wide answer cache is swept here too. It is not the
+                // firewall's, but this is the only hourly pass in the process, and
+                // a retention nobody enforces is a table that only grows.
+                await pruneReputation();
             }
             // Republish every tick, not only when a ban is written. The snapshot also
             // carries the accounts Polaris has re-decided - a membership change, a ban,

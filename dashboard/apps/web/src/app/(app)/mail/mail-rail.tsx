@@ -41,6 +41,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
     Archive,
     AlertTriangle,
+    BellOff,
     Bug,
     ChevronDown,
     ChevronRight,
@@ -107,7 +108,11 @@ const MERGED: readonly { label: string; href: string; icon: LucideIcon; role?: s
     { label: "Sent", href: "/mail/sent", icon: SendHorizontal, role: "sent" },
     { label: "Archive", href: "/mail/archive", icon: Archive, role: "archive" },
     { label: "Spam", href: "/mail/junk", icon: Bug, role: "junk" },
-    { label: "Trash", href: "/mail/trash", icon: Trash2, role: "trash" }
+    { label: "Trash", href: "/mail/trash", icon: Trash2, role: "trash" },
+    // Last, and not a folder: it is the one entry here that lists senders rather
+    // than mail. It sits in the rail all the same, because the way out of a
+    // mailing list is only ever found by somebody who went looking for it.
+    { label: "Subscriptions", href: "/mail/subscriptions", icon: BellOff }
 ];
 
 export function MailRail({ onNavigate }: { onNavigate?: () => void }) {

@@ -157,12 +157,27 @@ const dispatcher = new Agent({
     }
 });
 
+/**
+ * A body to send with the request, for the callers that are not reading a page
+ * but telling a server something - the one-click unsubscribe an RFC 8058 sender
+ * publishes is a POST with a form body and nothing else.
+ */
+export interface SentBody {
+    readonly contentType: string;
+    readonly body: string;
+}
+
 /** Fetch, following redirects by hand and re-checking every hop. */
 export async function follow(
     start: URL,
-    accept = "text/html,application/xhtml+xml"
+    accept = "text/html,application/xhtml+xml",
+    sent?: SentBody
 ): Promise<GuardedResponse | null> {
     let url = start;
+    /** Dropped on the redirects that mean "go and GET this instead". A 301, 302
+     *  or 303 answering a POST is every client's cue to stop posting; only 307
+     *  and 308 promise the body may be sent again. */
+    let posting = Boolean(sent);
     for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
         if (!(await reachable(url.hostname))) return null;
 
@@ -185,8 +200,10 @@ export async function follow(
                     // large sites, which is how a YouTube link ended up with no
                     // thumbnail and no channel on the card.
                     "user-agent": "Mozilla/5.0 (compatible; PolarisBot/1.0; +link preview)",
-                    accept
-                }
+                    accept,
+                    ...(posting && sent ? { "content-type": sent.contentType } : {})
+                },
+                ...(posting && sent ? { method: "POST", body: sent.body } : {})
             };
             response = await guardedFetch(url, init);
         } catch {
@@ -197,6 +214,7 @@ export async function follow(
 
         const next = response.headers.get("location");
         if (!next) return response;
+        if (response.status !== 307 && response.status !== 308) posting = false;
         try {
             url = new URL(next, url);
         } catch {

@@ -16,7 +16,11 @@ describe("what the headers promise", () => {
         const found = unsub.unsubscribeFromHeaders({
             "list-unsubscribe": "<mailto:leave@list.example>, <https://list.example/out?id=7>"
         });
-        expect(found).toEqual({ url: "https://list.example/out?id=7", kind: "link", source: "header" });
+        expect(found).toEqual({
+            url: "https://list.example/out?id=7",
+            kind: "link",
+            source: "header"
+        });
     });
 
     it("says when it can be done without opening anything", () => {
@@ -32,7 +36,11 @@ describe("what the headers promise", () => {
             "list-unsubscribe": "<mailto:leave@list.example>",
             "list-unsubscribe-post": "List-Unsubscribe=One-Click"
         });
-        expect(found).toEqual({ url: "mailto:leave@list.example", kind: "mailto", source: "header" });
+        expect(found).toEqual({
+            url: "mailto:leave@list.example",
+            kind: "mailto",
+            source: "header"
+        });
     });
 
     it("has no answer when the sender gave none", () => {
@@ -63,9 +71,9 @@ describe("what a message's own footer says", () => {
     it("does not need the accents to be typed", () => {
         const html = '<a href="https://x.example/a">Cancelar suscripci&oacute;n</a>';
         expect(unsub.unsubscribeInBody(html)?.url).toBe("https://x.example/a");
-        expect(unsub.unsubscribeInBody('<a href="https://y.example">Se d&eacute;sabonner</a>')?.url).toBe(
-            "https://y.example"
-        );
+        expect(
+            unsub.unsubscribeInBody('<a href="https://y.example">Se d&eacute;sabonner</a>')?.url
+        ).toBe("https://y.example");
     });
 
     it("reads the address when neither the link nor the sentence says anything", () => {
@@ -118,7 +126,76 @@ describe("both together", () => {
     });
 
     it("falls to the footer when there is no header", () => {
-        const found = unsub.unsubscribeOffer({}, '<a href="https://body.example/unsubscribe">Unsubscribe</a>');
+        const found = unsub.unsubscribeOffer(
+            {},
+            '<a href="https://body.example/unsubscribe">Unsubscribe</a>'
+        );
         expect(found?.source).toBe("body");
+    });
+});
+
+describe("the message a mailto asks for", () => {
+    it("reads the address, the subject and the body the sender named", () => {
+        expect(
+            unsub.unsubscribeMailto(
+                "mailto:leave-42@list.example?subject=unsubscribe%20list-42&body=confirm"
+            )
+        ).toEqual({
+            address: "leave-42@list.example",
+            subject: "unsubscribe list-42",
+            body: "confirm"
+        });
+    });
+
+    it("falls back to the word these robots read", () => {
+        expect(unsub.unsubscribeMailto("mailto:Leave@List.example")).toEqual({
+            address: "leave@list.example",
+            subject: "unsubscribe",
+            body: "unsubscribe"
+        });
+    });
+
+    it("takes the first of several addresses, which all mean the same thing", () => {
+        expect(unsub.unsubscribeMailto("mailto:a@list.example,b@list.example")?.address).toBe(
+            "a@list.example"
+        );
+    });
+
+    it("survives a malformed escape rather than throwing", () => {
+        // A stray per-cent sign is what a sale newsletter puts in its subject,
+        // and it is not a valid escape. The subject arrives as written instead
+        // of the parse failing.
+        expect(
+            unsub.unsubscribeMailto("mailto:leave@list.example?subject=100%%20off")?.subject
+        ).toBe("100% off");
+    });
+
+    it("keeps a plus in the subject, which is a plus and not a space", () => {
+        // RFC 6068 percent-encodes a mailto's fields and does nothing else with
+        // them, so a `+` is a `+`. Reading it as a form field turns the string
+        // the robot at the other end matches on into a different string, and the
+        // message is sent, accepted and ignored.
+        expect(
+            unsub.unsubscribeMailto("mailto:leave@list.example?subject=unsubscribe+list-42")
+                ?.subject
+        ).toBe("unsubscribe+list-42");
+    });
+
+    it("decodes each field exactly once", () => {
+        // Decoding twice turns an address that legitimately contains `%25` into
+        // one that contains `%`, and a subject that survived the first pass into
+        // whatever the second one makes of it.
+        expect(
+            unsub.unsubscribeMailto("mailto:leave@list.example?subject=100%2520off")?.subject
+        ).toBe("100%20off");
+    });
+
+    it("is nothing for anything that is not a mailto", () => {
+        expect(unsub.unsubscribeMailto("https://list.example/out")).toBeNull();
+        expect(unsub.unsubscribeMailto("mailto:not-an-address")).toBeNull();
+    });
+
+    it("POSTs exactly what RFC 8058 says", () => {
+        expect(unsub.ONE_CLICK_BODY).toBe("List-Unsubscribe=One-Click");
     });
 });

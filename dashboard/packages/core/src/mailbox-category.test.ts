@@ -71,7 +71,9 @@ describe("codes and sign-ins", () => {
         // rest of what is about to be taken - but it is still not a code, which
         // is what this is checking.
         expect(
-            categoriseMail(message({ subject: "Invoice 4471 is ready", fromAddress: "billing@shop.example" }))
+            categoriseMail(
+                message({ subject: "Invoice 4471 is ready", fromAddress: "billing@shop.example" })
+            )
         ).toBe("billing");
     });
 
@@ -96,18 +98,19 @@ describe("the other three", () => {
             "info@mail.notifications.instagram.com",
             "no-reply@discord.com"
         ]) {
-            expect(categoriseMail(message({ subject: "Somebody replied", fromAddress: from })), from).toBe(
-                "social"
-            );
+            expect(
+                categoriseMail(message({ subject: "Somebody replied", fromAddress: from })),
+                from
+            ).toBe("social");
         }
     });
 
     it("does not mistake a domain that merely ends in one", () => {
         // `notfacebook.com` is not Facebook, and a suffix match without the dot
         // would say it was.
-        expect(
-            categoriseMail(message({ subject: "hola", fromAddress: "a@notfacebook.com" }))
-        ).toBe("primary");
+        expect(categoriseMail(message({ subject: "hola", fromAddress: "a@notfacebook.com" }))).toBe(
+            "primary"
+        );
     });
 
     it("knows somebody selling something", () => {
@@ -181,31 +184,51 @@ describe("money that is about to move", () => {
 
     it("catches a card that is about to fail, which is the one nobody wants to miss", () => {
         expect(
-            categoriseMail(message({ subject: "Your card is expiring", fromAddress: "no-reply@example.com" }))
+            categoriseMail(
+                message({ subject: "Your card is expiring", fromAddress: "no-reply@example.com" })
+            )
         ).toBe("billing");
         expect(
-            categoriseMail(message({ subject: "Payment failed for your plan", fromAddress: "no-reply@example.com" }))
+            categoriseMail(
+                message({
+                    subject: "Payment failed for your plan",
+                    fromAddress: "no-reply@example.com"
+                })
+            )
         ).toBe("billing");
         expect(
-            categoriseMail(message({ subject: "Tu prueba gratuita termina mañana", fromAddress: "hi@example.com" }))
+            categoriseMail(
+                message({
+                    subject: "Tu prueba gratuita termina mañana",
+                    fromAddress: "hi@example.com"
+                })
+            )
         ).toBe("billing");
     });
 
     it("takes an invoice, and leaves a receipt where it was", () => {
         // A demand and a record are not the same mail: one is worth reading
         // before the money moves and the other after.
-        expect(categoriseMail(message({ subject: "Invoice 2026-114 is due", fromAddress: "a@b.example" }))).toBe(
-            "billing"
-        );
-        expect(categoriseMail(message({ subject: "Factura de septiembre", fromAddress: "a@b.example" }))).toBe(
-            "billing"
-        );
         expect(
-            categoriseMail(message({ subject: "Your order has shipped", fromAddress: "shop@example.com" }))
+            categoriseMail(
+                message({ subject: "Invoice 2026-114 is due", fromAddress: "a@b.example" })
+            )
+        ).toBe("billing");
+        expect(
+            categoriseMail(
+                message({ subject: "Factura de septiembre", fromAddress: "a@b.example" })
+            )
+        ).toBe("billing");
+        expect(
+            categoriseMail(
+                message({ subject: "Your order has shipped", fromAddress: "shop@example.com" })
+            )
         ).toBe("updates");
-        expect(categoriseMail(message({ subject: "Tu pedido va en reparto", fromAddress: "shop@example.com" }))).toBe(
-            "updates"
-        );
+        expect(
+            categoriseMail(
+                message({ subject: "Tu pedido va en reparto", fromAddress: "shop@example.com" })
+            )
+        ).toBe("updates");
     });
 
     it("wins over the offer wrapped around it", () => {
@@ -267,7 +290,9 @@ describe("what is left", () => {
     it("is where anything unrecognised lands", () => {
         // Deliberate. A promotion in the main list is an annoyance; a colleague
         // behind a tab nobody opens is the feature doing harm.
-        expect(categoriseMail(message({ subject: "???", fromAddress: "x@y.example" }))).toBe("primary");
+        expect(categoriseMail(message({ subject: "???", fromAddress: "x@y.example" }))).toBe(
+            "primary"
+        );
         expect(categoriseMail(message())).toBe("primary");
     });
 });
@@ -295,7 +320,9 @@ describe("mail about the safety of an account", () => {
         // "Action needed" says nothing on its own. What it is about is in the
         // snippet, which is where these are always written.
         expect(
-            categoriseMail(message("Action needed", "Anyone with read access can view exposed secrets."))
+            categoriseMail(
+                message("Action needed", "Anyone with read access can view exposed secrets.")
+            )
         ).toBe("security");
     });
 
@@ -355,5 +382,79 @@ describe("mail about the safety of an account", () => {
 
     it("has nothing to say about ordinary mail", () => {
         expect(isDisposableSecurityMail(message("Lunch on Thursday"))).toBe(false);
+    });
+});
+
+/**
+ * The receipt, and why it was not being recognised.
+ *
+ * A Steam receipt says `Invoice`, `VAT` and `Total` - in its body, which the
+ * categoriser never opens. All it gets is the subject, the snippet, the sender
+ * and the headers, and the line anybody actually sees says "Thank you for your
+ * recent transaction on Steam". Nothing in that is a billing word, so a purchase
+ * landed under Updates beside a parcel and a service notice.
+ *
+ * The lists are written against what a receipt SAYS, not against who sent it -
+ * there is no Steam in here, and adding a shop to Polaris must never mean adding
+ * a line to a list.
+ */
+describe("a purchase, recognised by what it says", () => {
+    const seen = (subject: string, snippet: string, from = "noreply@example.com") =>
+        categoriseMail(message({ subject, snippet, fromAddress: from }));
+
+    it("files the receipt that arrives with nothing but a thank-you", () => {
+        // The real one, from the real address, with the snippet as it arrives.
+        expect(
+            seen(
+                "Thank you for your Steam purchase!",
+                "Hello someone Thank you for your recent transaction on Steam. To view the details, please visit https://store.steampowered.com/email/VATPurchaseReceipt",
+                "noreply@steampowered.com"
+            )
+        ).toBe("billing");
+    });
+
+    it("files one in every language a receipt arrives in", () => {
+        expect(seen("Confirmacion", "Gracias por tu compra")).toBe("billing");
+        expect(seen("Recibo", "Pago recibido")).toBe("billing");
+        expect(seen("Confirmation", "Merci pour votre commande")).toBe("billing");
+        expect(seen("Bestellung", "Zahlung erhalten")).toBe("billing");
+    });
+
+    it("still leaves a parcel where a parcel belongs", () => {
+        // The one place the two lists overlap, and the commonest word in both:
+        // "your order" opens a receipt and a shipping notice alike.
+        expect(seen("Your order has shipped", "It is on its way")).toBe("updates");
+        expect(seen("Tu pedido va en reparto", "Llega hoy")).toBe("updates");
+        expect(seen("Your parcel is out for delivery", "")).toBe("updates");
+    });
+
+    it("keeps a demand ahead of a record", () => {
+        // A bill that has not been paid is still the more urgent of the two, and
+        // it wins even when the message also reads like a receipt.
+        expect(seen("Invoice 2026-114 is due", "Payment received for the previous one")).toBe(
+            "billing"
+        );
+    });
+
+    it("leaves a campaign that mentions one where a campaign belongs", () => {
+        // Splitting the receipt words out of the transactional pile must not
+        // move bulk mail that is plainly selling something: an offer on tickets
+        // is an offer, and a sale that thanks you for a past purchase on its way
+        // to the discount is still a sale.
+        const bulk = (subject: string, snippet: string) =>
+            categoriseMail(
+                message({
+                    subject,
+                    snippet,
+                    fromAddress: "news@shop.example",
+                    headers: { "list-unsubscribe": "<https://shop.example/out>" }
+                })
+            );
+        expect(bulk("Save 30% on your next ticket", "Book now, offer ends Sunday")).toBe(
+            "promotions"
+        );
+        expect(bulk("20% off, just for you", "Thank you for your purchase last month")).toBe(
+            "promotions"
+        );
     });
 });

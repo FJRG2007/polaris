@@ -19,6 +19,7 @@ import {
     MessagesSquare,
     ScanFace,
     Video,
+    Wrench,
     type LucideIcon
 } from "lucide-react";
 
@@ -214,6 +215,30 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             volumes: [{ name: "sessions", mountPath: "/app/.sessions", label: "Channel sessions" }],
             ports: [{ container: 8787, protocol: "http", label: "Bridge API" }]
         }
+    },
+    {
+        // Every small job somebody opens a website for, done here instead. It is
+        // one app rather than a dozen because the jobs share their halves: the
+        // thing that resizes an image is the thing that optimizes it, and both
+        // are one upload away from the one that reads its metadata.
+        //
+        // Installing it runs nothing. The conversions use engines Polaris already
+        // carries for Drive and Office, and the one job that needs something more
+        // - video - brings its own worker the first time somebody uses it, on the
+        // machine they pick, exactly as a camera does for Places. A Polaris where
+        // nobody trims a video never downloads the thing that trims videos.
+        id: "tools",
+        name: "Tools",
+        category: "Tools",
+        icon: Wrench,
+        opensAt: "/tools",
+        summary: "Convert, resize, optimize, trim and translate - without leaving Polaris.",
+        description:
+            "The jobs people open a random website for, and hand somebody else's server their files to do: turning a PDF into a Word document, an image into another format, a spreadsheet into a CSV. Resize and optimize pictures, read what a file actually contains, trim and mute a video, shorten a link, translate a passage. The files stay on your own machine, and nothing is uploaded anywhere it was not already.",
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true
     },
     {
         // One app for every game rather than one per game. Installing it turns the
@@ -931,7 +956,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: "1"
                 }
             ],
-            volumes: [{ name: "config", mountPath: "/config", label: "Server files and resources" }],
+            volumes: [
+                { name: "config", mountPath: "/config", label: "Server files and resources" }
+            ],
             // One number, two transports: a FiveM client speaks both to the same
             // port and an address carries only the one. Published onto the port the
             // image binds inside, which its own config writes before Polaris can

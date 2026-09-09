@@ -39,6 +39,8 @@ export const PERMISSIONS = [
     "home.read",
     "home.control",
     "home.manage",
+    "tools.use",
+    "tools.manage",
     "tasks.read",
     "tasks.manage",
     "inbox.read",
@@ -116,6 +118,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // network - the same reason registering a server was raised to an
         // administrative grant. Watching the house and pointing a camera are
         // everyday things; deciding what Polaris connects to is not.
+        "tools.use",
+        // And deliberately not "tools.manage", for the same shape of reason: a
+        // converter is somebody's own business, while a short link is a public
+        // address this Polaris answers for as long as it exists.
         "tasks.read",
         "tasks.manage",
         "inbox.read",
@@ -224,6 +230,11 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // look at where it already points, and neither is silencing an alert.
     "home.control": { area: "Home", label: "Move cameras and act on alerts" },
     "home.manage": { area: "Home", label: "Add cameras, and set how they detect and record" },
+    "tools.use": { area: "Tools", label: "Use the tools: convert, resize, translate" },
+    // A short link is a public address this Polaris answers, and it outlives the
+    // person who made it. Using a converter is nobody's business but theirs;
+    // publishing a link is.
+    "tools.manage": { area: "Tools", label: "Create short links and see who followed them" },
     "tasks.read": { area: "Tasks", label: "See spaces, lists and tasks" },
     "tasks.manage": { area: "Tasks", label: "Create and change tasks" },
     "inbox.read": { area: "Inbox", label: "Read conversations" },

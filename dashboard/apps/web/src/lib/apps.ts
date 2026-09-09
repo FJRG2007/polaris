@@ -86,6 +86,7 @@ import {
     Video,
     Webhook,
     Workflow,
+    Wrench,
     type LucideIcon
 } from "lucide-react";
 
@@ -215,6 +216,25 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/places",
         permission: "home.read",
         requiresApp: "home"
+    },
+    {
+        /**
+         * The odd jobs, and the reason they are one app: somebody who has just
+         * resized a picture is one click from optimizing it, and both are the
+         * same upload as reading what is inside it. Split across a dozen entries
+         * they would be a dozen things nobody remembers are here.
+         *
+         * Only present once somebody installs it, like Places - a Polaris that
+         * converts nothing should not carry a menu entry for converting things.
+         */
+        id: "tools",
+        label: "Tools",
+        description:
+            "Convert, resize, optimize, trim and translate - the small jobs, on your own machine",
+        icon: Wrench,
+        href: "/tools",
+        permission: "tools.use",
+        requiresApp: "tools"
     },
     {
         id: "tasks",

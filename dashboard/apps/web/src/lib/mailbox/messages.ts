@@ -29,6 +29,7 @@ import * as core from "@polaris/core";
 import { readShape } from "./structure";
 import { decodePart, unflow } from "./decode";
 import { catchUpFolder, refreshThreads } from "./sync";
+import { recordSubscription } from "./subscriptions";
 import type { ImapFlow } from "imapflow";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 
@@ -620,7 +621,13 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
             accountId: true,
             bodyText: true,
             bodyHtml: true,
-            folder: { select: { path: true } }
+            // For the subscription registry below, which can only read a footer
+            // once there is a body to read.
+            headers: true,
+            fromJson: true,
+            listId: true,
+            sentAt: true,
+            folder: { select: { path: true, role: true } }
         }
     });
     if (!message) throw new MailAccessError("That message is not yours.");
@@ -662,6 +669,22 @@ export async function loadBody(userId: string, messageId: string): Promise<MailB
         where: { id: message.id },
         data: { bodyText: body.text, bodyHtml: body.html }
     });
+
+    // The one moment a message's footer can be read. Plenty of mail that is
+    // unmistakably a mailing list publishes no `List-Unsubscribe` header at all,
+    // and its only way out is a link in a sentence - which is not on the row
+    // until now. Counted as nothing: this is mail being opened, not arriving.
+    if (message.folder.role !== "sent" && message.folder.role !== "drafts") {
+        await recordSubscription(message.accountId, {
+            from: addressesFrom(message.fromJson),
+            headers: (message.headers as Record<string, string> | null) ?? null,
+            html: body.html,
+            text: body.text,
+            listId: message.listId,
+            at: message.sentAt,
+            counts: false
+        });
+    }
     return body;
 }
 

@@ -27,6 +27,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { addressesFrom } from "./json";
+import { senderReputation } from "./sender-reputation";
 import { findFolderForRole } from "./folder-roles";
 
 /** What a message needs to say about itself to be judged. Everything is already
@@ -116,6 +117,13 @@ function identitiesOf(
  * Four small indexed reads. Worth saying out loud because this runs on every
  * arriving message and a filter that costs a second per message is a filter that
  * makes syncing feel broken.
+ *
+ * Alongside them, what the outside says about the sender - the one thing here
+ * that is not this mailbox's own memory. It is read in the same pass so it costs
+ * no extra wait, it answers from the platform's cache whenever it can, and it
+ * answers nothing at all when no provider is configured, which is the normal
+ * case. It can never fail the judgement: a provider that is slow, out of quota
+ * or broken leaves the filter with exactly what it had before.
  */
 async function knowledgeFor(
     accountId: string,
@@ -126,7 +134,7 @@ async function knowledgeFor(
     const identities = identitiesOf(message, fingerprint);
     const tokens = core.tokensOf(message);
 
-    const [contact, trusted, reputationRows, tokenRows, totals] = await Promise.all([
+    const [contact, trusted, reputationRows, tokenRows, totals, outside] = await Promise.all([
         sender
             ? prisma.mailContact.findUnique({
                   where: { accountId_address: { accountId, address: sender } },
@@ -153,7 +161,15 @@ async function knowledgeFor(
             by: ["verdict"],
             where: { accountId },
             _count: { _all: true }
-        })
+        }),
+        sender
+            ? senderReputation(sender).catch((caught: unknown) => {
+                  // Nothing outside this mailbox is allowed to decide whether a
+                  // message gets judged at all.
+                  console.error(caught);
+                  return [];
+              })
+            : Promise.resolve([])
     ]);
 
     const counts = new Map<string, core.TokenCounts>(tokenRows.map((row) => [row.token, row]));
@@ -179,7 +195,8 @@ async function knowledgeFor(
             junkCount: row.junkCount,
             goodCount: row.goodCount
         })),
-        contentScore: core.contentScore(tokens, counts, taught)
+        contentScore: core.contentScore(tokens, counts, taught),
+        outside
     };
 }
 
@@ -247,10 +264,7 @@ export async function judgeArrival(accountId: string, messageId: string): Promis
  * Nothing settles either - the sync that calls this reads Junk later in the same
  * pass and rebuilds the conversations when the folder is through.
  */
-export async function fileJudgedJunk(
-    userId: string,
-    messageIds: readonly string[]
-): Promise<void> {
+export async function fileJudgedJunk(userId: string, messageIds: readonly string[]): Promise<void> {
     if (messageIds.length === 0) return;
     try {
         // Imported here because that module reads this one back for its

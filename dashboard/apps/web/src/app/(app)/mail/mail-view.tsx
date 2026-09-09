@@ -30,6 +30,7 @@ import { MAIL_SHORTCUTS, useMailKeys } from "./use-mail-keys";
 import { useMail } from "./mail-shell";
 import { ThreadView } from "./thread-view";
 import { SenderFace } from "./sender-face";
+import { UnsubscribeButton } from "./unsubscribe-button";
 import { MailSearch } from "./mail-search";
 import * as core from "@polaris/core";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -81,7 +82,6 @@ import {
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import {
     Archive,
-    BellOff,
     Bug,
     Check,
     Clock,
@@ -1243,8 +1243,7 @@ export function MailView({
                                         // row it was opened on. The same rule a
                                         // drag from a row already follows.
                                         selection={
-                                            selected.length > 1 &&
-                                            selected.includes(thread.id)
+                                            selected.length > 1 && selected.includes(thread.id)
                                                 ? selectedMessageIds
                                                 : null
                                         }
@@ -2084,11 +2083,17 @@ function ThreadRow({
                     a list that shivers as you read down it. */}
                 <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center pr-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 sm:flex">
                     <div className="pointer-events-auto flex items-center gap-0.5 rounded-md border border-border bg-surface px-0.5 py-0.5 shadow-sm">
-                        {thread.unsubscribe ? (
-                            <RowAction
-                                icon={BellOff}
+                        {thread.unsubscribe && thread.unsubscribeKind ? (
+                            <UnsubscribeButton
+                                iconOnly
                                 label={`Stop these emails from ${people(thread, mine)}`}
-                                href={thread.unsubscribe}
+                                target={{
+                                    kind: thread.unsubscribeKind,
+                                    url: thread.unsubscribe,
+                                    source: thread.unsubscribeSource || "header",
+                                    sender: people(thread, mine),
+                                    messageId: thread.leadMessageId
+                                }}
                             />
                         ) : null}
                         {canArchive ? (

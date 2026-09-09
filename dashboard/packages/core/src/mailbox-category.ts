@@ -52,9 +52,16 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 2;
+export const MAIL_CATEGORY_VERSION = 3;
 
-export const MAIL_CATEGORIES = ["primary", "social", "promotions", "billing", "updates", "security"] as const;
+export const MAIL_CATEGORIES = [
+    "primary",
+    "social",
+    "promotions",
+    "billing",
+    "updates",
+    "security"
+] as const;
 
 export type MailCategory = (typeof MAIL_CATEGORIES)[number];
 
@@ -62,7 +69,7 @@ export const MAIL_CATEGORY_LABELS: Readonly<Record<MailCategory, string>> = {
     primary: "Primary",
     social: "Social",
     promotions: "Promotions",
-    billing: "Subscriptions and bills",
+    billing: "Purchases and bills",
     updates: "Updates",
     security: "Security"
 };
@@ -71,9 +78,11 @@ export const MAIL_CATEGORY_NOTES: Readonly<Record<MailCategory, string>> = {
     primary: "People writing to you, and anything Polaris could not place.",
     social: "What the services you use say about other people.",
     promotions: "Offers, newsletters, and anything else selling something.",
-    billing: "Renewals, charges and invoices - what is about to be taken, while there is still time to do something about it.",
-    updates: "Receipts, orders, deliveries and statements.",
-    security: "Codes, sign-in links, password notices - and anything else about the safety of an account you have. The codes stop working long before they stop taking up room; the alerts are the ones worth reading first."
+    billing:
+        "What you spent and what is about to be taken - receipts, renewals, charges and invoices.",
+    updates: "Deliveries, bookings and statements.",
+    security:
+        "Codes, sign-in links, password notices - and anything else about the safety of an account you have. The codes stop working long before they stop taking up room; the alerts are the ones worth reading first."
 };
 
 /** What the categoriser reads. Everything is already on the row: no message body
@@ -473,40 +482,97 @@ const BILLING_WORDS: readonly string[] = [
     "fattura"
 ];
 
-/** Words that mean a transaction happened. */
-const UPDATE_WORDS: readonly string[] = [
+/**
+ * Words that mean money already changed hands.
+ *
+ * Split out of the transactional pile because of what a person is doing when
+ * they come looking: "what did I spend" and "what am I about to spend" are one
+ * question asked twice, and answering it used to mean opening two tabs and
+ * knowing which of them a receipt had been filed under. A delivery is not that
+ * question, so it stayed behind.
+ *
+ * These are matched against the subject and the snippet, which is everything the
+ * categoriser gets - it never opens the body. That is why "invoice" and "total"
+ * are not enough on their own and this list exists: a Steam receipt says
+ * `Invoice`, `VAT` and `Total` in its body and, in the line anybody sees, only
+ * "Thank you for your recent transaction". Written against what a receipt says
+ * where it can be read, rather than against who sent it.
+ */
+const PURCHASE_WORDS: readonly string[] = [
+    // English
     "receipt",
+    "your receipt",
+    "receipt for",
     "your order",
     "order confirmation",
     "order #",
+    "your purchase",
+    "recent purchase",
+    "recent transaction",
+    "your transaction",
+    "thank you for your order",
+    "thank you for your purchase",
+    "payment received",
+    "payment confirmation",
+    "we received your payment",
+    "you paid",
+    "purchase confirmation",
+    "refund",
+    // Spanish
+    "recibo",
+    "tu pedido",
+    "pedido",
+    "tu compra",
+    "gracias por tu compra",
+    "gracias por su compra",
+    "confirmacion de pedido",
+    "confirmacion de compra",
+    "pago recibido",
+    "reembolso",
+    // Portuguese
+    "encomenda",
+    "pagamento",
+    "sua compra",
+    "obrigado pela sua compra",
+    // French
+    "commande",
+    "votre achat",
+    "merci pour votre commande",
+    "paiement recu",
+    // German
+    "bestellung",
+    "ihr einkauf",
+    "zahlung erhalten",
+    // Italian
+    "ordine",
+    "il tuo acquisto",
+    "pagamento ricevuto"
+];
+
+/**
+ * Words that mean something is on its way, or that a record was issued.
+ *
+ * What is left of the transactional pile once money has been taken out of it: a
+ * parcel, a booking, a statement. Nobody replies to these either, but none of
+ * them is an answer to "what did I spend".
+ */
+const UPDATE_WORDS: readonly string[] = [
     "shipped",
     "out for delivery",
     "delivered",
     "tracking",
-    "payment",
     "statement",
     "your booking",
     "itinerary",
     "ticket",
-    "refund",
-    "recibo",
-    "tu pedido",
-    "pedido",
     "enviado",
     "en reparto",
     "entregado",
     "seguimiento",
-    "pago",
-    "reembolso",
     "tu reserva",
     "en aduanas",
-    "encomenda",
-    "pagamento",
-    "commande",
     "livraison",
-    "bestellung",
     "lieferung",
-    "ordine",
     "spedizione"
 ];
 
@@ -529,7 +595,8 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     // A code in the subject with a word beside it. The subject is where these
     // always are, because the whole point is to be readable without opening it.
     if (SECURITY_WORDS.some((word) => subject.includes(word))) return "security";
-    if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word))) return "security";
+    if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word)))
+        return "security";
     // And anything about the safety of an account rather than a code to type
     // into one: a leaked credential, a suspicious sign-in, a repository with a
     // secret in it. Read from the snippet as well as the subject, because these
@@ -553,16 +620,30 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     const promotional = PROMOTION_WORDS.some((word) => words.includes(word));
     const transactional = UPDATE_WORDS.some((word) => words.includes(word));
     const billed = BILLING_WORDS.some((word) => words.includes(word));
+    // Money that already moved. Asked AFTER the parcel, because the two lists
+    // overlap on exactly one word and it is the commonest one: "your order" and
+    // "tu pedido" open a receipt and a shipping notice alike, and "your order
+    // has shipped" is a parcel however it starts.
+    const purchased = PURCHASE_WORDS.some((word) => words.includes(word));
 
     // Money about to move comes before everything except a code, and before the
     // word that is selling something: half of these arrive dressed as an offer -
     // "your plan renews, and here is 20% off the annual one" - and the half a
     // reader needs is the renewal.
+    //
+    // Everything under it is asked twice: once for the messages that are only
+    // transactional, and again at the bottom for the ones that are also selling
+    // something. Between the two sits the offer, so a campaign that mentions a
+    // ticket or a receipt on its way to selling a ticket stays in Promotions -
+    // which is where it was before the purchase words were split out, and where
+    // somebody looking for what they spent does not want it.
     if (billed) return "billing";
     if (transactional && !promotional) return "updates";
+    if (purchased && !promotional) return "billing";
     if (bulk && promotional) return "promotions";
     if (bulk) return "updates";
     if (transactional) return "updates";
+    if (purchased) return "billing";
 
     // Not bulk, nothing recognised - somebody wrote this.
     return "primary";

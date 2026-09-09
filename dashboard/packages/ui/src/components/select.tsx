@@ -62,12 +62,13 @@ export const SelectContent = forwardRef<
                 // The menu starts at the trigger's width but is allowed to grow
                 // past it: a narrow trigger must not clip the option it names.
                 // Capped to the viewport so a long option cannot push it off screen.
-                position === "popper" && "min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]",
+                position === "popper" &&
+                    "min-w-[--radix-select-trigger-width] max-w-[calc(100vw-2rem)]",
                 className
             )}
             {...props}
         >
-            <RadixSelect.Viewport className="max-h-72 overflow-y-auto p-1">
+            <RadixSelect.Viewport className="max-h-72 overflow-y-auto overscroll-contain p-1">
                 {children}
             </RadixSelect.Viewport>
         </RadixSelect.Content>
