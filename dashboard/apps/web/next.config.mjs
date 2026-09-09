@@ -110,6 +110,12 @@ const nextConfig = {
             ".js": [".ts", ".tsx", ".js"],
             ".jsx": [".tsx", ".jsx"]
         };
+        // The canvas library the presentation viewer draws with can also run
+        // outside a browser, and asks for Node's `canvas` package when it does.
+        // Nothing here ever takes that path - the drawing happens in a tab - and
+        // the package is a native build nobody should be compiling to serve a
+        // .pptx. Resolved to nothing so the optional require stays optional.
+        config.resolve.alias = { ...config.resolve.alias, canvas: false };
         return config;
     }
 };

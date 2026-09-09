@@ -27,7 +27,6 @@ COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
-COPY apps/web/package.json ./apps/web/
 COPY services/edge-guard/package.json ./services/edge-guard/
 # Plain `npm ci`, no BuildKit cache mount: an update builds this on the operator's
 # own machine, and `docker compose` falls back to the classic builder wherever the

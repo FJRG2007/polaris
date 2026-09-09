@@ -27,7 +27,6 @@ COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
-COPY apps/web/package.json ./apps/web/
 COPY services/edge-guard/package.json ./services/edge-guard/
 COPY services/messaging-bridge/package.json ./services/messaging-bridge/
 # The bridge pulls Puppeteer transitively; skip its Chromium download (the runner

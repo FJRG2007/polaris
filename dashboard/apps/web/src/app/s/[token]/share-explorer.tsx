@@ -1198,6 +1198,7 @@ export function ShareExplorer({
                 target={viewerTarget}
                 onOpenChange={(open) => !open && setViewerTarget(null)}
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
+                token={token}
                 readOnly
             />
         </div>

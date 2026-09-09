@@ -311,6 +311,9 @@ export {
   type TableStylePreset,
 } from './table-edit'
 export { listMasterParts, parseMasterPart, type MasterPartInfo } from './master-edit'
+export { displayMime, sniffImageMime } from './media-mime'
+export { neutralizeJpegOrientation } from './jpeg-orientation'
+export { makeMediaResolver, retintThemedSvg } from './media-resolver'
 
 // The following functions are implemented in this file and exposed directly via
 // export function (see below): editPictureSrcRect, setSlideBackground,
