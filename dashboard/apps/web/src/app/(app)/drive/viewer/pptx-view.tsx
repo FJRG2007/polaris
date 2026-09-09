@@ -189,8 +189,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
 
     if (failed) return <ViewerError>{failed}</ViewerError>;
     if (!slides) return <Loading />;
-    if (slides.length === 0)
-        return <ViewerError>This presentation has no slides.</ViewerError>;
+    if (slides.length === 0) return <ViewerError>This presentation has no slides.</ViewerError>;
 
     const slide = slides[Math.min(index, slides.length - 1)]!;
 

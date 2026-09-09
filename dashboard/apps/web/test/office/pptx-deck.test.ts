@@ -84,6 +84,8 @@ describe("reading a PowerPoint file", () => {
     it("refuses a file that is not a presentation, rather than answering an empty deck", async () => {
         // An empty deck and an unreadable file look identical on screen, and only
         // one of them is worth telling somebody about.
-        await expect(renderPptxDeck(new TextEncoder().encode("this is not a pptx"))).rejects.toThrow();
+        await expect(
+            renderPptxDeck(new TextEncoder().encode("this is not a pptx"))
+        ).rejects.toThrow();
     });
 });

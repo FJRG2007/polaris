@@ -84,7 +84,8 @@ export async function POST(request: Request): Promise<Response> {
     const token = url.searchParams.get("t");
     if (token) {
         const gate = await gateShareRequest(token, "slides.render");
-        if (!gate.ok) return NextResponse.json({ error: "Not available." }, { status: gate.status });
+        if (!gate.ok)
+            return NextResponse.json({ error: "Not available." }, { status: gate.status });
     } else if (!(await guardedUser())) {
         return NextResponse.json({ error: "Not signed in." }, { status: 401 });
     }
@@ -112,6 +113,9 @@ export async function POST(request: Request): Promise<Response> {
         // What went wrong is a detail of a file format, and naming it tells a
         // reader nothing they can act on. The screen says the presentation could
         // not be read.
-        return NextResponse.json({ error: "This presentation could not be read." }, { status: 422 });
+        return NextResponse.json(
+            { error: "This presentation could not be read." },
+            { status: 422 }
+        );
     }
 }

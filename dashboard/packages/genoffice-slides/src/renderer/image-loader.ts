@@ -14,8 +14,8 @@
  * The walk that finds those urls lives here too, so every surface that draws a
  * RenderSlide collects the same set.
  */
-import { metafileToDataUrl } from '@polaris/docx/metafile'
-import type { RenderFill, RenderNode, RenderSlide } from '@polaris/pptx-render'
+import { metafileToDataUrl } from "@polaris/docx/metafile";
+import type { RenderFill, RenderNode, RenderSlide } from "@polaris/pptx-render";
 
 /**
  * Every image URL a deck draws, in one place.
@@ -28,47 +28,47 @@ import type { RenderFill, RenderNode, RenderSlide } from '@polaris/pptx-render'
  * NodeBody, ChartBody or SlideThumb; adding one there means adding it here.
  */
 export function collectImageUrls(slides: readonly RenderSlide[]): Set<string> {
-  const urls = new Set<string>()
-  const fromFill = (fill: RenderFill | undefined) => {
-    if (fill && fill.kind === 'image' && fill.dataUrl) urls.add(fill.dataUrl)
-  }
-  const walk = (nodes: readonly RenderNode[]) => {
-    for (const n of nodes) {
-      switch (n.type) {
-        case 'picture':
-          if (n.dataUrl) urls.add(n.dataUrl)
-          fromFill(n.fill)
-          break
-        case 'shape':
-        case 'text':
-          fromFill(n.fill)
-          fromFill(n.fillOverlay)
-          break
-        case 'chart':
-          fromFill(n.bgFill)
-          fromFill(n.plotRect?.fill)
-          break
-        case 'table':
-          fromFill(n.bgFill)
-          for (const c of n.cells) fromFill(c.fill)
-          break
-        case 'group':
-          walk(n.children)
-          break
-      }
+    const urls = new Set<string>();
+    const fromFill = (fill: RenderFill | undefined) => {
+        if (fill && fill.kind === "image" && fill.dataUrl) urls.add(fill.dataUrl);
+    };
+    const walk = (nodes: readonly RenderNode[]) => {
+        for (const n of nodes) {
+            switch (n.type) {
+                case "picture":
+                    if (n.dataUrl) urls.add(n.dataUrl);
+                    fromFill(n.fill);
+                    break;
+                case "shape":
+                case "text":
+                    fromFill(n.fill);
+                    fromFill(n.fillOverlay);
+                    break;
+                case "chart":
+                    fromFill(n.bgFill);
+                    fromFill(n.plotRect?.fill);
+                    break;
+                case "table":
+                    fromFill(n.bgFill);
+                    for (const c of n.cells) fromFill(c.fill);
+                    break;
+                case "group":
+                    walk(n.children);
+                    break;
+            }
+        }
+    };
+    for (const s of slides) {
+        fromFill(s.background);
+        walk(s.nodes);
     }
-  }
-  for (const s of slides) {
-    fromFill(s.background)
-    walk(s.nodes)
-  }
-  return urls
+    return urls;
 }
 
-export type ApplyImages = (entries: ReadonlyArray<readonly [string, HTMLImageElement]>) => void
+export type ApplyImages = (entries: ReadonlyArray<readonly [string, HTMLImageElement]>) => void;
 
 /** EMF/WMF data URLs: browsers cannot decode metafiles — rasterize to PNG first (keyed by the original url). */
-const METAFILE_RE = /^data:(image\/x-(?:emf|wmf)|image\/(?:emf|wmf));base64,/
+const METAFILE_RE = /^data:(image\/x-(?:emf|wmf)|image\/(?:emf|wmf));base64,/;
 
 /**
  * Metafile text draws through canvas fonts, so the Office-private FontFaces (DFonts/cloud/
@@ -77,81 +77,82 @@ const METAFILE_RE = /^data:(image\/x-(?:emf|wmf)|image\/(?:emf|wmf));base64,/
  * Meiryo UI came out in the browser's default sans). `false` = a sync is in flight.
  */
 function waitForDocFonts(timeoutMs = 4000): Promise<void> {
-  if (typeof window === 'undefined' || window.__genofficeDocFontsSynced !== false)
-    return Promise.resolve()
-  return new Promise((resolve) => {
-    const started = Date.now()
-    const tick = () => {
-      if (window.__genofficeDocFontsSynced !== false || Date.now() - started >= timeoutMs) resolve()
-      else setTimeout(tick, 50)
-    }
-    setTimeout(tick, 50)
-  })
+    if (typeof window === "undefined" || window.__genofficeDocFontsSynced !== false)
+        return Promise.resolve();
+    return new Promise((resolve) => {
+        const started = Date.now();
+        const tick = () => {
+            if (window.__genofficeDocFontsSynced !== false || Date.now() - started >= timeoutMs)
+                resolve();
+            else setTimeout(tick, 50);
+        };
+        setTimeout(tick, 50);
+    });
 }
 
 async function rasterizeMetafile(url: string): Promise<string | null> {
-  const m = METAFILE_RE.exec(url)
-  if (!m) return null
-  await waitForDocFonts()
-  const b64 = url.slice(url.indexOf(',') + 1)
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  const mime = m[1]!.includes('emf') ? 'image/x-emf' : 'image/x-wmf'
-  return metafileToDataUrl(bytes, mime)
+    const m = METAFILE_RE.exec(url);
+    if (!m) return null;
+    await waitForDocFonts();
+    const b64 = url.slice(url.indexOf(",") + 1);
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const mime = m[1]!.includes("emf") ? "image/x-emf" : "image/x-wmf";
+    return metafileToDataUrl(bytes, mime);
 }
 
 export function createImageLoader(apply: ApplyImages, batchSize = 16, delayMs = 100) {
-  const loaded = new Map<string, HTMLImageElement>()
-  const loading = new Set<string>()
-  const buf = new Map<string, HTMLImageElement>()
-  let timer: ReturnType<typeof setTimeout> | null = null
-  let disposed = false
+    const loaded = new Map<string, HTMLImageElement>();
+    const loading = new Set<string>();
+    const buf = new Map<string, HTMLImageElement>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
 
-  const flush = () => {
-    if (timer) {
-      clearTimeout(timer)
-      timer = null
-    }
-    if (disposed || buf.size === 0) return
-    const entries = [...buf]
-    buf.clear()
-    apply(entries)
-  }
+    const flush = () => {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        if (disposed || buf.size === 0) return;
+        const entries = [...buf];
+        buf.clear();
+        apply(entries);
+    };
 
-  return {
-    load(urls: Iterable<string>) {
-      for (const u of urls) {
-        if (loaded.has(u) || loading.has(u)) continue
-        loading.add(u)
-        const img = new Image()
-        const done = (ok: boolean) => {
-          loading.delete(u)
-          if (ok) {
-            loaded.set(u, img)
-            if (!disposed) buf.set(u, img)
-          }
-          if (buf.size >= batchSize || loading.size === 0) flush()
-          else if (!timer && buf.size > 0) timer = setTimeout(flush, delayMs)
+    return {
+        load(urls: Iterable<string>) {
+            for (const u of urls) {
+                if (loaded.has(u) || loading.has(u)) continue;
+                loading.add(u);
+                const img = new Image();
+                const done = (ok: boolean) => {
+                    loading.delete(u);
+                    if (ok) {
+                        loaded.set(u, img);
+                        if (!disposed) buf.set(u, img);
+                    }
+                    if (buf.size >= batchSize || loading.size === 0) flush();
+                    else if (!timer && buf.size > 0) timer = setTimeout(flush, delayMs);
+                };
+                img.onload = () => done(true);
+                img.onerror = () => done(false);
+                if (METAFILE_RE.test(u)) {
+                    void rasterizeMetafile(u)
+                        .then((png) => {
+                            if (png) img.src = png;
+                            else done(false);
+                        })
+                        .catch(() => done(false));
+                } else {
+                    img.src = u;
+                }
+            }
+        },
+        // Only guards setState after unmount; in-flight loads keep filling `loaded`
+        dispose() {
+            disposed = true;
+            if (timer) clearTimeout(timer);
         }
-        img.onload = () => done(true)
-        img.onerror = () => done(false)
-        if (METAFILE_RE.test(u)) {
-          void rasterizeMetafile(u)
-            .then((png) => {
-              if (png) img.src = png
-              else done(false)
-            })
-            .catch(() => done(false))
-        } else {
-          img.src = u
-        }
-      }
-    },
-    // Only guards setState after unmount; in-flight loads keep filling `loaded`
-    dispose() {
-      disposed = true
-      if (timer) clearTimeout(timer)
-    },
-  }
+    };
 }

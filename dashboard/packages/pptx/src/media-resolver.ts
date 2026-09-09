@@ -95,7 +95,10 @@ export function retintThemedSvg(svg: string, opened: OpenedPptx, slidePath?: str
             const color = scheme ? resolveSchemeColor(scheme, theme) : undefined;
             if (!color) return rule;
             const property = kind === "Stroke" ? "stroke" : "fill";
-            return rule.replace(new RegExp(`${property}\\s*:\\s*[^;}]+`, "g"), `${property}:${color}`);
+            return rule.replace(
+                new RegExp(`${property}\\s*:\\s*[^;}]+`, "g"),
+                `${property}:${color}`
+            );
         }
     );
 }

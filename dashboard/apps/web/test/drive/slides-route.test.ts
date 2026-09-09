@@ -90,7 +90,9 @@ describe("posting a presentation to be built", () => {
     });
 
     it("says a file it could not parse could not be read", async () => {
-        renderPptxDeck.mockRejectedValueOnce(new Error("pptx: package unpacks to more than X bytes"));
+        renderPptxDeck.mockRejectedValueOnce(
+            new Error("pptx: package unpacks to more than X bytes")
+        );
         const answer = await route.POST(post(new Uint8Array([1, 2, 3])));
         expect(answer.status).toBe(422);
         // The reason is a detail of a file format; what leaves is a sentence.
