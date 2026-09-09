@@ -86,7 +86,9 @@ export async function currentWafAnomalies(now = Date.now()): Promise<WafAnomaly[
  * findings when the operator has asked for that, and reports how many it saw either
  * way so the tick can say something useful.
  */
-export async function runWafAnomalies(now = Date.now()): Promise<{ found: number; banned: number }> {
+export async function runWafAnomalies(
+    now = Date.now()
+): Promise<{ found: number; banned: number }> {
     const settings = await getWafAnomalySettings();
     if (!settings.enabled) return { found: 0, banned: 0 };
     const anomalies = await currentWafAnomalies(now);

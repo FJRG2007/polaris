@@ -2150,7 +2150,9 @@ async function telemetryEnv(environmentId: string): Promise<Record<string, strin
             where: { id: environmentId },
             select: {
                 name: true,
-                project: { select: { id: true, name: true, slug: true, ownerId: true, orgId: true } }
+                project: {
+                    select: { id: true, name: true, slug: true, ownerId: true, orgId: true }
+                }
             }
         });
         if (!environment) return {};

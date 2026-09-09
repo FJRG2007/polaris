@@ -34,7 +34,9 @@ const JAILS_KEY = "waf.jails";
 export async function getWafJails(): Promise<WafJail[]> {
     const raw = await getSetting(JAILS_KEY);
     const saved = parseJson<Partial<WafJail>[]>(raw) ?? [];
-    const byId = new Map(saved.filter((jail) => typeof jail?.id === "string").map((jail) => [jail.id, jail]));
+    const byId = new Map(
+        saved.filter((jail) => typeof jail?.id === "string").map((jail) => [jail.id, jail])
+    );
     return DEFAULT_WAF_JAILS.map((jail) => {
         const override = byId.get(jail.id);
         if (!override) return jail;
@@ -50,7 +52,10 @@ export async function getWafJails(): Promise<WafJail[]> {
 
 /** The fields an operator owns. The label and the description belong to the release,
  *  so they are neither stored nor accepted back. */
-export type WafJailSettings = Pick<WafJail, "id" | "enabled" | "maxRetry" | "findTimeSec" | "banTimeSec">;
+export type WafJailSettings = Pick<
+    WafJail,
+    "id" | "enabled" | "maxRetry" | "findTimeSec" | "banTimeSec"
+>;
 
 /** Save the jail settings. */
 export async function setWafJails(jails: readonly WafJailSettings[]): Promise<void> {
@@ -98,7 +103,10 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         // to that. The jails that name an exploit or a credential store are
         // unmoved and do not appear here.
         const sparing = verdicts.filter((verdict) => !jailBansSignedIn(verdict.jail));
-        const members = sparing.length > 0 ? await addressesSignedIn(sparing.map((v) => v.ip)) : new Set<string>();
+        const members =
+            sparing.length > 0
+                ? await addressesSignedIn(sparing.map((v) => v.ip))
+                : new Set<string>();
 
         let banned = 0;
         for (const verdict of verdicts) {
@@ -132,7 +140,10 @@ export async function runWafJails(now = Date.now()): Promise<{ scanned: number; 
         // is describing what happened to the instance.
         return { scanned: entries.length, banned };
     } catch (caught) {
-        console.error("polaris: the firewall jail pass failed:", caught instanceof Error ? caught.message : caught);
+        console.error(
+            "polaris: the firewall jail pass failed:",
+            caught instanceof Error ? caught.message : caught
+        );
         return { scanned: 0, banned: 0 };
     }
 }
